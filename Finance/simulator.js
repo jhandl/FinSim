@@ -1,156 +1,5 @@
-// Expanded Tax System Simulation in JavaScript
-
-// Step 1: Define comprehensive tax rules for multiple countries
-const taxRules = {
-  "Germany": {
-    "incomeTaxes": [
-      {
-        name: "Income Tax",
-        type: "bracket",
-        brackets: [
-          {"rate": 0.14, "from": 0, "to": 10000},
-          {"rate": 0.3, "from": 10001, "to": 50000},
-          {"rate": 0.42, "from": 50001, "to": 200000},
-          {"rate": 0.45, "from": 200001, "to": null}
-        ]
-      }
-    ],
-    "wealthTax": {"rate": 0.01, "threshold": 1000000},
-    "capitalGainsTax": {
-      "indexFunds": 0.25,
-      "etfs": 0.25,
-      "investmentTrusts": 0.28,
-      "individualShares": 0.3,
-      "bonds": 0.15
-    },
-    "pensionContribution": {
-      type: "fixedRate",
-      employeeRate: 0.09,
-      employerRate: 0.09
-    }
-  },
-  "USA": {
-    "incomeTaxes": [
-      {
-        name: "Federal Income Tax",
-        type: "bracket",
-        brackets: [
-          {"rate": 0.1, "from": 0, "to": 9950},
-          {"rate": 0.12, "from": 9951, "to": 40525},
-          {"rate": 0.22, "from": 40526, "to": 86375},
-          {"rate": 0.24, "from": 86376, "to": 164925},
-          {"rate": 0.32, "from": 164926, "to": 209425},
-          {"rate": 0.35, "from": 209426, "to": 523600},
-          {"rate": 0.37, "from": 523601, "to": null}
-        ]
-      },
-      {
-        name: "Social Security Tax",
-        type: "flatRate",
-        rate: 0.062,
-        threshold: 0
-      },
-      {
-        name: "Medicare Tax",
-        type: "flatRate",
-        rate: 0.0145,
-        threshold: 0
-      }
-    ],
-    "capitalGainsTax": {
-      "indexFunds": 0.2,
-      "etfs": 0.2,
-      "investmentTrusts": 0.22,
-      "individualShares": 0.25,
-      "bonds": 0.15
-    },
-    "pensionContribution": {
-      type: "fixedRate",
-      employeeRate: 0.062,
-      employerRate: 0.062
-    }
-  },
-  "France": {
-    "incomeTaxes": [
-      {
-        name: "Income Tax",
-        type: "bracket",
-        brackets: [
-          {"rate": 0, "from": 0, "to": 10225},
-          {"rate": 0.11, "from": 10226, "to": 26070},
-          {"rate": 0.3, "from": 26071, "to": 74545},
-          {"rate": 0.41, "from": 74546, "to": 160336},
-          {"rate": 0.45, "from": 160337, "to": null}
-        ]
-      },
-      {
-        name: "General Social Contribution",
-        type: "flatRate",
-        rate: 0.092,
-        threshold: 0
-      }
-    ],
-    "wealthTax": {"rate": 0.015, "threshold": 1300000},
-    "capitalGainsTax": {
-      "indexFunds": 0.3,
-      "etfs": 0.3,
-      "investmentTrusts": 0.32,
-      "individualShares": 0.35,
-      "bonds": 0.2
-    },
-    "pensionContribution": {
-      type: "fixedRate",
-      employeeRate: 0.082,
-      employerRate: 0.172
-    }
-  },
-  "Ireland": {
-    "incomeTaxes": [
-      {
-        "name": "Income Tax",
-        "type": "bracket",
-        "brackets": [
-          {"rate": 0.20, "from": 0, "to": 36800},
-          {"rate": 0.40, "from": 36801, "to": null}
-        ]
-      },
-      {
-        "name": "Universal Social Charge",
-        "type": "bracket",
-        "brackets": [
-          {"rate": 0.005, "from": 0, "to": 12012},
-          {"rate": 0.02, "from": 12013, "to": 21295},
-          {"rate": 0.045, "from": 21296, "to": 70044},
-          {"rate": 0.08, "from": 70045, "to": null}
-        ]
-      },
-      {
-        "name": "Pay Related Social Insurance",
-        "type": "flatRate",
-        "rate": 0.04,
-        "threshold": 18304
-      }
-    ],
-    "capitalGainsTax": {
-      "indexFunds": 0.33,
-      "etfs": 0.33,
-      "investmentTrusts": 0.33,
-      "individualShares": 0.33,
-      "bonds": 0.33
-    },
-    "pensionContribution": {
-      type: "ageBasedPercentage",
-      rates: [
-        { maxAge: 29, rate: 0.15 },
-        { maxAge: 39, rate: 0.20 },
-        { maxAge: 49, rate: 0.25 },
-        { maxAge: 59, rate: 0.30 },
-        { maxAge: Infinity, rate: 0.35 }
-      ],
-      annualCap: 115000
-    }
-  }
-};
+const fs = require('fs');
+const path = require('path');
 
 // Step 2: Define Investment Instruments
 const financialParameters = {
@@ -165,12 +14,30 @@ const financialParameters = {
 
 // Step 3: Define Tax System Class
 class TaxSystem {
-  constructor(taxRules, financialParameters) {
-    this.taxRules = taxRules;
+  constructor(financialParameters) {
+    this.taxRules = {};
     this.financialParameters = financialParameters;
   }
 
+  async loadCountryRules(country) {
+    if (!this.taxRules[country]) {
+      try {
+        const response = await fetch(`taxRules/${country}.json`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        this.taxRules[country] = await response.json();
+      } catch (error) {
+        console.error(`Error loading tax rules for ${country}:`, error);
+        return false;
+      }
+    }
+    return true;
+  }
+
   calculateIncomeTaxes(income, country) {
+    if (!this.loadCountryRules(country)) return [];
+
     const incomeTaxes = this.taxRules[country].incomeTaxes;
     if (!incomeTaxes) return [];
 
@@ -191,14 +58,30 @@ class TaxSystem {
   }
 
   calculateWealthTax(wealth, country) {
-    const wealthTaxRule = this.taxRules[country].wealthTax;
-    if (wealthTaxRule && wealth > wealthTaxRule.threshold) {
-      return wealth * wealthTaxRule.rate;
+    if (!this.loadCountryRules(country)) return 0;
+
+    const wealthTaxRule = this.taxRules[country].personalAssetsTax || this.taxRules[country].wealthTax;
+    if (!wealthTaxRule) return 0;
+
+    if (wealthTaxRule.type === 'bracket') {
+      let tax = 0;
+      for (const bracket of wealthTaxRule.brackets) {
+        if (wealth > bracket.from) {
+          const taxableAmount = Math.min(wealth - bracket.from, (bracket.to || Infinity) - bracket.from);
+          tax += taxableAmount * bracket.rate;
+        }
+        if (bracket.to && wealth <= bracket.to) break;
+      }
+      return tax;
+    } else {
+      // Existing flat rate calculation
+      return wealth > wealthTaxRule.threshold ? (wealth - wealthTaxRule.threshold) * wealthTaxRule.rate : 0;
     }
-    return 0;
   }
 
   calculatePensionContribution(income, country, age) {
+    if (!this.loadCountryRules(country)) return 0;
+
     const pensionRule = this.taxRules[country].pensionContribution;
     
     switch (pensionRule.type) {
@@ -219,6 +102,8 @@ class TaxSystem {
   }
 
   calculateCapitalGainsTax(investments, country) {
+    if (!this.loadCountryRules(country)) return 0;
+
     const capitalGainsRule = this.taxRules[country].capitalGainsTax;
     let totalCapitalGainsTax = 0;
 
@@ -259,7 +144,7 @@ class TaxSystem {
     return pensionPot * rate;
   }
 
-  simulateScenario(profile) {
+  async simulateScenario(profile) {
     const results = [];
     let remainingWealth = profile.initialWealth;
     let investments = profile.initialInvestments.map(inv => ({ ...inv }));
@@ -287,6 +172,12 @@ class TaxSystem {
         if (lifeEvent.event === 'move') {
           country = lifeEvent.newCountry;
         }
+      }
+
+      // Ensure country rules are loaded before calculations
+      if (!(await this.loadCountryRules(country))) {
+        console.error(`Failed to load tax rules for ${country}. Skipping year ${year}.`);
+        continue;
       }
 
       // Calculate yearly investment returns
@@ -370,7 +261,7 @@ const userProfile = {
 };
 
 // Step 5: Run the Simulation
-const taxSystem = new TaxSystem(taxRules, financialParameters);
+const taxSystem = new TaxSystem(financialParameters);
 const results = taxSystem.simulateScenario(userProfile);
 console.log(results);
 
@@ -388,3 +279,58 @@ results.forEach(result => {
   console.log(`  Expenses: €${result.expenses.toFixed(2)}`);
   console.log(`  Remaining Wealth: €${result.remainingWealth.toFixed(2)}`);
 });
+
+document.getElementById('simulationForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const userProfile = {
+        birthYear: parseInt(document.getElementById('birthYear').value),
+        initialWealth: parseFloat(document.getElementById('initialWealth').value),
+        initialPensionPot: parseFloat(document.getElementById('initialPensionPot').value),
+        initialInvestments: [
+            { type: 'indexFunds', amount: 50000 },
+            { type: 'individualShares', amount: 30000 }
+        ],
+        initialCountry: document.getElementById('initialCountry').value,
+        targetYear: parseInt(document.getElementById('targetYear').value),
+        lifeEvents: [
+            {
+                year: 2025,
+                income: 80000,
+                expenses: 42000,
+                event: 'move',
+                newCountry: 'USA'
+            },
+            {
+                year: 2030,
+                event: 'retire'
+            }
+        ]
+    };
+
+    const taxSystem = new TaxSystem(financialParameters);
+    const results = await taxSystem.simulateScenario(userProfile);
+
+    displayResults(results);
+});
+
+function displayResults(results) {
+    const resultsDiv = document.getElementById('results');
+    resultsDiv.innerHTML = '<h2>Simulation Results</h2>';
+
+    results.forEach(result => {
+        resultsDiv.innerHTML += `
+            <h3>Year: ${result.year}, Country: ${result.country}</h3>
+            <ul>
+                ${result.incomeTaxes.map(tax => `<li>${tax.name}: €${tax.amount.toFixed(2)}</li>`).join('')}
+                <li>Wealth Tax: €${result.wealthTax.toFixed(2)}</li>
+                <li>Pension Income: €${result.pensionIncome.toFixed(2)}</li>
+                <li>Capital Gains Tax: €${result.capitalGainsTax.toFixed(2)}</li>
+                <li>Total Tax: €${result.totalTax.toFixed(2)}</li>
+                <li>Net Income: €${result.netIncome.toFixed(2)}</li>
+                <li>Expenses: €${result.expenses.toFixed(2)}</li>
+                <li>Remaining Wealth: €${result.remainingWealth.toFixed(2)}</li>
+            </ul>
+        `;
+    });
+}
