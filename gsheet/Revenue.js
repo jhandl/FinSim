@@ -7,7 +7,7 @@ class Revenue {
   declareSalaryIncome(amount, pensionContribRate) {
     this.income += amount;
     this.pensionContribAmount += pensionContribRate * amount;
-    this.pensionContribRelief += pensionContribRate * Math.min(amount, adjust_(config.pensionContribEarningLimit, inflation));
+    this.pensionContribRelief += pensionContribRate * Math.min(amount, adjust_(config.pensionContribEarningLimit));
     this.salaries.push(amount);
     this.salaries.sort((a,b) => a-b); // sort lower to higher
     if (this.salaries.length > 1) this.people = 2;
@@ -55,7 +55,7 @@ class Revenue {
   netIncome() {
     this.computeTaxes();
     let gross = this.income - this.pensionContribAmount + this.privatePension + this.statePension + this.investmentIncome + this.nonEuShares;
-    let taxCredit = (age < 65) ? 0 : adjust_(this.people * config.ageTaxCredit, inflation);
+    let taxCredit = (age < 65) ? 0 : adjust_(this.people * config.ageTaxCredit);
     let tax = Math.max(this.it + this.prsi + this.usc + this.cgt - taxCredit, 0);
     return gross - tax;
   }
@@ -86,7 +86,7 @@ class Revenue {
     //       and anything above the last limit is taxed at the lat rate. 
     // The limits have to be in ascending order.
     const adjustedBands = Object.fromEntries(Object.entries(bands)
-                            .map(([k, v]) => [String(adjust_(parseInt(k)*multiplier,inflation)), v]));
+                            .map(([k, v]) => [String(adjust_(parseInt(k)*multiplier)), v]));
     return Object.keys(adjustedBands)
       .map((lowerLimit, index, arr) => {
           const upperLimit = arr[index + 1] || Infinity;
@@ -100,15 +100,15 @@ class Revenue {
   computeIT() {
     // standard income
     let taxable = this.income + this.privatePension + this.nonEuShares - this.pensionContribRelief;
-    let limit = adjust_(incomeTaxBracket + (this.people > 1 ? Math.min(config.itMaxMarriedBandIncrease, this.salaries[0]) : 0), inflation);
+    let limit = adjust_(params.incomeTaxBracket + (this.people > 1 ? Math.min(config.itMaxMarriedBandIncrease, this.salaries[0]) : 0));
     let tax = config.itLowerBandRate * Math.min(taxable, limit) 
             + config.itHigherBandRate * Math.max(taxable - limit, 0);
     if (this.privatePensionLumpSumCount > 0) {
       tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, this.privatePensionLumpSum, this.privatePensionLumpSumCount);
     }
-    let credit = adjust_(personalTaxCredit + this.salaries.length * config.itEmployeeTaxCredit, inflation);
+    let credit = adjust_(params.personalTaxCredit + this.salaries.length * config.itEmployeeTaxCredit);
     let exemption = this.people * config.itExemptionLimit;
-    if ((age < config.itExemptionAge) || (taxable > adjust_(exemption, inflation)) || (this.privatePensionLumpSumCount > 0)) {
+    if ((age < config.itExemptionAge) || (taxable > adjust_(exemption)) || (this.privatePensionLumpSumCount > 0)) {
       this.it = Math.max(tax - credit, 0);
     } else {
       this.it = 0;
@@ -130,8 +130,8 @@ class Revenue {
     for (let income of this.salaries) {
       let taxable = income + extraIncome;
       extraIncome = 0;
-      let exempt = adjust_(config.uscExemptAmount, inflation);
-      let exceed = adjust_(config.uscReducedRateMaxIncome, inflation);
+      let exempt = adjust_(config.uscExemptAmount);
+      let exceed = adjust_(config.uscReducedRateMaxIncome);
       let tax = 0;
       if (taxable > exempt) {
         if (age >= config.uscRaducedRateAge && taxable <= exceed) {
@@ -146,7 +146,7 @@ class Revenue {
 
   computeCGT() {
     let tax = 0;
-    let taxable = -adjust_(config.cgtTaxRelief, inflation); // capital gains tax relief
+    let taxable = -adjust_(config.cgtTaxRelief); // capital gains tax relief
     // go through the gains from the highest taxed to the least taxed, so that the credit has more impact
     for (let [taxRate, gains] of Object.entries(this.gains).sort((a,b) => b[0].localeCompare(a[0]))) {
       taxable += gains;

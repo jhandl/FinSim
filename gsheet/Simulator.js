@@ -1,13 +1,13 @@
-var config, age, year, phase, inflation, periods, row, success;
+var config, params, spreadsheet, dataTab, statusCell, dataSheet, events, errors;
+var age, year, phase, periods, row, success;
 var revenue, realEstate, stockGrowthOverride;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var incomeStatePension, incomePrivatePension, incomeEtfRent, incomeTrustRent, withdrawalRate;
-var cash, etf, trust, pension, dataSheet, statusCell;
+var cash, etf, trust, pension;
 var Events, Year, Age, IncomeSalaries, IncomeRSUs, IncomeRentals, IncomePrivatePension;
 var IncomeStatePension, IncomeEtfRent, IncomeTrustRent, IncomeCash, IT, PRSI, USC, CGT;
 var NetIncome, Expenses, Savings, PensionContribution, Cash, RealEstateCapital, EtfCapital;
 var TrustCapital, PensionFund, Worth;
- 
 
 const Phases = {
   growth: 'growth',
@@ -15,175 +15,15 @@ const Phases = {
   retired: 'retired'
 }
 
+
 function run() {
 
-  config = new Config();
-  revenue = new Revenue();
+  if (!initializeSimulator()) return;
 
-  let spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  let datasheet = spreadsheet.getSheetByName("Data");
-
-  statusCell = spreadsheet.getRangeByName("Progress").getCell(1, 1);
-  statusCell.setBackground("#E0E0E0")
-  statusCell.setValue("Initializing");
-  SpreadsheetApp.flush();
-
-  let startingAge = spreadsheet.getRangeByName("StartingAge").getValue();
-  let targetAge = spreadsheet.getRangeByName("TargetAge").getValue();
-  let initialSavings = spreadsheet.getRangeByName("InitialSavings").getValue();
-  let initialPension = spreadsheet.getRangeByName("InitialPension").getValue();
-  let initialETFs = spreadsheet.getRangeByName("InitialETFs").getValue();
-  let initialTrusts = spreadsheet.getRangeByName("InitialTrusts").getValue();
-
-  let retirementAge = spreadsheet.getRangeByName("RetirementAge").getValue();
-  let emergencyStash = spreadsheet.getRangeByName("EmergencyStash").getValue();
-  let pensionPercentage = spreadsheet.getRangeByName("PensionContributionPercentage").getValue();
-  let pensionCapped = (spreadsheet.getRangeByName("PensionContributionCapped").getValue() === "Yes");
-  let statePensionWeekly = spreadsheet.getRangeByName("StatePensionWeekly").getValue();
-
-  let growthRatePension = spreadsheet.getRangeByName("PensionGrowthRate").getValue();
-  let growthDevPension = spreadsheet.getRangeByName("PensionGrowthStdDev").getValue();
-  let growthRateETF = spreadsheet.getRangeByName("EtfGrowthRate").getValue();
-  let growthDevETF = spreadsheet.getRangeByName("EtfGrowthStdDev").getValue();
-  let growthRateTrust = spreadsheet.getRangeByName("TrustGrowthRate").getValue();
-  let growthDevTrust = spreadsheet.getRangeByName("TrustGrowthStdDev").getValue();
-  inflation = spreadsheet.getRangeByName("Inflation").getValue();
-
-  let etfAllocation = spreadsheet.getRangeByName("EtfAllocation").getValue();
-  let trustAllocation = spreadsheet.getRangeByName("TrustAllocation").getValue();
-
-  let priorityCash = spreadsheet.getRangeByName("Priorities").getCell(1, 2).getValue();
-  let priorityPension = spreadsheet.getRangeByName("Priorities").getCell(2, 2).getValue();
-  let priorityEtf = spreadsheet.getRangeByName("Priorities").getCell(3, 2).getValue();
-  let priorityTrust = spreadsheet.getRangeByName("Priorities").getCell(4, 2).getValue();
-
-  incomeTaxBracket = spreadsheet.getRangeByName("IncomeTaxBracket").getValue();
-  personalTaxCredit = spreadsheet.getRangeByName("PersonalTaxCredit").getValue();
-
-  let simulationRuns = 5000;
-
-  let errors = false;
-  spreadsheet.getRangeByName("Parameters").setBackground("#ffffff");
-  spreadsheet.getRangeByName("Parameters").clearNote();
-
-  if (retirementAge < config.minOccupationalPensionRetirementAge) {
-    spreadsheet.getRangeByName("RetirementAge").setNote("Warning: Only occupational pension schemes allow retirement before age 60.");
-  }
-  if (retirementAge < config.minPrivatePensionRetirementAge) {
-    spreadsheet.getRangeByName("RetirementAge").setNote("Warning: Private pensions don't normally allow retirement before age 50.");
-  }
-
-  if (etfAllocation + trustAllocation > 1) {
-    spreadsheet.getRangeByName("EtfAllocation").setBackground("#ffe066");
-    spreadsheet.getRangeByName("TrustAllocation").setBackground("#ffe066");
-    spreadsheet.getRangeByName("EtfAllocation").setNote("ETF + Trust allocations can't exceed 100%");
-    errors = true;
-  }
-
-  Events = spreadsheet.getRangeByName("Events");
-  Year = spreadsheet.getRangeByName("Year");
-  Age = spreadsheet.getRangeByName("Age");
-  IncomeSalaries = spreadsheet.getRangeByName("Salary");
-  IncomeRSUs = spreadsheet.getRangeByName("RSUs");
-  IncomeRentals = spreadsheet.getRangeByName("Rental");
-  IncomePrivatePension = spreadsheet.getRangeByName("PrivatePension");
-  IncomeStatePension = spreadsheet.getRangeByName("StatePension");
-  IncomeEtfRent = spreadsheet.getRangeByName("EtfRent");
-  IncomeTrustRent = spreadsheet.getRangeByName("TrustRent");
-  IncomeCash = spreadsheet.getRangeByName("IncomeCash");
-  IT = spreadsheet.getRangeByName("IT");
-  PRSI = spreadsheet.getRangeByName("PRSI");
-  USC = spreadsheet.getRangeByName("USC");
-  CGT = spreadsheet.getRangeByName("CGT");
-  NetIncome = spreadsheet.getRangeByName("NetIncome");
-  Expenses = spreadsheet.getRangeByName("Expenses");
-  Savings = spreadsheet.getRangeByName("Savings");
-  PensionContribution = spreadsheet.getRangeByName("PensionContribution");
-  WithdrawalRate = spreadsheet.getRangeByName("WithdrawalRate");
-  Cash = spreadsheet.getRangeByName("Cash");
-  RealEstateCapital = spreadsheet.getRangeByName("RealEstate");
-  EtfCapital = spreadsheet.getRangeByName("EtfCapital");
-  TrustCapital = spreadsheet.getRangeByName("TrustCapital");
-  PensionFund = spreadsheet.getRangeByName("PensionFund");
-  Worth = spreadsheet.getRangeByName("Worth");
-
-  // Read events from the parameters sheet
-  let events = [];
-  Events.setBackground("#ffffff")
-  Events.clearNote();
-  for (let i = 1; i <= Events.getHeight(); i++) {
-    let name = Events.getCell(i, 1).getValue();
-    let pos = name.indexOf(":");
-    if (pos < 0) {
-      if (name === "") break;
-      Events.getCell(i, 1).setNote("Invalid event format: missing colon.");
-      Events.getCell(i, 1).setBackground("#ffe066");
-      errors = true;
-      break;
-    }
-    let type = name.substr(0, pos);
-    let valid = { "NOP": "Non-operation: way to make the simulation ignore an event without needing to remove the line", "RI": "Rental Income", "SI": "Salary Income (with private pension contribution if so defined)", "SInp": "Salary Income (no private pension contribution)", "UI": "RSU Income", "DBI" : "Defined Benefit Pension Income", "FI" : "Tax-free Income", "E": "Expense", "R": "Real Estate", "M": "Mortgage", "SM": "Stock Market" };
-    if (!valid.hasOwnProperty(type)) {
-      Events.getCell(i, 1).setNote("Invalid event type. Valid types are: " + Object.keys(valid).map(key => { return key + " (" + valid[key] + ")" }).join(", "));
-      Events.getCell(i, 1).setBackground("#ffe066");
-      errors = true;
-      break;
-    }
-    let id = name.substr(pos + 1);
-    let amount = Events.getCell(i, 2).isBlank() ? 0 : Events.getCell(i, 2).getValue();
-    let fromAge = Events.getCell(i, 3).isBlank() ? 0 : Events.getCell(i, 3).getValue();
-    let toAge = Events.getCell(i, 4).isBlank() ? 999 : Events.getCell(i, 4).getValue();
-    let rate = Events.getCell(i, 5).isBlank() ? undefined : Events.getCell(i, 5).getValue();
-    let extra = Events.getCell(i, 6).isBlank() ? 0 : Events.getCell(i, 6).getValue();
-    events.push(new Event(type, id, amount, fromAge, toAge, rate, extra));
-  }
-
-  // Validate that mortgage events have their corresponding purchase event
-  for (let m = 0; m < events.length; m++) {
-    if (events[m].type === 'M') {
-      let found = false;
-      for (let p = 0; p < events.length; p++) {
-        if (events[p].type === 'R' && events[p].id === events[m].id) {
-          found = true;
-          if (events[p].fromAge !== events[m].fromAge) {
-            Events.getCell(m + 1, 3).setNote("The mortgage (M) and purchase (R) events for a property should have the same starting age.");
-            Events.getCell(m + 1, 3).setBackground("#ffe066");
-            Events.getCell(p + 1, 3).setBackground("#ffe066");
-            errors = true;
-            continue;
-          }
-          if (events[m].toAge > events[p].toAge) {
-            Events.getCell(m + 1, 4).setNote("The mortgage should not continure after the property is sold.");
-            Events.getCell(m + 1, 4).setBackground("#ffe066");
-            Events.getCell(p + 1, 4).setBackground("#ffe066");
-            errors = true;
-            continue;
-          }
-        }
-      }
-      if (!found) {
-        Events.getCell(m + 1, 1).setNote("Couldn't find a purchase (R) event for the property '" + events[m].id + "'.");
-        Events.getCell(m + 1, 1).setBackground("#ffe066");
-        errors = true;
-        continue;
-      }
-    }
-  }
-
-  if (errors) {
-    statusCell.setValue("Check errors");
-    statusCell.setBackground("#ffe066");
-    return;
-  }
-
-
-  dataSheet = [];
-
-  let montecarlo = (growthDevPension > 0 || growthDevETF > 0 || growthDevTrust > 0);
-  let runs = (montecarlo ? simulationRuns : 1);
+  let montecarlo = (params.growthDevPension > 0 || params.growthDevETF > 0 || params.growthDevTrust > 0);
+  let runs = (montecarlo ? config.simulationRuns : 1);
   let successes = 0;
   let failedAt = 0;
-
 
   statusCell.setValue("Running");
   SpreadsheetApp.flush();
@@ -193,12 +33,12 @@ function run() {
     // console.log("========= Run: "+run+" =========");
 
     revenue.reset();
-    pension = new Pension(growthRatePension, growthDevPension);
-    etf = new ETF(growthRateETF, growthDevETF);
-    trust = new InvestmentTrust(growthRateTrust, growthDevTrust);
-    if (initialPension > 0) pension.buy(initialPension);
-    if (initialETFs > 0) etf.buy(initialETFs);
-    if (initialTrusts > 0) trust.buy(initialTrusts);
+    pension = new Pension(params.growthRatePension, params.growthDevPension);
+    etf = new ETF(params.growthRateETF, params.growthDevETF);
+    trust = new InvestmentTrust(params.growthRateTrust, params.growthDevTrust);
+    if (params.initialPension > 0) pension.buy(params.initialPension);
+    if (params.initialETFs > 0) etf.buy(params.initialETFs);
+    if (params.initialTrusts > 0) trust.buy(params.initialTrusts);
 
     periods = 0;
     success = true;
@@ -211,7 +51,7 @@ function run() {
       let event = events[i];
       switch (event.type) {
         case 'R':
-          if (event.fromAge < startingAge) {
+          if (event.fromAge < params.startingAge) {
             props.set(event.id,
               {
                 "fromAge": event.fromAge,
@@ -220,7 +60,7 @@ function run() {
           }
           break;
         case 'M':
-          if (event.fromAge < startingAge) {
+          if (event.fromAge < params.startingAge) {
             props.set(event.id,
               {
                 "fromAge": event.fromAge,
@@ -235,17 +75,17 @@ function run() {
 
     // let years go by, repaying mortgage, until the starting age
     for (let [id, data] of props) {
-      for (let y = data.fromAge; y < startingAge; y++) {
+      for (let y = data.fromAge; y < params.startingAge; y++) {
         data.property.addYear();
       }
     }
 
     // Initialize first row
 
-    age = startingAge - 1;
+    age = params.startingAge - 1;
     year = new Date().getFullYear() - 1;
     phase = Phases.growth;
-    cash = initialSavings;
+    cash = params.initialSavings;
     failedAt = 0
     row = 0;
 
@@ -281,7 +121,7 @@ function run() {
 
       // Private Pension
 
-      if (age === retirementAge) {
+      if (age === params.retirementAge) {
         cash += pension.getLumpsum();
         phase = Phases.lumpSum;
       }
@@ -292,9 +132,9 @@ function run() {
 
       // State Pension
       if (age >= config.statePensionQualifyingAge) {
-        incomeStatePension = 52 * adjust_(statePensionWeekly, inflation);
+        incomeStatePension = 52 * adjust_(params.statePensionWeekly);
         if (age >= config.statePensionIncreaseAge) {
-          incomeStatePension += 52 * adjust_(config.statePensionIncreaseAmount, inflation);
+          incomeStatePension += 52 * adjust_(config.statePensionIncreaseAmount);
         }
       }
       revenue.declareStatePensionIncome(incomeStatePension);
@@ -318,9 +158,9 @@ function run() {
           case 'SI': // Salary income (with private pension contribution if so defined)
             if (age >= event.fromAge && age <= event.toAge && amount > 0) {
               incomeSalaries += amount;
-              let contribRate = pensionPercentage * ((age < 30) ? 0.15 : (age < 40) ? 0.20 : (age < 50) ? 0.25 : (age < 55) ? 0.30 : (age < 60) ? 0.35 : 0.40);
-              if (pensionCapped && (amount > adjust_(config.pensionContribEarningLimit, inflation))) {
-                contribRate = contribRate * adjust_(config.pensionContribEarningLimit, inflation) / amount;
+              let contribRate = params.pensionPercentage * ((age < 30) ? 0.15 : (age < 40) ? 0.20 : (age < 50) ? 0.25 : (age < 55) ? 0.30 : (age < 60) ? 0.35 : 0.40);
+              if (params.pensionCapped && (amount > adjust_(config.pensionContribEarningLimit))) {
+                contribRate = contribRate * adjust_(config.pensionContribEarningLimit) / amount;
               }
               let companyMatch = Math.min(event.extra, contribRate);
               let personalContrib = contribRate * amount;
@@ -401,8 +241,8 @@ function run() {
         savings = netIncome - expenses;
         cash += savings;
       }
-      targetCash = adjust_(emergencyStash, inflation);
-      if (phase == Phases.lumpSum && cash < targetCash && age >= retirementAge) {
+      targetCash = adjust_(params.emergencyStash);
+      if (phase == Phases.lumpSum && cash < targetCash && age >= params.retirementAge) {
         phase = Phases.retired;
       }
       if (cash < targetCash) {
@@ -420,7 +260,7 @@ function run() {
             withdraw_(1, 4, 2, 3); // cash -> etf -> trust -> pension
             break;
           case Phases.retired:
-            withdraw_(priorityCash, priorityPension, priorityEtf, priorityTrust);  // taken from user configuration
+            withdraw_(params.priorityCash, params.priorityPension, params.priorityEtf, params.priorityTrust);  // taken from user configuration
             break;
         }
       }
@@ -434,9 +274,9 @@ function run() {
       let invested = 0;
       if (cash > targetCash + 0.001 && incomeSalaries > 0) {
         let surplus = cash - targetCash;
-        etf.buy(surplus * etfAllocation);
-        trust.buy(surplus * trustAllocation);
-        invested = surplus * (etfAllocation + trustAllocation);
+        etf.buy(surplus * params.etfAllocation);
+        trust.buy(surplus * params.trustAllocation);
+        invested = surplus * (params.etfAllocation + params.trustAllocation);
         cash -= invested;
       }
       // Any remaining income should be used to top-up the emergency stash
@@ -485,12 +325,12 @@ function run() {
       dataSheet[row].worth += realEstate.getTotalValue() + pension.capital() + etf.capital() + trust.capital() + cash;
 
       if (!montecarlo) {
-        updateDataRow(row, (age-startingAge) / (100-startingAge));
+        updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
       }
 
     }
 
-    if (success || failedAt > targetAge) {
+    if (success || failedAt > params.targetAge) {
       successes += 1;
     }
 
@@ -502,7 +342,7 @@ function run() {
       updateDataRow(i, i/row, runs);
     }
   }
-  datasheet.getRange(Year.getRow() + row, Year.getColumn(), 100, Worth.getColumn() - Year.getColumn() + 1).clearContent();
+  dataTab.getRange(Year.getRow() + row, Year.getColumn(), 100, Worth.getColumn() - Year.getColumn() + 1).clearContent();
   
   //(runs-successes)
   if (montecarlo) {
@@ -514,7 +354,7 @@ function run() {
     let b = between(128, 160, percentSuccess);
     statusCell.setBackground(rgbToHex(r, g, b));
   } else {
-    if (success || failedAt > targetAge) {
+    if (success || failedAt > params.targetAge) {
       statusCell.setValue(success ? "Success!" : "Made it to " + failedAt);
       statusCell.setBackground("#9fdf9f")
     } else {
@@ -630,9 +470,9 @@ function withdraw_(fromCash, fromPension, fromEtf, fromTrust) {
 // the history of variation, or it needs to take the previous value (not the start value) and apply the latest 
 // rate once. Either case would require a rewrite of several parts of the simulator. 
 // Since it's used mainly to adjust for inflation, inflation has to remain fixed for now.
-function adjust_(value, rate, n = periods) {
-  if (rate === undefined) {
-    rate = inflation;
+function adjust_(value, rate = null, n = periods) {
+  if ((rate === null) || (rate === undefined)) {
+    rate = params.inflation;
   }
   return value * (1 + rate) ** n;
 }
@@ -662,3 +502,167 @@ function onEdit(e) {
   }
 }
 
+
+function readRanges() {
+  Events = spreadsheet.getRangeByName("Events");
+  Year = spreadsheet.getRangeByName("Year");
+  Age = spreadsheet.getRangeByName("Age");
+  IncomeSalaries = spreadsheet.getRangeByName("Salary");
+  IncomeRSUs = spreadsheet.getRangeByName("RSUs");
+  IncomeRentals = spreadsheet.getRangeByName("Rental");
+  IncomePrivatePension = spreadsheet.getRangeByName("PrivatePension");
+  IncomeStatePension = spreadsheet.getRangeByName("StatePension");
+  IncomeEtfRent = spreadsheet.getRangeByName("EtfRent");
+  IncomeTrustRent = spreadsheet.getRangeByName("TrustRent");
+  IncomeCash = spreadsheet.getRangeByName("IncomeCash");
+  IT = spreadsheet.getRangeByName("IT");
+  PRSI = spreadsheet.getRangeByName("PRSI");
+  USC = spreadsheet.getRangeByName("USC");
+  CGT = spreadsheet.getRangeByName("CGT");
+  NetIncome = spreadsheet.getRangeByName("NetIncome");
+  Expenses = spreadsheet.getRangeByName("Expenses");
+  Savings = spreadsheet.getRangeByName("Savings");
+  PensionContribution = spreadsheet.getRangeByName("PensionContribution");
+  WithdrawalRate = spreadsheet.getRangeByName("WithdrawalRate");
+  Cash = spreadsheet.getRangeByName("Cash");
+  RealEstateCapital = spreadsheet.getRangeByName("RealEstate");
+  EtfCapital = spreadsheet.getRangeByName("EtfCapital");
+  TrustCapital = spreadsheet.getRangeByName("TrustCapital");
+  PensionFund = spreadsheet.getRangeByName("PensionFund");
+  Worth = spreadsheet.getRangeByName("Worth");
+}
+
+function readParameters() {
+  statusCell = spreadsheet.getRangeByName("Progress").getCell(1, 1);
+  statusCell.setBackground("#E0E0E0");
+  statusCell.setValue("Initializing");
+  SpreadsheetApp.flush();
+
+  params = {
+    startingAge: spreadsheet.getRangeByName("StartingAge").getValue(),
+    targetAge: spreadsheet.getRangeByName("TargetAge").getValue(),
+    initialSavings: spreadsheet.getRangeByName("InitialSavings").getValue(),
+    initialPension: spreadsheet.getRangeByName("InitialPension").getValue(),
+    initialETFs: spreadsheet.getRangeByName("InitialETFs").getValue(),
+    initialTrusts: spreadsheet.getRangeByName("InitialTrusts").getValue(),
+    retirementAge: spreadsheet.getRangeByName("RetirementAge").getValue(),
+    emergencyStash: spreadsheet.getRangeByName("EmergencyStash").getValue(),
+    pensionPercentage: spreadsheet.getRangeByName("PensionContributionPercentage").getValue(),
+    pensionCapped: (spreadsheet.getRangeByName("PensionContributionCapped").getValue() === "Yes"),
+    statePensionWeekly: spreadsheet.getRangeByName("StatePensionWeekly").getValue(),
+    growthRatePension: spreadsheet.getRangeByName("PensionGrowthRate").getValue(),
+    growthDevPension: spreadsheet.getRangeByName("PensionGrowthStdDev").getValue(),
+    growthRateETF: spreadsheet.getRangeByName("EtfGrowthRate").getValue(),
+    growthDevETF: spreadsheet.getRangeByName("EtfGrowthStdDev").getValue(),
+    growthRateTrust: spreadsheet.getRangeByName("TrustGrowthRate").getValue(),
+    growthDevTrust: spreadsheet.getRangeByName("TrustGrowthStdDev").getValue(),
+    inflation: spreadsheet.getRangeByName("Inflation").getValue(),
+    etfAllocation: spreadsheet.getRangeByName("EtfAllocation").getValue(),
+    trustAllocation: spreadsheet.getRangeByName("TrustAllocation").getValue(),
+    priorityCash: spreadsheet.getRangeByName("Priorities").getCell(1, 2).getValue(),
+    priorityPension: spreadsheet.getRangeByName("Priorities").getCell(2, 2).getValue(),
+    priorityEtf: spreadsheet.getRangeByName("Priorities").getCell(3, 2).getValue(),
+    priorityTrust: spreadsheet.getRangeByName("Priorities").getCell(4, 2).getValue(),
+    incomeTaxBracket: spreadsheet.getRangeByName("IncomeTaxBracket").getValue(),
+    personalTaxCredit: spreadsheet.getRangeByName("PersonalTaxCredit").getValue()
+  };
+  spreadsheet.getRangeByName("Parameters").setBackground("#ffffff");
+  spreadsheet.getRangeByName("Parameters").clearNote();
+
+  if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
+    spreadsheet.getRangeByName("RetirementAge").setNote("Warning: Only occupational pension schemes allow retirement before age 60.");
+  }
+  if (params.retirementAge < config.minPrivatePensionRetirementAge) {
+    spreadsheet.getRangeByName("RetirementAge").setNote("Warning: Private pensions don't normally allow retirement before age 50.");
+  }
+
+  if (params.etfAllocation + params.trustAllocation > 1) {
+    spreadsheet.getRangeByName("EtfAllocation").setBackground("#ffe066");
+    spreadsheet.getRangeByName("TrustAllocation").setBackground("#ffe066");
+    spreadsheet.getRangeByName("EtfAllocation").setNote("ETF + Trust allocations can't exceed 100%");
+    errors = true;
+  }
+}
+
+// Read events from the parameters sheet
+function readEvents() {
+  events = [];
+  Events.setBackground("#ffffff")
+  Events.clearNote();
+  for (let i = 1; i <= Events.getHeight(); i++) {
+    let name = Events.getCell(i, 1).getValue();
+    let pos = name.indexOf(":");
+    if (pos < 0) {
+      if (name === "") break;
+      Events.getCell(i, 1).setNote("Invalid event format: missing colon.");
+      Events.getCell(i, 1).setBackground("#ffe066");
+      errors = true;
+      break;
+    }
+    let type = name.substr(0, pos);
+    let valid = { "NOP": "Non-operation: way to make the simulation ignore an event without needing to remove the line", "RI": "Rental Income", "SI": "Salary Income (with private pension contribution if so defined)", "SInp": "Salary Income (no private pension contribution)", "UI": "RSU Income", "DBI" : "Defined Benefit Pension Income", "FI" : "Tax-free Income", "E": "Expense", "R": "Real Estate", "M": "Mortgage", "SM": "Stock Market" };
+    if (!valid.hasOwnProperty(type)) {
+      Events.getCell(i, 1).setNote("Invalid event type. Valid types are: " + Object.keys(valid).map(key => { return key + " (" + valid[key] + ")" }).join(", "));
+      Events.getCell(i, 1).setBackground("#ffe066");
+      errors = true;
+      break;
+    }
+    let id = name.substr(pos + 1);
+    let amount = Events.getCell(i, 2).isBlank() ? 0 : Events.getCell(i, 2).getValue();
+    let fromAge = Events.getCell(i, 3).isBlank() ? 0 : Events.getCell(i, 3).getValue();
+    let toAge = Events.getCell(i, 4).isBlank() ? 999 : Events.getCell(i, 4).getValue();
+    let rate = Events.getCell(i, 5).isBlank() ? undefined : Events.getCell(i, 5).getValue();
+    let extra = Events.getCell(i, 6).isBlank() ? 0 : Events.getCell(i, 6).getValue();
+    events.push(new Event(type, id, amount, fromAge, toAge, rate, extra));
+  }
+
+  // Validate that mortgage events have their corresponding purchase event
+  for (let m = 0; m < events.length; m++) {
+    if (events[m].type === 'M') {
+      let found = false;
+      for (let p = 0; p < events.length; p++) {
+        if (events[p].type === 'R' && events[p].id === events[m].id) {
+          found = true;
+          if (events[p].fromAge !== events[m].fromAge) {
+            Events.getCell(m + 1, 3).setNote("The mortgage (M) and purchase (R) events for a property should have the same starting age.");
+            Events.getCell(m + 1, 3).setBackground("#ffe066");
+            Events.getCell(p + 1, 3).setBackground("#ffe066");
+            errors = true;
+            continue;
+          }
+          if (events[m].toAge > events[p].toAge) {
+            Events.getCell(m + 1, 4).setNote("The mortgage should not continure after the property is sold.");
+            Events.getCell(m + 1, 4).setBackground("#ffe066");
+            Events.getCell(p + 1, 4).setBackground("#ffe066");
+            errors = true;
+            continue;
+          }
+        }
+      }
+      if (!found) {
+        Events.getCell(m + 1, 1).setNote("Couldn't find a purchase (R) event for the property '" + events[m].id + "'.");
+        Events.getCell(m + 1, 1).setBackground("#ffe066");
+        errors = true;
+        continue;
+      }
+    }
+  }
+}
+
+
+function initializeSimulator() {
+  config = new Config();
+  revenue = new Revenue();
+  spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  dataTab = spreadsheet.getSheetByName("Data");
+  errors = false;
+  readRanges();
+  readParameters();
+  readEvents();
+  if (errors) {
+    statusCell.setValue("Check errors");
+    statusCell.setBackground("#ffe066");
+  }
+  dataSheet = [];
+  return !errors;
+}
