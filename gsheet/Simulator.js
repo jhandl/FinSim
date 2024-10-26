@@ -1,4 +1,4 @@
-var age, year, phase, inflation, periods, row, success;
+var config, age, year, phase, inflation, periods, row, success;
 var revenue, realEstate, stockGrowthOverride;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var incomeStatePension, incomePrivatePension, incomeEtfRent, incomeTrustRent, withdrawalRate;
@@ -18,7 +18,7 @@ const Phases = {
 function run() {
 
   config = new Config();
-  revenue = new Revenue(config);
+  revenue = new Revenue();
 
   let spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let datasheet = spreadsheet.getSheetByName("Data");
@@ -66,10 +66,10 @@ function run() {
   spreadsheet.getRangeByName("Parameters").setBackground("#ffffff");
   spreadsheet.getRangeByName("Parameters").clearNote();
 
-  if (retirementAge < revenue.minOccupationalPensionRetirementAge) {
+  if (retirementAge < config.minOccupationalPensionRetirementAge) {
     spreadsheet.getRangeByName("RetirementAge").setNote("Warning: Only occupational pension schemes allow retirement before age 60.");
   }
-  if (retirementAge < revenue.minPrivatePensionRetirementAge) {
+  if (retirementAge < config.minPrivatePensionRetirementAge) {
     spreadsheet.getRangeByName("RetirementAge").setNote("Warning: Private pensions don't normally allow retirement before age 50.");
   }
 
@@ -291,10 +291,10 @@ function run() {
       }
 
       // State Pension
-      if (age >= revenue.statePensionQualifyingAge) {
+      if (age >= config.statePensionQualifyingAge) {
         incomeStatePension = 52 * adjust_(statePensionWeekly, inflation);
-        if (age >= revenue.statePensionIncreaseAge) {
-          incomeStatePension += 52 * adjust_(revenue.statePensionIncreaseAmount, inflation);
+        if (age >= config.statePensionIncreaseAge) {
+          incomeStatePension += 52 * adjust_(config.statePensionIncreaseAmount, inflation);
         }
       }
       revenue.declareStatePensionIncome(incomeStatePension);
