@@ -98,7 +98,7 @@ class RealEstate {
     }
     
     getValue() {
-      return adjust_(this.paid + this.borrowed * this.fractionRepaid, this.appreciation, this.periods);
+      return adjust(this.paid + this.borrowed * this.fractionRepaid, this.appreciation, this.periods);
     }
     
   }
