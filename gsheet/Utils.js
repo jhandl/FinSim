@@ -27,3 +27,7 @@ function rgbToHex(r, g, b) {
 function between(a, b, p) {
   return Math.round(a + (b - a) * p);
 }
+
+function isBetween(num, min, max) {
+  return ((num >= min) && (num <= max));
+}

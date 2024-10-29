@@ -137,7 +137,9 @@ function readParameters() {
     priorityPension: spreadsheet.getRangeByName("Priorities").getCell(2, 2).getValue(),
     priorityEtf: spreadsheet.getRangeByName("Priorities").getCell(3, 2).getValue(),
     priorityTrust: spreadsheet.getRangeByName("Priorities").getCell(4, 2).getValue(),
-    incomeTaxBracket: spreadsheet.getRangeByName("IncomeTaxBracket").getValue(),
+    marriageYear: spreadsheet.getRangeByName("MarriageYear").getValue(),
+    youngestChildBorn: spreadsheet.getRangeByName("YoungestChildBorn").getValue(),
+    oldestChildBorn: spreadsheet.getRangeByName("OldestChildBorn").getValue(),
     personalTaxCredit: spreadsheet.getRangeByName("PersonalTaxCredit").getValue()
   };
   spreadsheet.getRangeByName("Parameters").setBackground(STATUS_COLORS.WHITE);
