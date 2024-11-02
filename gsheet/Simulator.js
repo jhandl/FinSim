@@ -110,8 +110,9 @@ function runSimulation() {
 
     if (!montecarlo) {
       updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
-    }  
+    }
   }
+  return (success || (failedAt > params.targetAge));
 }
 
 function calculatePensionIncome() {
@@ -432,6 +433,5 @@ function updateYearlyData() {
   if (!montecarlo) {
     updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
   }
-  return (success || (failedAt > params.targetAge));
 }
 
