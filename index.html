@@ -118,11 +118,16 @@
       document.getElementById('submitButton').addEventListener('click', function() {
         var name = document.getElementById('name').value;
         var email = document.getElementById('email').value;
-        if (name && email) {
-          alert('Thank you for registering, ' + name + '!');
+        var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (name && emailPattern.test(email)) {
           var formContainer = document.getElementById('formContainer');
           formContainer.classList.remove('show');
-          // Here you would normally send the data to your server
+          _cio.identify({
+            id: email,
+            created_at: Math.floor(Date.now() / 1000),
+            first_name: name.split(' ')[0],
+            last_name: name.split(' ')[1] || '',
+          });
         } else {
           alert('Please fill in both your name and email.');
         }
