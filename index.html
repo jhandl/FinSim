@@ -88,6 +88,22 @@
       .form-container button:hover {
         background-color: #005fa3;
       }
+      .thank-you-message {
+        font-weight: 700;
+        margin-top: 20px;
+        color: #0077cc;
+        opacity: 0;
+        transition: opacity 0.5s ease;
+      }
+      .thank-you-message.show {
+        opacity: 1;
+      }
+      .disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+        pointer-events: none;
+        transition: background-color 0.5s ease;
+      }
     </style>
   </head>
   <body>
@@ -96,13 +112,14 @@
       <img src="IFS.png" class="logo">
       <div class="button-container">
         <a href="https://docs.google.com/spreadsheets/d/1aPClS0_Fi4x14zIkQORALhZeFEeWw611Z-rrXYvy5Ko/edit?pli=1&gid=0#gid=0" target="_blank">Access the Simulator</a>
-        <a href="#" id="registerButton">Register for Updates</a>
+        <a href="#" id="registerButton" style="min-width: 170px;">Register for Updates</a>
       </div>
       <div class="form-container" id="formContainer">
         <input type="text" id="name" placeholder="Your Name">
         <input type="email" id="email" placeholder="Your Email">
         <button id="submitButton">Submit</button>
       </div>
+      <div class="thank-you-message" id="thankYouMessage" style="display: none;">Thank you for registering! We will keep you updated.</div>
     </div>
     <script type="text/javascript">
       document.getElementById('registerButton').addEventListener('click', function(event) {
@@ -119,21 +136,41 @@
         var name = document.getElementById('name').value;
         var email = document.getElementById('email').value;
         var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        
         if (name && emailPattern.test(email)) {
           var formContainer = document.getElementById('formContainer');
-          formContainer.classList.remove('show');
+          formContainer.style.maxHeight = '0';
+          formContainer.style.opacity = '0';
+          setTimeout(function() {
+            formContainer.style.display = 'none';
+          }, 500);
+          
+          var thankYouMessage = document.getElementById('thankYouMessage');
+          setTimeout(function() {
+            thankYouMessage.style.display = 'block';
+            thankYouMessage.classList.add('show');
+          }, 500);
+          
+          var registerButton = document.getElementById('registerButton');
+          setTimeout(function() {
+            registerButton.classList.add('disabled');
+            registerButton.textContent = 'Registered';
+          }, 500);
+          
+          // Call _cio.identify function with user information
           _cio.identify({
             id: email,
             created_at: Math.floor(Date.now() / 1000),
             first_name: name.split(' ')[0],
             last_name: name.split(' ')[1] || '',
           });
+          
         } else {
-          alert('Please fill in both your name and email.');
+          alert('Please fill in a valid name and email address.');
         }
       });
 
-      /* Do not remove the code below */
+      /* Do not remove or edit the code below */
       var _cio = _cio || [];
       (function() {
         var a,b,c;
