@@ -3,10 +3,7 @@ var revenue, realEstate, stockGrowthOverride;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var incomeStatePension, incomePrivatePension, incomeEtfRent, incomeTrustRent, withdrawalRate;
 var cash, etf, trust, pension;
-var Events, Year, Age, IncomeSalaries, IncomeRSUs, IncomeRentals, IncomePrivatePension;
-var IncomeStatePension, IncomeEtfRent, IncomeTrustRent, IncomeCash, IT, PRSI, USC, CGT;
-var NetIncome, Expenses, Savings, PensionContribution, Cash, RealEstateCapital, EtfCapital;
-var TrustCapital, PensionFund, Worth;
+var ui, dataSheet = [];
 
 const Phases = {
   growth: 'growth',
@@ -15,14 +12,14 @@ const Phases = {
 }
 
 function initializeSimulator() {
+  ui = new UIManager(new GoogleSheetsUI());
   config = new Config();
   revenue = new Revenue();
   errors = false;
-  readParameters();
-  readEvents();
+  params = ui.readParameters();
+  events = ui.readEvents();
   if (errors) {
-    statusCell.setValue("Check errors");
-    statusCell.setBackground("#ffe066");
+    ui.setStatus("Check errors", ui.STATUS_COLORS.WARNING);
   }
   dataSheet = [];
   return !errors;
@@ -33,15 +30,13 @@ function run() {
   montecarlo = (params.growthDevPension > 0 || params.growthDevETF > 0 || params.growthDevTrust > 0);
   let runs = (montecarlo ? config.simulationRuns : 1);
   let successes = 0;
-  updateProgress("Running");
+  ui.updateProgress("Running");
   for (let run = 0; run < runs; run++) {
     successes += runSimulation(); 
   }
-  updateDataSheet(runs);
-  updateStatusCell(successes, runs);
+  ui.updateDataSheet(runs);
+  ui.updateStatusCell(successes, runs);
 }
-
-
 
 function initializeSimulationVariables() {
   // revenue.reset();
@@ -62,7 +57,7 @@ function initializeSimulationVariables() {
   year = new Date().getFullYear() - 1;
   phase = Phases.growth;
   cash = params.initialSavings;
-  failedAt = 0
+  failedAt = 0;
   row = 0;
 }
 
@@ -108,9 +103,6 @@ function runSimulation() {
     handleInvestments();
     updateYearlyData();
 
-    if (!montecarlo) {
-      updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
-    }
   }
   return (success || (failedAt > params.targetAge));
 }
@@ -139,17 +131,18 @@ function processEvents() {
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
     let amount = adjust(event.amount, event.rate);
+    let inScope = (age >= event.fromAge && age <= event.toAge);
     switch (event.type) {
       case "NOP": // No Operation
         break;
       case 'RI': // Rental income
-        if (age >= event.fromAge && age <= event.toAge && amount > 0) {
+        if (inScope && amount > 0) {
           incomeRentals += amount;
           revenue.declareOtherIncome(amount);
         }
         break;
       case 'SI': // Salary income (with private pension contribution if so defined)
-        if (age >= event.fromAge && age <= event.toAge && amount > 0) {
+        if (inScope && amount > 0) {
           incomeSalaries += amount;
           let contribRate = params.pensionPercentage * ((age < 30) ? 0.15 : (age < 40) ? 0.20 : (age < 50) ? 0.25 : (age < 55) ? 0.30 : (age < 60) ? 0.35 : 0.40);
           if (params.pensionCapped && (amount > adjust(config.pensionContribEarningLimit))) {
@@ -165,30 +158,30 @@ function processEvents() {
         }
         break;
       case 'SInp': // Salary income (with no private pension contribution)
-        if (age >= event.fromAge && age <= event.toAge && amount > 0) {
+        if (inScope && amount > 0) {
           incomeSalaries += amount;
           revenue.declareSalaryIncome(amount, 0);
         }
         break;
       case 'UI': // RSU income
-        if (age >= event.fromAge && age <= event.toAge && amount > 0) {
+        if (inScope && amount > 0) {
           incomeShares += amount;
           revenue.declareNonEuSharesIncome(amount);
         }
         break;
       case 'DBI': // Defined Benefit Pension Income
-        if (age >= event.fromAge && age <= event.toAge && amount > 0) {
+        if (inScope && amount > 0) {
           incomeDefinedBenefit += amount;
           revenue.declareSalaryIncome(amount, 0);
         }
         break;
       case 'FI': // Tax-free income
-        if (age >= event.fromAge && age <= event.toAge && amount > 0) {
+        if (inScope && amount > 0) {
           incomeTaxFree += amount;
         }
         break;
       case 'E': // Expenses
-        if (age >= event.fromAge && age <= event.toAge) {
+        if (inScope) {
           expenses += amount;
         }
         break;
@@ -431,7 +424,8 @@ function updateYearlyData() {
   dataSheet[row].worth += realEstate.getTotalValue() + pension.capital() + etf.capital() + trust.capital() + cash;
 
   if (!montecarlo) {
-    updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
+    ui.updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
   }
+  
 }
 

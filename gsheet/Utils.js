@@ -4,7 +4,7 @@
 // rate once. Either case would require a rewrite of several parts of the simulator. 
 // Since it's used mainly to adjust for inflation, inflation has to remain fixed for now.
 function adjust(value, rate = null, n = periods) {
-  if ((rate === null) || (rate === undefined)) {
+  if ((rate === null) || (rate === undefined) || (rate === "")) {
     rate = params.inflation;
   }
   return value * (1 + rate) ** n;
