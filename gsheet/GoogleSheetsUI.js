@@ -16,7 +16,6 @@ class GoogleSheetsUI extends AbstractUI {
     this.spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     this.statusCell = this.spreadsheet.getRangeByName("Progress").getCell(1, 1);
     this.cacheNamedRanges();
-    this.setStatus("Ready", this.STATUS_COLORS.NEUTRAL);
   }
 
   cacheNamedRanges() {
@@ -63,8 +62,8 @@ class GoogleSheetsUI extends AbstractUI {
     this.flush();
   }
 
-  setProgress(percentage) {
-    this.setStatus(`Processing ${Math.round(percentage)}%`, this.STATUS_COLORS.NEUTRAL);
+  setProgress(message) {
+    this.setStatus(message, this.STATUS_COLORS.NEUTRAL);
   }
 
   clearContent(groupId) {
@@ -98,17 +97,16 @@ class GoogleSheetsUI extends AbstractUI {
   }
 
   // Helper method for data rows
-  setDataRow(rowIndex, data, scale = 1) {
+  setDataRow(rowIndex, data) {
     Object.entries(data).forEach(([field, value]) => {
       const range = this.namedRanges.get(field);
       if (range) {
-        range.getCell(rowIndex, 1).setValue(value / scale);
+        range.getCell(rowIndex, 1).setValue(value);
+      } else {
+        console.log("Missing range name: "+field);
+        throw "Missing range name!"
       }
     });
-
-    if (rowIndex % 5 === 0) {
-      this.setProgress((rowIndex / this.namedRanges.get('Year').getHeight()) * 100);
-    }
   }
 
 } 
