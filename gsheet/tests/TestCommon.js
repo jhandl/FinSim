@@ -5,6 +5,7 @@ class TestConfig {
     this.pensionContribEarningLimit = 100000;
     this.pensionLumpSumLimit = 0.25;
     this.pensionLumpSumTaxBands = {"0": 0, "100000": 0.2, "200000": 0.4};
+    this.pensionMinDrawdownBands = {"0": 0, "60": 0.04, "70": 0.05};
     this.itEmployeeTaxCredit = 1000;
     this.itExemptionLimit = 18000;
     this.itExemptionAge = 65;
@@ -22,13 +23,21 @@ class TestConfig {
     this.uscReducedTaxBands = {"0": 0.005, "12012": 0.02};
     this.cgtRate = 0.33;
     this.cgtTaxRelief = 1270;
+    this.etfDeemedDisposalYears = 8;
     this.etfExitTax = 0.41;
+    this.etfCanOffsetLosses = false;
   }
 }
 
 class TestCase {
   setUp() {
     config = new TestConfig();
+  }
+}
+
+function assertClose(actual, expected, message, epsilon = 0.01) {
+  if (Math.abs(actual - expected) > epsilon) {
+    throw new Error(`${message}: expected ${expected}, got ${actual}`);
   }
 }
 
