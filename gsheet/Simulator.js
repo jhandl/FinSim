@@ -1,5 +1,5 @@
 var age, year, phase, periods, row, failedAt, success, montecarlo;
-var revenue, realEstate, stockGrowthOverride;
+var config, revenue, realEstate, stockGrowthOverride;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var incomeStatePension, incomePrivatePension, incomeEtfRent, incomeTrustRent, withdrawalRate;
 var cash, etf, trust, pension;
@@ -9,6 +9,20 @@ const Phases = {
   growth: 'growth',
   lumpSum: 'lumpSum',
   retired: 'retired'
+}
+
+
+function run() {
+  if (!initializeSimulator()) return;
+  montecarlo = (params.growthDevPension > 0 || params.growthDevETF > 0 || params.growthDevTrust > 0);
+  let runs = (montecarlo ? config.simulationRuns : 1);
+  let successes = 0;
+  ui.updateProgress("Running");
+  for (let run = 0; run < runs; run++) {
+    successes += runSimulation(); 
+  }
+  ui.updateDataSheet(runs);
+  ui.updateStatusCell(successes, runs);
 }
 
 function initializeSimulator() {
@@ -23,19 +37,6 @@ function initializeSimulator() {
   }
   dataSheet = [];
   return !errors;
-}
-
-function run() {
-  if (!initializeSimulator()) return;
-  montecarlo = (params.growthDevPension > 0 || params.growthDevETF > 0 || params.growthDevTrust > 0);
-  let runs = (montecarlo ? config.simulationRuns : 1);
-  let successes = 0;
-  ui.updateProgress("Running");
-  for (let run = 0; run < runs; run++) {
-    successes += runSimulation(); 
-  }
-  ui.updateDataSheet(runs);
-  ui.updateStatusCell(successes, runs);
 }
 
 function initializeSimulationVariables() {

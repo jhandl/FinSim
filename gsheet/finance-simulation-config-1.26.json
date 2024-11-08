@@ -29,6 +29,7 @@
   "uscReducedTaxBands": {"0": 0.005, "12012": 0.02},
   "etfDeemedDisposalYears": 8,
   "etfExitTax": 0.41,
+  "etfCanOffsetLosses": false,
   "cgtRate": 0.33,
   "cgtTaxRelief": 1270
 }

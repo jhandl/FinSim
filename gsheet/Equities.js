@@ -5,6 +5,7 @@ class Equity {
     this.growth = growth;
     this.stdev = stdev;
     this.portfolio = [];
+    this.canOffsetLosses = true;
   }
 
   buy(amountToBuy) {
@@ -13,7 +14,9 @@ class Equity {
   
   declareRevenue(income, gains) {
     revenue.declareInvestmentIncome(income);
-    revenue.declareInvestmentGains(gains, this.taxRate);
+    if (gains > 0 || this.canOffsetLosses) {
+      revenue.declareInvestmentGains(gains, this.taxRate);
+    }
   }
   
   sell(amountToSell) {
@@ -21,12 +24,15 @@ class Equity {
     let gains = 0;
     while ((amountToSell > 0) && (this.portfolio.length > 0)) {
       let sale = 0;
+      // Sell the oldest holding (index 0) following the FIFO rule.
       if (amountToSell >= this.portfolio[0].amount + this.portfolio[0].interest) {
+        // sell the whole holding
         sale = this.portfolio[0].amount + this.portfolio[0].interest;
         sold += sale;
         gains += this.portfolio[0].interest;
         this.portfolio.shift();
       } else {
+        // sell a fraction of the holding
         sale = amountToSell;
         sold += amountToSell;
         let fraction = amountToSell / (this.portfolio[0].amount + this.portfolio[0].interest);
@@ -63,6 +69,7 @@ class ETF extends Equity {
   
   constructor(growth, stdev=0) {
     super(config.etfExitTax, growth, stdev);
+    this.canOffsetLosses = config.etfCanOffsetLosses;
   }
   
   addYear() {
@@ -74,7 +81,9 @@ class ETF extends Equity {
         this.portfolio[i].amount += gains;
         this.portfolio[i].interest = 0;
         this.portfolio[i].age = 0;
-        revenue.declareInvestmentGains(gains, this.taxRate);
+        if (gains > 0 || this.canOffsetLosses) {
+          revenue.declareInvestmentGains(gains, this.taxRate);
+        }
       }
     }
   }

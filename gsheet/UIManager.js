@@ -116,10 +116,10 @@ class UIManager {
     this.ui.clearWarning("Parameters");
 
     if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
-      this.ui.setWarning("RetirementAge", "Warning: Only occupational pension schemes allow retirement before age 60.");
+      this.ui.setWarning("RetirementAge", "Warning: Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
     }
     if (params.retirementAge < config.minPrivatePensionRetirementAge) {
-      this.ui.setWarning("RetirementAge", "Warning: Private pensions don't normally allow retirement before age 50.");
+      this.ui.setWarning("RetirementAge", "Warning: Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
     }
 
     if (params.etfAllocation + params.trustAllocation > 1.0001) {

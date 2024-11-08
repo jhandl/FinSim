@@ -182,15 +182,25 @@ class Revenue {
     }
   }
 
-  computeCGT() {
+computeCGT() {
     let tax = 0;
-    let taxable = -adjust(config.cgtTaxRelief); // capital gains tax relief
-    // go through the gains from the highest taxed to the least taxed, so that the credit has more impact
+    let remainingRelief = adjust(config.cgtTaxRelief);
+    let totalLosses = 0;
+    for (let [_, gains] of Object.entries(this.gains)) {
+      if (gains < 0) {
+        totalLosses -= gains;
+      }
+    }
     for (let [taxRate, gains] of Object.entries(this.gains).sort((a,b) => b[0].localeCompare(a[0]))) {
-      taxable += gains;
-      tax += Math.max(taxable * taxRate, 0);
+      if (gains > 0) {
+        let gainAfterLosses = Math.max(gains - totalLosses, 0);
+        totalLosses = Math.max(totalLosses - gains, 0);
+        let taxableGains = Math.max(gainAfterLosses - remainingRelief, 0);
+        remainingRelief = Math.max(remainingRelief - gainAfterLosses, 0);
+        tax += taxableGains * taxRate;
+      }
     }
     this.cgt = tax;
   }
-    
+
 }
