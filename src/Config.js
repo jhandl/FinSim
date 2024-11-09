@@ -9,7 +9,8 @@ class Config {
 
   load(version) {
     try {
-      const url = "https://storage.googleapis.com/financial-simulator-bucket/finance-simulation-config-"+version+".json";
+      // const url = "https://storage.googleapis.com/financial-simulator-bucket/finance-simulation-config-"+version+".json";
+      const url = "https://finsim.ie/config/finance-simulation-config-"+version+".json";
       const config = JSON.parse(UrlFetchApp.fetch(url).getContentText());
       Object.assign(this, config); // Assign all properties from config to 'this'
     } catch (err) {
