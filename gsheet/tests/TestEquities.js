@@ -14,15 +14,15 @@ class TestEquities extends TestCase {
     const equity = new Equity(0.33, 0.05); // 33% CGT, 5% growth
     
     equity.buy(10000);
-    assertClose(equity.capital(), 10000, "Initial capital should match purchase amount");
+    this.assertClose(equity.capital(), 10000, "Initial capital should match purchase amount");
     
     equity.addYear();
     // Growth should be exactly 5% without randomness
-    assertClose(equity.capital(), 10500, "Capital after 1 year should reflect growth rate");
+    this.assertClose(equity.capital(), 10500, "Capital after 1 year should reflect growth rate");
     
     const sold = equity.sell(5000);
-    assertClose(sold, 5000, "Sold amount should match requested amount");
-    assertClose(equity.capital(), 5500, "Remaining capital should reflect partial sale");
+    this.assertClose(sold, 5000, "Sold amount should match requested amount");
+    this.assertClose(equity.capital(), 5500, "Remaining capital should reflect partial sale");
   }
 
   testETFDeemedDisposal() {
@@ -41,9 +41,9 @@ class TestEquities extends TestCase {
       const end = 10000 * (1.05 ** years)
       const gains = end - start;
 
-      assertClose(revenue.gains[config.etfExitTax], gains, "ETF deemed disposal should trigger exit tax after "+years+" years");
-      assertClose(etf.portfolio[0].amount, end, "ETF base cost should be reset after deemed disposal");
-      assertClose(etf.portfolio[0].interest, 0, "ETF gains should be reset after deemed disposal");
+      this.assertClose(revenue.gains[config.etfExitTax], gains, "ETF deemed disposal should trigger exit tax after "+years+" years");
+      this.assertClose(etf.portfolio[0].amount, end, "ETF base cost should be reset after deemed disposal");
+      this.assertClose(etf.portfolio[0].interest, 0, "ETF gains should be reset after deemed disposal");
     }
   }
 
@@ -57,7 +57,7 @@ class TestEquities extends TestCase {
     const sold = trust.sell(trust.capital());
     
     // After 1 year at 5% growth: gains = 500
-    assertClose(revenue.gains[config.cgtRate], 500, 
+    this.assertClose(revenue.gains[config.cgtRate], 500, 
       "Investment trust should apply standard CGT rate to gains");
   }
 
@@ -68,17 +68,17 @@ class TestEquities extends TestCase {
     
     // Test lump sum withdrawal (25% tax-free limit)
     const lumpSum = pension.getLumpsum();
-    assertClose(lumpSum, 25000, "Pension lump sum should be 25% of total");
-    assertClose(revenue.privatePensionLumpSum, 25000, 
+    this.assertClose(lumpSum, 25000, "Pension lump sum should be 25% of total");
+    this.assertClose(revenue.privatePensionLumpSum, 25000, 
       "Lump sum should be declared as pension lump sum income");
     
     // Test minimum drawdown (4% at age 60-70) from the remaining 75000.
     age = 65;
     const expectedDrawdown = pension.capital() * 0.04;
     const drawdown = pension.drawdown();
-    assertClose(drawdown, expectedDrawdown, 
+    this.assertClose(drawdown, expectedDrawdown, 
       "Pension drawdown should match minimum requirement for age");
-    assertClose(revenue.privatePension, expectedDrawdown, 
+    this.assertClose(revenue.privatePension, expectedDrawdown, 
       "Drawdown should be declared as pension income");
   }
 
@@ -99,12 +99,12 @@ class TestEquities extends TestCase {
     // If LIFO: Would sell from second tranche (5250) which has lower gains
     // If proportional: Would mix gains from both tranches
     const sold = equity.sell(8000);
-    assertClose(sold, 8000, "Partial sale amount should match requested");
+    this.assertClose(sold, 8000, "Partial sale amount should match requested");
 
     // Check gains - should reflect FIFO order
     // Original cost basis for sold portion: 10000 * (8000/11025) = 7255.33
     // From first tranche: (8000 - 10000 * (8000/11025)) = 743.76 gain
-    assertClose(revenue.gains[config.cgtRate], 743.76, "Gains should reflect selling from oldest tranche first (FIFO)");
+    this.assertClose(revenue.gains[config.cgtRate], 743.76, "Gains should reflect selling from oldest tranche first (FIFO)");
   }
 
   testMultipleGrowthPeriods() {
@@ -118,30 +118,19 @@ class TestEquities extends TestCase {
     }
     
     // 10000 * (1.05)^5 = 12762.82
-    assertClose(equity.capital(), 12762.82, 
+    this.assertClose(equity.capital(), 12762.82, 
       "Capital should compound correctly over multiple years");
   }
 
   runTests() {
-    const tests = [
+    super.runTests([
       'testBasicEquityOperations',
       'testETFDeemedDisposal',
       'testInvestmentTrustGains',
       'testPensionWithdrawals',
       'testPartialSales',
       'testMultipleGrowthPeriods'
-    ];
-    
-    let passed = 0;
-    for (const test of tests) {
-      try {
-        this[test]();
-        console.log(`✓ ${test} passed`);
-        passed++;
-      } catch (e) {
-        console.error(`✗ ${test} failed: ${e.message}`);
-      }
-    }
-    console.log(`${passed}/${tests.length} tests passed`);
+    ])
   }
+
 }

@@ -30,15 +30,31 @@ class TestConfig {
 }
 
 class TestCase {
+
   setUp() {
     config = new TestConfig();
   }
-}
 
-function assertClose(actual, expected, message, epsilon = 0.01) {
-  if (Math.abs(actual - expected) > epsilon) {
-    throw new Error(`${message}: expected ${expected}, got ${actual}`);
+  assertClose(actual, expected, message, epsilon = 0.01) {
+    if (Math.abs(actual - expected) > epsilon) {
+      throw new Error(`${message}: expected ${expected}, got ${actual}`);
+    }
   }
+
+  runTests(tests) {    
+    let passed = 0;
+    for (const test of tests) {
+      try {
+        this[test]();
+        console.log(`✓ ${test} passed`);
+        passed++;
+      } catch (e) {
+        console.error(`✗ ${test}: ${e.message}`);
+      }
+    }
+    console.log(`${passed}/${tests.length} tests passed`);
+  }
+
 }
 
 function runTests() {

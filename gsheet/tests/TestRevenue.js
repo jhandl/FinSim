@@ -16,7 +16,7 @@ class TestRevenue extends TestCase {
     revenue.declareSalaryIncome(50000, 0);
     revenue.computeIT();
     // 35000 * 0.2 + 15000 * 0.4 - (1650 + 1000) = 10350
-    assertClose(revenue.it, 10350, "Basic income tax calculation failed");
+    this.assertClose(revenue.it, 10350, "Basic income tax calculation failed");
   }
 
   testMarriedIncomeTax() {
@@ -28,7 +28,7 @@ class TestRevenue extends TestCase {
     revenue.computeIT();
     // Using married bands + increase: (44000 + 25000) at 20%, rest at 40%
     // (69000 * 0.2 + 11000 * 0.4) - (1650 + 2*1000) = 14550
-    assertClose(revenue.it, 14550, "Married income tax calculation failed");
+    this.assertClose(revenue.it, 14550, "Married income tax calculation failed");
   }
 
   testPRSIExemption() {
@@ -37,7 +37,7 @@ class TestRevenue extends TestCase {
     revenue.reset();
     revenue.declareSalaryIncome(50000, 0);
     revenue.computePRSI();
-    assertClose(revenue.prsi, 0, "PRSI age exemption failed");
+    this.assertClose(revenue.prsi, 0, "PRSI age exemption failed");
   }
 
   testUSCReducedRates() {
@@ -47,7 +47,7 @@ class TestRevenue extends TestCase {
     revenue.declareSalaryIncome(50000, 0);
     revenue.computeUSC();
     // Should use reduced bands as income < 60000 and age > 70
-    assertClose(revenue.usc, 
+    this.assertClose(revenue.usc, 
       12012 * 0.005 + (50000 - 12012) * 0.02,
       "USC reduced rates calculation failed");
   }
@@ -58,7 +58,7 @@ class TestRevenue extends TestCase {
     revenue.declareSalaryIncome(120000, 0.1);
     revenue.computeIT();
     // Pension relief should be limited to 100000
-    assertClose(revenue.pensionContribRelief, 10000, 
+    this.assertClose(revenue.pensionContribRelief, 10000, 
       "Pension contribution relief limit failed");
   }
 
@@ -68,7 +68,7 @@ class TestRevenue extends TestCase {
     revenue.declareInvestmentGains(2000, 0.33);
     revenue.computeCGT();
     // Only (2000 - 1270) should be taxed
-    assertClose(revenue.cgt, 240.9, "CGT exemption calculation failed");
+    this.assertClose(revenue.cgt, 240.9, "CGT exemption calculation failed");
   }
 
   testCGTWithLosses() {
@@ -83,11 +83,11 @@ class TestRevenue extends TestCase {
     // ETF gains - relief (can't apply losses) = 2000 - 1270 = 730
     // Regular gains - losses - remaining relief = 1000 - 500 - 0 = 500
     // Total tax = 730 * 0.41 + 500 * 0.33 = 464.3
-    assertClose(revenue.cgt, 464.3, "CGT calculation with losses failed");
+    this.assertClose(revenue.cgt, 464.3, "CGT calculation with losses failed");
   }
 
   runTests() {
-    const tests = [
+    super.runTests([
       'testBasicIncomeTax',
       'testMarriedIncomeTax',
       'testPRSIExemption',
@@ -95,18 +95,7 @@ class TestRevenue extends TestCase {
       'testPensionContributions',
       'testCGTExemption',
       'testCGTWithLosses'
-    ];
-    
-    let passed = 0;
-    for (const test of tests) {
-      try {
-        this[test]();
-        console.log(`✓ ${test} passed`);
-        passed++;
-      } catch (e) {
-        console.error(`✗ ${test}: ${e.message}`);
-      }
-    }
-    console.log(`${passed}/${tests.length} tests passed`);
+    ])
   }
+
 }

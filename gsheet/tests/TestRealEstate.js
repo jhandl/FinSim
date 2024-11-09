@@ -11,11 +11,11 @@ class TestRealEstate extends TestCase {
     const property = new Property();
     property.buy(100000, 0.03); // 100k purchase with 3% appreciation
     
-    assertClose(property.getValue(), 100000, "Initial property value should match purchase price");
+    this.assertClose(property.getValue(), 100000, "Initial property value should match purchase price");
     
     property.addYear();
     // Value should increase by appreciation + inflation: 100000 * 1.03
-    assertClose(property.getValue(), 103000, "Property value after 1 year should include appreciation");
+    this.assertClose(property.getValue(), 103000, "Property value after 1 year should include appreciation");
   }
 
   testMortgageCalculation() {
@@ -26,12 +26,12 @@ class TestRealEstate extends TestCase {
     property.buy(100000,0);
     property.mortgage(30, 0.04, 12*954.83);
     
-    assertClose(property.borrowed, 200000, "Mortgage principal calculation failed", 0.5);
-    assertClose(property.getPayment(), 12*954.83, "Monthly payment should match input");
+    this.assertClose(property.borrowed, 200000, "Mortgage principal calculation failed", 0.5);
+    this.assertClose(property.getPayment(), 12*954.83, "Monthly payment should match input");
     
     // After 15 years (halfway)
     for (let i = 0; i < 15; i++) property.addYear();
-    assertClose(property.fractionRepaid, 0.5, "Mortgage repayment fraction after 15/30 years");
+    this.assertClose(property.fractionRepaid, 0.5, "Mortgage repayment fraction after 15/30 years");
   }
 
   testPropertyPortfolio() {
@@ -42,15 +42,15 @@ class TestRealEstate extends TestCase {
     portfolio.buy("home", 100000, 0.03);
     portfolio.buy("rental", 150000, 0.04);
     
-    assertClose(portfolio.getTotalValue(), 250000, "Portfolio total value should sum all properties");
+    this.assertClose(portfolio.getTotalValue(), 250000, "Portfolio total value should sum all properties");
     
     // Add mortgage to rental property
     portfolio.mortgage("rental", 20, 0.035, 1000);
     
     // Sell home property
     const salePrice = portfolio.sell("home");
-    assertClose(salePrice, 100000, "Property sale value should match current value");
-    assertClose(portfolio.getTotalValue(), 150000, "Portfolio should update after sale");
+    this.assertClose(salePrice, 100000, "Property sale value should match current value");
+    this.assertClose(portfolio.getTotalValue(), 150000, "Portfolio should update after sale");
   }
 
   testPropertyAppreciation() {
@@ -65,7 +65,7 @@ class TestRealEstate extends TestCase {
     
     // Initial value should be down payment + borrowed amount
     const borrowed = portfolio.properties["home"].borrowed;
-    assertClose(portfolio.getValue("home"), 100000, "Initial value should be the down payment");
+    this.assertClose(portfolio.getValue("home"), 100000, "Initial value should be the down payment");
     
     // After 5 years
     for (let i = 0; i < 5; i++) portfolio.addYear();
@@ -74,37 +74,26 @@ class TestRealEstate extends TestCase {
     // 1. Original value appreciated at 3% inflation for 5 years
     // 2. Mortgage repayment fraction (5/30)
     const expectedValue = adjust(100000 + borrowed * (5/30), 0.03, 5);
-    assertClose(portfolio.getValue("home"), expectedValue, "Property value should reflect appreciation and mortgage repayment");
+    this.assertClose(portfolio.getValue("home"), expectedValue, "Property value should reflect appreciation and mortgage repayment");
   }
 
   testNonExistentProperty() {
     this.setUp();
     const portfolio = new RealEstate();
     
-    assertClose(portfolio.getValue("nonexistent"), 0, "Non-existent property should return 0 value");
-    assertClose(portfolio.getPayment("nonexistent"), 0, "Non-existent property should return 0 payment");
-    assertClose(portfolio.sell("nonexistent"), 0, "Selling non-existent property should return 0");
+    this.assertClose(portfolio.getValue("nonexistent"), 0, "Non-existent property should return 0 value");
+    this.assertClose(portfolio.getPayment("nonexistent"), 0, "Non-existent property should return 0 payment");
+    this.assertClose(portfolio.sell("nonexistent"), 0, "Selling non-existent property should return 0");
   }
 
   runTests() {
-    const tests = [
+    super.runTests([
       'testPropertyPurchase',
       'testMortgageCalculation',
       'testPropertyPortfolio',
       'testPropertyAppreciation',
       'testNonExistentProperty'
-    ];
-    
-    let passed = 0;
-    for (const test of tests) {
-      try {
-        this[test]();
-        console.log(`✓ ${test} passed`);
-        passed++;
-      } catch (e) {
-        console.error(`✗ ${test} failed: ${e.message}`);
-      }
-    }
-    console.log(`${passed}/${tests.length} tests passed`);
+    ])
   }
+
 }
