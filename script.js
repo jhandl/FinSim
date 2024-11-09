@@ -4,6 +4,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const submitButton = document.getElementById('submitButton');
   const thankYouMessage = document.getElementById('thankYouMessage');
 
+  // Check if user is already registered
+  if (localStorage.getItem('isRegistered')) {
+    formContainer.style.display = 'none';
+    thankYouMessage.style.display = 'block';
+    thankYouMessage.classList.add('show');
+    registerButton.classList.add('disabled');
+    registerButton.textContent = 'Registered';
+  }
+
   registerButton.addEventListener('click', (event) => {
     event.preventDefault();
     formContainer.classList.toggle('show');
@@ -33,6 +42,11 @@ document.addEventListener('DOMContentLoaded', () => {
         first_name: name.split(' ')[0],
         last_name: name.split(' ')[1] || '',
       });
+
+      // Store registration state
+      localStorage.setItem('isRegistered', 'true');
+      localStorage.setItem('registeredEmail', email);
+      localStorage.setItem('registeredName', name);
     } else {
       alert('Please fill in a valid name and email address.');
     }
