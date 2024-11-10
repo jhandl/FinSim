@@ -1,9 +1,9 @@
-var age, year, phase, periods, row, failedAt, success, montecarlo;
-var config, revenue, realEstate, stockGrowthOverride;
+var ui, params, events, config, dataSheet, row, errors;
+var age, year, phase, periods, failedAt, success, montecarlo;
+var revenue, realEstate, stockGrowthOverride;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var incomeStatePension, incomePrivatePension, incomeEtfRent, incomeTrustRent, withdrawalRate;
 var cash, etf, trust, pension;
-var ui, dataSheet = [];
 
 const Phases = {
   growth: 'growth',
@@ -19,21 +19,29 @@ function run() {
   let successes = 0;
   ui.updateProgress("Running");
   for (let run = 0; run < runs; run++) {
+    console.log("Run: " + run);
     successes += runSimulation(); 
   }
+  console.log("Finished");
   ui.updateDataSheet(runs);
   ui.updateStatusCell(successes, runs);
 }
 
 function initializeSimulator() {
-  ui = new UIManager(new GoogleSheetsUI());
-  config = new Config();
+  if (typeof SpreadsheetApp !== 'undefined') {
+    ui = new UIManager(new GoogleSheetsUI());
+  } else {
+    ui = new UIManager(new WebUI());
+  }
+  ui.setStatus("Initializing", STATUS_COLORS.INFO);
+  config = new Config(ui.ui);
   revenue = new Revenue();
   errors = false;
   params = ui.readParameters();
   events = ui.readEvents();
   if (errors) {
-    ui.setStatus("Check errors", ui.STATUS_COLORS.WARNING);
+    console.log("Errors!");
+    ui.setStatus("Check errors", STATUS_COLORS.WARNING);
   }
   dataSheet = [];
   return !errors;
@@ -103,7 +111,6 @@ function runSimulation() {
     processEvents();
     handleInvestments();
     updateYearlyData();
-
   }
   return (success || (failedAt > params.targetAge));
 }
@@ -224,8 +231,7 @@ function processEvents() {
 }
 
 
-function handleInvestments() {
-
+function handleInvestments() {  
   netIncome = revenue.netIncome() + incomeTaxFree;
 
   if (netIncome > expenses) {
@@ -233,14 +239,17 @@ function handleInvestments() {
     cash += savings;
   }
   targetCash = adjust(params.emergencyStash);
+  
   if ((phase == Phases.lumpSum) && (cash < targetCash) && (age >= params.retirementAge)) {
     phase = Phases.retired;
   }
+  
   if (cash < targetCash) {
     cashDeficit = targetCash - cash;
   }
 
   let capitalPreWithdrawal = etf.capital() + trust.capital();
+  
   // If deficit, drawdown from where needed
   if (expenses > netIncome) {
     switch (phase) {
@@ -255,6 +264,7 @@ function handleInvestments() {
         break;
     }
   }
+
   if (capitalPreWithdrawal > 0) {
     withdrawalRate = (incomeEtfRent + incomeTrustRent) / capitalPreWithdrawal;
   } else {

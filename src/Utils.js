@@ -1,3 +1,10 @@
+STATUS_COLORS = {
+  ERROR: "#ff8080",
+  WARNING: "#ffe066",
+  SUCCESS: "#9fdf9f",
+  NEUTRAL: "#E0E0E0",
+  WHITE: "#FFFFFF"
+};
 
 // This function assumes fixed rate. If the rate varies each year, the adjustment needs to take into account
 // the history of variation, or it needs to take the previous value (not the start value) and apply the latest 

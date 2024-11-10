@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Ireland Financial Simulator</title>
+    <link rel="stylesheet" href="css/simulator.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <h1>Ireland Financial Simulator <span class="version">Version 1.26</span></h1>
+        </div>
+        <div class="header-center">
+            <button id="runSimulation" class="primary-button">Run Simulation</button>
+            <div id="progress" class="status-indicator">Ready</div>
+        </div>
+        <div class="header-right">
+            <button id="saveSimulation" class="secondary-button">Save</button>
+            <input type="file" id="loadSimulation" accept=".csv" style="display: none;">
+            <button id="loadSimulationBtn" class="secondary-button">Load</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="parameters-section">
+            <div class="card" id="startingPosition">
+                <h2>Starting Position</h2>
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <label for="StartingAge">Current Age</label>
+                        <input type="number" id="StartingAge" min="0" max="100">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="InitialSavings">Current Savings</label>
+                        <input type="number" id="InitialSavings">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="InitialPension">Pension Fund</label>
+                        <input type="number" id="InitialPension">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="InitialETFs">ETF Investments</label>
+                        <input type="number" id="InitialETFs">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="InitialTrusts">Trust Investments</label>
+                        <input type="number" id="InitialTrusts">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="targetsAllocations">
+                <h2>Targets & Allocations</h2>
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <label for="TargetAge">Target Age</label>
+                        <input type="number" id="TargetAge" min="0" max="100">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="RetirementAge">Retirement Age</label>
+                        <input type="number" id="RetirementAge" min="0" max="100">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="EmergencyStash">Emergency Fund</label>
+                        <input type="number" id="EmergencyStash">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="EtfAllocation">ETF Allocation (%)</label>
+                        <input type="number" id="EtfAllocation" min="0" max="100">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="TrustAllocation">Trust Allocation (%)</label>
+                        <input type="number" id="TrustAllocation" min="0" max="100">
+                    </div>
+
+                    <div class="input-wrapper">
+                        <label for="PensionContributionPercentage">Pension Contribution (%)</label>
+                        <input type="number" id="PensionContributionPercentage" min="0" max="100">
+                    </div>
+
+                    <div class="input-wrapper">
+                        <label for="PensionContributionCapped">Pension Contribution Capped</label>
+                        <select id="PensionContributionCapped">
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="growthRates">
+                <h2>Economy Parameters</h2>
+                <table class="growth-rates-table">
+                    <thead>
+                        <tr>
+                            <th>Investment</th>
+                            <th>Growth Rate (%)</th>
+                            <th>Volatility (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Pension</td>
+                            <td><input type="number" id="PensionGrowthRate" step="0.1"></td>
+                            <td><input type="number" id="PensionGrowthStdDev" step="0.1"></td>
+                        </tr>
+                        <tr>
+                            <td>ETFs</td>
+                            <td><input type="number" id="EtfGrowthRate" step="0.1"></td>
+                            <td><input type="number" id="EtfGrowthStdDev" step="0.1"></td>
+                        </tr>
+                        <tr>
+                            <td>Trusts</td>
+                            <td><input type="number" id="TrustGrowthRate" step="0.1"></td>
+                            <td><input type="number" id="TrustGrowthStdDev" step="0.1"></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="input-group" style="margin-top: 1rem;">
+                    <div class="input-wrapper">
+                        <label for="Inflation">Inflation (%)</label>
+                        <input type="number" id="Inflation" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="personalCircumstances">
+                <h2>Personal Circumstances</h2>
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <label for="MarriageYear">Marriage Year</label>
+                        <input type="number" id="MarriageYear">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="YoungestChildBorn">Youngest Child Birth Year</label>
+                        <input type="number" id="YoungestChildBorn">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="OldestChildBorn">Oldest Child Birth Year</label>
+                        <input type="number" id="OldestChildBorn">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="PersonalTaxCredit">Personal Tax Credit</label>
+                        <input type="number" id="PersonalTaxCredit">
+                    </div>
+
+                    <div class="input-wrapper">
+                        <label for="StatePensionWeekly">State Pension (Weekly)</label>
+                        <input type="number" id="StatePensionWeekly">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="drawdownPriorities">
+                <h2>Drawdown Priorities</h2>
+                <p class="help-text">Drag to reorder how your investments will be used during retirement</p>
+                <div class="priorities-container">
+                    <div class="priority-item" draggable="true" data-priority-id="PriorityCash">
+                        <div class="drag-handle">⋮⋮</div>
+                        <div class="priority-icon">💰</div>
+                        <div class="priority-label">Cash</div>
+                        <input type="hidden" id="PriorityCash" value="1">
+                    </div>
+                    <div class="priority-item" draggable="true" data-priority-id="PriorityPension">
+                        <div class="drag-handle">⋮⋮</div>
+                        <div class="priority-icon">🏦</div>
+                        <div class="priority-label">Pension</div>
+                        <input type="hidden" id="PriorityPension" value="2">
+                    </div>
+                    <div class="priority-item" draggable="true" data-priority-id="PriorityETF">
+                        <div class="drag-handle">⋮⋮</div>
+                        <div class="priority-icon">📈</div>
+                        <div class="priority-label">ETFs</div>
+                        <input type="hidden" id="PriorityETF" value="3">
+                    </div>
+                    <div class="priority-item" draggable="true" data-priority-id="PriorityTrust">
+                        <div class="drag-handle">⋮⋮</div>
+                        <div class="priority-icon">🏢</div>
+                        <div class="priority-label">Trusts</div>
+                        <input type="hidden" id="PriorityTrust" value="4">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="events-section">
+            <h2>Events</h2>
+            <div class="table-container">
+                <table id="Events">
+                    <thead>
+                        <tr>
+                            <th>Event Type</th>
+                            <th>Name</th>
+                            <th>Amount</th>
+                            <th>From Age</th>
+                            <th>To Age</th>
+                            <th>Rate</th>
+                            <th>Extra</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rows will be added dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            <button id="addEventRow" class="secondary-button">Add Event</button>
+        </div>
+
+        <div class="graphs-section">
+            <div class="graph-container">
+                <canvas id="cashflowGraph"></canvas>
+            </div>
+            <div class="graph-container">
+                <canvas id="assetsGraph"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <a href="#" class="footer-link">User Manual</a>
+        <a href="#" class="footer-link">Version History</a>
+        <span class="disclaimer">This simulator is for educational purposes only.</span>
+    </footer>
+
+    <script src="../src/Config.js"></script>
+    <script src="../src/Events.js"></script>
+    <script src="../src/Revenue.js"></script>
+    <script src="../src/Equities.js"></script>
+    <script src="../src/RealEstate.js"></script>
+    <script src="../src/Utils.js"></script>
+    <script src="../src/AbstractUI.js"></script>
+    <script src="../src/UIManager.js"></script>
+    <script src="../src/WebUI.js"></script>
+    <script src="../src/Simulator.js"></script>
+    <script src="js/simulator.js"></script>
+</body>
+</html> 

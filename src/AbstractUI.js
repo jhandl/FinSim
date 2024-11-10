@@ -1,4 +1,5 @@
 class AbstractUI {
+  
   constructor() {
     if (this.constructor === AbstractUI) {
       throw new Error("Abstract class cannot be instantiated");
@@ -14,7 +15,7 @@ class AbstractUI {
   }
 
   setValue(elementId, value) {
-    throw new Error("Method 'getValue' must be implemented");
+    throw new Error("Method 'setValue' must be implemented");
   }
 
   getTableData(groupId, columnCount) {
@@ -51,5 +52,53 @@ class AbstractUI {
 
   flush() {
     throw new Error("Method 'flush' must be implemented");
+  }
+
+  getVersion() {
+    throw new Error("Method 'getVersion' must be implemented");
+  }
+
+  setVersion(version) {
+    throw new Error("Method 'setVersion' must be implemented");
+  }
+
+  fetchUrl(url) {
+    throw new Error("Method 'fetchUrl' must be implemented");
+  }
+
+  showAlert(message, buttons) {
+    throw new Error("Method 'showAlert' must be implemented");
+  }
+
+  showToast(message, title, timeout) {
+    throw new Error("Method 'showToast' must be implemented");
+  }
+
+  setVersionNote(message) {
+    throw new Error("Method 'setVersionNote' must be implemented");
+  }
+
+  clearVersionNote() {
+    throw new Error("Method 'clearVersionNote' must be implemented");
+  }
+
+  setVersionHighlight(warning) {
+    throw new Error("Method 'setVersionHighlight' must be implemented");
+  }
+
+  newCodeVersion(latestVersion) {
+    throw new Error("Method 'newCodeVersion' must be implemented");
+  }
+
+  newDataVersion(latestVersion) {
+    throw new Error("Method 'newDataVersion' must be implemented");
+  }
+
+  clearAllWarnings() {
+    throw new Error("Method 'clearAllWarnings' must be implemented");
+  }
+
+  setTableCellWarning(tableName, row, col, message) {
+    throw new Error("Method 'setTableCellWarning' must be implemented");
   }
 } 

@@ -1,17 +1,8 @@
 class WebUI extends AbstractUI {
+
   constructor() {
     super();
-    this.STATUS_COLORS = {
-      ERROR: "#ff8080",
-      WARNING: "#ffe066",
-      SUCCESS: "#9fdf9f",
-      NEUTRAL: "#E0E0E0",
-      WHITE: "#FFFFFF"
-    };
     this.editCallbacks = new Map();
-  }
-
-  initialize() {
     this.statusElement = document.getElementById('progress');
     this.setupEventListeners();
   }
@@ -19,7 +10,22 @@ class WebUI extends AbstractUI {
   getValue(elementId) {
     const element = document.getElementById(elementId);
     if (!element) throw new Error(`Element not found: ${elementId}`);
-    return element.value !== undefined ? element.value : element.textContent;
+    const percentageFields = [
+      'PensionGrowthRate',
+      'PensionGrowthStdDev',
+      'EtfGrowthRate',
+      'EtfGrowthStdDev',
+      'TrustGrowthRate',
+      'TrustGrowthStdDev',
+      'Inflation'
+    ];
+    if (element.value !== undefined) {
+      if (percentageFields.includes(elementId)) {
+        return (parseFloat(element.value) || 0) / 100;
+      }
+      return element.value;
+    } 
+    return element.textContent;
   }
 
   setValue(elementId, value) {
@@ -44,10 +50,26 @@ class WebUI extends AbstractUI {
       if (cells.length === 0) continue; // Skip header row
       
       const rowData = [];
-      for (let i = 0; i < columnCount; i++) {
-        const value = cells[i]?.querySelector('input')?.value ?? 
-                     cells[i]?.textContent ?? '';
-        rowData.push(value);
+      
+      // Special handling for events table
+      if (groupId === 'Events') {
+        // Get type and name from first two cells
+        const type = cells[0].querySelector('select')?.value || '';
+        const name = cells[1].querySelector('input')?.value || '';
+        rowData.push(`${type}:${name}`); // Combined type:name as first element
+        
+        // Get remaining values starting from the Amount column (index 2)
+        for (let i = 2; i < columnCount + 1; i++) {
+          const input = cells[i]?.querySelector('input');
+          rowData.push(input?.value || '');
+        }
+      } else {
+        // Normal table handling
+        for (let i = 0; i < columnCount; i++) {
+          const value = cells[i]?.querySelector('input')?.value ?? 
+                       cells[i]?.textContent ?? '';
+          rowData.push(value);
+        }
       }
       
       if (rowData[0] === "") break;
@@ -58,15 +80,14 @@ class WebUI extends AbstractUI {
   }
 
   setStatus(message, color) {
-    if (!this.statusElement) return;
-    this.statusElement.textContent = message;
+    this.statusElement.innerHTML = message;
     if (color) {
       this.statusElement.style.backgroundColor = color;
     }
   }
 
-  setProgress(percentage) {
-    this.setStatus(`Processing ${Math.round(percentage)}%`, this.STATUS_COLORS.NEUTRAL);
+  setProgress(msg) {
+    this.setStatus(msg, STATUS_COLORS.NEUTRAL);
   }
 
   clearContent(groupId) {
@@ -85,19 +106,43 @@ class WebUI extends AbstractUI {
   }
 
   setWarning(elementId, message) {
-    const element = document.getElementById(elementId);
-    if (!element) throw new Error(`Element not found: ${elementId}`);
-    
-    element.setAttribute('title', message);
-    element.style.backgroundColor = this.STATUS_COLORS.WARNING;
-    
-    // Add warning icon if not exists
-    if (!element.nextElementSibling?.classList.contains('warning-icon')) {
-      const warningIcon = document.createElement('span');
-      warningIcon.classList.add('warning-icon');
-      warningIcon.textContent = '⚠️';
-      element.parentNode.insertBefore(warningIcon, element.nextSibling);
+    // Parse table cell reference if in format "TableName[row,col]"
+    const tableMatch = elementId.match(/^(\w+)\[(\d+),(\d+)\]$/);
+    if (tableMatch) {
+      const [_, tableName, row, col] = tableMatch;
+      this.setTableCellWarning(tableName, parseInt(row), parseInt(col), message);
+    } else {
+      const element = document.getElementById(elementId);
+      if (!element) throw new Error(`Element not found: ${elementId}`);
+      
+      element.setAttribute('title', message);
+      element.style.backgroundColor = STATUS_COLORS.WARNING;
+      
+      // Add warning icon if not exists
+      if (!element.nextElementSibling?.classList.contains('warning-icon')) {
+        const warningIcon = document.createElement('span');
+        warningIcon.classList.add('warning-icon');
+        warningIcon.textContent = '⚠️';
+        element.parentNode.insertBefore(warningIcon, element.nextSibling);
+      }
     }
+  }
+
+  setTableCellWarning(tableName, row, col, message) {
+    const table = document.getElementById(tableName);
+    if (!table) throw new Error(`Table not found: ${tableName}`);
+    
+    const tbody = table.getElementsByTagName('tbody')[0];
+    const rows = tbody.getElementsByTagName('tr');
+    
+    if (row - 1 >= rows.length) return;
+    
+    const cells = rows[row - 1].getElementsByTagName('td');
+    if (col - 1 >= cells.length) return;
+    
+    const cell = cells[col - 1];
+    cell.setAttribute('title', message);
+    cell.style.backgroundColor = STATUS_COLORS.WARNING;
   }
 
   clearWarning(elementId) {
@@ -105,12 +150,22 @@ class WebUI extends AbstractUI {
     if (!element) throw new Error(`Element not found: ${elementId}`);
     
     element.removeAttribute('title');
-    element.style.backgroundColor = this.STATUS_COLORS.WHITE;
+    element.style.backgroundColor = STATUS_COLORS.WHITE;
     
     const warningIcon = element.nextElementSibling;
     if (warningIcon?.classList.contains('warning-icon')) {
       warningIcon.remove();
     }
+  }
+
+  clearAllWarnings() {
+    // Find all elements with background color matching WARNING
+    const elements = document.querySelectorAll(`[style*="background-color: ${STATUS_COLORS.WARNING}"]`);
+    elements.forEach(element => {
+      if (element.id) {
+        this.clearWarning(element.id);
+      }
+    });
   }
 
   setBackground(elementId, color) {
@@ -159,4 +214,84 @@ class WebUI extends AbstractUI {
       this.setProgress((rowIndex / document.querySelectorAll('[id^="Year_"]').length) * 100);
     }
   }
+
+  getVersion() {
+    return localStorage.getItem('simulatorVersion') || '1.26';
+  }
+
+  setVersion(version) {
+    localStorage.setItem('simulatorVersion', version);
+    const versionSpan = document.querySelector('.version');
+    if (versionSpan) {
+      versionSpan.textContent = `Version ${version}`;
+    }
+  }
+
+  newDataVersion(latestVersion) {
+    if (this.showAlert("New configuration version available ("+latestVersion+"):\n\n"+config.dataUpdateMessage+")\n\nDo you want to update?", true))   {
+      this.setVersion(latestVersion);
+      this.showToast("Configuration updated to version " + latestVersion, "", 15);
+    }
+  }
+
+  fetchUrl(url) {
+    let xhr = new XMLHttpRequest();
+    xhr.open('GET', url, false);  // false makes the request synchronous
+    try {
+      xhr.send();
+      if (xhr.status === 200) {
+        return xhr.responseText;
+      } else {
+        throw new Error(`HTTP error! status: ${xhr.status}`);
+      }
+    } catch (error) {
+      throw new Error(`Failed to fetch URL: ${error.message}`);
+    }
+  }
+
+  showAlert(message, buttons = false) {
+    if (buttons) {
+      return confirm(message); // Returns true for OK/Yes, false for Cancel/No
+    } else {
+      alert(message);
+      return null;
+    }
+  }
+
+  showToast(message, title, timeout) {
+    // Simple implementation using a div that fades out
+    const toast = document.createElement('div');
+    toast.className = 'toast-message';
+    toast.textContent = title ? `${title}: ${message}` : message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.remove();
+    }, timeout * 1000);
+  }
+
+  setVersionNote(message) {
+    const versionSpan = document.querySelector('.version');
+    if (versionSpan) {
+      versionSpan.title = message;
+    }
+  }
+
+  clearVersionNote() {
+    const versionSpan = document.querySelector('.version');
+    if (versionSpan) {
+      versionSpan.title = '';
+    }
+  }
+
+  setVersionHighlight(warning) {
+    const versionSpan = document.querySelector('.version');
+    if (versionSpan) {
+      versionSpan.style.backgroundColor = warning ? '#ffe066' : 'transparent';
+    }
+  }
+
+  newCodeVersion(latestVersion) {
+    // No action needed in web version as users always get the latest version
+  }
+
 } 

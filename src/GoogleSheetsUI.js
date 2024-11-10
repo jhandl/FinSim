@@ -1,18 +1,9 @@
 class GoogleSheetsUI extends AbstractUI {
+
   constructor() {
     super();
     this.spreadsheet = null;
     this.namedRanges = new Map();
-    this.STATUS_COLORS = {
-      ERROR: "#ff8080",
-      WARNING: "#ffe066",
-      SUCCESS: "#9fdf9f",
-      NEUTRAL: "#E0E0E0",
-      WHITE: "#FFFFFF"
-    };
-  }
-
-  initialize() {
     this.spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     this.statusCell = this.spreadsheet.getRangeByName("Progress").getCell(1, 1);
     this.cacheNamedRanges();
@@ -63,7 +54,7 @@ class GoogleSheetsUI extends AbstractUI {
   }
 
   setProgress(message) {
-    this.setStatus(message, this.STATUS_COLORS.NEUTRAL);
+    this.setStatus(message, STATUS_COLORS.NEUTRAL);
   }
 
   clearContent(groupId) {
@@ -73,17 +64,35 @@ class GoogleSheetsUI extends AbstractUI {
   }
 
   setWarning(elementId, message) {
-    const range = this.namedRanges.get(elementId);
-    if (!range) throw new Error(`Element not found: ${elementId}`);
-    range.setNote(message);
-    range.setBackground(this.STATUS_COLORS.WARNING);
+    // Parse table cell reference if in format "TableName[row,col]"
+    const tableMatch = elementId.match(/^(\w+)\[(\d+),(\d+)\]$/);
+    if (tableMatch) {
+      const [_, tableName, row, col] = tableMatch;
+      this.setTableCellWarning(tableName, parseInt(row), parseInt(col), message);
+    } else {    
+      const range = this.namedRanges.get(elementId);
+      if (!range) throw new Error(`Element not found: ${elementId}`);
+      range.setNote(message);
+      range.setBackground(STATUS_COLORS.WARNING);
+      }
   }
 
+  setTableCellWarning(tableName, row, col, message) {
+    const range = this.namedRanges.get(tableName);
+    if (!range) throw new Error(`Table not found: ${tableName}`);
+    const cell = range.getCell(row, col);
+    cell.setNote(message);
+    cell.setBackground(STATUS_COLORS.WARNING);
+  }
   clearWarning(elementId) {
     const range = this.namedRanges.get(elementId);
     if (!range) throw new Error(`Element not found: ${elementId}`);
     range.clearNote();
-    range.setBackground(this.STATUS_COLORS.WHITE);
+    range.setBackground(STATUS_COLORS.WHITE);
+  }
+
+  clearAllWarnings() {
+    this.clearWarning("Parameters");
   }
 
   setBackground(elementId, color) {
@@ -96,7 +105,6 @@ class GoogleSheetsUI extends AbstractUI {
     SpreadsheetApp.flush();
   }
 
-  // Helper method for data rows
   setDataRow(rowIndex, data) {
     Object.entries(data).forEach(([field, value]) => {
       const range = this.namedRanges.get(field);
@@ -109,7 +117,68 @@ class GoogleSheetsUI extends AbstractUI {
     });
   }
 
-} 
+  getVersion() {
+    let title = this.spreadsheet.getRange("Main!B2").getCell(1,1).getValue();
+    return title.match(/\d+\.\d+/g)[0];
+  }
+
+  setVersion(version) {
+    this.spreadsheet.getRange("Main!B2").getCell(1,1).setValue("Version " + version);
+  }
+
+  fetchUrl(url) {
+    return UrlFetchApp.fetch(url).getContentText();
+  }
+
+  showAlert(message, buttons = false) {
+    if (buttons) {
+        var result = SpreadsheetApp.getUi().alert(
+            message, 
+            SpreadsheetApp.getUi().ButtonSet.YES_NO
+        );
+        return result === SpreadsheetApp.getUi().Button.YES;
+    } else {
+        SpreadsheetApp.getUi().alert(message);
+        return null;
+    }
+  }
+
+  showToast(message, title, timeout) {
+    SpreadsheetApp.getActive().toast(message, title, timeout);
+  }
+
+  setVersionNote(message) {
+    let titleCell = this.spreadsheet.getRange("Main!B2").getCell(1,1);
+    titleCell.setNote(message);
+  }
+
+  clearVersionNote() {
+    let titleCell = this.spreadsheet.getRange("Main!B2").getCell(1,1);
+    titleCell.clearNote();
+  }
+
+  setVersionHighlight(warning) {
+    let titleCell = this.spreadsheet.getRange("Main!B2").getCell(1,1);
+    titleCell.setBackground(warning ? "#ffe066" : "#c9daf8");
+  }
+
+  newCodeVersion(latestVersion) {
+    SpreadsheetApp.getUi().alert("*** New spreadsheet version available: "+latestVersion+" ***\n\nhttps://tinyurl.com/financial-simulator");
+    let titleCell = this.spreadsheet.getRange("Main!B2").getCell(1,1);
+    titleCell.setNote("A new version ("+latestVersion+") of this spreadsheet is available at https://tinyurl.com/financial-simulator");
+    titleCell.setBackground("#ffe066");
+  }
+
+  newDataVersion(latestVersion) {
+    const result = this.showAlert(config.dataUpdateMessage+"\n\nDo you want to update?", true);
+    if (result === true) {
+      this.setVersion(latestVersion);
+      this.showToast("Version updated!", "", 15);
+    }
+  }
+
+}
+
 
 function onEdit(e) {
   if (e.range.getA1Notation() == 'F2') {

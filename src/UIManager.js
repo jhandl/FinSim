@@ -1,14 +1,7 @@
 class UIManager {
+
   constructor(ui) {
     this.ui = ui;
-    this.STATUS_COLORS = {
-      ERROR: "#ff8080",
-      WARNING: "#ffe066",
-      SUCCESS: "#9fdf9f",
-      NEUTRAL: "#E0E0E0",
-      WHITE: "#FFFFFF"
-    };
-    this.ui.initialize();
   }
 
   updateDataSheet(runs) {
@@ -37,11 +30,16 @@ class UIManager {
     } else {
       if (success || failedAt > params.targetAge) {
         const msg = success ? "Success!" : "Made it to " + failedAt;
-        this.ui.setStatus(msg, this.STATUS_COLORS.SUCCESS);
+        this.ui.setStatus(msg, STATUS_COLORS.SUCCESS);
       } else {
-        this.ui.setStatus("Failed at age " + failedAt, this.STATUS_COLORS.ERROR);
+        this.ui.setStatus("Failed at age " + failedAt, STATUS_COLORS.ERROR);
       }
     }
+    this.ui.flush();
+  }
+
+  setStatus(message, color) {
+    this.ui.setStatus(message, color);
     this.ui.flush();
   }
 
@@ -113,7 +111,7 @@ class UIManager {
       personalTaxCredit: this.ui.getValue("PersonalTaxCredit")
     };
 
-    this.ui.clearWarning("Parameters");
+    this.ui.clearAllWarnings();
 
     if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
       this.ui.setWarning("RetirementAge", "Warning: Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
@@ -137,13 +135,13 @@ class UIManager {
     
     this.ui.clearWarning("Events");
     
-    const rows = this.ui.getTableData("Events", 6);
+    const rows = this.ui.getTableData("Events", 7);
     
     for (const [i, [name, amount, fromAge, toAge, rate, extra]] of rows.entries()) {
       const pos = name.indexOf(":");
       if (pos < 0) {
         if (name === "") break;
-        this.ui.setWarning(`Events_${i + 1}`, "Invalid event format: missing colon.");
+        this.ui.setWarning(`Events[${i + 1},1]`, "Invalid event format: missing colon.");
         errors = true;
         break;
       }
@@ -167,7 +165,7 @@ class UIManager {
         const validTypesMsg = Object.keys(valid)
           .map(key => `${key} (${valid[key]})`)
           .join(", ");
-        this.ui.setWarning(`Events_${i + 1}`, `Invalid event type. Valid types are: ${validTypesMsg}`);
+        this.ui.setWarning(`Events[${i + 1},1]`, `Invalid event type. Valid types are: ${validTypesMsg}`);
         errors = true;
         break;
       }
@@ -197,20 +195,21 @@ class UIManager {
           if (events[p].type === 'R' && events[p].id === events[m].id) {
             found = true;
             if (events[p].fromAge !== events[m].fromAge) {
-              this.ui.setWarning(`Events_${m + 1}`, "The mortgage (M) and purchase (R) events for a property should have the same starting age.");
+              this.ui.setWarning(`Events[${m + 1},3]`, "The mortgage (M) and purchase (R) events for a property should have the same starting age.");
               errors = true;
             }
             if (events[m].toAge > events[p].toAge) {
-              this.ui.setWarning(`Events_${m + 1}`, "The mortgage should not continue after the property is sold.");
+              this.ui.setWarning(`Events[${m + 1},4]`, "The mortgage should not continue after the property is sold.");
               errors = true;
             }
           }
         }
         if (!found) {
-          this.ui.setWarning(`Events_${m + 1}`, `Couldn't find a purchase (R) event for the property '${events[m].id}'.`);
+          this.ui.setWarning(`Events[${m + 1},1]`, `Couldn't find a purchase (R) event for the property '${events[m].id}'.`);
           errors = true;
         }
       }
     }
   }
+
 } 
