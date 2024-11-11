@@ -42,7 +42,6 @@ class UIManager {
 
   setStatus(message, color) {
     this.ui.setStatus(message, color);
-    this.ui.flush();
   }
 
   updateDataRow(row, progress, scale = 1) {
@@ -79,9 +78,7 @@ class UIManager {
     }
   }
 
-  readParameters() {
-    this.updateProgress("Initializing");
-    
+  readParameters(validate = true) {
     const params = {
       startingAge: this.ui.getValue("StartingAge"),
       targetAge: this.ui.getValue("TargetAge"),
@@ -112,64 +109,68 @@ class UIManager {
       oldestChildBorn: this.ui.getValue("OldestChildBorn"),
       personalTaxCredit: this.ui.getValue("PersonalTaxCredit")
     };
+    if (validate) {
+      this.ui.clearAllWarnings();
+      if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
+        this.ui.setWarning("RetirementAge", "Warning: Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
+      }
+      if (params.retirementAge < config.minPrivatePensionRetirementAge) {
+        this.ui.setWarning("RetirementAge", "Warning: Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
+      }
 
-    this.ui.clearAllWarnings();
-
-    if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
-      this.ui.setWarning("RetirementAge", "Warning: Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
-    }
-    if (params.retirementAge < config.minPrivatePensionRetirementAge) {
-      this.ui.setWarning("RetirementAge", "Warning: Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
-    }
-
-    if (params.etfAllocation + params.trustAllocation > 1.0001) {
-      this.ui.setWarning("EtfAllocation", "ETF + Trust allocations can't exceed 100%");
-      this.ui.setWarning("TrustAllocation", "");
-      errors = true;
+      if (params.etfAllocation + params.trustAllocation > 1.0001) {
+        this.ui.setWarning("EtfAllocation", "ETF + Trust allocations can't exceed 100%");
+        this.ui.setWarning("TrustAllocation", "");
+        errors = true;
+      }
     }
 
     return params;
   }
 
-  readEvents() {
+  readEvents(validate=true) {
     const events = [];
     errors = false;
     
     this.ui.clearWarning("Events");
     
-    const rows = this.ui.getTableData("Events", 7);
+    const rows = this.ui.getTableData("Events", 6);
     
     for (const [i, [name, amount, fromAge, toAge, rate, extra]] of rows.entries()) {
       const pos = name.indexOf(":");
       if (pos < 0) {
         if (name === "") break;
-        this.ui.setWarning(`Events[${i + 1},1]`, "Invalid event format: missing colon.");
-        errors = true;
-        break;
+        if (validate) {
+          this.ui.setWarning(`Events[${i + 1},1]`, "Invalid event format: missing colon.");
+          errors = true;
+          break;
+        }
       }
 
       const type = name.substr(0, pos);
-      const valid = {
-        "NOP": "Non-operation: way to make the simulation ignore an event without needing to remove the line",
-        "RI": "Rental Income",
-        "SI": "Salary Income (with private pension contribution if so defined)",
-        "SInp": "Salary Income (no private pension contribution)",
-        "UI": "RSU Income",
-        "DBI": "Defined Benefit Pension Income",
-        "FI": "Tax-free Income",
-        "E": "Expense",
-        "R": "Real Estate",
-        "M": "Mortgage",
-        "SM": "Stock Market"
-      }
+      if (validate) {
+        const valid = {
+          "NOP": "Non-operation: way to make the simulation ignore an event without needing to remove the line",
+          "RI": "Rental Income",
+          "SI": "Salary Income (with private pension contribution if so defined)",
+          "SInp": "Salary Income (no private pension contribution)",
+          "UI": "RSU Income",
+          "DBI": "Defined Benefit Pension Income",
+          "FI": "Tax-free Income",
+          "E": "Expense",
+          "R": "Real Estate",
+          "M": "Mortgage",
+          "SM": "Stock Market"
+        }
 
-      if (!valid.hasOwnProperty(type)) {
-        const validTypesMsg = Object.keys(valid)
-          .map(key => `${key} (${valid[key]})`)
-          .join(", ");
-        this.ui.setWarning(`Events[${i + 1},1]`, `Invalid event type. Valid types are: ${validTypesMsg}`);
-        errors = true;
-        break;
+        if (!valid.hasOwnProperty(type)) {
+          const validTypesMsg = Object.keys(valid)
+            .map(key => `${key} (${valid[key]})`)
+            .join(", ");
+          this.ui.setWarning(`Events[${i + 1},1]`, `Invalid event type. Valid types are: ${validTypesMsg}`);
+          errors = true;
+          break;
+        }
       }
 
       const id = name.substr(pos + 1);
@@ -184,8 +185,10 @@ class UIManager {
       ))
     }
 
-    this.validateMortgageEvents(events);
-    
+    if (validate) {
+      this.validateMortgageEvents(events);
+    }
+
     return events;
   }
 
@@ -212,6 +215,14 @@ class UIManager {
         }
       }
     }
+  }
+
+  saveToFile() {
+    this.ui.saveToFile();
+  }
+
+  loadFromFile(file) {
+    this.ui.loadFromFile(file);
   }
 
 } 

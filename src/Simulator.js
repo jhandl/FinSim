@@ -21,32 +21,51 @@ function run() {
   let successes = 0;
   ui.updateProgress("Running");
   for (let run = 0; run < runs; run++) {
-    console.log("Run: " + run);
     successes += runSimulation(); 
   }
-  console.log("Finished");
   ui.updateDataSheet(runs);
   ui.updateStatusCell(successes, runs);
 }
 
-function initializeSimulator() {
+function initializeUI() {
   if (typeof SpreadsheetApp !== 'undefined') {
     ui = new UIManager(new GoogleSheetsUI());
   } else {
     ui = new UIManager(new WebUI());
   }
+}
+
+function readScenario(validate) {
+  errors = false;
+  params = ui.readParameters(validate); // 6918 ms
+  events = ui.readEvents(validate); // 534 ms
+  if (errors) {
+    ui.setStatus("Check errors", STATUS_COLORS.WARNING);
+  }
+  return !errors;
+}
+
+function initializeSimulator() {
+  initializeUI();
   ui.setStatus("Initializing", STATUS_COLORS.INFO);
   config = new Config(ui.ui);
   revenue = new Revenue();
-  errors = false;
-  params = ui.readParameters();
-  events = ui.readEvents();
-  if (errors) {
-    console.log("Errors!");
-    ui.setStatus("Check errors", STATUS_COLORS.WARNING);
-  }
   dataSheet = [];
-  return !errors;
+  return readScenario(validate = true);
+}
+
+function saveToFile() {
+  initializeUI(); // 623 ms
+  ui.setStatus("Preparing to save", STATUS_COLORS.INFO);
+  if (readScenario(validate = false)) {
+    ui.saveToFile();
+  }
+  ui.setStatus("", STATUS_COLORS.INFO);
+}
+
+function loadFromFile(file) {
+  initializeUI();
+  ui.loadFromFile(file);
 }
 
 function initializeSimulationVariables() {

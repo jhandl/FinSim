@@ -105,4 +105,12 @@ class AbstractUI {
   isPercentage(elementId) {
     throw new Error("Method 'isPercentage' must be implemented");
   }
+
+  saveToFile() {
+    throw new Error("Method 'saveToFile' must be implemented");
+  }
+
+  loadFromFile(file) {
+    throw new Error("Method 'loadFromFile' must be implemented");
+  }
 } 

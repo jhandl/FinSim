@@ -517,34 +517,28 @@ footer {
     animation: priorityInsert 0.3s ease-out;
 }
 
-/* Add these styles for percentage inputs */
-.input-wrapper input[type="number"].percentage {
+/* Style for percentage inputs */
+.input-wrapper .percentage,
+.growth-rates-table .percentage {
     position: relative;
-    padding-right: 1.5rem;  /* Make room for the % symbol */
+    padding-right: 2rem !important; /* Make room for the % symbol */
 }
 
-.input-wrapper input[type="number"].percentage::after {
+/* Create a container for percentage inputs */
+.percentage-container {
+    position: relative;
+    width: 100%;
+    display: inline-block;
+}
+
+/* Add the % symbol */
+.percentage-container::after {
     content: '%';
     position: absolute;
-    right: 0.5rem;
+    right: 0.75rem;
     top: 50%;
     transform: translateY(-50%);
     color: #666;
     pointer-events: none;
-}
-
-/* Style for the growth rates table percentage inputs */
-.growth-rates-table input[type="number"].percentage {
-    position: relative;
-    padding-right: 1.5rem;
-}
-
-.growth-rates-table input[type="number"].percentage::after {
-    content: '%';
-    position: absolute;
-    right: 0.5rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #666;
-    pointer-events: none;
+    z-index: 1;
 }

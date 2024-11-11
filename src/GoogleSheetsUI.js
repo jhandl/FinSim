@@ -19,15 +19,28 @@ class GoogleSheetsUI extends AbstractUI {
   }
 
   getValue(elementId) {
-    const range = this.namedRanges.get(elementId);
-    if (!range) throw new Error(`Element not found: ${elementId}`);
-    return range.getValue();
+    const value = this.spreadsheet.getRange(elementId).getValue();
+    if (this.isBoolean(elementId)) {
+      // Convert Yes/No to true/false
+      if (typeof value === 'string') {
+        return value.toLowerCase() === 'yes';
+      }
+      return !!value; // Convert any other value to boolean
+    }
+    return value;
   }
 
   setValue(elementId, value) {
-    const range = this.namedRanges.get(elementId);
-    if (!range) throw new Error(`Element not found: ${elementId}`);
-    range.setValue(value);
+    if (this.isBoolean(elementId)) {
+      // Convert various boolean formats to Yes/No
+      if (typeof value === 'string') {
+        value = value.toLowerCase();
+        value = (value === 'true' || value === 'yes') ? 'Yes' : 'No';
+      } else {
+        value = value ? 'Yes' : 'No';
+      }
+    }
+    this.spreadsheet.getRange(elementId).setValue(value);
   }
 
   getTableData(groupId, columnCount = 1) {
@@ -56,7 +69,7 @@ class GoogleSheetsUI extends AbstractUI {
   }
 
   setProgress(message) {
-    this.setStatus(message, STATUS_COLORS.NEUTRAL);
+    this.setStatus(message, STATUS_COLORS.INFO);
   }
 
   clearContent(groupId) {
@@ -86,6 +99,7 @@ class GoogleSheetsUI extends AbstractUI {
     cell.setNote(message);
     cell.setBackground(STATUS_COLORS.WARNING);
   }
+
   clearWarning(elementId) {
     const range = this.namedRanges.get(elementId);
     if (!range) throw new Error(`Element not found: ${elementId}`);
@@ -180,51 +194,104 @@ class GoogleSheetsUI extends AbstractUI {
   }
 
   saveToFile() {
-    const csvContent = serializeSimulation(this);
+    const csvContent = serializeSimulation(this); // 10306 ms
+    this.setStatus("Saving", STATUS_COLORS.INFO);
+
+    // Create an HTML dialog with filename input and download button
+    const htmlOutput = HtmlService
+        .createHtmlOutput(`
+            <html>
+                <head>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        .form-group { margin-bottom: 15px; }
+                        label { display: block; margin-bottom: 5px; }
+                        input { width: 100%; padding: 5px; margin-bottom: 10px; }
+                        button { 
+                            background-color: #4CAF50; 
+                            color: white; 
+                            padding: 8px 15px; 
+                            border: none; 
+                            border-radius: 4px; 
+                            cursor: pointer; 
+                        }
+                        button:hover { background-color: #45a049; }
+                    </style>
+                </head>
+                <body>
+                    <div class="form-group">
+                        <label for="filename">Save as:</label>
+                        <input type="text" 
+                               id="filename" 
+                               value="simulation.csv" 
+                               onkeyup="validateFilename(this)">
+                    </div>
+                    <button onclick="downloadFile()">Download</button>
+                    
+                    <script>
+                        function validateFilename(input) {
+                            // Remove invalid filename characters
+                            input.value = input.value.replace(/[<>:"/\\|?*]/g, '');
+                            // Ensure it ends with .csv
+                            if (!input.value.toLowerCase().endsWith('.csv')) {
+                                input.value = input.value.replace(/\\.csv$/i, '') + '.csv';
+                            }
+                        }
+                        
+                        function downloadFile() {
+                            const csvContent = ${JSON.stringify(csvContent)};
+                            const filename = document.getElementById('filename').value;
+                            const blob = new Blob([csvContent], { type: 'text/csv' });
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                            google.script.host.close();
+                        }
+                    </script>
+                </body>
+            </html>
+        `)
+        .setWidth(300)
+        .setHeight(200);
     
-    // Create a new spreadsheet for the save file
-    const saveFile = SpreadsheetApp.create('Simulation Save ' + new Date().toISOString());
-    const sheet = saveFile.getActiveSheet();
-    
-    // Write the CSV content to the spreadsheet
-    const rows = csvContent.split('\n').map(line => [line]);
-    sheet.getRange(1, 1, rows.length, 1).setValues(rows);
-    
-    // Show the URL to the new spreadsheet
-    const url = saveFile.getUrl();
-    this.showAlert('Save file created at: ' + url);
+    SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Save Simulation');
   }
 
-  loadFromFile(fileId) {
-    try {
-      // Open the spreadsheet by ID
-      const ss = SpreadsheetApp.openById(fileId);
-      const sheet = ss.getActiveSheet();
-      
-      // Read all content
-      const content = sheet.getRange(1, 1, sheet.getLastRow(), 1)
-                         .getValues()
-                         .map(row => row[0])
-                         .join('\n');
-      
-      const eventData = deserializeSimulation(content, this);
-      
-      // Add events to the current sheet
-      const eventsRange = this.namedRanges.get('Events');
-      eventData.forEach((event, index) => {
-        for (let i = 0; i < event.length; i++) {
-          eventsRange.getCell(index + 1, i + 1).setValue(event[i]);
-        }
-      });
-      
-    } catch (error) {
-      this.showAlert('Error loading file: ' + error.message);
-    }
+  loadFromFile() {
   }
 
   isPercentage(elementId) {
-    // Google Sheets handles percentages automatically
-    return false;
+    try {
+      const range = this.spreadsheet.getRange(elementId);
+      // Check if the cell's number format contains a % symbol
+      const numberFormat = range.getNumberFormat();
+      return (numberFormat && numberFormat.includes('%'))
+    } catch (error) {
+      return false;
+    }
+  }
+
+  isBoolean(elementId) {
+    try {
+        const range = this.spreadsheet.getRange(elementId);
+        const validation = range.getDataValidation();
+        if (!validation) return false;
+        const criteria = validation.getCriteriaType();
+        const values = validation.getCriteriaValues();
+        // Check if it's a list validation with exactly two values: Yes and No
+        return (criteria === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) &&
+               (values.length === 1) &&
+               (Array.isArray(values[0])) &&
+               (values[0].length === 2) &&
+               (values[0].every(v => ['Yes', 'No'].includes(v)));
+    } catch (error) {
+        return false;
+    }
   }
 
 }

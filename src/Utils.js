@@ -4,7 +4,7 @@ STATUS_COLORS = {
   ERROR: "#ff8080",
   WARNING: "#ffe066",
   SUCCESS: "#9fdf9f",
-  NEUTRAL: "#E0E0E0",
+  INFO: "#E0E0E0",
   WHITE: "#FFFFFF"
 };
 
@@ -67,20 +67,27 @@ function serializeSimulation(ui) {
         YoungestChildBorn: ui.getValue('YoungestChildBorn'),
         OldestChildBorn: ui.getValue('OldestChildBorn'),
         PersonalTaxCredit: ui.getValue('PersonalTaxCredit'),
-        StatePensionWeekly: ui.getValue('StatePensionWeekly')
+        StatePensionWeekly: ui.getValue('StatePensionWeekly'),
+        PriorityCash: ui.getValue('PriorityCash'),
+        PriorityPension: ui.getValue('PriorityPension'),
+        PriorityETF: ui.getValue('PriorityETF'),
+        PriorityTrust: ui.getValue('PriorityTrust')
     };
 
-    // Format percentage values - let the UI tell us which fields are percentages
+    // Format special values (percentages and booleans)
     for (const [key, value] of Object.entries(parameters)) {
         if (ui.isPercentage(key)) {
             // Round to 4 decimal places before converting to percentage string
             const roundedValue = Math.round(value * 10000) / 100;
             parameters[key] = roundedValue + '%';
+        } else if (ui.isBoolean(key)) {
+            // Convert boolean to Yes/No
+            parameters[key] = value ? 'Yes' : 'No';
         }
     }
 
     // Get events data
-    const events = ui.getTableData('Events', 7);
+    const events = ui.getTableData('Events', 6);
 
     // Create CSV content
     let csvContent = "# Ireland Financial Simulator v1.26 Save File\n";
@@ -88,7 +95,7 @@ function serializeSimulation(ui) {
     for (const [key, value] of Object.entries(parameters)) {
         csvContent += `${key},${value}\n`;
     }
-    
+   
     csvContent += "\n# Events\n";
     csvContent += "Type,Name,Amount,FromAge,ToAge,Rate,Extra\n";
     events.forEach(event => {

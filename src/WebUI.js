@@ -7,6 +7,7 @@ class WebUI extends AbstractUI {
     this.editCallbacks = new Map();
     this.statusElement = document.getElementById('progress');
     this.setupEventListeners();
+    this.setupPercentageInputs();
   }
 
   getValue(elementId) {
@@ -18,12 +19,16 @@ class WebUI extends AbstractUI {
       if (typeof value === 'string') {
         value = value.replace('%', '');
       }
-      value = parseFloat(value) || 0;
       if (element.classList.contains('percentage')) {
         // Store internally as decimal
+        value = parseFloat(value) || 0;
         return value / 100;
       }
-      return value;
+      if (element.classList.contains('boolean')) {
+        // Convert Yes/No to true/false
+        return value === 'Yes';
+      }
+      return parseFloat(value) || 0;
     } 
     return element.textContent;
   }
@@ -37,6 +42,14 @@ class WebUI extends AbstractUI {
         const numValue = parseFloat(value);
         value = numValue < 1 ? (numValue * 100) : numValue;
         element.value = value;
+      } else if (element.classList.contains('boolean')) {
+        // Convert various boolean formats to Yes/No
+        if (typeof value === 'string') {
+          value = value.toLowerCase();
+          element.value = (value === 'true' || value === 'yes') ? 'Yes' : 'No';
+        } else {
+          element.value = value ? 'Yes' : 'No';
+        }
       } else {
         element.value = value;
       }
@@ -68,7 +81,8 @@ class WebUI extends AbstractUI {
         // Get remaining values starting from the Amount column (index 2)
         for (let i = 2; i < columnCount + 1; i++) {
           const input = cells[i]?.querySelector('input');
-          rowData.push(input?.value || '');
+          const value = input ? Number((parseFloat(input.value) || 0).toFixed(2)) : undefined;
+          rowData.push(value);
         }
       } else {
         // Normal table handling
@@ -147,7 +161,7 @@ class WebUI extends AbstractUI {
     const cells = rows[row - 1].getElementsByTagName('td');
     if (col - 1 >= cells.length) return;
     
-    const cell = cells[col - 1];
+    const cell = cells[col];
     cell.setAttribute('title', message);
     cell.style.backgroundColor = STATUS_COLORS.WARNING;
   }
@@ -302,12 +316,12 @@ class WebUI extends AbstractUI {
   }
 
   async saveToFile() {
-    try {
-        const csvContent = serializeSimulation(this);
+    const csvContent = serializeSimulation(this);
 
+    if ('showSaveFilePicker' in window) {
         try {
             const handle = await window.showSaveFilePicker({
-                suggestedName: 'simulation.csv',
+                suggestedName: 'scenario.csv',
                 types: [{
                     description: 'CSV Files',
                     accept: {
@@ -320,19 +334,24 @@ class WebUI extends AbstractUI {
             await writable.write(csvContent);
             await writable.close();
         } catch (err) {
-            // Fallback for browsers that don't support File System Access API
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'simulation.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+            if (err.name === 'AbortError') {
+                // User clicked Cancel, do nothing
+                return;
+            }
+            // Some other error occurred
+            alert('Error saving file: ' + err.message);
         }
-    } catch (error) {
-        alert('Error saving file: ' + error.message);
+    } else {
+        // Legacy fallback
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'scenario.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
     }
   }
 
@@ -342,6 +361,31 @@ class WebUI extends AbstractUI {
     try {
         const content = await file.text();
         const eventData = deserializeSimulation(content, this);
+        
+        // Update drawdown priorities panel
+        const priorityIds = ['PriorityCash', 'PriorityPension', 'PriorityETF', 'PriorityTrust'];
+        const prioritiesContainer = document.querySelector('.priorities-container');
+        
+        if (prioritiesContainer) {
+            // Sort priority items based on their values
+            const priorityValues = priorityIds.map(id => ({
+                id: id,
+                value: parseInt(this.getValue(id)) || 0,
+                element: prioritiesContainer.querySelector(`[data-priority-id="${id}"]`)
+            })).sort((a, b) => a.value - b.value);
+
+            // Reorder elements in the DOM
+            priorityValues.forEach(item => {
+                if (item.element) {
+                    prioritiesContainer.appendChild(item.element);
+                    // Update the hidden input value
+                    const input = item.element.querySelector('input');
+                    if (input) {
+                        input.value = item.value;
+                    }
+                }
+            });
+        }
         
         // Clear and rebuild events table
         const tbody = document.querySelector('#Events tbody');
@@ -401,6 +445,24 @@ class WebUI extends AbstractUI {
   isPercentage(elementId) {
     const element = document.getElementById(elementId);
     return element && element.classList.contains('percentage');
+  }
+
+  setupPercentageInputs() {
+    const percentageInputs = document.querySelectorAll('input.percentage');
+    percentageInputs.forEach(input => {
+      // Only wrap if not already wrapped
+      if (!input.parentElement.classList.contains('percentage-container')) {
+        const container = document.createElement('div');
+        container.className = 'percentage-container';
+        input.parentNode.insertBefore(container, input);
+        container.appendChild(input);
+      }
+    });
+  }
+
+  isBoolean(elementId) {
+    const element = document.getElementById(elementId);
+    return element && element.classList.contains('boolean');
   }
 
 } 
