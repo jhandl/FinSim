@@ -1,3 +1,5 @@
+/* This file has to work only on Google Sheets */
+
 class GoogleSheetsUI extends AbstractUI {
 
   constructor() {
@@ -175,6 +177,54 @@ class GoogleSheetsUI extends AbstractUI {
       this.setVersion(latestVersion);
       this.showToast("Version updated!", "", 15);
     }
+  }
+
+  saveToFile() {
+    const csvContent = serializeSimulation(this);
+    
+    // Create a new spreadsheet for the save file
+    const saveFile = SpreadsheetApp.create('Simulation Save ' + new Date().toISOString());
+    const sheet = saveFile.getActiveSheet();
+    
+    // Write the CSV content to the spreadsheet
+    const rows = csvContent.split('\n').map(line => [line]);
+    sheet.getRange(1, 1, rows.length, 1).setValues(rows);
+    
+    // Show the URL to the new spreadsheet
+    const url = saveFile.getUrl();
+    this.showAlert('Save file created at: ' + url);
+  }
+
+  loadFromFile(fileId) {
+    try {
+      // Open the spreadsheet by ID
+      const ss = SpreadsheetApp.openById(fileId);
+      const sheet = ss.getActiveSheet();
+      
+      // Read all content
+      const content = sheet.getRange(1, 1, sheet.getLastRow(), 1)
+                         .getValues()
+                         .map(row => row[0])
+                         .join('\n');
+      
+      const eventData = deserializeSimulation(content, this);
+      
+      // Add events to the current sheet
+      const eventsRange = this.namedRanges.get('Events');
+      eventData.forEach((event, index) => {
+        for (let i = 0; i < event.length; i++) {
+          eventsRange.getCell(index + 1, i + 1).setValue(event[i]);
+        }
+      });
+      
+    } catch (error) {
+      this.showAlert('Error loading file: ' + error.message);
+    }
+  }
+
+  isPercentage(elementId) {
+    // Google Sheets handles percentages automatically
+    return false;
   }
 
 }

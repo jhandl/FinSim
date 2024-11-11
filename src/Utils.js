@@ -1,3 +1,5 @@
+/* This file has to work on both the website and Google Sheets */
+
 STATUS_COLORS = {
   ERROR: "#ff8080",
   WARNING: "#ffe066",
@@ -37,4 +39,112 @@ function between(a, b, p) {
 
 function isBetween(num, min, max) {
   return ((num >= min) && (num <= max));
+}
+
+function serializeSimulation(ui) {
+    // Collect all parameters
+    const parameters = {
+        StartingAge: ui.getValue('StartingAge'),
+        TargetAge: ui.getValue('TargetAge'),
+        InitialSavings: ui.getValue('InitialSavings'),
+        InitialPension: ui.getValue('InitialPension'),
+        InitialETFs: ui.getValue('InitialETFs'),
+        InitialTrusts: ui.getValue('InitialTrusts'),
+        RetirementAge: ui.getValue('RetirementAge'),
+        EmergencyStash: ui.getValue('EmergencyStash'),
+        EtfAllocation: ui.getValue('EtfAllocation'),
+        TrustAllocation: ui.getValue('TrustAllocation'),
+        PensionContributionPercentage: ui.getValue('PensionContributionPercentage'),
+        PensionContributionCapped: ui.getValue('PensionContributionCapped'),
+        PensionGrowthRate: ui.getValue('PensionGrowthRate'),
+        PensionGrowthStdDev: ui.getValue('PensionGrowthStdDev'),
+        EtfGrowthRate: ui.getValue('EtfGrowthRate'),
+        EtfGrowthStdDev: ui.getValue('EtfGrowthStdDev'),
+        TrustGrowthRate: ui.getValue('TrustGrowthRate'),
+        TrustGrowthStdDev: ui.getValue('TrustGrowthStdDev'),
+        Inflation: ui.getValue('Inflation'),
+        MarriageYear: ui.getValue('MarriageYear'),
+        YoungestChildBorn: ui.getValue('YoungestChildBorn'),
+        OldestChildBorn: ui.getValue('OldestChildBorn'),
+        PersonalTaxCredit: ui.getValue('PersonalTaxCredit'),
+        StatePensionWeekly: ui.getValue('StatePensionWeekly')
+    };
+
+    // Format percentage values - let the UI tell us which fields are percentages
+    for (const [key, value] of Object.entries(parameters)) {
+        if (ui.isPercentage(key)) {
+            // Round to 4 decimal places before converting to percentage string
+            const roundedValue = Math.round(value * 10000) / 100;
+            parameters[key] = roundedValue + '%';
+        }
+    }
+
+    // Get events data
+    const events = ui.getTableData('Events', 7);
+
+    // Create CSV content
+    let csvContent = "# Ireland Financial Simulator v1.26 Save File\n";
+    csvContent += "# Parameters\n";
+    for (const [key, value] of Object.entries(parameters)) {
+        csvContent += `${key},${value}\n`;
+    }
+    
+    csvContent += "\n# Events\n";
+    csvContent += "Type,Name,Amount,FromAge,ToAge,Rate,Extra\n";
+    events.forEach(event => {
+        // Split the first field (which contains "type:name") into separate type and name
+        const [type, ...nameParts] = event[0].split(':');
+        const name = nameParts.join(':'); // Rejoin in case name contained colons
+        const otherFields = event.slice(1);
+        csvContent += `${type},${name},${otherFields.join(',')}\n`;
+    });
+
+    return csvContent;
+}
+
+function deserializeSimulation(content, ui) {
+    const lines = content.split('\n').map(line => line.trim());
+
+    // Verify file format
+    if (!lines[0].includes('Ireland Financial Simulator')) {
+        throw new Error('Invalid file format');
+    }
+
+    let section = '';
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith('#')) {
+            section = line;
+            continue;
+        }
+        if (line === '') continue;
+
+        if (section.includes('Parameters')) {
+            const [key, value] = line.split(',');
+            try {
+                ui.setValue(key, value);
+            } catch (e) {
+                // Skip if parameter doesn't exist
+            }
+        }
+    }
+
+    // Clear existing events
+    ui.clearContent('Events');
+
+    // Load events
+    let eventData = [];
+    let inEvents = false;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.includes('# Events')) {
+            inEvents = true;
+            continue;
+        }
+        if (inEvents && line && !line.startsWith('Type,')) {
+            eventData.push(line.split(','));
+        }
+    }
+
+    return eventData;
 }

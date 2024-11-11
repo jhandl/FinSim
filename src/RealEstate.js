@@ -1,3 +1,5 @@
+/* This file has to work on both the website and Google Sheets */
+
 class RealEstate {
   
   constructor() {

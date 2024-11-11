@@ -101,4 +101,8 @@ class AbstractUI {
   setTableCellWarning(tableName, row, col, message) {
     throw new Error("Method 'setTableCellWarning' must be implemented");
   }
+
+  isPercentage(elementId) {
+    throw new Error("Method 'isPercentage' must be implemented");
+  }
 } 

@@ -1,3 +1,5 @@
+/* This file has to work on both the website and Google Sheets */
+
 var ui, params, events, config, dataSheet, row, errors;
 var age, year, phase, periods, failedAt, success, montecarlo;
 var revenue, realEstate, stockGrowthOverride;

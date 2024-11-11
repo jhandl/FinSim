@@ -1,8 +1,5 @@
-/* import { WebUI } from '/src/WebUI.js';
+/* No need to import from other files as everything is loaded together in the html file */
 
-// Make WebUI available globally for Simulator.js
-window.WebUI = WebUI;
-*/
 
 class SimulatorInterface {
     
@@ -63,7 +60,7 @@ class SimulatorInterface {
         // Save button
         const saveButton = document.getElementById('saveSimulation');
         if (saveButton) {
-            saveButton.addEventListener('click', () => this.saveToFile());
+            saveButton.addEventListener('click', () => this.ui.saveToFile());
         }
 
         // Load button
@@ -71,7 +68,7 @@ class SimulatorInterface {
         const fileInput = document.getElementById('loadSimulation');
         if (loadButton && fileInput) {
             loadButton.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', (e) => this.loadFromFile(e.target.files[0]));
+            fileInput.addEventListener('change', (e) => this.ui.loadFromFile(e.target.files[0]));
         }
 
         // Setup drag and drop for priorities
@@ -145,27 +142,10 @@ class SimulatorInterface {
 
         const row = document.createElement('tr');
         
-        const eventTypes = [
-            'NOP:No Operation',
-            'RI:Rental Income',
-            'SI:Salary Income',
-            'SInp:Salary (No Pension)',
-            'UI:RSU Income',
-            'DBI:Defined Benefit Income',
-            'FI:Tax-free Income',
-            'E:Expense',
-            'R:Real Estate',
-            'M:Mortgage',
-            'SM:Stock Market'
-        ];
-
         row.innerHTML = `
             <td>
                 <select class="event-type">
-                    ${eventTypes.map(type => {
-                        const [value, label] = type.split(':');
-                        return `<option value="${value}">${label}</option>`;
-                    }).join('')}
+                    ${this.ui.getEventTypeOptions()}
                 </select>
             </td>
             <td><input type="text" class="event-name" placeholder="Event name"></td>
@@ -270,195 +250,6 @@ class SimulatorInterface {
         this.assetsChart.data.datasets[1].data = data.map(d => d.etfCapital);
         this.assetsChart.data.datasets[2].data = data.map(d => d.trustCapital);
         this.assetsChart.update();
-    }
-
-    async saveToFile() {
-        try {
-            // Collect all parameters
-            const parameters = {
-                StartingAge: this.ui.getValue('StartingAge'),
-                TargetAge: this.ui.getValue('TargetAge'),
-                InitialSavings: this.ui.getValue('InitialSavings'),
-                InitialPension: this.ui.getValue('InitialPension'),
-                InitialETFs: this.ui.getValue('InitialETFs'),
-                InitialTrusts: this.ui.getValue('InitialTrusts'),
-                RetirementAge: this.ui.getValue('RetirementAge'),
-                EmergencyStash: this.ui.getValue('EmergencyStash'),
-                EtfAllocation: this.ui.getValue('EtfAllocation'),
-                TrustAllocation: this.ui.getValue('TrustAllocation'),
-                PensionContributionPercentage: this.ui.getValue('PensionContributionPercentage'),
-                PensionContributionCapped: this.ui.getValue('PensionContributionCapped'),
-                PensionGrowthRate: this.ui.getValue('PensionGrowthRate'),
-                PensionGrowthStdDev: this.ui.getValue('PensionGrowthStdDev'),
-                EtfGrowthRate: this.ui.getValue('EtfGrowthRate'),
-                EtfGrowthStdDev: this.ui.getValue('EtfGrowthStdDev'),
-                TrustGrowthRate: this.ui.getValue('TrustGrowthRate'),
-                TrustGrowthStdDev: this.ui.getValue('TrustGrowthStdDev'),
-                Inflation: this.ui.getValue('Inflation'),
-                MarriageYear: this.ui.getValue('MarriageYear'),
-                YoungestChildBorn: this.ui.getValue('YoungestChildBorn'),
-                OldestChildBorn: this.ui.getValue('OldestChildBorn'),
-                PersonalTaxCredit: this.ui.getValue('PersonalTaxCredit'),
-                StatePensionWeekly: this.ui.getValue('StatePensionWeekly')
-            };
-
-            // Collect events table data
-            const events = [];
-            const tbody = document.querySelector('#Events tbody');
-            if (tbody) {
-                tbody.querySelectorAll('tr').forEach(row => {
-                    events.push({
-                        type: row.querySelector('.event-type').value,
-                        name: row.querySelector('.event-name').value,
-                        amount: row.querySelector('.event-amount').value,
-                        fromAge: row.querySelector('.event-from-age').value,
-                        toAge: row.querySelector('.event-to-age').value,
-                        rate: row.querySelector('.event-rate').value,
-                        extra: row.querySelector('.event-extra').value
-                    });
-                });
-            }
-
-            // Create CSV content
-            let csvContent = "# Ireland Financial Simulator v1.26 Save File\n";
-            csvContent += "# Parameters\n";
-            for (const [key, value] of Object.entries(parameters)) {
-                csvContent += `${key},${value}\n`;
-            }
-            
-            csvContent += "\n# Events\n";
-            csvContent += "Type,Name,Amount,FromAge,ToAge,Rate,Extra\n";
-            events.forEach(event => {
-                csvContent += `${event.type},${event.name},${event.amount},${event.fromAge},${event.toAge},${event.rate},${event.extra}\n`;
-            });
-
-            // Create file handle using the File System Access API
-            try {
-                const handle = await window.showSaveFilePicker({
-                    suggestedName: 'simulation.csv',
-                    types: [{
-                        description: 'CSV Files',
-                        accept: {
-                            'text/csv': ['.csv'],
-                        },
-                    }],
-                });
-                
-                // Create a FileSystemWritableFileStream to write to
-                const writable = await handle.createWritable();
-                
-                // Write the contents
-                await writable.write(csvContent);
-                
-                // Close the file and write the contents to disk
-                await writable.close();
-            } catch (err) {
-                // User cancelled or browser doesn't support File System Access API
-                // Fall back to the old method
-                const blob = new Blob([csvContent], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'simulation.csv';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }
-        } catch (error) {
-            alert('Error saving file: ' + error.message);
-        }
-    }
-
-    async loadFromFile(file) {
-        if (!file) return;
-
-        try {
-            const content = await file.text();
-            const lines = content.split('\n').map(line => line.trim());
-
-            // Verify file format
-            if (!lines[0].includes('Ireland Financial Simulator')) {
-                throw new Error('Invalid file format');
-            }
-
-            let section = '';
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                if (line.startsWith('#')) {
-                    section = line;
-                    continue;
-                }
-                if (line === '') continue;
-
-                if (section.includes('Parameters')) {
-                    const [key, value] = line.split(',');
-                    try {
-                        // Special handling for PensionContributionCapped which is a select
-                        if (key === 'PensionContributionCapped') {
-                            const select = document.getElementById(key);
-                            if (select) {
-                                select.value = value;
-                            }
-                        } else {
-                            this.ui.setValue(key, value);
-                        }
-                    } catch (e) {
-                        // Skip if parameter doesn't exist
-                    }
-                } else if (section.includes('Events')) {
-                    if (line.startsWith('Type,')) continue; // Skip header
-                    const [type, name, amount, fromAge, toAge, rate, extra] = line.split(',');
-                    if (type && amount) {
-                        const tbody = document.querySelector('#Events tbody');
-                        if (tbody) {
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>
-                                    <select class="event-type">
-                                        ${this.getEventTypeOptions(type)}
-                                    </select>
-                                </td>
-                                <td><input type="text" class="event-name" value="${name}"></td>
-                                <td><input type="number" class="event-amount" step="1000" value="${amount}"></td>
-                                <td><input type="number" class="event-from-age" min="0" max="100" value="${fromAge}"></td>
-                                <td><input type="number" class="event-to-age" min="0" max="100" value="${toAge}"></td>
-                                <td><input type="number" class="event-rate" step="0.001" value="${rate}"></td>
-                                <td><input type="number" class="event-extra" step="0.01" value="${extra}"></td>
-                                <td>
-                                    <button class="delete-event" title="Delete event">×</button>
-                                </td>
-                            `;
-                            tbody.appendChild(row);
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            alert('Error loading file: Please make sure this is a valid simulation save file.');
-            return;
-        }
-    }
-
-    getEventTypeOptions(selectedType = '') {
-        const eventTypes = [
-            'NOP:No Operation',
-            'RI:Rental Income',
-            'SI:Salary Income',
-            'SInp:Salary (No Pension)',
-            'UI:RSU Income',
-            'DBI:Defined Benefit Income',
-            'FI:Tax-free Income',
-            'E:Expense',
-            'R:Real Estate',
-            'M:Mortgage',
-            'SM:Stock Market'
-        ];
-
-        return eventTypes.map(type => {
-            const [value, label] = type.split(':');
-            return `<option value="${value}" ${value === selectedType ? 'selected' : ''}>${label}</option>`;
-        }).join('');
     }
 }
 

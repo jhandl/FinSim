@@ -516,3 +516,35 @@ footer {
 .priority-item.inserted {
     animation: priorityInsert 0.3s ease-out;
 }
+
+/* Add these styles for percentage inputs */
+.input-wrapper input[type="number"].percentage {
+    position: relative;
+    padding-right: 1.5rem;  /* Make room for the % symbol */
+}
+
+.input-wrapper input[type="number"].percentage::after {
+    content: '%';
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+    pointer-events: none;
+}
+
+/* Style for the growth rates table percentage inputs */
+.growth-rates-table input[type="number"].percentage {
+    position: relative;
+    padding-right: 1.5rem;
+}
+
+.growth-rates-table input[type="number"].percentage::after {
+    content: '%';
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+    pointer-events: none;
+}

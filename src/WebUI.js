@@ -1,3 +1,5 @@
+/* This file has to work only on the website */
+
 class WebUI extends AbstractUI {
 
   constructor() {
@@ -10,20 +12,18 @@ class WebUI extends AbstractUI {
   getValue(elementId) {
     const element = document.getElementById(elementId);
     if (!element) throw new Error(`Element not found: ${elementId}`);
-    const percentageFields = [
-      'PensionGrowthRate',
-      'PensionGrowthStdDev',
-      'EtfGrowthRate',
-      'EtfGrowthStdDev',
-      'TrustGrowthRate',
-      'TrustGrowthStdDev',
-      'Inflation'
-    ];
     if (element.value !== undefined) {
-      if (percentageFields.includes(elementId)) {
-        return (parseFloat(element.value) || 0) / 100;
+      let value = element.value;
+      // Remove % sign if present
+      if (typeof value === 'string') {
+        value = value.replace('%', '');
       }
-      return element.value;
+      value = parseFloat(value) || 0;
+      if (element.classList.contains('percentage')) {
+        // Store internally as decimal
+        return value / 100;
+      }
+      return value;
     } 
     return element.textContent;
   }
@@ -32,7 +32,14 @@ class WebUI extends AbstractUI {
     const element = document.getElementById(elementId);
     if (!element) throw new Error(`Element not found: ${elementId}`);
     if (element.value !== undefined) {
-      element.value = value;
+      if (element.classList.contains('percentage')) {
+        // If value comes from file as decimal (< 1), multiply by 100
+        const numValue = parseFloat(value);
+        value = numValue < 1 ? (numValue * 100) : numValue;
+        element.value = value;
+      } else {
+        element.value = value;
+      }
     } else {
       element.textContent = value;
     }
@@ -292,6 +299,108 @@ class WebUI extends AbstractUI {
 
   newCodeVersion(latestVersion) {
     // No action needed in web version as users always get the latest version
+  }
+
+  async saveToFile() {
+    try {
+        const csvContent = serializeSimulation(this);
+
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: 'simulation.csv',
+                types: [{
+                    description: 'CSV Files',
+                    accept: {
+                        'text/csv': ['.csv'],
+                    },
+                }],
+            });
+            
+            const writable = await handle.createWritable();
+            await writable.write(csvContent);
+            await writable.close();
+        } catch (err) {
+            // Fallback for browsers that don't support File System Access API
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'simulation.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        alert('Error saving file: ' + error.message);
+    }
+  }
+
+  async loadFromFile(file) {
+    if (!file) return;
+
+    try {
+        const content = await file.text();
+        const eventData = deserializeSimulation(content, this);
+        
+        // Clear and rebuild events table
+        const tbody = document.querySelector('#Events tbody');
+        if (tbody) {
+            tbody.innerHTML = ''; // Clear existing rows
+            eventData.forEach(([type, name, amount, fromAge, toAge, rate, extra]) => {
+                if (type && amount) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>
+                            <select class="event-type">
+                                ${this.getEventTypeOptions(type)}
+                            </select>
+                        </td>
+                        <td><input type="text" class="event-name" value="${name}"></td>
+                        <td><input type="number" class="event-amount" step="1000" value="${amount}"></td>
+                        <td><input type="number" class="event-from-age" min="0" max="100" value="${fromAge}"></td>
+                        <td><input type="number" class="event-to-age" min="0" max="100" value="${toAge}"></td>
+                        <td><input type="number" class="event-rate" step="0.001" value="${rate}"></td>
+                        <td><input type="number" class="event-extra" step="0.01" value="${extra}"></td>
+                        <td>
+                            <button class="delete-event" title="Delete event">×</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            });
+        }
+    } catch (error) {
+        console.log("error loading file: " + error);
+        alert('Error loading file: Please make sure this is a valid simulation save file.');
+        return;
+    }
+  }
+
+  getEventTypeOptions(selectedType = '') {
+    const eventTypes = [
+        'NOP:No Operation',
+        'RI:Rental Income',
+        'SI:Salary Income',
+        'SInp:Salary (No Pension)',
+        'UI:RSU Income',
+        'DBI:Defined Benefit Income',
+        'FI:Tax-free Income',
+        'E:Expense',
+        'R:Real Estate',
+        'M:Mortgage',
+        'SM:Stock Market'
+    ];
+
+    return eventTypes.map(type => {
+        const [value, label] = type.split(':');
+        return `<option value="${value}" ${value === selectedType ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+  }
+
+  isPercentage(elementId) {
+    const element = document.getElementById(elementId);
+    return element && element.classList.contains('percentage');
   }
 
 } 
