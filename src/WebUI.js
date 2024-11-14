@@ -81,8 +81,9 @@ class WebUI extends AbstractUI {
         // Get remaining values starting from the Amount column (index 2)
         for (let i = 2; i < columnCount + 1; i++) {
           const input = cells[i]?.querySelector('input');
-          const value = input ? Number((parseFloat(input.value) || 0).toFixed(2)) : undefined;
-          rowData.push(value);
+          const value = input?.value;
+          // Only parse if the value is not empty
+          rowData.push(value === '' ? undefined : parseFloat(value));
         }
       } else {
         // Normal table handling
@@ -219,20 +220,44 @@ class WebUI extends AbstractUI {
   }
 
   // Helper method for data rows
-  setDataRow(rowIndex, data, scale = 1) {
-    Object.entries(data).forEach(([field, value]) => {
-      const cell = document.querySelector(`#${field}_${rowIndex}`);
-      if (cell) {
-        if (cell.tagName === 'INPUT') {
-          cell.value = value / scale;
-        } else {
-          cell.textContent = value / scale;
+  setDataRow(rowIndex, data) {
+    const tbody = document.querySelector('#Data tbody');
+    if (!tbody) return;
+
+    // Create row if it doesn't exist
+    let row = document.getElementById(`data_row_${rowIndex}`);
+    if (!row) {
+        row = document.createElement('tr');
+        row.id = `data_row_${rowIndex}`;
+        tbody.appendChild(row);
+    }
+
+    // Clear existing cells
+    row.innerHTML = '';
+
+    // Get the order of columns from the table header, only those with data-key attributes
+    const headers = Array.from(document.querySelectorAll('#Data thead th[data-key]'));
+
+    // Create cells and format values in the order of the headers
+    headers.forEach(header => {
+        const key = header.dataset.key;
+        const value = data[key];
+
+        if (value !== undefined) {
+          const td = document.createElement('td');
+          if (key === 'Age' || key === 'Year') {
+            td.textContent = value.toLocaleString("en-IE", {style: 'decimal', maximumFractionDigits: 0});
+          } else if (key === 'WithdrawalRate') {
+            td.textContent = value.toLocaleString("en-IE", {style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2});
+          } else {
+            td.textContent = value.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
+          }
+          row.appendChild(td);
         }
-      }
     });
 
     if (rowIndex % 5 === 0) {
-      this.setProgress((rowIndex / document.querySelectorAll('[id^="Year_"]').length) * 100);
+        this.setProgress(Math.round((rowIndex / document.querySelectorAll('[id^="data_row_"]').length) * 100));
     }
   }
 
@@ -404,8 +429,8 @@ class WebUI extends AbstractUI {
                         <td><input type="number" class="event-amount" step="1000" value="${amount}"></td>
                         <td><input type="number" class="event-from-age" min="0" max="100" value="${fromAge}"></td>
                         <td><input type="number" class="event-to-age" min="0" max="100" value="${toAge}"></td>
-                        <td><input type="number" class="event-rate" step="0.001" value="${rate}"></td>
-                        <td><input type="number" class="event-extra" step="0.01" value="${extra}"></td>
+                        <td><input type="number" class="event-rate" step="0.001" min="0" max="1" value="${rate === undefined ? '' : rate}"></td>
+                        <td><input type="number" class="event-extra" step="0.01" value="${extra === undefined ? '' : extra}"></td>
                         <td>
                             <button class="delete-event" title="Delete event">×</button>
                         </td>

@@ -72,7 +72,7 @@ class UIManager {
       CGT: dataSheet[row].cgt / scale,
       Worth: dataSheet[row].worth / scale
     };
-    this.ui.setDataRow(row, data, scale);
+    this.ui.setDataRow(row, data);
     if (row % 5 === 0) {
       this.updateProgress("Updating "+Math.round(100 * progress) + "%");
     }
@@ -109,6 +109,7 @@ class UIManager {
       oldestChildBorn: this.ui.getValue("OldestChildBorn"),
       personalTaxCredit: this.ui.getValue("PersonalTaxCredit")
     };
+    
     if (validate) {
       this.ui.clearAllWarnings();
       if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
@@ -174,14 +175,14 @@ class UIManager {
       }
 
       const id = name.substr(pos + 1);
-      events.push(new Event(
+      events.push(new SimEvent(
         type,
         id,
         amount || 0,
         fromAge || 0,
         toAge || 999,
-        rate,
-        extra || 0
+        (rate === "") ? undefined : rate,
+        (extra === "") ? undefined : extra
       ))
     }
 

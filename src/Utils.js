@@ -81,7 +81,6 @@ function serializeSimulation(ui) {
             const roundedValue = Math.round(value * 10000) / 100;
             parameters[key] = roundedValue + '%';
         } else if (ui.isBoolean(key)) {
-            // Convert boolean to Yes/No
             parameters[key] = value ? 'Yes' : 'No';
         }
     }

@@ -1,6 +1,6 @@
 /* This file has to work on both the website and Google Sheets */
 
-class Event {
+class SimEvent {
   
   constructor(type, id, amount, fromAge, toAge, rate, extra) {
     this.type = type;

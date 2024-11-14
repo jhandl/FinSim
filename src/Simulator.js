@@ -252,7 +252,7 @@ function processEvents() {
 }
 
 
-function handleInvestments() {  
+function handleInvestments() {
   netIncome = revenue.netIncome() + incomeTaxFree;
 
   if (netIncome > expenses) {
@@ -299,7 +299,7 @@ function handleInvestments() {
     etf.buy(surplus * params.etfAllocation);
     trust.buy(surplus * params.trustAllocation);
     invested = surplus * (params.etfAllocation + params.trustAllocation);
-    cash -= invested;
+    cash -= invested;  
   }
   // Any remaining income should be used to top-up the emergency stash
   if ((netIncome > expenses + invested) && (targetCash - cash > 0.001)) {
@@ -458,6 +458,5 @@ function updateYearlyData() {
   if (!montecarlo) {
     ui.updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
   }
-  
 }
 

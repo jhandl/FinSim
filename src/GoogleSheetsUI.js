@@ -21,11 +21,13 @@ class GoogleSheetsUI extends AbstractUI {
   getValue(elementId) {
     const value = this.spreadsheet.getRange(elementId).getValue();
     if (this.isBoolean(elementId)) {
-      // Convert Yes/No to true/false
       if (typeof value === 'string') {
         return value.toLowerCase() === 'yes';
       }
       return !!value; // Convert any other value to boolean
+    }
+    if (this.isPercentage(elementId)) {
+      return Number(value.toFixed(2));
     }
     return value;
   }
