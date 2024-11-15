@@ -7,6 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Ireland Financial Simulator</title>
+    <link rel="icon" type="image/x-icon" href="IFS.ico">
     <link rel="stylesheet" href="css/simulator.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -38,22 +39,22 @@
                     
                     <div class="input-wrapper">
                         <label for="InitialSavings">Current Savings</label>
-                        <input type="number" id="InitialSavings">
+                        <input type="number" id="InitialSavings" class="currency">
                     </div>
                     
                     <div class="input-wrapper">
                         <label for="InitialPension">Pension Fund</label>
-                        <input type="number" id="InitialPension">
+                        <input type="number" id="InitialPension" class="currency">
                     </div>
                     
                     <div class="input-wrapper">
                         <label for="InitialETFs">ETF Investments</label>
-                        <input type="number" id="InitialETFs">
+                        <input type="number" id="InitialETFs" class="currency">
                     </div>
                     
                     <div class="input-wrapper">
                         <label for="InitialTrusts">Trust Investments</label>
-                        <input type="number" id="InitialTrusts">
+                        <input type="number" id="InitialTrusts" class="currency">
                     </div>
                 </div>
             </div>
@@ -73,26 +74,26 @@
                     
                     <div class="input-wrapper">
                         <label for="EmergencyStash">Emergency Fund</label>
-                        <input type="number" id="EmergencyStash">
+                        <input type="number" id="EmergencyStash" class="currency">
                     </div>
                     
                     <div class="input-wrapper">
                         <label for="EtfAllocation">ETF Allocation</label>
-                        <input type="number" id="EtfAllocation" class="percentage" min="0" max="100" step="1">
+                        <input type="number" id="EtfAllocation" class="percentage" min="0" max="100" step="1" placeholder=" ">
                     </div>
                     
                     <div class="input-wrapper">
                         <label for="TrustAllocation">Trust Allocation</label>
-                        <input type="number" id="TrustAllocation" class="percentage" min="0" max="100" step="1">
+                        <input type="number" id="TrustAllocation" class="percentage" min="0" max="100" step="1" placeholder=" ">
                     </div>
 
                     <div class="input-wrapper">
                         <label for="PensionContributionPercentage">Pension Contribution</label>
-                        <input type="number" id="PensionContributionPercentage" class="percentage" min="0" max="100" step="1">
+                        <input type="number" id="PensionContributionPercentage" class="percentage" min="0" max="100" step="1" placeholder=" ">
                     </div>
 
                     <div class="input-wrapper">
-                        <label for="PensionContributionCapped">Pension Contribution Capped</label>
+                        <label for="PensionContributionCapped">Pension Contrib. Capped</label>
                         <select id="PensionContributionCapped" class="boolean">
                             <option value="Yes">Yes</option>
                             <option value="No">No</option>
@@ -106,9 +107,9 @@
                 <table class="growth-rates-table">
                     <thead>
                         <tr>
-                            <th>Investment</th>
-                            <th>Growth Rate (%)</th>
-                            <th>Volatility (%)</th>
+                            <th></th>
+                            <th>Growth Rate</th>
+                            <th>Volatility</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -127,14 +128,13 @@
                             <td><input type="number" id="TrustGrowthRate" class="percentage" step="1"></td>
                             <td><input type="number" id="TrustGrowthStdDev" class="percentage" step="1"></td>
                         </tr>
+                        <tr>
+                            <td>Inflation</td>
+                            <td><input type="number" id="Inflation" class="percentage" step="0.1"></td>
+                            <td></td>
+                        </tr>
                     </tbody>
                 </table>
-                <div class="input-group" style="margin-top: 1rem;">
-                    <div class="input-wrapper">
-                        <label for="Inflation">Inflation (%)</label>
-                        <input type="number" id="Inflation" class="percentage" step="0.1">
-                    </div>
-                </div>
             </div>
 
             <div class="card" id="personalCircumstances">
@@ -157,12 +157,12 @@
                     
                     <div class="input-wrapper">
                         <label for="PersonalTaxCredit">Personal Tax Credit</label>
-                        <input type="number" id="PersonalTaxCredit">
+                        <input type="number" id="PersonalTaxCredit" class="currency">
                     </div>
 
                     <div class="input-wrapper">
                         <label for="StatePensionWeekly">State Pension (Weekly)</label>
-                        <input type="number" id="StatePensionWeekly">
+                        <input type="number" id="StatePensionWeekly" class="currency" data-1p-ignore>
                     </div>
                 </div>
             </div>

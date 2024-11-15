@@ -149,10 +149,10 @@ class SimulatorInterface {
                 </select>
             </td>
             <td><input type="text" class="event-name" placeholder="Event name"></td>
-            <td><input type="number" class="event-amount" step="1000"></td>
+            <td><input type="number" class="event-amount currency" inputmode="numeric" pattern="[0-9]*" step="1000"></td>
             <td><input type="number" class="event-from-age" min="0" max="100"></td>
             <td><input type="number" class="event-to-age" min="0" max="100"></td>
-            <td><input type="number" class="event-rate" step="0.001"></td>
+            <td><div class="percentage-container"><input type="number" class="event-rate percentage" inputmode="numeric" pattern="[0-9]*"></div></td>
             <td><input type="number" class="event-extra" step="0.01"></td>
             <td>
                 <button class="delete-event" title="Delete event">×</button>
@@ -160,6 +160,10 @@ class SimulatorInterface {
         `;
 
         tbody.appendChild(row);
+        
+        // Setup currency formatting for the new row
+        this.ui.setupCurrencyInputs();
+        this.ui.setupPercentageInputs();
     }
 
     setupCharts() {

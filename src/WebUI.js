@@ -8,27 +8,37 @@ class WebUI extends AbstractUI {
     this.statusElement = document.getElementById('progress');
     this.setupEventListeners();
     this.setupPercentageInputs();
+    this.setupCurrencyInputs();
   }
 
   getValue(elementId) {
     const element = document.getElementById(elementId);
     if (!element) throw new Error(`Element not found: ${elementId}`);
     if (element.value !== undefined) {
-      let value = element.value;
-      // Remove % sign if present
-      if (typeof value === 'string') {
-        value = value.replace('%', '');
-      }
-      if (element.classList.contains('percentage')) {
-        // Store internally as decimal
-        value = parseFloat(value) || 0;
-        return value / 100;
-      }
-      if (element.classList.contains('boolean')) {
-        // Convert Yes/No to true/false
-        return value === 'Yes';
-      }
-      return parseFloat(value) || 0;
+        let value = element.value;
+        // If value is empty string, return undefined
+        if (value === '') {
+            return undefined;
+        }
+        // Remove € sign and commas if present
+        if (element.classList.contains('currency')) {
+            value = value.replace(/[€,]/g, '');
+        }
+        // Remove % sign if present
+        if (typeof value === 'string') {
+            value = value.replace('%', '');
+        }
+        if (element.classList.contains('percentage')) {
+            // Store internally as decimal
+            value = parseFloat(value);
+            return isNaN(value) ? undefined : value / 100;
+        }
+        if (element.classList.contains('boolean')) {
+            // Convert Yes/No to true/false
+            return value === 'Yes';
+        }
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? undefined : parsed;
     } 
     return element.textContent;
   }
@@ -37,7 +47,19 @@ class WebUI extends AbstractUI {
     const element = document.getElementById(elementId);
     if (!element) throw new Error(`Element not found: ${elementId}`);
     if (element.value !== undefined) {
-      if (element.classList.contains('percentage')) {
+      if (element.classList.contains('currency')) {
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue)) {
+          element.value = numValue.toLocaleString('en-IE', {
+            style: 'currency',
+            currency: 'EUR',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+          });
+        } else {
+          element.value = value;
+        }
+      } else if (element.classList.contains('percentage')) {
         // If value comes from file as decimal (< 1), multiply by 100
         const numValue = parseFloat(value);
         value = numValue < 1 ? (numValue * 100) : numValue;
@@ -418,6 +440,9 @@ class WebUI extends AbstractUI {
             tbody.innerHTML = ''; // Clear existing rows
             eventData.forEach(([type, name, amount, fromAge, toAge, rate, extra]) => {
                 if (type && amount) {
+                    // Convert decimal rate to percentage for display, but keep empty if undefined
+                    const displayRate = (rate !== undefined && rate !== '') ? (rate * 100).toString() : '';
+                    
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>
@@ -426,19 +451,22 @@ class WebUI extends AbstractUI {
                             </select>
                         </td>
                         <td><input type="text" class="event-name" value="${name}"></td>
-                        <td><input type="number" class="event-amount" step="1000" value="${amount}"></td>
-                        <td><input type="number" class="event-from-age" min="0" max="100" value="${fromAge}"></td>
-                        <td><input type="number" class="event-to-age" min="0" max="100" value="${toAge}"></td>
-                        <td><input type="number" class="event-rate" step="0.001" min="0" max="1" value="${rate === undefined ? '' : rate}"></td>
+                        <td><input type="number" class="event-amount currency" step="1000" value="${amount}"></td>
+                        <td><input type="number" class="event-from-age" min="0" max="100" value="${fromAge || ''}"></td>
+                        <td><input type="number" class="event-to-age" min="0" max="100" value="${toAge || ''}"></td>
+                        <td><div class="percentage-container"><input type="number" class="event-rate percentage" value="${displayRate}"></div></td>
                         <td><input type="number" class="event-extra" step="0.01" value="${extra === undefined ? '' : extra}"></td>
                         <td>
                             <button class="delete-event" title="Delete event">×</button>
                         </td>
                     `;
                     tbody.appendChild(row);
-                }
+                }    
             });
+            this.setupCurrencyInputs();
+            this.setupPercentageInputs();
         }
+
     } catch (error) {
         console.log("error loading file: " + error);
         alert('Error loading file: Please make sure this is a valid simulation save file.');
@@ -475,19 +503,93 @@ class WebUI extends AbstractUI {
   setupPercentageInputs() {
     const percentageInputs = document.querySelectorAll('input.percentage');
     percentageInputs.forEach(input => {
-      // Only wrap if not already wrapped
-      if (!input.parentElement.classList.contains('percentage-container')) {
-        const container = document.createElement('div');
-        container.className = 'percentage-container';
-        input.parentNode.insertBefore(container, input);
-        container.appendChild(input);
-      }
+        // Only wrap if not already wrapped
+        if (!input.parentElement.classList.contains('percentage-container')) {
+            const container = document.createElement('div');
+            container.className = 'percentage-container';
+            input.parentNode.insertBefore(container, input);
+            container.appendChild(input);
+        }
+
+        // Add event listeners for focus and blur
+        input.addEventListener('focus', function() {
+            // Keep the displayed percentage value when focused
+            const value = this.value.replace('%', '');
+            if (value !== this.value) {
+                this.value = value;
+            }
+        });
+
+        input.addEventListener('blur', function() {
+            if (this.value.trim() !== '') {
+                const value = parseFloat(this.value);
+                if (!isNaN(value)) {
+                    this.value = value;
+                }
+            }
+        });
     });
   }
 
   isBoolean(elementId) {
     const element = document.getElementById(elementId);
     return element && element.classList.contains('boolean');
+  }
+
+  setupCurrencyInputs() {
+    const currencyInputs = document.querySelectorAll('input.currency');
+    
+    const formatOptions = {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      style: 'currency',
+      currency: 'EUR'
+    };
+
+    // Create container elements all at once
+    currencyInputs.forEach(input => {
+      if (!input.parentElement.classList.contains('currency-container')) {
+        const container = document.createElement('div');
+        container.className = 'currency-container';
+        input.parentNode.insertBefore(container, input);
+        container.appendChild(input);
+      }
+
+      // Remove type="number" to prevent browser validation of formatted numbers
+      input.type = 'text';
+      input.inputMode = 'numeric';
+      input.pattern = '[0-9]*';
+    });
+
+    // Use direct event listeners instead of delegation for better reliability
+    currencyInputs.forEach(input => {
+      input.addEventListener('focus', function() {
+        // On focus, show the raw number
+        const value = this.value.replace(/[€,]/g, '');
+        if (value !== this.value) {
+          this.value = value;
+        }
+      });
+
+      input.addEventListener('blur', function() {
+        const value = this.value.replace(/[€,]/g, '');
+        if (value) {
+          const number = parseFloat(value);
+          if (!isNaN(number)) {
+            this.value = number.toLocaleString('en-IE', formatOptions);
+          }
+        }
+      });
+
+      // Format initial value if it exists and isn't already formatted
+      const value = input.value;
+      if (value && value.indexOf('€') === -1) {
+        const number = parseFloat(value);
+        if (!isNaN(number)) {
+          input.value = number.toLocaleString('en-IE', formatOptions);
+        }
+      }
+    });
   }
 
 } 
