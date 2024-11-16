@@ -159,26 +159,30 @@ class WebUI extends AbstractUI {
   }
 
   setWarning(elementId, message) {
-    // Parse table cell reference if in format "TableName[row,col]"
-    const tableMatch = elementId.match(/^(\w+)\[(\d+),(\d+)\]$/);
-    if (tableMatch) {
-      const [_, tableName, row, col] = tableMatch;
-      this.setTableCellWarning(tableName, parseInt(row), parseInt(col), message);
-    } else {
-      const element = document.getElementById(elementId);
-      if (!element) throw new Error(`Element not found: ${elementId}`);
-      
-      element.style.backgroundColor = STATUS_COLORS.WARNING;
-      
-      let warningIcon = element.previousElementSibling;
-      if (!warningIcon?.classList.contains('warning-icon')) {
-        warningIcon = document.createElement('span');
-        warningIcon.classList.add('warning-icon');
-        warningIcon.textContent = '⚠️';
-        element.parentNode.insertBefore(warningIcon, element);
-      }
-      warningIcon.setAttribute('data-tooltip', message);
-    }
+    const element = document.getElementById(elementId);
+    if (!element) throw new Error(`Element not found: ${elementId}`);
+    
+    // Apply warning styles
+    element.style.backgroundColor = STATUS_COLORS.WARNING;
+    element.setAttribute('data-tooltip', message);
+
+    // Add hover events for input tooltip
+    element.addEventListener('mouseenter', function() {
+        const tooltip = document.createElement('div');
+        tooltip.className = 'input-tooltip';
+        tooltip.textContent = message;
+        element.parentNode.appendChild(tooltip);
+        
+        // Position the tooltip above the input
+        const rect = element.getBoundingClientRect();
+        tooltip.style.left = `${rect.left}px`;
+        tooltip.style.top = `${rect.top - tooltip.offsetHeight - 5}px`;
+    });
+
+    element.addEventListener('mouseleave', function() {
+        const tooltip = document.querySelector('.input-tooltip');
+        if (tooltip) tooltip.remove();
+    });
   }
 
   setTableCellWarning(tableName, row, col, message) {
@@ -203,11 +207,11 @@ class WebUI extends AbstractUI {
     if (!element) throw new Error(`Element not found: ${elementId}`);
     
     element.style.backgroundColor = STATUS_COLORS.WHITE;
+    element.removeAttribute('data-tooltip');
     
-    const warningIcon = element.previousElementSibling;
-    if (warningIcon?.classList.contains('warning-icon')) {
-      warningIcon.remove();
-    }
+    // Remove event listeners by cloning the element
+    const newElement = element.cloneNode(true);
+    element.parentNode.replaceChild(newElement, element);
   }
 
   clearAllWarnings() {
