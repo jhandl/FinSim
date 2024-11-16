@@ -168,16 +168,16 @@ class WebUI extends AbstractUI {
       const element = document.getElementById(elementId);
       if (!element) throw new Error(`Element not found: ${elementId}`);
       
-      element.setAttribute('title', message);
       element.style.backgroundColor = STATUS_COLORS.WARNING;
       
-      // Add warning icon if not exists
-      if (!element.nextElementSibling?.classList.contains('warning-icon')) {
-        const warningIcon = document.createElement('span');
+      let warningIcon = element.previousElementSibling;
+      if (!warningIcon?.classList.contains('warning-icon')) {
+        warningIcon = document.createElement('span');
         warningIcon.classList.add('warning-icon');
         warningIcon.textContent = '⚠️';
-        element.parentNode.insertBefore(warningIcon, element.nextSibling);
+        element.parentNode.insertBefore(warningIcon, element);
       }
+      warningIcon.setAttribute('data-tooltip', message);
     }
   }
 
@@ -202,10 +202,9 @@ class WebUI extends AbstractUI {
     const element = document.getElementById(elementId);
     if (!element) throw new Error(`Element not found: ${elementId}`);
     
-    element.removeAttribute('title');
     element.style.backgroundColor = STATUS_COLORS.WHITE;
     
-    const warningIcon = element.nextElementSibling;
+    const warningIcon = element.previousElementSibling;
     if (warningIcon?.classList.contains('warning-icon')) {
       warningIcon.remove();
     }

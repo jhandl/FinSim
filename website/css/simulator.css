@@ -618,3 +618,33 @@ input.currency {
     content: none;
 }
 
+.warning-icon {
+    margin-right: 0.25rem;
+    margin-left: -0.25rem;
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 0.9em;
+    cursor: help;
+}
+
+/* Custom tooltip using data-tooltip attribute */
+[data-tooltip] {
+    position: relative;
+    pointer-events: auto;
+}
+
+[data-tooltip]:hover::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px 10px;
+    background: black;
+    color: white;
+    border-radius: 4px;
+    font-size: 14px;
+    white-space: nowrap;
+    z-index: 1000;
+}
+
