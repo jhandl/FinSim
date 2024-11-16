@@ -15,7 +15,7 @@ class WebUI extends AbstractUI {
     const element = document.getElementById(elementId);
     if (!element) throw new Error(`Element not found: ${elementId}`);
     if (element.value !== undefined) {
-        let value = element.value;
+        let value = element.value;        
         // If value is empty string, return undefined
         if (value === '') {
             return undefined;
@@ -87,32 +87,41 @@ class WebUI extends AbstractUI {
     const rows = Array.from(table.getElementsByTagName('tr'));
     const elements = [];
 
+    const getInputValue = (input) => {
+      if (!input) return undefined;
+      const tempId = 'temp_input_for_getValue';
+      const originalId = input.id;
+      input.id = tempId;
+      const value = this.getValue(tempId);
+      if (originalId) {
+        input.id = originalId;
+      } else {
+        input.removeAttribute('id');
+      }
+      return value;
+    };
+
     for (const row of rows) {
       const cells = Array.from(row.getElementsByTagName('td'));
       if (cells.length === 0) continue; // Skip header row
       
       const rowData = [];
       
-      // Special handling for events table
       if (groupId === 'Events') {
         // Get type and name from first two cells
         const type = cells[0].querySelector('select')?.value || '';
         const name = cells[1].querySelector('input')?.value || '';
-        rowData.push(`${type}:${name}`); // Combined type:name as first element
+        rowData.push(`${type}:${name}`);
         
         // Get remaining values starting from the Amount column (index 2)
         for (let i = 2; i < columnCount + 1; i++) {
-          const input = cells[i]?.querySelector('input');
-          const value = input?.value;
-          // Only parse if the value is not empty
-          rowData.push(value === '' ? undefined : parseFloat(value));
+          rowData.push(getInputValue(cells[i]?.querySelector('input')));
         }
       } else {
         // Normal table handling
         for (let i = 0; i < columnCount; i++) {
-          const value = cells[i]?.querySelector('input')?.value ?? 
-                       cells[i]?.textContent ?? '';
-          rowData.push(value);
+          const input = cells[i]?.querySelector('input');
+          rowData.push(input ? getInputValue(input) : (cells[i]?.textContent ?? ''));
         }
       }
       
