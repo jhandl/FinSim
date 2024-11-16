@@ -292,6 +292,10 @@ class WebUI extends AbstractUI {
     }
   }
 
+  setChartsRow(rowIndex, data) {
+    window.simulatorInterface.updateChartsRow(rowIndex, data);
+  }
+
   getVersion() {
     return localStorage.getItem('simulatorVersion') || '1.26';
   }

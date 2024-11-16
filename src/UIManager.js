@@ -73,6 +73,7 @@ class UIManager {
       Worth: dataSheet[row].worth / scale
     };
     this.ui.setDataRow(row, data);
+    this.ui.setChartsRow(row, data);
     if (row % 5 === 0) {
       this.updateProgress("Updating "+Math.round(100 * progress) + "%");
     }

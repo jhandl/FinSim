@@ -22,6 +22,14 @@ class AbstractUI {
     throw new Error("Method 'getTableData' must be implemented");
   }
 
+  setDataRow(rowIndex, data) {
+    throw new Error("Method 'setDataRow' must be implemented");
+  }
+
+  setChartsRow(rowIndex, data) {
+    throw new Error("Method 'setChartsRow' must be implemented");
+  } 
+
   setStatus(message, color) {
     throw new Error("Method 'setStatus' must be implemented");
   }
@@ -113,4 +121,5 @@ class AbstractUI {
   loadFromFile(file) {
     throw new Error("Method 'loadFromFile' must be implemented");
   }
+
 } 
