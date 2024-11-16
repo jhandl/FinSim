@@ -1,6 +1,6 @@
 /* LAYOUT DEBUGGER */
 body::after {
-    content: '3 columns (> 2450px)';
+    content: '3 columns (> 2650px)';
     position: fixed;
     bottom: 10px;
     right: 10px;
@@ -12,9 +12,9 @@ body::after {
     z-index: 9999;
 }
 
-@media (max-width: 2450px) {
+@media (max-width: 2650px) {
     body::after {
-        content: '2 columns (1620px - 2450px)';
+        content: '2 columns (1620px - 2650px)';
         background: rgba(0, 119, 204, 0.8);
     }
 }

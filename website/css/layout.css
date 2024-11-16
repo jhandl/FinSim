@@ -39,7 +39,9 @@ footer {
   border-radius: 8px;
   padding: 1.5rem;
   box-shadow: var(--box-shadow);
-  width: 900px;
+  width: 100%;  /* Change from 900px to 100% */
+  max-width: 1000px;  /* Add this to maintain maximum width */
+  justify-self: start;  /* Add this to ensure left alignment */
 }
 
 /* Graphs section */
@@ -71,39 +73,49 @@ footer {
 }
 
 
-@media (max-width: 2450px) {
+@media (max-width: 2650px) {
   main {
-      grid-template-columns: minmax(auto, max-content) 1000px;
+    grid-template-columns: auto 1fr;  /* Changed from minmax(auto, max-content) 1000px */
       grid-template-areas: 
           "parameters events"
           "graphs graphs"
           "data-section data-section";
   }
 
+  .events-section {
+    /* width: 1000px;  Set fixed width */
+    width: 100%;
+    max-width: 1000px;
+    min-width: 1000px;
+    justify-self: start;
+    margin-right: 0;
+    margin-left: 0;
+  }
+
   .graphs-section {
       flex-direction: row;
       flex-wrap: wrap;
-      justify-content: center;
+      justify-content: space-between;
       gap: 2rem;
       width: 100%;
       max-height: none;
   }
 
   .graph-container {
-      flex: 1;
+      flex: 1 1 calc(50% - 1rem);
       min-width: 600px;
+      max-width: 100%;
       width: 100%;
   }
 }
 
 @media (max-width: 1800px) {
   main {
-      grid-template-columns: minmax(auto, max-content) 1000px;
+      grid-template-columns: minmax(auto, max-content) 1300px;
       grid-template-areas: 
           "parameters events"
           "graphs graphs"
           "data-section data-section";
-      justify-content: start;
   }
 
   .events-section {
@@ -112,6 +124,7 @@ footer {
 }
 
 @media (max-width: 1620px) {
+
   header {
       flex-direction: column;
       gap: 1rem;
