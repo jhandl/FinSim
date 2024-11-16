@@ -393,18 +393,37 @@ th {
     border: 1px solid var(--border-color);
     border-radius: 6px;
     cursor: move;
-    transition: all 0.2s ease;
     user-select: none;
+    position: relative;
+    z-index: 1;
 }
 
 .priority-item:hover {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transform: translateX(4px);
+    transition: all 0.2s ease;
 }
 
 .priority-item.dragging {
     opacity: 0.5;
     background: #f0f0f0;
+    position: relative;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.priority-item.drag-over {
+    border: 2px dashed var(--primary-color);
+    padding: calc(0.4rem - 1px) calc(0.75rem - 1px);
+}
+
+.priorities-container.dragging .priority-item:not(.dragging) {
+    transition: transform 0.2s ease;
+}
+
+.priority-item.placeholder {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .drag-handle {
@@ -424,11 +443,6 @@ th {
     flex-grow: 1;
     font-weight: 500;
     font-size: 1rem;
-}
-
-.priority-item.drag-over {
-    border: 2px dashed var(--primary-color);
-    padding: calc(0.4rem - 1px) calc(0.75rem - 1px);
 }
 
 @keyframes priorityInsert {
