@@ -1,3 +1,5 @@
+@import 'layout.css';
+
 :root {
     --primary-color: #0077cc;
     --secondary-color: #005fa3;
@@ -9,8 +11,11 @@
     --warning-color: #ffe066;
     --error-color: #ff8080;
     --label-width: 180px;
+    --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --transition-default: background-color 0.2s;
+    --border-radius: 4px;
+    --border-radius-large: 8px;
 }
-
 * {
     box-sizing: border-box;
     margin: 0;
@@ -64,30 +69,6 @@ header {
     align-items: center;
 }
 
-main {
-    width: 98%;
-    margin: 2rem auto;
-    padding: 0 1rem;
-    flex: 1;
-    overflow-y: auto;
-    display: grid;
-    grid-template-columns: minmax(auto, max-content) 1000px 1fr;
-    grid-template-areas: 
-        "parameters events graphs"
-        "data-section data-section data-section";
-    gap: 2rem;
-    justify-content: start;
-}
-
-footer {
-    background-color: var(--card-background);
-    padding: 1rem 2rem;
-    text-align: center;
-    border-top: 1px solid var(--border-color);
-    position: sticky;
-    bottom: 0;
-    z-index: 1000;
-}
 
 .footer-link {
     color: var(--primary-color);
@@ -102,21 +83,11 @@ footer {
 }
 
 
-
-/* Parameters section layout */
-.parameters-section {
-    grid-area: parameters;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(340px, 340px)); /* The minmax should remain untouched: minmax(340px, 340px). */
-    gap: 1.5rem;
-    justify-content: start;
-}
-
 .card {
     background-color: var(--card-background);
     border-radius: 8px;
     padding: 1.25rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--box-shadow);
     max-width: 340px;
     width: 100%;
 }
@@ -151,14 +122,23 @@ label {
     white-space: nowrap;
 }
 
-input {
-    width: 80px;
+input,
+select {
     padding: 0.4rem;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 1rem;
     transition: border-color 0.2s;
+}
+
+input {
+    width: 80px;
     text-align: right;
+}
+
+select {
+    height: 2.2rem;
+    padding: 0 0.5rem;
 }
 
 input:focus {
@@ -176,7 +156,7 @@ input:focus {
     cursor: pointer;
     font-weight: 500;
     font-size: 1.2rem;
-    transition: background-color 0.2s;
+    transition: var(--transition-default);
 }
 
 .primary-button:hover {
@@ -191,7 +171,7 @@ input:focus {
     border-radius: 4px;
     cursor: pointer;
     font-weight: 500;
-    transition: background-color 0.2s;
+    transition: var(--transition-default);
 }
 
 .secondary-button:hover {
@@ -207,18 +187,6 @@ input:focus {
     text-align: center;
 }
 
-/* Events section */
-.events-section {
-    grid-area: events;
-    background-color: var(--card-background);
-    border-radius: 8px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    width: 1000px;
-    min-width: 1000px;
-    max-width: 1000px;
-    justify-self: start;
-}
 
 .events-section h2 {
     margin-bottom: 1.5rem;
@@ -253,23 +221,12 @@ th {
     width: 100%;
 }
 
-/* Graphs section */
-.graphs-section {
-    grid-area: graphs;
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    margin: 0;
-    width: 100%;
-    min-width: 800px;
-    height: 100%;
-}
 
 .graph-container {
     background-color: var(--card-background);
     padding: 1.5rem;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--box-shadow);
     flex: 1;
     min-height: 500px;
     max-height: 600px;
@@ -287,141 +244,6 @@ th {
     padding: 1.5rem;
 }
 
-
-@media (max-width: 2450px) {
-    main {
-        grid-template-columns: minmax(auto, max-content) 1000px;
-        grid-template-areas: 
-            "parameters events"
-            "graphs graphs"
-            "data-section data-section";
-    }
-
-    .graphs-section {
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 2rem;
-        width: 100%;
-        max-height: none;
-    }
-
-    .graph-container {
-        flex: 1;
-        min-width: 600px;
-        width: 100%;
-    }
-}
-
-@media (max-width: 1800px) {
-    main {
-        grid-template-columns: minmax(auto, max-content) 1000px;
-        grid-template-areas: 
-            "parameters events"
-            "graphs graphs"
-            "data-section data-section";
-        justify-content: start;
-    }
-
-    .events-section {
-        justify-self: start;
-    }
-}
-
-@media (max-width: 1620px) {
-    header {
-        flex-direction: column;
-        gap: 1rem;
-        padding: 1rem;
-        position: sticky;
-        top: 0;
-    }
-
-    .header-left, .header-center, .header-right {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .header-left h1 {
-        font-size: 1.2rem;
-    }
-
-    .header-left .version {
-        font-size: 0.9rem;
-    }
-
-    .parameters-section {
-        grid-template-columns: 1fr;
-    }
-
-    .input-wrapper {
-        grid-template-columns: 1fr;
-        gap: 0.25rem;
-    }
-
-    label {
-        text-align: left;
-    }
-
-    .graphs-section {
-        grid-template-columns: 1fr;
-    }
-
-    .primary-button, .secondary-button {
-        width: 100%;
-    }
-
-    th, td {
-        padding: 0.5rem;
-        font-size: 0.9rem;
-    }
-
-    footer {
-        position: sticky;
-        bottom: 0;
-        padding: 0.5rem;
-    }
-
-    main {
-        margin: 1rem auto;
-        padding: 0 0.5rem;
-    }
-}
-
-@media (max-width: 1400px) {
-    main {
-        grid-template-columns: 1fr;
-        grid-template-areas: 
-            "parameters"
-            "events"
-            "graphs"
-            "data-section";
-    }
-
-    .parameters-section {
-        justify-content: center;
-    }
-
-    .events-section {
-        width: 100%;
-        min-width: 0;
-        max-width: 900px;
-        margin: 0 auto;
-        justify-self: center;
-    }
-}
-
-@media (max-width: 768px) {
-    .parameters-section {
-        grid-template-columns: 1fr;
-    }
-
-    .events-section {
-        width: 100%;
-        min-width: 0;
-        max-width: none;
-    }
-}
 
 /* Update these styles for the growth rates table */
 .growth-rates-table {
@@ -482,7 +304,7 @@ th {
     cursor: pointer;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
-    transition: background-color 0.2s;
+    transition: var(--transition-default);
 }
 
 .delete-event:hover {
@@ -490,52 +312,6 @@ th {
 }
 
 /* Update the events table styles */
-#Events td {
-    vertical-align: middle;
-}
-
-#Events input,
-#Events select {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    font-size: 1rem;
-}
-
-#Events td:last-child {
-    width: 40px;
-    text-align: center;
-}
-
-/* Make input fields in events table more compact */
-#Events input {
-    width: 100%;
-    max-width: 120px;
-}
-
-#Events select {
-    width: 100%;
-    max-width: 140px;
-}
-
-/* Make the description column slightly wider */
-#Events td:nth-child(2) input {
-    max-width: 200px;
-}
-
-/* Keep delete column narrow */
-#Events td:last-child {
-    width: 40px;
-    min-width: 40px;
-}
-
-/* Add or update these styles for the events table */
-.table-container {
-    overflow-x: auto;
-    margin: 1rem 0;
-}
-
 #Events {
     width: 100%;
     border-collapse: collapse;
@@ -547,6 +323,7 @@ th {
     padding: 0.75rem;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
 }
 
 #Events th {
@@ -563,35 +340,26 @@ th {
     font-size: 1rem;
 }
 
-#Events td:last-child {
-    width: 40px;
-    text-align: center;
-}
-
-.delete-event {
-    background-color: transparent;
-    border: none;
-    color: #ff4444;
-    font-size: 1.5rem;
-    font-weight: bold;
-    cursor: pointer;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    transition: background-color 0.2s;
-}
-
-.delete-event:hover {
-    background-color: rgba(255, 68, 68, 0.1);
-}
-
-/* Make input fields in events table more compact */
+/* Specific column widths */
 #Events input {
     min-width: 80px;
+    max-width: 120px;
     padding-right: 1.5rem;
 }
 
 #Events select {
     min-width: 200px;
+    max-width: 140px;
+}
+
+#Events td:nth-child(2) input {
+    max-width: 200px;
+}
+
+#Events td:last-child {
+    width: 40px;
+    min-width: 40px;
+    text-align: center;
 }
 
 /* Drawdown Priorities Styles */
@@ -713,21 +481,6 @@ th {
     width: 100% !important;
 }
 
-/* Add these styles for the data table */
-.data-section {
-    grid-area: data-section;
-    margin-top: 2rem;
-    width: 100%;
-    background-color: var(--card-background);
-    border-radius: 8px;
-    padding: 1.25rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* Remove card class constraints from data section */
-.data-section.card {
-    max-width: none;
-}
 
 #Data {
     width: 100%;
@@ -767,8 +520,8 @@ th {
 
 /* First group header's left border */
 #Data .header-groups th:first-child {
+    border: none;
     border-right: 3px solid #666;
-    border-left: 3px solid #666;
 }
 
 /* Vertical separators between groups - make them thicker and darker */
@@ -824,18 +577,9 @@ th {
 }
 
 /* Add thick borders between group headers */
-#Data .header-groups th:nth-child(2) {
-    border-right: 3px solid #666;
-}
-
-#Data .header-groups th:nth-child(3) {
-    border-right: 3px solid #666;
-}
-
-#Data .header-groups th:nth-child(4) {
-    border-right: 3px solid #666;
-}
-
+#Data .header-groups th:nth-child(2),
+#Data .header-groups th:nth-child(3),
+#Data .header-groups th:nth-child(4),
 #Data .header-groups th:nth-child(5) {
     border-right: 3px solid #666;
 }
@@ -850,22 +594,22 @@ th {
 
 /* Style for select boxes */
 select {
-    height: 2.2rem; /* Match the height of other inputs */
-    font-size: 1.1rem; /* Match the label font size */
+    height: 2.2rem;
+    font-size: 1.1rem;
     padding: 0 0.5rem;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     background-color: white;
 }
 
 /* Specific style for boolean selects */
 select.boolean {
-    width: 80px; /* Match other input widths */
+    width: 80px;
 }
 
 /* Style for select options */
 select option {
-    font-size: 1.1rem; /* Match the select font size */
+    font-size: 1.1rem;
     padding: 0.5rem;
 }
 
@@ -878,17 +622,17 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 
 input[type="number"] {
-    -moz-appearance: textfield; /* Firefox */
+    -moz-appearance: textfield;
     appearance: textfield;
 }
 
 /* Special width for Starting Position inputs */
 #startingPosition input {
-    width: 100px; /* Wider than standard 80px inputs */
+    width: 100px;
 }
 
 #startingPosition .percentage-container {
-    width: 100px; /* Match the input width */
+    width: 100px;
 }
 
 /* Update currency input styling */
