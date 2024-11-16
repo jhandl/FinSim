@@ -15,7 +15,10 @@
     --transition-default: background-color 0.2s;
     --border-radius: 4px;
     --border-radius-large: 8px;
+    --input-field-border: 1px;
+    --events-line-divider: 0px;
 }
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -82,7 +85,6 @@ header {
     margin-left: 1rem;
 }
 
-
 .card {
     background-color: var(--card-background);
     border-radius: 8px;
@@ -99,7 +101,6 @@ header {
     font-size: 1.4rem;
 }
 
-/* Input groups with horizontal layout */
 .input-group {
     display: flex;
     flex-direction: column;
@@ -124,8 +125,7 @@ label {
 
 input,
 select {
-    padding: 0.4rem;
-    border: 1px solid var(--border-color);
+    border: var(--input-field-border) solid var(--border-color);
     border-radius: 4px;
     font-size: 1rem;
     transition: border-color 0.2s;
@@ -133,12 +133,25 @@ select {
 
 input {
     width: 80px;
+    padding: 0.25rem;
     text-align: right;
 }
 
 select {
-    height: 2.2rem;
-    padding: 0 0.5rem;
+  height: 1.8rem;
+  padding: 0 0.5rem;
+  border: var(--input-field-border) solid var(--border-color);
+  border-radius: var(--border-radius);
+  background-color: white;
+}
+
+select.boolean {
+  width: 80px;
+}
+
+select option {
+  font-size: 1.1rem;
+  padding: 0.5rem;
 }
 
 input:focus {
@@ -195,24 +208,12 @@ input:focus {
     font-size: 1.4rem;
 }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 1rem 0;
-    background-color: var(--card-background);
-}
-
-th, td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid var(--border-color);
-}
-
 th {
     background-color: #f5f5f5;
     font-weight: 500;
     font-size: 1.1rem;
 }
+
 
 /* Make table scrollable on mobile */
 .table-container {
@@ -245,7 +246,6 @@ th {
 }
 
 
-/* Update these styles for the growth rates table */
 .growth-rates-table {
     width: 100%;
     border-collapse: collapse;
@@ -283,18 +283,15 @@ th {
     min-width: 80px;
 }
 
-/* Adjust the first column header alignment */
 .growth-rates-table th:first-child {
     width: 40%;
 }
 
-/* Make columns for inputs equal width */
 .growth-rates-table th:not(:first-child),
 .growth-rates-table td:not(:first-child) {
     width: 30%;
 }
 
-/* Add these styles for the events table delete button */
 .delete-event {
     background-color: transparent;
     border: none;
@@ -311,7 +308,6 @@ th {
     background-color: rgba(255, 68, 68, 0.1);
 }
 
-/* Update the events table styles */
 #Events {
     width: 100%;
     border-collapse: collapse;
@@ -320,9 +316,9 @@ th {
 
 #Events th,
 #Events td {
-    padding: 0.75rem;
+    padding: 0.25rem;
     text-align: left;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: var(--events-line-divider) solid var(--border-color);
     vertical-align: middle;
 }
 
@@ -334,26 +330,34 @@ th {
 #Events input,
 #Events select {
     width: 100%;
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
+    padding: 0.25rem;
+    border: var(--input-field-border) solid var(--border-color);
     border-radius: 4px;
     font-size: 1rem;
 }
 
-/* Specific column widths */
 #Events input {
     min-width: 80px;
     max-width: 120px;
-    padding-right: 1.5rem;
+    padding-right: 0.25rem;
 }
 
 #Events select {
-    min-width: 200px;
-    max-width: 140px;
+    min-width: 190px;
+    max-width: 190px;
 }
 
 #Events td:nth-child(2) input {
-    max-width: 200px;
+    min-width: 140px;
+}
+
+#Events td:nth-child(3) input {
+  min-width: 110px;
+  max-width: 110px;
+}
+
+#Events td:nth-child(6) input {
+    max-width: 80px;
 }
 
 #Events td:last-child {
@@ -362,7 +366,10 @@ th {
     text-align: center;
 }
 
-/* Drawdown Priorities Styles */
+#Events input.percentage {
+    padding-right: 1.5rem;
+}
+
 .priorities-container {
     display: flex;
     flex-direction: column;
@@ -439,29 +446,25 @@ th {
     animation: priorityInsert 0.3s ease-out;
 }
 
-/* Style for percentage inputs */
 .input-wrapper .percentage,
 .growth-rates-table .percentage {
     padding-right: 1.5rem;
     text-align: right;
 }
 
-/* Create a container for percentage inputs */
 .percentage-container {
     position: relative;
     display: inline-block;
 }
 
-/* Different widths for different contexts */
 .growth-rates-table .percentage-container {
-    width: 80px; /* Match the new input width */
+    width: 80px;
 }
 
 .input-wrapper .percentage-container {
-    width: 80px; /* Match the standard input width */
+    width: 80px;
 }
 
-/* Update the percentage input styling */
 .percentage-container::after {
     content: '%';
     position: absolute;
@@ -476,7 +479,6 @@ th {
     transition: opacity 0.2s;
 }
 
-/* Ensure percentage inputs take full width */
 .percentage {
     width: 100% !important;
 }
@@ -501,7 +503,6 @@ th {
     font-weight: bold;
 }
 
-/* Group header styles */
 #Data .header-groups th {
     background-color: #e0e0e0;
     text-align: center;
@@ -511,78 +512,58 @@ th {
     border-top: 3px solid #666;
 }
 
-/* Style for empty group headers (first and last groups) */
 #Data .header-groups th:first-child,
 #Data .header-groups th:last-child {
     background-color: transparent;
     border-bottom: 3px solid #666;
 }
 
-/* First group header's left border */
 #Data .header-groups th:first-child {
-    border: none;
     border-right: 3px solid #666;
 }
 
-/* Vertical separators between groups - make them thicker and darker */
-/* Time | Income */
-#Data td:nth-child(2),
-#Data th:nth-child(2) {
-    border-right: 3px solid #666;
-}
-
-/* Left table border */
-#Data td:nth-child(1),
-#Data th:nth-child(1) {
-    border-left: 3px solid #666;
-}
-
-/* Income | Taxes */
-#Data td:nth-child(10),
-#Data th:nth-child(10) {
-    border-right: 3px solid #666;
-}
-
-/* Taxes | Cashflow */
-#Data td:nth-child(14),
-#Data th:nth-child(14) {
-    border-right: 3px solid #666;
-}
-
-/* Cashflow | Assets */
-#Data td:nth-child(18),
-#Data th:nth-child(18) {
-    border-right: 3px solid #666;
-}
-
-/* Assets | Summary */
-#Data td:nth-child(23),
-#Data td:nth-child(25),
-#Data th:nth-child(23),
-#Data th:nth-child(25) {
-    border-right: 3px solid #666;
-}
-
-/* Update the group header borders to match */
-#Data .header-groups th:first-child {
-    border-top: none;
-    border-left: none;
-    border-right: 3px solid #666;
-}
-
-#Data .header-groups th:last-child {
-    border-top: none;
-    border-left: none;
-    border-right: none;
-}
-
-/* Add thick borders between group headers */
 #Data .header-groups th:nth-child(2),
 #Data .header-groups th:nth-child(3),
 #Data .header-groups th:nth-child(4),
 #Data .header-groups th:nth-child(5) {
     border-right: 3px solid #666;
 }
+
+#Data .header-groups th:first-child {
+  border-top: none;
+  border-left: none;
+  border-right: 3px solid #666;
+}
+
+#Data .header-groups th:last-child {
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+
+
+#Data td:nth-child(1),
+#Data th:nth-child(1) {
+    border-left: 3px solid #666;
+}
+
+/* Vertical separators between groups */
+#Data td:nth-child(2),
+#Data th:nth-child(2),
+#Data td:nth-child(10),
+#Data th:nth-child(10), 
+#Data td:nth-child(14),
+#Data th:nth-child(14),
+#Data td:nth-child(18),
+#Data th:nth-child(18),
+#Data td:nth-child(23),
+#Data th:nth-child(23),
+#Data th:nth-child(25),
+#Data td:nth-child(25)
+{
+    border-right: 3px solid #666;
+}
+
 
 #Data tbody tr:nth-child(even) {
     background-color: #f9f9f9;
@@ -592,26 +573,6 @@ th {
     background-color: #f0f0f0;
 }
 
-/* Style for select boxes */
-select {
-    height: 2.2rem;
-    font-size: 1.1rem;
-    padding: 0 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    background-color: white;
-}
-
-/* Specific style for boolean selects */
-select.boolean {
-    width: 80px;
-}
-
-/* Style for select options */
-select option {
-    font-size: 1.1rem;
-    padding: 0.5rem;
-}
 
 /* Remove up/down arrows from number inputs */
 input[type="number"]::-webkit-inner-spin-button,
@@ -626,7 +587,6 @@ input[type="number"] {
     appearance: textfield;
 }
 
-/* Special width for Starting Position inputs */
 #startingPosition input {
     width: 100px;
 }
@@ -635,13 +595,11 @@ input[type="number"] {
     width: 100px;
 }
 
-/* Update currency input styling */
 input.currency {
     text-align: right;
     padding-left: 0.5rem;
 }
 
-/* Remove the container's € symbol */
 .currency-container::after {
     content: none;
 }

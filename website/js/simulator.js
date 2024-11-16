@@ -148,11 +148,11 @@ class SimulatorInterface {
                     ${this.ui.getEventTypeOptions()}
                 </select>
             </td>
-            <td><input type="text" class="event-name" placeholder="Event name"></td>
+            <td><input type="text" class="event-name"></td>
             <td><input type="number" class="event-amount currency" inputmode="numeric" pattern="[0-9]*" step="1000"></td>
             <td><input type="number" class="event-from-age" min="0" max="100"></td>
             <td><input type="number" class="event-to-age" min="0" max="100"></td>
-            <td><div class="percentage-container"><input type="number" class="event-rate percentage" inputmode="numeric" pattern="[0-9]*" placeholder=" "></div></td>
+            <td><div class="percentage-container"><input type="number" class="event-rate percentage" inputmode="numeric" pattern="[0-9]*"></div></td>
             <td><input type="number" class="event-extra" step="0.01"></td>
             <td>
                 <button class="delete-event" title="Delete event">×</button>
