@@ -511,9 +511,24 @@ class WebUI extends AbstractUI {
             container.appendChild(input);
         }
 
-        // Add event listeners for focus and blur
+        // Function to update % symbol visibility
+        const updatePercentageVisibility = () => {
+            const container = input.parentElement;
+            if (container && container.classList.contains('percentage-container')) {
+                container.style.setProperty('--show-percentage', 
+                    input.value.trim() !== '' ? '1' : '0');
+            }
+        };
+
+        // Add event listeners
+        input.addEventListener('input', updatePercentageVisibility);
+        input.addEventListener('change', updatePercentageVisibility);
+
+        // Initial state
+        updatePercentageVisibility();
+
+        // Focus/blur handlers for editing
         input.addEventListener('focus', function() {
-            // Keep the displayed percentage value when focused
             const value = this.value.replace('%', '');
             if (value !== this.value) {
                 this.value = value;
@@ -527,6 +542,7 @@ class WebUI extends AbstractUI {
                     this.value = value;
                 }
             }
+            updatePercentageVisibility();
         });
     });
   }

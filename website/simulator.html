@@ -9,6 +9,7 @@
     <title>Ireland Financial Simulator</title>
     <link rel="icon" type="image/x-icon" href="IFS.ico">
     <link rel="stylesheet" href="css/simulator.css">
+    <link rel="stylesheet" href="css/layout-debugger.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -79,17 +80,17 @@
                     
                     <div class="input-wrapper">
                         <label for="EtfAllocation">ETF Allocation</label>
-                        <input type="number" id="EtfAllocation" class="percentage" min="0" max="100" step="1" placeholder=" ">
+                        <div class="percentage-container"><input type="number" id="EtfAllocation" class="percentage" min="0" max="100" step="1" placeholder=" "></div>
                     </div>
                     
                     <div class="input-wrapper">
                         <label for="TrustAllocation">Trust Allocation</label>
-                        <input type="number" id="TrustAllocation" class="percentage" min="0" max="100" step="1" placeholder=" ">
+                        <div class="percentage-container"><input type="number" id="TrustAllocation" class="percentage" min="0" max="100" step="1" placeholder=" "></div>
                     </div>
 
                     <div class="input-wrapper">
                         <label for="PensionContributionPercentage">Pension Contribution</label>
-                        <input type="number" id="PensionContributionPercentage" class="percentage" min="0" max="100" step="1" placeholder=" ">
+                        <div class="percentage-container"><input type="number" id="PensionContributionPercentage" class="percentage" min="0" max="100" step="1" placeholder=" "></div>
                     </div>
 
                     <div class="input-wrapper">
@@ -115,18 +116,19 @@
                     <tbody>
                         <tr>
                             <td>Pension</td>
-                            <td><input type="number" id="PensionGrowthRate" class="percentage" step="1"></td>
-                            <td><input type="number" id="PensionGrowthStdDev" class="percentage" step="1"></td>
+                            <td><div class="percentage-container"><input type="number" id="PensionGrowthRate" class="percentage" step="1"></div></td>
+                            <td><div class="percentage-container"><input type="number" id="PensionGrowthStdDev" class="percentage" step="1"></div></td>
                         </tr>
                         <tr>
                             <td>ETFs</td>
-                            <td><input type="number" id="EtfGrowthRate" class="percentage" step="1"></td>
-                            <td><input type="number" id="EtfGrowthStdDev" class="percentage" step="1"></td>
+                            <td><div class="percentage-container"><input type="number" id="EtfGrowthRate" class="percentage" step="1"></div></td>
+                            <td><div class="percentage-container"><input type="number" id="EtfGrowthStdDev" class="percentage" step="1"></div></td>
+                            </td>
                         </tr>
                         <tr>
                             <td>Trusts</td>
-                            <td><input type="number" id="TrustGrowthRate" class="percentage" step="1"></td>
-                            <td><input type="number" id="TrustGrowthStdDev" class="percentage" step="1"></td>
+                            <td><div class="percentage-container"><input type="number" id="TrustGrowthRate" class="percentage" step="1"></div></td>
+                            <td><div class="percentage-container"><input type="number" id="TrustGrowthStdDev" class="percentage" step="1"></div></td>
                         </tr>
                         <tr>
                             <td>Inflation</td>
