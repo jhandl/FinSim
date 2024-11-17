@@ -9,7 +9,7 @@
     <title>Ireland Financial Simulator</title>
     <link rel="icon" type="image/x-icon" href="IFS.ico">
     <link rel="stylesheet" href="css/simulator.css">
-    <!-- <link rel="stylesheet" href="css/layout-debugger.css"> -->
+    <link rel="stylesheet" href="css/layout-debugger.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -17,14 +17,16 @@
         <div class="header-left">
             <h1>Ireland Financial Simulator <span class="version">Version 1.26</span></h1>
         </div>
-        <div class="header-center">
-            <button id="runSimulation" class="primary-button">Run Simulation</button>
-            <div id="progress" class="status-indicator">Ready</div>
-        </div>
-        <div class="header-right">
-            <button id="saveSimulation" class="secondary-button">Save</button>
-            <input type="file" id="loadSimulation" accept=".csv" style="display: none;">
-            <button id="loadSimulationBtn" class="secondary-button">Load</button>
+        <div class="header-center-right">
+            <div class="header-center">
+                <button id="runSimulation" class="primary-button"><span>Run Simulation</span></button>
+                <div id="progress" class="status-indicator">Ready</div>
+            </div>
+            <div class="header-right">
+                <button id="saveSimulation" class="secondary-button">Save</button>
+                <input type="file" id="loadSimulation" accept=".csv" style="display: none;">
+                <button id="loadSimulationBtn" class="secondary-button">Load</button>
+            </div>
         </div>
     </header>
 
