@@ -19,17 +19,31 @@ class SimulatorInterface {
         if (runButton) {
             runButton.addEventListener('click', () => {
                 try {
+                    // Disable button and update its appearance
+                    runButton.disabled = true;
+                    runButton.classList.add('disabled');
+                    
                     // Update status before running simulation
                     this.ui.setStatus('Running...', '#f5f5f5');
                     
                     // Force browser to render the status update using requestAnimationFrame
                     requestAnimationFrame(() => {
                         requestAnimationFrame(() => {
-                            // Call the global run() function from Simulator.js
-                            run();
+                            try {
+                                // Call the global run() function from Simulator.js
+                                run();
+                            } finally {
+                                // Re-enable button regardless of success/failure
+                                runButton.disabled = false;
+                                runButton.classList.remove('disabled');
+                            }
                         });
                     });
                 } catch (error) {
+                    // Re-enable button on error
+                    runButton.disabled = false;
+                    runButton.classList.remove('disabled');
+                    
                     console.error('Simulation failed:', error);
                     this.ui.setStatus('Simulation failed: ' + error.message, this.ui.STATUS_COLORS.ERROR);
                 }
