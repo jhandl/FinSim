@@ -1,6 +1,6 @@
 main {
-  width: 98%;
-  max-width: 2650px;
+  width: 100%;
+  max-width: none;
   margin: 2rem auto;
   padding: 0 1rem;
   flex: 1;
@@ -101,7 +101,6 @@ footer {
 @media (max-width: 2520px) {
   main {
     width: 100%;
-    max-width: 2650px;
     grid-template-columns: minmax(auto, max-content) minmax(0, 1fr);
       grid-template-areas: 
           "parameters events"
@@ -167,10 +166,7 @@ footer {
       padding: 0.5rem;
   }
 
-  main {
-      margin: 1rem auto;
-      padding: 0 0.5rem;
-  }
+
 }
 
 @media (max-width: 1286px) {
