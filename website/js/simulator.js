@@ -19,10 +19,16 @@ class SimulatorInterface {
         if (runButton) {
             runButton.addEventListener('click', () => {
                 try {
-                    // Call the global run() function from Simulator.js
-                    run();
+                    // Update status before running simulation
+                    this.ui.setStatus('Running...', '#f5f5f5');
                     
-                    // Update charts with new data after simulation
+                    // Force browser to render the status update using requestAnimationFrame
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            // Call the global run() function from Simulator.js
+                            run();
+                        });
+                    });
                 } catch (error) {
                     console.error('Simulation failed:', error);
                     this.ui.setStatus('Simulation failed: ' + error.message, this.ui.STATUS_COLORS.ERROR);
