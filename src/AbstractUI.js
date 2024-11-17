@@ -106,10 +106,6 @@ class AbstractUI {
     throw new Error("Method 'clearAllWarnings' must be implemented");
   }
 
-  setTableCellWarning(tableName, row, col, message) {
-    throw new Error("Method 'setTableCellWarning' must be implemented");
-  }
-
   isPercentage(elementId) {
     throw new Error("Method 'isPercentage' must be implemented");
   }

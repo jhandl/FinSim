@@ -159,47 +159,41 @@ class WebUI extends AbstractUI {
   }
 
   setWarning(elementId, message) {
-    const element = document.getElementById(elementId);
-    if (!element) throw new Error(`Element not found: ${elementId}`);
+
+    const tableMatch = elementId.match(/^(\w+)\[(\d+),(\d+)\]$/);
+    var element = null;
+    if (tableMatch) {
+      var [_, tableName, row, col] = tableMatch;
+      const table = document.getElementById(tableName);
+      if (!table) throw new Error(`Table not found: ${tableName}`);
+      const tbody = table.getElementsByTagName('tbody')[0];
+      const rows = tbody.getElementsByTagName('tr');
+      row = parseInt(row);
+      col = parseInt(col);
+      if (row - 1 >= rows.length) return;
+      const cells = rows[row - 1].getElementsByTagName('td');
+      if (col - 1 >= cells.length) return;
+      element = cells[col].querySelector('input') || cells[col];
+    } else {
+      element = document.getElementById(elementId);
+      if (!element) throw new Error(`Element not found: ${elementId}`);
+    }
     
-    // Apply warning styles
     element.style.backgroundColor = STATUS_COLORS.WARNING;
     element.setAttribute('data-tooltip', message);
-
-    // Add hover events for input tooltip
     element.addEventListener('mouseenter', function() {
         const tooltip = document.createElement('div');
         tooltip.className = 'input-tooltip';
         tooltip.textContent = message;
         element.parentNode.appendChild(tooltip);
-        
-        // Position the tooltip above the input
         const rect = element.getBoundingClientRect();
         tooltip.style.left = `${rect.left}px`;
         tooltip.style.top = `${rect.top - tooltip.offsetHeight - 5}px`;
     });
-
     element.addEventListener('mouseleave', function() {
         const tooltip = document.querySelector('.input-tooltip');
         if (tooltip) tooltip.remove();
     });
-  }
-
-  setTableCellWarning(tableName, row, col, message) {
-    const table = document.getElementById(tableName);
-    if (!table) throw new Error(`Table not found: ${tableName}`);
-    
-    const tbody = table.getElementsByTagName('tbody')[0];
-    const rows = tbody.getElementsByTagName('tr');
-    
-    if (row - 1 >= rows.length) return;
-    
-    const cells = rows[row - 1].getElementsByTagName('td');
-    if (col - 1 >= cells.length) return;
-    
-    const cell = cells[col];
-    cell.setAttribute('title', message);
-    cell.style.backgroundColor = STATUS_COLORS.WARNING;
   }
 
   clearWarning(elementId) {
