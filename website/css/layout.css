@@ -1,11 +1,12 @@
 main {
   width: 98%;
+  max-width: 2650px;
   margin: 2rem auto;
   padding: 0 1rem;
   flex: 1;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: minmax(auto, max-content) 1000px 1fr;
+  grid-template-columns: minmax(auto, max-content) minmax(0, 900px) 1fr;
   grid-template-areas: 
       "parameters events graphs"
       "data-section data-section data-section";
@@ -40,7 +41,7 @@ footer {
   padding: 1.5rem;
   box-shadow: var(--box-shadow);
   width: 100%;  /* Change from 900px to 100% */
-  max-width: 1000px;  /* Add this to maintain maximum width */
+  max-width: 900px;  /* Add this to maintain maximum width */
   justify-self: start;  /* Add this to ensure left alignment */
 }
 
@@ -52,9 +53,33 @@ footer {
   gap: 2rem;
   margin: 0;
   width: 100%;
-  min-width: 800px;
+  min-width: 0;
   height: 100%;
 }
+
+.graph-container {
+  background-color: var(--card-background);
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+  flex: 1;
+  min-height: 500px;
+  max-height: 600px;
+  width: 100%;
+  position: relative;
+  min-width: 0;
+}
+
+/* Make canvas responsive */
+.graph-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 1.5rem;
+}
+
 
 /* Add these styles for the data table */
 .data-section {
@@ -73,9 +98,11 @@ footer {
 }
 
 
-@media (max-width: 2650px) {
+@media (max-width: 2520px) {
   main {
-    grid-template-columns: auto 1fr;  /* Changed from minmax(auto, max-content) 1000px */
+    width: 100%;
+    max-width: 2650px;
+    grid-template-columns: minmax(auto, max-content) minmax(0, 1fr);
       grid-template-areas: 
           "parameters events"
           "graphs graphs"
@@ -85,8 +112,8 @@ footer {
   .events-section {
     /* width: 1000px;  Set fixed width */
     width: 100%;
-    max-width: 1000px;
-    min-width: 1000px;
+    max-width: 900px;
+    min-width: 900px;
     justify-self: start;
     margin-right: 0;
     margin-left: 0;
@@ -95,7 +122,7 @@ footer {
   .graphs-section {
       flex-direction: row;
       flex-wrap: wrap;
-      justify-content: space-between;
+      justify-content: stretch;
       gap: 2rem;
       width: 100%;
       max-height: none;
@@ -103,48 +130,14 @@ footer {
 
   .graph-container {
       flex: 1 1 calc(50% - 1rem);
-      min-width: 600px;
+      min-width: 0;
       max-width: 100%;
       width: 100%;
   }
 }
 
-@media (max-width: 1800px) {
-  main {
-      grid-template-columns: minmax(auto, max-content) 1300px;
-      grid-template-areas: 
-          "parameters events"
-          "graphs graphs"
-          "data-section data-section";
-  }
 
-  .events-section {
-      justify-self: start;
-  }
-}
-
-@media (max-width: 1620px) {
-
-  header {
-      flex-direction: column;
-      gap: 1rem;
-      padding: 1rem;
-      position: sticky;
-      top: 0;
-  }
-
-  .header-left, .header-center, .header-right {
-      width: 100%;
-      justify-content: center;
-  }
-
-  .header-left h1 {
-      font-size: 1.2rem;
-  }
-
-  .header-left .version {
-      font-size: 0.9rem;
-  }
+@media (max-width: 1666px) {
 
   .parameters-section {
       grid-template-columns: 1fr;
@@ -161,10 +154,6 @@ footer {
 
   .graphs-section {
       grid-template-columns: 1fr;
-  }
-
-  .primary-button, .secondary-button {
-      width: 100%;
   }
 
   th, td {
@@ -184,7 +173,7 @@ footer {
   }
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 1286px) {
   main {
       grid-template-columns: 1fr;
       grid-template-areas: 
@@ -198,16 +187,47 @@ footer {
       justify-content: center;
   }
 
+  .graphs-section {
+      flex-direction: column;
+      max-width: 900px;
+  }
+
   .events-section {
       width: 100%;
       min-width: 0;
       max-width: 900px;
-      margin: 0 auto;
-      justify-self: center;
+      margin: 0;
+      justify-self: start;
   }
 }
 
 @media (max-width: 768px) {
+
+  header {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    position: sticky;
+    top: 0;
+  }
+
+  .header-left, .header-center, .header-right {
+      width: 100%;
+      justify-content: center;
+  }
+
+  .header-left h1 {
+      font-size: 1.2rem;
+  }
+
+  .header-left .version {
+      font-size: 0.9rem;
+  }
+
+  .primary-button, .secondary-button {
+    width: 100%;
+}
+
   .parameters-section {
       grid-template-columns: 1fr;
   }
@@ -215,6 +235,7 @@ footer {
   .events-section {
       width: 100%;
       min-width: 0;
-      max-width: none;
+      max-width: 900px;
+      justify-self: left;
   }
 }
