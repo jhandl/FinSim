@@ -196,25 +196,28 @@ class WebUI extends AbstractUI {
     });
   }
 
-  clearWarning(elementId) {
-    const element = document.getElementById(elementId);
-    if (!element) throw new Error(`Element not found: ${elementId}`);
-    
+  clearElementWarning(element) {
     element.style.backgroundColor = STATUS_COLORS.WHITE;
     element.removeAttribute('data-tooltip');
-    
-    // Remove event listeners by cloning the element
+  } 
+
+  clearWarning(elementId) {
+    const element = document.getElementById(elementId);    
+    this.clearElementWarning(element);
     const newElement = element.cloneNode(true);
     element.parentNode.replaceChild(newElement, element);
   }
 
   clearAllWarnings() {
-    // Find all elements with background color matching WARNING
-    const elements = document.querySelectorAll(`[style*="background-color: ${STATUS_COLORS.WARNING}"]`);
-    elements.forEach(element => {
-      if (element.id) {
-        this.clearWarning(element.id);
-      }
+    console.log("clearing all warnings");
+    const warningRGB = `rgb(${parseInt(STATUS_COLORS.WARNING.slice(1,3), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(3,5), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(5,7), 16)})`;
+    const elements = document.querySelectorAll('[style]');
+    const warningElements = Array.from(elements).filter(element => {
+      const bgColor = window.getComputedStyle(element).backgroundColor;
+      return bgColor === warningRGB;
+    });
+    warningElements.forEach(element => {
+      this.clearElementWarning(element);
     });
   }
 
