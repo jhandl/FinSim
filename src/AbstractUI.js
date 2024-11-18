@@ -6,6 +6,10 @@ class AbstractUI {
     }
   }
 
+  getInstance() {
+    throw new Error("Method 'getInstance' must be implemented");
+  }
+
   initialize() {
     throw new Error("Method 'initialize' must be implemented");
   }

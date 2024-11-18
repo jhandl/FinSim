@@ -1,5 +1,7 @@
 /* This file has to work only on Google Sheets */
 
+var GoogleSheetsUI_instance = null;
+
 class GoogleSheetsUI extends AbstractUI {
 
   constructor() {
@@ -9,6 +11,14 @@ class GoogleSheetsUI extends AbstractUI {
     this.spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     this.statusCell = this.spreadsheet.getRangeByName("Progress").getCell(1, 1);
     this.cacheNamedRanges();
+  }
+
+  // Singleton
+  static getInstance() {
+    if (!GoogleSheetsUI_instance) {
+      GoogleSheetsUI_instance = new GoogleSheetsUI();
+    }
+    return GoogleSheetsUI_instance;
   }
 
   cacheNamedRanges() {

@@ -29,9 +29,9 @@ function run() {
 
 function initializeUI() {
   if (typeof SpreadsheetApp !== 'undefined') {
-    ui = new UIManager(new GoogleSheetsUI());
+    ui = new UIManager(GoogleSheetsUI.getInstance());
   } else {
-    ui = new UIManager(new WebUI());
+    ui = new UIManager(WebUI.getInstance());
   }
 }
 
