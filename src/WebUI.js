@@ -212,13 +212,6 @@ class WebUI extends AbstractUI {
     element.removeAttribute('data-tooltip');
   } 
 
-  clearWarning(elementId) {
-    const element = document.getElementById(elementId);    
-    this.clearElementWarning(element);
-    const newElement = element.cloneNode(true);
-    element.parentNode.replaceChild(newElement, element);
-  }
-
   clearAllWarnings() {
     const warningRGB = `rgb(${parseInt(STATUS_COLORS.WARNING.slice(1,3), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(3,5), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(5,7), 16)})`;
     const elements = document.querySelectorAll('[style]');

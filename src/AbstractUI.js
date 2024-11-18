@@ -50,10 +50,6 @@ class AbstractUI {
     throw new Error("Method 'setWarning' must be implemented");
   }
 
-  clearWarning(elementId) {
-    throw new Error("Method 'clearWarning' must be implemented");
-  }
-
   setBackground(elementId, color) {
     throw new Error("Method 'setBackground' must be implemented");
   }

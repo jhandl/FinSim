@@ -37,6 +37,7 @@ function initializeUI() {
 
 function readScenario(validate) {
   errors = false;
+  ui.clearWarnings();
   params = ui.readParameters(validate); // 6918 ms
   events = ui.readEvents(validate); // 534 ms
   if (errors) {

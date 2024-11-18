@@ -112,7 +112,7 @@ class GoogleSheetsUI extends AbstractUI {
     cell.setBackground(STATUS_COLORS.WARNING);
   }
 
-  clearWarning(elementId) {
+  clearWarningById(elementId) {
     const range = this.namedRanges.get(elementId);
     if (!range) throw new Error(`Element not found: ${elementId}`);
     range.clearNote();
@@ -120,7 +120,8 @@ class GoogleSheetsUI extends AbstractUI {
   }
 
   clearAllWarnings() {
-    this.clearWarning("Parameters");
+    this.clearWarningById("Parameters");
+    this.clearWarningById("Events");
   }
 
   setBackground(elementId, color) {

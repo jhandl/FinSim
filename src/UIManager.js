@@ -112,7 +112,6 @@ class UIManager {
     };
     
     if (validate) {
-      this.ui.clearAllWarnings();
       if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
         this.ui.setWarning("RetirementAge", "Warning: Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
       }
@@ -130,12 +129,14 @@ class UIManager {
     return params;
   }
 
+  clearWarnings() {
+    this.ui.clearAllWarnings();
+  }
+
   readEvents(validate=true) {
     const events = [];
     errors = false;
-    
-    this.ui.clearWarning("Events");
-    
+        
     const rows = this.ui.getTableData("Events", 6);
     
     for (const [i, [name, amount, fromAge, toAge, rate, extra]] of rows.entries()) {
