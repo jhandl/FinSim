@@ -123,10 +123,7 @@ class WebUI extends AbstractUI {
         const typeSelect = cells[0].querySelector('select');
         const type = cells[0].querySelector('select')?.value || '';
         const name = cells[1].querySelector('input')?.value || '';
-
-        console.log("#removeme type: "+type+"  name: "+name);
         const eventsTable = document.getElementById('Events');
-
         rowData.push(`${type}:${name}`);
         
         // Get remaining values starting from the Amount column (index 2)
@@ -918,7 +915,7 @@ class WebUI extends AbstractUI {
 
   setupEventTableButtons() {
     this.setupAddEventButton();
-    this.setupEventTableDelegation();
+    this.setupEventTableRowDelete();
   }
 
   setupAddEventButton() {
@@ -931,22 +928,16 @@ class WebUI extends AbstractUI {
     }
   }
 
-  setupEventTableDelegation() {
+  setupEventTableRowDelete() {
     const eventsTable = document.getElementById('Events');
-    if (!eventsTable) return;
-
-    eventsTable.addEventListener('click', (e) => {
-      if (e.target.classList.contains('delete-event')) {
-        const row = e.target.closest('tr');
-        if (row) row.remove();
-      }
-    });
-
-    eventsTable.addEventListener('change', (e) => {
-      if (e.target?.classList.contains('event-type')) {
-        console.log("Change event detected. Current value:", e.target.value);
-      }
-    });
+    if (eventsTable) {
+      eventsTable.addEventListener('click', (e) => {
+        if (e.target.classList.contains('delete-event')) {
+          const row = e.target.closest('tr');
+          if (row) row.remove();
+        }
+      });
+    }
   }
 
   setupFileOperationButtons() {
@@ -964,10 +955,10 @@ class WebUI extends AbstractUI {
   setupLoadButton() {
     const loadButton = document.getElementById('loadSimulationBtn');
     const fileInput = document.getElementById('loadSimulation');
-    if (!loadButton || !fileInput) return;
-
-    loadButton.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => this.loadFromFile(e.target.files[0]));
+    if (loadButton && fileInput) {
+      loadButton.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', (e) => this.loadFromFile(e.target.files[0]));
+    }
   }
 
   setupPriorityDragAndDrop() {
