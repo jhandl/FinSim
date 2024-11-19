@@ -119,9 +119,14 @@ class WebUI extends AbstractUI {
       const rowData = [];
       
       if (groupId === 'Events') {
-        // Get type and name from first two cells
+        // Get type from select element and name from input
+        const typeSelect = cells[0].querySelector('select');
         const type = cells[0].querySelector('select')?.value || '';
         const name = cells[1].querySelector('input')?.value || '';
+
+        console.log("#removeme type: "+type+"  name: "+name);
+        const eventsTable = document.getElementById('Events');
+
         rowData.push(`${type}:${name}`);
         
         // Get remaining values starting from the Amount column (index 2)
@@ -139,7 +144,6 @@ class WebUI extends AbstractUI {
       if (rowData[0] === "") break;
       elements.push(rowData);
     }
-    
     return elements;
   }
 
@@ -440,10 +444,11 @@ class WebUI extends AbstractUI {
         const tbody = document.querySelector('#Events tbody');
         if (tbody) {
             tbody.innerHTML = ''; // Clear existing rows
-            eventData.forEach(([type, name, amount, fromAge, toAge, rate, extra]) => {
-                if (type && amount) {
-                    // Convert decimal rate to percentage for display, but keep empty if undefined
+            eventData.forEach(([type, name, amount, fromAge, toAge, rate, match]) => {
+                if (type) {
+                    // Convert decimal rate and match to percentage for display
                     const displayRate = (rate !== undefined && rate !== '') ? (rate * 100).toString() : '';
+                    const displayMatch = (match !== undefined && match !== '') ? (match * 100).toString() : '';
                     
                     const row = document.createElement('tr');
                     row.innerHTML = `
@@ -457,7 +462,7 @@ class WebUI extends AbstractUI {
                         <td><input type="number" class="event-from-age" min="0" max="100" value="${fromAge || ''}"></td>
                         <td><input type="number" class="event-to-age" min="0" max="100" value="${toAge || ''}"></td>
                         <td><div class="percentage-container"><input type="number" class="event-rate percentage" value="${displayRate}"></div></td>
-                        <td><input type="number" class="event-extra" step="0.01" value="${extra === undefined ? '' : extra}"></td>
+                        <td><div class="percentage-container"><input type="number" class="event-match percentage" value="${displayMatch}"></div></td>
                         <td>
                             <button class="delete-event" title="Delete event">×</button>
                         </td>
@@ -830,9 +835,6 @@ class WebUI extends AbstractUI {
     });
   }
 
-  handleEdit(event) {
-    // Handle input changes here
-  }
 
   updateChartsRow(rowIndex, data) {
     const i = rowIndex-1;
@@ -862,11 +864,16 @@ class WebUI extends AbstractUI {
   }
 
   setupEventListeners() {
-   
-    document.addEventListener('input', (event) => {
+    this.setupChangeListener();
+    this.setupRunSimulationButton();
+    this.setupEventTableButtons();
+    this.setupFileOperationButtons();
+    this.setupPriorityDragAndDrop();
+  }
+
+  setupChangeListener() {
+    document.addEventListener('change', (event) => {
       const element = event.target;
-      if (!element.id) return;
-      
       this.editCallbacks.forEach(callback => {
         callback({
           element: element,
@@ -875,86 +882,93 @@ class WebUI extends AbstractUI {
         });
       });
     });
+  }
 
-    // Run simulation button
+  setupRunSimulationButton() {
     const runButton = document.getElementById('runSimulation');
-    if (runButton) {
-        runButton.addEventListener('click', () => {
-            try {
-                // Disable button and update its appearance
-                runButton.disabled = true;
-                runButton.classList.add('disabled');
-                
-                // Update status before running simulation
-                this.setStatus('Running...', '#f5f5f5');
-                
-                // Force browser to render the status update using requestAnimationFrame
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(() => {
-                        try {
-                            // Call the global run() function from Simulator.js
-                            run();
-                        } finally {
-                            // Re-enable button regardless of success/failure
-                            runButton.disabled = false;
-                            runButton.classList.remove('disabled');
-                        }
-                    });
-                });
-            } catch (error) {
-                // Re-enable button on error
-                runButton.disabled = false;
-                runButton.classList.remove('disabled');
-                
-                console.error('Simulation failed:', error);
-                this.setStatus('Simulation failed: ' + error.message, STATUS_COLORS.ERROR);
-            }
-        });
-    }
+    if (!runButton) return;
 
-    // Add event row button
+    runButton.addEventListener('click', () => {
+      try {
+        runButton.disabled = true;
+        runButton.classList.add('disabled');
+        this.setStatus('Running...', '#f5f5f5');
+        
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            try {
+              run();
+            } finally {
+              this.enableRunButton(runButton);
+            }
+          });
+        });
+      } catch (error) {
+        this.enableRunButton(runButton);
+        console.error('Simulation failed:', error);
+        this.setStatus('Simulation failed: ' + error.message, STATUS_COLORS.ERROR);
+      }
+    });
+  }
+
+  enableRunButton(button) {
+    button.disabled = false;
+    button.classList.remove('disabled');
+  }
+
+  setupEventTableButtons() {
+    this.setupAddEventButton();
+    this.setupEventTableDelegation();
+  }
+
+  setupAddEventButton() {
     const addEventButton = document.getElementById('addEventRow');
     if (addEventButton) {
-        addEventButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.addEventRow();
-        });
+      addEventButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.addEventRow();
+      });
     }
+  }
 
-    // Event delegation for delete buttons
+  setupEventTableDelegation() {
     const eventsTable = document.getElementById('Events');
-    if (eventsTable) {
-        eventsTable.addEventListener('click', (e) => {
-            if (e.target.classList.contains('delete-event')) {
-                const row = e.target.closest('tr');
-                if (row) {
-                    const tbody = row.parentElement;
-                    row.remove();
-                }
-            }
-        });
-    }
+    if (!eventsTable) return;
 
-    // Setup edit callbacks for all inputs
-    this.onEdit(this.handleEdit.bind(this));
+    eventsTable.addEventListener('click', (e) => {
+      if (e.target.classList.contains('delete-event')) {
+        const row = e.target.closest('tr');
+        if (row) row.remove();
+      }
+    });
 
-    // Save button
+    eventsTable.addEventListener('change', (e) => {
+      if (e.target?.classList.contains('event-type')) {
+        console.log("Change event detected. Current value:", e.target.value);
+      }
+    });
+  }
+
+  setupFileOperationButtons() {
+    this.setupSaveButton();
+    this.setupLoadButton();
+  }
+
+  setupSaveButton() {
     const saveButton = document.getElementById('saveSimulation');
     if (saveButton) {
-        saveButton.addEventListener('click', () => this.saveToFile());
+      saveButton.addEventListener('click', () => this.saveToFile());
     }
+  }
 
-    // Load button
+  setupLoadButton() {
     const loadButton = document.getElementById('loadSimulationBtn');
     const fileInput = document.getElementById('loadSimulation');
-    if (loadButton && fileInput) {
-        loadButton.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', (e) => this.loadFromFile(e.target.files[0]));
-    }
+    if (!loadButton || !fileInput) return;
 
-    // Setup drag and drop for priorities
-    this.setupPriorityDragAndDrop();
-}
+    loadButton.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => this.loadFromFile(e.target.files[0]));
+  }
 
   setupPriorityDragAndDrop() {
     const container = document.querySelector('.priorities-container');
@@ -1034,7 +1048,7 @@ class WebUI extends AbstractUI {
         <td><input type="number" class="event-from-age" min="0" max="100"></td>
         <td><input type="number" class="event-to-age" min="0" max="100"></td>
         <td><div class="percentage-container"><input type="number" class="event-rate percentage" inputmode="numeric" pattern="[0-9]*"></div></td>
-        <td><input type="number" class="event-extra" step="0.01"></td>
+        <td><div class="percentage-container"><input type="number" class="event-match percentage" inputmode="numeric" pattern="[0-9]*"></div></td>
         <td>
             <button class="delete-event" title="Delete event">×</button>
         </td>

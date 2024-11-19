@@ -355,6 +355,10 @@ th {
     max-width: 80px;
 }
 
+#Events td:nth-child(7) input {
+    max-width: 80px;
+}
+
 #Events td:last-child {
     width: 40px;
     min-width: 40px;

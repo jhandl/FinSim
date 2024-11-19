@@ -138,8 +138,8 @@ class UIManager {
     errors = false;
         
     const rows = this.ui.getTableData("Events", 6);
-    
-    for (const [i, [name, amount, fromAge, toAge, rate, extra]] of rows.entries()) {
+
+      for (const [i, [name, amount, fromAge, toAge, rate, match]] of rows.entries()) {
       const pos = name.indexOf(":");
       if (pos < 0) {
         if (name === "") break;
@@ -184,7 +184,7 @@ class UIManager {
         fromAge || 0,
         toAge || 999,
         (rate === "") ? undefined : rate,
-        (extra === "") ? undefined : extra
+        (match === "") ? undefined : match
       ))
     }
 

@@ -240,7 +240,7 @@ function processEvents() {
         break;
       case 'SM': // Stock Market Growth override to simulate a crash or a bubble (only the growth part of the bubble)
         if (age == event.fromAge) {
-          stockGrowthOverride = event.amount / (event.toAge - event.fromAge);
+          stockGrowthOverride = event.rate / (event.toAge - event.fromAge);
         }
         if (age === event.toAge) {
           stockGrowthOverride = undefined;
