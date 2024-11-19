@@ -1,13 +1,9 @@
 # Roadmap
 
 ## Version 2
-- Add scenario tests, by adding the expected results at the end of the config files and creating a config file for each scenario
 - Add a wizard
-- Grey out the NOP rows
-- Reduce AbstractUI to a minimum
 - Add a step function to represent government's delayed updates
 - Review pension types and minimum retirement ages (ChatGPT chat “Pension Types in Ireland”) 
-- Ask AI to check that there’s no hardcoded numbers left
 - Add a way to view and override config settings (like DD)
 - Add a button in the website to take users to the google sheet
 - Add a link to FinSim.ie in the spreadsheet

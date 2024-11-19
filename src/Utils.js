@@ -154,3 +154,13 @@ function deserializeSimulation(content, ui) {
 
     return eventData;
 }
+
+function getRateForKey(key, rateBands) {
+  const bandKeys = Object.keys(rateBands).map(Number);
+  for (const bandKey of bandKeys) {
+    if (key >= bandKey) {
+      return rateBands[bandKey];
+    }
+  }
+  return rateBands[bandKeys[0]]; // Return lowest age band rate as fallback
+}

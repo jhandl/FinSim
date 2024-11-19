@@ -179,7 +179,7 @@ function processEvents() {
       case 'SI': // Salary income (with private pension contribution if so defined)
         if (inScope) {
           incomeSalaries += amount;
-          let contribRate = params.pensionPercentage * ((age < 30) ? 0.15 : (age < 40) ? 0.20 : (age < 50) ? 0.25 : (age < 55) ? 0.30 : (age < 60) ? 0.35 : 0.40);
+          let contribRate = params.pensionPercentage * getRateForKey(age, config.pensionContributionRateBands);
           if (params.pensionCapped && (amount > adjust(config.pensionContribEarningLimit))) {
             contribRate = contribRate * adjust(config.pensionContribEarningLimit) / amount;
           }
