@@ -215,11 +215,13 @@ class WebUI extends AbstractUI {
 
   clearAllWarnings() {
     const warningRGB = `rgb(${parseInt(STATUS_COLORS.WARNING.slice(1,3), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(3,5), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(5,7), 16)})`;
-    const elements = document.querySelectorAll('[style]');
+    const elements = document.querySelectorAll('input[style]');
     const warningElements = Array.from(elements).filter(element => {
-      const bgColor = window.getComputedStyle(element).backgroundColor;
+      // Get the directly assigned background color from style attribute
+      const bgColor = element.style.backgroundColor;
       return bgColor === warningRGB;
     });
+    
     warningElements.forEach(element => {
       this.clearElementWarning(element);
     });
@@ -458,7 +460,7 @@ class WebUI extends AbstractUI {
                         <td><input type="number" class="event-amount currency" step="1000" value="${amount}"></td>
                         <td><input type="number" class="event-from-age" min="0" max="100" value="${fromAge || ''}"></td>
                         <td><input type="number" class="event-to-age" min="0" max="100" value="${toAge || ''}"></td>
-                        <td><div class="percentage-container"><input type="number" class="event-rate percentage" value="${displayRate}"></div></td>
+                        <td><div class="percentage-container"><input type="number" class="event-rate percentage" value="${displayRate}" placeholder="inflation"></div></td>
                         <td><div class="percentage-container"><input type="number" class="event-match percentage" value="${displayMatch}"></div></td>
                         <td>
                             <button class="delete-event" title="Delete event">×</button>
@@ -513,6 +515,11 @@ class WebUI extends AbstractUI {
             container.className = 'percentage-container';
             input.parentNode.insertBefore(container, input);
             container.appendChild(input);
+            
+            // Add placeholder if it's a rate input
+            if (input.classList.contains('event-rate')) {
+                input.placeholder = 'inflation';
+            }
         }
 
         // Function to update % symbol visibility
@@ -578,21 +585,21 @@ class WebUI extends AbstractUI {
       // Remove type="number" to prevent browser validation of formatted numbers
       input.type = 'text';
       input.inputMode = 'numeric';
-      input.pattern = '[0-9]*';
+      input.pattern = '[0-9\$€,]*';
     });
 
     // Use direct event listeners instead of delegation for better reliability
     currencyInputs.forEach(input => {
       input.addEventListener('focus', function() {
         // On focus, show the raw number
-        const value = this.value.replace(/[€,]/g, '');
+        const value = this.value.replace(/[\$€,]/g, '');
         if (value !== this.value) {
           this.value = value;
         }
       });
 
       input.addEventListener('blur', function() {
-        const value = this.value.replace(/[€,]/g, '');
+        const value = this.value.replace(/[\$€,]/g, '');
         if (value) {
           const number = parseFloat(value);
           if (!isNaN(number)) {
@@ -1038,7 +1045,7 @@ class WebUI extends AbstractUI {
         <td><input type="number" class="event-amount currency" inputmode="numeric" pattern="[0-9]*" step="1000"></td>
         <td><input type="number" class="event-from-age" min="0" max="100"></td>
         <td><input type="number" class="event-to-age" min="0" max="100"></td>
-        <td><div class="percentage-container"><input type="number" class="event-rate percentage" inputmode="numeric" pattern="[0-9]*"></div></td>
+        <td><div class="percentage-container"><input type="number" class="event-rate percentage" inputmode="numeric" pattern="[0-9]*" placeholder="inflation"></div></td>
         <td><div class="percentage-container"><input type="number" class="event-match percentage" inputmode="numeric" pattern="[0-9]*"></div></td>
         <td>
             <button class="delete-event" title="Delete event">×</button>

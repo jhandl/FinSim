@@ -119,7 +119,7 @@ function resetYearlyVariables() {
 function runSimulation() {
   initializeSimulationVariables();
 
-  while (age < 100) {
+  while (age < params.targetAge) {
 
     row++;
     year++;
@@ -134,7 +134,7 @@ function runSimulation() {
     handleInvestments();
     updateYearlyData();
   }
-  return (success || (failedAt > params.targetAge));
+  return success;
 }
 
 function calculatePensionIncome() {
@@ -161,24 +161,29 @@ function processEvents() {
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
     let amount = adjust(event.amount, event.rate);
-    let inScope = (age >= event.fromAge && age <= event.toAge);
+    // Default toAge to 999 if not required for this event type
+    let inScope = (age >= event.fromAge && age <= (event.toAge || 999));
+
     switch (event.type) {
+
       case "NOP": // No Operation
         break;
+
       case 'RI': // Rental income
-        if (inScope && amount > 0) {
+        if (inScope) {
           incomeRentals += amount;
           revenue.declareOtherIncome(amount);
         }
         break;
+
       case 'SI': // Salary income (with private pension contribution if so defined)
-        if (inScope && amount > 0) {
+        if (inScope) {
           incomeSalaries += amount;
           let contribRate = params.pensionPercentage * ((age < 30) ? 0.15 : (age < 40) ? 0.20 : (age < 50) ? 0.25 : (age < 55) ? 0.30 : (age < 60) ? 0.35 : 0.40);
           if (params.pensionCapped && (amount > adjust(config.pensionContribEarningLimit))) {
             contribRate = contribRate * adjust(config.pensionContribEarningLimit) / amount;
           }
-          let companyMatch = Math.min(event.extra, contribRate);
+          let companyMatch = Math.min(event.match || 0, contribRate);
           let personalContrib = contribRate * amount;
           let companyContrib = companyMatch * amount;
           let totalContrib = personalContrib + companyContrib;
@@ -187,65 +192,74 @@ function processEvents() {
           revenue.declareSalaryIncome(amount, contribRate);
         }
         break;
-      case 'SInp': // Salary income (with no private pension contribution)
-        if (inScope && amount > 0) {
+
+      case 'SInp': // Salary income (with no private pension contribution even if pension contribution is > 0)
+        if (inScope) {
           incomeSalaries += amount;
           revenue.declareSalaryIncome(amount, 0);
         }
         break;
+
       case 'UI': // RSU income
-        if (inScope && amount > 0) {
+        if (inScope) {
           incomeShares += amount;
           revenue.declareNonEuSharesIncome(amount);
         }
         break;
+
       case 'DBI': // Defined Benefit Pension Income
-        if (inScope && amount > 0) {
+        if (inScope) {
           incomeDefinedBenefit += amount;
           revenue.declareSalaryIncome(amount, 0);
         }
         break;
+
       case 'FI': // Tax-free income
-        if (inScope && amount > 0) {
+        if (inScope) {
           incomeTaxFree += amount;
         }
         break;
+
       case 'E': // Expenses
         if (inScope) {
           expenses += amount;
         }
         break;
+
       case 'M': // Mortgage
         if (age == event.fromAge) {
           realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, amount);
           //            console.log("Borrowed "+Math.round(realEstate.properties[event.id].borrowed)+" on a "+(event.toAge - event.fromAge)+"-year "+(event.rate*100)+"% mortgage for property ["+event.id+"] paying "+Math.round(amount)+"/year");
         }
-        if (age >= event.fromAge && age < event.toAge) {
+        if (inScope) {
           expenses += realEstate.getPayment(event.id); // not adjusted once mortgage starts, assuming fixed rate
           //            console.log("Mortgage payment "+realEstate.getPayment(event.id)+" for property ["+event.id+"] ("+(realEstate.properties[event.id].paymentsMade+1)+" of "+realEstate.properties[event.id].terms+")");
         }
         break;
+
       case 'R': // Real estate
         // purchase
         if (age === event.fromAge) {
-          realEstate.buy(event.id, amount, event.rate);
+          realEstate.buy(event.id, amount, event.rate || undefined); // Default rate to 0 if not provided
           expenses += amount;
           //            console.log("Buy property ["+event.id+"] with "+Math.round(amount)+"  downpayment (valued "+Math.round(realEstate.getValue(event.id))+")");            
         }
-        // sale
-        if (age === event.toAge) {
+        // sale - only if toAge is specified
+        if (event.toAge && age === event.toAge) {
           //            console.log("Sell property ["+event.id+"] for "+Math.round(realEstate.getValue(event.id)));            
-          cash += realEstate.sell(event.id)
+          cash += realEstate.sell(event.id);
         }
         break;
-      case 'SM': // Stock Market Growth override to simulate a crash or a bubble (only the growth part of the bubble)
+
+      case 'SM': // Stock Market Growth override to simulate bull or bear markets
         if (age == event.fromAge) {
-          stockGrowthOverride = event.rate / (event.toAge - event.fromAge);
+          stockGrowthOverride = event.rate / (event.toAge - event.fromAge + 1);
         }
-        if (age === event.toAge) {
+        if (age === event.toAge + 1) {
           stockGrowthOverride = undefined;
         }
         break;
+
       default:
         break;
     }

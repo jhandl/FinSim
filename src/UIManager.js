@@ -178,17 +178,15 @@ class UIManager {
 
       const id = name.substr(pos + 1);
       events.push(new SimEvent(
-        type,
-        id,
-        amount || 0,
-        fromAge || 0,
-        toAge || 999,
+        type, id, amount, fromAge, 
+        (toAge === "" && (type === "R" || type === "DBI")) ? 999 : toAge,
         (rate === "") ? undefined : rate,
         (match === "") ? undefined : match
       ))
     }
 
     if (validate) {
+      this.validateEventFields(events);
       this.validateMortgageEvents(events);
     }
 
@@ -217,6 +215,70 @@ class UIManager {
           errors = true;
         }
       }
+    }
+  }
+
+  validateEventFields(events) {
+    const requiredFields = {
+      'NOP': [],
+      'RI': ['name', 'amount', 'fromAge', 'toAge'],
+      'SI': ['name', 'amount', 'fromAge', 'toAge'],
+      'SInp': ['name', 'amount', 'fromAge', 'toAge'],
+      'UI': ['name', 'amount', 'fromAge', 'toAge'],
+      'DBI': ['name', 'amount', 'fromAge'],
+      'FI': ['name', 'amount', 'fromAge', 'toAge'],
+      'E': ['name', 'amount', 'fromAge', 'toAge'],
+      'R': ['name', 'amount', 'fromAge'],
+      'M': ['name', 'amount', 'fromAge', 'toAge', 'rate'],
+      'SM': ['name', 'fromAge', 'toAge', 'rate']
+    };
+
+    const columnIndices = {
+      'name': 1,
+      'amount': 2,
+      'fromAge': 3,
+      'toAge': 4,
+      'rate': 5
+    };
+
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      const required = requiredFields[event.type];
+      if (!required) continue;
+
+      required.forEach(field => {
+        let value = undefined;
+        switch(field) {
+          case 'name':
+            value = event.id;
+            break;
+          case 'amount':
+            value = event.amount;
+            break;
+          case 'fromAge':
+            value = event.fromAge;
+            break;
+          case 'toAge':
+            value = event.toAge;
+            break;
+          case 'rate':
+            value = event.rate;
+            break;
+        }
+
+        if (value === undefined || value === '') {
+          this.ui.setWarning(`Events[${i + 1},${columnIndices[field]}]`, "Required field");
+          errors = true;
+        }
+      });
+
+      if (event.fromAge && event.toAge) {
+        if (event.toAge < event.fromAge) {
+          this.ui.setWarning(`Events[${i + 1},4]`, "End age can't be less than start age");
+          errors = true;
+        }
+      }
+
     }
   }
 

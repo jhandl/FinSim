@@ -1,8 +1,6 @@
 # Roadmap
 
 ## Version 2
-- Change Extra to Match & turn it into a percentage
-- Validate that each event has the required fields
 - Add scenario tests, by adding the expected results at the end of the config files and creating a config file for each scenario
 - Add a wizard
 - Grey out the NOP rows
