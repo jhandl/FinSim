@@ -1,6 +1,10 @@
 body {
     font-family: 'Roboto', sans-serif;
-    background-color: #f0f4f8;
+    background: linear-gradient(rgba(128, 128, 128, 0.5), rgba(128, 128, 128, 0.5)),
+                url('background.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
     margin: 0;
     padding: 0;
     display: flex;
@@ -13,8 +17,8 @@ body {
 .container {
     text-align: center;
     padding: 40px;
-    background-color: #ffffff;
-    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     margin-top: 10vh;
     margin-bottom: 30px;
