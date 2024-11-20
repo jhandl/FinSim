@@ -37,7 +37,7 @@ class GoogleSheetsUI extends AbstractUI {
       return !!value; // Convert any other value to boolean
     }
     if (this.isPercentage(elementId)) {
-      return Number(value.toFixed(2));
+      return Number(value.toFixed(4));
     }
     return value;
   }
@@ -145,6 +145,8 @@ class GoogleSheetsUI extends AbstractUI {
       }
     });
   }
+
+  setChartsRow(rowIndex, data) {}
 
   getVersion() {
     let title = this.spreadsheet.getRange("Main!B2").getCell(1,1).getValue();

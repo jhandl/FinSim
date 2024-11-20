@@ -287,7 +287,6 @@ class UIManager {
   }
 
   loadFromFile(file) {
-    console.log("loadFromFile");
     this.ui.loadFromFile(file);
   }
 
