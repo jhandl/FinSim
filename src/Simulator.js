@@ -233,7 +233,7 @@ function processEvents() {
         }
         if (inScope) {
           expenses += realEstate.getPayment(event.id); // not adjusted once mortgage starts, assuming fixed rate
-          //            console.log("Mortgage payment "+realEstate.getPayment(event.id)+" for property ["+event.id+"] ("+(realEstate.properties[event.id].paymentsMade+1)+" of "+realEstate.properties[event.id].terms+")");
+          //            console.log("Mortgage payment "+realEstate.getPayment(event.id)+" for property ["+event.id+"] ("+(realEstate.properties[event.id].paymentsMade)+" of "+realEstate.properties[event.id].terms+")");
         }
         break;
 
@@ -314,7 +314,7 @@ function handleInvestments() {
     etf.buy(surplus * params.etfAllocation);
     trust.buy(surplus * params.trustAllocation);
     invested = surplus * (params.etfAllocation + params.trustAllocation);
-    cash -= invested;  
+    cash -= invested;
   }
   // Any remaining income should be used to top-up the emergency stash
   if ((netIncome > expenses + invested) && (targetCash - cash > 0.001)) {

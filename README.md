@@ -7,10 +7,11 @@
 
 
 ## Version 2
+- Add a background image to the landing page showing the graph, resized to fill the screen.
 - Add a wizard
     - https://introjs.com/docs
     - https://driverjs.com/docs
-- Add a chat box
+- Add a chat box - Intercom?
 - Add a step function to represent government's delayed updates
 - Review pension types and minimum retirement ages (ChatGPT chat “Pension Types in Ireland”) 
 - Add a way to view and override config settings (like DD)
