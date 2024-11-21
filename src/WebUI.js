@@ -630,7 +630,9 @@ class WebUI extends AbstractUI {
             ticks: {
                 callback: function(value, index, values) {
                     return this.chart.data.labels[index];
-                }
+                },
+                maxRotation: 0,
+                minRotation: 0
             }
         }
     };
@@ -778,7 +780,22 @@ class WebUI extends AbstractUI {
                 }
             ]
         },
-        options: commonOptions
+        options: {
+            ...commonOptions,
+            plugins: {
+                ...commonOptions.plugins,
+                title: {
+                    display: true,
+                    text: 'Cashflow Chart',
+                    font: {
+                        size: 20
+                    }
+                },
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
     });
 
     // Setup Assets Chart
@@ -835,7 +852,22 @@ class WebUI extends AbstractUI {
                 }
             ]
         },
-        options: commonOptions
+        options: {
+            ...commonOptions,
+            plugins: {
+                ...commonOptions.plugins,
+                title: {
+                    display: true,
+                    text: 'Assets Chart',
+                    font: {
+                        size: 20
+                    }
+                },
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
     });
   }
 
@@ -843,7 +875,7 @@ class WebUI extends AbstractUI {
   updateChartsRow(rowIndex, data) {
     const i = rowIndex-1;
     // Update Cashflow Chart
-    this.cashflowChart.data.labels[i] = data.Year;
+    this.cashflowChart.data.labels[i] = data.Age;
     this.cashflowChart.data.datasets[0].data[i] = data.NetIncome;
     this.cashflowChart.data.datasets[1].data[i] = data.Expenses;
     this.cashflowChart.data.datasets[2].data[i] = data.IncomeCash;
@@ -858,7 +890,7 @@ class WebUI extends AbstractUI {
     this.cashflowChart.update();
 
     // Update Assets Chart
-    this.assetsChart.data.labels[i] = data.Year;
+    this.assetsChart.data.labels[i] = data.Age;
     this.assetsChart.data.datasets[0].data[i] = data.EtfCapital;
     this.assetsChart.data.datasets[1].data[i] = data.TrustCapital;
     this.assetsChart.data.datasets[2].data[i] = data.PensionFund;
