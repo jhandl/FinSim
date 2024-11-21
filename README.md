@@ -1,13 +1,13 @@
 # Roadmap
 
 ## Bugs
+- House value is ignoring the rate field
 - Clean up the graphs and the data table when the user reduces the number of years
 - Change years to age in the graphs
 - Add graph titles
 
 
 ## Version 2
-- Add a background image to the landing page showing the graph, resized to fill the screen.
 - Add a wizard
     - https://introjs.com/docs
     - https://driverjs.com/docs
