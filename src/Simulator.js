@@ -228,7 +228,7 @@ function processEvents() {
 
       case 'M': // Mortgage
         if (age == event.fromAge) {
-          realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, amount);
+          realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount);
           //            console.log("Borrowed "+Math.round(realEstate.properties[event.id].borrowed)+" on a "+(event.toAge - event.fromAge)+"-year "+(event.rate*100)+"% mortgage for property ["+event.id+"] paying "+Math.round(amount)+"/year");
         }
         if (inScope) {
@@ -240,7 +240,7 @@ function processEvents() {
       case 'R': // Real estate
         // purchase
         if (age === event.fromAge) {
-          realEstate.buy(event.id, amount, event.rate || undefined); // Default rate to 0 if not provided
+          realEstate.buy(event.id, amount, event.rate);
           expenses += amount;
           //            console.log("Buy property ["+event.id+"] with "+Math.round(amount)+"  downpayment (valued "+Math.round(realEstate.getValue(event.id))+")");            
         }
