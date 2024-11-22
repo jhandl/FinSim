@@ -33,14 +33,18 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    padding-top: 67px;
+    padding-bottom: 67px;
 }
 
 header {
     background-color: var(--card-background);
     padding: 1rem 2rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 1000;
     display: flex;
     flex-wrap: wrap;
@@ -676,5 +680,17 @@ input.percentage::placeholder {
 
 .table-container {
     overflow: visible;
+}
+
+footer {
+    background-color: var(--card-background);
+    padding: 1rem 2rem;
+    text-align: center;
+    border-top: 1px solid var(--border-color);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
 }
 

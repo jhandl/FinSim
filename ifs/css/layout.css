@@ -21,6 +21,7 @@ footer {
   position: sticky;
   bottom: 0;
   z-index: 1000;
+  width: 100vw;
 }
 
 /* Parameters section layout */
@@ -89,6 +90,7 @@ footer {
   border-radius: 8px;
   padding: 1.25rem;
   box-shadow: var(--box-shadow);
+  min-width: max-content;
 }
 
 /* Remove card class constraints from data section */
@@ -203,6 +205,8 @@ footer {
     padding: 1rem;
     position: sticky;
     top: 0;
+    z-index: 1000;
+    width: 100vw;
   }
 
   .header-left, .header-center-right {
