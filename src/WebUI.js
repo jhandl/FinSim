@@ -895,6 +895,7 @@ class WebUI extends AbstractUI {
   setupEventListeners() {
     this.setupChangeListener();
     this.setupRunSimulationButton();
+    this.setupWizardButton();
     this.setupEventTableButtons();
     this.setupFileOperationButtons();
     this.setupPriorityDragAndDrop();
@@ -1038,6 +1039,14 @@ class WebUI extends AbstractUI {
             item.classList.remove('drag-over');
         });
     });
+  }
+
+  setupWizardButton() {
+    const wizardButton = document.getElementById('startWizard');
+    if (wizardButton) {
+      this.wizard = new Wizard();
+      wizardButton.addEventListener('click', () => this.wizard.start());
+    }
   }
 
   updatePriorityValues() {

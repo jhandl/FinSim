@@ -10,6 +10,8 @@
     <link rel="icon" type="image/x-icon" href="IFS.ico">
     <link rel="stylesheet" href="css/simulator.css">
     <!-- <link rel="stylesheet" href="css/layout-debugger.css"> --> 
+    <script src="driver.js"></script>
+    <link rel="stylesheet" href="driver.css"/>
     <script src="chart.js"></script>
 </head>
 <body>
@@ -21,6 +23,7 @@
             <div class="header-center">
                 <button id="runSimulation" class="primary-button"><span>Run Simulation</span></button>
                 <div id="progress" class="status-indicator">Ready</div>
+                <button id="startWizard" class="secondary-button">Help</button>
             </div>
             <div class="header-right">
                 <button id="saveSimulation" class="secondary-button">Save</button>
@@ -296,6 +299,7 @@
     <script src="../src/RealEstate.js"></script>
     <script src="../src/Utils.js"></script>
     <script src="../src/AbstractUI.js"></script>
+    <script src="../src/Wizard.js"></script>
     <script src="../src/UIManager.js"></script>
     <script src="../src/WebUI.js"></script>
     <script src="../src/Simulator.js"></script>
