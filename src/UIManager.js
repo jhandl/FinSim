@@ -12,11 +12,11 @@ class UIManager {
         this.updateDataRow(i, i/row, runs);
       }
     }
-    // this.ui.clearContent("Data"); // TODO: UIManager cleared everything below the current row, not sure why. Check this.
+    this.ui.clearExtraDataRows(params.targetAge);
   }
 
   updateProgress(msg) {
-    this.ui.setProgress(msg);
+    this.ui.setStatus(msg);
     this.ui.flush();
   }
 

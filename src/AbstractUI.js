@@ -38,10 +38,6 @@ class AbstractUI {
     throw new Error("Method 'setStatus' must be implemented");
   }
 
-  setProgress(percentage) {
-    throw new Error("Method 'setProgress' must be implemented");
-  }
-
   clearContent(groupId) {
     throw new Error("Method 'clearContent' must be implemented");
   }
@@ -116,6 +112,10 @@ class AbstractUI {
 
   loadFromFile(file) {
     throw new Error("Method 'loadFromFile' must be implemented");
+  }
+
+  clearExtraDataRows(maxAge) {
+    throw new Error("Method 'clearExtraDataRows' must be implemented");
   }
 
 } 

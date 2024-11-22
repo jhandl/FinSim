@@ -135,9 +135,6 @@ function deserializeSimulation(content, ui) {
         }
     }
 
-    // Clear existing events
-    ui.clearContent('Events');
-
     // Load events
     let eventData = [];
     let inEvents = false;

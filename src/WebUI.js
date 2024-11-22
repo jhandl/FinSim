@@ -144,15 +144,9 @@ class WebUI extends AbstractUI {
     return elements;
   }
 
-  setStatus(message, color) {
+  setStatus(message, color=STATUS_COLORS.INFO) {
     this.statusElement.innerHTML = message;
-    if (color) {
-      this.statusElement.style.backgroundColor = color;
-    }
-  }
-
-  setProgress(msg) {
-    this.setStatus(msg, STATUS_COLORS.NEUTRAL);
+    this.statusElement.style.backgroundColor = color;
   }
 
   clearContent(groupId) {
@@ -278,10 +272,6 @@ class WebUI extends AbstractUI {
           row.appendChild(td);
         }
     });
-
-    if (rowIndex % 5 === 0) {
-        this.setProgress(Math.round((rowIndex / document.querySelectorAll('[id^="data_row_"]').length) * 100));
-    }
   }
 
   setChartsRow(rowIndex, data) {
@@ -409,75 +399,78 @@ class WebUI extends AbstractUI {
 
   async loadFromFile(file) {
     if (!file) return;
+    this.clearContent('Events');
+    this.clearExtraDataRows(0);
 
     try {
-        const content = await file.text();
-        const eventData = deserializeSimulation(content, this);
-        
-        // Update drawdown priorities panel
-        const priorityIds = ['PriorityCash', 'PriorityPension', 'PriorityETF', 'PriorityTrust'];
-        const prioritiesContainer = document.querySelector('.priorities-container');
-        
-        if (prioritiesContainer) {
-            // Sort priority items based on their values
-            const priorityValues = priorityIds.map(id => ({
-                id: id,
-                value: parseInt(this.getValue(id)) || 0,
-                element: prioritiesContainer.querySelector(`[data-priority-id="${id}"]`)
-            })).sort((a, b) => a.value - b.value);
+      const content = await file.text();
+      const eventData = deserializeSimulation(content, this);
+      
+      // Update drawdown priorities panel
+      const priorityIds = ['PriorityCash', 'PriorityPension', 'PriorityETF', 'PriorityTrust'];
+      const prioritiesContainer = document.querySelector('.priorities-container');
+      
+      if (prioritiesContainer) {
+          // Sort priority items based on their values
+          const priorityValues = priorityIds.map(id => ({
+              id: id,
+              value: parseInt(this.getValue(id)) || 0,
+              element: prioritiesContainer.querySelector(`[data-priority-id="${id}"]`)
+          })).sort((a, b) => a.value - b.value);
 
-            // Reorder elements in the DOM
-            priorityValues.forEach(item => {
-                if (item.element) {
-                    prioritiesContainer.appendChild(item.element);
-                    // Update the hidden input value
-                    const input = item.element.querySelector('input');
-                    if (input) {
-                        input.value = item.value;
-                    }
-                }
-            });
-        }
-        
-        // Clear and rebuild events table
-        const tbody = document.querySelector('#Events tbody');
-        if (tbody) {
-            tbody.innerHTML = ''; // Clear existing rows
-            eventData.forEach(([type, name, amount, fromAge, toAge, rate, match]) => {
-                if (type) {
-                    // Convert decimal rate and match to percentage for display
-                    const displayRate = (rate !== undefined && rate !== '') ? (rate * 100).toString() : '';
-                    const displayMatch = (match !== undefined && match !== '') ? (match * 100).toString() : '';
-                    
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>
-                            <select class="event-type">
-                                ${this.getEventTypeOptions(type)}
-                            </select>
-                        </td>
-                        <td><input type="text" class="event-name" value="${name}"></td>
-                        <td><input type="number" class="event-amount currency" step="1000" value="${amount}"></td>
-                        <td><input type="number" class="event-from-age" min="0" max="100" value="${fromAge || ''}"></td>
-                        <td><input type="number" class="event-to-age" min="0" max="100" value="${toAge || ''}"></td>
-                        <td><div class="percentage-container"><input type="number" class="event-rate percentage" value="${displayRate}" placeholder="inflation"></div></td>
-                        <td><div class="percentage-container"><input type="number" class="event-match percentage" value="${displayMatch}"></div></td>
-                        <td>
-                            <button class="delete-event" title="Delete event">×</button>
-                        </td>
-                    `;
-                    tbody.appendChild(row);
-                }    
-            });
-            this.setupCurrencyInputs();
-            this.setupPercentageInputs();
-        }
+          // Reorder elements in the DOM
+          priorityValues.forEach(item => {
+              if (item.element) {
+                  prioritiesContainer.appendChild(item.element);
+                  // Update the hidden input value
+                  const input = item.element.querySelector('input');
+                  if (input) {
+                      input.value = item.value;
+                  }
+              }
+          });
+      }
+      
+      // Clear and rebuild events table
+      const tbody = document.querySelector('#Events tbody');
+      if (tbody) {
+          tbody.innerHTML = ''; // Clear existing rows
+          eventData.forEach(([type, name, amount, fromAge, toAge, rate, match]) => {
+              if (type) {
+                  // Convert decimal rate and match to percentage for display
+                  const displayRate = (rate !== undefined && rate !== '') ? (rate * 100).toString() : '';
+                  const displayMatch = (match !== undefined && match !== '') ? (match * 100).toString() : '';
+                  
+                  const row = document.createElement('tr');
+                  row.innerHTML = `
+                      <td>
+                          <select class="event-type">
+                              ${this.getEventTypeOptions(type)}
+                          </select>
+                      </td>
+                      <td><input type="text" class="event-name" value="${name}"></td>
+                      <td><input type="number" class="event-amount currency" step="1000" value="${amount}"></td>
+                      <td><input type="number" class="event-from-age" min="0" max="100" value="${fromAge || ''}"></td>
+                      <td><input type="number" class="event-to-age" min="0" max="100" value="${toAge || ''}"></td>
+                      <td><div class="percentage-container"><input type="number" class="event-rate percentage" value="${displayRate}" placeholder="inflation"></div></td>
+                      <td><div class="percentage-container"><input type="number" class="event-match percentage" value="${displayMatch}"></div></td>
+                      <td>
+                          <button class="delete-event" title="Delete event">×</button>
+                      </td>
+                  `;
+                  tbody.appendChild(row);
+              }    
+          });
+          this.setupCurrencyInputs();
+          this.setupPercentageInputs();
+      }
 
     } catch (error) {
         console.log("error loading file: " + error);
         alert('Error loading file: Please make sure this is a valid simulation save file.');
         return;
     }
+    this.setStatus("Ready");
   }
 
   getEventTypeOptions(selectedType = '') {
@@ -1089,6 +1082,50 @@ class WebUI extends AbstractUI {
     // Setup currency formatting for the new row
     this.setupCurrencyInputs();
     this.setupPercentageInputs();
+  }
+
+  clearExtraDataRows(maxAge) {
+    const headerRow = document.querySelector('#Data thead tr:nth-child(2)');
+    const headers = Array.from(headerRow.cells);
+    const ageColumnIndex = headers.findIndex(header => header.getAttribute('data-key') === 'Age');
+    if (ageColumnIndex === -1) {
+        console.error("Age column not found");
+        return;
+    }
+    const dataRows = document.querySelectorAll('#Data tbody tr');
+    dataRows.forEach(row => {
+        const ageCell = row.cells[ageColumnIndex];
+        if (ageCell) {
+            const age = parseInt(ageCell.textContent, 10);
+            if (age > maxAge) {
+                row.remove();
+            }
+        }
+    });
+
+    // Filter out data points beyond maxAge
+    this.cashflowChart.data.labels = this.cashflowChart.data.labels.filter((label, index) => {
+        return label <= maxAge;
+    });
+
+    this.cashflowChart.data.datasets.forEach(dataset => {
+        dataset.data = dataset.data.filter((_, index) => {
+            return this.cashflowChart.data.labels[index] !== undefined;
+        });
+    });
+
+    this.assetsChart.data.labels = this.assetsChart.data.labels.filter((label, index) => {
+        return label <= maxAge;
+    });
+
+    this.assetsChart.data.datasets.forEach(dataset => {
+        dataset.data = dataset.data.filter((_, index) => {
+            return this.assetsChart.data.labels[index] !== undefined;
+        });
+    });
+
+    this.cashflowChart.update();
+    this.assetsChart.update();
   }
 }
 

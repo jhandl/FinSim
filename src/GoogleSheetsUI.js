@@ -72,16 +72,12 @@ class GoogleSheetsUI extends AbstractUI {
     return elements;
   }
 
-  setStatus(message, color) {
+  setStatus(message, color=STATUS_COLORS.INFO) {
     this.statusCell.setValue(message);
     if (color) {
       this.statusCell.setBackground(color);
     }
     this.flush();
-  }
-
-  setProgress(message) {
-    this.setStatus(message, STATUS_COLORS.INFO);
   }
 
   clearContent(groupId) {
@@ -306,6 +302,17 @@ class GoogleSheetsUI extends AbstractUI {
                (values[0].every(v => ['Yes', 'No'].includes(v)));
     } catch (error) {
         return false;
+    }
+  }
+
+  clearExtraDataRows(maxAge) {
+    const dataRange = this.namedRanges.get("Data");
+    if (!dataRange) throw new Error("Data range not found");
+
+    const dataHeight = dataRange.getHeight();
+    for (let i = maxAge + 1; i <= dataHeight; i++) {
+      const row = dataRange.getCell(i, 1).getEntireRow();
+      row.clearContent();
     }
   }
 
