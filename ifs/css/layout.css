@@ -5,7 +5,8 @@ main {
   padding: 0 1rem;
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(auto, max-content) minmax(0, 900px) 1fr;
+  /*grid-template-columns: minmax(auto, max-content) minmax(0, 900px) 1fr;*/
+  grid-template-columns: minmax(auto, max-content) minmax(0, 900px) minmax(0, 1fr);
   grid-template-areas: 
       "parameters events graphs"
       "data-section data-section data-section";
@@ -43,6 +44,7 @@ footer {
   width: 100%;  /* Change from 900px to 100% */
   max-width: 900px;  /* Add this to maintain maximum width */
   justify-self: start;  /* Add this to ensure left alignment */
+  flex-shrink: 0;
 }
 
 /* Graphs section */
@@ -55,6 +57,7 @@ footer {
   width: 100%;
   min-width: 0;
   height: 100%;
+  flex-shrink: 1;
 }
 
 .graph-container {
