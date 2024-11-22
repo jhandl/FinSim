@@ -502,6 +502,7 @@ th {
     border-collapse: separate;
     border-spacing: 0;
     font-size: 0.9rem;
+    position: relative;
 }
 
 #Data th, #Data td {
@@ -649,5 +650,31 @@ input.percentage::placeholder {
     color: #999;
     opacity: 0.7;
     font-size: 0.9rem;
+}
+
+#Data thead tr:last-child {
+    position: sticky;
+    top: 67px;
+    background-color: #f5f5f5;
+    z-index: 2;
+}
+
+#Data thead tr:last-child th {
+    position: sticky;
+    top: 67px;
+    background-color: #f5f5f5;
+}
+
+#Data thead tr:last-child::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-bottom: 3px solid #666;
+}
+
+.table-container {
+    overflow: visible;
 }
 

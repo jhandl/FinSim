@@ -1,7 +1,6 @@
 # Roadmap
 
 ## Bugs
-- House value is ignoring the rate field
 - Clean up the graphs and the data table when the user reduces the number of years
 - Change years to age in the graphs
 - Add graph titles

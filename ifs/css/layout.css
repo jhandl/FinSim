@@ -4,7 +4,6 @@ main {
   margin: 2rem auto;
   padding: 0 1rem;
   flex: 1;
-  overflow-y: auto;
   display: grid;
   grid-template-columns: minmax(auto, max-content) minmax(0, 900px) 1fr;
   grid-template-areas: 
