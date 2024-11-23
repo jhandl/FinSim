@@ -28,6 +28,7 @@ function run() {
 }
 
 function initializeUI() {
+  console.log("Initializing UI");
   if (typeof SpreadsheetApp !== 'undefined') {
     ui = new UIManager(GoogleSheetsUI.getInstance());
   } else {
@@ -56,7 +57,6 @@ function initializeSimulator() {
 }
 
 function saveToFile() {
-  initializeUI(); // 623 ms
   ui.setStatus("Preparing to save", STATUS_COLORS.INFO);
   if (readScenario(validate = false)) {
     ui.saveToFile();
@@ -65,7 +65,6 @@ function saveToFile() {
 }
 
 function loadFromFile(file) {
-  initializeUI();
   ui.loadFromFile(file);
 }
 

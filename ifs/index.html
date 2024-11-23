@@ -10,8 +10,9 @@
     <link rel="icon" type="image/x-icon" href="IFS.ico">
     <link rel="stylesheet" href="css/simulator.css">
     <!-- <link rel="stylesheet" href="css/layout-debugger.css"> --> 
-    <script src="driver.js"></script>
     <link rel="stylesheet" href="driver.css"/>
+    <script src="driver.js"></script>
+    <script src="js-yaml.min.js"></script>
     <script src="chart.js"></script>
 </head>
 <body>
@@ -69,13 +70,13 @@
                 <h2>Targets & Allocations</h2>
                 <div class="input-group">
                     <div class="input-wrapper">
-                        <label for="TargetAge">Target Age</label>
-                        <input type="number" id="TargetAge" min="0" max="100">
+                        <label for="RetirementAge">Retirement Age</label>
+                        <input type="number" id="RetirementAge" min="0" max="100">
                     </div>
                     
                     <div class="input-wrapper">
-                        <label for="RetirementAge">Retirement Age</label>
-                        <input type="number" id="RetirementAge" min="0" max="100">
+                        <label for="TargetAge">Target Age</label>
+                        <input type="number" id="TargetAge" min="0" max="100">
                     </div>
                     
                     <div class="input-wrapper">
@@ -153,13 +154,13 @@
                     </div>
                     
                     <div class="input-wrapper">
-                        <label for="YoungestChildBorn">Youngest Child Birth Year</label>
-                        <input type="number" id="YoungestChildBorn">
+                        <label for="OldestChildBorn">Oldest Child Birth Year</label>
+                        <input type="number" id="OldestChildBorn">
                     </div>
                     
                     <div class="input-wrapper">
-                        <label for="OldestChildBorn">Oldest Child Birth Year</label>
-                        <input type="number" id="OldestChildBorn">
+                        <label for="YoungestChildBorn">Youngest Child Birth Year</label>
+                        <input type="number" id="YoungestChildBorn">
                     </div>
                     
                     <div class="input-wrapper">

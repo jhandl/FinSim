@@ -1,0 +1,224 @@
+steps:
+  - element: "#startingPosition"
+    popover:
+      title: "Here you describe your current financial situation. This will be the starting point for the simulation."
+      description: ""
+      side: "right"
+      align: "start"
+      
+  - element: "#StartingAge"
+    popover:
+      title: "Enter your current age."
+      description: ""
+      side: "right"
+      align: "start"
+  
+  - element: "#InitialSavings"
+    popover:
+      title: "Enter your current savings."
+      description: "Cash you have sitting in your bank accounts or safety box, not earning significant interest."
+      side: "right"
+      align: "start"
+  
+  - element: "#InitialPension"
+    popover:
+      title: "Enter the total amount in your private pension funds."
+      description: "If you haven't contributed to one yet, enter '0'. If you have more than one pension fund, enter the total amount here."
+      side: "right"
+      align: "start"
+
+  - element: "#InitialETFs"
+    popover:
+      title: "Enter the current value of your ETF investments."
+      description: "Keep in mind that since I don't know when you bought those ETFs I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid 8 years into the run and every 8 years thereafter."
+      side: "right"
+      align: "start"
+  
+  - element: "#InitialTrusts"
+    popover:
+      title: "Enter the current value in your investment trusts or stocks."
+      description: ""
+      side: "right"
+      align: "start"
+
+  - element: "#targetsAllocations"
+    popover:
+      title: "Here you describe your financial plan."
+      description: ""
+      side: "right"
+      align: "start"
+  
+  - element: "#RetirementAge"
+    popover:
+      title: "This is the age at which you plan to retire."
+      description: ""
+      side: "right"
+      align: "start"
+
+  - element: "#TargetAge"
+    popover:
+      title: "This is your life expectancy, the age you expect to live to."
+      description: "The simulation will end at this age, and will be successful if you reach this age without running out of money."
+      side: "right"
+      align: "start"
+
+  - element: "#EmergencyStash"
+    popover:
+      title: "This is the amount of money you plan to have in cash to cover unexpected expenses."
+      description: "This will be inflation adjusted."
+      side: "right"
+      align: "start"
+
+  - element: "#EtfAllocation"
+    popover:
+      title: "This is the percentage of your portfolio that you plan to have in ETFs."
+      description: "Any cash remaining after funding your emergency stash will be invested in ETFs in this proportion. The sum of ETFs and Trusts can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash."
+      side: "right"
+      align: "start"
+
+  - element: "#TrustAllocation"
+    popover:
+      title: "This is the percentage of your portfolio that you plan to have in investment trusts or shares."
+      description: "Any cash remaining after funding your emergency stash will be invested in trusts or shares in this proportion. The sum of ETFs and Trusts can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash."
+      side: "right"
+      align: "start"
+
+  - element: "#PensionContributionPercentage"
+    popover:
+      title: "How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme."
+      description: "If you enter 100% here, you will contribute the maximum allowed for your age (15% to 40%). Do not include employer matching contributions here; there's another place for that."
+      side: "right"
+      align: "start"
+
+  - element: "#PensionContributionCapped"
+    popover:
+      title: "Whether your pension contribution is capped to match the maximum amount that you can get tax relief on."
+      description: "This limit is the same for everyone, it does not depend on age. If you select 'Yes', your pension contributions will be capped at the maximum allowed. If you select 'No' and your income is greater than that limit, you pay income tax on the excess."
+      side: "right"
+      align: "start"
+
+  - element: "#growthRates"
+    popover:
+      title: "Here is where you speculate how the economy will do on average in the future."
+      description: "You may want to enter conservative numbers to stress test your scenario. For reference, the average annual growth rate of the S&P500 over its lifetime has been around 10% in US dollars (not adjusted for inflation and not including fees). If you enter volatility numbers larger than zero, I will run a Monte Carlo simulation using these numbers to calculate the probability of success of your scenario."
+      side: "right"
+      align: "start"
+
+  - element: "#PensionGrowthRate"
+    popover:
+      title: "This is the expected average annual growth rate of your private pension, not adjusted for inflation."
+      description: "Also, keep in mind pension funds tend to invest more conservatively and have higher fees, so take that into account when calculating this number."
+      side: "right"
+      align: "start"
+
+  - element: "#PensionGrowthStdDev"
+    popover:
+      title: "This is the expected standard deviation of the annual growth rate of your private pension."
+      description: "Keep in mind that pension funds tend to invest more conservatively so may have lower volatility than the stock market. Take that into account when calculating this number."
+      side: "right"
+      align: "start"
+
+  - element: "#EtfGrowthRate"
+    popover:
+      title: "This is the expected average annual growth rate of your ETFs, not adjusted for inflation."
+      description: "For reference, the average growth rate of the S&P500 over its lifetime has been around 10%."
+      side: "right"
+      align: "start"
+
+  - element: "#EtfGrowthStdDev"
+    popover:
+      title: "This is the expected standard deviation of the annual growth rate of your ETFs."
+      description: "For reference, the average volatility of the S&P500 over its lifetime (including bull markets and crashes) has been around 15%."
+      side: "right"
+      align: "start"
+
+  - element: "#TrustGrowthRate"
+    popover:
+      title: "This is the expected average annual growth rate of your investment trusts or shares, not adjusted for inflation."
+      description: "Keep in mind that investment trusts or shares tend to have higher fees, so take that into account when calculating this number."
+      side: "right"
+      align: "start"
+
+  - element: "#TrustGrowthStdDev"
+    popover:
+      title: "This is the expected standard deviation of the annual growth rate of your investment trusts or shares."
+      description: "For reference, the average volatility of the S&P500 over its lifetime (including bull markets and crashes) has been around 15%."
+      side: "right"
+      align: "start"
+
+  - element: "#Inflation"
+    popover:
+      title: "This is the expected average annual inflation rate."
+      description: "Central banks aim for an inflation rate of around 2%. However, deviations occur due to shocks (e.g., pandemics, wars, etc) can cause deviations that are skewed towards higher numbers. For example, in 2022 inflation was 7.8%, the highest since 1984. In contrast, by October 2024 it had decreased to 0.7%."
+      side: "right"
+      align: "start"
+
+  - element: "#personalCircumstances"
+    popover:
+      title: "Here you describe your personal circumstances, as they may affect tax credits and would be difficult to capture as events."
+      description: ""
+      side: "right"
+      align: "start"
+
+  - element: "#MarriageYear"
+    popover:
+      title: "Enter the year that you got married or entered into a civil partnership, or that you plan to."
+      description: "Your income tax band limits change if you are married or in a civil partnership. You can enter any year in the past if you were already married or in partnership, or a year in the future if you plan to get married or enter into a civil partnership then."
+      side: "right"
+      align: "start"
+
+  - element: "#OldestChildBorn"
+    popover:
+      title: "Enter the year that your oldest child was born or is expected or speculated to be born."
+      description: "Your income tax band limits are increased if you have dependent children, starting when your first child is born."
+      side: "right"
+      align: "start"
+
+  - element: "#YoungestChildBorn"
+    popover:
+      title: "Enter the year that your youngest child was born or is expected or speculated to be born."
+      description: "The increased income tax band limits for dependent children go on until your youngest child is more than 18 years old."
+      side: "right"
+      align: "start"
+
+  - element: "#PersonalTaxCredit"
+    popover:
+      title: "Enter the amount of personal tax credit you are entitled to according to your personal circumstances (widow, carer, etc)."
+      description: "This is the amount of tax credit you get for yourself, before factoring in any dependent children (refer to <a href='https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx'>this revenue page</a>')."
+      side: "right"
+      align: "start"
+
+  - element: "#StatePensionWeekly"
+    popover:
+      title: "Enter your expected weekly state pension amount."
+      description: "Given that different ways to calculate your state pension, refer to <a href='https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/'>this citizens information page</a> to find how to calculate yours."
+      side: "right"
+      align: "start"
+
+  - element: "#drawdownPriorities"
+    popover:
+      title: "Here you can set the priorities for the drawdown of your assets."
+      description: "You can drag and drop the items to change their order of priority. The top item will be the highest priority, meaning that it will be used first to cover your expenses when needed (for example in retirement)."
+      side: "right"
+      align: "start"
+
+  - element: "#runSimulation"
+    popover:
+      title: "Once you have entered all the data, click here to run the simulation."
+      description: ""
+      side: "bottom"
+      align: "start"
+  
+  - element: "#cashflowGraph"
+    popover:
+      title: "Cashflow Graph"
+      description: "This graph shows your projected cashflow over time."
+      side: "top"
+      align: "center"
+  
+  - element: "#assetsGraph"
+    popover:
+      title: "Assets Graph"
+      description: "This graph shows your projected assets over time."
+      side: "top"
+      align: "center"
