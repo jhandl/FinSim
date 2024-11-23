@@ -57,7 +57,7 @@ steps:
 
   - element: "#TargetAge"
     popover:
-      title: "This is your life expectancy, the age you expect to live to."
+      title: "This is your life expectancy."
       description: "The simulation will end at this age, and will be successful if you reach this age without running out of money."
       side: "right"
       align: "start"
@@ -177,21 +177,21 @@ steps:
   - element: "#YoungestChildBorn"
     popover:
       title: "Enter the year that your youngest child was born or is expected or speculated to be born."
-      description: "The increased income tax band limits for dependent children go on until your youngest child is more than 18 years old."
+      description: "The increased income tax band limits for dependent children go on until your youngest child is over 18."
       side: "right"
       align: "start"
 
   - element: "#PersonalTaxCredit"
     popover:
       title: "Enter the amount of personal tax credit you are entitled to according to your personal circumstances (widow, carer, etc)."
-      description: "This is the amount of tax credit you get for yourself, before factoring in any dependent children (refer to <a href='https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx'>this revenue page</a>')."
+      description: "This is the amount of tax credit you get for yourself, before factoring in any dependent children (refer to [this revenue page](https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx))."
       side: "right"
       align: "start"
 
   - element: "#StatePensionWeekly"
     popover:
       title: "Enter your expected weekly state pension amount."
-      description: "Given that different ways to calculate your state pension, refer to <a href='https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/'>this citizens information page</a> to find how to calculate yours."
+      description: "Given that different ways to calculate your state pension, refer to [this page](https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/) to find how to calculate yours."
       side: "right"
       align: "start"
 

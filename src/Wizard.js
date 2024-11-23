@@ -11,11 +11,23 @@ class Wizard {
     document.addEventListener('focusin', this.followFocus);
   }
 
+  processMarkdownLinks(text) {
+    if (!text) return text;
+    return text.replace(
+      /\[([^\]]+)\]\(([^\)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+  }
+
   async loadConfig() {
     try {
       const response = await fetch('./wizardConfig.yml');
       const yamlText = await response.text();
       this.config = jsyaml.load(yamlText);
+      this.config.steps = this.config.steps.map(step => {
+        step.popover.description = this.processMarkdownLinks(step.popover.description);
+        return step;
+      });
     } catch (error) {
       console.error('Failed to load wizard configuration:', error);
     }

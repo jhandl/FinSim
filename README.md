@@ -1,5 +1,8 @@
 # Roadmap
 
+## Improvements
+- Use arrow keys to move between steps and enter to edit fields
+
 
 ## Version 2
 - Add a chat box - Intercom?
