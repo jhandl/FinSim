@@ -1,8 +1,10 @@
 # Roadmap
 
 ## Improvements
-- Use arrow keys to move between steps and enter to edit fields
-
+- Use up and down arrow keys to move between steps and enter to edit fields
+- Separate tour from the field help, add a hot-ket (H?) to invoke field help
+- Create user guide from yaml file
+- Create an example scenario and some way to load it
 
 ## Version 2
 - Add a chat box - Intercom?

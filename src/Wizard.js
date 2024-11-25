@@ -7,7 +7,7 @@ class Wizard {
     this.lastFocusedWasInput = false;
     this.lastStepIndex = 0;
     this.followFocus = this.followFocus.bind(this);
-    this.handleTabKey = this.handleTabKey.bind(this);
+    this.handleKeys = this.handleKeys.bind(this);
     document.addEventListener('focusin', this.followFocus);
   }
 
@@ -21,7 +21,14 @@ class Wizard {
 
   async loadConfig() {
     try {
-      const response = await fetch('./wizardConfig.yml');
+      const timestamp = new Date().getTime();
+      const response = await fetch(`./wizardConfig.yml?t=${timestamp}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       const yamlText = await response.text();
       this.config = jsyaml.load(yamlText);
       this.config.steps = this.config.steps.map(step => {
@@ -39,11 +46,16 @@ class Wizard {
     }
 
     let startingStepIndex = this.lastFocusedWasInput ? (this.getLastFocusedFieldIndex() || this.lastStepIndex) : this.lastStepIndex;
-    document.querySelector(this.config.steps[startingStepIndex].element).focus();
+    if (startingStepIndex > 0) {
+      document.querySelector(this.config.steps[startingStepIndex].element).focus();
+    }
 
     this.tour = this.driver({
       showProgress: true,
       animate: true,
+      smoothScroll: true,
+      showProgress: false,
+      overlayOpacity: 0.5,
       allowKeyboardControl: false,
       steps: this.config.steps,
       onNextClick: (element) => {
@@ -65,7 +77,7 @@ class Wizard {
       onDestroyStarted: () => this.finishTour()
     });
 
-    document.addEventListener('keydown', this.handleTabKey);
+    document.addEventListener('keydown', this.handleKeys);
     
     this.tour.drive(startingStepIndex);
   }
@@ -90,12 +102,12 @@ class Wizard {
   }
 
   finishTour() {
-    document.removeEventListener('keydown', this.handleTabKey);
+    document.removeEventListener('keydown', this.handleKeys);
     this.lastStepIndex = this.tour.getActiveIndex()
     this.tour.destroy();
   }
 
-  handleTabKey(event) {
+  handleKeys(event) {
     if (event.key === 'Escape') {
       this.finishTour();
       return;
