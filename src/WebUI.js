@@ -1070,10 +1070,14 @@ class WebUI extends AbstractUI {
   }
 
   setupWizardInvocation() {
-    const wizardButton = document.getElementById('startWizard');
     const wizard = Wizard.getInstance();
-    if (wizardButton) {
-      wizardButton.addEventListener('click', () => wizard.start());
+    const helpButton = document.getElementById('startWizard');
+    if (helpButton) {
+      helpButton.addEventListener('click', () => wizard.start());
+    }
+    const userManualButton = document.getElementById('userManual');
+    if (userManualButton) {
+      userManualButton.addEventListener('click', () => wizard.start(1));
     }
     document.addEventListener('keydown', function(event) {
       if (event.key === '?') {

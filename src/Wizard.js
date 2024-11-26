@@ -180,14 +180,14 @@ class Wizard {
     });
   }
 
-  async start() {
+  async start(fromStep = undefined) {
     if (!this.config) {
       await this.loadConfig();
     }
 
     this.validSteps = this.filterValidSteps();
 
-    let startingStepIndex = this.lastFocusedWasInput ? (this.getLastFocusedFieldIndex() || this.lastStepIndex) : this.lastStepIndex;
+    let startingStepIndex = fromStep ? fromStep : (this.lastFocusedWasInput ? (this.getLastFocusedFieldIndex() || this.lastStepIndex) : this.lastStepIndex);
     if (startingStepIndex > 1 && startingStepIndex < this.validSteps.length) {
       const element = document.querySelector(this.validSteps[startingStepIndex].element);
       if (element) {
