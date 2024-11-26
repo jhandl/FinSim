@@ -1,19 +1,16 @@
 # Roadmap
 
-## Improvements
-- Create an example scenario and some way to load it
-- Add a user manual and version history
-
 ## Version 2
-- Add a chat box - Intercom?
 - Add a step function to represent government's delayed updates
 - Review pension types and minimum retirement ages (ChatGPT chat “Pension Types in Ireland”) 
 - Add a way to view and override config settings (like DD)
-- Add a button in the website to take users to the google sheet
 - Add a link to FinSim.ie in the spreadsheet
+- Add ability to fetch data from the web / google sheets
+- Add references to the claims about the S&P500 stats (https://chatgpt.com/share/67465c37-0c00-8004-bf40-1c6b01ef523f)
 
 
 ## Version 3
+- Add a chat box - Intercom?
 - Make things more generic so they apply to different systems
 - Add dividends and their tax
 - Add countries and a way to select a country
