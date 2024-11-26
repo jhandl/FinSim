@@ -1,6 +1,6 @@
 /* This file has to work on both the website and Google Sheets */
 
-var ui, params, events, config, dataSheet, row, errors;
+var uiManager, params, events, config, dataSheet, row, errors;
 var age, year, phase, periods, failedAt, success, montecarlo;
 var revenue, realEstate, stockGrowthOverride;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
@@ -19,53 +19,52 @@ function run() {
   montecarlo = (params.growthDevPension > 0 || params.growthDevETF > 0 || params.growthDevTrust > 0);
   let runs = (montecarlo ? config.simulationRuns : 1);
   let successes = 0;
-  ui.updateProgress("Running");
+  uiManager.updateProgress("Running");
   for (let run = 0; run < runs; run++) {
     successes += runSimulation(); 
   }
-  ui.updateDataSheet(runs);
-  ui.updateStatusCell(successes, runs);
+  uiManager.updateDataSheet(runs);
+  uiManager.updateStatusCell(successes, runs);
 }
 
 function initializeUI() {
-  console.log("Initializing UI");
   if (typeof SpreadsheetApp !== 'undefined') {
-    ui = new UIManager(GoogleSheetsUI.getInstance());
+    uiManager = new UIManager(GoogleSheetsUI.getInstance());
   } else {
-    ui = new UIManager(WebUI.getInstance());
+    uiManager = new UIManager(WebUI.getInstance());
   }
 }
 
 function readScenario(validate) {
   errors = false;
-  ui.clearWarnings();
-  params = ui.readParameters(validate); // 6918 ms
-  events = ui.readEvents(validate); // 534 ms
+  uiManager.clearWarnings();
+  params = uiManager.readParameters(validate); // 6918 ms
+  events = uiManager.readEvents(validate); // 534 ms
   if (errors) {
-    ui.setStatus("Check errors", STATUS_COLORS.WARNING);
+    uiManager.setStatus("Check errors", STATUS_COLORS.WARNING);
   }
   return !errors;
 }
 
 function initializeSimulator() {
   initializeUI();
-  ui.setStatus("Initializing", STATUS_COLORS.INFO);
-  config = new Config(ui.ui);
+  uiManager.setStatus("Initializing", STATUS_COLORS.INFO);
+  config = Config.getInstance(uiManager.ui);
   revenue = new Revenue();
   dataSheet = [];
   return readScenario(validate = true);
 }
 
 function saveToFile() {
-  ui.setStatus("Preparing to save", STATUS_COLORS.INFO);
+  uiManager.setStatus("Preparing to save", STATUS_COLORS.INFO);
   if (readScenario(validate = false)) {
-    ui.saveToFile();
+    uiManager.saveToFile();
   }
-  ui.setStatus("", STATUS_COLORS.INFO);
+  uiManager.setStatus("", STATUS_COLORS.INFO);
 }
 
 function loadFromFile(file) {
-  ui.loadFromFile(file);
+  uiManager.loadFromFile(file);
 }
 
 function initializeSimulationVariables() {
@@ -470,7 +469,7 @@ function updateYearlyData() {
   dataSheet[row].worth += realEstate.getTotalValue() + pension.capital() + etf.capital() + trust.capital() + cash;
 
   if (!montecarlo) {
-    ui.updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
+    uiManager.updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
   }
 }
 

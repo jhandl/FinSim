@@ -682,6 +682,52 @@ input.percentage::placeholder {
     overflow: visible;
 }
 
+
+
+.driver-popover {
+    padding-top: 30px !important;
+    min-width: 300px !important;
+    max-width: clamp(300px, 50vw, 600px)  !important;
+}
+
+.driver-popover.welcome-popover {
+    min-width: 300px !important;
+    max-width: clamp(300px, 80vw, 900px) !important;
+} 
+
+.driver-popover.howto-popover {
+    min-width: 300px !important;
+    max-width: clamp(300px, 80vw, 1500px) !important;
+}
+
+.driver-popover .driver-popover-title {
+    font-size: 1.4rem;
+    font-weight: bold;
+    text-align: center;
+    padding-bottom: 1.5rem;
+    padding-top: 1.5rem;
+}
+
+.driver-popover .driver-popover-description {
+    font-size: 1.2rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+
+.driver-popover p {
+    margin-bottom: 0.5em;
+}
+
+.driver-popover ol, .driver-popover ul {
+    margin-left: 20px;
+    padding-left: 20px;
+    margin-bottom: 20px;
+}
+
+.driver-popover li {
+    margin-bottom: 10px;
+}
+
 footer {
     background-color: var(--card-background);
     padding: 1rem 2rem;

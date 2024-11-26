@@ -1,11 +1,22 @@
 /* This file has to work on both the website and Google Sheets */
 
+var Config_instance = null;
+
 class Config {
+
   constructor(ui) {
     this.ui = ui;
     this.thisVersion = this.ui.getVersion();
     this.load(this.thisVersion);
     this.checkForUpdates();
+  }
+
+  // Singleton
+  static getInstance(ui) {
+    if (!Config_instance) {
+      Config_instance = new Config(ui);
+    }
+    return Config_instance;
   }
 
   load(version) {

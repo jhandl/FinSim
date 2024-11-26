@@ -1,196 +1,858 @@
 steps:
-  #- popover:
-  #    title: "Welcome to the Financial Independence Simulator"
-  #    description: "This is a tool to help you plan for your financial future. It allows you to simulate different scenarios to see how different decisions could affect your financial situation."
+  - popover:
+      popoverClass: "welcome-popover"
+      title: "Welcome to the Ireland Financial Simulator"
+      description: >
+        <p><b>What it is: </b>This is a tool to help you understand how different decisions and scenarios can affect your long term financial future, within the context of the Irish tax system.</p>
+        <p><b>What it's not:</b> This is not a budgeting tool nor financial advice. Don't make serious life decisions based on this. It's not a substitute for a good financial advisor.</p>
+        <p><b>Privacy notice:</b> The simulator does not collect any data from you. It runs purely in your browser. You can run it offline.</p>
+      showButtons: ["next"]
+      nextBtnText: ["How to use →"]
+
+  - popover:
+      popoverClass: "howto-popover"
+      title: "How to use the simulator"
+      description: >
+        <p><b>Steps:</b></p>
+        <ol><li>First you need to fill out the panels on the left to describe your current financial situation, your financial plan, expected economic conditions, etc.</li>
+        <li>Then, you add rows to the Events table describing your income, expenses, and plans for things like buying a house, getting a mortgage, etc. Each event has a starting and an ending point in time, and they are expressed in terms of your age. Keep in mind that everything is calculated on a yearly basis, so add up all your expenses for the year and use that number. If you have expenses that have a clear timeframe (like paying for college), put it in a separate event.</li>
+        <li>Finally, run the simulation to see how it goes. You will see the outcome in three ways:</li>
+        <ul><li>The status box next to the "Run Simulation" button will tell you if your scenario is successful, or at what age it failed (when you couldn't afford your expenses), or the likelyhood that it succeeds (see volatility below).</li>
+        <li>The graphs will show the evolution of your cashflow (how your expenses stack up against your income, where that income comes from), and your assets (how much you have accumulated and where) as time goes by, from your current age to your taget age.</li>
+        <li>The table at the bottom will show you, year by year, the details of your income, taxes, cashflow, and assets.</li></ul></ol>
+        <p><b>Stress testing:</b> You can change the economy parameters to see what happens if inflation is higher, investments grow slower or are more volatile, etc. You can further stress test your scenario by adding a stock market crash or two.</p>
+        <p><b>Volatility:</b> If you introduce volatility in any of your investments (anything higher than 0%), it will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp). This runs the simulation ${simulationRuns} times, each time with random rates of growth according to a normal distribution with the median and standard deviation your provided, and it tells you how likely your scenario will succeed in those conditions (the percentage of those simulations that ended in success).</p><p>&nbsp;&nbsp;The graphs will represent the average of all the runs. You may be surprised to see non-zero amounts of money remaining in the assets graph past the expected failure age. This is due to the percentage of runs that were successful due to random chance. You may also be surprised by a lower than expected success rate, when the scenario seems to work well for 0% volatility. This is the result of the erosion of returns due to volatility ($100 + 10% = $110; $110 - 10% = $99).</p><p>&nbsp;&nbsp;If you leave the StdDev parameters at 0% for all three investment vehicles, it will run the simulation once, without any variability, and it will tell you at what age you ran out of money. If you want to see the effect of a change in your parameters (other than volatility), it's best to set the volatility to zero. That way it's deterministic, and any change in outcome is the direct result of the change to your scenario. Once you introduce volatility and run the Monte Carlo simulation, the only meaningful outcome is the percentage of success.</p>
+        <p><b>Saving scenarios:</b> To avoid losing your scenario when you close the browser window, use the "Save" button so you can load it again next time. </p>
+        <p><b>Help system:</b> If you are editig a field and press the Help button, you will get help for that specific field. You can navigate the help cards with the buttons on the cards and with &lt;tab&gt; and &lt;shift-tab&gt;, and you can leave the help system with &lt;Esc&gt; or clicking outside of the help card.</p>
+      prevBtnText: ["← Welcome"]
+      nextBtnText: ["Start tour →"]
 
   - element: "#startingPosition"
     popover:
-      description: "<b>This is where you describe your current financial situation.</b><p/>It's the starting point for the simulation."
+      description: "<p>This is where you describe your current financial situation.</p><p>It's the starting point for the simulation.</p>"
       side: "right"
       align: "start"
       
   - element: "#StartingAge"
     popover:
-      description: "Enter your current age."
+      description: "<p>Enter your current age.</p>"
       side: "right"
       align: "start"
   
   - element: "#InitialSavings"
     popover:
-      description: "<b>Enter your current savings.</b><p/>Any cash you have sitting in your bank accounts or safety box, not earning significant interest."
+      description: "<p>Enter your current savings.</p><p>Any cash you have sitting in your bank accounts or safety box, not earning significant interest.</p>"
       side: "right"
       align: "start"
   
   - element: "#InitialPension"
     popover:
-      description: "<b>Enter the total amount in your private pension funds.</b><p/>If you haven't contributed to one yet, enter '0'. If you have more than one pension fund, enter the total amount here."
+      description: "<p>Enter the total amount in your private pension funds.</p><p>If you haven't contributed to one yet, enter '0'. If you have more than one pension fund, enter the total amount here.</p>"
       side: "right"
       align: "start"
 
   - element: "#InitialETFs"
     popover:
-      description: "<b>Enter the current value of your ETF investments.</b><p/>Keep in mind that since I don't know when you bought those ETFs I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid 8 years into the run and every 8 years thereafter."
+      description: "<p>Enter the current value of your ETF investments.</p><p>Keep in mind that since I don't know when you bought those ETFs I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid 8 years into the run and every 8 years thereafter.</p>"
       side: "right"
       align: "start"
   
   - element: "#InitialTrusts"
     popover:
-      description: "<b>Enter the current value in your investment trusts or stocks.</b><p/>Keep in mind that since I don't know when you bought those trusts or shares I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid 8 years into the run and every 8 years thereafter."
+      description: "<p>Enter the current value in your investment trusts or stocks.</p>"
       side: "right"
       align: "start"
 
   - element: "#targetsAllocations"
     popover:
-      description: "<b>Here you describe your financial plan.</b>"
+      description: "<p>This is where you describe your financial plan.</p>"
       side: "right"
       align: "start"
   
   - element: "#RetirementAge"
     popover:
-      description: "<b>This is the age at which you plan to retire.</b>"
+      description: "<p>Enter the age at which you plan to retire.</p>"
       side: "right"
       align: "start"
 
   - element: "#TargetAge"
     popover:
-      description: "<b>This is your life expectancy.</b><p/>The simulation will end at this age, and will be successful if you reach this age without running out of money."
+      description: "<p>This is your life expectancy.</p><p>The simulation will end at this age, and will be successful if you reach this age without running out of money.</p>"
       side: "right"
       align: "start"
 
   - element: "#EmergencyStash"
     popover:
-      description: "<b>This is the amount of money you plan to have in cash to cover unexpected expenses.</b><p/>This will be inflation adjusted."
+      description: "<p>This is the amount of money you plan to have in cash to cover unexpected expenses.</p><p>This will be inflation adjusted.</p>"
       side: "right"
       align: "start"
 
   - element: "#EtfAllocation"
     popover:
-      description: "<b>This is the percentage of your portfolio that you plan to have in ETFs.</b><p/>Any cash remaining after funding your emergency stash will be invested in ETFs in this proportion. The sum of ETFs and Trusts can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash."
+      description: "<p>This is the percentage of your portfolio that you plan to have in ETFs.</p><p>Any cash remaining after funding your emergency stash will be invested in ETFs in this proportion.</p><p>The sum of ETFs and Trusts can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
       side: "right"
       align: "start"
 
   - element: "#TrustAllocation"
     popover:
-      description: "<b>This is the percentage of your portfolio that you plan to have in investment trusts or shares.</b><p/>Any cash remaining after funding your emergency stash will be invested in trusts or shares in this proportion. The sum of ETFs and Trusts can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash."
+      description: "<p>This is the percentage of your portfolio that you plan to have in investment trusts or shares.</p><p>Any cash remaining after funding your emergency stash will be invested in trusts or shares in this proportion.</p><p>The sum of ETFs and Trusts can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
       side: "right"
       align: "start"
 
   - element: "#PensionContributionPercentage"
     popover:
-      description: "<b>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</b><p/>If you enter 100% here, you will contribute the maximum allowed for your age (15% to 40%). Do not include employer matching contributions here; there's another place for that."
+      description: "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age (15% to 40%). Do not include employer matching contributions here; there's another place for that.</p>"
       side: "right"
       align: "start"
 
   - element: "#PensionContributionCapped"
     popover:
-      description: "<b>Whether your pension contribution is capped to match the maximum amount that you can get tax relief on.</b><p/>This limit is the same for everyone, it does not depend on age. If you select 'Yes', your pension contributions will be capped at the maximum allowed. If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess."
+      description: "<p>Whether your pension contribution is capped to match the maximum amount that you can get tax relief on (${pensionContribEarningLimit,currency}).</p><p>This limit is the same for everyone, it does not depend on age. If you select 'Yes', your pension contributions will be capped at the maximum allowed. If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess.</p>"
       side: "right"
       align: "start"
 
   - element: "#growthRates"
     popover:
-      description: "<b>Here is where you speculate how the economy will do on average in the future.</b><p/>You may want to enter conservative numbers to stress test your scenario. For reference, the average annual growth rate of the S&P500 over its lifetime has been around 10% in US dollars (not adjusted for inflation and not including fees). If you enter volatility numbers larger than zero, I will run a Monte Carlo simulation using these numbers to calculate the probability of success of your scenario."
+      description: "<p>Here is where you speculate how the economy will do on average in the future.</p><p>You may want to enter conservative numbers to stress test your scenario. For reference, the average annual growth rate of the S&P500 over its lifetime has been around 10% in US dollars (not adjusted for inflation and not including fees).</p><p>If you enter volatility numbers larger than zero, I will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp) using these numbers to calculate the probability of success of your scenario.</p>"
       side: "right"
       align: "start"
 
   - element: "#PensionGrowthRate"
     popover:
-      description: "<b>This is the expected average annual growth rate of your private pension, not adjusted for inflation.</b><p/>Keep in mind pension funds tend to invest more conservatively and have higher fees, so take that into account when calculating this number."
+      description: "<p>This is the expected average annual growth rate of your private pension, not adjusted for inflation.</p><p>Keep in mind pension funds tend to invest more conservatively and have higher fees, so take that into account when calculating this number.</p>"
       side: "right"
       align: "start"
 
   - element: "#PensionGrowthStdDev"
     popover:
-      description: "<b>This is the expected standard deviation of the annual growth rate of your private pension.</b><p/>Keep in mind that pension funds tend to invest more conservatively so may have lower volatility than the stock market. Take that into account when calculating this number."
+      description: "<p>This is the expected standard deviation of the annual growth rate of your private pension.</p><p>Keep in mind that pension funds tend to invest more conservatively so may have lower volatility than the stock market. Take that into account when calculating this number.</p>"
       side: "right"
       align: "start"
 
   - element: "#EtfGrowthRate"
     popover:
-      description: "<b>This is the expected average annual growth rate of your ETFs, not adjusted for inflation.</b><p/>For reference, the average growth rate of the S&P500 over its lifetime has been around 10%."
+      description: "<p>This is the expected average annual growth rate of your ETFs, not adjusted for inflation.</p><p>For reference, the average growth rate of the S&P500 over its lifetime has been around 10%.</p>"
       side: "right"
       align: "start"
 
   - element: "#EtfGrowthStdDev"
     popover:
-      description: "<b>This is the expected standard deviation of the annual growth rate of your ETFs.</b><p/>For reference, the average volatility of the S&P500 over its lifetime (including bull markets and crashes) has been around 15%."
+      description: "<p>This is the expected standard deviation of the annual growth rate of your ETFs.</p><p>For reference, the average volatility of the S&P500 over its lifetime (including bull markets and crashes) has been around 15%.</p>"
       side: "right"
       align: "start"
 
   - element: "#TrustGrowthRate"
     popover:
-      description: "<b>This is the expected average annual growth rate of your investment trusts or shares, not adjusted for inflation.</b><p/>Keep in mind that investment trusts or shares tend to have higher fees, so take that into account when calculating this number."
+      description: "<p>This is the expected average annual growth rate of your investment trusts or shares, not adjusted for inflation.</p><p>Keep in mind that investment trusts or shares tend to have higher fees, so take that into account when calculating this number.</p>"
       side: "right"
       align: "start"
 
   - element: "#TrustGrowthStdDev"
     popover:
-      description: "<b>This is the expected standard deviation of the annual growth rate of your investment trusts or shares.</b><p/>For reference, the average volatility of the S&P500 over its lifetime (including bull markets and crashes) has been around 15%."
+      description: "<p>This is the expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>For reference, the average volatility of the S&P500 over its lifetime (including bull markets and crashes) has been around 15%.</p>"
       side: "right"
       align: "start"
 
   - element: "#Inflation"
     popover:
-      description: "<b>This is the expected average annual inflation rate.</b><p/>Central banks aim for an inflation rate of around 2%. However, deviations due to shocks (e.g., pandemics, wars, etc) can cause deviations that are skewed towards higher numbers. For example, in 2022 inflation was 7.8%, the highest since 1984. In contrast, by October 2024 it had decreased to 0.7%."
+      description: "<p>This is the expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of around 2%. However, deviations due to shocks (e.g., pandemics, wars, etc) can cause deviations that are skewed towards higher numbers. For example, in 2022 inflation was 7.8%, the highest since 1984. In contrast, by October 2024 it had decreased to 0.7%.</p>"
       side: "right"
       align: "start"
 
   - element: "#personalCircumstances"
     popover:
-      description: "<b>Here you describe your personal circumstances.</b><p/>They may affect your income tax bands and tax credits, and would be difficult to capture as events."
+      description: "<p>Here you describe your personal circumstances.</p><p>They may affect your income tax bands and tax credits, and would be difficult to capture as events.</p>"
       side: "right"
       align: "start"
 
   - element: "#MarriageYear"
     popover:
-      description: "<b>Enter the year that you got married or entered into a civil partnership, or that you plan to.</b><p/>Your income tax band limits change if you are married or in a civil partnership. You can enter any year in the past if you were already married or in partnership, or a year in the future if you plan to get married or enter into a civil partnership then."
+      description: "<p>Enter the year that you got married or entered into a civil partnership, or that you plan to.</p><p>Your income tax band limits change if you are married or in a civil partnership. You can enter any year in the past if you were already married or in partnership, or a year in the future if you plan to get married or enter into a civil partnership then.</p>"
       side: "right"
       align: "start"
 
   - element: "#OldestChildBorn"
     popover:
-      description: "<b>Enter the year that your oldest child was born or is expected or speculated to be born.</b><p/>Your income tax band limits are increased if you have dependent children, starting when your first child is born."
+      description: "<p>Enter the year that your oldest child was born or is expected or speculated to be born.</p><p>Your income tax band limits are increased if you have dependent children, starting when your first child is born.</p>"
       side: "right"
       align: "start"
 
   - element: "#YoungestChildBorn"
     popover:
-      description: "<b>Enter the year that your youngest child was born or is expected or speculated to be born.</b><p/>The increased income tax band limits for dependent children go on until your youngest child is over 18."
+      description: "<p>Enter the year that your youngest child was born or is expected or speculated to be born.</p><p>The increased income tax band limits for dependent children go on until your youngest child is over 18.</p>"
       side: "right"
       align: "start"
 
   - element: "#PersonalTaxCredit"
     popover:
-      description: "<b>Enter the amount of personal tax credit you are entitled to according to your personal circumstances (widow, carer, etc).</b><p/>This is the amount of tax credit you get for yourself, before factoring in any dependent children (refer to [this revenue page](https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx))."
+      description: "<p>Enter the amount of personal tax credit you are entitled to according to your personal circumstances (widow, carer, etc).</p><p>This is the amount of tax credit you get for yourself, before factoring in any dependent children (refer to [this revenue page](https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx)).</p>"
       side: "right"
       align: "start"
 
   - element: "#StatePensionWeekly"
     popover:
-      description: "<b>Enter your expected weekly state pension amount.</b><p/>Given that different ways to calculate your state pension, refer to [this page](https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/) to find how to calculate yours."
+      description: "<p>Enter your expected weekly state pension amount.</p><p>Given that different ways to calculate your state pension, refer to [this page](https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/) to find how to calculate yours.</p>"
       side: "right"
       align: "start"
 
   - element: "#drawdownPriorities"
     popover:
-      description: "<b>Here you can set the priorities for the drawdown of your assets.</b><p/>You can drag and drop the items to change their order of priority. The top item will be the highest priority, meaning that it will be used first to cover your expenses when needed (for example in retirement)."
+      description: "<p>Here you can set the priorities for the drawdown of your assets.</p><p>You can drag and drop the items to change their order of priority. The top item will be the highest priority, meaning that it will be used first to cover your expenses when needed (for example in retirement).</p>"
       side: "right"
       align: "start"
 
-  - element: "#runSimulation"
+  - element: "#Events"
     popover:
-      description: "<b>Once you have entered all the data, click here to run the simulation.</b>"
+      description: "<p>Here you can add, remove, and edit the events that make up your scenario.</p>"
       side: "bottom"
       align: "start"
+
+
+###########################################################
+# Event Type
+
+  - element: "#EventType"
+    popover:
+      description: "<p>Select the type of event.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["NOP"]
+    popover:
+      description: "<p>The 'No Operation' is a way to mute an event without deleting it.</p><p>If you select it, the event will not be included in the simulation.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["RI"]
+    popover:
+      description: "<p>A gross income from a rental property or other non-PAYE income.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["SI"]
+    popover:
+      description: "<p>A gross salary income.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["SInp"]
+    popover:
+      description: "<p>A gross salary income that doesn't contribute to a pension.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["UI"]
+    popover:
+      description: "<p>The gross income from Restricted Stock Units, provided by some employers as part of the compensation package.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["DBI"]
+    popover:
+      description: "<p>An occupational pension scheme that provides a fixed income in retirement.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["FI"]
+    popover:
+      description: "<p>This event lets you add a net income from things like a gift or inheritance.</p><p>It assumes any tax has already been paid, so this is kind of a wildcard event that lets you inject cash into your income stream, and it will be invested according to your chosen allocation</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["E"]
+    popover:
+      description: "<p>An expense item.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["SM"]
+    popover:
+      description: "<p>A stock market crash or bubble. Using this event you can stress test your plan.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["R"]
+    popover:
+      description: "<p>The ownership of a real estate property.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["M"]
+    popover:
+      description: "<p>A mortgage on a real estate property.</p>"
+      side: "bottom"
+      align: "center"
+
+###########################################################
+# Event Name
+
+  - element: "#EventName"
+    popover:
+      description: "<p>Enter the name of the event.</p><p>In most cases you can enter any name you want. It's just for your reference. But in some cases, like for the 'Mortgage' event, it will be used to match the corresponding 'Real Estate' event, so they must have the same name.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["NOP"]
+    popover:
+      description: "<p>No Operation events ignore all fields.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["RI"]
+    popover:
+      description: "<p><p>Enter the name of the event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["SI"]
+    popover:
+      description: "<p>Enter the name of the salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["SInp"]
+    popover:
+      description: "<p>Enter the name of the salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["UI"]
+    popover:
+      description: "<p>Enter the name of the RSU income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["DBI"]
+    popover:
+      description: "<p>Enter the name of the Defined Benefit income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["FI"]
+    popover:
+      description: "<p>Enter the name of the tax free income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["E"]
+    popover:
+      description: "<p>Enter the name of the Expense event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["SM"]
+    popover:
+      description: "<p>Enter the name of the Stock Market event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["R"]
+    popover:
+      description: "<p>Enter the name of the Real Estate event.</p><p>You can enter any name you want, but if it's bought with a mortgage, the corresponding 'Mortgage' event must have the same name.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["M"]
+    popover:
+      description: "<p>Enter the name of the mortgage event.</p><p>The name must match the name of the corresponding Real Estate event.</p>"
+      side: "bottom"
+      align: "center"
+
+
+###########################################################
+# Event Amount
+
+  - element: "#EventAmount"
+    popover:
+      description: "<p>Enter the yearly amount for the event</p><p>For 'Real Estate' events, enter the down payment. For 'Mortgage' events, enter the amount you will repay each year. For 'Stock' events, you don't enter anything here.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["NOP"]
+    popover:
+      description: "<p>No Operation events ignore all fields.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["RI"]
+    popover:
+      description: "<p>Enter the present value of the gross yearly income from the rental property or other non-PAYE income.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["SI"]
+    popover:
+      description: "<p>Enter the present value of the gross yearly salary income.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["SInp"]
+    popover:
+      description: "<p>Enter the present value of the gross yearly salary income.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["UI"]
+    popover:
+      description: "<p>Enter the present value of the gross yearly income from Restricted Stock Units.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["DBI"]
+    popover:
+      description: "<p>Enter the present value of the gross yearly income from the Defined Benefit pension scheme.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["FI"]
+    popover:
+      description: "<p>Enter the present value of the gross yearly income from a tax free income.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["E"]
+    popover:
+      description: "<p>Enter the present value of the yearly expense.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["SM"]
+    popover:
+      description: "<p>Stock Market events use the Rate field to indicate the percentage change in the stock market, not the Amount field.</p>"
+      side: "bottom"
+      align: "center"
+
+
+  - element: "#EventAmount"
+    eventTypes: ["R"]
+    popover:
+      description: "<p>Enter the present value of the down payment for the real estate property.</p><p>If the property is bought without a mortgage, enter the full purchase price here.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["M"]
+    popover:
+      description: "<p>Enter the present value of the yearly amount you will repay on the mortgage.</p><p>You can get this number from a mortgage calculator like [this one](https://www.mortgages.ie/go/first_time_buyers/mortgage_payments_calculator) and multiplying the monthly repayment by 12.</p>"
+      side: "bottom"
+      align: "center"
+
+###########################################################
+# Event From Age
+
+  - element: "#EventFromAge"
+    popover:
+      description: "<p>Enter the age at which the event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["NOP"]
+    popover:
+      description: "<p>No Operation events ignore all fields.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["RI"]
+    popover:
+      description: "<p>Enter the age at which the rental income event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["SI"]
+    popover:
+      description: "<p>Enter the age at which the salary income event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["SInp"]
+    popover:
+      description: "<p>Enter the age at which the salary income event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["UI"]
+    popover:
+      description: "<p>Enter the age at which the RSU income event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["DBI"]
+    popover:
+      description: "<p>Enter the age at which the Defined Benefit income event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["FI"]
+    popover:
+      description: "<p>Enter the age at which the tax free income event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["E"]
+    popover:
+      description: "<p>Enter the age at which the expense event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["SM"]
+    popover:
+      description: "<p>Enter the age at which the stock market event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["R"]
+    popover:
+      description: "<p>Enter the age at which the property is bought.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["M"]
+    popover:
+      description: "<p>Enter the age at which the mortgage starts. It must match the age of the corresponding Rental Property event.</p>"
+      side: "bottom"
+      align: "center"
+
+###########################################################
+# Event To Age
+
+  - element: "#EventToAge"
+    popover:
+      description: "<p>Enter the age after which the event ends.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["NOP"]
+    popover:
+      description: "<p>No Operation events ignore all fields.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["RI"]
+    popover:
+      description: "<p>Enter the age up to which the rental income continues.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["SI"]
+    popover:
+      description: "<p>Enter the age up to which the salary income continues.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["SInp"]
+    popover:
+      description: "<p>Enter the age up to which the salary income continues.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["UI"]
+    popover:
+      description: "<p>Enter the age up to which the RSU income continues.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["DBI"]
+    popover:
+      description: "<p>Enter the age up to which the Defined Benefit income continues.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["FI"]
+    popover:
+      description: "<p>Enter the age up to which the tax free income continues.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["E"]
+    popover:
+      description: "<p>Enter the age up to which the expense continues.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["SM"]
+    popover:
+      description: "<p>Enter the age up to which the stock market event continues.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["R"]
+    popover:
+      description: "<p>Enter the age up to which the property is held. The total value of the property will be computed including mortgage repayments plus the expected appreciation and it will be sold after the age you enter here. The proceeds will be invested according to your chosen allocation</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["M"]
+    popover:
+      description: "<p>Enter the age up to which the mortgage continues. It can't be later than when the corresponding property is sold.</p>"
+      side: "bottom"
+      align: "center"
+
+###########################################################
+# Event Rate
+
+  - element: "#EventRate"
+    popover:
+      description: "<p>Enter the expected average annual growth rate of the event.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p><p>For 'Stock Market' events, enter the expected average annual growth rate of the stock market. This will replace all the growth rates you entered in the 'Economy' panel for the period you specified. For example, if you enter 10% here, all investments will grow 10% in that period (this is prorated over the whole period). If you enter a negative number, it means that the stock market will crash by that much in that period.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["NOP"]
+    popover:
+      description: "<p>No Operation events ignore all fields.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["RI"]
+    popover:
+      description: "<p>Enter the expected average annual growth rate of the rental income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["SI"]
+    popover:
+      description: "<p>Enter the expected average annual growth rate of the salary income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["SInp"]
+    popover:
+      description: "<p>Enter the expected average annual growth rate of the salary income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["UI"]
+    popover:
+      description: "<p>Enter the expected average annual growth rate of the RSU income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["DBI"]
+    popover:
+      description: "<p>Enter the expected average annual growth rate of the Defined Benefit income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["FI"]
+    popover:
+      description: "<p>Enter the expected average annual growth rate of the tax free income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["E"]
+    popover:
+      description: "<p>Enter the expected average annual growth rate of the expense.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["SM"]
+    popover:
+      description: "<p>Enter the total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate a 2000-style crash when you're 40, you'd enter -50% as the amount, 40 as the starting age, and 41 as the ending age. This will override the the market growth you specified in the parameters (for Pension, ETFs, and Trusts) with a 25% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["R"]
+    popover:
+      description: "<p>Enter the expected yearly rate of appreciation of the property.</p><p>For properties bought in the past, you can calculate the appreciation using the the original purchase price and the current market value.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["M"]
+    popover:
+      description: "<p>Enter the mortgage loan rate.</p>"
+      side: "bottom"
+      align: "center"
+
+###########################################################
+# Event Match
+
+  - element: "#EventMatch"
+    popover:
+      description: "<p>For Salary events, enter the percentage of your pension contributions that your employer will match.</p><p>Many employers match contributions up to a certain percentage of your salary. If you contribute less than that, your employer will only match up to that amount. If your employer doesn't offer this, leave it blank or enter 0.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["NOP"]
+    popover:
+      description: "<p>No Operation events ignore all fields.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["RI"]
+    popover:
+      description: "<p>Rental income events ignore this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["SI"]
+    popover:
+      description: "<p>Enter the percentage up to which your employer will match your private pension contributions.</p><p>Many employers match contributions up to a certain percentage of your salary. If you contribute less than that, your employer will only match up to that amount. If your employer doesn't offer this, leave it blank or enter 0.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["SInp"]
+    popover:
+      description: "<p>Non-contributory salary income events ignore this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["UI"]
+    popover:
+      description: "<p>RSU income events ignore this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["DBI"]
+    popover:
+      description: "<p>Defined Benefit income events ignore this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["FI"]
+    popover:
+      description: "<p>Tax free income events ignore this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["E"]
+    popover:
+      description: "<p>Expense events ignore this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["SM"]
+    popover:
+      description: "<p>Stock Market events ignore this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["R"]
+    popover:
+      description: "<p>Real Estate events ignore this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["M"]
+    popover:
+      description: "<p>Mortgage events ignore this field.</p>"
+      side: "bottom"
+      align: "center"
+
+###########################################################
+
+
+  - element: "#runSimulation"
+    popover:
+      description: "<p>Once you have entered all the data,<br/> click here to run the simulation.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#progress"
+    popover:
+      description: "<p>The outcome of the simulation will be shown here.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#saveSimulation"
+    popover:
+      description: "<p>Click here to save your scenario to a file.</p>"
+      side: "left"
+      align: "end"
+  
+  - element: "#loadSimulation"
+    popover:
+      description: "<p>Click here to load a scenario from a file.</p>"
+      side: "left"
+      align: "end"
   
   - element: "#cashflowGraph"
     popover:
-      description: "<b>This graph shows your projected cashflow over time.</b>"
+      description: "<p>This graph shows your projected cashflow over time.</p>"
       side: "top"
       align: "center"
   
   - element: "#assetsGraph"
     popover:
-      description: "<b>This graph shows your projected assets over time.</b>"
+      description: "<p>This graph shows your projected assets over time.</p>"
+      side: "top"
+      align: "center"
+
+  - element: "#Data"
+    popover:
+      description: "<p>Here you will see the actual numbers as they are computed by the simulator, year by year, from your current age to the target age.</p><p>The columns are mostly self-explanatory. The cash column under income may raise some eyebrows: it shows withdrawals from cash savings to cover expenses when the net income is not enough.</p>"
       side: "top"
       align: "center"

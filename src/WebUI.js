@@ -8,6 +8,7 @@ class WebUI extends AbstractUI {
     super();
     this.editCallbacks = new Map();
     this.statusElement = document.getElementById('progress');
+    this.eventRowCounter = 0;
     this.setupEventListeners();
     this.setupPercentageInputs();
     this.setupCurrencyInputs();
@@ -397,6 +398,47 @@ class WebUI extends AbstractUI {
     }
   }
 
+  generateEventRowId() {
+    return `row_${++this.eventRowCounter}`;
+  }
+
+  createEventRow(type = '', name = '', amount = '', fromAge = '', toAge = '', rate = '', match = '') {
+    const rowId = this.generateEventRowId();
+    const row = document.createElement('tr');
+    row.dataset.rowId = rowId;
+    
+    row.innerHTML = `
+        <td>
+            <select id="EventType_${rowId}" class="event-type">
+                ${this.getEventTypeOptions(type)}
+            </select>
+        </td>
+        <td><input type="text" id="EventName_${rowId}" class="event-name" value="${name}"></td>
+        <td><input type="number" id="EventAmount_${rowId}" class="event-amount currency" inputmode="numeric" pattern="[0-9]*" step="1000" value="${amount}"></td>
+        <td><input type="number" id="EventFromAge_${rowId}" class="event-from-age" min="0" max="100" value="${fromAge}"></td>
+        <td><input type="number" id="EventToAge_${rowId}" class="event-to-age" min="0" max="100" value="${toAge}"></td>
+        <td><div class="percentage-container"><input type="number" id="EventRate_${rowId}" class="event-rate percentage" inputmode="numeric" pattern="[0-9]*" placeholder="inflation" value="${rate}"></div></td>
+        <td><div class="percentage-container"><input type="number" id="EventMatch_${rowId}" class="event-match percentage" inputmode="numeric" pattern="[0-9]*" value="${match}"></div></td>
+        <td>
+            <button class="delete-event" title="Delete event">×</button>
+        </td>
+    `;
+
+    return row;
+  }
+
+  addEventRow() {
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return;
+
+    const row = this.createEventRow();
+    tbody.appendChild(row);
+    
+    // Setup currency formatting for the new row
+    this.setupCurrencyInputs();
+    this.setupPercentageInputs();
+  }
+
   async loadFromFile(file) {
     if (!file) return;
     this.clearContent('Events');
@@ -435,31 +477,16 @@ class WebUI extends AbstractUI {
       const tbody = document.querySelector('#Events tbody');
       if (tbody) {
           tbody.innerHTML = ''; // Clear existing rows
+          this.eventRowCounter = 0;
           eventData.forEach(([type, name, amount, fromAge, toAge, rate, match]) => {
               if (type) {
                   // Convert decimal rate and match to percentage for display
                   const displayRate = (rate !== undefined && rate !== '') ? (rate * 100).toString() : '';
                   const displayMatch = (match !== undefined && match !== '') ? (match * 100).toString() : '';
                   
-                  const row = document.createElement('tr');
-                  row.innerHTML = `
-                      <td>
-                          <select class="event-type">
-                              ${this.getEventTypeOptions(type)}
-                          </select>
-                      </td>
-                      <td><input type="text" class="event-name" value="${name}"></td>
-                      <td><input type="number" class="event-amount currency" step="1000" value="${amount}"></td>
-                      <td><input type="number" class="event-from-age" min="0" max="100" value="${fromAge || ''}"></td>
-                      <td><input type="number" class="event-to-age" min="0" max="100" value="${toAge || ''}"></td>
-                      <td><div class="percentage-container"><input type="number" class="event-rate percentage" value="${displayRate}" placeholder="inflation"></div></td>
-                      <td><div class="percentage-container"><input type="number" class="event-match percentage" value="${displayMatch}"></div></td>
-                      <td>
-                          <button class="delete-event" title="Delete event">×</button>
-                      </td>
-                  `;
+                  const row = this.createEventRow(type, name, amount, fromAge || '', toAge || '', displayRate, displayMatch);
                   tbody.appendChild(row);
-              }    
+              }
           });
           this.setupCurrencyInputs();
           this.setupPercentageInputs();
@@ -986,8 +1013,8 @@ class WebUI extends AbstractUI {
   }
 
   setupLoadButton() {
-    const loadButton = document.getElementById('loadSimulationBtn');
-    const fileInput = document.getElementById('loadSimulation');
+    const loadButton = document.getElementById('loadSimulation');
+    const fileInput = document.getElementById('loadSimulationDialog');
     if (loadButton && fileInput) {
       loadButton.addEventListener('click', () => fileInput.click());
       fileInput.addEventListener('change', (e) => this.loadFromFile(e.target.files[0]));
@@ -1060,37 +1087,6 @@ class WebUI extends AbstractUI {
             setTimeout(() => item.classList.remove('inserted'), 300);
         }
     });
-  }
-
-  addEventRow() {
-    const tbody = document.querySelector('#Events tbody');
-    
-    if (!tbody) return;
-
-    const row = document.createElement('tr');
-    
-    row.innerHTML = `
-        <td>
-            <select class="event-type">
-                ${this.getEventTypeOptions()}
-            </select>
-        </td>
-        <td><input type="text" class="event-name"></td>
-        <td><input type="number" class="event-amount currency" inputmode="numeric" pattern="[0-9]*" step="1000"></td>
-        <td><input type="number" class="event-from-age" min="0" max="100"></td>
-        <td><input type="number" class="event-to-age" min="0" max="100"></td>
-        <td><div class="percentage-container"><input type="number" class="event-rate percentage" inputmode="numeric" pattern="[0-9]*" placeholder="inflation"></div></td>
-        <td><div class="percentage-container"><input type="number" class="event-match percentage" inputmode="numeric" pattern="[0-9]*"></div></td>
-        <td>
-            <button class="delete-event" title="Delete event">×</button>
-        </td>
-    `;
-
-    tbody.appendChild(row);
-    
-    // Setup currency formatting for the new row
-    this.setupCurrencyInputs();
-    this.setupPercentageInputs();
   }
 
   clearExtraDataRows(maxAge) {
