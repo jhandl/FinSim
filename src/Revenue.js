@@ -124,7 +124,6 @@ class Revenue {
       }
     } else if (this.dependentChildren) {
       itBands = config.itSingleDependentChildrenBands;
-      console.log("age: "+age+"  dependent children");
     }
     let tax = this.computeProgressiveTax(itBands, taxable, 1, marriedBandIncrease);
 

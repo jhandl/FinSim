@@ -9,6 +9,7 @@ class WebUI extends AbstractUI {
     this.editCallbacks = new Map();
     this.statusElement = document.getElementById('progress');
     this.eventRowCounter = 0;
+    this.addEventRow();
     this.setupEventListeners();
     this.setupPercentageInputs();
     this.setupCurrencyInputs();
@@ -922,7 +923,7 @@ class WebUI extends AbstractUI {
   setupEventListeners() {
     this.setupChangeListener();
     this.setupRunSimulationButton();
-    this.setupWizardButton();
+    this.setupWizardInvocation();
     this.setupEventTableButtons();
     this.setupFileOperationButtons();
     this.setupPriorityDragAndDrop();
@@ -1068,12 +1069,18 @@ class WebUI extends AbstractUI {
     });
   }
 
-  setupWizardButton() {
+  setupWizardInvocation() {
     const wizardButton = document.getElementById('startWizard');
+    const wizard = Wizard.getInstance();
     if (wizardButton) {
-      this.wizard = new Wizard();
-      wizardButton.addEventListener('click', () => this.wizard.start());
+      wizardButton.addEventListener('click', () => wizard.start());
     }
+    document.addEventListener('keydown', function(event) {
+      if (event.key === '?') {
+        event.preventDefault();
+        wizard.start();
+      }
+    });
   }
 
   updatePriorityValues() {

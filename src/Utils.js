@@ -16,7 +16,7 @@ function adjust(value, rate = null, n = periods) {
   if ((rate === null) || (rate === undefined) || (rate === "")) {
     rate = params.inflation;
   }
-  return value * (1 + rate) ** n;
+  return value * Math.pow(1 + rate, n);
 }
 
 function gaussian(mean, stdev, withOverride = true) {

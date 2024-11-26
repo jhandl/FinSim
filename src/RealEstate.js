@@ -83,7 +83,7 @@ class Property {
   mortgage(years, rate, payment) {
     const n = years * 12;
     const r = rate / 12;
-    const c = (1 + r) ** n;
+    const c = Math.pow(1 + r, n);
     this.borrowed = payment/12 * (c - 1) / (r * c);
     this.terms = years;
     this.payment = payment;

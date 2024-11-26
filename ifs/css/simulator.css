@@ -698,6 +698,8 @@ input.percentage::placeholder {
 .driver-popover.howto-popover {
     min-width: 300px !important;
     max-width: clamp(300px, 80vw, 1500px) !important;
+    max-height: 80vh !important;
+    overflow-y: scroll;
 }
 
 .driver-popover .driver-popover-title {

@@ -1,3 +1,5 @@
+var wizard_instance = null;
+
 class Wizard {
 
   constructor() {
@@ -14,6 +16,15 @@ class Wizard {
     document.addEventListener('focusin', this.followFocus);
   }
 
+  // Singleton
+  static getInstance() {
+    if (!wizard_instance) {
+      wizard_instance = new Wizard();
+    }
+    return wizard_instance;
+  }
+
+  
   processMarkdownLinks(text) {
     if (!text) return text;
     return text.replace(
@@ -202,7 +213,7 @@ class Wizard {
         }
         this.tour.moveNext();
       },
-      onPreviousClick: (element) => {
+      onPrevClick: (element) => {
         const prevIndex = this.tour.getActiveIndex() - 1;
         if (prevIndex >= 0) {
           const prevElement = document.querySelector(this.validSteps[prevIndex].element);
@@ -252,21 +263,28 @@ class Wizard {
       return;
     }
     
-    if (event.key === 'Tab') {
+    const moveActions = {
+      'Tab': (event) => event.shiftKey ? 'previous' : 'next',
+      'ArrowRight': () => 'next',
+      'ArrowDown': () => 'next',
+      'ArrowLeft': () => 'previous',
+      'ArrowUp': () => 'previous'
+    };
+
+    const direction = moveActions[event.key]?.(event);
+    if (direction) {
       event.preventDefault();
-      if (event.shiftKey) {
-        if (this.tour.hasPreviousStep()) {
-          this.tour.movePrevious();
+      const canMove = direction === 'next' 
+        ? this.tour.hasNextStep() 
+        : this.tour.hasPreviousStep();
+      
+      if (canMove) {
+        direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
+        const currentIndex = this.tour.getActiveIndex();
+        const currentElement = document.querySelector(this.validSteps[currentIndex].element);
+        if (currentElement) {
+          currentElement.focus();
         }
-      } else {
-        if (this.tour.hasNextStep()) {
-          this.tour.moveNext();
-        }
-      }
-      const currentIndex = this.tour.getActiveIndex();
-      const currentElement = document.querySelector(this.config.steps[currentIndex].element);
-      if (currentElement) {
-        currentElement.focus();
       }
     }
   }

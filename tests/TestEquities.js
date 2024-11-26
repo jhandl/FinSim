@@ -38,7 +38,7 @@ class TestEquities extends TestCase {
         etf.addYear();
       }
       
-      const end = 10000 * (1.05 ** years)
+      const end = 10000 * Math.pow(1.05, years)
       const gains = end - start;
 
       this.assertClose(revenue.gains[config.etfExitTax], gains, "ETF deemed disposal should trigger exit tax after "+years+" years");

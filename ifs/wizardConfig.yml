@@ -14,16 +14,16 @@ steps:
       title: "How to use the simulator"
       description: >
         <p><b>Steps:</b></p>
-        <ol><li>First you need to fill out the panels on the left to describe your current financial situation, your financial plan, expected economic conditions, etc.</li>
-        <li>Then, you add rows to the Events table describing your income, expenses, and plans for things like buying a house, getting a mortgage, etc. Each event has a starting and an ending point in time, and they are expressed in terms of your age. Keep in mind that everything is calculated on a yearly basis, so add up all your expenses for the year and use that number. If you have expenses that have a clear timeframe (like paying for college), put it in a separate event.</li>
+        <ol><li>First, fill out the panels on the left to describe your current financial situation, your financial plan, expected economic conditions, etc.</li>
+        <li>Then, add rows to the Events table describing your income, expenses, and plans for things like buying a house, changing jobs, etc. Each event has a starting and an ending point in time, and they are expressed in terms of your age. Everything is calculated on a yearly basis, so add up all your expenses for the year and use that number. If you have expenses that have a clear timeframe (like paying for college), add them as separate events.</li>
         <li>Finally, run the simulation to see how it goes. You will see the outcome in three ways:</li>
-        <ul><li>The status box next to the "Run Simulation" button will tell you if your scenario is successful, or at what age it failed (when you couldn't afford your expenses), or the likelyhood that it succeeds (see volatility below).</li>
-        <li>The graphs will show the evolution of your cashflow (how your expenses stack up against your income, where that income comes from), and your assets (how much you have accumulated and where) as time goes by, from your current age to your taget age.</li>
+        <ul><li>The status box next to the "Run Simulation" button will tell you if your scenario was successful, or at what age it failed (it fails if at any point you can't afford your expenses), or the likelyhood that it succeeds (see volatility below).</li>
+        <li>The graphs will show the evolution of your cashflow (how your expenses stack up against your income and where it comes from), and your assets (how much you have accumulated and where), from your current age to your target age.</li>
         <li>The table at the bottom will show you, year by year, the details of your income, taxes, cashflow, and assets.</li></ul></ol>
         <p><b>Stress testing:</b> You can change the economy parameters to see what happens if inflation is higher, investments grow slower or are more volatile, etc. You can further stress test your scenario by adding a stock market crash or two.</p>
-        <p><b>Volatility:</b> If you introduce volatility in any of your investments (anything higher than 0%), it will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp). This runs the simulation ${simulationRuns} times, each time with random rates of growth according to a normal distribution with the median and standard deviation your provided, and it tells you how likely your scenario will succeed in those conditions (the percentage of those simulations that ended in success).</p><p>&nbsp;&nbsp;The graphs will represent the average of all the runs. You may be surprised to see non-zero amounts of money remaining in the assets graph past the expected failure age. This is due to the percentage of runs that were successful due to random chance. You may also be surprised by a lower than expected success rate, when the scenario seems to work well for 0% volatility. This is the result of the erosion of returns due to volatility ($100 + 10% = $110; $110 - 10% = $99).</p><p>&nbsp;&nbsp;If you leave the StdDev parameters at 0% for all three investment vehicles, it will run the simulation once, without any variability, and it will tell you at what age you ran out of money. If you want to see the effect of a change in your parameters (other than volatility), it's best to set the volatility to zero. That way it's deterministic, and any change in outcome is the direct result of the change to your scenario. Once you introduce volatility and run the Monte Carlo simulation, the only meaningful outcome is the percentage of success.</p>
-        <p><b>Saving scenarios:</b> To avoid losing your scenario when you close the browser window, use the "Save" button so you can load it again next time. </p>
-        <p><b>Help system:</b> If you are editig a field and press the Help button, you will get help for that specific field. You can navigate the help cards with the buttons on the cards and with &lt;tab&gt; and &lt;shift-tab&gt;, and you can leave the help system with &lt;Esc&gt; or clicking outside of the help card.</p>
+        <p><b>Volatility:</b> If you introduce volatility in any of your investments (anything higher than 0%), it will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp). This runs the simulation ${simulationRuns} times, each time with random rates of growth according to a normal distribution with the median and standard deviation you provided, and it tells you how likely your scenario will succeed in those conditions (the percentage of those simulations that ended in success).</p><p>&nbsp;&nbsp;The graphs will represent the average of all the runs. You may be surprised to see non-zero amounts of money remaining in the assets graph past the expected failure age. This is due to the percentage of runs that were successful due to random chance. You may also be surprised by a lower than expected success rate, when the scenario seems to work well for 0% volatility. This is the result of the erosion of returns due to volatility ($100 + 10% = $110; $110 - 10% = $99).</p><p>&nbsp;&nbsp;If you leave the volatility at 0% for all three investment vehicles, the simulation will run once, without any variability, and it will tell you at what age you ran out of money. If you want to see the effect of a change in your scenario, it's best to set the volatility to zero. That way it's deterministic, and any change in outcome is the direct result of the change to your scenario. Once you introduce volatility, the only meaningful outcome is the percentage of success.</p>
+        <p><b>Saving scenarios:</b> To avoid losing your scenario when you close the browser window, use the "Save" button so you can load it again next time. You can name the file so you can store all your scenarios.</p>
+        <p><b>Help system:</b> If you are editing a field and press the Help button or the ? key, you will get help for that specific field. You can navigate the help cards with the buttons on the cards, with the arrow keys and with &lt;tab&gt; and &lt;shift-tab&gt;, and you can leave the help system with &lt;Esc&gt; or clicking outside of the help card.</p>
       prevBtnText: ["← Welcome"]
       nextBtnText: ["Start tour →"]
 
@@ -47,19 +47,19 @@ steps:
   
   - element: "#InitialPension"
     popover:
-      description: "<p>Enter the total amount in your private pension funds.</p><p>If you haven't contributed to one yet, enter '0'. If you have more than one pension fund, enter the total amount here.</p>"
+      description: "<p>The total amount in your private pension funds.</p><p>If you haven't contributed to one yet, enter '0'. If you have more than one pension fund, enter the total amount here.</p>"
       side: "right"
       align: "start"
 
   - element: "#InitialETFs"
     popover:
-      description: "<p>Enter the current value of your ETF investments.</p><p>Keep in mind that since I don't know when you bought those ETFs I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid 8 years into the run and every 8 years thereafter.</p>"
+      description: "<p>The current value of your ETF investments.</p><p>Keep in mind that since I don't know when you bought those ETFs I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid 8 years into the run and every 8 years thereafter.</p>"
       side: "right"
       align: "start"
   
   - element: "#InitialTrusts"
     popover:
-      description: "<p>Enter the current value in your investment trusts or stocks.</p>"
+      description: "<p>The current value in your investment trusts or stocks.</p>"
       side: "right"
       align: "start"
 
@@ -71,7 +71,7 @@ steps:
   
   - element: "#RetirementAge"
     popover:
-      description: "<p>Enter the age at which you plan to retire.</p>"
+      description: "<p>The age at which you plan to retire.</p>"
       side: "right"
       align: "start"
 
@@ -167,25 +167,25 @@ steps:
 
   - element: "#MarriageYear"
     popover:
-      description: "<p>Enter the year that you got married or entered into a civil partnership, or that you plan to.</p><p>Your income tax band limits change if you are married or in a civil partnership. You can enter any year in the past if you were already married or in partnership, or a year in the future if you plan to get married or enter into a civil partnership then.</p>"
+      description: "<p>The year that you got married or entered into a civil partnership, or that you plan to.</p><p>Your income tax band limits change if you are married or in a civil partnership. You can enter any year in the past if you were already married or in partnership, or a year in the future if you plan to get married or enter into a civil partnership then.</p>"
       side: "right"
       align: "start"
 
   - element: "#OldestChildBorn"
     popover:
-      description: "<p>Enter the year that your oldest child was born or is expected or speculated to be born.</p><p>Your income tax band limits are increased if you have dependent children, starting when your first child is born.</p>"
+      description: "<p>The year that your oldest child was born or is expected or speculated to be born.</p><p>Your income tax band limits are increased if you have dependent children, starting when your first child is born.</p>"
       side: "right"
       align: "start"
 
   - element: "#YoungestChildBorn"
     popover:
-      description: "<p>Enter the year that your youngest child was born or is expected or speculated to be born.</p><p>The increased income tax band limits for dependent children go on until your youngest child is over 18.</p>"
+      description: "<p>The year that your youngest child was born or is expected or speculated to be born.</p><p>The increased income tax band limits for dependent children go on until your youngest child is over 18.</p>"
       side: "right"
       align: "start"
 
   - element: "#PersonalTaxCredit"
     popover:
-      description: "<p>Enter the amount of personal tax credit you are entitled to according to your personal circumstances (widow, carer, etc).</p><p>This is the amount of tax credit you get for yourself, before factoring in any dependent children (refer to [this revenue page](https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx)).</p>"
+      description: "<p>The amount of personal tax credit you are entitled to according to your personal circumstances (widow, carer, etc).</p><p>This is the amount of tax credit you get for yourself, before factoring in any dependent children (refer to [this revenue page](https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx)).</p>"
       side: "right"
       align: "start"
 
@@ -201,11 +201,11 @@ steps:
       side: "right"
       align: "start"
 
-  - element: "#Events"
+  - element: ".events-section"
     popover:
       description: "<p>Here you can add, remove, and edit the events that make up your scenario.</p>"
-      side: "bottom"
-      align: "start"
+      side: "top"
+      align: "center"
 
 
 ###########################################################
@@ -299,7 +299,7 @@ steps:
 
   - element: "#EventName"
     popover:
-      description: "<p>Enter the name of the event.</p><p>In most cases you can enter any name you want. It's just for your reference. But in some cases, like for the 'Mortgage' event, it will be used to match the corresponding 'Real Estate' event, so they must have the same name.</p>"
+      description: "<p>The name of the event.</p><p>In most cases you can enter any name you want. It's just for your reference. But in some cases, like for the 'Mortgage' event, it will be used to match the corresponding 'Real Estate' event, so they must have the same name.</p>"
       side: "bottom"
       align: "center"
 
@@ -313,70 +313,70 @@ steps:
   - element: "#EventName"
     eventTypes: ["RI"]
     popover:
-      description: "<p><p>Enter the name of the event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p><p>The name of the event.</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["SI"]
     popover:
-      description: "<p>Enter the name of the salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of the salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>Enter the name of the salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of the salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["UI"]
     popover:
-      description: "<p>Enter the name of the RSU income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of the RSU income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["DBI"]
     popover:
-      description: "<p>Enter the name of the Defined Benefit income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of the Defined Benefit income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["FI"]
     popover:
-      description: "<p>Enter the name of the tax free income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of the tax free income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["E"]
     popover:
-      description: "<p>Enter the name of the Expense event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of the Expense event.</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["SM"]
     popover:
-      description: "<p>Enter the name of the Stock Market event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of the Stock Market event.</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["R"]
     popover:
-      description: "<p>Enter the name of the Real Estate event.</p><p>You can enter any name you want, but if it's bought with a mortgage, the corresponding 'Mortgage' event must have the same name.</p>"
+      description: "<p>The name of the Real Estate event.</p><p>You can enter any name you want, but if it's bought with a mortgage, the corresponding 'Mortgage' event must have the same name.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["M"]
     popover:
-      description: "<p>Enter the name of the mortgage event.</p><p>The name must match the name of the corresponding Real Estate event.</p>"
+      description: "<p>The name of the mortgage event.</p><p>The name must match the name of the corresponding Real Estate event.</p>"
       side: "bottom"
       align: "center"
 
@@ -386,7 +386,7 @@ steps:
 
   - element: "#EventAmount"
     popover:
-      description: "<p>Enter the yearly amount for the event</p><p>For 'Real Estate' events, enter the down payment. For 'Mortgage' events, enter the amount you will repay each year. For 'Stock' events, you don't enter anything here.</p>"
+      description: "<p>The yearly amount for the event</p><p>For 'Real Estate' events, enter the down payment. For 'Mortgage' events, enter the amount you will repay each year. For 'Stock' events, you don't enter anything here.</p>"
       side: "bottom"
       align: "center"
 
@@ -400,56 +400,56 @@ steps:
   - element: "#EventAmount"
     eventTypes: ["RI"]
     popover:
-      description: "<p>Enter the present value of the gross yearly income from the rental property or other non-PAYE income.</p>"
+      description: "<p>The present value of the gross yearly income from the rental property or other non-PAYE income.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventAmount"
     eventTypes: ["SI"]
     popover:
-      description: "<p>Enter the present value of the gross yearly salary income.</p>"
+      description: "<p>The present value of the gross yearly salary income.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventAmount"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>Enter the present value of the gross yearly salary income.</p>"
+      description: "<p>The present value of the gross yearly salary income.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventAmount"
     eventTypes: ["UI"]
     popover:
-      description: "<p>Enter the present value of the gross yearly income from Restricted Stock Units.</p>"
+      description: "<p>The present value of the gross yearly income from Restricted Stock Units.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventAmount"
     eventTypes: ["DBI"]
     popover:
-      description: "<p>Enter the present value of the gross yearly income from the Defined Benefit pension scheme.</p>"
+      description: "<p>The present value of the gross yearly income from the Defined Benefit pension scheme.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventAmount"
     eventTypes: ["FI"]
     popover:
-      description: "<p>Enter the present value of the gross yearly income from a tax free income.</p>"
+      description: "<p>The present value of the gross yearly income from a tax free income.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventAmount"
     eventTypes: ["E"]
     popover:
-      description: "<p>Enter the present value of the yearly expense.</p>"
+      description: "<p>The present value of the yearly expense.</p>"
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAmount"
     eventTypes: ["SM"]
     popover:
-      description: "<p>Stock Market events use the Rate field to indicate the percentage change in the stock market, not the Amount field.</p>"
+      description: "<p>This field is ignored.</p><p>Stock Market events use the Rate field to indicate the percentage change in the stock market, not the Amount field.</p>"
       side: "bottom"
       align: "center"
 
@@ -457,14 +457,14 @@ steps:
   - element: "#EventAmount"
     eventTypes: ["R"]
     popover:
-      description: "<p>Enter the present value of the down payment for the real estate property.</p><p>If the property is bought without a mortgage, enter the full purchase price here.</p>"
+      description: "<p>The present value of the down payment for the real estate property.</p><p>If the property is bought without a mortgage, enter the full purchase price here.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventAmount"
     eventTypes: ["M"]
     popover:
-      description: "<p>Enter the present value of the yearly amount you will repay on the mortgage.</p><p>You can get this number from a mortgage calculator like [this one](https://www.mortgages.ie/go/first_time_buyers/mortgage_payments_calculator) and multiplying the monthly repayment by 12.</p>"
+      description: "<p>The present value of the yearly amount you will repay on the mortgage.</p><p>You can get this number from a [mortgage calculator](https://www.mortgages.ie/go/first_time_buyers/mortgage_payments_calculator) and multiplying the monthly repayment by 12.</p>"
       side: "bottom"
       align: "center"
 
@@ -473,7 +473,7 @@ steps:
 
   - element: "#EventFromAge"
     popover:
-      description: "<p>Enter the age at which the event starts.</p>"
+      description: "<p>The age at which the event starts.</p>"
       side: "bottom"
       align: "center"
 
@@ -487,70 +487,70 @@ steps:
   - element: "#EventFromAge"
     eventTypes: ["RI"]
     popover:
-      description: "<p>Enter the age at which the rental income event starts.</p>"
+      description: "<p>The age at which the income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["SI"]
     popover:
-      description: "<p>Enter the age at which the salary income event starts.</p>"
+      description: "<p>The age at which the salary income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>Enter the age at which the salary income event starts.</p>"
+      description: "<p>The age at which the salary income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["UI"]
     popover:
-      description: "<p>Enter the age at which the RSU income event starts.</p>"
+      description: "<p>The age at which the RSU income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["DBI"]
     popover:
-      description: "<p>Enter the age at which the Defined Benefit income event starts.</p>"
+      description: "<p>The age at which the Defined Benefit income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["FI"]
     popover:
-      description: "<p>Enter the age at which the tax free income event starts.</p>"
+      description: "<p>The age at which the tax free income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["E"]
     popover:
-      description: "<p>Enter the age at which the expense event starts.</p>"
+      description: "<p>The age at which the expense event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["SM"]
     popover:
-      description: "<p>Enter the age at which the stock market event starts.</p>"
+      description: "<p>The age at which the stock market event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["R"]
     popover:
-      description: "<p>Enter the age at which the property is bought.</p>"
+      description: "<p>The age at which the property is bought.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["M"]
     popover:
-      description: "<p>Enter the age at which the mortgage starts. It must match the age of the corresponding Rental Property event.</p>"
+      description: "<p>The age at which the mortgage starts. It must match the age of the corresponding Rental Property event.</p>"
       side: "bottom"
       align: "center"
 
@@ -559,7 +559,7 @@ steps:
 
   - element: "#EventToAge"
     popover:
-      description: "<p>Enter the age after which the event ends.</p>"
+      description: "<p>The age up to and including which the event continues.</p>"
       side: "bottom"
       align: "center"
 
@@ -573,70 +573,70 @@ steps:
   - element: "#EventToAge"
     eventTypes: ["RI"]
     popover:
-      description: "<p>Enter the age up to which the rental income continues.</p>"
+      description: "<p>The age up to and including which the rental income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["SI"]
     popover:
-      description: "<p>Enter the age up to which the salary income continues.</p>"
+      description: "<p>The age up to and including which the salary income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>Enter the age up to which the salary income continues.</p>"
+      description: "<p>The age up to and including which the salary income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["UI"]
     popover:
-      description: "<p>Enter the age up to which the RSU income continues.</p>"
+      description: "<p>The age up to and including which the RSU income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["DBI"]
     popover:
-      description: "<p>Enter the age up to which the Defined Benefit income continues.</p>"
+      description: "<p>The age up to and including which the Defined Benefit income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["FI"]
     popover:
-      description: "<p>Enter the age up to which the tax free income continues.</p>"
+      description: "<p>The age up to and including which the tax free income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["E"]
     popover:
-      description: "<p>Enter the age up to which the expense continues.</p>"
+      description: "<p>The age up to and including which the expense is incurred.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["SM"]
     popover:
-      description: "<p>Enter the age up to which the stock market event continues.</p>"
+      description: "<p>The age up to and including which the stock market event continues.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["R"]
     popover:
-      description: "<p>Enter the age up to which the property is held. The total value of the property will be computed including mortgage repayments plus the expected appreciation and it will be sold after the age you enter here. The proceeds will be invested according to your chosen allocation</p>"
+      description: "<p>The age up to and including which the property is held.</p><p>The total value of the property will be computed including mortgage repayments plus the expected appreciation and it will be sold after the age you enter here. The proceeds will be invested according to your chosen allocation</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["M"]
     popover:
-      description: "<p>Enter the age up to which the mortgage continues. It can't be later than when the corresponding property is sold.</p>"
+      description: "<p>The age up to and including which the mortgage is repaid. It can't be later than when the corresponding property is sold.</p>"
       side: "bottom"
       align: "center"
 
@@ -645,7 +645,7 @@ steps:
 
   - element: "#EventRate"
     popover:
-      description: "<p>Enter the expected average annual growth rate of the event.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p><p>For 'Stock Market' events, enter the expected average annual growth rate of the stock market. This will replace all the growth rates you entered in the 'Economy' panel for the period you specified. For example, if you enter 10% here, all investments will grow 10% in that period (this is prorated over the whole period). If you enter a negative number, it means that the stock market will crash by that much in that period.</p>"
+      description: "<p>The expected average annual growth rate of the event.</p><p>If you leave it blank, it will use the inflation rate.</p><p>For 'Stock Market' events, enter the change rate of the stock market over the full period you specified. This will replace all the growth rates you entered in the 'Economy' panel for that period. For example, if you enter -30% starting at age 40 and ending at 42, all investments will fall around 11.2% each one of those three years (compounding).</p>"
       side: "bottom"
       align: "center"
 
@@ -659,70 +659,70 @@ steps:
   - element: "#EventRate"
     eventTypes: ["RI"]
     popover:
-      description: "<p>Enter the expected average annual growth rate of the rental income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      description: "<p>The expected average annual growth rate of the rental income.</p><p>If you leave it blank, it will use the inflation rate.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventRate"
     eventTypes: ["SI"]
     popover:
-      description: "<p>Enter the expected average annual growth rate of the salary income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      description: "<p>The expected average annual growth rate of the salary income.</p><p>If you leave it blank, it will use the inflation rate.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventRate"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>Enter the expected average annual growth rate of the salary income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      description: "<p>The expected average annual growth rate of the salary income.</p><p>If you leave it blank, it will use the inflation rate.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventRate"
     eventTypes: ["UI"]
     popover:
-      description: "<p>Enter the expected average annual growth rate of the RSU income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      description: "<p>The expected average annual growth rate of the RSU income.</p><p>If you leave it blank, it will use the inflation rate.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventRate"
     eventTypes: ["DBI"]
     popover:
-      description: "<p>Enter the expected average annual growth rate of the Defined Benefit income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      description: "<p>The expected average annual growth rate of the Defined Benefit income.</p><p>If you leave it blank, it will use the inflation rate.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventRate"
     eventTypes: ["FI"]
     popover:
-      description: "<p>Enter the expected average annual growth rate of the tax free income.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      description: "<p>The expected average annual growth rate of the tax free income.</p><p>If you leave it blank, it will use the inflation rate.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventRate"
     eventTypes: ["E"]
     popover:
-      description: "<p>Enter the expected average annual growth rate of the expense.</p><p>If you leave it blank, it will be assumed to be the same as the inflation rate.</p>"
+      description: "<p>The expected average annual growth rate of the expense.</p><p>If you leave it blank, it will use the inflation rate.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventRate"
     eventTypes: ["SM"]
     popover:
-      description: "<p>Enter the total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate a 2000-style crash when you're 40, you'd enter -50% as the amount, 40 as the starting age, and 41 as the ending age. This will override the the market growth you specified in the parameters (for Pension, ETFs, and Trusts) with a 25% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p>"
+      description: "<p>The total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate an S&P500 dot-com crash when you're 40, you'd enter -49% as the amount, 40 as the starting age, and 41 as the ending age. This will override the the market growth you specified in the parameters (for Pension, ETFs, and Trusts) with a ~28.6% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventRate"
     eventTypes: ["R"]
     popover:
-      description: "<p>Enter the expected yearly rate of appreciation of the property.</p><p>For properties bought in the past, you can calculate the appreciation using the the original purchase price and the current market value.</p>"
+      description: "<p>The expected yearly rate of appreciation of the property.</p><p>For properties bought in the past, you can calculate the appreciation using the the original purchase price and the current market value.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventRate"
     eventTypes: ["M"]
     popover:
-      description: "<p>Enter the mortgage loan rate.</p>"
+      description: "<p>The mortgage loan rate.</p>"
       side: "bottom"
       align: "center"
 
@@ -752,7 +752,7 @@ steps:
   - element: "#EventMatch"
     eventTypes: ["SI"]
     popover:
-      description: "<p>Enter the percentage up to which your employer will match your private pension contributions.</p><p>Many employers match contributions up to a certain percentage of your salary. If you contribute less than that, your employer will only match up to that amount. If your employer doesn't offer this, leave it blank or enter 0.</p>"
+      description: "<p>The percentage up to which your employer will match your private pension contributions.</p><p>Many employers match contributions up to a certain percentage of your salary. If you contribute less than that, your employer will only match up to that amount. If your employer doesn't offer this, leave it blank or enter 0.</p>"
       side: "bottom"
       align: "center"
 
@@ -823,7 +823,13 @@ steps:
 
   - element: "#progress"
     popover:
-      description: "<p>The outcome of the simulation will be shown here.</p>"
+      description: "<p>The outcome of the simulation will be shown here.</p><p>If you specified zero volatility in all investment vehicles, this will show either 'Success' or the age at which you ran out of money. If you specified some volatility, it will show the probability of success of your scenario.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#startWizard"
+    popover:
+      description: "<p>You can get help with any field by pressing the Help button or the ? key.</p>"
       side: "bottom"
       align: "center"
 
@@ -851,7 +857,7 @@ steps:
       side: "top"
       align: "center"
 
-  - element: "#Data"
+  - element: ".data-section"
     popover:
       description: "<p>Here you will see the actual numbers as they are computed by the simulator, year by year, from your current age to the target age.</p><p>The columns are mostly self-explanatory. The cash column under income may raise some eyebrows: it shows withdrawals from cash savings to cover expenses when the net income is not enough.</p>"
       side: "top"

@@ -251,7 +251,7 @@ function processEvents() {
 
       case 'SM': // Stock Market Growth override to simulate bull or bear markets
         if (age == event.fromAge) {
-          stockGrowthOverride = event.rate / (event.toAge - event.fromAge + 1);
+          stockGrowthOverride = Math.pow(1 + event.rate, 1 / (event.toAge - event.fromAge + 1)) - 1;
         }
         if (age === event.toAge + 1) {
           stockGrowthOverride = undefined;
