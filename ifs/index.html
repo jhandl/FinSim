@@ -10,10 +10,10 @@
     <link rel="icon" type="image/x-icon" href="IFS.ico">
     <link rel="stylesheet" href="css/simulator.css">
     <!-- <link rel="stylesheet" href="css/layout-debugger.css"> --> 
-    <link rel="stylesheet" href="driver.css"/>
-    <script src="driver.js"></script>
-    <script src="js-yaml.min.js"></script>
-    <script src="chart.js"></script>
+    <link rel="stylesheet" href="libs/driver.css"/>
+    <script src="libs/driver.js"></script>
+    <script src="libs/js-yaml.min.js"></script>
+    <script src="libs/chart.js"></script>
 </head>
 <body>
     <header>
@@ -289,21 +289,29 @@
     </main>
 
     <footer>
-        <a class="footer-link" href="#userManual" id="userManual">User Manual</a>
-        <a class="footer-link" href="#versionHistory" id="versionHistory">Version History</a>
-        <a class="footer-link" href="https://docs.google.com/spreadsheets/d/1aPClS0_Fi4x14zIkQORALhZeFEeWw611Z-rrXYvy5Ko/edit?pli=1&gid=0#gid=0" target="_blank" rel="noopener noreferrer">Google Sheet version</a>
+        <a class="footer-link" href="javascript:void(0)" id="userManual">User Manual</a>
+        <a class="footer-link" href="javascript:void(0)" id="versionHistory">Version History</a>
+        <a class="footer-link" href="https://docs.google.com/spreadsheets/d/1aPClS0_Fi4x14zIkQORALhZeFEeWw611Z-rrXYvy5Ko/edit?pli=1&gid=0#gid=0" target="_blank" rel="noopener noreferrer">Google Sheet</a>
     </footer>
 
-    <script src="../src/Config.js"></script>
-    <script src="../src/Events.js"></script>
-    <script src="../src/Revenue.js"></script>
-    <script src="../src/Equities.js"></script>
-    <script src="../src/RealEstate.js"></script>
-    <script src="../src/Utils.js"></script>
-    <script src="../src/AbstractUI.js"></script>
-    <script src="../src/Wizard.js"></script>
-    <script src="../src/UIManager.js"></script>
-    <script src="../src/WebUI.js"></script>
-    <script src="../src/Simulator.js"></script>
+    <script src="../src/frontend/AbstractUI.js"></script>
+    <script src="../src/frontend/UIManager.js"></script>
+    <script src="../src/frontend/web/utils/DOMUtils.js"></script>
+    <script src="../src/frontend/web/utils/FormatUtils.js"></script>
+    <script src="../src/frontend/web/utils/NotificationUtils.js"></script>
+    <script src="../src/frontend/web/components/TableManager.js"></script>
+    <script src="../src/frontend/web/components/EventsTableManager.js"></script>
+    <script src="../src/frontend/web/components/ChartManager.js"></script>
+    <script src="../src/frontend/web/components/FileManager.js"></script>
+    <script src="../src/frontend/web/components/DragAndDrop.js"></script>
+    <script src="../src/frontend/web/components/Wizard.js"></script>
+    <script src="../src/frontend/web/WebUI.js"></script>
+    <script src="../src/core/Config.js"></script>
+    <script src="../src/core/Events.js"></script>
+    <script src="../src/core/Revenue.js"></script>
+    <script src="../src/core/Equities.js"></script>
+    <script src="../src/core/RealEstate.js"></script>
+    <script src="../src/core/Utils.js"></script>
+    <script src="../src/core/Simulator.js"></script>
 </body>
 </html> 

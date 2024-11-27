@@ -2,7 +2,7 @@
 
 ## Version 2
 - Add a step function to represent government's delayed updates
-- Review pension types and minimum retirement ages (ChatGPT chat “Pension Types in Ireland”) 
+- Review pension types and minimum retirement ages (ChatGPT “Pension Types in Ireland”) 
 - Add a way to view and override config settings (like DD)
 - Add a link to FinSim.ie in the spreadsheet
 - Add ability to fetch data from the web / google sheets
@@ -10,7 +10,6 @@
 
 
 ## Version 3
-- Add a chat box - Intercom?
 - Make things more generic so they apply to different systems
 - Add dividends and their tax
 - Add countries and a way to select a country
@@ -21,5 +20,5 @@
 - Add crypto because the laws in each country can be different for that
 - Add some way to limit the basic features and create a paywall for the rest
 - Integrate with payments provider
-- Dark mode
+- Add a chat box - Intercom?
 

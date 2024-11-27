@@ -1,5 +1,14 @@
 /* This file has to work on both the website and Google Sheets */
 
+STATUS_COLORS = {
+  ERROR: "#ff8080",
+  WARNING: "#ffe066",
+  SUCCESS: "#9fdf9f",
+  INFO: "#E0E0E0",
+  WHITE: "#FFFFFF"
+};
+
+
 class UIManager {
 
   constructor(ui) {
@@ -13,6 +22,7 @@ class UIManager {
       }
     }
     this.ui.clearExtraDataRows(params.targetAge);
+    this.ui.clearExtraChartRows(params.targetAge);
   }
 
   updateProgress(msg) {

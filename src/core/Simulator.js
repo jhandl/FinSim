@@ -29,7 +29,7 @@ function run() {
 
 function initializeUI() {
   if (typeof SpreadsheetApp !== 'undefined') {
-    uiManager = new UIManager(GoogleSheetsUI.getInstance());
+    uiManager = new UIManager(GasUI.getInstance());
   } else {
     uiManager = new UIManager(WebUI.getInstance());
   }
@@ -307,7 +307,7 @@ function handleInvestments() {
 
   // If extra cash, invest
   let invested = 0;
-  if ((cash > targetCash + 0.001) && (incomeSalaries > 0)) {
+  if (cash > targetCash + 0.001) {
     let surplus = cash - targetCash;
     etf.buy(surplus * params.etfAllocation);
     trust.buy(surplus * params.trustAllocation);

@@ -10,10 +10,6 @@ class AbstractUI {
     throw new Error("Method 'getInstance' must be implemented");
   }
 
-  initialize() {
-    throw new Error("Method 'initialize' must be implemented");
-  }
-
   getValue(elementId) {
     throw new Error("Method 'getValue' must be implemented");
   }
@@ -48,10 +44,6 @@ class AbstractUI {
 
   setBackground(elementId, color) {
     throw new Error("Method 'setBackground' must be implemented");
-  }
-
-  onEdit(callback) {
-    throw new Error("Method 'onEdit' must be implemented");
   }
 
   flush() {
@@ -104,6 +96,10 @@ class AbstractUI {
 
   isPercentage(elementId) {
     throw new Error("Method 'isPercentage' must be implemented");
+  }
+
+  isBoolean(elementId) {
+    throw new Error("Method 'isBoolean' must be implemented");
   }
 
   saveToFile() {

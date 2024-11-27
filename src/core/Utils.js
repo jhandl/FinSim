@@ -1,13 +1,5 @@
 /* This file has to work on both the website and Google Sheets */
 
-STATUS_COLORS = {
-  ERROR: "#ff8080",
-  WARNING: "#ffe066",
-  SUCCESS: "#9fdf9f",
-  INFO: "#E0E0E0",
-  WHITE: "#FFFFFF"
-};
-
 // This function assumes fixed rate. If the rate varies each year, the adjustment needs to take into account
 // the history of variation, or it needs to take the previous value (not the start value) and apply the latest 
 // rate once. Either case would require a rewrite of several parts of the simulator. 
@@ -77,11 +69,9 @@ function serializeSimulation(ui) {
     // Format special values (percentages and booleans)
     for (const [key, value] of Object.entries(parameters)) {
         if (ui.isPercentage(key)) {
-            // Round to 4 decimal places before converting to percentage string
-            const roundedValue = Math.round(value * 10000) / 100;
-            parameters[key] = roundedValue + '%';
+            parameters[key] = FormatUtils.formatPercentage(Math.round(value * 10000) / 10000);
         } else if (ui.isBoolean(key)) {
-            parameters[key] = value ? 'Yes' : 'No';
+            parameters[key] = FormatUtils.formatBoolean(value);
         }
     }
 
@@ -160,5 +150,5 @@ function getRateForKey(key, rateBands) {
         return rateBands[bandKey];
     }
   }
-  return rateBands[bandKeys[0]]; // Return lowest age band rate as fallback
+  return rateBands[bandKeys[0]];
 }
