@@ -193,6 +193,20 @@ class WebUI extends AbstractUI {
     this.chartManager.clearExtraChartRows(maxAge);
   }
 
+  setScenarioName(name) {
+    const scenarioSpan = document.querySelector('.scenario-name');
+    if (scenarioSpan) {
+        scenarioSpan.textContent = name;
+    }
+  }
+
+  clearScenarioName() {
+    const scenarioSpan = document.querySelector('.scenario-name');
+    if (scenarioSpan) {
+        scenarioSpan.textContent = '';
+    }
+  }
+
   flush() {
     // No-op in web UI as changes are immediate
   }

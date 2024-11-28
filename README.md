@@ -2,7 +2,6 @@
 
 
 ## Version 2
-- Show the name of the loaded / saved scenario
 - Add a step function to represent government's delayed updates
 - Review pension types and minimum retirement ages (ChatGPT “Pension Types in Ireland”) 
 - Add a way to view and override config settings (like DD)

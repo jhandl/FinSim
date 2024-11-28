@@ -27,11 +27,13 @@ class FileManager {
 
   async saveToFile() {
     const csvContent = serializeSimulation(this.webUI);
+    const currentScenarioName = document.querySelector('.scenario-name')?.textContent || 'my scenario';
+    const suggestedName = `${currentScenarioName.trim()}.csv`;
 
     if ('showSaveFilePicker' in window) {
       try {
         const handle = await window.showSaveFilePicker({
-          suggestedName: 'scenario.csv',
+          suggestedName: suggestedName,
           types: [{
             description: 'CSV Files',
             accept: {
@@ -40,15 +42,16 @@ class FileManager {
           }],
         });
         
+        const scenarioName = handle.name.replace('.csv', '');
+        this.webUI.setScenarioName(scenarioName);
+        
         const writable = await handle.createWritable();
         await writable.write(csvContent);
         await writable.close();
       } catch (err) {
         if (err.name === 'AbortError') {
-          // User clicked Cancel, do nothing
           return;
         }
-        // Some other error occurred
         this.webUI.notificationUtils.showAlert('Error saving file: ' + err.message);
       }
     } else {
@@ -57,7 +60,7 @@ class FileManager {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'scenario.csv';
+      a.download = suggestedName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -67,6 +70,9 @@ class FileManager {
 
   async loadFromFile(file) {
     if (!file) return;
+
+    const scenarioName = file.name.replace('.csv', '');
+    this.webUI.setScenarioName(scenarioName);
 
     this.webUI.tableManager.clearContent('Events');
     this.webUI.tableManager.clearExtraDataRows(0);

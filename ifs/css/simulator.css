@@ -697,3 +697,19 @@ footer {
     z-index: 1000;
 }
 
+.scenario-name {
+    font-size: 1.3rem;
+    font-weight: bold;
+    margin-right: 10px;
+    color: #666;
+}
+
+.scenario-name:not(:empty)::before {
+  content: "Scenario: \"";
+}
+
+
+.scenario-name:not(:empty)::after {
+    content: "\"";
+}
+
