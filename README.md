@@ -1,12 +1,16 @@
 # Roadmap
 
+
 ## Version 2
+- Show the name of the loaded / saved scenario
 - Add a step function to represent government's delayed updates
 - Review pension types and minimum retirement ages (ChatGPT “Pension Types in Ireland”) 
 - Add a way to view and override config settings (like DD)
 - Add a link to FinSim.ie in the spreadsheet
 - Add ability to fetch data from the web / google sheets
 - Add references to the claims about the S&P500 stats (https://chatgpt.com/share/67465c37-0c00-8004-bf40-1c6b01ef523f)
+- Produce a log of what happened over the years (bought "cuba", sold ETF for $x, couldn't cover expenses, etc)
+- Analyse the log with LLM to produce a summary of what happened and maybe some recommendations
 
 
 ## Version 3

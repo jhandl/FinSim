@@ -70,8 +70,9 @@ class FileManager {
 
     this.webUI.tableManager.clearContent('Events');
     this.webUI.tableManager.clearExtraDataRows(0);
+    this.webUI.chartManager.clearExtraChartRows(0);
 
-    // try {
+     try {
       const content = await file.text();
       const eventData = deserializeSimulation(content, this.webUI);
       
@@ -119,11 +120,11 @@ class FileManager {
         this.webUI.formatUtils.setupPercentageInputs();
       }
 
-    // } catch (error) {
-    //   console.log("error loading file: " + error);
-    //   this.webUI.notificationUtils.showAlert('Error loading file: Please make sure this is a valid simulation save file.');
-    //   return;
-    // }
+    } catch (error) {
+      console.log("error loading file: " + error);
+      this.webUI.notificationUtils.showAlert('Error loading file: Please make sure this is a valid simulation save file.');
+      return;
+    }
     this.webUI.setStatus("Ready");
   }
 
