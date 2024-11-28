@@ -113,7 +113,7 @@ steps:
 
   - element: "#growthRates"
     popover:
-      description: "<p>Here is where you speculate how the economy will do on average in the future.</p><p>You may want to enter conservative numbers to stress test your scenario. For reference, the average annual growth rate of the S&P500 over its lifetime has been around 10% in US dollars (not adjusted for inflation and not including fees).</p><p>If you enter volatility numbers larger than zero, I will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp) using these numbers to calculate the probability of success of your scenario.</p>"
+      description: "<p>Here is where you speculate how the economy will do on average in the future.</p><p>You may want to enter conservative numbers to stress test your scenario. For reference, the average annual growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur) in US dollars (not adjusted for inflation and not including fees).</p><p>If you enter volatility numbers larger than zero, I will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp) using these numbers to calculate the probability of success of your scenario.</p>"
       side: "right"
       align: "start"
 
@@ -131,13 +131,13 @@ steps:
 
   - element: "#EtfGrowthRate"
     popover:
-      description: "<p>This is the expected average annual growth rate of your ETFs, not adjusted for inflation.</p><p>For reference, the average growth rate of the S&P500 over its lifetime has been around 10%.</p>"
+      description: "<p>This is the expected average annual growth rate of your ETFs, not adjusted for inflation.</p><p>For reference, the average growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
       side: "right"
       align: "start"
 
   - element: "#EtfGrowthStdDev"
     popover:
-      description: "<p>This is the expected standard deviation of the annual growth rate of your ETFs.</p><p>For reference, the average volatility of the S&P500 over its lifetime (including bull markets and crashes) has been around 15%.</p>"
+      description: "<p>This is the expected standard deviation of the annual growth rate of your ETFs.</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
       side: "right"
       align: "start"
 
@@ -149,13 +149,13 @@ steps:
 
   - element: "#TrustGrowthStdDev"
     popover:
-      description: "<p>This is the expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>For reference, the average volatility of the S&P500 over its lifetime (including bull markets and crashes) has been around 15%.</p>"
+      description: "<p>This is the expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
       side: "right"
       align: "start"
 
   - element: "#Inflation"
     popover:
-      description: "<p>This is the expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of around 2%. However, deviations due to shocks (e.g., pandemics, wars, etc) can cause deviations that are skewed towards higher numbers. For example, in 2022 inflation was 7.8%, the highest since 1984. In contrast, by October 2024 it had decreased to 0.7%.</p>"
+      description: "<p>This is the expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of around 2%. However, deviations due to shocks (e.g., pandemics, wars, etc) can cause deviations that are skewed towards higher numbers. For example, [in 2019 inflation in Ireland was 1.3%](https://www.cso.ie/en/releasesandpublications/er/cpi/consumerpriceindexdecember2019/), lower than its [30-year average of 2.3%](https://www.officialdata.org/ireland/inflation/1993?endYear=2024&amount=100). In contrast, [in 2022 it rose to 8.2%](https://www.cso.ie/en/releasesandpublications/ep/p-cpi/consumerpriceindexdecember2022/), the highest since 1984.</p>"
       side: "right"
       align: "start"
 
@@ -708,7 +708,7 @@ steps:
   - element: "#EventRate"
     eventTypes: ["SM"]
     popover:
-      description: "<p>The total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate an S&P500 dot-com crash when you're 40, you'd enter -49% as the amount, 40 as the starting age, and 41 as the ending age. This will override the the market growth you specified in the parameters (for Pension, ETFs, and Trusts) with a ~28.6% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p>"
+      description: "<p>The total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate an S&P500 dot-com crash when you're 40, you'd enter -49% as the amount, 40 as the starting age, and 41 as the ending age. This will override the the market growth you specified in the parameters (for Pension, ETFs, and Trusts) with a ~28.6% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p><p>Keep in mind that high volatility values already imply bubbles and crashes.</p>"
       side: "bottom"
       align: "center"
 
