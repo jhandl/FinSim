@@ -221,7 +221,7 @@ class UIManager {
           }
         }
         if (!found) {
-          this.ui.setWarning(`Events[${m + 1},1]`, `Couldn't find a purchase (R) event for the property '${events[m].id}'.`);
+          this.ui.setWarning(`Events[${m + 1},1]`, `Couldn't find a purchase event for the property '${events[m].id}'.`);
           errors = true;
         }
       }
@@ -229,34 +229,12 @@ class UIManager {
   }
 
   validateEventFields(events) {
-    const requiredFields = {
-      'NOP': [],
-      'RI': ['name', 'amount', 'fromAge', 'toAge'],
-      'SI': ['name', 'amount', 'fromAge', 'toAge'],
-      'SInp': ['name', 'amount', 'fromAge', 'toAge'],
-      'UI': ['name', 'amount', 'fromAge', 'toAge'],
-      'DBI': ['name', 'amount', 'fromAge'],
-      'FI': ['name', 'amount', 'fromAge', 'toAge'],
-      'E': ['name', 'amount', 'fromAge', 'toAge'],
-      'R': ['name', 'amount', 'fromAge'],
-      'M': ['name', 'amount', 'fromAge', 'toAge', 'rate'],
-      'SM': ['name', 'fromAge', 'toAge', 'rate']
-    };
-
-    const columnIndices = {
-      'name': 1,
-      'amount': 2,
-      'fromAge': 3,
-      'toAge': 4,
-      'rate': 5
-    };
-
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
-      const required = requiredFields[event.type];
+      const required = UIManager.getRequiredFields(event.type);
       if (!required) continue;
 
-      required.forEach(field => {
+      UIManager.getFields().forEach(field => {
         let value = undefined;
         switch(field) {
           case 'name':
@@ -274,10 +252,13 @@ class UIManager {
           case 'rate':
             value = event.rate;
             break;
+          case 'match':
+            value = event.match;
+            break;
         }
 
-        if (value === undefined || value === '') {
-          this.ui.setWarning(`Events[${i + 1},${columnIndices[field]}]`, "Required field");
+        if (required[field] === 'required' && (value === undefined || value === '')) {
+          this.ui.setWarning(`Events[${i + 1},${UIManager.getIndexForField(field)}]`, "Required field");
           errors = true;
         }
       });
@@ -288,7 +269,6 @@ class UIManager {
           errors = true;
         }
       }
-
     }
   }
 
@@ -298,6 +278,44 @@ class UIManager {
 
   loadFromFile(file) {
     this.ui.loadFromFile(file);
+  }
+
+  static getFields() {
+    return ['name', 'amount', 'fromAge', 'toAge', 'rate', 'match'];
+  }
+
+  static getIndexForField(field) {
+    return {
+      'name': 1,
+      'amount': 2,
+      'fromAge': 3,
+      'toAge': 4,
+      'rate': 5,
+      'match': 6
+    }[field];
+  }
+
+  static getRequiredFields(eventType) {
+    // r=required, o=optional, -=hidden
+    const patterns = {
+      'NOP': 'oooooo',
+      'RI':  'rrrro-',
+      'SI':  'rrrroo',
+      'SInp':'rrrro-',
+      'UI':  'rrrro-',
+      'DBI': 'rrr-o-',
+      'FI':  'rrrro-',
+      'E':   'rrrro-',
+      'R':   'rrroo-',
+      'M':   'rrrrr-',
+      'SM':  'r-rrr-'
+    };
+    const fields = UIManager.getFields();
+    const pattern = patterns[eventType]?.split('') || [];
+    return Object.fromEntries(fields.map((field, i) => [
+      field,
+      pattern[i] === 'r' ? 'required' : pattern[i] === 'o' ? 'optional' : 'hidden'
+    ]));
   }
 
 } 

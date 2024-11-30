@@ -7,6 +7,7 @@ class EventsTableManager {
     this.eventRowCounter = 0;
     this.setupAddEventButton();
     this.setupEventTableRowDelete();
+    this.setupEventTypeChangeHandler();
   }
 
   setupAddEventButton() {
@@ -31,28 +32,39 @@ class EventsTableManager {
     }
   }
 
-  generateEventRowId() {
-      return `row_${++this.eventRowCounter}`;
+  setupEventTypeChangeHandler() {
+    const eventsTable = document.getElementById('Events');
+    if (eventsTable) {
+      eventsTable.addEventListener('change', (e) => {
+        if (e.target.classList.contains('event-type')) {
+          this.updateFieldVisibility(e.target);
+        }
+      });
+    }
   }
 
-  getEventTypeOptions(selectedType = '') {
-    const eventTypes = [
-      'NOP:No Operation',
-      'RI:Rental Income',
-      'SI:Salary Income',
-      'SInp:Salary (No Pension)',
-      'UI:RSU Income',
-      'DBI:Defined Benefit Income',
-      'FI:Tax-free Income',
-      'E:Expense',
-      'R:Real Estate',
-      'M:Mortgage',
-      'SM:Stock Market'
-    ];
-    return eventTypes.map(type => {
-      const [value, label] = type.split(':');
-      return `<option value="${value}" ${value === selectedType ? 'selected' : ''}>${label}</option>`;
-    }).join('');
+  updateFieldVisibility(typeSelect) {
+    const row = typeSelect.closest('tr');
+    const eventType = typeSelect.value;
+    const required = UIManager.getRequiredFields(eventType);
+    UIManager.getFields().forEach(field => {
+      const colIndex = UIManager.getIndexForField(field);
+      const cell = row.cells[colIndex];
+      if (cell) {
+        const input = cell.querySelector('input');
+        if (input) {
+          input.style.visibility = required[field] === 'hidden' ? 'hidden' : 'visible';
+        }
+      }
+    });
+    const rateInput = row.querySelector('.event-rate');
+    if (rateInput) {
+        rateInput.placeholder = (!required || !required.rate || required.rate === 'optional') ? 'inflation' : '';
+    }
+  }
+
+  generateEventRowId() {
+      return `row_${++this.eventRowCounter}`;
   }
 
   createEventRow(type = '', name = '', amount = '', fromAge = '', toAge = '', rate = '', match = '') {
@@ -89,6 +101,26 @@ class EventsTableManager {
 
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
+  }
+
+  getEventTypeOptions(selectedType = '') {
+    const eventTypes = [
+      'NOP:No Operation',
+      'RI:Rental Income',
+      'SI:Salary Income',
+      'SInp:Salary (No Pension)',
+      'UI:RSU Income',
+      'DBI:Defined Benefit Income',
+      'FI:Tax-free Income',
+      'E:Expense',
+      'R:Real Estate',
+      'M:Mortgage',
+      'SM:Stock Market'
+    ];
+    return eventTypes.map(type => {
+      const [value, label] = type.split(':');
+      return `<option value="${value}" ${value === selectedType ? 'selected' : ''}>${label}</option>`;
+    }).join('');
   }
 
 } 
