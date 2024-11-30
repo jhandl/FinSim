@@ -99,7 +99,7 @@ class TableManager {
       if (value !== undefined) {
         const td = document.createElement('td');
         if (key === 'Age' || key === 'Year') {
-          td.textContent = value.toLocaleString("en-IE", {style: 'decimal', maximumFractionDigits: 0});
+          td.textContent = value.toString();
         } else if (key === 'WithdrawalRate') {
           td.textContent = value.toLocaleString("en-IE", {style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2});
         } else {

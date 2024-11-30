@@ -1,13 +1,20 @@
 # Roadmap
 
+Feedback
+- Escala para ayudar a calcular el rate de sueldo
+- boton para decir "gasto de unica vez" sin tener que poner dos veces el mismo año (y sin rate)
+- Rate en el mortgage aparece como inflacion
+- Dar ejemplos de rate de real estate como hice con volatility
+    - Para eso estaría bueno fetchear los datos de algún sitio, asignarlos a config y usar una variable
+- Hide fields that are not used by an event type
 
 ## Version 2 - "Web version"
+- Add a link to an example in the main help page, that loads a file from github
 - Review pension types and minimum retirement ages (ChatGPT “Pension Types in Ireland”) 
 - Add a way to view and override config settings (like DD)
 - Add a link to FinSim.ie in the spreadsheet
 - Add ability to fetch data from the web / google sheets
 - Move the urls from the help yaml to the config file and use variables in the yaml
-
 
 ## Version 3 - "Modernize"
 - Move core (only premium features) to backend (initially my mac, then Google functions or AWS lambda), ideally with toggle to still run in the browser for dev.
@@ -15,6 +22,7 @@
 - Make things more generic so they apply to different systems
 
 ## Version 4 - "Complete"
+- Did I consider debt (other than mortgage)?
 - Add inflation volatility
 - Add dividends and their tax
 - Add a step function to represent government's delayed updates

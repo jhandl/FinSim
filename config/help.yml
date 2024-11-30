@@ -191,7 +191,7 @@ steps:
 
   - element: "#StatePensionWeekly"
     popover:
-      description: "<p>Enter your expected weekly state pension amount.</p><p>Given that different ways to calculate your state pension, refer to [this page](https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/) to find how to calculate yours.</p>"
+      description: "<p>Enter your expected weekly state pension amount.</p><p>There's different ways to calculate your state pension. Refer to [this page](https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/) to find how to calculate yours.</p>"
       side: "right"
       align: "start"
 
