@@ -266,27 +266,104 @@ class Wizard {
     const moveActions = {
       'Tab': (event) => event.shiftKey ? 'previous' : 'next',
       'ArrowRight': () => 'next',
-      'ArrowDown': () => 'next',
       'ArrowLeft': () => 'previous',
-      'ArrowUp': () => 'previous'
+      'ArrowUp': () => this.handleVerticalNavigation('up'),
+      'ArrowDown': () => this.handleVerticalNavigation('down')
     };
 
     const direction = moveActions[event.key]?.(event);
-    if (direction) {
+    if (direction !== undefined) {
       event.preventDefault();
-      const canMove = direction === 'next' 
-        ? this.tour.hasNextStep() 
-        : this.tour.hasPreviousStep();
-      
-      if (canMove) {
-        direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
-        const currentIndex = this.tour.getActiveIndex();
-        const currentElement = document.querySelector(this.validSteps[currentIndex].element);
-        if (currentElement) {
-          currentElement.focus();
+      if (direction === 'next' || direction === 'previous') {
+        const canMove = direction === 'next' 
+          ? this.tour.hasNextStep() 
+          : this.tour.hasPreviousStep();
+        
+        if (canMove) {
+          // Remove focus from the current field if it's an input or select
+          if (document.activeElement && document.activeElement.matches('input, select')) {
+            document.activeElement.blur();
+            this.lastFocusedField = null;
+          }
+          
+          direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
+          const currentIndex = this.tour.getActiveIndex();
+          const currentElement = document.querySelector(this.validSteps[currentIndex].element);
+          if (currentElement) {
+            currentElement.focus();
+          }
         }
       }
     }
+  }
+
+  handleVerticalNavigation(direction) {
+    if (this.lastFocusedField && this.lastFocusedField.matches('input, select')) {
+      const currentState = this.getEventTableState();
+      if (!currentState.isEmpty && currentState.focusedRow) {
+        const tbody = document.querySelector('#Events tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const currentRowIndex = rows.indexOf(currentState.focusedRow);
+        
+        let targetRow;
+        if (direction === 'up') {
+          if (currentRowIndex === 0) {
+            const tableStep = this.validSteps.findIndex(step => step.element === '.events-section');
+            if (tableStep >= 0) {
+              document.activeElement.blur();
+              this.lastFocusedField = null;
+              this.start(tableStep);
+              return null;
+            }
+          } else {
+            targetRow = rows[currentRowIndex - 1];
+          }
+        } else if (direction === 'down') {
+          if (currentRowIndex === rows.length - 1) {
+            // Find the first step after all table-related steps
+            const currentStep = this.tour.getActiveIndex();
+            const nextNonTableStep = this.validSteps.findIndex((step, index) => {
+              return index > currentStep && (!step.element || !step.element.includes('Event'));
+            });
+            if (nextNonTableStep >= 0) {
+              document.activeElement.blur();
+              this.lastFocusedField = null;
+              this.start(nextNonTableStep);
+              return null;
+            }
+          } else {
+            targetRow = rows[currentRowIndex + 1];
+          }
+        }
+
+        if (targetRow) {
+          const targetRowId = targetRow.dataset.rowId;
+          const currentField = this.lastFocusedField;
+          const currentFieldId = currentField.id;
+          const fieldType = currentFieldId.split('_')[0];
+          const targetField = targetRow.querySelector(`#${fieldType}_${targetRowId}`);
+          
+          if (targetField) {
+            targetField.focus();
+            // If the field is hidden, focus will not succeed, so focus the Event Type field instead
+            if (document.activeElement !== targetField) {
+              const eventTypeField = targetRow.querySelector(`#EventType_${targetRowId}`);
+              if (eventTypeField) {
+                eventTypeField.focus();
+                this.start(this.tour.getActiveIndex());
+                eventTypeField.blur();
+                return null;
+              }
+            } else {
+              this.start(this.tour.getActiveIndex());
+              return null;
+            }
+          }
+        }
+      }
+    }
+    console.log("returning default direction");
+    return direction === 'up' ? 'previous' : 'next';
   }
 
 }

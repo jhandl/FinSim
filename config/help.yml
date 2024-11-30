@@ -227,7 +227,7 @@ steps:
   - element: "#EventType"
     eventTypes: ["RI"]
     popover:
-      description: "<p>A gross income from a rental property or other non-PAYE income.</p>"
+      description: "<p>The gross income from a rental property or other non-PAYE income.</p>"
       side: "bottom"
       align: "center"
 
@@ -449,7 +449,7 @@ steps:
   - element: "#EventAmount"
     eventTypes: ["SM"]
     popover:
-      description: "<p>This field is ignored.</p><p>Stock Market events use the Rate field to indicate the percentage change in the stock market, not the Amount field.</p>"
+      description: "<p>Stock Market events don't use this field.</p>"
       side: "bottom"
       align: "center"
 
@@ -550,7 +550,7 @@ steps:
   - element: "#EventFromAge"
     eventTypes: ["M"]
     popover:
-      description: "<p>The age at which the mortgage starts. It must match the age of the corresponding Rental Property event.</p>"
+      description: "<p>The age at which the mortgage starts. It must match the 'from age' of the corresponding Rental Property event.</p>"
       side: "bottom"
       align: "center"
 
@@ -601,7 +601,7 @@ steps:
   - element: "#EventToAge"
     eventTypes: ["DBI"]
     popover:
-      description: "<p>The age up to and including which the Defined Benefit income is received.</p>"
+      description: "<p>The age up to and including which the Defined Benefit income is received. You can leave it blank if you don't plan to transfer it to another arrangement.</p>"
       side: "bottom"
       align: "center"
 
@@ -645,7 +645,7 @@ steps:
 
   - element: "#EventRate"
     popover:
-      description: "<p>The expected average annual growth rate of the event.</p><p>If you leave it blank, it will use the inflation rate.</p><p>For 'Stock Market' events, enter the change rate of the stock market over the full period you specified. This will replace all the growth rates you entered in the 'Economy' panel for that period. For example, if you enter -30% starting at age 40 and ending at 42, all investments will fall around 11.2% each one of those three years (compounding).</p>"
+      description: "<p>The expected average annual growth rate of the event.</p><p>If you leave it blank, it will use the inflation rate.</p><p>For 'Stock Market' events, enter the change rate of the stock market over the full period you specified. This will replace all the growth rates you entered in the 'Economy' panel for that period."
       side: "bottom"
       align: "center"
 
@@ -708,7 +708,7 @@ steps:
   - element: "#EventRate"
     eventTypes: ["SM"]
     popover:
-      description: "<p>The total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate an S&P500 dot-com crash when you're 40, you'd enter 40 as the starting age, and 41 as the ending age, and -40% as the rate. This will override the the market growth you specified in the economy parameters with a ~29% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p><p>Keep in mind that high volatility values already imply bubbles and crashes, but it's interesting to see what happens if the crash comes at the worst time, just as you're retiring.</p>"
+      description: "<p>The total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate an S&P500 dot-com crash when you're 40, you'd enter 40 as the starting age, and 41 as the ending age, and -40% as the rate. This will override the the market growth you specified in the economy parameters with a ~29% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p><p>Keep in mind that high volatility values already imply bubbles and crashes, but it's interesting to see what happens if the crash comes at the worst time, for example just as you retire.</p>"
       side: "bottom"
       align: "center"
 
@@ -722,7 +722,7 @@ steps:
   - element: "#EventRate"
     eventTypes: ["M"]
     popover:
-      description: "<p>The mortgage loan rate.</p>"
+      description: "<p>The mortgage loan rate.</p><p>You can get this number from a [mortgage calculator](https://www.mortgages.ie/go/first_time_buyers/mortgage_payments_calculator).</p>"
       side: "bottom"
       align: "center"
 
@@ -731,7 +731,7 @@ steps:
 
   - element: "#EventMatch"
     popover:
-      description: "<p>For Salary events, enter the percentage of your pension contributions that your employer will match.</p><p>Many employers match contributions up to a certain percentage of your salary. If you contribute less than that, your employer will only match up to that amount. If your employer doesn't offer this, leave it blank or enter 0.</p>"
+      description: "<p>For Salary events, enter the percentage of your pension contributions that your employer will match.</p><p>Many employers match contributions up to a certain percentage of your salary.</p>"
       side: "bottom"
       align: "center"
 

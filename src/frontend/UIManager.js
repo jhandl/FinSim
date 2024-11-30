@@ -303,7 +303,7 @@ class UIManager {
       'SI':  'rrrroo',
       'SInp':'rrrro-',
       'UI':  'rrrro-',
-      'DBI': 'rrr-o-',
+      'DBI': 'rrroo-',
       'FI':  'rrrro-',
       'E':   'rrrro-',
       'R':   'rrroo-',
