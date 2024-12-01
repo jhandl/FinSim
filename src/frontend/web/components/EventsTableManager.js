@@ -88,6 +88,9 @@ class EventsTableManager {
           <button class="delete-event" title="Delete event">×</button>
       </td>
     `;
+    if (type) {
+      this.updateFieldVisibility(row.querySelector(`#EventType_${rowId}`));
+    }
 
     return row;
   }

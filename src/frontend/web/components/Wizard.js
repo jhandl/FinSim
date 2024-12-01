@@ -362,7 +362,6 @@ class Wizard {
         }
       }
     }
-    console.log("returning default direction");
     return direction === 'up' ? 'previous' : 'next';
   }
 
