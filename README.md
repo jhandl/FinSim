@@ -56,6 +56,7 @@ Feedback
 - Add a way to have EA and GA so people can test before it goes out to everyone
 - Add campaigns to CIO to let people of a country know they have a new version to test (use API so it goes out as soon as the AI made changes)
 - Integrate with payments provider
+- Let people pledge to subscribe for adding a country. If enough people do it, add it, and they get a discount.
 - Implement a tiered model:
   - Free: Basic features (save to one file, 0% volatility deterministic runs, no crypto, no log, no analysis), limited to 1 country
   - Essential: All features, limited to 1 country
