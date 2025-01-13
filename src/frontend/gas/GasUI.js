@@ -1,8 +1,8 @@
 /* This file has to work only on Google Sheets */
 
-var GoogleSheetsUI_instance = null;
+var GasUI_instance = null;
 
-class GoogleSheetsUI extends AbstractUI {
+class GasUI extends AbstractUI {
 
   constructor() {
     super();
@@ -15,10 +15,10 @@ class GoogleSheetsUI extends AbstractUI {
 
   // Singleton
   static getInstance() {
-    if (!GoogleSheetsUI_instance) {
-      GoogleSheetsUI_instance = new GoogleSheetsUI();
+    if (!GasUI_instance) {
+      GasUI_instance = new GasUI();
     }
-    return GoogleSheetsUI_instance;
+    return GasUI_instance;
   }
 
   cacheNamedRanges() {
@@ -310,9 +310,13 @@ class GoogleSheetsUI extends AbstractUI {
     if (!dataRange) throw new Error("Data range not found");
 
     const dataHeight = dataRange.getHeight();
-    for (let i = maxAge + 1; i <= dataHeight; i++) {
-      const row = dataRange.getCell(i, 1).getEntireRow();
-      row.clearContent();
+    const rowsToKeep = maxAge - params.startingAge + 1; // +1 because we include both start and end ages
+    
+    if (rowsToKeep < dataHeight) {
+        const startRow = rowsToKeep + 1;  // Start clearing from the row after maxAge
+        const numRowsToClear = dataHeight - rowsToKeep;
+        const rangeToClear = dataRange.offset(startRow - 1, 0, numRowsToClear);
+        rangeToClear.clearContent();
     }
   }
 
