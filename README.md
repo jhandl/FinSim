@@ -28,6 +28,7 @@ Feedback
 - Add self-employed option, joint declaration, etc
 - Handle loss harvesting for trusts
 - Change input system to capture the details needed for things like personal tax credits, benefits, etc.
+- Show median age money ran out, 5 and 95% percentile.
 
 ## Version 5 - "Expand"
 - Enable sharing with scenario(s) included
