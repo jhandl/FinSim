@@ -1,5 +1,9 @@
 # Roadmap
 
+## Bugs
+- Increasing the current age or decreasing the target age causes the data table to keep the extra rows from previous simulations. We got rid of the problem when loading new data but now when the user changes those ages.
+
+
 Feedback
 - Escala para ayudar a calcular el rate de sueldo
 - boton para decir "gasto de unica vez" sin tener que poner dos veces el mismo año (y sin rate)
