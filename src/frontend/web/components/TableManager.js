@@ -119,15 +119,23 @@ class TableManager {
       return;
     }
     const dataRows = document.querySelectorAll('#Data tbody tr');
-    dataRows.forEach(row => {
+    let maxAgeRowIndex = -1;
+    dataRows.forEach((row, index) => {
       const ageCell = row.cells[ageColumnIndex];
       if (ageCell) {
         const age = parseInt(ageCell.textContent, 10);
-        if (age > maxAge) {
-          row.remove();
+        if (age === maxAge && maxAgeRowIndex === -1) {  // Find first occurrence
+          maxAgeRowIndex = index + 1;  // Save the index of the next row
         }
       }
     });
+    if (maxAgeRowIndex !== -1) {
+      // Remove all rows starting after the first maxAge row
+      for (let i = dataRows.length - 1; i >= maxAgeRowIndex; i--) {
+        console.log("Removing row: " + i);
+        dataRows[i].remove();
+      }
+    }
   }
 
 }

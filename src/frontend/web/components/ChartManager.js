@@ -283,25 +283,23 @@ class ChartManager {
 
   clearExtraChartRows(maxAge) {
     if (this.cashflowChart) {
-      this.cashflowChart.data.labels = this.cashflowChart.data.labels.filter((label, index) => {
-        return label <= maxAge;
-      });
-      this.cashflowChart.data.datasets.forEach(dataset => {
-        dataset.data = dataset.data.filter((_, index) => {
-          return this.cashflowChart.data.labels[index] !== undefined;
+      const maxAgeIndex = this.cashflowChart.data.labels.findIndex(label => label === maxAge);
+      if (maxAgeIndex !== -1) {
+        this.cashflowChart.data.labels = this.cashflowChart.data.labels.slice(0, maxAgeIndex + 1);
+        this.cashflowChart.data.datasets.forEach(dataset => {
+          dataset.data = dataset.data.slice(0, maxAgeIndex + 1);
         });
-      });
+      };
       this.cashflowChart.update();
     }
     if (this.assetsChart) {
-      this.assetsChart.data.labels = this.assetsChart.data.labels.filter((label, index) => {
-        return label <= maxAge;
-      });
-      this.assetsChart.data.datasets.forEach(dataset => {
-        dataset.data = dataset.data.filter((_, index) => {
-          return this.assetsChart.data.labels[index] !== undefined;
+      const maxAgeIndex = this.assetsChart.data.labels.findIndex(label => label === maxAge);
+      if (maxAgeIndex !== -1) {
+        this.assetsChart.data.labels = this.assetsChart.data.labels.slice(0, maxAgeIndex + 1);
+        this.assetsChart.data.datasets.forEach(dataset => {
+          dataset.data = dataset.data.slice(0, maxAgeIndex + 1);
         });
-      });
+      };
       this.assetsChart.update();
     }
   }
