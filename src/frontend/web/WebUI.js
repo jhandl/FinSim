@@ -146,23 +146,22 @@ class WebUI extends AbstractUI {
     if (!runButton) return;
 
     runButton.addEventListener('click', () => {
-      try {
-        runButton.disabled = true;
-        runButton.classList.add('disabled');
-        this.setStatus('Running...');
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            run();
-          });
-        });
-      } catch (error) {
-        console.error('Simulation failed:', error);
-        this.setStatus('Simulation failed: ' + error.message, STATUS_COLORS.ERROR);
-      } finally {
-        runButton.disabled = false;
-        runButton.classList.remove('disabled');
-      }
-
+      runButton.disabled = true;
+      runButton.classList.add('disabled');
+      this.setStatus('Running...');
+      
+      // Use setTimeout to run after UI updates
+      setTimeout(() => {
+        try {
+          run();
+        } catch (error) {
+          console.error('Simulation failed:', error);
+          this.setStatus('Simulation failed: ' + error.message, STATUS_COLORS.ERROR);
+        } finally {
+          runButton.disabled = false;
+          runButton.classList.remove('disabled');
+        }
+      }, 0);
     });
   }
 

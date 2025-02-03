@@ -10,26 +10,31 @@ Feedback
     - Para eso estaría bueno fetchear los datos de algún sitio, asignarlos a config y usar una variable
 
 ## Version 2 - "Web version"
+- Improve landing page.
+- Remove the "user manual" and use the Help button for that.
 - Add a link to an example in the main help page, that loads a file from github
 - Review pension types and minimum retirement ages (ChatGPT “Pension Types in Ireland”) 
+--
 - Add a way to view and override config settings (like DD)
 - Add a link to FinSim.ie in the spreadsheet
 - Add ability to fetch data from the web / google sheets
 - Move the urls from the help yaml to the config file and use variables in the yaml
 
 ## Version 3 - "Modernize"
+- Make things more generic so they apply to different systems (notepad "Generic Tax System").
+--
 - Move core (only premium features) to backend (initially my mac, then Google functions or AWS lambda), ideally with toggle to still run in the browser for dev.
+--
 - Reimplement the UI in React
-- Make things more generic so they apply to different systems
 
 ## Version 4 - "Complete"
+- Properly handle multiple people's incomes
+- Handle loss harvesting for trusts
 - Did I consider debt (other than mortgage)?
 - Add inflation volatility
 - Add dividends and their tax
 - Add a step function to represent government's delayed updates
-- Properly handle multiple people's incomes
 - Add self-employed option, joint declaration, etc
-- Handle loss harvesting for trusts
 - Change input system to capture the details needed for things like personal tax credits, benefits, etc.
 - Show median age money ran out, 5 and 95% percentile.
 
