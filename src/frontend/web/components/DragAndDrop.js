@@ -12,17 +12,23 @@ class DragAndDrop {
     if (!container) return;
 
     const items = container.querySelectorAll('.priority-item');
-
+    
     items.forEach(item => {
-      item.addEventListener('dragstart', e => {
+      // Make the item draggable
+      item.setAttribute('draggable', 'true');
+      
+      item.addEventListener('dragstart', (e) => {
+        this.dragSrcEl = item;
         item.classList.add('dragging');
-        e.dataTransfer.setData('text/plain', item.dataset.priorityId);
+        e.dataTransfer.effectAllowed = 'move';
       });
 
       item.addEventListener('dragend', () => {
         item.classList.remove('dragging');
-      })
-      item.addEventListener('dragover', e => {
+        this.updatePriorityValues();
+      });
+
+      item.addEventListener('dragover', (e) => {
         e.preventDefault();
         const dragging = container.querySelector('.dragging');
         if (dragging && dragging !== item) {
@@ -33,22 +39,7 @@ class DragAndDrop {
           } else {
             container.insertBefore(dragging, item.nextSibling);
           }
-          this.updatePriorityValues();
         }
-      });
-
-      item.addEventListener('dragenter', e => {
-        e.preventDefault();
-        item.classList.add('drag-over');
-      });
-
-      item.addEventListener('dragleave', () => {
-        item.classList.remove('drag-over');
-      });
-
-      item.addEventListener('drop', e => {
-        e.preventDefault();
-        item.classList.remove('drag-over');
       });
     });
   }
@@ -59,9 +50,6 @@ class DragAndDrop {
       const input = item.querySelector('input');
       if (input) {
         input.value = index + 1;
-        // Add animation class
-        item.classList.add('inserted');
-        setTimeout(() => item.classList.remove('inserted'), 300);
       }
     });
   }
