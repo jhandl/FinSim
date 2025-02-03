@@ -20,7 +20,8 @@ class FormatUtils {
     
     // If value is decimal (< 1), multiply by 100
     const displayValue = numValue <= 1 ? (numValue * 100) : numValue;
-    return `${displayValue}%`;
+    // Format with at most 1 decimal place, and remove .0 if present
+    return `${parseFloat(displayValue.toFixed(1)).toString()}%`;
   }
 
   static parsePercentage(value) {
@@ -96,7 +97,8 @@ class FormatUtils {
         if (this.value.trim() !== '') {
           const value = parseFloat(this.value);
           if (!isNaN(value)) {
-            this.value = value;
+            // Format with at most 1 decimal place, and remove .0 if present
+            this.value = parseFloat(value.toFixed(1)).toString();
           }
         }
         updatePercentageVisibility();
