@@ -1,9 +1,17 @@
 # Roadmap
 
-## Bugs
+### Bugs
+- Event names can't be saved with a comma to the csv file.
+- When purchasing real estate, the money seems to come from cash first, even though the priority is etf.
+- The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?
+- ETFs should be called "Index Funds", Trusts should be "Individual Shares"
+
+### Ideas
+- I learned about finance and investing late in life. There’s a lot like me. Help them get to where I am. (And plan their retirement? No, that’s financial advice)
+- Add an event to change the pension contribution rate.
 
 
-Feedback
+### Feedback
 - Escala para ayudar a calcular el rate de sueldo
 - boton para decir "gasto de unica vez" sin tener que poner dos veces el mismo año (y sin rate)
 - Dar ejemplos de rate de real estate como hice con volatility

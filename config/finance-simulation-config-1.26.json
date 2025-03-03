@@ -6,7 +6,7 @@
   "pensionContribEarningLimit": 115000,
   "pensionLumpSumLimit": 0.25,
   "pensionLumpSumTaxBands": {"0": 0, "200000": 0.2, "500000": 0.4},
-  "pensionMinDrawdownBands": {"0": 0, "60": 0.04, "70": 0.05}, 
+  "pensionMinDrawdownBands": {"0": 0, "61": 0.04, "71": 0.05}, 
   "pensionContributionRateBands": {"0": 0.15, "30": 0.20, "40": 0.25, "50": 0.30, "55": 0.35, "60": 0.40},
   "minPrivatePensionRetirementAge": 60,
   "minOccupationalPensionRetirementAge": 65,

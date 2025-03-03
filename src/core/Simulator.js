@@ -9,7 +9,6 @@ var cash, etf, trust, pension;
 
 const Phases = {
   growth: 'growth',
-  lumpSum: 'lumpSum',
   retired: 'retired'
 }
 
@@ -139,7 +138,7 @@ function calculatePensionIncome() {
   // Private Pension
   if (age === params.retirementAge) {
     cash += pension.getLumpsum();
-    phase = Phases.lumpSum;
+    phase = Phases.retired;
   }
   if (phase === Phases.retired) {
     incomePrivatePension += pension.drawdown();
@@ -274,10 +273,6 @@ function handleInvestments() {
   }
   targetCash = adjust(params.emergencyStash);
   
-  if ((phase == Phases.lumpSum) && (cash < targetCash) && (age >= params.retirementAge)) {
-    phase = Phases.retired;
-  }
-  
   if (cash < targetCash) {
     cashDeficit = targetCash - cash;
   }
@@ -288,10 +283,7 @@ function handleInvestments() {
   if (expenses > netIncome) {
     switch (phase) {
       case Phases.growth:
-        withdraw(1, 0, 2, 3); // cash -> etf -> trust
-        break;
-      case Phases.lumpSum:
-        withdraw(1, 4, 2, 3); // cash -> etf -> trust -> pension
+        withdraw(params.priorityCash, 0, params.priorityEtf, params.priorityTrust);  // taken from user configuration, but without ability to withdraw from pension
         break;
       case Phases.retired:
         withdraw(params.priorityCash, params.priorityPension, params.priorityEtf, params.priorityTrust);  // taken from user configuration

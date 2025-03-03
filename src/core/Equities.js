@@ -127,7 +127,7 @@ class Pension extends Equity {
   drawdown() {
     let ageLimits = Object.keys(config.pensionMinDrawdownBands);
     let minimumDrawdown = ageLimits.reduce(
-        (acc, limit) => (age > limit ? config.pensionMinDrawdownBands[limit] : acc), 
+        (acc, limit) => (age >= limit ? config.pensionMinDrawdownBands[limit] : acc), 
         config.pensionMinDrawdownBands[ageLimits[0]]
     );
     return this.sell(this.capital() * minimumDrawdown);
