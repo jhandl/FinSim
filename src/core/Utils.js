@@ -91,8 +91,12 @@ function serializeSimulation(ui) {
         // Split the first field (which contains "type:name") into separate type and name
         const [type, ...nameParts] = event[0].split(':');
         const name = nameParts.join(':'); // Rejoin in case name contained colons
+        
+        // URL-encode commas in the name to prevent breaking CSV format
+        const encodedName = name.replace(/,/g, "%2C");
+        
         const otherFields = event.slice(1);
-        csvContent += `${type},${name},${otherFields.join(',')}\n`;
+        csvContent += `${type},${encodedName},${otherFields.join(',')}\n`;
     });
 
     return csvContent;
@@ -135,7 +139,11 @@ function deserializeSimulation(content, ui) {
             continue;
         }
         if (inEvents && line && !line.startsWith('Type,')) {
-            eventData.push(line.split(','));
+            const parts = line.split(',');
+            if (parts.length > 1) {
+                parts[1] = parts[1].replace(/%2C/g, ",");
+            }
+            eventData.push(parts);
         }
     }
 

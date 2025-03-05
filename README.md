@@ -1,7 +1,6 @@
 # Roadmap
 
 ### Bugs
-- Event names can't be saved with a comma to the csv file.
 - When purchasing real estate, the money seems to come from cash first, even though the priority is etf.
 - The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?
 - ETFs should be called "Index Funds", Trusts should be "Individual Shares"
