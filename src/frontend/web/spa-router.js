@@ -77,7 +77,6 @@ function navigateTo(path) {
     } else {
         window.location.hash = path.replace('#', '');
     }
-    handleRoute(path);
 }
 
 /**
@@ -223,7 +222,6 @@ function processPageContent(htmlContent, sourcePath) {
  * Load scripts sequentially to maintain execution order
  */
 async function loadScriptsSequentially(scripts, basePath) {
-    console.log('Loading scripts:', scripts.map(s => s.src || 'inline'));
     for (let i = 0; i < scripts.length; i++) {
         const script = scripts[i];
         await loadScript(script, basePath);

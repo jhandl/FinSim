@@ -319,10 +319,7 @@
     <script>
         // Listen for the custom event dispatched by the SPA router
         document.addEventListener('spa:content-loaded', function() {
-            // Initialize WebUI after SPA content is loaded
             const webUI = WebUI.getInstance();
-            
-            // Setup essential UI elements
             webUI.setupRunSimulationButton();
             webUI.setupWizardInvocation();
             webUI.setStatus("Ready", STATUS_COLORS.INFO);
