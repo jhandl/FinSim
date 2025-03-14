@@ -83,7 +83,7 @@ class Wizard {
   async loadConfig() {
     try {
       const timestamp = new Date().getTime();
-      const response = await fetch(`/config/help.yml?t=${timestamp}`, {
+      const response = await fetch(`/src/frontend/web/assets/help.yml?t=${timestamp}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',

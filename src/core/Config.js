@@ -21,8 +21,8 @@ class Config {
 
   load(version) {
     try {
-      // const url = "https://storage.googleapis.com/financial-simulator-bucket/finance-simulation-config-"+version+".json";
-      const url = "https://finsim.ie/config/finance-simulation-config-"+version+".json";
+      // Simple relative path for the configuration file
+      const url = "/src/core/config/finance-simulation-config-" + version + ".json";
       const config = JSON.parse(this.ui.fetchUrl(url));
       Object.assign(this, config);
     } catch (err) {

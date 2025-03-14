@@ -5,29 +5,54 @@ var WebUI_instance = null;
 class WebUI extends AbstractUI {
   
   constructor() {
-    super();
-    this.chartManager = new ChartManager();
-    this.tableManager = new TableManager(this);
-    this.fileManager = new FileManager(this);
-    this.eventsTableManager = new EventsTableManager(this);
-    this.dragAndDrop = new DragAndDrop();
-    this.notificationUtils = new NotificationUtils();
-    this.formatUtils = new FormatUtils();
-    this.editCallbacks = new Map();
-    this.setupChangeListener();
-    this.setupRunSimulationButton();
-    this.setupWizardInvocation();
-    this.eventsTableManager.addEventRow();
+    try {
+      console.log('Creating new WebUI instance');
+      super();
+      
+      // Initialize in a specific order to ensure dependencies are met
+      this.formatUtils = new FormatUtils();
+      this.notificationUtils = new NotificationUtils();
+      this.chartManager = new ChartManager();
+      this.tableManager = new TableManager(this);
+      this.fileManager = new FileManager(this);
+      this.eventsTableManager = new EventsTableManager(this);
+      this.dragAndDrop = new DragAndDrop();
+      this.editCallbacks = new Map();
+      
+      // Setup event listeners
+      this.setupChangeListener();
+      this.setupRunSimulationButton();
+      this.setupWizardInvocation();
+      
+      this.eventsTableManager.addEventRow();
+      
+      // Set initial UI state
+      this.setStatus("Ready", STATUS_COLORS.INFO);
+      
+    } catch (error) {
+      throw error;
+    }
   }
 
   // Singleton
   static getInstance() {
     if (!WebUI_instance) {
-      WebUI_instance = new WebUI();
+      try {
+        WebUI_instance = new WebUI();
+        
+        // Initialize Config after WebUI is created
+        try {
+          Config.getInstance(WebUI_instance);
+        } catch (configError) {
+          // Continue without Config rather than breaking the whole app
+        }
+        
+      } catch (error) {
+        throw error;
+      }
     }
     return WebUI_instance;
   }
-
 
   setStatus(message, color=STATUS_COLORS.INFO) {
     this.notificationUtils.setStatus(message, color);
@@ -127,7 +152,6 @@ class WebUI extends AbstractUI {
     return this.fileManager.loadFromFile(file);
   }
 
-
   setupChangeListener() {
     document.addEventListener('change', (event) => {
       const element = event.target;
@@ -155,7 +179,6 @@ class WebUI extends AbstractUI {
         try {
           run();
         } catch (error) {
-          console.error('Simulation failed:', error);
           this.setStatus('Simulation failed: ' + error.message, STATUS_COLORS.ERROR);
         } finally {
           runButton.disabled = false;
@@ -164,7 +187,6 @@ class WebUI extends AbstractUI {
       }, 0);
     });
   }
-
 
   setupWizardInvocation() {
     const wizard = Wizard.getInstance();
@@ -209,7 +231,6 @@ class WebUI extends AbstractUI {
   flush() {
     // No-op in web UI as changes are immediate
   }
-
 }
 
 window.addEventListener('DOMContentLoaded', () => {

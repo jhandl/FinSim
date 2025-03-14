@@ -55,6 +55,10 @@ a, .register-button {
     color: #fff;
     border-radius: 4px;
     transition: background-color 0.3s;
+    border: none;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
 }
 
 a:hover, .register-button:hover {
@@ -63,16 +67,18 @@ a:hover, .register-button:hover {
 
 .form-container {
     overflow: hidden;
-    max-height: 0;
-    opacity: 0;
+    max-height: 0 !important;
+    opacity: 0 !important;
     flex-direction: column;
     margin-top: 20px;
-    transition: max-height 0.5s ease, opacity 0.5s ease;
+    transition: all 0.5s ease;
+    visibility: hidden;
 }
 
 .form-container.show {
-    max-height: 500px;
-    opacity: 1;
+    max-height: 500px !important;
+    opacity: 1 !important;
+    visibility: visible;
 }
 
 .form-container input, .form-container button {

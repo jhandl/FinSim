@@ -7,13 +7,13 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Ireland Financial Simulator</title>
-    <link rel="icon" type="image/x-icon" href="IFS.ico">
-    <link rel="stylesheet" href="css/simulator.css">
-    <!-- <link rel="stylesheet" href="css/layout-debugger.css"> --> 
-    <link rel="stylesheet" href="libs/driver.css"/>
-    <script src="libs/driver.js"></script>
-    <script src="libs/js-yaml.min.js"></script>
-    <script src="libs/chart.js"></script>
+    <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico">
+    <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css">
+    <!-- <link rel="stylesheet" href="/src/frontend/web/ifs/css/layout-debugger.css"> --> 
+    <link rel="stylesheet" href="/src/frontend/web/ifs/libs/driver.css"/>
+    <script src="/src/frontend/web/ifs/libs/driver.js"></script>
+    <script src="/src/frontend/web/ifs/libs/js-yaml.min.js"></script>
+    <script src="/src/frontend/web/ifs/libs/chart.js"></script>
 </head>
 <body>
     <header>
@@ -297,24 +297,36 @@
         <a class="footer-link" href="https://docs.google.com/spreadsheets/d/1aPClS0_Fi4x14zIkQORALhZeFEeWw611Z-rrXYvy5Ko/edit?pli=1&gid=0#gid=0" target="_blank" rel="noopener noreferrer">Google Sheet</a>
     </footer>
 
-    <script src="../src/frontend/AbstractUI.js"></script>
-    <script src="../src/frontend/UIManager.js"></script>
-    <script src="../src/frontend/web/utils/DOMUtils.js"></script>
-    <script src="../src/frontend/web/utils/FormatUtils.js"></script>
-    <script src="../src/frontend/web/utils/NotificationUtils.js"></script>
-    <script src="../src/frontend/web/components/TableManager.js"></script>
-    <script src="../src/frontend/web/components/EventsTableManager.js"></script>
-    <script src="../src/frontend/web/components/ChartManager.js"></script>
-    <script src="../src/frontend/web/components/FileManager.js"></script>
-    <script src="../src/frontend/web/components/DragAndDrop.js"></script>
-    <script src="../src/frontend/web/components/Wizard.js"></script>
-    <script src="../src/frontend/web/WebUI.js"></script>
-    <script src="../src/core/Config.js"></script>
-    <script src="../src/core/Events.js"></script>
-    <script src="../src/core/Revenue.js"></script>
-    <script src="../src/core/Equities.js"></script>
-    <script src="../src/core/RealEstate.js"></script>
-    <script src="../src/core/Utils.js"></script>
-    <script src="../src/core/Simulator.js"></script>
+    <script src="/src/frontend/AbstractUI.js"></script>
+    <script src="/src/frontend/UIManager.js"></script>
+    <script src="/src/frontend/web/utils/DOMUtils.js"></script>
+    <script src="/src/frontend/web/utils/FormatUtils.js"></script>
+    <script src="/src/frontend/web/utils/NotificationUtils.js"></script>
+    <script src="/src/frontend/web/components/TableManager.js"></script>
+    <script src="/src/frontend/web/components/EventsTableManager.js"></script>
+    <script src="/src/frontend/web/components/ChartManager.js"></script>
+    <script src="/src/frontend/web/components/FileManager.js"></script>
+    <script src="/src/frontend/web/components/DragAndDrop.js"></script>
+    <script src="/src/frontend/web/components/Wizard.js"></script>
+    <script src="/src/frontend/web/WebUI.js"></script>
+    <script src="/src/core/Config.js"></script>
+    <script src="/src/core/Events.js"></script>
+    <script src="/src/core/Revenue.js"></script>
+    <script src="/src/core/Equities.js"></script>
+    <script src="/src/core/RealEstate.js"></script>
+    <script src="/src/core/Utils.js"></script>
+    <script src="/src/core/Simulator.js"></script>
+    <script>
+        // Listen for the custom event dispatched by the SPA router
+        document.addEventListener('spa:content-loaded', function() {
+            // Initialize WebUI after SPA content is loaded
+            const webUI = WebUI.getInstance();
+            
+            // Setup essential UI elements
+            webUI.setupRunSimulationButton();
+            webUI.setupWizardInvocation();
+            webUI.setStatus("Ready", STATUS_COLORS.INFO);
+        });
+    </script>
 </body>
 </html> 

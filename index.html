@@ -4,26 +4,49 @@
     <title>Ireland Financial Simulator</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="landing/styles.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
-    <link rel="icon" type="image/x-icon" href="ifs/IFS.ico">
+    <!-- SPA base configuration -->
+    <base href="/">
 </head>
 <body>
-    <div class="container">
-        <h1>Welcome to the Ireland Financial Simulator</h1>
-        <img src="landing/IFS.png" class="logo" alt="Logo">
-        <div class="button-container">
-            <a href="ifs">Access the Simulator</a>
-            <a href="#" id="registerButton" class="register-button" style="min-width: 170px;">Register for Updates</a>
-        </div>
-        <div class="form-container" id="formContainer">
-            <input type="text" id="name" placeholder="Your Name">
-            <input type="email" id="email" placeholder="Your Email">
-            <button id="submitButton">Submit</button>
-        </div>
-        <div class="thank-you-message" id="thankYouMessage" style="display: none;">Thank you for registering! I will keep you updated.</div>
-    </div>
-    <script type="module" src="landing/script.js"></script>
+    <!-- Main container for SPA content -->
+    <div id="app-root"></div>
+    
+    <!-- Error handling -->
+    <script>
+        window.addEventListener('error', function(event) {
+            console.error('Global error caught:', event.error);
+            
+            // Only show the error UI if it's a script loading error and app-root is empty
+            if (event.error && event.error.message && event.error.message.includes('script') && 
+                document.getElementById('app-root').children.length === 0) {
+                
+                document.getElementById('app-root').innerHTML = `
+                    <div style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif;">
+                        <h1 style="color: #d32f2f;">Error Loading Application</h1>
+                        <p style="margin: 20px 0;">${error.message}</p>
+                        <button style="background-color: #2196F3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;" onclick="window.location.reload()">Reload Page</button>
+                    </div>
+                `;
+            }
+        });
+    </script>
+    
+    <!-- SPA router script -->
+    <script src="/src/frontend/web/spa-router.js" onerror="handleScriptError(event)"></script>
+    
+    <script>
+        function handleScriptError(event) {
+            console.error('Failed to load script:', event.target.src);
+            document.getElementById('app-root').innerHTML = `
+                <div style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif;">
+                    <h1 style="color: #d32f2f;">Error Loading Application</h1>
+                    <p style="margin: 20px 0;">The application could not be loaded because a required script failed to load:</p>
+                    <p style="margin: 20px 0;">${event.target.src}</p>
+                    <button style="background-color: #2196F3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;" onclick="window.location.reload()">Reload Page</button>
+                </div>
+            `;
+        }
+    </script>
 </body>
 </html>
 
