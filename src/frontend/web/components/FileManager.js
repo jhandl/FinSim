@@ -127,7 +127,6 @@ class FileManager {
       }
 
     } catch (error) {
-      console.log("error loading file: " + error);
       this.webUI.notificationUtils.showAlert('Error loading file: Please make sure this is a valid simulation save file.');
       return;
     }
