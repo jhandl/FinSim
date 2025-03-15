@@ -1,20 +1,9 @@
 // Define the initialization function
-function initLandingPage() {
-  console.log('[Debug] initLandingPage called');
-  console.log('[Debug] Document readyState:', document.readyState);
-  
+function initLandingPage() {  
   const registerButton = document.getElementById('registerButton');
   const formContainer = document.getElementById('formContainer');
   const submitButton = document.getElementById('submitButton');
   const thankYouMessage = document.getElementById('thankYouMessage');
-
-  // Log the state of all required elements
-  console.log('[Debug] DOM Elements state:', {
-    registerButton: registerButton ? 'found' : 'missing',
-    formContainer: formContainer ? 'found' : 'missing',
-    submitButton: submitButton ? 'found' : 'missing',
-    thankYouMessage: thankYouMessage ? 'found' : 'missing'
-  });
 
   // If any of these elements don't exist, return early
   if (!registerButton || !formContainer || !submitButton || !thankYouMessage) {
@@ -22,14 +11,9 @@ function initLandingPage() {
     return;
   }
 
-  console.log('[Debug] All elements found, proceeding with setup');
-
   // Check if user is already registered
   const isRegistered = localStorage.getItem('isRegistered');
-  console.log('[Debug] Registration state:', { isRegistered });
-
   if (isRegistered) {
-    console.log('[Debug] User already registered, updating UI');
     thankYouMessage.style.display = 'block';
     thankYouMessage.classList.add('show');
     registerButton.classList.add('disabled');
@@ -42,13 +26,11 @@ function initLandingPage() {
   
   // Use a named function for the click handler
   function handleRegisterClick(event) {
-    console.log('[Debug] Register button clicked');
     event.preventDefault();
     formContainer.classList.toggle('show');
   }
   
   // Attach the click handler to the new button
-  console.log('[Debug] Attaching click handler to register button');
   newRegisterButton.addEventListener('click', handleRegisterClick);
 
   submitButton.addEventListener('click', () => {
@@ -119,9 +101,7 @@ window._cio = window._cio || [];
   t.setAttribute('data-site-id', 'f97aca856a79975797f8');
   t.src = 'https://assets.customer.io/assets/track-eu.js';
   t.onload = function() {
-    console.log('customer.io script loaded successfully');
   };
   document.head.appendChild(t);
-  console.log('Inserted script into DOM');
 })();
 

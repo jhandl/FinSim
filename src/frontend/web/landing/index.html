@@ -7,6 +7,27 @@
     <link rel="stylesheet" href="/src/frontend/web/landing/styles.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
     <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico">
+    <script>
+        // Handle navigation links
+        document.addEventListener('click', (e) => {
+            let target = e.target;
+            while (target && target.tagName !== 'A') {
+                target = target.parentNode;
+                if (!target) break;
+            }
+            
+            if (target && target.tagName === 'A') {
+                const href = target.getAttribute('href');
+                
+                // Only handle internal navigation
+                if (href && (href === '/' || href === '#ifs')) {
+                    e.preventDefault();
+                    // Update the parent window's URL directly
+                    window.parent.location.hash = href === '/' ? '' : href;
+                }
+            }
+        });
+    </script>
 </head>
 <body>
     <div class="container">

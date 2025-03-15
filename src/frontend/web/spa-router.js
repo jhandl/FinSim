@@ -41,8 +41,9 @@ function initRouter() {
         handleRoute(window.location.hash || '/');
     });
     
-    // Intercept clicks on links for SPA navigation
+    // Intercept clicks on links for SPA navigation (only in parent window)
     document.addEventListener('click', (e) => {
+        
         // Find if click was on an anchor tag or its child
         let target = e.target;
         while (target && target.tagName !== 'A') {
@@ -83,7 +84,6 @@ function navigateTo(path) {
  * Handle routing based on the current path
  */
 function handleRoute(route) {    
-    console.log('SPA navigating to:', route);
     // Route handling
     if (route === '' || route === '/') {
         loadPage(routes['/']);
@@ -104,18 +104,34 @@ async function loadPage(routeConfig) {
         document.title = routeConfig.title;
         updateFavicon(routeConfig.favicon);
         
-        // Fetch the page content
-        const response = await fetch(routeConfig.contentPath);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch page: ${response.status} ${response.statusText}`);
+        // Get the container
+        const container = document.getElementById('app-container');
+        
+        // Remove the existing iframe (this destroys its entire context)
+        const oldFrame = document.getElementById('app-frame');
+        if (oldFrame) {
+            oldFrame.remove();
         }
         
-        const htmlContent = await response.text();
+        // Create a new iframe
+        const newFrame = document.createElement('iframe');
+        newFrame.id = 'app-frame';
+        newFrame.style.cssText = 'width: 100%; height: 100%; border: none; overflow: hidden;';
         
-        // Process and inject the content
-        processPageContent(htmlContent, routeConfig.contentPath);
+        // Add the new iframe to the container
+        container.appendChild(newFrame);
+        
+        // Set up load handler before setting src
+        newFrame.onload = () => {
+            const event = new CustomEvent('spa:content-loaded');
+            document.dispatchEvent(event);
+        };
+        
+        // Load the page into the new iframe
+        newFrame.src = routeConfig.contentPath;
+        
     } catch (error) {
-        document.getElementById('app-root').innerHTML = `
+        document.getElementById('app-container').innerHTML = `
             <div style="text-align: center; margin-top: 50px;">
                 <h1>Error Loading Page</h1>
                 <p>${error.message}</p>

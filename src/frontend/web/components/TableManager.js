@@ -132,7 +132,6 @@ class TableManager {
     if (maxAgeRowIndex !== -1) {
       // Remove all rows starting after the first maxAge row
       for (let i = dataRows.length - 1; i >= maxAgeRowIndex; i--) {
-        console.log("Removing row: " + i);
         dataRows[i].remove();
       }
     }
