@@ -136,7 +136,6 @@ class GasUI extends AbstractUI {
       if (range) {
         range.getCell(rowIndex, 1).setValue(value);
       } else {
-        console.log("Missing range name: "+field);
         throw "Missing range name!"
       }
     });

@@ -6,7 +6,6 @@ class WebUI extends AbstractUI {
   
   constructor() {
     try {
-      console.log('Creating new WebUI instance');
       super();
       
       // Initialize in a specific order to ensure dependencies are met

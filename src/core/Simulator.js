@@ -14,7 +14,6 @@ const Phases = {
 
 
 function run() {
-  console.log('Starting simulation run');
   if (!initializeSimulator()) return;
   montecarlo = (params.growthDevPension > 0 || params.growthDevETF > 0 || params.growthDevTrust > 0);
   let runs = (montecarlo ? config.simulationRuns : 1);
