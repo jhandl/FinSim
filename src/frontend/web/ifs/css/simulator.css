@@ -55,11 +55,17 @@ header {
 .header-left {
     flex: 1 1 auto;
     min-width: 200px;
+    color: #2563eb;
 }
 
 .header-left h1 {
     margin: 0;
     font-size: 1.5rem;
+}
+
+.header-left h1 a {
+    color: inherit;
+    text-decoration: none;
 }
 
 .header-left .version {

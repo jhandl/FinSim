@@ -1,49 +1,156 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Ireland Financial Simulator</title>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/src/frontend/web/landing/styles.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
-    <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico">
-    <script>
-        // Handle navigation links
-        document.addEventListener('click', (e) => {
-            let target = e.target;
-            while (target && target.tagName !== 'A') {
-                target = target.parentNode;
-                if (!target) break;
-            }
-            
-            if (target && target.tagName === 'A') {
-                const href = target.getAttribute('href');
-                
-                // Only handle internal navigation
-                if (href && (href === '/' || href === '#ifs')) {
-                    e.preventDefault();
-                    // Update the parent window's URL directly
-                    window.parent.location.hash = href === '/' ? '' : href;
-                }
-            }
-        });
-    </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ireland Financial Simulator</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+  <header>
     <div class="container">
-        <h1>Welcome to the Ireland Financial Simulator</h1>
-        <img src="/src/frontend/web/landing/IFS.png" class="logo" alt="Logo">
-        <div class="button-container">
-            <a href="#ifs">Access the Simulator</a>
-            <a href="#" id="registerButton" class="register-button" style="min-width: 170px;">Register for Updates</a>
-        </div>
-        <div class="form-container" id="formContainer">
-            <input type="text" id="name" placeholder="Your Name">
-            <input type="email" id="email" placeholder="Your Email">
-            <button id="submitButton">Submit</button>
-        </div>
-        <div class="thank-you-message" id="thankYouMessage" style="display: none;">Thank you for registering! I will keep you updated.</div>
+      <div class="logo">
+        <h1>Ireland Financial Simulator</h1>
+      </div>
+      <nav>
+        <ul>
+          <li><a data-scroll-to="disclaimer">Disclaimer</a></li>
+          <li><a data-scroll-to="features">Features</a></li>
+          <li><a data-scroll-to="how-it-works">How It Works</a></li>
+        </ul>
+      </nav>
     </div>
-    <script type="module" src="/src/frontend/web/landing/script.js"></script>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content">
+        <h1>What if...?</h1><h2>Your Personal Finance Lab</h2>
+        <p>An educational simulator to help you understand how different decisions and scenarios can affect your long-term financial future within the Irish tax system.</p>
+        <a href="/#ifs" class="cta-button">Try The Simulator</a>
+      </div>
+      <div class="hero-image">
+        <img src="finsim.png" alt="Financial Simulator Dashboard">
+      </div>
+    </div>
+  </section>
+
+  <section id="disclaimer" class="disclaimer">
+    <div class="container">
+      <div class="disclaimer-box">
+        <h2>Educational Purpose Only</h2>
+        <div class="disclaimer-content">
+          <div class="disclaimer-item">
+            <h3><i class="fas fa-check-circle"></i> What it is</h3>
+            <p>This is a tool to help you understand how different decisions and scenarios can affect your long-term financial future, within the context of the Irish tax system.</p>
+          </div>
+          <div class="disclaimer-item">
+            <h3><i class="fas fa-times-circle"></i> What it's not</h3>
+            <p>This is not a budgeting tool nor financial advice. Don't make serious life decisions based on this. It's not a substitute for a good financial advisor.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="features" class="features">
+    <div class="container">
+      <h2>Key Features</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
+          <h3>Scenario Planning</h3>
+          <p>Model your financial future with customizable life events and economic conditions.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+          <h3>Stress Testing</h3>
+          <p>Test your financial plan against market crashes and varying economic conditions.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><i class="fas fa-random"></i></div>
+          <h3>Monte Carlo Simulation</h3>
+          <p>Understand the probability of success with volatility-based simulations.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><i class="fas fa-save"></i></div>
+          <h3>Save Scenarios</h3>
+          <p>Save and reload your financial scenarios for future reference and comparison.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how-it-works" class="how-it-works">
+    <div class="container">
+      <h2>How It Works</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Input Your Financial Data</h3>
+            <p>Enter your current financial situation, plans, and expected economic conditions.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Add Life Events</h3>
+            <p>Create events for income, expenses, and major life changes like buying a house or changing jobs.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3>Run Simulation</h3>
+            <p>See how your financial future unfolds through detailed graphs and year-by-year breakdowns.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="container">
+      <h2>Ready to explore your financial future?</h2>
+      <p>This educational tool helps you understand the long-term impact of your financial decisions.</p>
+      <a href="/#ifs" class="cta-button">Launch Simulator</a>
+    </div>
+  </section>
+
+  <!--
+  <section class="newsletter">
+    <div class="container">
+      <div class="newsletter-content">
+        <h2>Stay Updated</h2>
+        <p>Subscribe to receive news about feature updates, financial insights, and tips for using the simulator.</p>
+        <form id="newsletter-form" class="newsletter-form">
+          <div class="form-group">
+            <input type="email" id="email" placeholder="Your email address" required>
+            <button type="submit" class="subscribe-button">Subscribe</button>
+          </div>
+          <div id="form-message"></div>
+          <p class="privacy-note">We respect your privacy. Your email will only be used to send simulator updates.</p>
+        </form>
+      </div>
+    </div>
+  </section>
+  -->
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2024 Financial Simulator. For educational purposes only.</p>
+      <div class="footer-links">
+        <a data-scroll-to="disclaimer">Disclaimer</a>
+        <a data-scroll-to="features">Features</a>
+        <a data-scroll-to="how-it-works">How It Works</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
 </body>
-</html> 
+</html>
+
+

@@ -22,6 +22,7 @@ class WebUI extends AbstractUI {
       this.setupChangeListener();
       this.setupRunSimulationButton();
       this.setupWizardInvocation();
+      this.setupNavigation();
       
       this.eventsTableManager.addEventRow();
       
@@ -202,6 +203,15 @@ class WebUI extends AbstractUI {
         event.preventDefault();
         wizard.start();
       }
+    });
+  }
+
+  setupNavigation() {
+    document.querySelectorAll('a[href^="/"]').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.parent.postMessage({ type: 'navigate', href: link.getAttribute('href') }, '*');
+      });
     });
   }
 

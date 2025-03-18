@@ -1,6 +1,6 @@
 /**
  * SPA Router for Ireland Financial Simulator
- * Handles routing between landing page (/) and simulator (#ifs)
+ * Handles routing between landing page (/) and simulator (/#ifs)
  * Uses hash-based routing for simplified navigation
  */
 
@@ -11,7 +11,7 @@ const routes = {
         contentPath: '/src/frontend/web/landing/index.html',
         favicon: '/src/frontend/web/ifs/IFS.ico'
     },
-    '#ifs': {
+    '/#ifs': {
         title: 'Ireland Financial Simulator',
         contentPath: '/src/frontend/web/ifs/index.html',
         favicon: '/src/frontend/web/ifs/IFS.ico'
@@ -41,29 +41,18 @@ function initRouter() {
         handleRoute(window.location.hash || '/');
     });
     
-    // Intercept clicks on links for SPA navigation (only in parent window)
-    document.addEventListener('click', (e) => {
-        
-        // Find if click was on an anchor tag or its child
-        let target = e.target;
-        while (target && target.tagName !== 'A') {
-            target = target.parentNode;
-            if (!target) break;
+    // Listen for navigation messages from iframes
+    window.addEventListener('message', (event) => {
+        // Only accept messages from our own iframes
+        if (!event.source.frameElement || !event.source.frameElement.id === 'app-frame') {
+            return;
         }
         
-        if (target && target.tagName === 'A' && target.getAttribute('href')) {
-            const href = target.getAttribute('href');
-            
-            // Only intercept internal links that aren't external protocols
-            if (!href.startsWith('http') && 
-                !href.startsWith('//') && 
-                !href.startsWith('javascript:')) {
-                
-                // Only handle specific routes we know about
-                if (href === '/' || href === '#ifs') {
-                    e.preventDefault();
-                    navigateTo(href);
-                }
+        const { type, href } = event.data;
+        if (type === 'navigate' && href) {
+            // Only handle specific routes we know about
+            if (href === '/' || href === '/#ifs') {
+                navigateTo(href);
             }
         }
     });
@@ -74,9 +63,10 @@ function initRouter() {
  */
 function navigateTo(path) {
     if (path === '/') {
-        window.location.hash = '';
+        // Use the origin to get the base URL without any hash
+        window.location.href = window.location.origin + window.location.pathname;
     } else {
-        window.location.hash = path.replace('#', '');
+        window.location.hash = path.replace('/#', '');
     }
 }
 
@@ -88,7 +78,7 @@ function handleRoute(route) {
     if (route === '' || route === '/') {
         loadPage(routes['/']);
     } else if (route === '#ifs') {
-        loadPage(routes['#ifs']);
+        loadPage(routes['/#ifs']);
     } else {
         // Handle 404 or redirect to default
         navigateTo('/');
@@ -120,12 +110,6 @@ async function loadPage(routeConfig) {
         
         // Add the new iframe to the container
         container.appendChild(newFrame);
-        
-        // Set up load handler before setting src
-        newFrame.onload = () => {
-            const event = new CustomEvent('spa:content-loaded');
-            document.dispatchEvent(event);
-        };
         
         // Load the page into the new iframe
         newFrame.src = routeConfig.contentPath;
@@ -226,11 +210,7 @@ function processPageContent(htmlContent, sourcePath) {
     const scripts = Array.from(doc.querySelectorAll('script'));
     
     loadScriptsSequentially(scripts, basePath).then(() => {
-        // Dispatch the content loaded event
-        setTimeout(() => {
-            const event = new CustomEvent('spa:content-loaded');
-            document.dispatchEvent(event);
-        }, 100);
+        // Scripts loaded
     });
 }
 
