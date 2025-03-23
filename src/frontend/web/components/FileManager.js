@@ -70,15 +70,15 @@ class FileManager {
 
   async loadFromFile(file) {
     if (!file) return;
-
     const scenarioName = file.name.replace('.csv', '');
     this.webUI.setScenarioName(scenarioName);
 
     this.webUI.tableManager.clearContent('Events');
     this.webUI.tableManager.clearExtraDataRows(0);
     this.webUI.chartManager.clearExtraChartRows(0);
+    const fileInput = document.getElementById('loadSimulationDialog');
 
-     try {
+    try {
       const content = await file.text();
       const eventData = deserializeSimulation(content, this.webUI);
       
@@ -125,12 +125,13 @@ class FileManager {
         this.webUI.formatUtils.setupCurrencyInputs();
         this.webUI.formatUtils.setupPercentageInputs();
       }
-
+      this.webUI.setStatus("Ready");
     } catch (error) {
       this.webUI.notificationUtils.showAlert('Error loading file: Please make sure this is a valid simulation save file.');
       return;
+    } finally {
+      if (fileInput) fileInput.value = '';
     }
-    this.webUI.setStatus("Ready");
   }
 
   fetchUrl(url) {
