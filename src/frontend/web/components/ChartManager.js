@@ -121,7 +121,7 @@ class ChartManager {
               order: 9
             },
             {
-              label: 'Trusts',
+              label: 'Shares',
               borderColor: '#81C784',
               backgroundColor: '#C8E6C9',
               fill: true,
@@ -131,7 +131,7 @@ class ChartManager {
               order: 8
             },
             {
-              label: 'ETFs',
+              label: 'Index Funds',
               borderColor: '#9575CD',
               backgroundColor: '#E1BEE7',
               fill: true,
@@ -204,7 +204,8 @@ class ChartManager {
               }
             },
             legend: {
-              position: 'right'
+              position: 'right',
+              onClick: null
             }
           }
         }
@@ -222,7 +223,7 @@ class ChartManager {
           labels: [],
           datasets: [
             {
-              label: 'ETFs',
+              label: 'Index Funds',
               borderColor: '#9575CD',
               backgroundColor: '#E1BEE7',
               fill: true,
@@ -231,7 +232,7 @@ class ChartManager {
               order: 4
             },
             {
-              label: 'Trusts',
+              label: 'Shares',
               borderColor: '#81C784',
               backgroundColor: '#C8E6C9',
               fill: true,
@@ -280,7 +281,8 @@ class ChartManager {
               }
             },
             legend: {
-              position: 'right'
+              position: 'right',
+              onClick: null
             }
           }
         }
@@ -306,8 +308,8 @@ class ChartManager {
       this.cashflowChart.data.datasets[0].data[i] = data.NetIncome;
       this.cashflowChart.data.datasets[1].data[i] = data.Expenses;
       this.cashflowChart.data.datasets[2].data[i] = data.IncomeCash;
-      this.cashflowChart.data.datasets[3].data[i] = data.IncomeTrustRent;
-      this.cashflowChart.data.datasets[4].data[i] = data.IncomeEtfRent;
+      this.cashflowChart.data.datasets[3].data[i] = data.IncomeSharesRent;
+      this.cashflowChart.data.datasets[4].data[i] = data.IncomeFundsRent;
       this.cashflowChart.data.datasets[5].data[i] = data.IncomeStatePension;
       this.cashflowChart.data.datasets[6].data[i] = data.IncomePrivatePension;
       this.cashflowChart.data.datasets[7].data[i] = data.IncomeRSUs;
@@ -318,8 +320,8 @@ class ChartManager {
 
       // Update Assets Chart
       this.assetsChart.data.labels[i] = data.Age;
-      this.assetsChart.data.datasets[0].data[i] = data.EtfCapital;
-      this.assetsChart.data.datasets[1].data[i] = data.TrustCapital;
+      this.assetsChart.data.datasets[0].data[i] = data.FundsCapital;
+      this.assetsChart.data.datasets[1].data[i] = data.SharesCapital;
       this.assetsChart.data.datasets[2].data[i] = data.PensionFund;
       this.assetsChart.data.datasets[3].data[i] = data.Cash;
       this.assetsChart.data.datasets[4].data[i] = data.RealEstateCapital;

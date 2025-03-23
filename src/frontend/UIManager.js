@@ -63,8 +63,8 @@ class UIManager {
       IncomeRentals: dataSheet[row].incomeRentals / scale,
       IncomePrivatePension: dataSheet[row].incomePrivatePension / scale,
       IncomeStatePension: dataSheet[row].incomeStatePension / scale,
-      IncomeEtfRent: dataSheet[row].incomeEtfRent / scale,
-      IncomeTrustRent: dataSheet[row].incomeTrustRent / scale,
+      IncomeFundsRent: dataSheet[row].incomeFundsRent / scale,
+      IncomeSharesRent: dataSheet[row].incomeSharesRent / scale,
       IncomeCash: dataSheet[row].incomeCash / scale,
       RealEstateCapital: dataSheet[row].realEstateCapital / scale,
       NetIncome: dataSheet[row].netIncome / scale,
@@ -72,8 +72,8 @@ class UIManager {
       Savings: dataSheet[row].savings / scale,
       PensionFund: dataSheet[row].pensionFund / scale,
       Cash: dataSheet[row].cash / scale,
-      EtfCapital: dataSheet[row].etfCapital / scale,
-      TrustCapital: dataSheet[row].trustCapital / scale,
+      FundsCapital: dataSheet[row].indexFundsCapital / scale,
+      SharesCapital: dataSheet[row].sharesCapital / scale,
       PensionContribution: dataSheet[row].pensionContribution / scale,
       WithdrawalRate: dataSheet[row].withdrawalRate / scale,
       IT: dataSheet[row].it / scale,
@@ -82,6 +82,7 @@ class UIManager {
       CGT: dataSheet[row].cgt / scale,
       Worth: dataSheet[row].worth / scale
     };
+
     this.ui.setDataRow(row, data);
     this.ui.setChartsRow(row, data);
     if (row % 5 === 0) {
@@ -95,8 +96,8 @@ class UIManager {
       targetAge: this.ui.getValue("TargetAge"),
       initialSavings: this.ui.getValue("InitialSavings"),
       initialPension: this.ui.getValue("InitialPension"),
-      initialETFs: this.ui.getValue("InitialETFs"),
-      initialTrusts: this.ui.getValue("InitialTrusts"),
+      initialFunds: this.ui.getValue("InitialFunds"),
+      initialShares: this.ui.getValue("InitialShares"),
       retirementAge: this.ui.getValue("RetirementAge"),
       emergencyStash: this.ui.getValue("EmergencyStash"),
       pensionPercentage: this.ui.getValue("PensionContributionPercentage"),
@@ -104,17 +105,17 @@ class UIManager {
       statePensionWeekly: this.ui.getValue("StatePensionWeekly"),
       growthRatePension: this.ui.getValue("PensionGrowthRate"),
       growthDevPension: this.ui.getValue("PensionGrowthStdDev"),
-      growthRateETF: this.ui.getValue("EtfGrowthRate"),
-      growthDevETF: this.ui.getValue("EtfGrowthStdDev"),
-      growthRateTrust: this.ui.getValue("TrustGrowthRate"),
-      growthDevTrust: this.ui.getValue("TrustGrowthStdDev"),
+      growthRateFunds: this.ui.getValue("FundsGrowthRate"),
+      growthDevFunds: this.ui.getValue("FundsGrowthStdDev"),
+      growthRateShares: this.ui.getValue("SharesGrowthRate"),
+      growthDevShares: this.ui.getValue("SharesGrowthStdDev"),
       inflation: this.ui.getValue("Inflation"),
-      etfAllocation: this.ui.getValue("EtfAllocation"),
-      trustAllocation: this.ui.getValue("TrustAllocation"),
+      FundsAllocation: this.ui.getValue("FundsAllocation"),
+      SharesAllocation: this.ui.getValue("SharesAllocation"),
       priorityCash: this.ui.getValue("PriorityCash"),
       priorityPension: this.ui.getValue("PriorityPension"),
-      priorityEtf: this.ui.getValue("PriorityETF"),
-      priorityTrust: this.ui.getValue("PriorityTrust"),
+      priorityFunds: this.ui.getValue("PriorityFunds"),
+      priorityShares: this.ui.getValue("PriorityShares"),
       marriageYear: this.ui.getValue("MarriageYear"),
       youngestChildBorn: this.ui.getValue("YoungestChildBorn"),
       oldestChildBorn: this.ui.getValue("OldestChildBorn"),
@@ -129,9 +130,9 @@ class UIManager {
         this.ui.setWarning("RetirementAge", "Warning: Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
       }
 
-      if (params.etfAllocation + params.trustAllocation > 1.0001) {
-        this.ui.setWarning("EtfAllocation", "ETF + Trust allocations can't exceed 100%");
-        this.ui.setWarning("TrustAllocation", "");
+      if (params.FundsAllocation + params.SharesAllocation > 1.0001) {
+        this.ui.setWarning("FundsAllocation", "Index Funds + Individual Shares allocations can't exceed 100%");
+        this.ui.setWarning("SharesAllocation", "");
         errors = true;
       }
     }

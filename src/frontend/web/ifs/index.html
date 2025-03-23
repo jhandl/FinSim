@@ -56,13 +56,13 @@
                     </div>
                     
                     <div class="input-wrapper">
-                        <label for="InitialETFs">ETF Investments</label>
-                        <input type="number" id="InitialETFs" class="currency">
+                        <label for="InitialFunds">Index Funds</label>
+                        <input type="number" id="InitialFunds" class="currency">
                     </div>
                     
                     <div class="input-wrapper">
-                        <label for="InitialTrusts">Trust Investments</label>
-                        <input type="number" id="InitialTrusts" class="currency">
+                        <label for="InitialShares">Shares</label>
+                        <input type="number" id="InitialShares" class="currency">
                     </div>
                 </div>
             </div>
@@ -86,13 +86,13 @@
                     </div>
                     
                     <div class="input-wrapper">
-                        <label for="EtfAllocation">ETF Allocation</label>
-                        <div class="percentage-container"><input type="number" id="EtfAllocation" class="percentage" min="0" max="100" step="1" placeholder=" "></div>
+                        <label for="FundsAllocation">Index Funds Allocation</label>
+                        <div class="percentage-container"><input type="number" id="FundsAllocation" class="percentage" min="0" max="100" step="1" placeholder=" "></div>
                     </div>
                     
                     <div class="input-wrapper">
-                        <label for="TrustAllocation">Trust Allocation</label>
-                        <div class="percentage-container"><input type="number" id="TrustAllocation" class="percentage" min="0" max="100" step="1" placeholder=" "></div>
+                        <label for="SharesAllocation">Shares Allocation</label>
+                        <div class="percentage-container"><input type="number" id="SharesAllocation" class="percentage" min="0" max="100" step="1" placeholder=" "></div>
                     </div>
 
                     <div class="input-wrapper">
@@ -127,15 +127,14 @@
                             <td><div class="percentage-container"><input type="number" id="PensionGrowthStdDev" class="percentage" step="1"></div></td>
                         </tr>
                         <tr>
-                            <td>ETFs</td>
-                            <td><div class="percentage-container"><input type="number" id="EtfGrowthRate" class="percentage" step="1"></div></td>
-                            <td><div class="percentage-container"><input type="number" id="EtfGrowthStdDev" class="percentage" step="1"></div></td>
-                            </td>
+                            <td>Index Funds</td>
+                            <td><div class="percentage-container"><input type="number" id="FundsGrowthRate" class="percentage" step="1"></div></td>
+                            <td><div class="percentage-container"><input type="number" id="FundsGrowthStdDev" class="percentage" step="1"></div></td>
                         </tr>
                         <tr>
-                            <td>Trusts</td>
-                            <td><div class="percentage-container"><input type="number" id="TrustGrowthRate" class="percentage" step="1"></div></td>
-                            <td><div class="percentage-container"><input type="number" id="TrustGrowthStdDev" class="percentage" step="1"></div></td>
+                            <td>Shares</td>
+                            <td><div class="percentage-container"><input type="number" id="SharesGrowthRate" class="percentage" step="1"></div></td>
+                            <td><div class="percentage-container"><input type="number" id="SharesGrowthStdDev" class="percentage" step="1"></div></td>
                         </tr>
                         <tr>
                             <td>Inflation</td>
@@ -188,20 +187,20 @@
                     <div class="priority-item" draggable="true" data-priority-id="PriorityPension">
                         <div class="drag-handle">⋮⋮</div>
                         <div class="priority-icon">🏦</div>
-                        <div class="priority-label">Pension</div>
+                        <div class="priority-label">Private Pension</div>
                         <input type="hidden" id="PriorityPension" value="2">
                     </div>
-                    <div class="priority-item" draggable="true" data-priority-id="PriorityETF">
+                    <div class="priority-item" draggable="true" data-priority-id="PriorityFunds">
                         <div class="drag-handle">⋮⋮</div>
                         <div class="priority-icon">📈</div>
-                        <div class="priority-label">ETFs</div>
-                        <input type="hidden" id="PriorityETF" value="3">
+                        <div class="priority-label">Index Funds</div>
+                        <input type="hidden" id="PriorityFunds" value="3">
                     </div>
-                    <div class="priority-item" draggable="true" data-priority-id="PriorityTrust">
+                    <div class="priority-item" draggable="true" data-priority-id="PriorityShares">
                         <div class="drag-handle">⋮⋮</div>
                         <div class="priority-icon">🏢</div>
-                        <div class="priority-label">Trusts</div>
-                        <input type="hidden" id="PriorityTrust" value="4">
+                        <div class="priority-label">Shares</div>
+                        <input type="hidden" id="PriorityShares" value="4">
                     </div>
                 </div>
             </div>
@@ -263,8 +262,8 @@
                             <th data-key="IncomeRSUs">RSUs</th>
                             <th data-key="IncomePrivatePension">P.Pension</th>
                             <th data-key="IncomeStatePension">S.Pension</th>
-                            <th data-key="IncomeEtfRent">ETFs</th>
-                            <th data-key="IncomeTrustRent">Trusts</th>
+                            <th data-key="IncomeFundsRent">Index Funds</th>
+                            <th data-key="IncomeSharesRent">Shares</th>
                             <th data-key="IncomeCash">Cash</th>
                             <th data-key="IT">IT</th>
                             <th data-key="PRSI">PRSI</th>
@@ -277,8 +276,8 @@
                             <th data-key="PensionFund">P.Fund</th>
                             <th data-key="Cash">Cash</th>
                             <th data-key="RealEstateCapital">R.Estate</th>
-                            <th data-key="EtfCapital">ETFs</th>
-                            <th data-key="TrustCapital">Trusts</th>
+                            <th data-key="FundsCapital">Index Funds</th>
+                            <th data-key="SharesCapital">Shares</th>
                             <th data-key="WithdrawalRate">Withdraw%</th>
                             <th data-key="Worth">Worth</th>
                         </tr>

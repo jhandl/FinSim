@@ -28,9 +28,9 @@
   "uscReducedRateMaxIncome": 60000,
   "uscTaxBands": {"0": 0.005, "12012": 0.02, "27382": 0.03, "70044": 0.08},
   "uscReducedTaxBands": {"0": 0.005, "12012": 0.02},
-  "etfDeemedDisposalYears": 8,
-  "etfExitTax": 0.41,
-  "etfCanOffsetLosses": false,
+  "deemedDisposalYears": 8,
+  "FundsExitTax": 0.41,
+  "FundsCanOffsetLosses": false,
   "cgtRate": 0.33,
   "cgtTaxRelief": 1270
 }

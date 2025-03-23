@@ -83,7 +83,7 @@ class FileManager {
       const eventData = deserializeSimulation(content, this.webUI);
       
       // Update drawdown priorities panel
-      const priorityIds = ['PriorityCash', 'PriorityPension', 'PriorityETF', 'PriorityTrust'];
+      const priorityIds = ['PriorityCash', 'PriorityPension', 'PriorityFunds', 'PriorityShares'];
       const prioritiesContainer = document.querySelector('.priorities-container');
       
       if (prioritiesContainer) {

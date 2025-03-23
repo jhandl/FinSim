@@ -3,7 +3,6 @@
 ### Bugs
 - When purchasing real estate, the money seems to come from cash first, even though the priority is etf.
 - The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?
-- ETFs should be called "Index Funds", Trusts should be "Individual Shares"
 
 ### Ideas
 - I learned about finance and investing late in life. There’s a lot like me. Help them get to where I am. (And plan their retirement? No, that’s financial advice)

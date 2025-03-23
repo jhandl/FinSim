@@ -51,13 +51,13 @@ steps:
       side: "right"
       align: "start"
 
-  - element: "#InitialETFs"
+  - element: "#InitialFunds"
     popover:
-      description: "<p>The current value of your ETF investments.</p><p>Keep in mind that since I don't know when you bought those ETFs I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid 8 years into the run and every 8 years thereafter.</p>"
+      description: "<p>The current value of your Index Funds investments.</p><p>Keep in mind that since I don't know when you bought those funds I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid 8 years into the run and every 8 years thereafter.</p>"
       side: "right"
       align: "start"
   
-  - element: "#InitialTrusts"
+  - element: "#InitialShares"
     popover:
       description: "<p>The current value in your investment trusts or stocks.</p>"
       side: "right"
@@ -87,15 +87,15 @@ steps:
       side: "right"
       align: "start"
 
-  - element: "#EtfAllocation"
+  - element: "#FundsAllocation"
     popover:
-      description: "<p>This is the percentage of your portfolio that you plan to have in ETFs.</p><p>Any cash remaining after funding your emergency stash will be invested in ETFs in this proportion.</p><p>The sum of ETFs and Trusts can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
+      description: "<p>This is the percentage of your portfolio that you plan to have in Index Funds.</p><p>Any cash remaining after funding your emergency stash will be invested in Index Funds in this proportion.</p><p>The sum of Index Funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
       side: "right"
       align: "start"
 
-  - element: "#TrustAllocation"
+  - element: "#SharesAllocation"
     popover:
-      description: "<p>This is the percentage of your portfolio that you plan to have in investment trusts or shares.</p><p>Any cash remaining after funding your emergency stash will be invested in trusts or shares in this proportion.</p><p>The sum of ETFs and Trusts can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
+      description: "<p>This is the percentage of your portfolio that you plan to have in investment trusts or shares.</p><p>Any cash remaining after funding your emergency stash will be invested in trusts or shares in this proportion.</p><p>The sum of Index Funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
       side: "right"
       align: "start"
 
@@ -129,25 +129,25 @@ steps:
       side: "right"
       align: "start"
 
-  - element: "#EtfGrowthRate"
+  - element: "#FundsGrowthRate"
     popover:
-      description: "<p>This is the expected average annual growth rate of your ETFs, not adjusted for inflation.</p><p>For reference, the average growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
+      description: "<p>This is the expected average annual growth rate of your Index Funds, not adjusted for inflation.</p><p>For reference, the average growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
       side: "right"
       align: "start"
 
-  - element: "#EtfGrowthStdDev"
+  - element: "#FundsGrowthStdDev"
     popover:
-      description: "<p>This is the expected standard deviation of the annual growth rate of your ETFs.</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
+      description: "<p>This is the expected standard deviation of the annual growth rate of your Index Funds.</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
       side: "right"
       align: "start"
 
-  - element: "#TrustGrowthRate"
+  - element: "#SharesGrowthRate"
     popover:
       description: "<p>This is the expected average annual growth rate of your investment trusts or shares, not adjusted for inflation.</p><p>Keep in mind that investment trusts or shares tend to have higher fees, so take that into account when calculating this number.</p>"
       side: "right"
       align: "start"
 
-  - element: "#TrustGrowthStdDev"
+  - element: "#SharesGrowthStdDev"
     popover:
       description: "<p>This is the expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
       side: "right"

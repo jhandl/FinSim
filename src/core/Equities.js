@@ -67,18 +67,18 @@ class Equity {
 }
 
 
-class ETF extends Equity {
+class IndexFunds extends Equity {
   
   constructor(growth, stdev=0) {
-    super(config.etfExitTax, growth, stdev);
-    this.canOffsetLosses = config.etfCanOffsetLosses;
+    super(config.FundsExitTax, growth, stdev);
+    this.canOffsetLosses = config.FundsCanOffsetLosses;
   }
   
   addYear() {
     super.addYear();
-    // pay deemed disposal taxes for ETFs aged multiple of 8 years
+    // pay deemed disposal taxes for Index Funds aged multiple of 8 years
     for (let i = 0; i < this.portfolio.length; i++) {
-      if ((config.etfDeemedDisposalYears > 0) && (this.portfolio[i].age % config.etfDeemedDisposalYears === 0)) {
+      if ((config.deemedDisposalYears > 0) && (this.portfolio[i].age % config.deemedDisposalYears === 0)) {
         let gains = this.portfolio[i].interest;
         this.portfolio[i].amount += gains;
         this.portfolio[i].interest = 0;
@@ -93,7 +93,7 @@ class ETF extends Equity {
 }
 
 
-class InvestmentTrust extends Equity {
+class Shares extends Equity {
 
   constructor(growth, stdev=0) {
     super(config.cgtRate, growth, stdev);
