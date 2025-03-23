@@ -51,6 +51,7 @@
 - Add countries and a way to select a country
 - Add an event to move to a country
 - Add a way for an AI agent to research a country and generate the config file for it
+- Consider the tax treaties between countries when moving to another country
 - Produce a log of what happened over the years (bought "cuba", sold ETF for $x, couldn't cover expenses, etc)
 - Analyse the log with LLM to produce a summary of what happened and maybe some recommendations
 - Add a way for the user to get an AI explanation of a point in the graph
