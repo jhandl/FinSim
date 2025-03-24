@@ -43,6 +43,13 @@ class Wizard {
         maximumFractionDigits: 0
       }).format(value);
     }
+    if (format === 'percentage') {
+      return new Intl.NumberFormat('en-IE', { 
+        style: 'percent',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(value);
+    }
     return value;
   }
 
@@ -51,12 +58,46 @@ class Wizard {
     const config = Config.getInstance(WebUI.getInstance()); // the Wizard only runs in the website so it's safe to assume that the UI is the WebUI
     if (!config || !text || typeof text !== 'string') return text;
     return text.replace(/\${([^}]+)}/g, (match, variable) => {
-      const [varName, format] = variable.split(',').map(s => s.trim());
-      if (config.hasOwnProperty(varName)) {
-        const value = config[varName];
+      let [varToken, format] = variable.split(',').map(s => s.trim());
+      if (varToken.includes('.')) {
+        const tokens = varToken.split('.');
+        let value = config;
+        for (let i = 0; i < tokens.length - 1; i++) {
+          if (value && typeof value === 'object' && tokens[i] in value) {
+            value = value[tokens[i]];
+          } else {
+            return match;
+          }
+        }
+        const lastToken = tokens[tokens.length - 1];
+        if (value && typeof value === 'object') {
+          if (lastToken in value) {
+            value = value[lastToken];
+          } else if (lastToken === 'min' || lastToken === 'max') {
+            let keys = Object.keys(value).filter(k => !isNaN(parseFloat(k)));
+            if (keys.length === 0) {
+              keys = Object.keys(value);
+            }
+            if (keys.length > 0) {
+              keys.sort((a, b) => parseFloat(a) - parseFloat(b));
+              const chosenKey = lastToken === 'min' ? keys[0] : keys[keys.length - 1];
+              value = value[chosenKey];
+            } else {
+              return match;
+            }
+          } else {
+            return match;
+          }
+        } else {
+          return match;
+        }
         return this.formatValue(value, format);
       }
-      console.warn(`Variable ${varName} not found in config`);
+      if (config.hasOwnProperty(varToken)) {
+        const value = config[varToken];
+        return this.formatValue(value, format);
+      }
+      console.warn(`Variable ${varToken} not found in config`);
       return match; // Keep original if variable not found
     });
   }

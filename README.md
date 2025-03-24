@@ -11,7 +11,7 @@
 
 ### Feedback
 - Escala para ayudar a calcular el rate de sueldo
-- boton para decir "gasto de unica vez" sin tener que poner dos veces el mismo año (y sin rate)
+- Event type para "gasto de unica vez" sin tener que poner dos veces el mismo año (y sin rate)
 - Dar ejemplos de rate de real estate como hice con volatility
     - Para eso estaría bueno fetchear los datos de algún sitio, asignarlos a config y usar una variable
 

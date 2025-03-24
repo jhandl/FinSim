@@ -21,7 +21,7 @@ steps:
         <li>The graphs will show the evolution of your cashflow (how your expenses stack up against your income and where it comes from), and your assets (how much you have accumulated and where), from your current age to your target age.</li>
         <li>The table at the bottom will show you, year by year, the details of your income, taxes, cashflow, and assets.</li></ul></ol>
         <p><b>Stress testing:</b> You can change the economy parameters to see what happens if inflation is higher, investments grow slower or are more volatile, etc. You can further stress test your scenario by adding a stock market crash or two.</p>
-        <p><b>Volatility:</b> If you introduce volatility in any of your investments (anything higher than 0%), it will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp). This runs the simulation ${simulationRuns} times, each time with random rates of growth according to a normal distribution with the median and standard deviation you provided, and it tells you how likely your scenario will succeed in those conditions (the percentage of those simulations that ended in success).</p><p>&nbsp;&nbsp;The graphs will represent the average of all the runs. You may be surprised to see non-zero amounts of money remaining in the assets graph past the expected failure age. This is due to the percentage of runs that were successful due to random chance. You may also be surprised by a lower than expected success rate, when the scenario seems to work well for 0% volatility. This is the result of the erosion of returns due to volatility ($100 + 10% = $110; $110 - 10% = $99).</p><p>&nbsp;&nbsp;If you leave the volatility at 0% for all three investment vehicles, the simulation will run once, without any variability, and it will tell you at what age you ran out of money. If you want to see the effect of a change in your scenario, it's best to set the volatility to zero. That way it's deterministic, and any change in outcome is the direct result of the change to your scenario. Once you introduce volatility, the only meaningful outcome is the percentage of success.</p>
+        <p><b>Volatility:</b> If you introduce volatility in any of your investments (anything higher than 0%), it will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp). This runs the simulation ${simulationRuns} times, each time with random rates of growth according to a normal distribution with the median and standard deviation you provided, and it tells you how likely your scenario will succeed in those conditions (the percentage of those simulations that ended in success).</p><p>&nbsp;&nbsp;The graphs will represent the average of all the runs. You may be surprised to see non-zero amounts of money remaining in the assets graph past the expected failure age. This is due to the percentage of runs that were successful due to random chance. You may also be surprised by a lower than expected success rate, when the scenario seems to work well for 0% volatility. This is the result of the erosion of returns due to volatility ($100 - 10% = $90; $90 + 10% = $99).</p><p>&nbsp;&nbsp;If you leave the volatility at 0% for all three investment vehicles, the simulation will run once, without any variability, and it will tell you at what age you ran out of money. If you want to see the effect of a change in your scenario, it's best to set the volatility to zero. That way it's deterministic, and any change in outcome is the direct result of the change to your scenario. Once you introduce volatility, the only meaningful outcome is the percentage of success.</p>
         <p><b>Saving scenarios:</b> To avoid losing your scenario when you close the browser window, use the "Save" button so you can load it again next time. You can name the file so you can store all your scenarios.</p>
         <p><b>Help system:</b> If you are editing a field and press the Help button or the ? key, you will get help for that specific field. You can navigate the help cards with the buttons on the cards, with the arrow keys and with &lt;tab&gt; and &lt;shift-tab&gt;, and you can leave the help system with &lt;Esc&gt; or clicking outside of the help card.</p>
       prevBtnText: ["← Welcome"]
@@ -53,7 +53,7 @@ steps:
 
   - element: "#InitialFunds"
     popover:
-      description: "<p>The current value of your Index Funds investments.</p><p>Keep in mind that since I don't know when you bought those funds I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid 8 years into the run and every 8 years thereafter.</p>"
+      description: "<p>The current value of your index funds investments (e.g. ETFs).</p><p>Keep in mind that since I don't know when you bought those funds I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid ${deemedDisposalYears} years into the run and every ${deemedDisposalYears} years thereafter.</p>"
       side: "right"
       align: "start"
   
@@ -89,19 +89,19 @@ steps:
 
   - element: "#FundsAllocation"
     popover:
-      description: "<p>This is the percentage of your portfolio that you plan to have in Index Funds.</p><p>Any cash remaining after funding your emergency stash will be invested in Index Funds in this proportion.</p><p>The sum of Index Funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
+      description: "<p>This is the percentage of your portfolio that you plan to have in index funds (e.g. ETFs).</p><p>Any cash remaining after funding your emergency stash will be invested in index funds in this proportion.</p><p>The sum of index funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
       side: "right"
       align: "start"
 
   - element: "#SharesAllocation"
     popover:
-      description: "<p>This is the percentage of your portfolio that you plan to have in investment trusts or shares.</p><p>Any cash remaining after funding your emergency stash will be invested in trusts or shares in this proportion.</p><p>The sum of Index Funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
+      description: "<p>This is the percentage of your portfolio that you plan to have in investment trusts or shares.</p><p>Any cash remaining after funding your emergency stash will be invested in trusts or shares in this proportion.</p><p>The sum of index funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
       side: "right"
       align: "start"
 
   - element: "#PensionContributionPercentage"
     popover:
-      description: "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age (15% to 40%). Do not include employer matching contributions here; there's another place for that.</p>"
+      description: "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age (${pensionContributionRateBands.min, percentage} to ${pensionContributionRateBands.max, percentage}). Do not include employer matching contributions here; there's another place for that.</p>"
       side: "right"
       align: "start"
 
@@ -131,13 +131,13 @@ steps:
 
   - element: "#FundsGrowthRate"
     popover:
-      description: "<p>This is the expected average annual growth rate of your Index Funds, not adjusted for inflation.</p><p>For reference, the average growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
+      description: "<p>This is the expected average annual growth rate of your index funds (e.g. ETFs), not adjusted for inflation.</p><p>For reference, the average growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
       side: "right"
       align: "start"
 
   - element: "#FundsGrowthStdDev"
     popover:
-      description: "<p>This is the expected standard deviation of the annual growth rate of your Index Funds.</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
+      description: "<p>This is the expected standard deviation of the annual growth rate of your index funds (e.g. ETFs).</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
       side: "right"
       align: "start"
 
@@ -155,7 +155,7 @@ steps:
 
   - element: "#Inflation"
     popover:
-      description: "<p>This is the expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of around 2%. However, deviations due to shocks (e.g., pandemics, wars, etc) can cause deviations that are skewed towards higher numbers. For example, [in 2019 inflation in Ireland was 1.3%](https://www.cso.ie/en/releasesandpublications/er/cpi/consumerpriceindexdecember2019/), lower than its [30-year average of 2.3%](https://www.officialdata.org/ireland/inflation/1993?endYear=2024&amount=100). In contrast, [in 2022 it rose to 8.2%](https://www.cso.ie/en/releasesandpublications/ep/p-cpi/consumerpriceindexdecember2022/), the highest since 1984.</p>"
+      description: "<p>This is the expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of 2% to 3%. However, deviations due to shocks (e.g., pandemics, wars, etc) can cause deviations that are skewed towards higher numbers. For example, [in 2019 inflation in Ireland was 1.3%](https://www.cso.ie/en/releasesandpublications/er/cpi/consumerpriceindexdecember2019/), lower than its [30-year average of 2.3%](https://www.officialdata.org/ireland/inflation/1993?endYear=2024&amount=100). In contrast, [in 2022 it rose to 8.2%](https://www.cso.ie/en/releasesandpublications/ep/p-cpi/consumerpriceindexdecember2022/), the highest since 1984.</p>"
       side: "right"
       align: "start"
 
