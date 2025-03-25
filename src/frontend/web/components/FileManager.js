@@ -118,8 +118,8 @@ class FileManager {
       this.webUI.eventsTableManager.eventRowCounter = 0;
       eventData.forEach(([type, name, amount, fromAge, toAge, rate, match]) => {
         if (type) {
-          const displayRate = (rate !== undefined && rate !== '') ? (rate * 100).toString() : '';
-          const displayMatch = (match !== undefined && match !== '') ? (match * 100).toString() : '';
+          const displayRate = (rate !== undefined && rate !== '') ? String(parseFloat((Number(rate) * 100).toFixed(2))) : '';
+          const displayMatch = (match !== undefined && match !== '') ? String(parseFloat((Number(match) * 100).toFixed(2))) : '';
           const row = this.webUI.eventsTableManager.createEventRow(type, name, amount, fromAge || '', toAge || '', displayRate, displayMatch);
           tbody.appendChild(row);
         }
