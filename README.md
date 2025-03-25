@@ -1,13 +1,12 @@
 # Roadmap
 
-### Bugs
+### Bugs?
 - When purchasing real estate, the money seems to come from cash first, even though the priority is etf.
 - The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?
 
 ### Ideas
 - I learned about finance and investing late in life. There’s a lot like me. Help them get to where I am. (And plan their retirement? No, that’s financial advice)
 - Add an event to change the pension contribution rate.
-
 
 ### Feedback
 - Escala para ayudar a calcular el rate de sueldo
@@ -16,18 +15,13 @@
     - Para eso estaría bueno fetchear los datos de algún sitio, asignarlos a config y usar una variable
 
 ## Version 2 - "Web version"
-- Review pension types and minimum retirement ages (ChatGPT “Pension Types in Ireland”) 
---
-- Add a way to view and override config settings (like DD)
-- Add a link to FinSim.ie in the spreadsheet
-- Add ability to fetch data from the web / google sheets
 - Move the urls from the help yaml to the config file and use variables in the yaml
+- Review pension types and minimum retirement ages (ChatGPT “Pension Types in Ireland”) 
+- Add ability to fetch data from the web / google sheets
 
 ## Version 3 - "Modernize"
 - Make things more generic so they apply to different systems (notepad "Generic Tax System").
---
 - Move core (only premium features) to backend (initially my mac, then Google functions or AWS lambda), ideally with toggle to still run in the browser for dev.
---
 - Reimplement the UI in React
 
 ## Version 4 - "Complete"
