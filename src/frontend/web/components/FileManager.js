@@ -1,5 +1,3 @@
-/* File management functionality */
-
 class FileManager {
 
   constructor(webUI) {
@@ -71,67 +69,65 @@ class FileManager {
   async loadFromFile(file) {
     if (!file) return;
     const scenarioName = file.name.replace('.csv', '');
-    this.webUI.setScenarioName(scenarioName);
-
-    this.webUI.tableManager.clearContent('Events');
-    this.webUI.tableManager.clearExtraDataRows(0);
-    this.webUI.chartManager.clearExtraChartRows(0);
     const fileInput = document.getElementById('loadSimulationDialog');
-
     try {
       const content = await file.text();
-      const eventData = deserializeSimulation(content, this.webUI);
-      
-      // Update drawdown priorities panel
-      const priorityIds = ['PriorityCash', 'PriorityPension', 'PriorityFunds', 'PriorityShares'];
-      const prioritiesContainer = document.querySelector('.priorities-container');
-      
-      if (prioritiesContainer) {
-        // Sort priority items based on their values
-        const priorityValues = priorityIds.map(id => ({
-          id: id,
-          value: parseInt(this.webUI.getValue(id)) || 0,
-          element: prioritiesContainer.querySelector(`[data-priority-id="${id}"]`)
-        })).sort((a, b) => a.value - b.value);
-
-        // Reorder elements in the DOM
-        priorityValues.forEach(item => {
-          if (item.element) {
-            prioritiesContainer.appendChild(item.element);
-            // Update the hidden input value
-            const input = item.element.querySelector('input');
-            if (input) {
-              input.value = item.value;
-            }
-          }
-        });
-      }
-      
-      // Clear and rebuild events table
-      const tbody = document.querySelector('#Events tbody');
-      if (tbody) {
-        tbody.innerHTML = ''; // Clear existing rows
-        this.webUI.eventsTableManager.eventRowCounter = 0;
-        eventData.forEach(([type, name, amount, fromAge, toAge, rate, match]) => {
-          if (type) {
-            // Convert decimal rate and match to percentage for display
-            const displayRate = (rate !== undefined && rate !== '') ? (rate * 100).toString() : '';
-            const displayMatch = (match !== undefined && match !== '') ? (match * 100).toString() : '';
-            
-            const row = this.webUI.eventsTableManager.createEventRow(type, name, amount, fromAge || '', toAge || '', displayRate, displayMatch);
-            tbody.appendChild(row);
-          }
-        });
-        this.webUI.formatUtils.setupCurrencyInputs();
-        this.webUI.formatUtils.setupPercentageInputs();
-      }
-      this.webUI.setStatus("Ready");
+      this.loadFromString(content, scenarioName);
     } catch (error) {
+      console.error(error);
       this.webUI.notificationUtils.showAlert('Error loading file: Please make sure this is a valid simulation save file.');
       return;
     } finally {
       if (fileInput) fileInput.value = '';
     }
+  }
+
+  async loadFromUrl(url, name) {
+    const content = await this.fetchUrl(url);
+    this.loadFromString(content, name);
+  }
+
+  loadFromString(content, name) {
+    this.webUI.tableManager.clearContent('Events');
+    this.webUI.tableManager.clearExtraDataRows(0);
+    this.webUI.chartManager.clearExtraChartRows(0);
+    this.webUI.setScenarioName(name);
+    const eventData = deserializeSimulation(content, this.webUI);
+    const priorityIds = ['PriorityCash', 'PriorityPension', 'PriorityFunds', 'PriorityShares'];
+    const prioritiesContainer = document.querySelector('.priorities-container');
+    if (prioritiesContainer) {
+      const priorityValues = priorityIds.map(id => ({
+        id: id,
+        value: parseInt(this.webUI.getValue(id)) || 0,
+        element: prioritiesContainer.querySelector(`[data-priority-id="${id}"]`)
+      })).sort((a, b) => a.value - b.value);
+
+      priorityValues.forEach(item => {
+        if (item.element) {
+          prioritiesContainer.appendChild(item.element);
+          const input = item.element.querySelector('input');
+          if (input) {
+            input.value = item.value;
+          }
+        }
+      });
+    }
+    const tbody = document.querySelector('#Events tbody');
+    if (tbody) {
+      tbody.innerHTML = '';
+      this.webUI.eventsTableManager.eventRowCounter = 0;
+      eventData.forEach(([type, name, amount, fromAge, toAge, rate, match]) => {
+        if (type) {
+          const displayRate = (rate !== undefined && rate !== '') ? (rate * 100).toString() : '';
+          const displayMatch = (match !== undefined && match !== '') ? (match * 100).toString() : '';
+          const row = this.webUI.eventsTableManager.createEventRow(type, name, amount, fromAge || '', toAge || '', displayRate, displayMatch);
+          tbody.appendChild(row);
+        }
+      });
+      this.webUI.formatUtils.setupCurrencyInputs();
+      this.webUI.formatUtils.setupPercentageInputs();
+    }
+    this.webUI.setStatus("Ready");
   }
 
   fetchUrl(url) {

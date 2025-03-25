@@ -16,8 +16,6 @@
     - Para eso estaría bueno fetchear los datos de algún sitio, asignarlos a config y usar una variable
 
 ## Version 2 - "Web version"
-- Remove the "user manual" and use the Help button for that.
-- Add a link to an example in the main help page, that loads a file from github
 - Review pension types and minimum retirement ages (ChatGPT “Pension Types in Ireland”) 
 --
 - Add a way to view and override config settings (like DD)

@@ -196,7 +196,7 @@ class WebUI extends AbstractUI {
     }
     const userManualButton = document.getElementById('userManual');
     if (userManualButton) {
-      userManualButton.addEventListener('click', () => wizard.start(1));
+      userManualButton.addEventListener('click', () => wizard.start(0));
     }
     document.addEventListener('keydown', function(event) {
       if (event.key === '?') {

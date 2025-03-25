@@ -228,7 +228,7 @@ class Wizard {
 
     this.validSteps = this.filterValidSteps();
 
-    let startingStepIndex = fromStep ? fromStep : (this.lastFocusedWasInput ? (this.getLastFocusedFieldIndex() || this.lastStepIndex) : this.lastStepIndex);
+    let startingStepIndex = fromStep !== undefined ? fromStep : (this.lastFocusedWasInput ? (this.getLastFocusedFieldIndex() || this.lastStepIndex) : this.lastStepIndex);
     if (startingStepIndex > 1 && startingStepIndex < this.validSteps.length) {
       const element = document.querySelector(this.validSteps[startingStepIndex].element);
       if (element) {
@@ -264,7 +264,21 @@ class Wizard {
         }
         this.tour.movePrevious();
       },
-      onDestroyStarted: () => this.finishTour()
+      onDestroyStarted: () => this.finishTour(),
+      onHighlighted: (element) => {
+        // Look for the static button in the help popover for 'How to use the simulator'
+        const popover = document.querySelector('.driver-popover');
+        if (popover) {
+          const btn = popover.querySelector('#load-example-scenario');
+          if (btn && !btn.getAttribute('data-click-attached')) {
+            btn.setAttribute('data-click-attached', 'true');
+            btn.addEventListener('click', () => {
+              WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
+              this.finishTour();
+            });
+          }
+        }
+      }
     });
 
     document.addEventListener('keydown', this.handleKeys);
