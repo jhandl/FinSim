@@ -1,12 +1,17 @@
 /* DOM manipulation utility functions */
 
-class DOMUtils {
+import FormatUtils from './FormatUtils.js'; // Import local utility
+
+export default class DOMUtils {
 
   static getValue(elementId) {
     const element = document.getElementById(elementId);
-    if (!element) throw new Error(`Element not found: ${elementId}`);
+    if (!element) {
+        console.warn(`Element not found: ${elementId}`);
+        return undefined;
+    }
     if (element.value !== undefined) {
-      let value = element.value;        
+      let value = element.value;
       // If value is empty string, return undefined
       if (value === '') {
         return undefined;
@@ -20,28 +25,41 @@ class DOMUtils {
       if (element.classList.contains('boolean')) {
         return value === 'Yes';
       }
+      // Try parsing as float, return undefined if NaN, otherwise return the number
       const parsed = parseFloat(value);
       return isNaN(parsed) ? undefined : parsed;
-    } 
+    }
+    // Fallback for non-input elements (though less common for getValue)
     return element.textContent;
   }
 
   static setValue(elementId, value) {
     const element = document.getElementById(elementId);
-    if (!element) throw new Error(`Element not found: ${elementId}`);
+     if (!element) {
+        console.warn(`Element not found: ${elementId}`);
+        return;
+    }
+    const displayValue = (value === null || value === undefined) ? '' : value;
+
     if (element.value !== undefined) {
-      if (element.classList.contains('currency')) {
-        element.value = FormatUtils.formatCurrency(value);
+      if (displayValue === '') {
+          element.value = '';
+      } else if (element.classList.contains('currency')) {
+        element.value = FormatUtils.formatCurrency(displayValue);
       } else if (element.classList.contains('percentage')) {
-        element.value = FormatUtils.formatPercentage(value).replace('%', '');
+        // FormatUtils.formatPercentage returns string with '%', remove it for input value
+        element.value = FormatUtils.formatPercentage(displayValue).replace('%', '');
       } else if (element.classList.contains('boolean')) {
-        element.value = FormatUtils.formatBoolean(value);
+        element.value = FormatUtils.formatBoolean(displayValue);
       } else {
-        element.value = value;
+        element.value = displayValue; // Set the raw value for other input types
       }
+      // Trigger change event manually if needed, as programmatic changes don't fire it
+      // element.dispatchEvent(new Event('change', { bubbles: true }));
     } else {
-      element.textContent = value;
+      // For non-input elements, set textContent
+      element.textContent = displayValue;
     }
   }
 
-} 
+}

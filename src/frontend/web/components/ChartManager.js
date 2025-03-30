@@ -1,11 +1,15 @@
 /* Chart management functionality */
 
-class ChartManager {
+import Chart from 'chart.js/auto'; // Import Chart.js library
+import FormatUtils from '../utils/FormatUtils.js'; // Import local utility
+
+export default class ChartManager {
 
   constructor() {
     try {
       this.setupCharts();
     } catch (error) {
+      console.error("Chart setup failed:", error); // Log error
       // Continue without charts rather than breaking the whole app
       this.chartsInitialized = false;
     }
@@ -18,7 +22,7 @@ class ChartManager {
       if (!cashflowCtx) {
         throw new Error("Missing cashflowGraph element");
       }
-      
+
       // Make sure we can get a 2D context
       try {
         const cashflowCtx2D = cashflowCtx.getContext('2d');
@@ -28,7 +32,7 @@ class ChartManager {
       } catch (ctxError) {
         throw ctxError;
       }
-      
+
       const commonScaleOptions = {
         y: {
           stacked: true,
@@ -37,14 +41,17 @@ class ChartManager {
         x: {
           ticks: {
             callback: function(value, index, values) {
-              return this.chart.data.labels[index];
+              // 'this' refers to the scale object, use chart instance passed via context if needed
+              // Or access labels directly if chart instance is stored on ChartManager
+              // Assuming labels are updated elsewhere and accessible via chart instance
+              return this.chart.data.labels[index] !== undefined ? this.chart.data.labels[index] : '';
             },
             maxRotation: 0,
             minRotation: 0
           }
         }
       };
-      
+
       // Add common tooltip configuration
       const commonOptions = {
         responsive: true,
@@ -64,16 +71,8 @@ class ChartManager {
                   label += ': ';
                 }
                 if (context.parsed.y !== null) {
-                  // Check if FormatUtils is available
-                  if (typeof FormatUtils !== 'undefined' && FormatUtils.formatCurrency) {
-                    label += FormatUtils.formatCurrency(context.parsed.y);
-                  } else {
-                    // Fallback if FormatUtils isn't available
-                    label += new Intl.NumberFormat('en-IE', {
-                      style: 'currency',
-                      currency: 'EUR'
-                    }).format(context.parsed.y);
-                  }
+                  // FormatUtils is imported now
+                  label += FormatUtils.formatCurrency(context.parsed.y);
                 }
                 return label;
               }
@@ -82,7 +81,7 @@ class ChartManager {
         },
         scales: commonScaleOptions
       };
-      
+
       this.cashflowChart = new Chart(cashflowCtx.getContext('2d'), {
         type: 'line',
         data: {
@@ -205,18 +204,18 @@ class ChartManager {
             },
             legend: {
               position: 'right',
-              onClick: null
+              onClick: null // Disable legend item click
             }
           }
         }
       });
-      
+
       // Setup Assets Chart
       const assetsCtx = document.getElementById('assetsGraph');
       if (!assetsCtx) {
         throw new Error("Missing assetsGraph element");
       }
-      
+
       this.assetsChart = new Chart(assetsCtx.getContext('2d'), {
         type: 'line',
         data: {
@@ -282,27 +281,29 @@ class ChartManager {
             },
             legend: {
               position: 'right',
-              onClick: null
+              onClick: null // Disable legend item click
             }
           }
         }
       });
-      
+
       // Set flag indicating that charts were initialized correctly
       this.chartsInitialized = true;
     } catch (error) {
       this.chartsInitialized = false;
-      throw error;
+      throw error; // Re-throw error after setting flag
     }
   }
 
   updateChartsRow(rowIndex, data) {
     try {
-      if (!this.chartsInitialized) {
+      if (!this.chartsInitialized || !this.cashflowChart || !this.assetsChart) {
         return;
       }
-      
-      const i = rowIndex-1;
+
+      const i = rowIndex - 1;
+      if (i < 0) return; // Ignore invalid index
+
       // Update Cashflow Chart
       this.cashflowChart.data.labels[i] = data.Age;
       this.cashflowChart.data.datasets[0].data[i] = data.NetIncome;
@@ -327,6 +328,7 @@ class ChartManager {
       this.assetsChart.data.datasets[4].data[i] = data.RealEstateCapital;
       this.assetsChart.update();
     } catch (error) {
+      console.error("Error updating charts:", error); // Log error
       // Silently fail as this is not critical
     }
   }
@@ -336,29 +338,30 @@ class ChartManager {
       if (!this.chartsInitialized) {
         return;
       }
-      
+
       if (this.cashflowChart) {
         const maxAgeIndex = this.cashflowChart.data.labels.findIndex(label => label === maxAge);
-        if (maxAgeIndex !== -1) {
-          this.cashflowChart.data.labels = this.cashflowChart.data.labels.slice(0, maxAgeIndex + 1);
+        if (maxAgeIndex !== -1 && maxAgeIndex + 1 < this.cashflowChart.data.labels.length) {
+          this.cashflowChart.data.labels.length = maxAgeIndex + 1; // Truncate labels array
           this.cashflowChart.data.datasets.forEach(dataset => {
-            dataset.data = dataset.data.slice(0, maxAgeIndex + 1);
+            dataset.data.length = maxAgeIndex + 1; // Truncate data arrays
           });
-        };
-        this.cashflowChart.update();
+          this.cashflowChart.update();
+        }
       }
       if (this.assetsChart) {
         const maxAgeIndex = this.assetsChart.data.labels.findIndex(label => label === maxAge);
-        if (maxAgeIndex !== -1) {
-          this.assetsChart.data.labels = this.assetsChart.data.labels.slice(0, maxAgeIndex + 1);
+         if (maxAgeIndex !== -1 && maxAgeIndex + 1 < this.assetsChart.data.labels.length) {
+          this.assetsChart.data.labels.length = maxAgeIndex + 1; // Truncate labels array
           this.assetsChart.data.datasets.forEach(dataset => {
-            dataset.data = dataset.data.slice(0, maxAgeIndex + 1);
+            dataset.data.length = maxAgeIndex + 1; // Truncate data arrays
           });
-        };
-        this.assetsChart.update();
+          this.assetsChart.update();
+        }
       }
     } catch (error) {
+      console.error("Error clearing extra chart rows:", error); // Log error
       // Silently fail as this is not critical
     }
   }
-} 
+}

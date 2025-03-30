@@ -1,6 +1,7 @@
 /* Event management functionality */
 
-class EventsTableManager {
+// Assume UIManager is loaded globally for GAS compatibility
+export default class EventsTableManager {
 
   constructor(webUI) {
     this.webUI = webUI;
@@ -45,7 +46,9 @@ class EventsTableManager {
 
   updateFieldVisibility(typeSelect) {
     const row = typeSelect.closest('tr');
+    if (!row) return; // Exit if row not found
     const eventType = typeSelect.value;
+    // UIManager is global
     const required = UIManager.getRequiredFields(eventType);
     UIManager.getFields().forEach(field => {
       const colIndex = UIManager.getIndexForField(field);
@@ -53,17 +56,20 @@ class EventsTableManager {
       if (cell) {
         const input = cell.querySelector('input');
         if (input) {
+          // Use 'hidden' for visibility to maintain layout
           input.style.visibility = required[field] === 'hidden' ? 'hidden' : 'visible';
         }
       }
     });
     const rateInput = row.querySelector('.event-rate');
     if (rateInput) {
+        // Set placeholder based on whether rate is optional
         rateInput.placeholder = (!required || !required.rate || required.rate === 'optional') ? 'inflation' : '';
     }
   }
 
   generateEventRowId() {
+      // Simple counter, might need adjustment if rows are reordered/deleted frequently in complex ways
       return `row_${++this.eventRowCounter}`;
   }
 
@@ -71,7 +77,6 @@ class EventsTableManager {
     const rowId = this.generateEventRowId();
     const row = document.createElement('tr');
     row.dataset.rowId = rowId;
-    
     row.innerHTML = `
       <td>
           <select id="EventType_${rowId}" class="event-type">
@@ -102,28 +107,28 @@ class EventsTableManager {
     const row = this.createEventRow();
     tbody.appendChild(row);
 
+    // Apply formatting to the newly added row
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
   }
 
   getEventTypeOptions(selectedType = '') {
     const eventTypes = [
-      'NOP:No Operation',
-      'RI:Rental Income',
-      'SI:Salary Income',
-      'SInp:Salary (No Pension)',
-      'UI:RSU Income',
-      'DBI:Defined Benefit Income',
-      'FI:Tax-free Income',
-      'E:Expense',
-      'R:Real Estate',
-      'M:Mortgage',
-      'SM:Stock Market'
+      { value: 'NOP', label: 'No Operation' },
+      { value: 'RI', label: 'Rental Income' },
+      { value: 'SI', label: 'Salary Income' },
+      { value: 'SInp', label: 'Salary (No Pension)' },
+      { value: 'UI', label: 'RSU Income' },
+      { value: 'DBI', label: 'Defined Benefit Income' },
+      { value: 'FI', label: 'Tax-free Income' },
+      { value: 'E', label: 'Expense' },
+      { value: 'R', label: 'Real Estate' },
+      { value: 'M', label: 'Mortgage' },
+      { value: 'SM', label: 'Stock Market' }
     ];
     return eventTypes.map(type => {
-      const [value, label] = type.split(':');
-      return `<option value="${value}" ${value === selectedType ? 'selected' : ''}>${label}</option>`;
+      return `<option value="${type.value}" ${type.value === selectedType ? 'selected' : ''}>${type.label}</option>`;
     }).join('');
   }
 
-} 
+}

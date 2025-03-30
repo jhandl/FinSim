@@ -1,0 +1,22 @@
+{
+  "name": "finsim",
+  "version": "1.0.0",
+  "description": "### Bugs? - When purchasing real estate, the money seems to come from cash first, even though the priority is etf. - The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^6.2.3"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.8",
+    "driver.js": "^1.3.5",
+    "js-yaml": "^4.1.0"
+  }
+}

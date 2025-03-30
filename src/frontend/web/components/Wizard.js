@@ -1,9 +1,15 @@
-var wizard_instance = null;
+import * as Driver from 'driver.js'; // Use namespace import
+import yaml from 'js-yaml';
+import { WebUI } from '../WebUI.js'; // Use named import
 
-class Wizard {
+// Assume Config and UIManager are globally available
+
+let wizard_instance = null; // Module-scoped singleton instance
+
+export default class Wizard {
 
   constructor() {
-    this.driver = window.driver.js.driver;
+    this.driver = Driver.default || Driver.driver || Driver; // Try default export, then named export, then namespace
     this.tour = null;
     this.config = null;
     this.lastFocusedField = null;
@@ -24,7 +30,7 @@ class Wizard {
     return wizard_instance;
   }
 
-  
+
   processMarkdownLinks(text) {
     if (!text) return text;
     return text.replace(
@@ -36,15 +42,15 @@ class Wizard {
   // Helper function to format numbers based on type
   formatValue(value, format) {
     if (format === 'currency') {
-      return new Intl.NumberFormat('en-IE', { 
-        style: 'currency', 
+      return new Intl.NumberFormat('en-IE', {
+        style: 'currency',
         currency: 'EUR',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
       }).format(value);
     }
     if (format === 'percentage') {
-      return new Intl.NumberFormat('en-IE', { 
+      return new Intl.NumberFormat('en-IE', {
         style: 'percent',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
@@ -132,9 +138,9 @@ class Wizard {
         }
       });
       const yamlText = await response.text();
-      
-      this.config = this.processVariablesInObject(jsyaml.load(yamlText));
-      
+
+      this.config = this.processVariablesInObject(yaml.load(yamlText)); // Use imported yaml
+
       // Process markdown links in descriptions
       if (this.config.steps) {
         this.config.steps = this.config.steps.map(step => {
@@ -166,7 +172,7 @@ class Wizard {
     const rateInput = row.querySelector(`input#EventRate_${rowId}`);
     const matchInput = row.querySelector(`input#EventMatch_${rowId}`);
 
-    const hasNonDefaultValues = 
+    const hasNonDefaultValues =
         (typeSelect && typeSelect.value && typeSelect.value !== "NOP") ||
         (nameInput && nameInput.value.trim() !== '') ||
         (amountInput && amountInput.value.trim() !== '') ||
@@ -183,7 +189,7 @@ class Wizard {
         focusedRow,
         rowId
     };
-    
+
     return state;
   }
 
@@ -192,7 +198,7 @@ class Wizard {
 
     this.tableState = this.getEventTableState();
     const configCopy = JSON.parse(JSON.stringify(this.config));
-    
+
     return configCopy.steps.filter(step => {
       // Steps without elements are always valid
       if (!step.element) return true;
@@ -224,6 +230,10 @@ class Wizard {
   async start(fromStep = undefined) {
     if (!this.config) {
       await this.loadConfig();
+       if (!this.config) { // Check again after loading attempt
+          console.error("Wizard cannot start without configuration.");
+          return;
+      }
     }
 
     this.validSteps = this.filterValidSteps();
@@ -237,10 +247,9 @@ class Wizard {
     }
 
     this.tour = this.driver({
-      showProgress: true,
+      showProgress: false,
       animate: true,
       smoothScroll: true,
-      showProgress: false,
       overlayOpacity: 0.5,
       allowKeyboardControl: false,
       steps: this.validSteps,
@@ -287,9 +296,10 @@ class Wizard {
   }
 
   getLastFocusedFieldIndex() {
+     if (!this.lastFocusedField) return null;
     const index = this.validSteps.findIndex(step => {
-      let elementSelector = step.element;
-      const stepElement = document.querySelector(elementSelector);
+      if (!step.element) return false; // Skip steps without elements
+      const stepElement = document.querySelector(step.element);
       return stepElement === this.lastFocusedField;
     });
     return index >= 0 ? index : null;
@@ -308,8 +318,11 @@ class Wizard {
 
   finishTour() {
     document.removeEventListener('keydown', this.handleKeys);
-    this.lastStepIndex = this.tour.getActiveIndex()
-    this.tour.destroy();
+     if (this.tour && this.tour.isActive()) {
+        this.lastStepIndex = this.tour.getActiveIndex(); // Store last index before destroying
+        this.tour.destroy();
+    }
+    this.tour = null; // Clear tour instance
   }
 
   handleKeys(event) {

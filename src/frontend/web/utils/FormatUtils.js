@@ -1,11 +1,11 @@
 /* Formatting utility functions */
 
-class FormatUtils {
-  
+export default class FormatUtils {
+
   static formatCurrency(value) {
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return value;
-    
+
     return numValue.toLocaleString('en-IE', {
       style: 'currency',
       currency: 'EUR',
@@ -17,7 +17,7 @@ class FormatUtils {
   static formatPercentage(value) {
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return value;
-    
+
     // If value is decimal (< 1), multiply by 100
     const displayValue = numValue <= 1 ? (numValue * 100) : numValue;
     // Format with at most 1 decimal place, and remove .0 if present
@@ -55,7 +55,7 @@ class FormatUtils {
         container.className = 'percentage-container';
         input.parentNode.insertBefore(container, input);
         container.appendChild(input);
-        
+
         // Add placeholder if it's an optional rate input
         if (input.classList.contains('event-rate')) {
           const rowId = input.id.split('_')[1];
@@ -108,7 +108,7 @@ class FormatUtils {
 
   setupCurrencyInputs() {
     const currencyInputs = document.querySelectorAll('input.currency');
-    
+
     // Create container elements all at once
     currencyInputs.forEach(input => {
       if (!input.parentElement.classList.contains('currency-container')) {
@@ -128,16 +128,16 @@ class FormatUtils {
     currencyInputs.forEach(input => {
       input.addEventListener('focus', function() {
         // On focus, show the raw number
-        const value = FormatUtils.parseCurrency(this.value);
+        const value = FormatUtils.parseCurrency(this.value); // Use static method
         if (!isNaN(value)) {
           this.value = value;
         }
       });
 
       input.addEventListener('blur', function() {
-        const value = FormatUtils.parseCurrency(this.value);
+        const value = FormatUtils.parseCurrency(this.value); // Use static method
         if (!isNaN(value)) {
-          this.value = FormatUtils.formatCurrency(value);
+          this.value = FormatUtils.formatCurrency(value); // Use static method
         }
       });
 
@@ -146,10 +146,10 @@ class FormatUtils {
       if (value && value.indexOf('€') === -1) {
         const number = parseFloat(value);
         if (!isNaN(number)) {
-          input.value = FormatUtils.formatCurrency(number);
+          input.value = FormatUtils.formatCurrency(number); // Use static method
         }
       }
     });
   }
 
-} 
+}

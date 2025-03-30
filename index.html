@@ -43,22 +43,11 @@
         });
     </script>
     
-    <!-- SPA router script -->
-    <script src="/src/frontend/web/spa-router.js" onerror="handleScriptError(event)"></script>
     
-    <script>
-        function handleScriptError(event) {
-            console.error('Failed to load script:', event.target.src);
-            document.getElementById('app-container').innerHTML = `
-                <div style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif;">
-                    <h1 style="color: #d32f2f;">Error Loading Application</h1>
-                    <p style="margin: 20px 0;">The application could not be loaded because a required script failed to load:</p>
-                    <p style="margin: 20px 0;">${event.target.src}</p>
-                    <button style="background-color: #2196F3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;" onclick="window.location.reload()">Reload Page</button>
-                </div>
-            `;
-        }
-    </script>
+    <!-- SPA router script (loaded as module) -->
+    <script type="module" src="/src/frontend/web/spa-router.js"></script>
+    
+    <!-- Redundant error handler script removed -->
 </body>
 </html>
 

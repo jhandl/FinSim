@@ -27,8 +27,8 @@ class Config {
       Object.assign(this, config);
     } catch (err) {
       console.error('Error loading configuration:', err);
-      this.ui.showAlert("Can't load configuration file for version "+version);
-      throw new Error("Error loading configuration:"+err);
+      this.ui.showAlert("Can't load configuration file for version " + version);
+      throw new Error("Error loading configuration:" + err);
     }
   }
 
