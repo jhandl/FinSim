@@ -283,6 +283,7 @@ function handleInvestments() {
   if (expenses > netIncome) {
     switch (phase) {
       case Phases.growth:
+        console.log("Withdrawing from cash (), funds, and shares");
         withdraw(params.priorityCash, 0, params.priorityFunds, params.priorityShares);  // taken from user configuration, but without ability to withdraw from pension
         break;
       case Phases.retired:

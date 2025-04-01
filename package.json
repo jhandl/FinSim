@@ -1,7 +1,7 @@
 {
   "name": "finsim",
   "version": "1.0.0",
-  "description": "### Bugs? - When purchasing real estate, the money seems to come from cash first, even though the priority is etf. - The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?",
+  "description": "An educational simulator to help you understand how different decisions and scenarios can affect your long-term financial future within the Irish tax system.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "terser": "^5.39.0",
     "vite": "^6.2.3"
   },
   "dependencies": {

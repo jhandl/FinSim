@@ -8,13 +8,13 @@
 const routes = {
     '/': {
         title: 'Ireland Financial Simulator - Home',
-        contentPath: '/src/frontend/web/landing/index.html',
-        favicon: '/src/frontend/web/ifs/IFS.ico'
+        contentPath: '/src/frontend/web/landing/index.html', // Path is the same for dev and prod build structure
+        favicon: import.meta.env.DEV ? '/src/frontend/web/ifs/IFS.ico' : '/IFS.ico' // Favicon path differs
     },
     '/#ifs': {
         title: 'Ireland Financial Simulator',
-        contentPath: '/src/frontend/web/ifs/index.html',
-        favicon: '/src/frontend/web/ifs/IFS.ico'
+        contentPath: '/src/frontend/web/ifs/index.html', // Path is the same for dev and prod build structure
+        favicon: import.meta.env.DEV ? '/src/frontend/web/ifs/IFS.ico' : '/IFS.ico' // Favicon path differs
     }
 };
 

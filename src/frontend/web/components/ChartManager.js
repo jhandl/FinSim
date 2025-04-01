@@ -141,8 +141,8 @@ export default class ChartManager {
             },
             {
               label: 'S.Pension',
-              borderColor: '#64B5F6',
-              backgroundColor: '#BBDEFB',
+              borderColor: '#4495F6',
+              backgroundColor: '#9BBEFB',
               fill: true,
               data: [],
               stack: 'main',
@@ -204,7 +204,15 @@ export default class ChartManager {
             },
             legend: {
               position: 'right',
-              onClick: null // Disable legend item click
+              onClick: null, // Disable legend item click
+              labels: {
+                generateLabels: function(chart) {
+                  const defaultLabels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                  const topGroup = defaultLabels.filter(item => item.text === 'Net Income' || item.text === 'Expenses');
+                  const bottomGroup = defaultLabels.filter(item => item.text !== 'Net Income' && item.text !== 'Expenses').reverse();
+                  return topGroup.concat(bottomGroup);
+                }
+              }
             }
           }
         }
@@ -281,6 +289,7 @@ export default class ChartManager {
             },
             legend: {
               position: 'right',
+              reverse: true,
               onClick: null // Disable legend item click
             }
           }
