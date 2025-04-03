@@ -1,8 +1,8 @@
 /* This file has to work on both the website and Google Sheets */
 
 // This function assumes fixed rate. If the rate varies each year, the adjustment needs to take into account
-// the history of variation, or it needs to take the previous value (not the start value) and apply the latest 
-// rate once. Either case would require a rewrite of several parts of the simulator. 
+// the history of variation, or it needs to take the previous value (not the start value) and apply the latest
+// rate once. Either case would require a rewrite of several parts of the simulator.
 // Since it's used mainly to adjust for inflation, inflation has to remain fixed for now.
 function adjust(value, rate = null, n = periods) {
   if ((rate === null) || (rate === undefined) || (rate === "")) {
@@ -31,6 +31,24 @@ function between(a, b, p) {
 
 function isBetween(num, min, max) {
   return ((num >= min) && (num <= max));
+}
+
+function formatPercentage(value) {
+  const numValue = parseFloat(value);
+  if (isNaN(numValue)) return value;
+
+  // If value is decimal (< 1), multiply by 100
+  const displayValue = numValue <= 1 ? (numValue * 100) : numValue;
+  // Format with at most 1 decimal place, and remove .0 if present
+  return `${parseFloat(displayValue.toFixed(1)).toString()}%`;
+}
+
+function formatBoolean(value) {
+  if (typeof value === 'string') {
+    value = value.toLowerCase();
+    return (value === 'true' || value === 'yes') ? 'Yes' : 'No';
+  }
+  return value ? 'Yes' : 'No';
 }
 
 function serializeSimulation(ui) {
@@ -69,9 +87,9 @@ function serializeSimulation(ui) {
     // Format special values (percentages and booleans)
     for (const [key, value] of Object.entries(parameters)) {
         if (ui.isPercentage(key)) {
-            parameters[key] = FormatUtils.formatPercentage(Math.round(value * 10000) / 10000);
+            parameters[key] = formatPercentage(Math.round(value * 10000) / 10000); // Use local function
         } else if (ui.isBoolean(key)) {
-            parameters[key] = FormatUtils.formatBoolean(value);
+            parameters[key] = formatBoolean(value); // Use local function
         }
     }
 
@@ -84,17 +102,17 @@ function serializeSimulation(ui) {
     for (const [key, value] of Object.entries(parameters)) {
         csvContent += `${key},${value}\n`;
     }
-   
+
     csvContent += "\n# Events\n";
     csvContent += "Type,Name,Amount,FromAge,ToAge,Rate,Extra\n";
     events.forEach(event => {
         // Split the first field (which contains "type:name") into separate type and name
         const [type, ...nameParts] = event[0].split(':');
         const name = nameParts.join(':'); // Rejoin in case name contained colons
-        
+
         // URL-encode commas in the name to prevent breaking CSV format
         const encodedName = name.replace(/,/g, "%2C");
-        
+
         const otherFields = event.slice(1);
         csvContent += `${type},${encodedName},${otherFields.join(',')}\n`;
     });
