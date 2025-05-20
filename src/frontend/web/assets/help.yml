@@ -827,12 +827,6 @@ steps:
       side: "bottom"
       align: "center"
 
-  - element: "#startWizard"
-    popover:
-      description: "<p>You can get help with any field by pressing the Help button or the ? key.</p>"
-      side: "bottom"
-      align: "center"
-
   - element: "#saveSimulation"
     popover:
       description: "<p>Click here to save your scenario to a file.</p>"
@@ -845,6 +839,12 @@ steps:
       side: "left"
       align: "end"
   
+  - element: "#startWizard"
+    popover:
+      description: "<p>You can get help with any field by pressing the Help button or the ? key.</p>"
+      side: "bottom"
+      align: "center"
+
   - element: "#cashflowGraph"
     popover:
       description: "<p>This graph shows your projected cashflow over time.</p>"
