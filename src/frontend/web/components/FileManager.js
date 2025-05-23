@@ -97,18 +97,27 @@ class FileManager {
     try {
       const content = await file.text();
       this.loadFromString(content, scenarioName);
+      this.updateLastSavedState(); // Ensure this is here
     } catch (error) {
       console.error(error);
       this.webUI.notificationUtils.showAlert('Error loading file: Please make sure this is a valid simulation save file.');
-      return;
+      return; // Keep this return to avoid issues in finally if fileInput is crucial
     } finally {
       if (fileInput) fileInput.value = '';
     }
   }
 
   async loadFromUrl(url, name) {
-    const content = await this.fetchUrl(url);
-    this.loadFromString(content, name);
+    try {
+      const content = await this.fetchUrl(url); // ensure await here
+      this.loadFromString(content, name);
+      this.updateLastSavedState(); // Update state after successful load and UI update
+    } catch (error) {
+      // Handle or propagate error, e.g., show a notification via webUI
+      console.error(`Error in loadFromUrl for ${name}:`, error);
+      this.webUI.notificationUtils.showAlert(`Error loading demo scenario '${name}'. Please check console for details.`);
+      // Optionally, re-throw if WebUI needs to react further
+    }
   }
 
   loadFromString(content, name) {
@@ -152,21 +161,24 @@ class FileManager {
       this.webUI.formatUtils.setupPercentageInputs();
     }
     this.webUI.setStatus("Ready");
+    // Note: The removal of 'this.lastSavedState = serializeSimulation(this.webUI);'
+    // from loadFromString was specified, but based on the last file read,
+    // it was already not present. If it were, it would be removed here.
   }
 
-  fetchUrl(url) {
-    let xhr = new XMLHttpRequest();
-    xhr.open('GET', url, false);  // false makes the request synchronous
+  async fetchUrl(url) {
     try {
-      xhr.send();
-      if (xhr.status === 200) {
-        return xhr.responseText;
-      } else {
-        throw new Error(`HTTP error! status: ${xhr.status}`);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      return await response.text();
     } catch (error) {
-      throw new Error(`Failed to fetch URL: ${error.message}`);
+      // It's good practice to re-throw or handle the error appropriately.
+      // For now, let's make sure it propagates to be caught by callers.
+      console.error(`Failed to fetch URL: ${url}`, error);
+      throw new Error(`Failed to fetch URL ${url}: ${error.message}`);
     }
   }
 
-} 
+}
