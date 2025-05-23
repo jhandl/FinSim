@@ -29,6 +29,7 @@ class WebUI extends AbstractUI {
       
       // Set initial UI state
       this.setStatus("Ready", STATUS_COLORS.INFO);
+      this.fileManager.updateLastSavedState(); // Establish baseline for new scenario
       
     } catch (error) {
       throw error;
@@ -171,7 +172,14 @@ class WebUI extends AbstractUI {
     const loadDemoButton = document.getElementById('loadDemoScenarioHeader');
     if (loadDemoButton) {
       loadDemoButton.addEventListener('click', () => {
-        this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
+        if (this.fileManager.hasUnsavedChanges()) {
+          if (window.confirm("Loading the demo scenario will overwrite any unsaved changes. Are you sure you want to proceed?")) {
+            this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
+          }
+        } else {
+          // No unsaved changes, load directly
+          this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
+        }
       });
     } else {
       // It's better to log an error if the button isn't found during development
