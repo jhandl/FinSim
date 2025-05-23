@@ -288,15 +288,7 @@ th {
 
 .growth-rates-table input,
 .growth-rates-table .currency-container {
-<<<<<<< Updated upstream
     width: 72px !important;
-=======
-<<<<<<< Updated upstream
-    width: 80px !important;
-=======
-    width: 60px !important;
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 }
 
 .growth-rates-table td:not(:first-child) {
