@@ -830,19 +830,19 @@ steps:
   - element: "#saveSimulation"
     popover:
       description: "<p>Click here to save your scenario to a file.</p>"
-      side: "left"
+      side: "bottom"
       align: "end"
   
   - element: "#loadSimulation"
     popover:
       description: "<p>Click here to load a scenario from a file.</p>"
-      side: "left"
+      side: "bottom"
       align: "end"
   
   - element: "#startWizard"
     popover:
       description: "<p>You can get help with any field by pressing the Help button or the ? key.</p>"
-      side: "bottom"
+      side: "left"
       align: "center"
 
   - element: "#cashflowGraph"
