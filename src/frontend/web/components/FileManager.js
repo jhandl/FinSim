@@ -40,8 +40,17 @@ class FileManager {
     const loadButton = document.getElementById('loadSimulation');
     const fileInput = document.getElementById('loadSimulationDialog');
     if (loadButton && fileInput) {
-      loadButton.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener('change', (e) => this.webUI.loadFromFile(e.target.files[0]));
+      loadButton.addEventListener('click', () => {
+        if (this.hasUnsavedChanges()) {
+          if (window.confirm("Loading a new scenario from file will overwrite any unsaved changes. Are you sure you want to proceed?")) {
+            fileInput.click();
+          }
+        } else {
+          // No unsaved changes, proceed directly
+          fileInput.click();
+        }
+      });
+      fileInput.addEventListener('change', (e) => this.webUI.loadFromFile(e.target.files[0])); // This line remains the same
     }
   }
 
