@@ -265,9 +265,9 @@ th {
 }
 
 .growth-rates-table th {
-    text-align: left;
-    padding: 0.25rem 0.5rem;
-    font-size: 1rem;
+    text-align: center;
+    padding: 0.25rem 0.25rem;
+    font-size: 0.9rem;
     font-weight: 500;
     color: var(--text-color);
     background-color: transparent;
@@ -277,21 +277,31 @@ th {
 .growth-rates-table td {
     padding: 0.1rem;
     border: none;
+    font-size: 0.9rem;
 }
 
 .growth-rates-table td:first-child {
     font-weight: 500;
     text-align: right;
-    padding-right: 1rem;
+    padding-right: 0.25rem;
 }
 
 .growth-rates-table input,
 .growth-rates-table .currency-container {
+<<<<<<< Updated upstream
     width: 72px !important;
+=======
+<<<<<<< Updated upstream
+    width: 80px !important;
+=======
+    width: 60px !important;
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 }
 
 .growth-rates-table td:not(:first-child) {
     min-width: 80px;
+    text-align: center;
 }
 
 .growth-rates-table th:first-child {
@@ -300,7 +310,7 @@ th {
 
 .growth-rates-table th:not(:first-child),
 .growth-rates-table td:not(:first-child) {
-    width: 30%;
+    width: 25%;
 }
 
 .delete-event {
