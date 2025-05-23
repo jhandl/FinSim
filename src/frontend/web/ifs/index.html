@@ -20,6 +20,18 @@
     <script src="/src/core/Equities.js"></script>
     <script src="/src/core/RealEstate.js"></script>
     <script src="/src/core/Utils.js"></script>
+    <!-- Taxman and dependencies -->
+    <script src="/src/core/tax/SchemaEvaluator.js"></script>
+    <script src="/src/core/tax/IncomeTaxCalculator.js"></script>
+    <script src="/src/core/tax/CapitalGainsTaxCalculator.js"></script>
+    <script src="/src/core/tax/InvestmentIncomeTaxCalculator.js"></script>
+    <script src="/src/core/tax/PropertyTaxCalculator.js"></script>
+    <script src="/src/core/tax/SocialContributionsCalculator.js"></script>
+    <script src="/src/core/tax/WealthTaxCalculator.js"></script>
+    <script src="/src/core/tax/ResidencyRulesHandler.js"></script> <!-- Added missing handler -->
+    <script src="/src/core/TaxmanDependencyLoader.js"></script>
+    <script src="/src/core/Taxman.js"></script>
+    <!-- Simulator depends on Taxman -->
     <script src="/src/core/Simulator.js"></script>
     <script src="/src/core/AbstractUI.js"></script>
     <script src="/src/core/UIManager.js"></script>
@@ -30,19 +42,21 @@
 <body>
     <header>
         <div class="header-left">
-            <h1><a href="/">Ireland Financial Simulator</a> <span class="version">Version 1.26</span></h1>
+            <h1><a href="/">Ireland Financial Simulator</a></h1>
         </div>
         <div class="header-center-right">
             <div class="header-center">
                 <span class="scenario-name"></span>
                 <button id="runSimulation" class="primary-button"><span>Run Simulation</span></button>
                 <div id="progress" class="status-indicator">Ready</div>
-                <button id="startWizard" class="secondary-button">Help</button>
-            </div>
-            <div class="header-right">
                 <button id="saveSimulation" class="secondary-button">Save</button>
                 <input type="file" id="loadSimulationDialog" accept=".csv" style="display: none;">
                 <button id="loadSimulation" class="secondary-button">Load</button>
+            </div>
+            <div class="header-right">
+                <button id="startWizard" class="secondary-button">Help</button>
+                <a href="https://www.buymeacoffee.com/jhandl" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png" alt="Buy Me A Coffee" style="height: 36px !important;width: 130px !important; vertical-align: middle;" ></a>
+
             </div>
         </div>
     </header>
@@ -302,9 +316,5 @@
         </div>
     </main>
 
-    <footer>
-        <a class="footer-link" href="javascript:void(0)" id="userManual">User Guide</a>
-        <a class="footer-link" href="https://docs.google.com/spreadsheets/d/1aPClS0_Fi4x14zIkQORALhZeFEeWw611Z-rrXYvy5Ko/edit?pli=1&gid=0#gid=0" target="_blank" rel="noopener noreferrer">Google Sheet</a>
-    </footer>
 </body>
 </html>

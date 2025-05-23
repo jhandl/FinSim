@@ -66,7 +66,7 @@ function nonModuleConcatMinifyPlugin(options) {
             },
             mangle: {
               toplevel: true,
-              reserved: ['AbstractUI', 'UIManager', 'Config', 'run', 'deserializeSimulation'] // Prevent renaming of these specific globals
+              reserved: ['AbstractUI', 'UIManager', 'Config', 'FormatUtils', 'run', 'serializeSimulation', 'deserializeSimulation'] // Prevent renaming of these specific globals
             },
             output: {
               beautify: false

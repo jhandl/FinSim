@@ -2,8 +2,8 @@
 
 var uiManager, params, events, config, dataSheet, row, errors;
 var age, year, phase, periods, failedAt, success, montecarlo;
-var revenue, realEstate, stockGrowthOverride;
-var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
+var revenue, realEstate, stockGrowthOverride, taxman;
+var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit, cgtLossCarryforward;
 var incomeStatePension, incomePrivatePension, incomeFundsRent, incomeSharesRent, withdrawalRate;
 var cash, indexFunds, shares, pension;
 
@@ -25,6 +25,8 @@ function run() {
   uiManager.updateDataSheet(runs);
   uiManager.updateStatusCell(successes, runs);
 }
+
+// Stubs for Taxman simContext removed (evaluateFormula moved to Utils.js, executeCustomRule handled internally by Taxman)
 
 function initializeUI() {
   if (typeof SpreadsheetApp !== 'undefined') {
@@ -48,8 +50,31 @@ function readScenario(validate) {
 function initializeSimulator() {
   initializeUI();
   uiManager.setStatus("Initializing", STATUS_COLORS.INFO);
+  // Config.getInstance now loads both main and taxman configs
   config = Config.getInstance(uiManager.ui);
-  revenue = new Revenue();
+  revenue = new Revenue(); // Keep existing
+  taxman = null; // Initialize taxman to null
+
+  try {
+      // Step 1.3: Use Taxman config loaded by Config class
+      if (!config.taxmanConfig) {
+          // Config class should have already shown an alert if loading failed
+          throw new Error("Taxman configuration is missing or was not loaded successfully by Config class.");
+      }
+
+      // Taxman now gets evaluateFormula from Utils.js and handles executeCustomRule internally.
+      // Pass an empty context object for now, in case other context needs arise later.
+      const simContext = {};
+
+      // Taxman constructor performs its own schemaName check. Config class does basic validation.
+      taxman = new Taxman(config.taxmanConfig, simContext);
+
+  } catch (e) {
+      // Catch errors during Taxman instantiation specifically
+      console.error("Failed to instantiate Taxman:", e);
+      uiManager.setStatus("Taxman Init Error", STATUS_COLORS.ERROR);
+      taxman = null; // Ensure taxman is null if init fails
+  }
   dataSheet = [];
   return readScenario(validate = true);
 }
@@ -87,6 +112,7 @@ function initializeSimulationVariables() {
   cash = params.initialSavings;
   failedAt = 0;
   row = 0;
+  cgtLossCarryforward = 0; // Initialize CGT loss carryforward
 }
 
 function resetYearlyVariables() {
@@ -107,6 +133,7 @@ function resetYearlyVariables() {
   savings = 0;
 
   revenue.reset();
+  taxman.reset();
   indexFunds.addYear();
   shares.addYear();
   pension.addYear();
@@ -128,7 +155,159 @@ function runSimulation() {
     resetYearlyVariables();
     calculatePensionIncome();
     processEvents();
+
+    // Step 2.5: Assemble currentState for Taxman (Complete population)
+
+    // --- Calculate Asset Details ---
+    const calculateEquityCostBasis = (equityInstance) => equityInstance.portfolio.reduce((sum, holding) => sum + holding.amount, 0);
+    const indexFundsValue = indexFunds.capital();
+    const indexFundsCostBasis = calculateEquityCostBasis(indexFunds);
+    const sharesValue = shares.capital();
+    const sharesCostBasis = calculateEquityCostBasis(shares);
+    const pensionValue = pension.capital();
+    const pensionCostBasis = calculateEquityCostBasis(pension);
+
+    let realEstateValue = 0;
+    let realEstateCostBasis = 0;
+    let totalMortgageLiability = 0;
+    const realEstateAssets = [];
+    for (const id in realEstate.properties) {
+        const prop = realEstate.properties[id];
+        const propValue = prop.getValue();
+        realEstateValue += propValue;
+        realEstateCostBasis += prop.paid; // Using downpayment as cost basis for now
+        totalMortgageLiability += prop.borrowed * (1 - prop.fractionRepaid); // Estimate outstanding balance
+        realEstateAssets.push({
+             id: id, // Keep track of individual properties if needed later
+             type: 'realEstateProperty',
+             value: propValue,
+             costBasis: prop.paid + prop.borrowed, // Corrected: Downpayment + Mortgage
+             details: {
+                 initialBorrowed: prop.borrowed,
+                 fractionRepaid: prop.fractionRepaid,
+                 appreciationRate: prop.appreciation,
+                 periodsHeld: prop.periods
+             }
+        });
+    }
+
+    const assets = [
+        { type: 'cash', value: cash, costBasis: cash, details: {} }, // Cost basis of cash is its value
+        { type: 'indexFund', value: indexFundsValue, costBasis: indexFundsCostBasis, details: {} },
+        { type: 'shares', value: sharesValue, costBasis: sharesCostBasis, details: {} },
+        { type: 'pension', value: pensionValue, costBasis: pensionCostBasis, details: {} },
+        ...realEstateAssets // Add individual properties
+    ];
+
+    const totalAssetsValue = assets.reduce((sum, asset) => sum + asset.value, 0);
+    const liabilities = {
+        mortgageTotal: totalMortgageLiability
+        // Add other liabilities here if tracked (e.g., loans)
+    };
+    const totalLiabilities = Object.values(liabilities).reduce((sum, liab) => sum + liab, 0);
+    const netWorth = totalAssetsValue - totalLiabilities;
+
+    const currentState = {
+        year: year,
+        age: age,
+        filingStatus: 'single', // Placeholder - Needs mapping
+        dependents: 0,          // Placeholder - Needs mapping
+        expenses: { total: expenses }, // Keep simple for now
+        assets: assets,
+        netWorth: netWorth,
+        liabilities: liabilities,
+        cgtLossCarryforward: cgtLossCarryforward, // Use the stored value from the previous year
+        pensionPlanType: null,  // Placeholder - Needs mapping
+        residencyStatus: 'resident' // Placeholder - Needs mapping
+    };
+    // Verification log for Step 2.5
+    // console.log(`Year ${year}, Age ${age} - Current State for Taxman (Full):`, JSON.stringify(currentState, null, 2)); // Pretty print
+
+    // Step 2.3: Initial Taxman.computeTaxes Call (Parallel)
+    let taxmanResult = null;
+    if (taxman) {
+        try {
+            taxmanResult = taxman.computeTaxes(currentState);
+            // Log the full result for detailed inspection during parallel run
+            // console.log(`Taxman Result (Year ${year}, Age ${age}):`, JSON.stringify(taxmanResult, null, 2)); // Commented out for focused CGT comparison
+        } catch (e) {
+            console.error(`Taxman.computeTaxes failed (Year ${year}, Age ${age}):`, e);
+            // Optionally set status or handle error further if needed
+        }
+        // Step 3.4: Store the new loss carryforward for the next year
+        cgtLossCarryforward = taxmanResult?.newLossCarryforward ?? 0;
+
+        // Step 4.2: Handle Cost Basis Updates signaled by Taxman (e.g., after unrealized gains tax)
+        if (taxmanResult?.costBasisUpdates?.length > 0) {
+            taxmanResult.costBasisUpdates.forEach(update => {
+                console.log(`%cSimulator: Received cost basis update signal from Taxman:`, 'color: blue;', update);
+                switch (update.assetType) {
+                    // Assuming 'index_fund' is the type used in Taxman/Schema for IndexFunds
+                    case 'index_fund':
+                        if (indexFunds && typeof indexFunds.applyUnrealizedGainsTax === 'function') {
+                            // Call the new method to apply the basis update logic internally
+                            indexFunds.applyUnrealizedGainsTax(update.assetType, update.newCostBasis, update.details);
+                        } else {
+                            console.error(`Cannot apply cost basis update: IndexFunds instance or applyUnrealizedGainsTax method not found.`);
+                        }
+                        break;
+                    // case 'shares': // Add cases for other asset types if they can trigger unrealized gains tax
+                    //     if (shares && typeof shares.applyUnrealizedGainsTax === 'function') {
+                    //         shares.applyUnrealizedGainsTax(update.assetType, update.newCostBasis, update.details);
+                    //     } else {
+                    //          console.error(`Cannot apply cost basis update: Shares instance or applyUnrealizedGainsTax method not found.`);
+                    //     }
+                    //     break;
+                    default:
+                        console.warn(`Received cost basis update for unhandled asset type: '${update.assetType}'`);
+                }
+            });
+        }
+    }
+    // Note: Core logic in handleInvestments still uses Revenue for now.
+
     handleInvestments();
+
+    // <<< Add specific CGT comparison log >>>
+    if (taxmanResult && revenue) { // Only log if both modules ran
+        const revenueCGT = revenue.cgt || 0; // Get legacy CGT, default to 0 if undefined/null
+        const taxmanCGT = taxmanResult.capitalGainsTax?.totalLiability ?? 0; // Get taxman CGT liability, default to 0
+        // Only log if there's a potential value to compare
+        if (revenueCGT !== 0 || taxmanCGT !== 0) {
+             console.log(`%cCGT Comparison (Year ${year}, Age ${age}): Revenue=${revenueCGT.toFixed(2)}, Taxman=${taxmanCGT.toFixed(2)}`, 'color: orange; font-weight: bold;');
+        }
+    }
+    // <<< End comparison log >>>
+
+    // <<< Add detailed comparison log >>>
+    if (taxmanResult && revenue) {
+        // Calculate Taxman Net Income (Gross Income - Total Tax)
+        // Define Gross Income consistently for comparison (sum of declared incomes)
+        const grossIncomeDeclared = (incomeSalaries || 0) + (incomeShares || 0) + (incomeRentals || 0) + (incomePrivatePension || 0) + (incomeStatePension || 0) + (incomeDefinedBenefit || 0) + (incomeFundsRent || 0) + (incomeSharesRent || 0);
+        const taxmanTotalTax = taxmanResult.totalTaxLiability || 0;
+        const taxmanNetIncome = grossIncomeDeclared - taxmanTotalTax + (incomeTaxFree || 0); // Add tax-free income back
+
+        // Extract individual tax components (adjust paths based on actual taxmanResult structure)
+        const taxmanIT = taxmanResult.incomeTax?.totalLiability ?? 0;
+        const taxmanPRSI = taxmanResult.socialContributions?.contributions?.find(c => c.name === 'PRSI')?.amount ?? 0;
+        const taxmanUSC = taxmanResult.socialContributions?.contributions?.find(c => c.name === 'USC')?.amount ?? 0;
+        const taxmanCGT = taxmanResult.capitalGainsTax?.totalLiability ?? 0; // Define taxmanCGT here
+
+        const revenueTotalTax = (revenue.it || 0) + (revenue.prsi || 0) + (revenue.usc || 0) + (revenue.cgt || 0);
+        const revenueNetIncome = revenue.netIncome() + (incomeTaxFree || 0); // Use existing method + tax-free
+
+        console.log(`%c--- Tax Comparison (Year ${year}, Age ${age}) ---`, 'color: blue; font-weight: bold;');
+        console.log(`  Gross Income (Declared): ${grossIncomeDeclared.toFixed(2)}`);
+        console.log(`  IT:      Revenue=${(revenue.it || 0).toFixed(2)}, Taxman=${taxmanIT.toFixed(2)}`);
+        console.log(`  PRSI:    Revenue=${(revenue.prsi || 0).toFixed(2)}, Taxman=${taxmanPRSI.toFixed(2)}`);
+        console.log(`  USC:     Revenue=${(revenue.usc || 0).toFixed(2)}, Taxman=${taxmanUSC.toFixed(2)}`);
+        console.log(`  CGT:     Revenue=${(revenue.cgt || 0).toFixed(2)}, Taxman=${taxmanCGT.toFixed(2)}`);
+        console.log(`  TOTAL TAX: Revenue=${revenueTotalTax.toFixed(2)}, Taxman=${taxmanTotalTax.toFixed(2)}`);
+        console.log(`  NET INCOME: Revenue=${revenueNetIncome.toFixed(2)}, Taxman=${taxmanNetIncome.toFixed(2)}`);
+        console.log(`%c------------------------------------`, 'color: blue; font-weight: bold;');
+    }
+    // <<< End detailed comparison log >>>
+
     updateYearlyData();
   }
   return success;
@@ -151,6 +330,7 @@ function calculatePensionIncome() {
     }
   }
   revenue.declareStatePensionIncome(incomeStatePension);
+  taxman.declareIncome('state_pension', incomeStatePension); // Pass args separately
 }
 
 function processEvents() {
@@ -170,6 +350,7 @@ function processEvents() {
         if (inScope) {
           incomeRentals += amount;
           revenue.declareOtherIncome(amount);
+          taxman.declareIncome('rental', amount); // Pass args separately
         }
         break;
 
@@ -187,6 +368,7 @@ function processEvents() {
           pensionContribution += totalContrib;
           pension.buy(totalContrib);
           revenue.declareSalaryIncome(amount, contribRate);
+          taxman.declareIncome('employment', amount, { pensionContribRate: contribRate }); // Pass args separately
         }
         break;
 
@@ -194,6 +376,7 @@ function processEvents() {
         if (inScope) {
           incomeSalaries += amount;
           revenue.declareSalaryIncome(amount, 0);
+          taxman.declareIncome('employment', amount, { pensionContribRate: 0 }); // Pass args separately
         }
         break;
 
@@ -201,6 +384,8 @@ function processEvents() {
         if (inScope) {
           incomeShares += amount;
           revenue.declareNonEuSharesIncome(amount);
+          // RSU income often treated as employment income for social charges. Re-categorize for Taxman.
+          taxman.declareIncome('employment', amount, { source: 'RSU', pensionContribRate: 0 }); // Pass args separately
         }
         break;
 
@@ -208,6 +393,7 @@ function processEvents() {
         if (inScope) {
           incomeDefinedBenefit += amount;
           revenue.declareSalaryIncome(amount, 0);
+          taxman.declareIncome('employment', amount, { source: 'DefinedBenefitPension', pensionContribRate: 0 }); // Pass args separately
         }
         break;
 
@@ -259,6 +445,43 @@ function processEvents() {
 
       default:
         break;
+
+      // Step 4.2: Handle Transfer Tax Events
+      case 'Gift':
+      case 'Inheritance':
+        if (inScope && taxman) {
+            // Assuming 'event.details' contains necessary info like relationship, assetType, etc.
+            // The schema defines what 'details' are needed for TransferTaxCalculator.
+            const transferDetails = {
+                value: amount,
+                assetType: event.assetType || 'cash', // Default to cash if not specified
+                relationshipToDonor: event.relationship || 'other', // Default if not specified
+                // Add other relevant details from the event object based on schema needs
+            };
+            taxman.declareTransfer(event.type.toLowerCase(), transferDetails); // 'gift' or 'inheritance'
+            console.log(`Taxman declared transfer: type=${event.type}, details=`, transferDetails);
+        }
+        break;
+
+      // Step 4.2: Handle Pension Withdrawal Event
+      case 'PensionWithdrawal':
+         if (inScope && taxman) {
+             // Assuming 'event.details' contains necessary info like withdrawalType ('normal', 'early', 'lumpSum')
+             const withdrawalDetails = {
+                 amount: amount,
+                 withdrawalType: event.withdrawalType || 'normal', // Default if not specified
+                 planType: event.planType || 'genericPension' // Default or map from event
+                 // Add other relevant details from the event object based on schema needs
+             };
+             taxman.declarePensionWithdrawal(withdrawalDetails);
+             console.log(`Taxman declared pension withdrawal: details=`, withdrawalDetails);
+             // Note: The actual income declaration might still happen in calculatePensionIncome or here,
+             // depending on whether the withdrawal itself constitutes taxable income immediately
+             // vs. just triggering a specific tax calculation via the calculator.
+             // For now, assume the calculator handles the tax implications based on the declaration.
+         }
+         break;
+
     }
   }
 }

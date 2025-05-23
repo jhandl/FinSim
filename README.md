@@ -60,6 +60,8 @@
 
 
 ## Version 6 - "Monetize"
+- According to the Central Bank of Ireland's Innovation Hub, offering an educational tool is ok under the regulations as long as I don't offer personalized financial advice, and I don't offer specific financial products like a broker (https://www.centralbank.ie/regulation/industry-market-sectors/brokers-retail-intermediaries/investment-brokers-intermediaries).
+- If I want to monetize it, I may need to consult a solicitor and or tax advisor, but it's up to me if I want to incorporate a company or become a sole trader; depends on what is better from a tax perspective.
 - Add a way to have EA and GA so people can test before it goes out to everyone
 - Add campaigns to CIO to let people of a country know they have a new version to test (use API so it goes out as soon as the AI made changes)
 - Integrate with payments provider

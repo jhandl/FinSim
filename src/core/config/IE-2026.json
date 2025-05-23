@@ -1,0 +1,412 @@
+{
+  "schemaName": "GenericTaxSystem",
+  "schemaVersion": "1.0",
+  "countryCode": "IE",
+  "jurisdictionName": "Ireland",
+  "currency": "EUR",
+  "taxYear": "2026",
+  "description": "Tax configuration for Ireland, based on finance-simulation-config-1.26.json and Revenue.js logic.",
+  "systemSettings": {
+    "taxationBasis": {
+      "type": "residence",
+      "description": "Based on tax residency."
+    },
+    "defaultFilingStatus": "single",
+    "filingStatuses": [
+      { "id": "single", "description": "Single Individual" },
+      { "id": "marriedJointly", "description": "Married/Civil Partnership, Joint Assessment" },
+      { "id": "singleDependentChildren", "description": "Single Person Child Carer Credit recipient (approximated)" }
+    ],
+    "incomeSplitting": null
+  },
+  "incomeTax": {
+    "description": "Income Tax (IT). Note: Age Tax Credit is applied globally after tax calculation, not as an IT credit.",
+    "incomeAdjustments": [
+      {
+        "name": "Pension Contribution Relief",
+        "description": "Relief on employee pension contributions.",
+        "type": "deduction",
+        "calculationRule": {
+          "method": "formula",
+          "formula": "min(pensionContributionAmount, maxPensionRelief)",
+          "description": "Calculated based on actual contribution, age-related percentage limits, and earnings cap. Requires custom context variable 'maxPensionRelief' calculated according to pensionRules."
+        },
+        "conditions": [],
+        "applicableIncomeTypes": ["employment"]
+      }
+    ],
+    "allowChoiceBetweenStandardAndItemizedDeduction": false,
+    "filingStatusRules": {
+      "single": {
+        "description": "Rules for Single status.",
+        "taxableIncomeDefinitionNotes": "Gross Income + Taxable Pensions/Other Income - Pension Relief.",
+        "personalAllowances": null,
+        "standardDeductions": null,
+        "itemizedDeductions": null,
+        "taxCalculationMethod": {
+          "method": "brackets",
+          "brackets": [
+            { "lowerBound": 0, "upperBound": 44000, "rate": 0.20 },
+            { "lowerBound": 44000, "upperBound": null, "rate": 0.40 }
+          ],
+          "taxBase": "taxableIncome"
+        },
+        "taxCredits": [
+          {
+            "name": "Personal Tax Credit (Single)",
+            "description": "TODO: Confirm standard value for 2026.",
+            "type": "nonRefundable",
+            "calculationRule": { "method": "fixedAmount", "value": 1875 },
+            "conditions": []
+          },
+          {
+            "name": "Employee Tax Credit (PAYE)",
+            "description": "Credit for PAYE employees.",
+            "type": "nonRefundable",
+            "calculationRule": { "method": "fixedAmount", "value": 2000 },
+            "conditions": [
+              { "conditionType": "custom", "customRuleIdentifier": "hasEmploymentIncome" }
+            ]
+          }
+        ]
+      },
+      "marriedJointly": {
+        "description": "Rules for Married/Civil Partnership, Joint Assessment.",
+        "taxableIncomeDefinitionNotes": "Gross Income + Taxable Pensions/Other Income - Pension Relief. Band increase needs custom logic.",
+        "personalAllowances": null,
+        "standardDeductions": null,
+        "itemizedDeductions": null,
+        "taxCalculationMethod": {
+          "method": "brackets",
+          "brackets": [
+            { "lowerBound": 0, "upperBound": 51000, "rate": 0.20, "description": "Base band limit. Increase logic handled separately." },
+            { "lowerBound": 51000, "upperBound": null, "rate": 0.40, "description": "Base band limit. Increase logic handled separately." }
+          ],
+          "taxBase": "taxableIncome",
+          "customRuleIdentifier": "marriedBandIncrease"
+        },
+        "taxCredits": [
+          {
+            "name": "Personal Tax Credit (Married)",
+            "description": "TODO: Confirm standard value for 2026.",
+            "type": "nonRefundable",
+            "calculationRule": { "method": "fixedAmount", "value": 3750 },
+            "conditions": []
+          },
+          {
+            "name": "Employee Tax Credit (PAYE)",
+            "description": "Credit for PAYE employees, up to 2.",
+            "type": "nonRefundable",
+            "calculationRule": {
+              "method": "formula",
+              "formula": "min(numberOfEmployees, 2) * 2000",
+              "description": "Requires custom context variable 'numberOfEmployees'."
+             },
+            "conditions": [
+              { "conditionType": "custom", "customRuleIdentifier": "hasEmploymentIncome" }
+            ]
+          }
+        ]
+      },
+      "singleDependentChildren": {
+        "description": "Rules for Single Person Child Carer Credit recipient (approximated).",
+        "taxableIncomeDefinitionNotes": "Gross Income + Taxable Pensions/Other Income - Pension Relief.",
+        "personalAllowances": null,
+        "standardDeductions": null,
+        "itemizedDeductions": null,
+        "taxCalculationMethod": {
+          "method": "brackets",
+          "brackets": [
+            { "lowerBound": 0, "upperBound": 48000, "rate": 0.20 },
+            { "lowerBound": 48000, "upperBound": null, "rate": 0.40 }
+          ],
+          "taxBase": "taxableIncome"
+        },
+        "taxCredits": [
+          {
+            "name": "Personal Tax Credit (Single)",
+            "description": "TODO: Confirm standard value for 2026.",
+            "type": "nonRefundable",
+            "calculationRule": { "method": "fixedAmount", "value": 1875 },
+            "conditions": []
+          },
+          {
+            "name": "Single Person Child Carer Credit",
+            "description": "TODO: Confirm standard value for 2026.",
+            "type": "nonRefundable",
+            "calculationRule": { "method": "fixedAmount", "value": 1750 },
+            "conditions": [
+              { "conditionType": "familySize", "operator": ">", "value": 1 }
+            ]
+          },
+          {
+            "name": "Employee Tax Credit (PAYE)",
+            "description": "Credit for PAYE employees.",
+            "type": "nonRefundable",
+            "calculationRule": { "method": "fixedAmount", "value": 2000 },
+            "conditions": [
+              { "conditionType": "custom", "customRuleIdentifier": "hasEmploymentIncome" }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "socialContributions": [
+    {
+      "name": "PRSI",
+      "description": "Pay Related Social Insurance.",
+      "contributionType": "generalSocialCharge",
+      "appliesToIncomeType": ["employment", "selfEmployment", "investment"],
+      "calculationMethod": {
+        "method": "flatRate",
+        "flatRateRule": { "method": "fixedAmount", "value": 0.04 }
+      },
+      "rates": {
+        "employeeRateFactor": 1.0,
+        "employerRateFactor": 0.0
+      },
+      "incomeThresholds": {
+        "lowerBoundRule": { "method": "fixedAmount", "value": 0 },
+        "upperBoundCeilingRule": { "method": "fixedAmount", "value": null }
+      },
+      "exemptions": [
+        {
+          "conditionType": "age",
+          "operator": ">",
+          "value": 70
+        }
+      ]
+    },
+    {
+      "name": "USC",
+      "description": "Universal Social Charge. Applied per person, complex interaction.",
+      "contributionType": "generalSocialCharge",
+      "appliesToIncomeType": ["employment", "selfEmployment", "pension", "investment"],
+      "calculationMethod": {
+        "method": "custom",
+        "customRuleIdentifier": "calculateUSC"
+      },
+      "rates": {
+        "employeeRateFactor": 1.0,
+        "employerRateFactor": 0.0
+      },
+      "incomeThresholds": {
+        "lowerBoundRule": { "method": "fixedAmount", "value": 13000 },
+        "upperBoundCeilingRule": { "method": "fixedAmount", "value": null }
+      },
+      "exemptions": [],
+      "baseBrackets": [
+        { "lowerBound": 0, "upperBound": 12012, "rate": 0.005 },
+        { "lowerBound": 12012, "upperBound": 27382, "rate": 0.02 },
+        { "lowerBound": 27382, "upperBound": 70044, "rate": 0.03 },
+        { "lowerBound": 70044, "upperBound": null, "rate": 0.08 }
+      ],
+      "reducedRateBrackets": [
+        { "lowerBound": 0, "upperBound": 12012, "rate": 0.005 },
+        { "lowerBound": 12012, "upperBound": null, "rate": 0.02 }
+      ],
+      "reducedRateConditions": [
+        { "conditionType": "age", "operator": ">=", "value": 70 },
+        { "conditionType": "income", "operator": "<=", "value": 60000, "incomeType": "totalIncomeSubjectToUSC" }
+      ]
+    }
+  ],
+  "capitalGainsTax": {
+    "description": "Capital Gains Tax (CGT)",
+    "annualExemption": {
+      "calculationRule": { "method": "fixedAmount", "value": 1270 },
+      "appliesPer": "individual"
+    },
+    "holdingPeriods": [
+      { "label": "shortTerm", "maxMonths": 12 },
+      { "label": "longTerm", "minMonths": 12.01 }
+    ],
+    "taxationMethod": {
+      "method": "flatRate",
+      "flatRateRule": { "method": "fixedAmount", "value": 0.33 }
+    },
+    "ratesByAssetAndHolding": [
+      {
+        "assetType": "index_fund",
+        "holdingPeriodLabel": "longTerm",
+        "applicableRateRule": { "method": "fixedAmount", "value": 0.41 },
+        "rateCalculationNote": "Exit Tax applied on gains, including deemed disposals.",
+        "deemedDisposalRule": {
+          "applies": true,
+          "periodYearsRule": { "method": "fixedAmount", "value": 8 },
+          "taxRateRule": { "method": "fixedAmount", "value": 0.41 },
+          "description": "Exit tax on unrealized gains every 8 years for specific funds."
+        }
+      }
+    ],
+    "lossTreatment": {
+      "offsetGains": {
+        "allowWithinSameAssetType": true,
+        "allowAcrossAssetTypes": true,
+        "allowAgainstHoldingPeriod": "any"
+      },
+      "offsetOrdinaryIncomeLimit": {
+        "calculationRule": { "method": "fixedAmount", "value": 0 },
+        "appliesPer": "individual"
+      },
+      "carryforward": {
+        "allowed": true,
+        "durationYearsRule": { "method": "fixedAmount", "value": null },
+        "type": "combined"
+      },
+      "specialRules": [
+        {
+          "assetType": "indexFundIreland",
+          "rule": "lossesCannotOffsetOtherGains",
+          "description": "Losses from Irish domiciled funds subject to exit tax cannot offset other gains (config.FundsCanOffsetLosses: false)."
+        }
+      ]
+    }
+  },
+  "investmentIncomeTax": {
+    "description": "Taxation of Investment Income (Dividends, Interest). Generally taxed as income in Ireland.",
+    "dividends": {
+      "taxationMethod": "asOrdinaryIncome",
+      "rates": {},
+      "allowance": { "calculationRule": { "method": "fixedAmount", "value": 0 } }
+    },
+    "interest": {
+      "taxationMethod": "asOrdinaryIncome",
+      "rates": {},
+      "allowance": { "calculationRule": { "method": "fixedAmount", "value": 0 } }
+    }
+  },
+  "wealthTax": {
+    "applies": false
+  },
+  "propertyTax": [],
+  "transferTax": [],
+  "pensionRules": {
+    "description": "Rules for Pension Contributions and Withdrawals.",
+    "contributionTaxTreatment": [
+      {
+        "planTypeRegex": ".*",
+        "treatmentType": "deduction",
+        "limitRule": {
+          "method": "custom",
+          "customRuleIdentifier": "calculatePensionContributionLimit",
+          "description": "Limit based on age-related percentage of earnings (up to earnings cap)."
+        },
+        "ageBasedPercentageLimits": [
+            { "maxAge": 29, "rate": 0.15 },
+            { "maxAge": 39, "rate": 0.20 },
+            { "maxAge": 49, "rate": 0.25 },
+            { "maxAge": 54, "rate": 0.30 },
+            { "maxAge": 59, "rate": 0.35 },
+            { "maxAge": null, "rate": 0.40 }
+        ],
+        "earningsCap": 115000
+      }
+    ],
+    "growthTaxTreatment": {
+      "default": "taxDeferred"
+    },
+    "withdrawalTaxTreatment": [
+      {
+        "planTypeRegex": "PrivatePension",
+        "withdrawalAge": {
+          "normalMinAge": 60,
+          "earlyMinAge": null
+        },
+        "taxationMethod": {
+          "normalWithdrawal": "asOrdinaryIncome",
+          "earlyWithdrawal": "asOrdinaryIncomePlusPenalty",
+          "lumpSum": "specialRate"
+        },
+        "ratesAndPenalties": {
+          "earlyWithdrawalPenaltyRateRule": { "method": "fixedAmount", "value": 0.0 },
+          "specialTaxRateRule": { "method": "fixedAmount", "value": null },
+          "lumpSumTaxFreePortionRule": { "method": "fixedAmount", "value": 0.0 },
+          "lumpSumMaxPercentage": 0.25,
+          "lumpSumTaxBrackets": [
+            { "lowerBound": 0, "upperBound": 200000, "rate": 0.0 },
+            { "lowerBound": 200000, "upperBound": 500000, "rate": 0.2 },
+            { "lowerBound": 500000, "upperBound": null, "rate": 0.4 }
+          ]
+        }
+      },
+      {
+        "planTypeRegex": "OccupationalPension",
+        "withdrawalAge": {
+          "normalMinAge": 65,
+          "earlyMinAge": null
+        },
+        "taxationMethod": {
+          "normalWithdrawal": "asOrdinaryIncome",
+          "earlyWithdrawal": "asOrdinaryIncomePlusPenalty",
+          "lumpSum": "specialRate"
+        },
+        "ratesAndPenalties": {
+           "customRuleIdentifier": "usePrivatePensionWithdrawalRules"
+        }
+      },
+      {
+        "planTypeRegex": "StatePension",
+        "withdrawalAge": {
+          "normalMinAge": 66,
+          "earlyMinAge": null
+        },
+        "taxationMethod": {
+          "normalWithdrawal": "asOrdinaryIncome",
+          "earlyWithdrawal": "notApplicable",
+          "lumpSum": "notApplicable"
+        },
+        "ratesAndPenalties": {}
+      }
+    ]
+  },
+  "residencyRules": {
+    "description": "Standard rules for Irish residents assumed.",
+    "residencyDefinitionNotes": "Based on statutory residence rules (days present).",
+    "nonResidentTaxation": {},
+    "foreignTaxRelief": {
+      "applies": true,
+      "method": "credit",
+      "creditLimitRule": "lesserOfBoth"
+    },
+    "specialRegimes": []
+  },
+  "complexRulePlaceholders": [
+    {
+      "ruleIdentifier": "marriedBandIncrease",
+      "description": "Income tax standard rate band for married couples increases by the lower of the second earner's income or a cap (35000 EUR in config).",
+      "affectedSections": ["incomeTax.filingStatusRules.marriedJointly.taxCalculationMethod"],
+      "requiredInputs": ["filingStatus", "incomeSourceDetails"],
+      "expectedOutput": "Adjusted upper bound for the standard rate tax bracket."
+    },
+    {
+       "ruleIdentifier": "calculateUSC",
+       "description": "USC is calculated per individual if married. Non-salary income is typically allocated to the lower earner. Reduced rates apply based on age and income thresholds.",
+       "affectedSections": ["socialContributions"],
+       "requiredInputs": ["filingStatus", "incomeSourceDetails", "age", "uscBaseBrackets", "uscReducedRateBrackets", "uscReducedRateConditions", "uscIncomeThresholds"],
+       "expectedOutput": "Total USC liability for the tax unit."
+    },
+    {
+        "ruleIdentifier": "itAgeExemption",
+        "description": "Individuals aged 65+ may be exempt from Income Tax if their total income is below a certain threshold (18000 single / 36000 married). This overrides calculated IT liability.",
+        "affectedSections": ["incomeTax"],
+        "requiredInputs": ["age", "filingStatus", "totalIncomeForExemptionCheck", "calculatedIncomeTaxLiability"],
+        "expectedOutput": "Final Income Tax liability (potentially zero)."
+    },
+    {
+        "ruleIdentifier": "calculatePensionContributionLimit",
+        "description": "The maximum allowable pension contribution for tax relief depends on age-related percentage limits applied to relevant earnings, capped at an overall earnings limit (115000 EUR).",
+        "affectedSections": ["pensionRules.contributionTaxTreatment", "incomeTax.incomeAdjustments"],
+        "requiredInputs": ["age", "relevantEarnings", "pensionContributionAmount", "ageBasedPercentageLimits", "earningsCap"],
+        "expectedOutput": "Maximum allowable pension contribution relief amount ('maxPensionRelief' context variable)."
+    },
+    {
+        "ruleIdentifier": "hasEmploymentIncome",
+        "description": "Checks if the individual/couple has income classified as 'employment' to determine eligibility for Employee Tax Credit.",
+        "affectedSections": ["incomeTax.filingStatusRules.*.taxCredits"],
+        "requiredInputs": ["incomeSourceDetails"],
+        "expectedOutput": "Boolean."
+    }
+  ]
+}

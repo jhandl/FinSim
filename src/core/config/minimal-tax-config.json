@@ -1,0 +1,33 @@
+{
+  "schemaName": "GenericTaxSystem",
+  "schemaVersion": "1.0",
+  "countryCode": "IE",
+  "description": "Minimal configuration for initial Taxman integration testing (loaded from file).",
+  "incomeTax": {
+    "brackets": [],
+    "allowances": [],
+    "deductions": [],
+    "credits": []
+  },
+  "socialContributions": [],
+  "capitalGainsTax": {
+    "rules": [
+      {
+        "id": "cgtAnnualExemption",
+        "description": "Annual CGT Exemption",
+        "method": "fixedAmount",
+        "value": 1270
+      }
+    ],
+    "rates": [
+      {
+        "description": "Standard CGT Rate",
+        "appliesTo": ["general", "shares", "index_fund", "realEstate", "other"],
+        "rate": 33
+      }
+    ]
+  },
+  "investmentIncomeTax": {},
+  "wealthTax": {},
+  "propertyTax": {}
+}

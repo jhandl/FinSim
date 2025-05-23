@@ -178,3 +178,32 @@ function getRateForKey(key, rateBands) {
   }
   return rateBands[bandKeys[0]];
 }
+
+// Node.js compatibility: Export functions needed for testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        evaluateFormula
+        // Add other functions here if they need testing later
+        // adjust, gaussian, rgbToHex, between, isBetween, formatPercentage, formatBoolean, serializeSimulation, deserializeSimulation, getRateForKey
+    };
+}
+
+/**
+ * Evaluates a mathematical formula string within a given context.
+ * Uses the Function constructor for basic evaluation. Be cautious with complex/untrusted formulas.
+ * @param {string} formula - The formula string to evaluate.
+ * @param {object} contextData - An object containing variables accessible to the formula.
+ * @returns {number|NaN} The result of the formula or NaN if evaluation fails.
+ */
+function evaluateFormula(formula, contextData) {
+    // console.log(`Utils.evaluateFormula called: ${formula}`, contextData); // Temporarily commented out for testing
+    try {
+        const safeContext = contextData || {};
+        // Using Function constructor. Ensure formula and context are trusted.
+        // 'use strict'; // Consider adding 'use strict' for safety
+        return new Function('context', `with(context) { try { return ${formula}; } catch(e) { /* console.warn('Formula eval error within Function:', e); */ return NaN; } }`)(safeContext);
+    } catch (e) {
+        // console.warn(`Formula evaluation setup failed for "${formula}": ${e}`);
+        return NaN;
+    }
+}

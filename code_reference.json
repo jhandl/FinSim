@@ -1,0 +1,820 @@
+[
+  {
+    "filename": "core/AbstractUI.js",
+    "classes": [
+      {
+        "name": "AbstractUI",
+        "methods": [
+          "constructor()",
+          "getInstance()",
+          "getValue(elementId)",
+          "setValue(elementId, value)",
+          "getTableData(groupId, columnCount)",
+          "setDataRow(rowIndex, data)",
+          "setChartsRow(rowIndex, data)",
+          "setStatus(message, color)",
+          "clearContent(groupId)",
+          "setWarning(elementId, message)",
+          "setBackground(elementId, color)",
+          "flush()",
+          "getVersion()",
+          "setVersion(version)",
+          "fetchUrl(url)",
+          "showAlert(message, buttons)",
+          "showToast(message, title, timeout)",
+          "setVersionNote(message)",
+          "clearVersionNote()",
+          "setVersionHighlight(warning)",
+          "newCodeVersion(latestVersion)",
+          "newDataVersion(latestVersion)",
+          "clearAllWarnings()",
+          "isPercentage(elementId)",
+          "isBoolean(elementId)",
+          "saveToFile()",
+          "loadFromFile(file)",
+          "clearExtraDataRows(maxAge)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/Config.js",
+    "classes": [
+      {
+        "name": "Config",
+        "methods": [
+          "constructor(ui)",
+          "getInstance(ui)",
+          "load(version)",
+          "loadTaxmanConfig()",
+          "checkForUpdates()",
+          "newCodeVersion()",
+          "newDataVersion()",
+          "clearVersionAlert()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": [
+      "Config_instance"
+    ]
+  },
+  {
+    "filename": "core/Equities.js",
+    "classes": [
+      {
+        "name": "Equity",
+        "methods": [
+          "constructor(taxRate, growth, stdev = ...)",
+          "buy(amountToBuy)",
+          "declareRevenue(income, gains)",
+          "sell(amountToSell)",
+          "capital()",
+          "addYear()"
+        ],
+        "attributes": []
+      },
+      {
+        "name": "IndexFunds",
+        "methods": [
+          "constructor(growth, stdev = ...)",
+          "addYear()",
+          "applyUnrealizedGainsTax(assetType, newCostBasis, details)"
+        ],
+        "attributes": []
+      },
+      {
+        "name": "Shares",
+        "methods": [
+          "constructor(growth, stdev = ...)"
+        ],
+        "attributes": []
+      },
+      {
+        "name": "Pension",
+        "methods": [
+          "constructor(growth, stdev = ...)",
+          "declareRevenue(income, gains)",
+          "getLumpsum()",
+          "drawdown()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/Events.js",
+    "classes": [
+      {
+        "name": "SimEvent",
+        "methods": [
+          "constructor(type, id, amount, fromAge, toAge, rate, match)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/RealEstate.js",
+    "classes": [
+      {
+        "name": "RealEstate",
+        "methods": [
+          "constructor()",
+          "buy(id, downpayment, appreciation)",
+          "sell(id)",
+          "mortgage(id, years, rate, payment)",
+          "getValue(id)",
+          "getPayment(id)",
+          "getTotalValue()",
+          "addYear()"
+        ],
+        "attributes": []
+      },
+      {
+        "name": "Property",
+        "methods": [
+          "constructor()",
+          "buy(paid, appreciation)",
+          "mortgage(years, rate, payment)",
+          "addYear()",
+          "getPayment()",
+          "getValue()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/Revenue.js",
+    "classes": [
+      {
+        "name": "Revenue",
+        "methods": [
+          "declareSalaryIncome(amount, pensionContribRate)",
+          "declareNonEuSharesIncome(amount)",
+          "declarePrivatePensionIncome(amount)",
+          "declarePrivatePensionLumpSum(amount)",
+          "declareStatePensionIncome(amount)",
+          "declareInvestmentIncome(amount)",
+          "declareOtherIncome(amount)",
+          "declareInvestmentGains(amount, taxRate)",
+          "computeTaxes()",
+          "netIncome()",
+          "reset()",
+          "computeProgressiveTax(bands, income, multiplier = ..., limitShift = ...)",
+          "computeIT()",
+          "computePRSI()",
+          "computeUSC()",
+          "computeCGT()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/Simulator.js",
+    "classes": [],
+    "functions": [
+      "run()",
+      "initializeUI()",
+      "readScenario(validate)",
+      "initializeSimulator()",
+      "saveToFile()",
+      "loadFromFile(file)",
+      "initializeSimulationVariables()",
+      "resetYearlyVariables()",
+      "runSimulation()",
+      "calculatePensionIncome()",
+      "processEvents()",
+      "handleInvestments()",
+      "withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority)",
+      "initializeRealEstate()",
+      "updateYearlyData()"
+    ],
+    "variables": [
+      "uiManager",
+      "params",
+      "events",
+      "config",
+      "dataSheet",
+      "row",
+      "errors",
+      "age",
+      "year",
+      "phase",
+      "periods",
+      "failedAt",
+      "success",
+      "montecarlo",
+      "revenue",
+      "realEstate",
+      "stockGrowthOverride",
+      "taxman",
+      "netIncome",
+      "expenses",
+      "savings",
+      "targetCash",
+      "cashWithdraw",
+      "cashDeficit",
+      "cgtLossCarryforward",
+      "incomeStatePension",
+      "incomePrivatePension",
+      "incomeFundsRent",
+      "incomeSharesRent",
+      "withdrawalRate",
+      "cash",
+      "indexFunds",
+      "shares",
+      "pension",
+      "Phases"
+    ]
+  },
+  {
+    "filename": "core/Taxman.js",
+    "classes": [
+      {
+        "name": "Taxman",
+        "methods": [
+          "constructor(taxConfig, simContext = ...)",
+          "reset(currentState = ...)",
+          "declareIncome(type, amount, details = ...)",
+          "declareCapitalGainOrLoss(entry)",
+          "_recalculateTotalGrossIncome()",
+          "computeTaxes(currentState)",
+          "netIncome()",
+          "_calculateTotalTaxLiability()",
+          "_getIncomeSourceGross(type)",
+          "_getIncomeByTypes(types)",
+          "_executeCustomRule(identifier, context)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/TaxmanDependencyLoader.js",
+    "classes": [
+      {
+        "name": "TaxmanDependencyLoader",
+        "methods": [
+          "constructor()",
+          "get(className)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/UIManager.js",
+    "classes": [
+      {
+        "name": "UIManager",
+        "methods": [
+          "constructor(ui)",
+          "updateDataSheet(runs)",
+          "updateProgress(msg)",
+          "updateStatusCell(successes, runs)",
+          "setStatus(message, color)",
+          "updateDataRow(row, progress, scale = ...)",
+          "readParameters(validate = ...)",
+          "clearWarnings()",
+          "readEvents(validate = ...)",
+          "validateMortgageEvents(events)",
+          "validateEventFields(events)",
+          "saveToFile()",
+          "loadFromFile(file)",
+          "getFields()",
+          "getIndexForField(field)",
+          "getRequiredFields(eventType)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/Utils.js",
+    "classes": [],
+    "functions": [
+      "adjust(value, rate = ..., n = ...)",
+      "gaussian(mean, stdev, withOverride = ...)",
+      "rgbToHex(r, g, b)",
+      "between(a, b, p)",
+      "isBetween(num, min, max)",
+      "formatPercentage(value)",
+      "formatBoolean(value)",
+      "serializeSimulation(ui)",
+      "deserializeSimulation(content, ui)",
+      "getRateForKey(key, rateBands)",
+      "evaluateFormula(formula, contextData)"
+    ],
+    "variables": []
+  },
+  {
+    "filename": "core/tax/CapitalGainsTaxCalculator.js",
+    "classes": [
+      {
+        "name": "CapitalGainsTaxCalculator",
+        "methods": [
+          "constructor(taxmanInstance, schemaEvaluator)",
+          "reset()",
+          "declareGainOrLoss(entry)",
+          "calculateCapitalGainsTax()",
+          "_getRateInfoForCGT(holdingPeriodLabel, assetType = ...)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/tax/IncomeTaxCalculator.js",
+    "classes": [
+      {
+        "name": "IncomeTaxCalculator",
+        "methods": [
+          "constructor(taxmanInstance, schemaEvaluator)",
+          "calculateAdjustments()",
+          "calculateDeductionsAndAllowances()",
+          "calculateIncomeTax()",
+          "calculateCredits()",
+          "_calculateFamilyQuotientParts(rule)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/tax/InvestmentIncomeTaxCalculator.js",
+    "classes": [
+      {
+        "name": "InvestmentIncomeTaxCalculator",
+        "methods": [
+          "constructor(taxmanInstance, schemaEvaluator, cgtCalculator)",
+          "calculateInvestmentTax()",
+          "_calculateSingleInvestmentIncome(incomeTypeName, typeConfig, grossAmount, context)",
+          "_calculateTaxByMethod(taxationMethod, taxableAmount, rateRule, incomeTypeName, context)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/tax/PensionWithdrawalCalculator.js",
+    "classes": [
+      {
+        "name": "PensionWithdrawalCalculator",
+        "methods": [
+          "constructor(taxmanInstance, schemaEvaluator)",
+          "reset()",
+          "declareWithdrawal(withdrawalDetails)",
+          "calculatePensionWithdrawalTax(currentState)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/tax/PropertyTaxCalculator.js",
+    "classes": [
+      {
+        "name": "PropertyTaxCalculator",
+        "methods": [
+          "constructor(taxmanInstance, schemaEvaluator)",
+          "calculatePropertyTax()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/tax/ResidencyRulesHandler.js",
+    "classes": [
+      {
+        "name": "ResidencyRulesHandler",
+        "methods": [
+          "constructor(taxmanInstance, schemaEvaluator)",
+          "applyResidencyRules(currentTaxResult)",
+          "_applyNonResidentRules(currentTaxResult)",
+          "_applyForeignTaxRelief(currentTaxResult)",
+          "_applySpecialRegimes(currentTaxResult)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/tax/SchemaEvaluator.js",
+    "classes": [
+      {
+        "name": "SchemaEvaluator",
+        "methods": [
+          "constructor(taxmanInstance)",
+          "evaluateCondition(rule, context = ...)",
+          "calculateValue(rule, context = ...)",
+          "_calculateAllowance(allowanceRule, context = ...)",
+          "applyPhaseOut(baseAmount, rule, context = ...)",
+          "calculateBracketTax(brackets, taxableAmount)",
+          "getBasisValue(basis, context = ...)",
+          "countDependents(filter = ...)",
+          "getMarginalIncomeRate(incomeLevel = ...)",
+          "getIncomeBracketLabel(incomeLevel, incomeBasis = ...)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/tax/SocialContributionsCalculator.js",
+    "classes": [
+      {
+        "name": "SocialContributionsCalculator",
+        "methods": [
+          "constructor(taxmanInstance, schemaEvaluator)",
+          "calculateContributions()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/tax/TransferTaxCalculator.js",
+    "classes": [
+      {
+        "name": "TransferTaxCalculator",
+        "methods": [
+          "constructor(taxmanInstance, schemaEvaluator)",
+          "reset()",
+          "declareTransfer(transferDetails)",
+          "calculateTransferTax(currentState)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "core/tax/WealthTaxCalculator.js",
+    "classes": [
+      {
+        "name": "WealthTaxCalculator",
+        "methods": [
+          "constructor(taxmanInstance, schemaEvaluator)",
+          "calculateWealthTax()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "frontend/gas/GasUI.js",
+    "classes": [
+      {
+        "name": "GasUI",
+        "methods": [
+          "constructor()",
+          "getInstance()",
+          "cacheNamedRanges()",
+          "getValue(elementId)",
+          "setValue(elementId, value)",
+          "getTableData(groupId, columnCount = ...)",
+          "setStatus(message, color = ...)",
+          "clearContent(groupId)",
+          "setWarning(elementId, message)",
+          "setTableCellWarning(tableName, row, col, message)",
+          "clearWarningById(elementId)",
+          "clearAllWarnings()",
+          "setBackground(elementId, color)",
+          "flush()",
+          "setDataRow(rowIndex, data)",
+          "setChartsRow(rowIndex, data)",
+          "getVersion()",
+          "setVersion(version)",
+          "fetchUrl(url)",
+          "showAlert(message, buttons = ...)",
+          "showToast(message, title, timeout)",
+          "setVersionNote(message)",
+          "clearVersionNote()",
+          "setVersionHighlight(warning)",
+          "newCodeVersion(latestVersion)",
+          "newDataVersion(latestVersion)",
+          "saveToFile()",
+          "loadFromFile()",
+          "isPercentage(elementId)",
+          "isBoolean(elementId)",
+          "clearExtraDataRows(maxAge)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [
+      "onEdit(e)"
+    ],
+    "variables": [
+      "GasUI_instance"
+    ]
+  },
+  {
+    "filename": "frontend/web/WebUI.js",
+    "classes": [
+      {
+        "name": "WebUI",
+        "methods": [
+          "constructor()",
+          "getInstance()",
+          "setStatus(message, color = ...)",
+          "setWarning(elementId, message)",
+          "clearElementWarning(element)",
+          "clearAllWarnings()",
+          "getTableData(groupId, columnCount = ...)",
+          "setDataRow(rowIndex, data)",
+          "setChartsRow(rowIndex, data)",
+          "getVersion()",
+          "setVersion(version)",
+          "newDataVersion(latestVersion)",
+          "showAlert(message, buttons = ...)",
+          "showToast(message, title, timeout)",
+          "setVersionNote(message)",
+          "clearVersionNote()",
+          "setVersionHighlight(warning)",
+          "newCodeVersion(latestVersion)",
+          "isPercentage(elementId)",
+          "isBoolean(elementId)",
+          "getValue(elementId)",
+          "setValue(elementId, value)",
+          "fetchUrl(url)",
+          "saveToFile()",
+          "loadFromFile(file)",
+          "setupChangeListener()",
+          "setupRunSimulationButton()",
+          "setupWizardInvocation()",
+          "setupNavigation()",
+          "clearExtraDataRows(maxAge)",
+          "clearExtraChartRows(maxAge)",
+          "setScenarioName(name)",
+          "clearScenarioName()",
+          "flush()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": [
+      "WebUI_instance"
+    ]
+  },
+  {
+    "filename": "frontend/web/components/ChartManager.js",
+    "classes": [
+      {
+        "name": "ChartManager",
+        "methods": [
+          "constructor()",
+          "setupCharts()",
+          "updateChartsRow(rowIndex, data)",
+          "clearExtraChartRows(maxAge)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "frontend/web/components/DragAndDrop.js",
+    "classes": [
+      {
+        "name": "DragAndDrop",
+        "methods": [
+          "constructor()",
+          "setupPriorityDragAndDrop()",
+          "updatePriorityValues()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "frontend/web/components/EventsTableManager.js",
+    "classes": [
+      {
+        "name": "EventsTableManager",
+        "methods": [
+          "constructor(webUI)",
+          "setupAddEventButton()",
+          "setupEventTableRowDelete()",
+          "setupEventTypeChangeHandler()",
+          "updateFieldVisibility(typeSelect)",
+          "generateEventRowId()",
+          "createEventRow(type = ..., name = ..., amount = ..., fromAge = ..., toAge = ..., rate = ..., match = ...)",
+          "addEventRow()",
+          "getEventTypeOptions(selectedType = ...)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "frontend/web/components/FileManager.js",
+    "classes": [
+      {
+        "name": "FileManager",
+        "methods": [
+          "constructor(webUI)",
+          "setupSaveButton()",
+          "setupLoadButton()",
+          "saveToFile()",
+          "loadFromFile(file)",
+          "loadFromUrl(url, name)",
+          "loadFromString(content, name)",
+          "fetchUrl(url)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "frontend/web/components/TableManager.js",
+    "classes": [
+      {
+        "name": "TableManager",
+        "methods": [
+          "constructor(webUI)",
+          "getTableData(groupId, columnCount)",
+          "clearContent(groupId)",
+          "setDataRow(rowIndex, data)",
+          "clearExtraDataRows(maxAge)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "frontend/web/components/Wizard.js",
+    "classes": [
+      {
+        "name": "Wizard",
+        "methods": [
+          "constructor()",
+          "getInstance()",
+          "processMarkdownLinks(text)",
+          "formatValue(value, format)",
+          "processVariables(text)",
+          "processVariablesInObject(obj)",
+          "loadConfig()",
+          "getEventTableState()",
+          "filterValidSteps()",
+          "start(fromStep = ...)",
+          "getLastFocusedFieldIndex()",
+          "followFocus(event)",
+          "finishTour()",
+          "handleKeys(event)",
+          "handleVerticalNavigation(direction)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": [
+      "wizard_instance"
+    ]
+  },
+  {
+    "filename": "frontend/web/landing/main.js",
+    "classes": [],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "frontend/web/landing/script.js",
+    "classes": [],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "frontend/web/spa-router.js",
+    "classes": [],
+    "functions": [
+      "initRouter()",
+      "navigateTo(path)",
+      "handleRoute(route)",
+      "loadPage(routeConfig)",
+      "updateFavicon(faviconPath)",
+      "clearPageAssets()",
+      "processPageContent(htmlContent, sourcePath)",
+      "loadScriptsSequentially(scripts, basePath)",
+      "loadScript(script, basePath)",
+      "ensureAbsolutePath(path, basePath)",
+      "getBasePath(sourcePath)"
+    ],
+    "variables": [
+      "routes",
+      "loadedAssets"
+    ]
+  },
+  {
+    "filename": "frontend/web/utils/DOMUtils.js",
+    "classes": [
+      {
+        "name": "DOMUtils",
+        "methods": [
+          "getValue(elementId)",
+          "setValue(elementId, value)"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "frontend/web/utils/FormatUtils.js",
+    "classes": [
+      {
+        "name": "FormatUtils",
+        "methods": [
+          "formatCurrency(value)",
+          "formatPercentage(value)",
+          "parsePercentage(value)",
+          "parseCurrency(value)",
+          "formatBoolean(value)",
+          "setupPercentageInputs()",
+          "setupCurrencyInputs()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  },
+  {
+    "filename": "frontend/web/utils/NotificationUtils.js",
+    "classes": [
+      {
+        "name": "NotificationUtils",
+        "methods": [
+          "constructor()",
+          "setStatus(message, color = ...)",
+          "setVersionNote(message)",
+          "clearVersionNote()",
+          "setVersionHighlight(warning)",
+          "showAlert(message, buttons = ...)",
+          "showToast(message, title, timeout)",
+          "newDataVersion(latestVersion)",
+          "setWarning(elementId, message)",
+          "_handleMouseEnter(event)",
+          "_handleMouseLeave(event)",
+          "clearElementWarning(element)",
+          "clearAllWarnings()"
+        ],
+        "attributes": []
+      }
+    ],
+    "functions": [],
+    "variables": []
+  }
+]

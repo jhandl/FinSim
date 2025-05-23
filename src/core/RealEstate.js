@@ -16,9 +16,26 @@ class RealEstate {
   
   sell(id) {
     if (id in this.properties) {
-      let value = this.properties[id].getValue();
+      const property = this.properties[id];
+      const saleProceeds = property.getValue();
+      const costBasis = property.paid + property.borrowed; // Initial cost = downpayment + borrowed amount
+      const gainOrLoss = saleProceeds - costBasis;
+      const holdingPeriodYears = property.periods; // Age of the property in years
+
+      // Declare to Taxman
+      if (taxman) { // Check if taxman exists
+          taxman.declareCapitalGainOrLoss({
+              assetType: 'real_estate',
+              amount: gainOrLoss,
+              costBasis: costBasis,
+              saleProceeds: saleProceeds,
+              holdingPeriodYears: holdingPeriodYears,
+              details: { description: `Sold property ${id}` }
+          });
+      }
+
       delete this.properties[id];
-      return value;
+      return saleProceeds; // Return the sale proceeds (value)
     }
     return 0;
   }
