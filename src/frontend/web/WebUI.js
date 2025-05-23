@@ -41,16 +41,9 @@ class WebUI extends AbstractUI {
     if (!WebUI_instance) {
       try {
         WebUI_instance = new WebUI();
-        
-        // Initialize Config after WebUI is created
-        try {
-          Config.getInstance(WebUI_instance);
-        } catch (configError) {
-          // Continue without Config rather than breaking the whole app
-        }
-        
+        // Config.getInstance(WebUI_instance); // REMOVE THIS LINE
       } catch (error) {
-        throw error;
+        throw error; // Propagate error if WebUI creation fails
       }
     }
     return WebUI_instance;
@@ -266,6 +259,25 @@ class WebUI extends AbstractUI {
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  WebUI.getInstance();
-}); 
+window.addEventListener('DOMContentLoaded', async () => { // Add async
+  try {
+    const webUi = WebUI.getInstance(); // Get WebUI instance
+    await Config.initialize(webUi);   // Initialize Config and wait for it
+    
+    // Any further app initialization that depends on Config being ready can go here.
+    // For example, if WebUI needs to refresh something based on config:
+    // webUi.postConfigInit(); // (if such a method were needed)
+
+  } catch (error) {
+    console.error("Failed to initialize application:", error);
+    // Display a user-friendly error message on the page if necessary
+    const body = document.querySelector('body');
+    if (body) {
+      body.innerHTML = `<div style="padding: 20px; text-align: center; font-family: sans-serif;">
+                          <h1>Application Error</h1>
+                          <p>Could not initialize application configuration. Please try again later.</p>
+                          <p>Details: ${error.message}</p>
+                       </div>`;
+    }
+  }
+});
