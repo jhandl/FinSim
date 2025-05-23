@@ -143,7 +143,7 @@ steps:
 
   - element: "#SharesGrowthRate"
     popover:
-      description: "<p>This is the expected average annual growth rate of your investment trusts or shares, not adjusted for inflation.</p><p>Keep in mind that investment trusts or shares tend to have higher fees, so take that into account when calculating this number.</p>"
+      description: "<p>This is the expected average annual growth rate of your investment trusts or shares, not adjusted for inflation.</p><p>Keep in mind that investment trusts tend to have higher fees, so take that into account when calculating this number.</p>"
       side: "right"
       align: "start"
 
