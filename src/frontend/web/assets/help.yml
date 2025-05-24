@@ -841,7 +841,6 @@ steps:
   
   - element: "#loadDemoScenario"
     popover:
-      title: "Load Demo Scenario"
       description: "<p>Click here to load a pre-configured example scenario into the simulator.</p>"
       side: "bottom"
       align: "end"
@@ -849,8 +848,8 @@ steps:
   - element: "#startWizard"
     popover:
       description: "<p>You can get help with any field by pressing the Help button or the ? key.</p>"
-      side: "left"
-      align: "center"
+      side: "bottom"
+      align: "end"
 
   - element: "#cashflowGraph"
     popover:
@@ -868,4 +867,4 @@ steps:
     popover:
       description: "<p>Here you will see the actual numbers as they are computed by the simulator, year by year, from your current age to the target age.</p><p>The columns are mostly self-explanatory. The cash column under income may raise some eyebrows: it shows withdrawals from cash savings to cover expenses when the net income is not enough.</p>"
       side: "top"
-      align: "center"
+      align: "start"
