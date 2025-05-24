@@ -208,7 +208,17 @@ class WebUI extends AbstractUI {
     const wizard = Wizard.getInstance();
     const helpButton = document.getElementById('startWizard');
     if (helpButton) {
-      helpButton.addEventListener('click', () => wizard.start());
+      helpButton.addEventListener('click', () => {
+        // Use wizard's built-in logic only if there was a recently focused input field
+        // lastStepIndex > 0 alone doesn't indicate field context, just previous wizard usage
+        if (wizard.lastFocusedWasInput && wizard.lastFocusedField) {
+          // There was recent field interaction - use wizard's built-in logic
+          wizard.start();
+        } else {
+          // No recent field interaction - start from step 1 (how to use the simulator)
+          wizard.start(1);
+        }
+      });
     }
     const userManualButton = document.getElementById('userManual');
     if (userManualButton) {
@@ -217,7 +227,12 @@ class WebUI extends AbstractUI {
     document.addEventListener('keydown', function(event) {
       if (event.key === '?') {
         event.preventDefault();
-        wizard.start();
+        // For keyboard shortcut, use same logic as Help button
+        if (wizard.lastFocusedWasInput && wizard.lastFocusedField) {
+          wizard.start();
+        } else {
+          wizard.start(1);
+        }
       }
     });
   }

@@ -13,7 +13,9 @@ class Wizard {
     this.tableState = null;
     this.followFocus = this.followFocus.bind(this);
     this.handleKeys = this.handleKeys.bind(this);
+    this.handleClick = this.handleClick.bind(this);
     document.addEventListener('focusin', this.followFocus);
+    document.addEventListener('click', this.handleClick);
   }
 
   // Singleton
@@ -329,8 +331,19 @@ class Wizard {
         this.lastFocusedField = event.target;
         this.lastFocusedWasInput = true;
       } else {
+        // Focus moved to a non-input element (button, link, etc.)
+        this.lastFocusedField = null;
         this.lastFocusedWasInput = false;
       }
+    }
+  }
+
+  handleClick(event) {
+    // Clear field tracking when clicking on non-input elements
+    // This handles cases where clicking on non-focusable elements doesn't trigger focusin
+    if (!event.target.matches('input, textarea, select')) {
+      this.lastFocusedField = null;
+      this.lastFocusedWasInput = false;
     }
   }
 
