@@ -50,17 +50,20 @@ header {
     display: flex;
     flex-wrap: wrap;
     gap: 0.9rem;
+    align-items: center;
 }
 
 .header-left {
     flex: 1 1 auto;
     min-width: 200px;
     color: #2563eb;
+    display: flex;
+    align-items: center;
 }
 
 .header-left h1 {
     margin: 0;
-    font-size: 1.35rem;
+    font-size: 1.4rem;
 }
 
 .header-left h1 a {
