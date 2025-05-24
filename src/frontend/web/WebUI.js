@@ -162,7 +162,7 @@ class WebUI extends AbstractUI {
 
   // New method to setup the load demo scenario button
   setupLoadDemoScenarioButton() {
-    const loadDemoButton = document.getElementById('loadDemoScenarioHeader');
+    const loadDemoButton = document.getElementById('loadDemoScenario');
     if (loadDemoButton) {
       loadDemoButton.addEventListener('click', () => {
         if (this.fileManager.hasUnsavedChanges()) {
@@ -178,7 +178,7 @@ class WebUI extends AbstractUI {
       // It's better to log an error if the button isn't found during development
       // but for production, we might not want to throw an error or log excessively.
       // For now, let's log it as it helps in debugging.
-      console.error("loadDemoScenarioHeader button not found");
+      console.error("loadDemoScenario button not found");
     }
   }
 

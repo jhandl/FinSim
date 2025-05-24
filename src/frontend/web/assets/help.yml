@@ -839,10 +839,10 @@ steps:
       side: "bottom"
       align: "end"
   
-  - element: "#loadDemoScenarioHeader"
+  - element: "#loadDemoScenario"
     popover:
       title: "Load Demo Scenario"
-      description: "<p>Click this button to load a pre-configured example scenario into the simulator.</p><p>If you have made any unsaved changes to your current scenario, you will be asked to confirm before the demo data is loaded.</p>"
+      description: "<p>Click here to load a pre-configured example scenario into the simulator.</p>"
       side: "bottom"
       align: "end"
   
