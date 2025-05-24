@@ -278,16 +278,33 @@ class Wizard {
             });
           }
 
-          // Focus the 'Next' button specifically on the first step (index 0)
+          // Focus management for step 0 (welcome step)
           if (this.tour && typeof this.tour.getActiveIndex === 'function' && this.tour.getActiveIndex() === 0) {
-            const nextButton = popover.querySelector('.driver-next-btn');
-            if (nextButton) {
-              setTimeout(() => {
+            // Make sure popover is focusable
+            if (!popover.hasAttribute('tabindex')) {
+              popover.setAttribute('tabindex', '-1');
+            }
+            
+            // Try to find the next button
+            const nextButton = popover.querySelector('.driver-popover-next-btn') || 
+                              popover.querySelector('[data-driver="next"]') ||
+                              popover.querySelector('.driver-btn.driver-next');
+            
+            // Check if we have a focused element that can handle keyboard events
+            const currentFocus = document.activeElement;
+            
+            // If current focus is body (auto startup) or not a good focus target, establish proper focus
+            if (currentFocus === document.body || currentFocus === document.documentElement) {
+              // First try the next button
+              if (nextButton) {
                 nextButton.focus({ preventScroll: true });
-              }, 100); // Using a slightly longer timeout
+              } else {
+                // Make body focusable and focus it
+                document.body.setAttribute('tabindex', '-1');
+                document.body.focus({ preventScroll: true });
+              }
             }
           }
-          // The previous generic popover.focus() has been removed.
         }
       }
     });
@@ -338,6 +355,7 @@ class Wizard {
     };
 
     const direction = moveActions[event.key]?.(event);
+    
     if (direction !== undefined) {
       event.preventDefault();
       if (direction === 'next' || direction === 'previous') {
