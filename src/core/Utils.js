@@ -68,6 +68,10 @@ function serializeSimulation(ui) {
 
     // Format special values (percentages and booleans)
     for (const [key, value] of Object.entries(parameters)) {
+        // Skip formatting if value is undefined or null
+        if (value === undefined || value === null) {
+            continue;
+        }
         if (ui.isPercentage(key)) {
             parameters[key] = FormatUtils.formatPercentage(Math.round(value * 10000) / 10000);
         } else if (ui.isBoolean(key)) {
@@ -82,7 +86,9 @@ function serializeSimulation(ui) {
     let csvContent = "# Ireland Financial Simulator v1.26 Save File\n";
     csvContent += "# Parameters\n";
     for (const [key, value] of Object.entries(parameters)) {
-        csvContent += `${key},${value}\n`;
+        // Convert undefined values to empty strings to avoid "undefined" in CSV
+        const csvValue = (value === undefined || value === null) ? '' : value;
+        csvContent += `${key},${csvValue}\n`;
     }
    
     csvContent += "\n# Events\n";
@@ -95,7 +101,10 @@ function serializeSimulation(ui) {
         // URL-encode commas in the name to prevent breaking CSV format
         const encodedName = name.replace(/,/g, "%2C");
         
-        const otherFields = event.slice(1);
+        // Convert undefined values in event fields to empty strings
+        const otherFields = event.slice(1).map(field => 
+            (field === undefined || field === null) ? '' : field
+        );
         csvContent += `${type},${encodedName},${otherFields.join(',')}\n`;
     });
 
@@ -121,8 +130,25 @@ function deserializeSimulation(content, ui) {
 
         if (section.includes('Parameters')) {
             const [key, value] = line.split(',');
+            
+            // Map legacy field names to current field names for backward compatibility
+            const legacyFieldMap = {
+                'InitialETFs': 'InitialFunds',
+                'InitialTrusts': 'InitialShares',
+                'EtfAllocation': 'FundsAllocation',
+                'TrustAllocation': 'SharesAllocation',
+                'EtfGrowthRate': 'FundsGrowthRate',
+                'EtfGrowthStdDev': 'FundsGrowthStdDev',
+                'TrustGrowthRate': 'SharesGrowthRate',
+                'TrustGrowthStdDev': 'SharesGrowthStdDev',
+                'PriorityETF': 'PriorityFunds',
+                'PriorityTrust': 'PriorityShares'
+            };
+            
+            const actualKey = legacyFieldMap[key] || key;
+            
             try {
-                ui.setValue(key, value);
+                ui.setValue(actualKey, value);
             } catch (e) {
                 // Skip if parameter doesn't exist
             }
