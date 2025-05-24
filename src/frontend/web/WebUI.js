@@ -263,6 +263,12 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     const webUi = WebUI.getInstance(); // Get WebUI instance
     await Config.initialize(webUi);   // Initialize Config and wait for it
     
+    // Automatically start the wizard
+    const wizard = Wizard.getInstance();
+    if (wizard) {
+      wizard.start(0); // Start wizard from the first step (welcome popover)
+    }
+
     // Any further app initialization that depends on Config being ready can go here.
     // For example, if WebUI needs to refresh something based on config:
     // webUi.postConfigInit(); // (if such a method were needed)
