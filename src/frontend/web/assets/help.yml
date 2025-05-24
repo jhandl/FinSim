@@ -155,7 +155,7 @@ steps:
 
   - element: "#Inflation"
     popover:
-      description: "<p>This is the expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of 2% to 3%. However, deviations due to shocks (e.g., pandemics, wars, etc) can cause deviations that are skewed towards higher numbers. For example, [in 2019 inflation in Ireland was 1.3%](https://www.cso.ie/en/releasesandpublications/er/cpi/consumerpriceindexdecember2019/), lower than its [30-year average of 2.3%](https://www.officialdata.org/ireland/inflation/1993?endYear=2024&amount=100). In contrast, [in 2022 it rose to 8.2%](https://www.cso.ie/en/releasesandpublications/ep/p-cpi/consumerpriceindexdecember2022/), the highest since 1984.</p>"
+      description: "<p>This is the expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of 2% to 3%. However, deviations due to shocks (e.g., pandemics, wars, etc) are skewed towards higher numbers. For example, [in 2019 inflation in Ireland was 1.3%](https://www.cso.ie/en/releasesandpublications/er/cpi/consumerpriceindexdecember2019/), lower than its [30-year average of 2.3%](https://www.officialdata.org/ireland/inflation/1993?endYear=2024&amount=100). In contrast, [in 2022 it rose to 8.2%](https://www.cso.ie/en/releasesandpublications/ep/p-cpi/consumerpriceindexdecember2022/), the highest since 1984.</p>"
       side: "right"
       align: "start"
 
@@ -262,7 +262,7 @@ steps:
   - element: "#EventType"
     eventTypes: ["FI"]
     popover:
-      description: "<p>This event lets you add a net income from things like a gift or inheritance.</p><p>It assumes any tax has already been paid, so this is kind of a wildcard event that lets you inject cash into your income stream, and it will be invested according to your chosen allocation</p>"
+      description: "<p>This event lets you add a net income from things like a gift or inheritance.</p><p>It assumes any tax has already been paid, so this is kind of a wildcard event that lets you inject cash into your income stream.</p>"
       side: "bottom"
       align: "center"
 
@@ -708,7 +708,7 @@ steps:
   - element: "#EventRate"
     eventTypes: ["SM"]
     popover:
-      description: "<p>The total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate an S&P500 dot-com crash when you're 40, you'd enter 40 as the starting age, and 41 as the ending age, and -40% as the rate. This will override the market growth you specified in the economy parameters with a ~29% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p><p>Keep in mind that high volatility values already imply bubbles and crashes, but it's interesting to see what happens if the crash comes at the worst time, for example just as you retire.</p>"
+      description: "<p>The total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate an S&P500 dot-com crash when you're 40, you'd enter 40 as the starting age, and 41 as the ending age, and -40% as the rate. This will override the market growth you specified in the economy parameters with a ~29% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p><p>Keep in mind that high volatility values already imply bubbles and crashes, but it's interesting to see what happens if the crash comes at the worst time, for example [just as you retire](https://www.investopedia.com/terms/s/sequence-risk.asp).</p>"
       side: "bottom"
       align: "center"
 
@@ -841,14 +841,13 @@ steps:
   
   - element: "#loadDemoScenarioHeader"
     popover:
-      title: "Load Demo Scenario"
       description: "<p>Click this button to load a pre-configured example scenario into the simulator.</p><p>If you have made any unsaved changes to your current scenario, you will be asked to confirm before the demo data is loaded.</p>"
       side: "bottom"
       align: "end"
   
   - element: "#startWizard"
     popover:
-      description: "<p>You can get help with any field by pressing the Help button or the ? key.</p>"
+      description: "<p>You can get help with any field by pressing the Help button or the ? key while on that field.</p>"
       side: "left"
       align: "center"
 
@@ -868,4 +867,4 @@ steps:
     popover:
       description: "<p>Here you will see the actual numbers as they are computed by the simulator, year by year, from your current age to the target age.</p><p>The columns are mostly self-explanatory. The cash column under income may raise some eyebrows: it shows withdrawals from cash savings to cover expenses when the net income is not enough.</p>"
       side: "top"
-      align: "center"
+      align: "left"
