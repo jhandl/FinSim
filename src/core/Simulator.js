@@ -155,6 +155,17 @@ function calculatePensionIncome() {
 
 function processEvents() {
   expenses = 0;
+  
+  // First pass: Process all real estate sales for the current age
+  for (let i = 0; i < events.length; i++) {
+    let event = events[i];
+    if (event.type === 'R' && event.toAge && age === event.toAge) {
+      // console.log("Sell property ["+event.id+"] for "+Math.round(realEstate.getValue(event.id)));            
+      cash += realEstate.sell(event.id);
+    }
+  }
+  
+  // Second pass: Process all other events including real estate purchases
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
     let amount = adjust(event.amount, event.rate);
@@ -235,17 +246,17 @@ function processEvents() {
         break;
 
       case 'R': // Real estate
-        // purchase
+        // purchase only (sales were handled in first pass)
         if (age === event.fromAge) {
           realEstate.buy(event.id, amount, event.rate);
-          expenses += amount;
-          //            console.log("Buy property ["+event.id+"] with "+Math.round(amount)+"  downpayment (valued "+Math.round(realEstate.getValue(event.id))+")");            
+          // Use available cash first, only add remainder to expenses
+          let cashUsed = Math.min(cash, amount);
+          cash -= cashUsed;
+          let remainingExpense = amount - cashUsed;
+          expenses += remainingExpense;
+          //            console.log("Buy property ["+event.id+"] with "+Math.round(amount)+" downpayment (used "+Math.round(cashUsed)+" cash, "+Math.round(remainingExpense)+" added to expenses) (valued "+Math.round(realEstate.getValue(event.id))+")");            
         }
-        // sale - only if toAge is specified
-        if (event.toAge && age === event.toAge) {
-          //            console.log("Sell property ["+event.id+"] for "+Math.round(realEstate.getValue(event.id)));            
-          cash += realEstate.sell(event.id);
-        }
+        // Note: sales are now handled in the first pass above to ensure sale proceeds are available before purchases
         break;
 
       case 'SM': // Stock Market Growth override to simulate bull or bear markets

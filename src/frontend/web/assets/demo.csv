@@ -31,11 +31,11 @@ PriorityShares,2
 
 # Events
 Type,Name,Amount,FromAge,ToAge,Rate,Extra
-SI, Person1,45000,30,64,0.04,0.06
+SI, Person1,44000,30,64,0.04,0.06
 SI,Person2,30000,30,64,0.02,0
-E,Life,39000,30,100,,
+E,Life,40000,30,100,,
 E,Kid,6000,32,52,,
 R,Family House,40000,35,65,,
 M,Family House,18948,35,60,0.035,
-R,Downsize,300000,65,100,,
+R,Downsize,280000,65,100,,
 SM,Crash,,70,72,-0.25,
