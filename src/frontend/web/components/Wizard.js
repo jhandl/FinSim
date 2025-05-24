@@ -269,20 +269,25 @@ class Wizard {
         const popover = document.querySelector('.driver-popover');
         if (popover) {
           // Existing logic for the #load-example-scenario button
-          const btn = popover.querySelector('#load-example-scenario');
-          if (btn && !btn.getAttribute('data-click-attached')) {
-            btn.setAttribute('data-click-attached', 'true');
-            btn.addEventListener('click', () => {
+          const loadExampleBtn = popover.querySelector('#load-example-scenario');
+          if (loadExampleBtn && !loadExampleBtn.getAttribute('data-click-attached')) {
+            loadExampleBtn.setAttribute('data-click-attached', 'true');
+            loadExampleBtn.addEventListener('click', () => {
               WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
               this.finishTour();
             });
           }
 
-          // New logic to focus the popover for keyboard navigation
-          popover.setAttribute('tabindex', '-1');
-          setTimeout(() => {
-            popover.focus({ preventScroll: true }); // preventScroll might be useful
-          }, 50); 
+          // Focus the 'Next' button specifically on the first step (index 0)
+          if (this.tour && typeof this.tour.getActiveIndex === 'function' && this.tour.getActiveIndex() === 0) {
+            const nextButton = popover.querySelector('.driver-next-btn');
+            if (nextButton) {
+              setTimeout(() => {
+                nextButton.focus({ preventScroll: true });
+              }, 100); // Using a slightly longer timeout
+            }
+          }
+          // The previous generic popover.focus() has been removed.
         }
       }
     });
