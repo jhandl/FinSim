@@ -22,7 +22,7 @@ steps:
         <li>The table at the bottom will show you, year by year, the details of your income, taxes, cashflow, and assets.</li></ul></ol>
         <p><b>Stress testing:</b> You can change the economy parameters to see what happens if inflation is higher, investments grow slower or are more volatile, etc. You can further stress test your scenario by adding a stock market crash or two.</p>
         <p><b>Volatility:</b> If you introduce volatility in any of your investments (anything higher than 0%), it will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp). This runs the simulation ${simulationRuns} times, each time with random rates of growth according to a normal distribution with the median and standard deviation you provided, and it tells you how likely your scenario will succeed in those conditions (the percentage of those simulations that ended in success).</p><p>&nbsp;&nbsp;The graphs will represent the average of all the runs. You may be surprised to see non-zero amounts of money remaining in the assets graph past the expected failure age. This is due to the percentage of runs that were successful due to random chance. You may also be surprised by a lower than expected success rate, when the scenario seems to work well for 0% volatility. This is the result of the erosion of returns due to volatility ($100 - 10% = $90; $90 + 10% = $99).</p><p>&nbsp;&nbsp;If you leave the volatility at 0% for all three investment vehicles, the simulation will run once, without any variability, and it will tell you at what age you ran out of money. If you want to see the effect of a change in your scenario, it's best to set the volatility to zero. That way it's deterministic, and any change in outcome is the direct result of the change to your scenario. Once you introduce volatility, the only meaningful outcome is the percentage of success.</p>
-        <p><b>Saving scenarios:</b> To avoid losing your scenario when you close the browser window, use the "Save" button so you can load it again next time from your local hard drive. You can name the file so you can store different scenarios. You can load an example scenario here: </p>
+        <p><b>Saving scenarios:</b> To avoid losing your scenario when you close the browser window, use the "Save" button so you can load it again next time from your local hard drive. You can name the file so you can store different scenarios. </p>
         <p><b>Help system:</b> If you are editing a field and press the Help button or the ? key, you will get help for that specific field. You can navigate the help cards with the buttons on the cards, with the arrow keys and with &lt;tab&gt; and &lt;shift-tab&gt;, and you can leave the help system with &lt;Esc&gt; or clicking outside of the help card.</p>
       prevBtnText: ["← Welcome"]
       nextBtnText: ["Start tour →"]
@@ -836,6 +836,13 @@ steps:
   - element: "#loadSimulation"
     popover:
       description: "<p>Click here to load a scenario from a file.</p>"
+      side: "bottom"
+      align: "end"
+  
+  - element: "#loadDemoScenarioHeader"
+    popover:
+      title: "Load Demo Scenario"
+      description: "<p>Click this button to load a pre-configured example scenario into the simulator.</p><p>If you have made any unsaved changes to your current scenario, you will be asked to confirm before the demo data is loaded.</p>"
       side: "bottom"
       align: "end"
   
