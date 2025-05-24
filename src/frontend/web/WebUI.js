@@ -23,7 +23,7 @@ class WebUI extends AbstractUI {
       this.setupRunSimulationButton();
       this.setupWizardInvocation();
       this.setupNavigation();
-      this.setupLoadDemoScenarioButton(); // New method call for the demo button
+      this.setupLoadDemoScenarioButton();
       
       this.eventsTableManager.addEventRow();
       
@@ -41,7 +41,6 @@ class WebUI extends AbstractUI {
     if (!WebUI_instance) {
       try {
         WebUI_instance = new WebUI();
-        // Config.getInstance(WebUI_instance); // REMOVE THIS LINE
       } catch (error) {
         throw error; // Propagate error if WebUI creation fails
       }
@@ -162,7 +161,7 @@ class WebUI extends AbstractUI {
 
   // New method to setup the load demo scenario button
   setupLoadDemoScenarioButton() {
-    const loadDemoButton = document.getElementById('loadDemoScenario');
+    const loadDemoButton = document.getElementById('loadDemoScenarioHeader');
     if (loadDemoButton) {
       loadDemoButton.addEventListener('click', () => {
         if (this.fileManager.hasUnsavedChanges()) {
@@ -178,7 +177,7 @@ class WebUI extends AbstractUI {
       // It's better to log an error if the button isn't found during development
       // but for production, we might not want to throw an error or log excessively.
       // For now, let's log it as it helps in debugging.
-      console.error("loadDemoScenario button not found");
+      console.error("loadDemoScenarioHeader button not found");
     }
   }
 

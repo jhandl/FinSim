@@ -12,7 +12,7 @@ class Config {
   }
 
   // Singleton
-  static getInstance() { // Remove ui parameter if only needed for initialize
+  static getInstance() {
     if (!Config_instance) {
       // This indicates that initialize was not called or failed.
       // Depending on strictness, could throw an error or return null.
@@ -40,11 +40,11 @@ class Config {
     return Config_instance;
   }
 
-  async load(version) { // Add async
+  async load(version) {
     try {
       // Simple relative path for the configuration file
       const url = "/src/core/config/finance-simulation-config-" + version + ".json";
-      const jsonString = await this.ui.fetchUrl(url); // await the fetchUrl call
+      const jsonString = await this.ui.fetchUrl(url);
       const config = JSON.parse(jsonString);
       Object.assign(this, config);
     } catch (err) {

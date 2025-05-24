@@ -170,9 +170,6 @@ class FileManager {
       this.webUI.formatUtils.setupPercentageInputs();
     }
     this.webUI.setStatus("Ready");
-    // Note: The removal of 'this.lastSavedState = serializeSimulation(this.webUI);'
-    // from loadFromString was specified, but based on the last file read,
-    // it was already not present. If it were, it would be removed here.
   }
 
   async fetchUrl(url) {
