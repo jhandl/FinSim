@@ -266,9 +266,9 @@ class Wizard {
       },
       onDestroyStarted: () => this.finishTour(),
       onHighlighted: (element) => {
-        // Look for the static button in the help popover for 'How to use the simulator'
         const popover = document.querySelector('.driver-popover');
         if (popover) {
+          // Existing logic for the #load-example-scenario button
           const btn = popover.querySelector('#load-example-scenario');
           if (btn && !btn.getAttribute('data-click-attached')) {
             btn.setAttribute('data-click-attached', 'true');
@@ -277,6 +277,12 @@ class Wizard {
               this.finishTour();
             });
           }
+
+          // New logic to focus the popover for keyboard navigation
+          popover.setAttribute('tabindex', '-1');
+          setTimeout(() => {
+            popover.focus({ preventScroll: true }); // preventScroll might be useful
+          }, 50); 
         }
       }
     });
