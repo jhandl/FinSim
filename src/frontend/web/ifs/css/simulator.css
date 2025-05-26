@@ -18,6 +18,39 @@
     --border-radius-large: 8px;
     --input-field-border: 1px;
     --events-line-divider: 0px;
+    
+    /* Viewport units with fallbacks */
+    --viewport-height: 100vh;
+    --viewport-width: 100vw;
+}
+
+/* Use dynamic viewport units where supported */
+@supports (height: 100dvh) {
+    :root {
+        --viewport-height: 100dvh;
+        --viewport-width: 100dvw;
+    }
+}
+
+/* Landscape mode optimizations */
+@media (orientation: landscape) and (max-height: 500px) {
+    /* Reduce header padding in landscape on short screens */
+    header {
+        padding: 0.5rem 1.8rem;
+    }
+    
+    /* Reduce body padding to maximize content space */
+    body {
+        padding-top: calc(50px + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(50px + env(safe-area-inset-bottom, 0px));
+    }
+    
+    /* Ensure safe areas are respected on sides in landscape */
+    .header-left,
+    .header-center-right {
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
+    }
 }
 
 * {
@@ -31,11 +64,13 @@ body {
     background-color: var(--background-color);
     color: var(--text-color);
     margin: 0;
-    min-height: 100vh;
+    min-height: var(--viewport-height);
     display: flex;
     flex-direction: column;
-    padding-top: 60px;
-    padding-bottom: 60px;
+    padding-top: calc(60px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
 }
 
 header {
@@ -677,6 +712,9 @@ input.percentage::placeholder {
 footer {
     background-color: var(--card-background);
     padding: 1rem 2rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(2rem + env(safe-area-inset-left, 0px));
+    padding-right: calc(2rem + env(safe-area-inset-right, 0px));
     text-align: center;
     border-top: 1px solid var(--border-color);
     position: fixed;
