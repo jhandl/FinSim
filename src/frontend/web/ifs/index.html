@@ -316,12 +316,16 @@
     <script>
     function optimizeMobileHeader() {
         const currentWidth = window.innerWidth;
+        const currentHeight = window.innerHeight;
         
         // If in desktop mode, reset styles and exit
-        if (currentWidth > 895) {
+        if (currentWidth > 915) {
             resetButtonStyles();
             return;
         }
+        
+        // Detect mobile landscape mode (width > height and mobile width range)
+        const isMobileLandscape = currentWidth > currentHeight && currentWidth <= 915 && currentWidth >= 568;
         
         // Always reset styles first, then recalculate for current width
         resetButtonStyles();
@@ -341,15 +345,29 @@
             const availableGapSpace = containerWidth - totalButtonWidth;
             const naturalGap = availableGapSpace / gaps;
             
+            // Apply 10% reduction for mobile landscape mode
+            const landscapeReduction = isMobileLandscape ? 0.9 : 1.0;
+            
             // If natural gap is good (4px+ for safety margin), use it (max 0.6rem)
             if (naturalGap >= 4) {
-                const gapRem = Math.min(naturalGap / 16, 0.6);
+                const gapRem = Math.min(naturalGap / 16, 0.6) * landscapeReduction;
                 container.style.setProperty('gap', `${gapRem}rem`, 'important');
+                
+                // Apply padding reduction for landscape mode
+                if (isMobileLandscape) {
+                    buttons.forEach(btn => {
+                        if (btn.tagName === 'BUTTON') {
+                            const currentPaddingPx = parseFloat(getComputedStyle(btn).paddingLeft);
+                            const reducedPaddingPx = currentPaddingPx * landscapeReduction;
+                            btn.style.setProperty('padding', `0.35rem ${reducedPaddingPx / 16}rem`, 'important');
+                        }
+                    });
+                }
                 return;
             }
             
             // Gap too small - use 3px gap and reduce button padding to fit
-            const targetGap = 3;
+            const targetGap = 3 * landscapeReduction;
             const totalTargetGapSpace = targetGap * gaps;
             const totalOverflow = totalButtonWidth + totalTargetGapSpace - containerWidth;
             
@@ -362,9 +380,12 @@
             const currentPaddingPx = parseFloat(getComputedStyle(sampleButton).paddingLeft);
             let newPaddingPx = Math.max(2, currentPaddingPx - paddingReductionPerSide);
             
+            // Apply landscape reduction to padding
+            newPaddingPx = newPaddingPx * landscapeReduction;
+            
             // If still not enough reduction, be more aggressive
             if (newPaddingPx > 10 && totalOverflow > 5) {
-                newPaddingPx = Math.max(3, currentPaddingPx * 0.5); // Cut padding in half
+                newPaddingPx = Math.max(3, currentPaddingPx * 0.5 * landscapeReduction); // Cut padding in half with landscape reduction
             }
             
             buttons.forEach(btn => {
