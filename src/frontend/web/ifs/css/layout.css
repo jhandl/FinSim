@@ -17,15 +17,12 @@ main {
 footer {
   background-color: var(--card-background);
   padding: 0.9rem 1.8rem;
-  padding-bottom: calc(0.9rem + env(safe-area-inset-bottom, 0px));
-  padding-left: calc(1.8rem + env(safe-area-inset-left, 0px));
-  padding-right: calc(1.8rem + env(safe-area-inset-right, 0px));
   text-align: center;
   border-top: 1px solid var(--border-color);
   position: sticky;
   bottom: 0;
   z-index: 1000;
-  width: 100dvw;
+  width: 100vw;
 }
 
 /* Parameters section layout */
@@ -222,13 +219,10 @@ footer {
     flex-direction: column;
     gap: 0.5rem;
     padding: 0 !important; /* Remove all header padding */
-    padding-top: env(safe-area-inset-top, 0px) !important;
-    padding-left: env(safe-area-inset-left, 0px) !important;
-    padding-right: env(safe-area-inset-right, 0px) !important;
     position: sticky;
     top: 0;
     z-index: 1000;
-    width: 100dvw;
+    width: 100vw;
   }
 
   /* Add top margin to main content to account for taller mobile header */
@@ -357,60 +351,3 @@ footer {
       grid-template-columns: 1fr;
   }
 }
-
-/* Landscape mode optimizations */
-@media (orientation: landscape) and (max-height: 500px) {
-  /* Reduce margins in landscape to maximize content space */
-  main {
-    margin: 1rem auto;
-    padding: 0 0.5rem;
-    padding-left: calc(0.5rem + env(safe-area-inset-left, 0px));
-    padding-right: calc(0.5rem + env(safe-area-inset-right, 0px));
-  }
-  
-  /* Make graphs more compact in landscape */
-  .graph-container {
-    min-height: 280px; /* Reduced from 360px */
-    max-height: 400px; /* Reduced from 540px */
-  }
-}
-
-/* Landscape-specific mobile header optimizations */
-@media (max-width: 895px) and (orientation: landscape) and (max-height: 500px) {
-  /* Adjust mobile header margin for landscape */
-  main {
-    margin-top: 4.5rem !important; /* Reduced from 5.75rem for landscape */
-  }
-  
-  header {
-    gap: 0.25rem !important; /* Reduce gap further in landscape */
-  }
-  
-  .header-left {
-    padding: 0.2rem 0 0.05rem 0 !important; /* Reduce padding in landscape */
-  }
-  
-  .header-center-right {
-    gap: 0.15rem !important; /* Reduce gap between rows in landscape */
-  }
-  
-  .header-right {
-    padding: 0 0 0.25rem 0 !important; /* Reduce bottom padding in landscape */
-  }
-  
-  /* Make buttons even more compact in landscape */
-  .primary-button, .secondary-button {
-    font-size: 0.8rem !important;
-    padding: 0.25rem 0.25rem !important;
-  }
-  
-  .header-left h1 {
-    font-size: 1.1rem !important; /* Smaller title in landscape */
-  }
-  
-  .header-left .version {
-    font-size: 0.8rem !important;
-  }
-}
-
-
