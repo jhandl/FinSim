@@ -10,115 +10,13 @@
 
 ---
 
-## Phase 1: Fix Pop-up/Modal Issues (CRITICAL)
-
-### File: `src/frontend/web/ifs/css/wizard.css`
-
-**Current Issue**: Pop-ups overflow screen, buttons unreachable, background scrolls instead of popover content.
-
-#### Step 1.1: Add Mobile Popover Constraints
-
-Add these rules at the end of `wizard.css`:
-
-```css
-/* Mobile popover fixes */
-@media (max-width: 768px) {
-  .driver-popover {
-    max-height: 90vh !important;
-    width: calc(100vw - 40px) !important;
-    max-width: calc(100vw - 40px) !important;
-    min-width: 280px !important;
-    position: fixed !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    overflow-y: auto !important;
-    padding-bottom: 80px !important; /* Space for buttons */
-  }
-  
-  /* Note: !important is necessary here because driver.js applies inline styles */
-
-  .driver-popover.welcome-popover,
-  .driver-popover.howto-popover {
-    max-height: 85vh !important;
-    width: calc(100vw - 20px) !important;
-    max-width: calc(100vw - 20px) !important;
-  }
-
-  .driver-popover .driver-popover-description {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-    max-height: none !important;
-  }
-
-  /* Ensure buttons are always visible */
-  .driver-popover .driver-popover-footer {
-    position: sticky !important;
-    bottom: 0 !important;
-    background: white !important;
-    padding: 1rem !important;
-    border-top: 1px solid #eee !important;
-    margin-top: 1rem !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .driver-popover {
-    width: calc(100vw - 20px) !important;
-    max-width: calc(100vw - 20px) !important;
-    min-width: 260px !important;
-  }
-}
-```
-
-#### Step 1.2: Add Body Scroll Lock
-
-Add to `wizard.css`:
-
-```css
-/* Prevent background scrolling when popover is active */
-body.driver-active {
-  overflow: hidden !important;
-  position: fixed !important;
-  width: 100% !important;
-}
-```
-
-#### Step 1.3: Update Wizard.js to Add Body Class
-
-**File: `src/frontend/web/components/Wizard.js`**
-
-Find the `onHighlighted` callback in the `this.driver()` configuration (around line 265) and modify it to add body class management at the beginning:
-
-```javascript
-onHighlighted: (element) => {
-  // Add body class to prevent scrolling
-  document.body.classList.add('driver-active');
-  
-  const popover = document.querySelector('.driver-popover');
-  if (popover) {
-    // ... existing logic for the #load-example-scenario button ...
-    // ... existing focus management logic ...
-  }
-},
-onDestroyStarted: () => {
-  // Remove body class to restore scrolling
-  document.body.classList.remove('driver-active');
-  this.finishTour();
-}
-```
-
-**Test**: Pop-ups should fit on screen, scroll internally, and prevent background scrolling.
-
----
-
-## Phase 2: Landing Page Header Optimization
+## Phase 1: Landing Page Header Optimization
 
 ### File: `src/frontend/web/landing/styles.css`
 
 **Current Issue**: Header too tall, navigation wraps poorly, title too big.
 
-#### Step 2.1: Optimize Header Height
+#### Step 1.1: Optimize Header Height
 
 Find the existing `@media (max-width: 768px)` rule (around line 473) and modify:
 
@@ -157,7 +55,7 @@ Find the existing `@media (max-width: 768px)` rule (around line 473) and modify:
 }
 ```
 
-#### Step 2.2: Navigation Improvements & Smaller Screen Optimizations
+#### Step 1.2: Navigation Improvements & Smaller Screen Optimizations
 
 Modify the existing `@media (max-width: 576px)` rule (around line 497) to include these additional optimizations:
 
@@ -187,7 +85,7 @@ Modify the existing `@media (max-width: 576px)` rule (around line 497) to includ
   }
 
   .hero-content h2 {
-    font-size: 1.6rem; /* Reduced from 2.2rem */
+    font-size: 1.8rem; /* Reduced from 2.2rem */
   }
 
   .hero {
@@ -218,24 +116,24 @@ Modify the existing `@media (max-width: 576px)` rule (around line 497) to includ
 }
 ```
 
-#### Step 2.3: Hero Section Optimization
+#### Step 1.3: Hero Section Optimization
 
 The above changes already include hero section optimizations. Verify these align with the plan:
 - Hero title: `3rem → 2rem` (768px) → `1.6rem` (480px) ✅
-- Hero subtitle: `2.2rem → 1.6rem` (576px) → `1.4rem` (480px) ✅  
+- Hero subtitle: `2.2rem → 1.8rem` (576px) → `1.4rem` (480px) ✅  
 - Hero padding: `80px 0 → 40px 0` (768px) → `30px 0` (576px) ✅
 
 **Test**: Header should use ≤25% of screen height on mobile devices.
 
 ---
 
-## Phase 3A: Simulator Header - Multi-row Layout
+## Phase 2A: Simulator Header - Multi-row Layout
 
 ### File: `src/frontend/web/ifs/css/layout.css`
 
 **Current Issue**: Buttons overlap, logo wraps, horizontal overflow.
 
-#### Step 3A.1: Extend Existing Mobile Header Rules
+#### Step 2A.1: Extend Existing Mobile Header Rules
 
 Find the existing `@media (max-width: 691px)` rule (around line 204) and extend it by adding these rules after the existing ones:
 
@@ -333,7 +231,7 @@ Find the existing `@media (max-width: 691px)` rule (around line 204) and extend 
 }
 ```
 
-#### Step 3A.2: Update Parameter Section Layout
+#### Step 2A.2: Update Parameter Section Layout
 
 The existing layout.css already handles parameter section layout changes at various breakpoints. The current 691px rule already sets `.parameters-section { grid-template-columns: 1fr; }` and `.events-section` width adjustments.
 
@@ -374,14 +272,14 @@ If additional fine-tuning is needed, add these rules to the existing breakpoints
 
 **Test**: Header should stack in organized rows, all buttons visible, no horizontal overflow.
 
-#### Step 3A.3: Verify Button Priority System
+#### Step 2A.3: Verify Button Priority System
 
 Ensure the implementation follows the plan's button priority system:
 - **Always Visible**: Run Simulation ✅, Status ✅, Demo ✅, Help ✅
 - **Secondary**: Save ✅, Load ✅ (visible when space allows)
 - **Tertiary**: Coffee ✅ (lowest priority, made smaller)
 
-#### Step 3A.4: Logo Protection
+#### Step 2A.4: Logo Protection
 
 The existing 691px rule already handles logo font-size reduction. Verify:
 - Logo never wraps (existing `white-space: nowrap` if needed)
@@ -390,15 +288,15 @@ The existing 691px rule already handles logo font-size reduction. Verify:
 
 ---
 
-## Phase 3B: Simulator Header - Hamburger Menu Layout (Alternative)
+## Phase 2B: Simulator Header - Hamburger Menu Layout (Alternative)
 
-**⚠️ IMPORTANT: Only implement this if Phase 3A doesn't work well. Skip to Phase 4 if 3A is successful.**
+**⚠️ IMPORTANT: Only implement this if Phase 2A doesn't work well. Skip to Phase 3 if 2A is successful.**
 
-This approach requires more significant changes to the HTML structure and should be considered only if the multi-row layout in 3A proves insufficient.
+This approach requires more significant changes to the HTML structure and should be considered only if the multi-row layout in 2A proves insufficient.
 
 ### File: `src/frontend/web/ifs/index.html`
 
-#### Step 3B.1: Add Hamburger Menu Structure
+#### Step 2B.1: Add Hamburger Menu Structure
 
 Find the header section (around line 18) and modify:
 
@@ -430,11 +328,11 @@ Find the header section (around line 18) and modify:
 </header>
 ```
 
-#### Step 3B.2: Add Hamburger Menu CSS
+#### Step 2B.2: Add Hamburger Menu CSS
 
 **File: `src/frontend/web/ifs/css/layout.css`**
 
-Replace the Phase 3A CSS with:
+Replace the Phase 2A CSS with:
 
 ```css
 @media (max-width: 768px) {
@@ -469,7 +367,7 @@ Replace the Phase 3A CSS with:
 }
 ```
 
-#### Step 3B.3: Add JavaScript for Menu Toggle
+#### Step 2B.3: Add JavaScript for Menu Toggle
 
 **File: `src/frontend/web/ifs/index.html`**
 
@@ -499,13 +397,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
 ---
 
-## Phase 4: Data Table Mobile Strategy
+## Phase 3: Data Table Mobile Strategy
 
 ### File: `src/frontend/web/ifs/css/layout.css`
 
 **Current Issue**: Data table too wide for mobile screens.
 
-#### Step 4.1: Hide Data Table on Mobile
+#### Step 3.1: Hide Data Table on Mobile
 
 Add to the end of `layout.css`:
 
@@ -533,13 +431,13 @@ Add to the end of `layout.css`:
 
 **Note**: Using 768px here because data tables need more space than typical mobile layouts. This is consistent with the landing page breakpoint usage.
 
-#### Step 4.2: Alternative - Add Mobile Message
+#### Step 3.2: Alternative - Add Mobile Message
 
 **File: `src/frontend/web/ifs/index.html`**
 
 Find the data-section div (around line 280) and add a mobile message:
 
-**Note**: This is an alternative to Step 4.1. Choose either 4.1 (CSS-only hiding) or 4.2 (HTML message), not both.
+**Note**: This is an alternative to Step 3.1. Choose either 3.1 (CSS-only hiding) or 3.2 (HTML message), not both.
 
 ```html
 <div class="data-section card">
@@ -585,20 +483,20 @@ And add CSS:
 
 ---
 
-## Phase 5: Content Layout Adjustments
+## Phase 4: Content Layout Adjustments
 
 ### File: `src/frontend/web/ifs/css/simulator.css`
 
 **Current Issue**: Forms and content need mobile optimization for better usability.
 
-#### Step 5.1: Grid Layout Optimizations
+#### Step 4.1: Grid Layout Optimizations
 
 The existing layout.css already handles most grid layout changes, but verify:
 - Parameters section becomes single column at 691px ✅ (existing)
 - Events section width adjustments ✅ (existing)
 - Graphs section responsive behavior ✅ (existing)
 
-#### Step 5.2: Optimize Card Layouts
+#### Step 4.2: Optimize Card Layouts
 
 Add to the end of `simulator.css`:
 
@@ -689,30 +587,24 @@ Add to the end of `simulator.css`:
 ## Testing Checklist
 
 ### Phase 1 Testing
-- [ ] Pop-ups fit entirely on screen (iPhone SE, Galaxy S8)
-- [ ] Pop-up content scrolls, not background
-- [ ] All buttons in pop-ups are reachable
-- [ ] Background doesn't scroll when pop-up is open
-
-### Phase 2 Testing
 - [ ] Landing page header ≤25% of screen height
 - [ ] Navigation doesn't wrap awkwardly
 - [ ] All navigation links are tappable
 - [ ] Hero section fits well on screen
 
-### Phase 3 Testing
+### Phase 2 Testing
 - [ ] Simulator header fits without horizontal scroll
 - [ ] Logo "Ireland Financial Simulator" doesn't wrap
 - [ ] Demo and Help buttons clearly visible
 - [ ] All buttons are tappable (44px+ touch targets)
 - [ ] No button overlap or bunching
 
-### Phase 4 Testing
+### Phase 3 Testing
 - [ ] Data table hidden on mobile
 - [ ] Helpful message shown instead
 - [ ] No layout breaks when table is hidden
 
-### Phase 5 Testing
+### Phase 4 Testing
 - [ ] All forms usable on mobile
 - [ ] Input fields appropriately sized
 - [ ] No horizontal scrolling anywhere
@@ -732,12 +624,11 @@ Test on:
 
 If any phase causes issues:
 
-1. **Phase 1**: Comment out new CSS rules in `wizard.css`
-2. **Phase 2**: Revert changes to `landing/styles.css`
-3. **Phase 3A**: Revert `layout.css` changes
-4. **Phase 3B**: Remove HTML changes and new CSS
-5. **Phase 4**: Remove data table hiding rules
-6. **Phase 5**: Remove mobile card optimizations
+1. **Phase 1**: Revert changes to `landing/styles.css`
+2. **Phase 2A**: Revert `layout.css` changes
+3. **Phase 2B**: Remove HTML changes and new CSS
+4. **Phase 3**: Remove data table hiding rules
+5. **Phase 4**: Remove mobile card optimizations
 
 Each phase is independent, so you can rollback individual phases without affecting others.
 
@@ -752,7 +643,7 @@ The implementation follows the existing codebase breakpoint pattern:
 - **480px**: Small phones - add new optimizations
 - **768px**: Used only for landing page and data table (matches existing pattern)
 
-**Note**: The plan's Phase 6 (CSS Architecture Changes) is integrated throughout this implementation rather than as a separate phase. The new CSS custom properties suggested in the plan are not implemented as they would require more extensive refactoring. The current approach uses existing CSS patterns for better integration.
+**Note**: The plan's Phase 5 (CSS Architecture Changes) is integrated throughout this implementation rather than as a separate phase. The new CSS custom properties suggested in the plan are not implemented as they would require more extensive refactoring. The current approach uses existing CSS patterns for better integration.
 
 ### Key Integration Principles
 1. **Extend, Don't Replace**: Build on existing mobile rules rather than replacing them
@@ -762,27 +653,26 @@ The implementation follows the existing codebase breakpoint pattern:
 
 ### Implementation Order & Testing Strategy
 Following the plan's recommended order:
-1. **Phase 1** (Critical): Pop-up accessibility - test immediately on real devices
-2. **Phase 2** (Medium): Landing page header - test navigation usability  
-3. **Phase 3A** (High): Multi-row header approach - test button accessibility and layout
-4. **Phase 3B** (Alternative): Hamburger approach - only if 3A insufficient
-5. **Phase 4** (Low): Table hiding - verify no layout breaks
-6. **Phase 5** (Low): Content optimizations - full mobile workflow testing
+1. **Phase 1** (Medium): Landing page header - test navigation usability  
+2. **Phase 2A** (High): Multi-row header approach - test button accessibility and layout
+3. **Phase 2B** (Alternative): Hamburger approach - only if 2A insufficient
+4. **Phase 3** (Low): Table hiding - verify no layout breaks
+5. **Phase 4** (Low): Content optimizations - full mobile workflow testing
 
 ### Testing Priority
-1. **Phase 1** (Critical): Pop-up accessibility - test immediately on real devices
-2. **Phase 3A** (High): Header layout - verify no button overlap or horizontal scroll
-3. **Phase 2** (Medium): Landing page - ensure header height reduction works
-4. **Phase 4-5** (Low): Content optimizations - verify no layout breaks
+1. **Phase 2A** (High): Header layout - verify no button overlap or horizontal scroll
+2. **Phase 1** (Medium): Landing page - ensure header height reduction works
+3. **Phase 3-4** (Low): Content optimizations - verify no layout breaks
 
 ### Success Metrics Alignment
 This implementation addresses all success metrics from the plan:
-- ✅ Pop-ups are fully accessible and scrollable on mobile (Phase 1)
-- ✅ Landing page header uses ≤25% of screen height on mobile (Phase 2)
-- ✅ All simulator functions accessible without horizontal scrolling (Phase 3A)
-- ✅ Demo and Help buttons prominently visible for new user onboarding (Phase 3A)
+- ✅ Landing page header uses ≤25% of screen height on mobile (Phase 1)
+- ✅ All simulator functions accessible without horizontal scrolling (Phase 2A)
+- ✅ Demo and Help buttons prominently visible for new user onboarding (Phase 2A)
 - ✅ Desktop experience remains completely unchanged (≥992px preserved)
 - ✅ No layout breaks or overlapping elements on any screen size (All phases)
+
+**Note**: The plan's original success metric about "Pop-ups are fully accessible and scrollable on mobile" was removed when Phase 1 (Pop-up fixes) was eliminated from the implementation.
 
 ## Performance Notes
 
