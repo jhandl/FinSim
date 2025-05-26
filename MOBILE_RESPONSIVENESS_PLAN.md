@@ -72,7 +72,7 @@ This plan addresses critical mobile usability issues reported by users, focusing
 **Problem**: Table too wide, unusable horizontal scrolling
 
 ### 3.1 Progressive Table Hiding
-- **≤768px**: Hide data table section entirely
+- **≤895px**: Hide data table section entirely
 - Show message: "Data table available on larger screens" with button to "View in Desktop Mode"
 
 ## **Phase 4: Content Layout Adjustments**

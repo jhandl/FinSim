@@ -409,7 +409,7 @@ Add to the end of `layout.css`:
 
 ```css
 /* Hide data table on mobile */
-@media (max-width: 768px) {
+@media (max-width: 895px) {
   .data-section {
     display: none;
   }
@@ -429,7 +429,7 @@ Add to the end of `layout.css`:
 }
 ```
 
-**Note**: Using 768px here because data tables need more space than typical mobile layouts. This is consistent with the landing page breakpoint usage.
+**Note**: Using 895px here because data tables need more space than typical mobile layouts. This is consistent with the landing page breakpoint usage.
 
 #### Step 3.2: Alternative - Add Mobile Message
 
@@ -462,7 +462,7 @@ Find the data-section div (around line 280) and add a mobile message:
 And add CSS:
 
 ```css
-@media (max-width: 768px) {
+@media (max-width: 895px) {
   .desktop-data-content {
     display: none;
   }
