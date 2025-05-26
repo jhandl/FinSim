@@ -266,8 +266,15 @@ class Wizard {
         }
         this.tour.movePrevious();
       },
-      onDestroyStarted: () => this.finishTour(),
+      onDestroyStarted: () => {
+        // Remove body class to restore scrolling
+        document.body.classList.remove('driver-active');
+        this.finishTour();
+      },
       onHighlighted: (element) => {
+        // Add body class to prevent scrolling
+        document.body.classList.add('driver-active');
+        
         const popover = document.querySelector('.driver-popover');
         if (popover) {
           // Existing logic for the #load-example-scenario button

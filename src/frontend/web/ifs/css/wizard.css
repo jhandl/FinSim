@@ -43,3 +43,59 @@
 .driver-popover li {
   margin-bottom: 10px;
 }
+
+/* Mobile popover fixes */
+@media (max-width: 768px) {
+  .driver-popover {
+    max-height: 90vh !important;
+    width: calc(100vw - 40px) !important;
+    max-width: calc(100vw - 40px) !important;
+    min-width: 280px !important;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    overflow-y: auto !important;
+    padding-bottom: 80px !important; /* Space for buttons */
+  }
+  
+  /* Note: !important is necessary here because driver.js applies inline styles */
+
+  .driver-popover.welcome-popover,
+  .driver-popover.howto-popover {
+    max-height: 85vh !important;
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+
+  .driver-popover .driver-popover-description {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    max-height: none !important;
+  }
+
+  /* Ensure buttons are always visible */
+  .driver-popover .driver-popover-footer {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: white !important;
+    padding: 1rem !important;
+    border-top: 1px solid #eee !important;
+    margin-top: 1rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .driver-popover {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    min-width: 260px !important;
+  }
+}
+
+/* Prevent background scrolling when popover is active */
+body.driver-active {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+}
