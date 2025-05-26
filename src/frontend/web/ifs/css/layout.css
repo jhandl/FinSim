@@ -212,6 +212,11 @@ footer {
     width: 100vw;
   }
 
+  /* Add top margin to main content to account for taller mobile header */
+  main {
+    margin-top: 5.75rem; /* Increased to provide more clearance for mobile header */
+  }
+
   .header-left {
     width: 100%;
     min-width: 0 !important; /* Override desktop min-width: 200px */
