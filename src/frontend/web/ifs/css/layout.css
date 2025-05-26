@@ -201,6 +201,19 @@ footer {
   }
 }
 
+/* Handle two-row header layout - when header wraps but isn't in full mobile mode */
+@media (max-width: 1100px) and (min-width: 896px) {
+  /* Add margin for two-row header */
+  main {
+    margin-top: 4rem; /* Adjust for two-row header height */
+  }
+  
+  /* Center the logo when it's on its own row */
+  .header-left {
+    justify-content: center !important;
+  }
+}
+
 @media (max-width: 895px) {
   header {
     flex-direction: column;
@@ -223,7 +236,7 @@ footer {
     flex: none !important; /* Override desktop flex: 1 1 auto */
     justify-content: center; /* Center the logo text */
     margin: 0; /* Remove any margins */
-    padding: 0; /* Remove any padding */
+    padding: 0.3rem 0 0.1rem 0; /* Add top padding, reduce bottom padding */
   }
 
   .header-center-right {
@@ -295,10 +308,6 @@ footer {
     min-width: 100px;
   }
 
-  .parameters-section {
-      grid-template-columns: 1fr;
-  }
-
   .events-section {
       width: 810px; /* Fixed width for consistency - same as max-width used elsewhere */
       max-width: 810px;
@@ -333,5 +342,12 @@ footer {
     color: #666;
     font-style: italic;
     line-height: 1.5;
+  }
+}
+
+/* Add new breakpoint for mobile phones where parameters should be single column */
+@media (max-width: 691px) {
+  .parameters-section {
+      grid-template-columns: 1fr;
   }
 }

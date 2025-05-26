@@ -2,11 +2,15 @@
   padding-top: 30px !important;
   min-width: 300px !important;
   max-width: clamp(300px, 50vw, 600px)  !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
 }
 
 .driver-popover.welcome-popover {
   min-width: 300px !important;
   max-width: clamp(300px, 80vw, 900px) !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
 } 
 
 .driver-popover.howto-popover {
@@ -42,4 +46,82 @@
 
 .driver-popover li {
   margin-bottom: 10px;
+}
+
+/* Mobile optimizations for small screens */
+@media (max-width: 480px) {
+  .driver-popover {
+    max-height: 85vh !important;
+    max-width: 95vw !important;
+    min-width: 280px !important;
+    padding-top: 20px !important;
+  }
+
+  .driver-popover.welcome-popover {
+    max-height: 85vh !important;
+    max-width: 95vw !important;
+    min-width: 280px !important;
+  }
+
+  .driver-popover.howto-popover {
+    max-height: 85vh !important;
+    max-width: 95vw !important;
+    min-width: 280px !important;
+  }
+
+  .driver-popover .driver-popover-title {
+    font-size: 1.1rem;
+    padding-bottom: 1rem;
+    padding-top: 1rem;
+  }
+
+  .driver-popover .driver-popover-description {
+    font-size: 1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .driver-popover ol, .driver-popover ul {
+    margin-left: 15px;
+    padding-left: 15px;
+    margin-bottom: 15px;
+  }
+
+  .driver-popover li {
+    margin-bottom: 8px;
+  }
+}
+
+/* Extra small screens like iPhone SE */
+@media (max-width: 375px) {
+  .driver-popover {
+    max-height: 80vh !important;
+    max-width: 98vw !important;
+    min-width: 260px !important;
+    padding-top: 15px !important;
+  }
+
+  .driver-popover.welcome-popover {
+    max-height: 80vh !important;
+    max-width: 98vw !important;
+    min-width: 260px !important;
+  }
+
+  .driver-popover.howto-popover {
+    max-height: 80vh !important;
+    max-width: 98vw !important;
+    min-width: 260px !important;
+  }
+
+  .driver-popover .driver-popover-title {
+    font-size: 1rem;
+    padding-bottom: 0.8rem;
+    padding-top: 0.8rem;
+  }
+
+  .driver-popover .driver-popover-description {
+    font-size: 0.9rem;
+    padding-left: 0.8rem;
+    padding-right: 0.8rem;
+  }
 }
