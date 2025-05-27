@@ -5,7 +5,7 @@ steps:
       description: >
         <p><b>What it is: </b>This is a tool to help you understand how different decisions and scenarios can affect your long term financial future, within the context of the Irish tax system.</p>
         <p><b>What it's not:</b> This is not a budgeting tool nor financial advice. Don't make serious life decisions based on this. It's not a substitute for a good financial advisor.</p>
-        <p><b>Privacy notice:</b> The simulator does not collect any data from you. It runs entirely in your browser so the information you enter stays in your computer. You can run it offline.</p>
+        <p><b>Privacy notice:</b> We don't collect any data from you. The simulator runs entirely in your browser so the information you enter stays in your computer. You can run it offline.</p>
       showButtons: ["next"]
       nextBtnText: ["How to use →"]
 
