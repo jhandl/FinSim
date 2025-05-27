@@ -317,91 +317,91 @@
     function optimizeMobileHeader() {
         const currentWidth = window.innerWidth;
         const currentHeight = window.innerHeight;
-        
-        // If in desktop mode, reset styles and exit
+                
         if (currentWidth > 915) {
             resetButtonStyles();
             return;
         }
         
-        // Detect mobile landscape mode (width > height and mobile width range)
         const isMobileLandscape = currentWidth > currentHeight && currentWidth <= 915 && currentWidth >= 568;
-        
-        // Always reset styles first, then recalculate for current width
         resetButtonStyles();
         
-        // Small delay to ensure styles are reset before measuring
+        // This adds a small delay to ensure styles are reset before measuring
         setTimeout(() => {
         
-        function fitContainer(container) {
-            const buttons = container.querySelectorAll('button, .status-indicator');
-            if (buttons.length <= 1) return;
-            
-            const containerWidth = container.offsetWidth;
-            let totalButtonWidth = 0;
-            buttons.forEach(btn => totalButtonWidth += btn.offsetWidth);
-            
-            const gaps = buttons.length - 1;
-            const availableGapSpace = containerWidth - totalButtonWidth;
-            const naturalGap = availableGapSpace / gaps;
-            
-            // Apply 10% reduction for mobile landscape mode
-            const landscapeReduction = isMobileLandscape ? 0.9 : 1.0;
-            
-            // If natural gap is good (4px+ for safety margin), use it (max 0.6rem)
-            if (naturalGap >= 4) {
-                const gapRem = Math.min(naturalGap / 16, 0.6) * landscapeReduction;
-                container.style.setProperty('gap', `${gapRem}rem`, 'important');
+            function fitContainer(container) {
+                const containerClass = container.className;
+                const buttons = container.querySelectorAll('button, .status-indicator');
+                if (buttons.length <= 1) {
+                    return;
+                }
                 
-                // Apply padding reduction for landscape mode
-                if (isMobileLandscape) {
-                    buttons.forEach(btn => {
-                        if (btn.tagName === 'BUTTON') {
-                            const currentPaddingPx = parseFloat(getComputedStyle(btn).paddingLeft);
-                            const reducedPaddingPx = currentPaddingPx * landscapeReduction;
-                            btn.style.setProperty('padding', `0.35rem ${reducedPaddingPx / 16}rem`, 'important');
-                        }
-                    });
+                const containerWidth = container.offsetWidth;
+                let totalButtonWidth = 0;
+                buttons.forEach(btn => totalButtonWidth += btn.offsetWidth);
+                
+                const gaps = buttons.length - 1;
+                const availableGapSpace = containerWidth - totalButtonWidth;
+                const naturalGap = availableGapSpace / gaps;
+                
+                const landscapeReduction = isMobileLandscape ? 0.9 : 1.0;
+                
+                // If natural gap is good (4px+ for safety margin), use it (max 0.6rem)
+                if (naturalGap >= 4) {
+                    const gapRem = Math.min(naturalGap / 16, 0.6) * landscapeReduction;
+                    container.style.setProperty('gap', `${gapRem}rem`, 'important');
+                    
+                    // Apply padding reduction for landscape mode
+                    if (isMobileLandscape) {
+                        buttons.forEach(btn => {
+                            if (btn.tagName === 'BUTTON') {
+                                const currentPaddingPx = parseFloat(getComputedStyle(btn).paddingLeft);
+                                const reducedPaddingPx = currentPaddingPx * landscapeReduction;
+                                btn.style.setProperty('padding', `0.35rem ${reducedPaddingPx / 16}rem`, 'important');
+                            }
+                        });
+                    }
+                    return;
                 }
-                return;
+                
+                // Gap too small - use 3px gap and reduce button padding to fit
+                const targetGap = 3 * landscapeReduction;
+                const totalTargetGapSpace = targetGap * gaps;
+                const totalOverflow = totalButtonWidth + totalTargetGapSpace - containerWidth;
+                
+                // Calculate how much to reduce each button's padding (both sides)
+                const buttonCount = container.querySelectorAll('button').length;
+                const paddingReductionPerSide = totalOverflow / (buttonCount * 2);
+                
+                // Get current padding from computed style
+                const sampleButton = container.querySelector('button');
+                const currentPaddingPx = parseFloat(getComputedStyle(sampleButton).paddingLeft);
+                let newPaddingPx = Math.max(2, currentPaddingPx - paddingReductionPerSide);
+                
+                // Apply landscape reduction to padding
+                newPaddingPx = newPaddingPx * landscapeReduction;
+                
+                // If still not enough reduction, be more aggressive
+                if (newPaddingPx > 10 && totalOverflow > 5) {
+                    const aggressivePaddingPx = Math.max(3, currentPaddingPx * 0.5 * landscapeReduction);
+                    newPaddingPx = aggressivePaddingPx;
+                }
+                
+                buttons.forEach(btn => {
+                    if (btn.tagName === 'BUTTON') {
+                        btn.style.setProperty('padding', `0.35rem ${newPaddingPx / 16}rem`, 'important');
+                    }
+                });
+                container.style.setProperty('gap', `${targetGap / 16}rem`, 'important');
             }
             
-            // Gap too small - use 3px gap and reduce button padding to fit
-            const targetGap = 3 * landscapeReduction;
-            const totalTargetGapSpace = targetGap * gaps;
-            const totalOverflow = totalButtonWidth + totalTargetGapSpace - containerWidth;
+            const headerCenter = document.querySelector('.header-center');
+            const headerRight = document.querySelector('.header-right');
             
-            // Calculate how much to reduce each button's padding (both sides)
-            const buttonCount = container.querySelectorAll('button').length;
-            const paddingReductionPerSide = totalOverflow / (buttonCount * 2);
-            
-            // Get current padding from computed style
-            const sampleButton = container.querySelector('button');
-            const currentPaddingPx = parseFloat(getComputedStyle(sampleButton).paddingLeft);
-            let newPaddingPx = Math.max(2, currentPaddingPx - paddingReductionPerSide);
-            
-            // Apply landscape reduction to padding
-            newPaddingPx = newPaddingPx * landscapeReduction;
-            
-            // If still not enough reduction, be more aggressive
-            if (newPaddingPx > 10 && totalOverflow > 5) {
-                newPaddingPx = Math.max(3, currentPaddingPx * 0.5 * landscapeReduction); // Cut padding in half with landscape reduction
-            }
-            
-            buttons.forEach(btn => {
-                if (btn.tagName === 'BUTTON') {
-                    btn.style.setProperty('padding', `0.35rem ${newPaddingPx / 16}rem`, 'important');
-                }
-            });
-            container.style.setProperty('gap', `${targetGap / 16}rem`, 'important');
-        }
-        
-        const headerCenter = document.querySelector('.header-center');
-        const headerRight = document.querySelector('.header-right');
-        
-        if (headerCenter) fitContainer(headerCenter);
-        if (headerRight) fitContainer(headerRight);
-        }, 10); // End setTimeout
+            if (headerCenter) fitContainer(headerCenter);
+            if (headerRight) fitContainer(headerRight);
+
+        }, 10); // End of setTimeout
     }
     
     function resetButtonStyles() {
