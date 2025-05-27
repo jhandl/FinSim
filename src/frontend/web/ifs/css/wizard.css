@@ -126,32 +126,68 @@
   }
 }
 
-/* Mobile landscape mode - account for safe areas to prevent UI overlap */
+/* Mobile landscape mode - account for browser UI to prevent overlap */
 @media (max-width: 915px) and (orientation: landscape) {
   .driver-popover {
-    max-height: calc(90vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    /* Fallback for older browsers */
+    max-height: 75vh !important;
+    /* Use small viewport height for consistent behavior across browsers */
+    max-height: 75svh !important;
+    /* Additional fallback with safe-area-inset for supported browsers */
+    max-height: calc(75vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .driver-popover.welcome-popover {
-    max-height: calc(90vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    max-height: 75vh !important;
+    max-height: 75svh !important;
+    max-height: calc(75vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .driver-popover.howto-popover {
-    max-height: calc(80vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    max-height: 70vh !important;
+    max-height: 70svh !important;
+    max-height: calc(70vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
 /* Mobile landscape mode for smaller devices - more aggressive height reduction */
 @media (max-width: 480px) and (orientation: landscape) {
   .driver-popover {
-    max-height: calc(85vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    max-height: 70vh !important;
+    max-height: 70svh !important;
+    max-height: calc(70vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .driver-popover.welcome-popover {
-    max-height: calc(85vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    max-height: 70vh !important;
+    max-height: 70svh !important;
+    max-height: calc(70vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .driver-popover.howto-popover {
-    max-height: calc(75vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    max-height: 65vh !important;
+    max-height: 65svh !important;
+    max-height: calc(65vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* Very short landscape screens (like iPhone in landscape) */
+@media (max-width: 915px) and (orientation: landscape) and (max-height: 450px) {
+  .driver-popover {
+    max-height: 65vh !important;
+    max-height: 65svh !important;
+    max-height: calc(65vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .driver-popover.welcome-popover {
+    max-height: 65vh !important;
+    max-height: 65svh !important;
+    max-height: calc(65vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .driver-popover.howto-popover {
+    max-height: 60vh !important;
+    max-height: 60svh !important;
+    max-height: calc(60vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
   }
 }
