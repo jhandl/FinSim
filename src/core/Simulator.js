@@ -408,20 +408,28 @@ function initializeRealEstate() {
     switch (event.type) {
       case 'R':
         if (event.fromAge < params.startingAge) {
-          props.set(event.id,
-            {
+          if (!props.has(event.id)) {
+            props.set(event.id, {
               "fromAge": event.fromAge,
-              "property": realEstate.buy(event.id, event.amount, event.rate)
+              "property": null
             });
+          } else {
+            props.get(event.id).fromAge = event.fromAge;
+          }
+          props.get(event.id).property = realEstate.buy(event.id, event.amount, event.rate);
         }
         break;
       case 'M':
         if (event.fromAge < params.startingAge) {
-          props.set(event.id,
-            {
+          if (!props.has(event.id)) {
+            props.set(event.id, {
               "fromAge": event.fromAge,
-              "property": realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount)
+              "property": null
             });
+          } else {
+            props.get(event.id).fromAge = event.fromAge;
+          }
+          props.get(event.id).property = realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount);
         }
         break;
       default:

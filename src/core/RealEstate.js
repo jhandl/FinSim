@@ -7,7 +7,6 @@ class RealEstate {
   }
   
   buy(id, downpayment, appreciation) {
-    if (id == "micky") this.absurd();
     if (!(id in this.properties)) {
       this.properties[id] = new Property();
     }
