@@ -99,11 +99,23 @@ class EventsTableManager {
     const tbody = document.querySelector('#Events tbody');
     if (!tbody) return;
 
+    // Store the current scroll position to prevent page jumping
+    const currentScrollY = window.scrollY;
+    
     const row = this.createEventRow();
     tbody.appendChild(row);
 
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
+    
+    // Prevent any automatic focus that might cause scrolling
+    // Use setTimeout to ensure this runs after any potential focus events
+    setTimeout(() => {
+      // Restore scroll position if it changed (prevents mobile page jumping)
+      if (window.scrollY !== currentScrollY) {
+        window.scrollTo(0, currentScrollY);
+      }
+    }, 0);
   }
 
   getEventTypeOptions(selectedType = '') {
