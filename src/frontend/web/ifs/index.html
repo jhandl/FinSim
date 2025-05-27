@@ -403,10 +403,10 @@
                 // Apply landscape reduction to padding
                 newPaddingPx = newPaddingPx * landscapeReduction;
                 
-                // If wrapping detected or still not enough reduction, be more aggressive
+                // If wrapping detected or still not enough reduction, apply moderate reduction
                 if (isWrapping || (newPaddingPx > 10 && totalOverflow > 5)) {
-                    const aggressivePaddingPx = Math.max(2, currentPaddingPx * (isWrapping ? 0.3 : 0.5) * landscapeReduction);
-                    newPaddingPx = aggressivePaddingPx;
+                    const reductionPx = Math.max(3, currentPaddingPx * (isWrapping ? 0.7 : 0.8) * landscapeReduction);
+                    newPaddingPx = reductionPx;
                 }
                 
                 buttons.forEach(btn => {
@@ -417,20 +417,42 @@
                 });
                 container.style.setProperty('gap', `${targetGapWithReduction / 16}rem`, 'important');
                 
-                // After applying changes, check again for wrapping and apply even more aggressive reduction if needed
+                // After applying changes, iteratively reduce until no wrapping occurs
                 setTimeout(() => {
-                    if (detectWrapping(container)) {
-                        // Emergency reduction - make buttons as small as possible
-                        const emergencyPaddingPx = Math.max(1, newPaddingPx * 0.5);
-                        buttons.forEach(btn => {
-                             if (btn.tagName === 'BUTTON') {
-                                 const currentVerticalPadding = parseFloat(getComputedStyle(btn).paddingTop);
-                                 btn.style.setProperty('padding', `${currentVerticalPadding / 16}rem ${emergencyPaddingPx / 16}rem`, 'important');
-                                 btn.style.setProperty('font-size', '0.8rem', 'important');
-                             }
-                         });
-                        container.style.setProperty('gap', '1px', 'important');
+                    let iterations = 0;
+                    const maxIterations = 10; // Prevent infinite loops
+                    
+                    function iterativelyReduce() {
+                        if (iterations >= maxIterations || !detectWrapping(container)) {
+                            return; // Stop if max iterations reached or no wrapping detected
+                        }
+                        
+                        iterations++;
+                        
+                        // Get current values
+                        const currentButtons = container.querySelectorAll('button');
+                        const currentGapPx = parseFloat(getComputedStyle(container).gap) || 0;
+                        
+                        // Make small incremental reductions
+                        const paddingReduction = 0.05; // Reduce by 5% each iteration
+                        const gapReduction = Math.max(1, currentGapPx * 0.9); // Reduce gap by 10% but minimum 1px
+                        
+                        currentButtons.forEach(btn => {
+                            const currentHorizontalPadding = parseFloat(getComputedStyle(btn).paddingLeft);
+                            const currentVerticalPadding = parseFloat(getComputedStyle(btn).paddingTop);
+                            const newHorizontalPadding = Math.max(2, currentHorizontalPadding * (1 - paddingReduction));
+                            
+                            btn.style.setProperty('padding', `${currentVerticalPadding / 16}rem ${newHorizontalPadding / 16}rem`, 'important');
+                        });
+                        
+                        // Reduce gap slightly
+                        container.style.setProperty('gap', `${gapReduction / 16}rem`, 'important');
+                        
+                        // Check again after a small delay to allow layout to settle
+                        setTimeout(iterativelyReduce, 5);
                     }
+                    
+                    iterativelyReduce();
                 }, 5);
             }
             
