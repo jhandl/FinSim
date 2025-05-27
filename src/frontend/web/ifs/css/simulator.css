@@ -387,7 +387,7 @@ th {
 }
 
 #Events input.percentage {
-    padding-right: 1.35rem;
+    padding-right: 1.0rem;
 }
 
 .priorities-container {
@@ -455,7 +455,7 @@ th {
 
 .input-wrapper .percentage,
 .growth-rates-table .percentage {
-    padding-right: 1.35rem;
+    padding-right: 1.0rem;
     text-align: right;
 }
 
@@ -475,7 +475,7 @@ th {
 .percentage-container::after {
     content: '%';
     position: absolute;
-    right: 0.45rem;
+    right: 0.25rem;
     top: 50%;
     transform: translateY(-50%);
     color: #666;
