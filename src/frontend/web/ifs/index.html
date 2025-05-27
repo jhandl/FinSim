@@ -484,29 +484,43 @@
     window.addEventListener('resize', () => setTimeout(optimizeMobileHeader, 100));
     
     // Fix iOS Safari zoom on orientation change
-    function preventZoomOnOrientationChange() {
+    let lastOrientation = window.orientation;
+    function preventZoomOnOrientationChange(isOrientationChange = false) {
         const viewport = document.querySelector('meta[name="viewport"]');
         if (viewport) {
             // Force viewport reset on orientation change
             viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
             
-            // Additional fix: force a slight zoom reset
-            setTimeout(() => {
-                if (window.visualViewport) {
-                    window.scrollTo(0, 0);
-                }
-            }, 100);
+            // Only scroll to top on actual orientation changes, not regular resize events
+            if (isOrientationChange) {
+                setTimeout(() => {
+                    if (window.visualViewport) {
+                        window.scrollTo(0, 0);
+                    }
+                }, 100);
+            }
         }
     }
 
     // Listen for orientation changes
-    window.addEventListener('orientationchange', preventZoomOnOrientationChange);
+    window.addEventListener('orientationchange', () => {
+        lastOrientation = window.orientation;
+        preventZoomOnOrientationChange(true);
+    });
     
-    // Also listen for resize events as a fallback for orientation changes
+    // Listen for resize events but only scroll to top if orientation actually changed
     let orientationResizeTimeout;
     window.addEventListener('resize', function() {
         clearTimeout(orientationResizeTimeout);
-        orientationResizeTimeout = setTimeout(preventZoomOnOrientationChange, 100);
+        orientationResizeTimeout = setTimeout(() => {
+            // Check if orientation actually changed (fallback for devices that don't fire orientationchange)
+            const currentOrientation = window.orientation;
+            const orientationChanged = currentOrientation !== lastOrientation;
+            if (orientationChanged) {
+                lastOrientation = currentOrientation;
+            }
+            preventZoomOnOrientationChange(orientationChanged);
+        }, 100);
     });
     </script>
 </body>
