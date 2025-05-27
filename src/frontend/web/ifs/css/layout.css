@@ -142,10 +142,6 @@ footer {
 
 @media (max-width: 1499px) {
 
-  .parameters-section {
-      grid-template-columns: 1fr;
-  }
-
   .input-wrapper {
       grid-template-columns: 1fr;
       gap: 0.225rem;
@@ -345,9 +341,4 @@ footer {
   }
 }
 
-/* Add new breakpoint for mobile phones where parameters should be single column */
-@media (max-width: 691px) {
-  .parameters-section {
-      grid-template-columns: 1fr;
-  }
-}
+
