@@ -614,14 +614,28 @@ input.currency {
 
 .input-tooltip {
     position: fixed;
-    padding: 5px 10px;
-    background: black;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.9);
     color: white;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 14px;
-    white-space: nowrap;
+    line-height: 1.4;
+    max-width: calc(100vw - 20px);
+    word-wrap: break-word;
+    white-space: normal;
     z-index: 1000;
     pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Mobile-specific tooltip adjustments */
+@media (max-width: 768px) {
+    .input-tooltip {
+        font-size: 16px;
+        padding: 10px 14px;
+        max-width: calc(100vw - 20px);
+        line-height: 1.5;
+    }
 }
 
 input[data-tooltip] {
