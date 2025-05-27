@@ -125,3 +125,33 @@
     padding-right: 0.8rem;
   }
 }
+
+/* Mobile landscape mode - account for safe areas to prevent UI overlap */
+@media (max-width: 915px) and (orientation: landscape) {
+  .driver-popover {
+    max-height: calc(90vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  }
+
+  .driver-popover.welcome-popover {
+    max-height: calc(90vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  }
+
+  .driver-popover.howto-popover {
+    max-height: calc(80vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Mobile landscape mode for smaller devices - more aggressive height reduction */
+@media (max-width: 480px) and (orientation: landscape) {
+  .driver-popover {
+    max-height: calc(85vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  }
+
+  .driver-popover.welcome-popover {
+    max-height: calc(85vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  }
+
+  .driver-popover.howto-popover {
+    max-height: calc(75vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  }
+}
