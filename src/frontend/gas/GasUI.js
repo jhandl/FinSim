@@ -80,6 +80,11 @@ class GasUI extends AbstractUI {
     this.flush();
   }
 
+  setError(message) {
+    // In Google Sheets, errors are just shown as status with error color
+    this.setStatus(message, STATUS_COLORS.ERROR);
+  }
+
   clearContent(groupId) {
     const range = this.namedRanges.get(groupId);
     if (!range) throw new Error(`Group not found: ${groupId}`);

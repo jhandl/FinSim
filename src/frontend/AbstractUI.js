@@ -34,6 +34,10 @@ class AbstractUI {
     throw new Error("Method 'setStatus' must be implemented");
   }
 
+  setError(message) {
+    throw new Error("Method 'setError' must be implemented");
+  }
+
   clearContent(groupId) {
     throw new Error("Method 'clearContent' must be implemented");
   }

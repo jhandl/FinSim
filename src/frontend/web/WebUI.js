@@ -11,12 +11,16 @@ class WebUI extends AbstractUI {
       // Initialize in a specific order to ensure dependencies are met
       this.formatUtils = new FormatUtils();
       this.notificationUtils = new NotificationUtils();
+      this.errorModalUtils = new ErrorModalUtils();
       this.chartManager = new ChartManager();
       this.tableManager = new TableManager(this);
       this.fileManager = new FileManager(this);
       this.eventsTableManager = new EventsTableManager(this);
       this.dragAndDrop = new DragAndDrop();
       this.editCallbacks = new Map();
+      
+      // Connect error modal to notification utils
+      this.notificationUtils.setErrorModalUtils(this.errorModalUtils);
       
       // Setup event listeners
       this.setupChangeListener();
@@ -50,6 +54,10 @@ class WebUI extends AbstractUI {
 
   setStatus(message, color=STATUS_COLORS.INFO) {
     this.notificationUtils.setStatus(message, color);
+  }
+
+  setError(message) {
+    this.notificationUtils.setError(message);
   }
 
   setWarning(elementId, message) {
@@ -195,7 +203,7 @@ class WebUI extends AbstractUI {
         try {
           run();
         } catch (error) {
-          this.setStatus('Simulation failed: ' + error.message, STATUS_COLORS.ERROR);
+          this.setError('Simulation failed: ' + error.message);
         } finally {
           runButton.disabled = false;
           runButton.classList.remove('disabled');

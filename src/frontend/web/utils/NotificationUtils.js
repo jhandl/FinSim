@@ -4,11 +4,33 @@ class NotificationUtils {
 
   constructor() {
     this.statusElement = document.getElementById('progress');
+    this.errorModalUtils = null; // Will be initialized later
   }
 
   setStatus(message, color=STATUS_COLORS.INFO) {
+    // Clear any existing error state
+    if (this.errorModalUtils) {
+      this.errorModalUtils.clearError();
+    }
+    
+    // Set normal status
     this.statusElement.innerHTML = message;
     this.statusElement.style.backgroundColor = color;
+    this.statusElement.classList.remove('error');
+  }
+
+  setError(message) {
+    // This method is for actual errors that should trigger the modal
+    if (this.errorModalUtils) {
+      this.errorModalUtils.setError(message);
+    } else {
+      // Fallback if error modal utils not available
+      this.setStatus(message, STATUS_COLORS.ERROR);
+    }
+  }
+
+  setErrorModalUtils(errorModalUtils) {
+    this.errorModalUtils = errorModalUtils;
   }
 
   setVersionNote(message) {

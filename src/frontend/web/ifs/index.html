@@ -297,6 +297,7 @@
     <script src="/src/frontend/web/utils/DOMUtils.js"></script>
     <script src="/src/frontend/web/utils/FormatUtils.js"></script>
     <script src="/src/frontend/web/utils/NotificationUtils.js"></script>
+    <script src="/src/frontend/web/utils/ErrorModalUtils.js"></script>
     <script src="/src/frontend/web/components/TableManager.js"></script>
     <script src="/src/frontend/web/components/EventsTableManager.js"></script>
     <script src="/src/frontend/web/components/ChartManager.js"></script>
@@ -523,5 +524,21 @@
         }, 100);
     });
     </script>
+
+    <!-- Error Modal -->
+    <div id="errorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Error</h3>
+                <span class="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button id="errorModalClose" class="primary-button">OK</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html> 
