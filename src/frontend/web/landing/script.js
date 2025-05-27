@@ -57,6 +57,32 @@ document.addEventListener("DOMContentLoaded", () => {
   createResponsiveMenu()
   window.addEventListener("resize", createResponsiveMenu)
 
+  // Fix iOS Safari zoom on orientation change
+  function preventZoomOnOrientationChange() {
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+      // Force viewport reset on orientation change
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+      
+      // Additional fix: force a slight zoom reset
+      setTimeout(() => {
+        if (window.visualViewport) {
+          window.scrollTo(0, 0);
+        }
+      }, 100);
+    }
+  }
+
+  // Listen for orientation changes
+  window.addEventListener('orientationchange', preventZoomOnOrientationChange);
+  
+  // Also listen for resize events as a fallback
+  let resizeTimeout;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(preventZoomOnOrientationChange, 100);
+  });
+
   // Newsletter form handling
   const newsletterForm = document.getElementById("newsletter-form")
   const formMessage = document.getElementById("form-message")
