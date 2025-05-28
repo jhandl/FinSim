@@ -257,31 +257,31 @@
                             <th colspan="2"></th>
                         </tr>
                         <tr>
-                            <th data-key="Age">Age</th>
-                            <th data-key="Year">Year</th>
-                            <th data-key="IncomeSalaries">Salaries</th>
-                            <th data-key="IncomeRentals">Rentals</th>
-                            <th data-key="IncomeRSUs">RSUs</th>
-                            <th data-key="IncomePrivatePension">P.Pension</th>
-                            <th data-key="IncomeStatePension">S.Pension</th>
-                            <th data-key="IncomeFundsRent">Index Funds</th>
-                            <th data-key="IncomeSharesRent">Shares</th>
-                            <th data-key="IncomeCash">Cash</th>
-                            <th data-key="IT">IT</th>
-                            <th data-key="PRSI">PRSI</th>
-                            <th data-key="USC">USC</th>
-                            <th data-key="CGT">CGT</th>
-                            <th data-key="NetIncome">Net Income</th>
-                            <th data-key="Expenses">Expenses</th>
-                            <th data-key="PensionContribution">Contribution</th>
-                            <th data-key="Savings">Savings</th>
-                            <th data-key="PensionFund">P.Fund</th>
-                            <th data-key="Cash">Cash</th>
-                            <th data-key="RealEstateCapital">R.Estate</th>
-                            <th data-key="FundsCapital">Index Funds</th>
-                            <th data-key="SharesCapital">Shares</th>
-                            <th data-key="WithdrawalRate">Withdraw%</th>
-                            <th data-key="Worth">Worth</th>
+                            <th data-key="Age" title="Your age in this simulation year">Age</th>
+                            <th data-key="Year" title="Calendar year of the simulation">Year</th>
+                            <th data-key="IncomeSalaries" title="Total salary income received this year">Salaries</th>
+                            <th data-key="IncomeRentals" title="Rental income from real estate properties">Rentals</th>
+                            <th data-key="IncomeRSUs" title="Income from Restricted Stock Units (RSUs) vesting">RSUs</th>
+                            <th data-key="IncomePrivatePension" title="Withdrawals from your private pension fund">P.Pension</th>
+                            <th data-key="IncomeStatePension" title="State pension payments received">S.Pension</th>
+                            <th data-key="IncomeFundsRent" title="Income generated from index fund investments">Index Funds</th>
+                            <th data-key="IncomeSharesRent" title="Income generated from Investment Trusts or individual shares">Shares</th>
+                            <th data-key="IncomeCash" title="Withdrawals from your cash savings">Cash</th>
+                            <th data-key="IT" title="Income Tax paid on taxable income">IT</th>
+                            <th data-key="PRSI" title="Pay Related Social Insurance contributions">PRSI</th>
+                            <th data-key="USC" title="Universal Social Charge paid">USC</th>
+                            <th data-key="CGT" title="Capital Gains Tax paid on investment gains">CGT</th>
+                            <th data-key="NetIncome" title="Total income after all taxes and deductions">Net Income</th>
+                            <th data-key="Expenses" title="Your annual living expenses">Expenses</th>
+                            <th data-key="PensionContribution" title="Amount contributed to your private pension">P. Contrib</th>
+                            <th data-key="Savings" title="Net amount saved (net income - expenses - investments)">Savings</th>
+                            <th data-key="PensionFund" title="Total value of your private pension fund">P.Fund</th>
+                            <th data-key="Cash" title="Total cash savings balance">Cash</th>
+                            <th data-key="RealEstateCapital" title="Total value of your owned real estate">R.Estate</th>
+                            <th data-key="FundsCapital" title="Total value of your index fund investments">Index Funds</th>
+                            <th data-key="SharesCapital" title="Total value of your Investment Trusts or individual share investments">Shares</th>
+                            <th data-key="WithdrawalRate" title="Percentage of your investments (Index Funds + Shares) that you're withdrawing to cover your expenses.">Withdraw%</th>
+                            <th data-key="Worth" title="Your total net worth (sum of all assets)">Worth</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -522,6 +522,178 @@
             }
             preventZoomOnOrientationChange(orientationChanged);
         }, 100);
+    });
+    </script>
+
+    <!-- Column Header Tooltip Manager -->
+    <script>
+    // Handle column header tooltips with real DOM elements and accurate positioning
+    document.addEventListener('DOMContentLoaded', function() {
+        const columnHeaders = document.querySelectorAll('#Data th[title]');
+        let activeTooltip = null;
+        let activeHeader = null;
+        
+        // Store original titles and remove them to prevent browser tooltips
+        const originalTitles = new Map();
+        columnHeaders.forEach(header => {
+            const title = header.getAttribute('title');
+            if (title) {
+                originalTitles.set(header, title);
+                header.removeAttribute('title');
+                header.setAttribute('data-tooltip', title);
+            }
+        });
+        
+        // Function to create tooltip element
+        function createTooltip(header, text) {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'column-tooltip';
+            tooltip.textContent = text;
+            header.appendChild(tooltip);
+            return tooltip;
+        }
+        
+        // Function to position tooltip accurately
+        function positionTooltip(header, tooltip) {
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                // Mobile uses fixed positioning (handled by CSS)
+                return;
+            }
+            
+            // Get measurements
+            const headerRect = header.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            
+            // Calculate positions relative to the header element
+            const headerWidth = headerRect.width;
+            const tooltipWidth = tooltipRect.width;
+            
+            // Ideal centered position (relative to header)
+            let tooltipLeft = (headerWidth - tooltipWidth) / 2;
+            
+            // Check for clipping and adjust
+            const headerLeftInViewport = headerRect.left;
+            const tooltipLeftInViewport = headerLeftInViewport + tooltipLeft;
+            const tooltipRightInViewport = tooltipLeftInViewport + tooltipWidth;
+            
+            const margin = 10;
+            
+            // Adjust for left clipping
+            if (tooltipLeftInViewport < margin) {
+                tooltipLeft = margin - headerLeftInViewport;
+            }
+            // Adjust for right clipping
+            else if (tooltipRightInViewport > viewportWidth - margin) {
+                tooltipLeft = (viewportWidth - margin - headerLeftInViewport) - tooltipWidth;
+            }
+            
+            // Position tooltip
+            tooltip.style.left = tooltipLeft + 'px';
+        }
+        
+        // Function to show tooltip
+        function showTooltip(header) {
+            // Don't create if already showing for this header
+            if (activeHeader === header && activeTooltip) {
+                return;
+            }
+            
+            // Hide any existing tooltip immediately
+            hideTooltip();
+            
+            const text = header.getAttribute('data-tooltip');
+            if (!text) return;
+            
+            const tooltip = createTooltip(header, text);
+            activeTooltip = tooltip;
+            activeHeader = header;
+            
+            // Position and show
+            requestAnimationFrame(() => {
+                positionTooltip(header, tooltip);
+                tooltip.classList.add('visible');
+            });
+        }
+        
+        // Function to hide tooltip immediately
+        function hideTooltip() {
+            if (activeTooltip && activeHeader) {
+                activeTooltip.classList.remove('visible');
+                if (activeTooltip.parentNode) {
+                    activeTooltip.parentNode.removeChild(activeTooltip);
+                }
+                activeTooltip = null;
+                activeHeader = null;
+            }
+        }
+        
+        // Add event listeners to each column header
+        columnHeaders.forEach(header => {
+            // Desktop hover events
+            header.addEventListener('mouseenter', function() {
+                if (window.innerWidth > 768) {
+                    showTooltip(this);
+                }
+            });
+            
+            header.addEventListener('mouseleave', function() {
+                if (window.innerWidth > 768) {
+                    hideTooltip();
+                }
+            });
+            
+            // Mobile touch events
+            header.addEventListener('touchstart', function(e) {
+                if (window.innerWidth <= 768) {
+                    e.preventDefault();
+                    
+                    if (activeHeader === this) {
+                        hideTooltip();
+                    } else {
+                        showTooltip(this);
+                    }
+                }
+            });
+        });
+        
+        // Hide tooltip when touching/clicking elsewhere
+        document.addEventListener('touchstart', function(e) {
+            if (window.innerWidth <= 768) {
+                const isColumnHeader = e.target.closest('#Data th[data-tooltip]');
+                if (!isColumnHeader && activeTooltip) {
+                    hideTooltip();
+                }
+            }
+        });
+        
+        document.addEventListener('click', function(e) {
+            const isColumnHeader = e.target.closest('#Data th[data-tooltip]');
+            if (!isColumnHeader && activeTooltip) {
+                hideTooltip();
+            }
+        });
+        
+        // Hide tooltip on scroll
+        document.addEventListener('scroll', function() {
+            if (activeTooltip) {
+                hideTooltip();
+            }
+        });
+        
+        // Hide tooltip on orientation change and window resize
+        window.addEventListener('orientationchange', function() {
+            if (activeTooltip) {
+                hideTooltip();
+            }
+        });
+        
+        window.addEventListener('resize', function() {
+            if (activeTooltip) {
+                hideTooltip();
+            }
+        });
     });
     </script>
 
