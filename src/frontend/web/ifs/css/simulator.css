@@ -660,16 +660,37 @@ input.percentage::placeholder {
     font-size: 0.9rem;
 }
 
-#Data thead tr:last-child {
+#Data thead tr:first-child {
     position: sticky;
     top: 67px;
+    z-index: 3;
+}
+
+#Data thead tr:first-child th {
+    position: sticky;
+    top: 67px;
+}
+
+/* Preserve the original background colors for grouped headers when sticky */
+#Data thead tr:first-child th:first-child,
+#Data thead tr:first-child th:last-child {
+    background-color: transparent;
+}
+
+#Data thead tr:first-child th:not(:first-child):not(:last-child) {
+    background-color: #e0e0e0;
+}
+
+#Data thead tr:last-child {
+    position: sticky;
+    top: 105px; /* Adjusted to account for the height of the first header row */
     background-color: #f5f5f5;
     z-index: 2;
 }
 
 #Data thead tr:last-child th {
     position: sticky;
-    top: 67px;
+    top: 105px; /* Adjusted to account for the height of the first header row */
     background-color: #f5f5f5;
 }
 
