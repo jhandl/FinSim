@@ -549,7 +549,8 @@
             const tooltip = document.createElement('div');
             tooltip.className = 'column-tooltip';
             tooltip.textContent = text;
-            header.appendChild(tooltip);
+            tooltip.setAttribute('data-header-id', header.dataset.key || Math.random().toString(36).substr(2, 9));
+            document.body.appendChild(tooltip);
             return tooltip;
         }
         
@@ -566,31 +567,29 @@
             const tooltipRect = tooltip.getBoundingClientRect();
             const viewportWidth = window.innerWidth;
             
-            // Calculate positions relative to the header element
+            // Calculate positions relative to the viewport for body-appended tooltip
             const headerWidth = headerRect.width;
             const tooltipWidth = tooltipRect.width;
             
-            // Ideal centered position (relative to header)
-            let tooltipLeft = (headerWidth - tooltipWidth) / 2;
-            
-            // Check for clipping and adjust
-            const headerLeftInViewport = headerRect.left;
-            const tooltipLeftInViewport = headerLeftInViewport + tooltipLeft;
-            const tooltipRightInViewport = tooltipLeftInViewport + tooltipWidth;
+            // Position above the header
+            let left = headerRect.left + (headerWidth - tooltipWidth) / 2;
+            let top = headerRect.top - tooltipRect.height - 10;
             
             const margin = 10;
             
             // Adjust for left clipping
-            if (tooltipLeftInViewport < margin) {
-                tooltipLeft = margin - headerLeftInViewport;
+            if (left < margin) {
+                left = margin;
             }
             // Adjust for right clipping
-            else if (tooltipRightInViewport > viewportWidth - margin) {
-                tooltipLeft = (viewportWidth - margin - headerLeftInViewport) - tooltipWidth;
+            else if (left + tooltipWidth > viewportWidth - margin) {
+                left = viewportWidth - tooltipWidth - margin;
             }
             
-            // Position tooltip
-            tooltip.style.left = tooltipLeft + 'px';
+            // Position tooltip relative to viewport
+            tooltip.style.position = 'fixed';
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
         }
         
         // Function to show tooltip
