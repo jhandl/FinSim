@@ -198,7 +198,7 @@ footer {
 }
 
 /* Handle two-row header layout - when header wraps but isn't in full mobile mode */
-@media (max-width: 1100px) and (min-width: 835px) {
+@media (max-width: 1174px) and (min-width: 835px) {
   /* Add margin for two-row header */
   main {
     margin-top: 4rem; /* Adjust for two-row header height */
@@ -254,11 +254,6 @@ footer {
     padding: 0; /* Remove any padding */
   }
 
-  /* Hide scenario name on mobile to prevent offset */
-  .scenario-name {
-    display: none !important;
-  }
-
   .header-right {
     width: 100%;
     margin: 0 !important; /* Override desktop margin-left: auto */
@@ -302,6 +297,15 @@ footer {
 
   .status-indicator {
     min-width: 100px;
+  }
+
+  /* Adjust floating scenario name for mobile */
+  .scenario-name {
+    font-size: 0.8rem;
+    top: 0.25rem;
+    left: 0.25rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.2rem 0.4rem;
   }
 
   .events-section {
