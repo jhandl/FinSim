@@ -870,8 +870,7 @@ footer {
 
 /* Real DOM tooltip elements */
 .column-tooltip {
-    position: absolute;
-    bottom: 100%;
+    position: fixed;
     background-color: rgba(0, 0, 0, 0.9);
     color: white;
     padding: 0.5rem 0.75rem;
@@ -886,7 +885,6 @@ footer {
     text-align: left;
     line-height: 1.3;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    margin-bottom: 5px;
 }
 
 .column-tooltip.visible {
