@@ -5,7 +5,6 @@
 - The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?
 
 ### Improvements
-- The scenario name should be displayed in a better, unobtrusive way.
 
 ### Ideas
 - I learned about finance and investing late in life. There’s a lot like me. Help them get to where I am. (And plan their retirement? No, that’s financial advice)
