@@ -721,30 +721,6 @@ footer {
     z-index: 1000;
 }
 
-.scenario-name {
-    position: absolute;
-    top: 0rem;
-    left: 0rem;
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #333;
-    background-color: rgba(255, 255, 255, 0.55);
-    padding: 0.25rem 0.25rem;
-    z-index: 1001;
-    max-width: calc(100vw - 1rem);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.scenario-name:not(:empty)::before {
-    content: "\"";
-}
-
-.scenario-name:not(:empty)::after {
-    content: "\"";
-}
-
 /* Error Modal Styles */
 .modal {
     display: none;

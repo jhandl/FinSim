@@ -263,17 +263,15 @@ class WebUI extends AbstractUI {
   }
 
   setScenarioName(name) {
-    const scenarioSpan = document.querySelector('.scenario-name');
-    if (scenarioSpan) {
-        scenarioSpan.textContent = name;
-    }
+    this.fileManager.setScenarioName(name);
+  }
+
+  getScenarioName() {
+    return this.fileManager.getScenarioName();
   }
 
   clearScenarioName() {
-    const scenarioSpan = document.querySelector('.scenario-name');
-    if (scenarioSpan) {
-        scenarioSpan.textContent = '';
-    }
+    this.fileManager.clearScenarioName();
   }
 
   flush() {

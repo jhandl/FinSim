@@ -299,15 +299,6 @@ footer {
     min-width: 100px;
   }
 
-  /* Adjust floating scenario name for mobile */
-  .scenario-name {
-    font-size: 1rem;
-    top: 0.25rem;
-    left: 0.25rem;
-    max-width: calc(100vw - 2rem);
-    padding: 0.25rem 0.25rem;
-  }
-
   .events-section {
       width: 810px; /* Fixed width for consistency - same as max-width used elsewhere */
       max-width: 810px;

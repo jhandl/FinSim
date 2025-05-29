@@ -3,6 +3,7 @@ class FileManager {
   constructor(webUI) {
     this.webUI = webUI;
     this.lastSavedState = null; // Initialize lastSavedState
+    this.currentScenarioName = ''; // Track current scenario name
     this.setupSaveButton();
     this.setupLoadButton();
   }
@@ -56,7 +57,7 @@ class FileManager {
 
   async saveToFile() {
     const csvContent = serializeSimulation(this.webUI);
-    const currentScenarioName = document.querySelector('.scenario-name')?.textContent || 'my scenario';
+    const currentScenarioName = this.currentScenarioName || 'my scenario';
     const suggestedName = `${currentScenarioName.trim()}.csv`;
 
     if ('showSaveFilePicker' in window) {
@@ -72,7 +73,7 @@ class FileManager {
         });
         
         const scenarioName = handle.name.replace('.csv', '');
-        this.webUI.setScenarioName(scenarioName);
+        this.setScenarioName(scenarioName);
         
         const writable = await handle.createWritable();
         await writable.write(csvContent);
@@ -133,7 +134,7 @@ class FileManager {
     this.webUI.tableManager.clearContent('Events');
     this.webUI.tableManager.clearExtraDataRows(0);
     this.webUI.chartManager.clearExtraChartRows(0);
-    this.webUI.setScenarioName(name);
+    this.setScenarioName(name);
     const eventData = deserializeSimulation(content, this.webUI);
     const priorityIds = ['PriorityCash', 'PriorityPension', 'PriorityFunds', 'PriorityShares'];
     const prioritiesContainer = document.querySelector('.priorities-container');
@@ -185,6 +186,19 @@ class FileManager {
       console.error(`Failed to fetch URL: ${url}`, error);
       throw new Error(`Failed to fetch URL ${url}: ${error.message}`);
     }
+  }
+
+  // Methods to manage scenario name
+  setScenarioName(name) {
+    this.currentScenarioName = name || '';
+  }
+
+  getScenarioName() {
+    return this.currentScenarioName;
+  }
+
+  clearScenarioName() {
+    this.currentScenarioName = '';
   }
 
 }
