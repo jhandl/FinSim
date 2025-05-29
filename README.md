@@ -5,6 +5,10 @@
 - The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?
 
 ### Improvements
+- Use both the marriage year and the number of incomes for income tax bands.
+- If year input field is empty or 0 assume infinite (not married, no children).
+- Allow leaving other fields empty, and use "0" if so.
+- Add partner age and retirement age.
 
 ### Ideas
 - I learned about finance and investing late in life. There’s a lot like me. Help them get to where I am. (And plan their retirement? No, that’s financial advice)
