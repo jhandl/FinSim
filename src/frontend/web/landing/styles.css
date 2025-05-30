@@ -338,6 +338,61 @@ nav ul li a:hover {
 }
 
 
+/* About Section */
+.about {
+  background-color: white;
+  padding: 80px 0;
+}
+
+.about h2 {
+  text-align: center;
+  margin-bottom: 50px;
+  font-size: 2rem;
+}
+
+.about-content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.about-text p {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  margin-bottom: 20px;
+  color: var(--gray-color);
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.about-text p i {
+  color: var(--primary-color);
+  font-size: 1.2rem;
+  margin-top: 6px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.about-text p:last-of-type {
+  margin-bottom: 0;
+}
+
+.about-image {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.about-image img {
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow);
+  max-width: 100%;
+  height: auto;
+}
+
+
 /* Newsletter Section */
 .newsletter {
   background-color: #f0f9ff;

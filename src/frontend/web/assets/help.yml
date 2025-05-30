@@ -185,7 +185,7 @@ steps:
 
   - element: "#PersonalTaxCredit"
     popover:
-      description: "<p>The amount of personal tax credit you are entitled to according to your personal circumstances (widow, carer, etc).</p><p>This is the amount of tax credit you get for yourself, before factoring in any dependent children (refer to [this revenue page](https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx)).</p>"
+      description: "<p>The amount of personal tax credit you are entitled to according to your personal circumstances (widow, carer, etc).</p><p>This is separate from the employee tax credit, and doesn't factor in dependent children (refer to [this revenue page](https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx)).</p>"
       side: "right"
       align: "start"
 

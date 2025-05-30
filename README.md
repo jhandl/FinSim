@@ -9,6 +9,9 @@
 - If year input field is empty or 0 assume infinite (not married, no children).
 - Allow leaving other fields empty, and use "0" if so.
 - Add partner age and retirement age.
+- Add ability to arrange events by start age or event category. Maybe allow drag-and-drop.
+- Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain.
+- In the data table, highlight the "pinch points", with failures in red and near failures in yellow.
 
 ### Ideas
 - I learned about finance and investing late in life. There’s a lot like me. Help them get to where I am. (And plan their retirement? No, that’s financial advice)
