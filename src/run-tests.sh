@@ -30,6 +30,7 @@ show_usage() {
     echo "EXAMPLES:"
     echo -e "  ${GREEN}./run-tests.sh${NC}                    # Run all tests"
     echo -e "  ${GREEN}./run-tests.sh TestBasicTax${NC}       # Run specific test"
+    echo -e "  ${GREEN}./run-tests.sh --list${NC}             # List available tests"
     echo -e "  ${GREEN}./run-tests.sh --help${NC}             # Show this help"
     echo ""
 }
@@ -99,11 +100,38 @@ find_test_files() {
     find "$TESTS_DIR" -name "*.js" -type f | sort
 }
 
+# Function to list available tests
+list_tests() {
+    echo -e "${BLUE}Available FinSim Tests:${NC}"
+    echo -e "${BLUE}======================${NC}"
+    echo ""
+    
+    local test_files=($(find_test_files))
+    if [ ${#test_files[@]} -eq 0 ]; then
+        echo -e "${YELLOW}No test files found in $TESTS_DIR${NC}"
+        return 0
+    fi
+    
+    for test_file in "${test_files[@]}"; do
+        local test_name=$(basename "$test_file" .js)
+        echo -e "  ${GREEN}$test_name${NC}"
+    done
+    
+    echo ""
+    echo -e "Usage: ${GREEN}./run-tests.sh [test-name]${NC}"
+    echo ""
+}
+
 # Main execution
 main() {
     case "$1" in
         -h|--help|--help-script)
             show_usage
+            exit 0
+            ;;
+        --list)
+            check_prerequisites
+            list_tests
             exit 0
             ;;
     esac
