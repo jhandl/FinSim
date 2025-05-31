@@ -390,6 +390,31 @@ class TestFramework {
 
       // Extract results from context
       const results = vm.runInContext('simulationResults', this.simulationContext);
+      
+      // Check if Monte Carlo was used and apply averaging
+      const montecarlo = vm.runInContext('montecarlo', this.simulationContext);
+      if (montecarlo) {
+        const config = vm.runInContext('config', this.simulationContext);
+        const runs = config.simulationRuns;
+        
+        // Apply Monte Carlo averaging to dataSheet
+        if (results.dataSheet && results.dataSheet.length > 0) {
+          for (let i = 0; i < results.dataSheet.length; i++) {
+            if (results.dataSheet[i] && typeof results.dataSheet[i] === 'object') {
+              for (const field in results.dataSheet[i]) {
+                if (typeof results.dataSheet[i][field] === 'number') {
+                  results.dataSheet[i][field] = results.dataSheet[i][field] / runs;
+                }
+              }
+            }
+          }
+        }
+        
+        // Add Monte Carlo metadata to results
+        results.montecarlo = true;
+        results.runs = runs;
+      }
+      
       return results;
 
     } catch (error) {
