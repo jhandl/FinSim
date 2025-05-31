@@ -5,6 +5,7 @@
 - The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?
 
 ### Improvements
+- Add tests. Each test is a serialized scenario, and the outcome is the data table and assertions about it.
 - Use both the marriage year and the number of incomes for income tax bands.
 - If year input field is empty or 0 assume infinite (not married, no children).
 - Allow leaving other fields empty, and use "0" if so.
@@ -12,6 +13,68 @@
 - Add ability to arrange events by start age or event category. Maybe allow drag-and-drop.
 - Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain.
 - In the data table, highlight the "pinch points", with failures in red and near failures in yellow.
+- Add inheritance event.
+- New event: period of high inflation.
+- New event: increase pension contribution rate.
+- New event: pay off mortgage.
+
+### SEO
+- "Educational Sandbox", "What if lab", "not a crystal ball", "Personbal Finance Lab", "Learn by doing, experimenting, and visualizing"
+- Ask on reddit: What "what if" scenario are you most curious about running for your long term financial future?
+- "Not affiliated with any financial institution"
+- "It empowers you to ask those what if questions and see potential futures, visualized over decades, helps you think through the possibilities. Hopefully you gain valuable insights into your own financial future." 
+- "Less overwhelmed by the sheer complexity of financial planning"
+- Write blog posts, that explain how the simulator can help users answer their specific questions or model their own situation, maybe even linking to example scenarios.
+   - Based on the answers to the reddit post, write blog posts about the most common scenarios.
+   - About "not affiliated with any financial institution"
+   - About "less overwhelmed by the sheer complexity of financial planning"
+   - About "educational sandbox"
+   - About "personal finance lab"
+   - About "learn by doing, experimenting, and visualizing"
+   - About "who is this for?"
+   - About my history with finances (copy the one I already sent as a guest post)
+   - About the "Saving for a house deposit"
+   - About "Investing vs Saving: an Irish tax perspective"
+- Who is this for? 
+   - People planning for retirement
+   - Figuring out the affordability of buying a first home
+   - Understanding the financial impact of having children,
+   - Planning for education costs.
+   - Modeling different drawdown strategies.
+   - Seeing the impact of retiring earlier or later.
+   - Teaching financial literacy.
+   - Doing quick high level scenario modeling during client meetings, to illustrate a point visually.
+- Figure out a way to include phrases like:
+   - income tax calculator
+   - pension calculator
+   - budget planner
+   - household budget calculator
+   - compound interest calculator
+   - savings calculator
+   - take home pay calculator
+   - retirement calculator
+   - retirement income calculator
+   - tax on investments
+   - tax on dividends
+   - tax on capital gains
+   - tax on savings
+   - tax on retirement income
+   - tax on income
+   - tax on expenses
+   - tax on inheritance
+- Maybe list all the useful sites that have specific calculators for each of those things, and explain how we integrate all of it in one place.
+- Add an FAQ section, based on questions on reddit and about the simulator.
+   - What taxes are considered?
+   - Is it better to contribute to pension or save?
+   - How is FinSim different?
+      - Comprehensive scope, an "All-in-One" tool covering multiple aspects of personal finance
+      - Irish tax system
+      - Privacy
+      - No ads or tracking
+      - No need for signup or login
+      - Free to use
+      - Interactivity ("what if")
+- Look up what "meta titles" are.
 
 ### Ideas
 - I learned about finance and investing late in life. There’s a lot like me. Help them get to where I am. (And plan their retirement? No, that’s financial advice)
