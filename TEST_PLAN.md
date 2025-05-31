@@ -1,5 +1,24 @@
 # FinSim Acceptance Test Plan
 
+## Quick Reference: Running Tests
+
+**🚨 IMPORTANT**: Always use `./run-tests.sh` from the `src/` directory. Never use `node TestRunner.js` directly.
+
+```bash
+# Basic commands (run from src/ directory)
+./run-tests.sh                    # Run all tests
+./run-tests.sh --list             # List available tests  
+./run-tests.sh --help             # Show all options
+./run-tests.sh --pattern="Basic"  # Run specific test pattern
+./run-tests.sh --category=tax     # Run tests by category
+./run-tests.sh --verbose          # Detailed output
+./run-tests.sh --csv              # Export to CSV
+```
+
+📖 **Complete instructions**: See Section 6.0
+
+---
+
 ## 1. Executive Summary
 
 This document outlines the test plan for implementing acceptance tests for the FinSim (Ireland Financial Simulator) application. The goal is to create a comprehensive suite of serialized scenario-based tests that validate the simulator's financial calculations and data outputs through structured assertions.
@@ -175,13 +194,104 @@ The simulator outputs data rows with these key fields:
 
 ## 6. Test Implementation Plan
 
-### 6.0 Command Line Execution Requirements
-All tests must be designed to run from the command line using Node.js. Key requirements:
+### 6.0 Test Execution Instructions
+
+**IMPORTANT**: All tests are executed using the `./run-tests.sh` script from the `src/` directory. Do NOT use `node TestRunner.js` directly.
+
+#### Basic Test Execution Commands:
+```bash
+# Navigate to the src directory first
+cd /path/to/FinSim/src
+
+# Run all tests
+./run-tests.sh
+
+# List available tests
+./run-tests.sh --list
+
+# Get help (shows all available options)
+./run-tests.sh --help
+```
+
+#### Running Specific Tests:
+```bash
+# Run tests matching a pattern
+./run-tests.sh --pattern="Basic"
+./run-tests.sh "Tax"                # Direct pattern (no --pattern flag needed)
+
+# Run tests by category
+./run-tests.sh --category=tax
+./run-tests.sh --category=pension
+
+# Run a specific test file
+./run-tests.sh --suite=TestBasicTaxCalculation.js
+
+# Run exact test name
+./run-tests.sh --pattern="Basic Salary Tax Calculation"
+```
+
+#### Output and Formatting Options:
+```bash
+# Export results to JSON
+./run-tests.sh --format=json --output=results.json
+
+# Export to CSV
+./run-tests.sh --csv                # Quick shortcut
+./run-tests.sh --format=csv
+
+# Verbose output with detailed logging
+./run-tests.sh --verbose
+
+# Minimal output (errors only)
+./run-tests.sh --quiet
+
+# Disable progress bar
+./run-tests.sh --no-progress
+```
+
+#### Execution Control Options:
+```bash
+# Stop on first failure
+./run-tests.sh --fail-fast
+
+# Set custom timeout (30 seconds default)
+./run-tests.sh --timeout=60000
+
+# Combine multiple options
+./run-tests.sh --verbose --category=tax --fail-fast
+```
+
+#### Development Workflow Examples:
+```bash
+# Quick development cycle: run specific test with detailed output
+./run-tests.sh --verbose --pattern="Basic"
+
+# Export all test results for analysis
+./run-tests.sh --format=json --output=daily-test-results.json
+
+# Run only tax-related tests quietly
+./run-tests.sh --quiet --category=tax
+
+# Full test suite with failure details
+./run-tests.sh --verbose --fail-fast
+```
+
+#### File Structure Requirements:
+- Test files must be in `src/tests/` directory
+- Test files follow naming patterns: `Test*.js`, `*Test.js`, `*.test.js`, `test-*.js`
+- Each test file exports a single test definition object
 - Tests import core simulation modules directly (no browser dependencies)
-- Command line interface with options like: `npm test`, `npm test -- --category=tax`, `npm test -- --scenario=pension`
+
+#### Prerequisites:
+- Node.js must be installed and available in PATH
+- All core simulation files must be present in `src/core/`
+- Test configuration files must be available in `src/core/config/`
+
+#### Command Line Execution Requirements:
+- Tests run from the command line using Node.js with no external dependencies
 - Detailed console output with progress indicators and failure descriptions
 - JSON/CSV output options for automated analysis
-- Self-contained execution with no external service dependencies
+- Self-contained execution compatible with CI/CD pipelines
 
 ### 6.1 Phase 1: Test Infrastructure (Weeks 1-2)
 **Gen-AI Coder Prompts:**
@@ -278,4 +388,138 @@ This test plan provides a comprehensive framework for implementing acceptance te
 
 The plan emphasizes practical, real-world scenarios while maintaining rigorous validation of the underlying mathematical models. By following this plan, the development team will have confidence in the accuracy and reliability of the FinSim financial planning simulator.
 
-**Next Steps**: Begin implementation with Phase 1 (Test Infrastructure) and proceed systematically through each phase, using the detailed Gen-AI Coder prompts provided for each deliverable. 
+**Next Steps**: Begin implementation with Phase 1 (Test Infrastructure) and proceed systematically through each phase, using the detailed Gen-AI Coder prompts provided for each deliverable.
+
+## 11. Troubleshooting and Common Mistakes
+
+### 11.1 Test Execution Issues
+
+#### ❌ Common Mistake: Using `node` command directly
+```bash
+# DON'T DO THIS:
+node TestRunner.js
+node core/TestRunner.js  
+cd core && node TestRunner.js
+
+# CORRECT WAY:
+cd src
+./run-tests.sh
+```
+
+#### ❌ Common Mistake: Wrong working directory
+```bash
+# DON'T run from root directory:
+cd /path/to/FinSim
+./src/run-tests.sh
+
+# CORRECT - run from src directory:
+cd /path/to/FinSim/src
+./run-tests.sh
+```
+
+#### ❌ Common Mistake: Forgetting script permissions
+```bash
+# If you get "Permission denied":
+chmod +x run-tests.sh
+./run-tests.sh
+```
+
+### 11.2 Test Discovery Issues
+
+#### ❌ No tests found
+```bash
+# Problem: Tests directory wrong or missing
+./run-tests.sh --list
+# Shows: ❌ No tests found.
+
+# Solution: Check directory structure
+ls tests/          # Should show Test*.js files
+pwd               # Should be in /path/to/FinSim/src
+```
+
+#### ❌ Test pattern not matching
+```bash
+# Problem: Pattern too specific
+./run-tests.sh --pattern="BasicTaxCalculation"  # Won't match "Basic Salary Tax Calculation"
+
+# Solution: Use partial patterns
+./run-tests.sh --pattern="Basic"               # Matches partial name
+./run-tests.sh --pattern="Tax"                 # Matches any test with "Tax"
+```
+
+### 11.3 Parameter Validation Errors
+
+#### ❌ Unknown option errors
+```bash
+# Problem: Typo in option name
+./run-tests.sh --verbos                        # Typo: missing 'e'
+# Shows: Error: Unknown option '--verbos'
+
+# Solution: Use correct option names
+./run-tests.sh --verbose                       # Correct
+./run-tests.sh --help                         # Shows all valid options
+```
+
+### 11.4 Output and Format Issues
+
+#### ❌ JSON/CSV output not working
+```bash
+# Problem: Missing output file path
+./run-tests.sh --format=json                   # Outputs to console
+
+# Solution: Specify output file
+./run-tests.sh --format=json --output=results.json
+./run-tests.sh --csv                          # Quick CSV shortcut
+```
+
+### 11.5 Development Workflow Tips
+
+#### ✅ Recommended development cycle:
+```bash
+# 1. List available tests first
+./run-tests.sh --list
+
+# 2. Run specific test with verbose output for debugging
+./run-tests.sh --verbose --pattern="YourTestName"
+
+# 3. Run category tests once confident
+./run-tests.sh --category=tax --fail-fast
+
+# 4. Full test suite before committing
+./run-tests.sh --format=json --output=pre-commit-results.json
+```
+
+#### ✅ Quick debugging commands:
+```bash
+# Debug single test with maximum detail
+./run-tests.sh --verbose --no-progress --pattern="Basic"
+
+# Check if test files are valid
+./run-tests.sh --list                         # Shows parsing errors
+
+# Test without output clutter
+./run-tests.sh --quiet --pattern="Basic"
+
+# Export failed tests for analysis
+./run-tests.sh --format=json --output=failures.json || echo "Tests failed"
+```
+
+### 11.6 Environment Issues
+
+#### ❌ Node.js not found
+```bash
+# Error: command not found: node
+# Solution: Install Node.js or add to PATH
+which node                                     # Check if installed
+node --version                                 # Check version
+```
+
+#### ❌ Missing core files
+```bash
+# Error: Core file not found
+# Solution: Ensure all files present
+ls core/                                       # Should show all .js files
+ls core/config/                               # Should show config files
+```
+
+Remember: **Always use `./run-tests.sh` from the `src/` directory!** 
