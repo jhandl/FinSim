@@ -333,15 +333,15 @@ class EventGenerator {
   }
 
   /**
-   * Generate a lump sum investment event
+   * Generate a lump sum tax-free income event
    * @param {string} id - Event identifier
-   * @param {number} amount - Investment amount
-   * @param {number} age - Age at investment
-   * @returns {Object} - Investment event object
+   * @param {number} amount - Tax-free income amount
+   * @param {number} age - Age at which income is received
+   * @returns {Object} - Tax-free income event object
    */
-  static createInvestmentEvent(id, amount, age) {
+  static createTaxFreeIncomeEvent(id, amount, age) {
     return {
-      type: 'FI',  // Fund Investment
+      type: 'FI',  // Tax-free Income
       id: id,
       amount: amount,
       fromAge: age,

@@ -10,6 +10,10 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
+// Configuration constants
+const CONFIG_FILE_NAME = 'finance-simulation-config-1.26.json';
+const CONFIG_PATH = path.join(__dirname, 'config', CONFIG_FILE_NAME);
+
 // Test assertion types
 const AssertionTypes = {
   EXACT_VALUE: 'exact_value',
@@ -271,9 +275,9 @@ class TestFramework {
   }
 
   /**
-   * Execute the core simulation logic using the sandbox context
+   * Execute the core simulation in a sandbox context
    * @param {Object} params - Simulation parameters
-   * @param {Array} events - Array of event objects
+   * @param {Array} events - Array of simulation events
    * @returns {Object} - Simulation results
    */
   async executeCoreSimulation(params, events) {
@@ -296,14 +300,14 @@ class TestFramework {
         MockUIManager.prototype.readParameters = function(validate) { return params; };
         MockUIManager.prototype.readEvents = function(validate) { return events; };
         
-        // Create mock UI object that loads the real config
+        // Create mock UI object that loads the actual config
         var mockUI = {
           getVersion: function() { return '1.26'; },
           fetchUrl: function(url) {
             // Load the actual config file
             var fs = require('fs');
             var path = require('path');
-            var configPath = path.join(__dirname, 'config', 'finance-simulation-config-1.26.json');
+            var configPath = '${CONFIG_PATH}';
             return fs.readFileSync(configPath, 'utf8');
           },
           showAlert: function(msg) { console.warn(msg); },
@@ -348,29 +352,20 @@ class TestFramework {
         
       `, this.simulationContext);
 
-              // Load the real config synchronously and set up Config
-        const fs = require('fs');
-        const path = require('path');
-        const configPath = path.join(__dirname, 'config', 'finance-simulation-config-1.26.json');
-        const realConfigData = fs.readFileSync(configPath, 'utf8');
-        const realConfig = JSON.parse(realConfigData);
-        
+        // Set up Config instance with actual config data
         vm.runInContext(`
-          // Set up real Config instance with actual data
-          var realConfigData = ${realConfigData};
-          Config_instance = Object.assign(new Config(mockUI), realConfigData);
+          // Set up Config instance with actual data
+          Config_instance = Object.assign(new Config(mockUI), ${fs.readFileSync(CONFIG_PATH, 'utf8')});
           
-          // Override Config.getInstance to return our real config
+          // Override Config.getInstance to return our config
           Config.getInstance = function() {
             return Config_instance;
           };
-          
-
         `, this.simulationContext);
         
-        // Use the REAL simulator - call run() just like the web UI does
+        // Use the simulator - call run() just like the web UI does
         vm.runInContext(`
-          function runRealSimulation() {
+          function runTestSimulation() {
             var startTime = Date.now();
             
             try {
@@ -383,14 +378,14 @@ class TestFramework {
                 executionTime: Date.now() - startTime
               };
             } catch (error) {
-              console.error('Error in real simulation:', error.message);
+              console.error('Error in simulation:', error.message);
               console.error('Error stack:', error.stack);
               throw error;
             }
           }
           
-          // Execute the real simulation
-          var simulationResults = runRealSimulation();
+          // Execute the simulation
+          var simulationResults = runTestSimulation();
         `, this.simulationContext);
 
       // Extract results from context
