@@ -146,14 +146,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Simple responsive menu toggle (if needed for smaller screens)
   const createResponsiveMenu = () => {
-    const header = document.querySelector("header")
+    const headerContainer = document.querySelector("header .container")
     const nav = document.querySelector("nav")
 
     if (window.innerWidth <= 768 && !document.querySelector(".menu-toggle")) {
       const menuToggle = document.createElement("button")
       menuToggle.classList.add("menu-toggle")
       menuToggle.innerHTML = '<i class="fas fa-bars"></i>'
-      header.insertBefore(menuToggle, nav)
+      headerContainer.insertBefore(menuToggle, nav)
 
       nav.style.display = "none"
 
@@ -171,7 +171,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (menuToggle) {
         menuToggle.remove()
       }
-      nav.style.display = "block"
+      if (nav) {
+        nav.style.display = "block"
+      }
     }
   }
 
