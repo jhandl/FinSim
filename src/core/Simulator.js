@@ -22,12 +22,6 @@ function run() {
   for (let run = 0; run < runs; run++) {
     successes += runSimulation(); 
   }
-  
-  // Convert arrays to medians after Monte Carlo runs complete
-  if (montecarlo) {
-    convertArraysToMedians();
-  }
-  
   uiManager.updateDataSheet(runs);
   uiManager.updateStatusCell(successes, runs);
 }
@@ -457,96 +451,36 @@ function updateYearlyData() {
   let SharesTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.cgt * incomeSharesRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
 
   if (!(row in dataSheet)) {
-    if (montecarlo) {
-      // For Monte Carlo, store arrays of values
-      dataSheet[row] = { "age": [], "year": [], "incomeSalaries": [], "incomeRSUs": [], "incomeRentals": [], "incomePrivatePension": [], "incomeStatePension": [], "incomeFundsRent": [], "incomeSharesRent": [], "incomeCash": [], "realEstateCapital": [], "netIncome": [], "expenses": [], "savings": [], "pensionFund": [], "cash": [], "indexFundsCapital": [], "sharesCapital": [], "pensionContribution": [], "withdrawalRate": [], "it": [], "prsi": [], "usc": [], "cgt": [], "worth": [] };
-    } else {
-      // For deterministic, store single values
-      dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "savings": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0 };
-    }
+    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "savings": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0 };
   }
-  
-  if (montecarlo) {
-    // For Monte Carlo, push values to arrays
-    dataSheet[row].age.push(age);
-    dataSheet[row].year.push(year);
-    dataSheet[row].incomeSalaries.push(incomeSalaries);
-    dataSheet[row].incomeRSUs.push(incomeShares);
-    dataSheet[row].incomeRentals.push(incomeRentals);
-    dataSheet[row].incomePrivatePension.push(incomePrivatePension + incomeDefinedBenefit);
-    dataSheet[row].incomeStatePension.push(incomeStatePension);
-    dataSheet[row].incomeFundsRent.push(Math.max(incomeFundsRent - FundsTax, 0));
-    dataSheet[row].incomeSharesRent.push(Math.max(incomeSharesRent - SharesTax, 0));
-    dataSheet[row].incomeCash.push(Math.max(cashWithdraw, 0) + incomeTaxFree);
-    dataSheet[row].realEstateCapital.push(realEstate.getTotalValue());
-    dataSheet[row].netIncome.push(netIncome);
-    dataSheet[row].expenses.push(expenses);
-    dataSheet[row].savings.push(savings);
-    dataSheet[row].pensionFund.push(pension.capital());
-    dataSheet[row].cash.push(cash);
-    dataSheet[row].indexFundsCapital.push(indexFunds.capital());
-    dataSheet[row].sharesCapital.push(shares.capital());
-    dataSheet[row].pensionContribution.push(pensionContribution);
-    dataSheet[row].withdrawalRate.push(withdrawalRate);
-    dataSheet[row].it.push(revenue.it);
-    dataSheet[row].prsi.push(revenue.prsi);
-    dataSheet[row].usc.push(revenue.usc);
-    dataSheet[row].cgt.push(revenue.cgt);
-    dataSheet[row].worth.push(realEstate.getTotalValue() + pension.capital() + indexFunds.capital() + shares.capital() + cash);
-  } else {
-    // For deterministic, accumulate as before
-    dataSheet[row].age += age;
-    dataSheet[row].year += year;
-    dataSheet[row].incomeSalaries += incomeSalaries;
-    dataSheet[row].incomeRSUs += incomeShares;
-    dataSheet[row].incomeRentals += incomeRentals;
-    dataSheet[row].incomePrivatePension += incomePrivatePension + incomeDefinedBenefit;
-    dataSheet[row].incomeStatePension += incomeStatePension;
-    dataSheet[row].incomeFundsRent += Math.max(incomeFundsRent - FundsTax, 0);
-    dataSheet[row].incomeSharesRent += Math.max(incomeSharesRent - SharesTax, 0);
-    dataSheet[row].incomeCash += Math.max(cashWithdraw, 0) + incomeTaxFree;
-    dataSheet[row].realEstateCapital += realEstate.getTotalValue();
-    dataSheet[row].netIncome += netIncome;
-    dataSheet[row].expenses += expenses;
-    dataSheet[row].savings += savings;
-    dataSheet[row].pensionFund += pension.capital();
-    dataSheet[row].cash += cash;
-    dataSheet[row].indexFundsCapital += indexFunds.capital();
-    dataSheet[row].sharesCapital += shares.capital();
-    dataSheet[row].pensionContribution += pensionContribution;
-    dataSheet[row].withdrawalRate += withdrawalRate;
-    dataSheet[row].it += revenue.it;
-    dataSheet[row].prsi += revenue.prsi;
-    dataSheet[row].usc += revenue.usc;
-    dataSheet[row].cgt += revenue.cgt;
-    dataSheet[row].worth += realEstate.getTotalValue() + pension.capital() + indexFunds.capital() + shares.capital() + cash;
-  }
+  dataSheet[row].age += age;
+  dataSheet[row].year += year;
+  dataSheet[row].incomeSalaries += incomeSalaries;
+  dataSheet[row].incomeRSUs += incomeShares;
+  dataSheet[row].incomeRentals += incomeRentals;
+  dataSheet[row].incomePrivatePension += incomePrivatePension + incomeDefinedBenefit;
+  dataSheet[row].incomeStatePension += incomeStatePension;
+  dataSheet[row].incomeFundsRent += Math.max(incomeFundsRent - FundsTax, 0);
+  dataSheet[row].incomeSharesRent += Math.max(incomeSharesRent - SharesTax, 0);
+  dataSheet[row].incomeCash += Math.max(cashWithdraw, 0) + incomeTaxFree;
+  dataSheet[row].realEstateCapital += realEstate.getTotalValue();
+  dataSheet[row].netIncome += netIncome;
+  dataSheet[row].expenses += expenses;
+  dataSheet[row].savings += savings;
+  dataSheet[row].pensionFund += pension.capital();
+  dataSheet[row].cash += cash;
+  dataSheet[row].indexFundsCapital += indexFunds.capital();
+  dataSheet[row].sharesCapital += shares.capital();
+  dataSheet[row].pensionContribution += pensionContribution;
+  dataSheet[row].withdrawalRate += withdrawalRate;
+  dataSheet[row].it += revenue.it;
+  dataSheet[row].prsi += revenue.prsi;
+  dataSheet[row].usc += revenue.usc;
+  dataSheet[row].cgt += revenue.cgt;
+  dataSheet[row].worth += realEstate.getTotalValue() + pension.capital() + indexFunds.capital() + shares.capital() + cash;
 
   if (!montecarlo) {
     uiManager.updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
-  }
-}
-
-// Helper function to calculate median
-function calculateMedian(arr) {
-  if (arr.length === 0) return 0;
-  const sorted = [...arr].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 
-    ? (sorted[mid - 1] + sorted[mid]) / 2 
-    : sorted[mid];
-}
-
-// Helper function to convert Monte Carlo arrays to median values
-function convertArraysToMedians() {
-  for (let i = 1; i <= row; i++) {
-    if (dataSheet[i] && typeof dataSheet[i] === 'object') {
-      for (const field in dataSheet[i]) {
-        if (Array.isArray(dataSheet[i][field])) {
-          dataSheet[i][field] = calculateMedian(dataSheet[i][field]);
-        }
-      }
-    }
   }
 }
 
