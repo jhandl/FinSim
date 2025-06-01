@@ -2,12 +2,12 @@
  * 
  * This test validates the statistical behavior of high volatility (25% std dev) Monte Carlo simulation.
  * High volatility triggers Monte Carlo simulation (5000 runs) and demonstrates:
- * 1. Run-to-run variability - Results vary €500k-€523k between test executions
- * 2. Statistical range - Results cluster around deterministic €503k but with variation
- * 3. No extreme outliers - Averaging across 5000 runs prevents extreme values
+ * 1. Run-to-run variability - Results vary around median baseline
+ * 2. Statistical range - Results cluster around median which is lower than deterministic due to volatility
+ * 3. No extreme outliers - Median calculation across 5000 runs prevents extreme values
  * 
- * Key insight: Monte Carlo results have inherent variability even with 5000 runs,
- * which is the statistical behavior we need to test for, not precise values.
+ * Key insight: Monte Carlo MEDIAN results are lower than mean due to lognormal distribution properties.
+ * Median provides more conservative/realistic projections than mean for compound growth with volatility.
  */
 
 const path = require('path');
@@ -55,15 +55,15 @@ module.exports = {
   },
 
   assertions: [
-    // Test 1: Monte Carlo results should be in reasonable range around deterministic €503k
-    // Observed variation: €500k to €523k across different runs
+    // Test 1: Monte Carlo median results should be in reasonable range 
+    // Median is significantly lower than mean due to lognormal distribution skew
     {
       type: 'range',
       target: 'final',
       field: 'sharesCapital',
       expected: {
-        min: 480000,              // Allow for Monte Carlo variation below deterministic
-        max: 550000               // Allow for Monte Carlo variation above deterministic
+        min: 250000,              // Allow for Monte Carlo median variation
+        max: 320000               // Median range based on observed ~€281k result
       }
     },
 
@@ -74,29 +74,29 @@ module.exports = {
       field: 'sharesCapital',
       expected: {
         operator: '>',
-        value: 400000             // Much higher than initial €100k investment
+        value: 200000             // Significantly higher than initial €100k investment
       }
     },
 
-    // Test 3: Statistical averaging - no extreme outliers due to Monte Carlo averaging
+    // Test 3: Statistical median - no extreme outliers due to Monte Carlo median calculation
     {
       type: 'comparison',
       target: 'final',
       field: 'sharesCapital',
       expected: {
         operator: '<',
-        value: 600000             // No extreme high outliers with averaging across 5000 runs
+        value: 400000             // No extreme high outliers with median across 5000 runs
       }
     },
 
-    // Test 4: No extreme downside either - averaging protects against worst cases
+    // Test 4: No extreme downside either - median protects against worst cases
     {
       type: 'comparison',
       target: 'final',
       field: 'sharesCapital',
       expected: {
         operator: '>',
-        value: 400000             // Averaging prevents extreme low outliers
+        value: 200000             // Median prevents extreme low outliers
       }
     },
 
@@ -120,15 +120,15 @@ module.exports = {
       tolerance: 0
     },
 
-    // Test 7: Monte Carlo result should be reasonably close to expected range
-    // Based on actual result of €496k, test that it's in a realistic range
+    // Test 7: Monte Carlo median result should be in realistic range
+    // Based on median calculation showing ~€281k result
     {
       type: 'comparison',
       target: 'final',
       field: 'sharesCapital',
       expected: {
         operator: '>',
-        value: 450000             // Should be substantially higher than initial €100k
+        value: 220000             // Should be substantially higher than initial €100k
       }
     },
 
@@ -138,8 +138,8 @@ module.exports = {
       target: 'final',
       field: 'worth',
       expected: {
-        min: 490000,              // Cash (~€10k) + shares (€480k-€550k range)
-        max: 560000
+        min: 260000,              // Cash (~€10k) + shares (€250k-€320k range)
+        max: 330000
       }
     },
 
@@ -160,15 +160,15 @@ module.exports = {
       tolerance: 10
     },
 
-    // Test 10: Validate Monte Carlo produces reasonable results
-    // Multiple runs show €500k-€523k range, demonstrating run-to-run variability
+    // Test 10: Validate Monte Carlo median produces reasonable results
+    // Median provides conservative projections compared to mean
     {
       type: 'comparison',
       target: 'final',
       field: 'sharesCapital',
       expected: {
         operator: '<',
-        value: 600000             // Upper bound - no extreme outliers due to averaging
+        value: 400000             // Upper bound - median is more conservative than mean
       }
     }
   ]

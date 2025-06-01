@@ -397,20 +397,7 @@ class TestFramework {
         const config = vm.runInContext('config', this.simulationContext);
         const runs = config.simulationRuns;
         
-        // Apply Monte Carlo averaging to dataSheet
-        if (results.dataSheet && results.dataSheet.length > 0) {
-          for (let i = 0; i < results.dataSheet.length; i++) {
-            if (results.dataSheet[i] && typeof results.dataSheet[i] === 'object') {
-              for (const field in results.dataSheet[i]) {
-                if (typeof results.dataSheet[i][field] === 'number') {
-                  results.dataSheet[i][field] = results.dataSheet[i][field] / runs;
-                }
-              }
-            }
-          }
-        }
-        
-        // Add Monte Carlo metadata to results
+        // Add Monte Carlo metadata to results (median conversion already done in Simulator)
         results.montecarlo = true;
         results.runs = runs;
       }
