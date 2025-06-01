@@ -83,6 +83,69 @@ document.addEventListener("DOMContentLoaded", () => {
     resizeTimeout = setTimeout(preventZoomOnOrientationChange, 100);
   });
 
+  // Podcast player functionality
+  const podcastBtn = document.getElementById("podcast-btn")
+  const podcastAudio = document.getElementById("podcast-audio")
+  const podcastIcon = document.getElementById("podcast-icon")
+  const progressFill = document.getElementById("progress-fill")
+  const podcastText = document.getElementById("podcast-text")
+
+  // Helper function to format time
+  function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  if (podcastBtn && podcastAudio) {
+    podcastBtn.addEventListener("click", () => {
+      if (podcastAudio.paused) {
+        podcastAudio.play()
+        podcastBtn.classList.add("playing")
+        podcastIcon.className = "fas fa-pause"
+      } else {
+        podcastAudio.pause()
+        podcastBtn.classList.remove("playing")
+        podcastIcon.className = "fas fa-play"
+        podcastText.textContent = "Listen"
+      }
+    })
+
+    // Update progress and time display
+    podcastAudio.addEventListener("timeupdate", () => {
+      if (podcastAudio.duration) {
+        const progress = (podcastAudio.currentTime / podcastAudio.duration) * 100
+        progressFill.style.width = `${progress}%`
+        
+        if (podcastBtn.classList.contains("playing")) {
+          const currentTime = formatTime(podcastAudio.currentTime)
+          const duration = formatTime(podcastAudio.duration)
+          podcastText.textContent = `${currentTime} / ${duration}`
+        }
+      }
+    })
+
+    // Initialize duration display when metadata loads
+    podcastAudio.addEventListener("loadedmetadata", () => {
+      const duration = formatTime(podcastAudio.duration)
+      podcastBtn.title = `Listen to podcast about the simulator (${duration})`
+    })
+
+    // Reset button when audio ends
+    podcastAudio.addEventListener("ended", () => {
+      podcastBtn.classList.remove("playing")
+      podcastIcon.className = "fas fa-play"
+      progressFill.style.width = "0%"
+      podcastText.textContent = "Listen"
+    })
+
+    // Handle audio loading errors gracefully
+    podcastAudio.addEventListener("error", () => {
+      console.warn("Podcast audio could not be loaded")
+      podcastBtn.style.display = "none" // Hide button if audio fails to load
+    })
+  }
+
   // Newsletter form handling
   const newsletterForm = document.getElementById("newsletter-form")
   const formMessage = document.getElementById("form-message")

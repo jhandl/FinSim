@@ -18,7 +18,7 @@
           <li><a data-scroll-to="disclaimer">Disclaimer</a></li>
           <li><a data-scroll-to="features">Features</a></li>
           <li><a data-scroll-to="how-it-works">How It Works</a></li>
-          <li><a data-scroll-to="about-me">About Me</a></li>
+          <li><a data-scroll-to="about-me">About</a></li>
         </ul>
       </nav>
     </div>
@@ -27,9 +27,25 @@
   <section id="top" class="hero">
     <div class="container">
       <div class="hero-content">
-        <h1>What if...?</h1><h2>Your Personal Finance Lab</h2>
+        <div class="hero-title">
+          <h1>What if...?</h1>
+          <button id="podcast-btn" class="podcast-button" title="Listen to podcast about the simulator">
+            <div class="podcast-controls">
+              <i class="fas fa-play" id="podcast-icon"></i>
+              <span id="podcast-text">Listen</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="progress-fill"></div>
+            </div>
+          </button>
+        </div>
+        <h2>Your Personal Finance Lab</h2>
         <p>An educational simulator to help you understand how different decisions and scenarios can affect your long-term financial future within the Irish tax system.</p>
         <a href="/#ifs" class="cta-button">Try The Simulator</a>
+        <audio id="podcast-audio" preload="metadata">
+          <source src="../assets/podcast.wav" type="audio/wav">
+          Your browser does not support the audio element.
+        </audio>
       </div>
       <div class="hero-image">
         <img src="finsim.png" alt="Financial Simulator Dashboard">
@@ -114,7 +130,7 @@
 
   <section id="about-me" class="about">
     <div class="container">
-      <h2>About me</h2>
+      <h2>About</h2>
       <div class="about-content">
         <div class="about-text">
           <p><i class="fas fa-code"></i><span>I'm a software developer with a passion for financial literacy and an itch I needed to scratch.</span></p>
