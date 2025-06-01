@@ -64,6 +64,27 @@ class Equity {
     }
   }
 
+  simulateSellAll(testRevenue) {
+    let totalCapital = this.capital();
+    let totalGains = 0;
+    
+    // Calculate total gains without modifying portfolio
+    for (let holding of this.portfolio) {
+      totalGains += holding.interest;
+    }
+    
+    // Use simulation method instead of real one
+    this.simulateDeclareRevenue(totalCapital, totalGains, testRevenue);
+    return totalCapital;
+  }
+
+  simulateDeclareRevenue(income, gains, testRevenue) {
+    testRevenue.declareInvestmentIncome(income);
+    if (gains > 0 || this.canOffsetLosses) {
+      testRevenue.declareInvestmentGains(gains, this.taxRate);
+    }
+  }
+
 }
 
 

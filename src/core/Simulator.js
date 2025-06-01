@@ -339,58 +339,65 @@ function handleInvestments() {
 // - fromX = 3 (use X if first and second options not enough)
 //
 function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) {
+  const clonedRevenue = revenue.clone();
+  indexFunds.simulateSellAll(clonedRevenue);
+  shares.simulateSellAll(clonedRevenue);
+  let needed = expenses + cashDeficit - netIncome;
+  let totalAvailable = Math.max(0, cash) + Math.max(0, pension.capital()) + Math.max(0, clonedRevenue.netIncome());
+  if (needed > totalAvailable + 0.01) {
+    liquidateAll();
+    return;
+  }
+  
   cashWithdraw = 0;
   let totalWithdraw = 0;
-  let startNetIncome = revenue.netIncome();
-
   for (let priority = 1; priority <= 4; priority++) {
-    while (expenses + cashDeficit - netIncome > 0.75) {
+    let loopCount = 0;
+    while (expenses + cashDeficit - netIncome >= 1) {
+      loopCount++;
+      if (loopCount > 50) {
+        break;
+      }
+      needed = expenses + cashDeficit - netIncome;
       let keepTrying = false;
-      let needed = expenses + cashDeficit - netIncome;
       let indexFundsCapital = indexFunds.capital();
       let sharesCapital = shares.capital();
-      let pensionCapital = pension.capital();
-      //      if (option === 1) console.log("Need "+Math.round(needed)+" (netIncome="+Math.round(netIncome)+" < Expenses="+Math.round(expenses)+"). Funds: cash="+Math.round(cash)+" (deficit="+Math.round(cashDeficit)+") Funds="+Math.round(FundsCapital)+" Shares="+Math.round(SharesCapital)+" pension="+Math.round(pensionCapital));
+      let pensionCapital = pension.capital();      
       switch (priority) {
         case cashPriority:
-          if (cash > 0) {
+          if (cash > 0.5) {
             cashWithdraw = Math.min(cash, needed);
             totalWithdraw += cashWithdraw;
             cash -= cashWithdraw;
-            //            console.log("... Withdrawing "+Math.round(cashWithdraw)+" from cash savings");
           };
           break;
         case pensionPriority:
-          if (pensionCapital > 0) {
+          if (pensionCapital > 0.5) {
             let withdraw = Math.min(pensionCapital, needed);
             totalWithdraw += withdraw;
             incomePrivatePension += pension.sell(withdraw);
-            //            console.log("... Withdrawing "+Math.round(withdraw)+" from pension");
             keepTrying = true;
           }
           break;
         case FundsPriority:
-          if (indexFundsCapital > 0) {
+          if (indexFundsCapital > 0.5) {
             let withdraw = Math.min(indexFundsCapital, needed);
             totalWithdraw += withdraw;
             incomeFundsRent += indexFunds.sell(withdraw);
-            //            console.log("... Withdrawing "+Math.round(withdraw)+" from index funds");
             keepTrying = true;
           }
           break;
         case SharesPriority:
-          if (sharesCapital > 0) {
+          if (sharesCapital > 0.5) {
             let withdraw = Math.min(sharesCapital, needed);
             totalWithdraw += withdraw;
             incomeSharesRent += shares.sell(withdraw);
-            //            console.log("... Withdrawing "+Math.round(withdraw)+" from Shares");
             keepTrying = true;
           }
           break;
         default:
       }
       netIncome = cashWithdraw + revenue.netIncome();
-      // console.log("netIncome: "+netIncome+"  delta: "+(netIncome-startNetIncome)+"  Withdraw: "+totalWithdraw);
       if (keepTrying == false) {
         break;
       }
@@ -398,6 +405,20 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
   }
 }
 
+function liquidateAll() {
+  cashWithdraw = cash;
+  cash = 0;
+  if (pension.capital() > 0) {
+    incomePrivatePension += pension.sell(pension.capital());
+  }
+  if (indexFunds.capital() > 0) {
+    incomeFundsRent += indexFunds.sell(indexFunds.capital());
+  }
+  if (shares.capital() > 0) {
+    incomeSharesRent += shares.sell(shares.capital());
+  }
+  netIncome = cashWithdraw + revenue.netIncome();
+}
 
 function initializeRealEstate() {
   realEstate = new RealEstate();

@@ -204,4 +204,35 @@ computeCGT() {
     this.cgt = tax;
   }
 
+  // Create a new Revenue instance with a deep copy of this one's state
+  clone() {
+    const copy = new Revenue();
+    // Clone gains (might be an array with string keys)
+    copy.gains = {};
+    for (let key of Object.keys(this.gains)) {
+      copy.gains[key] = this.gains[key];
+    }
+    // Clone primitive fields
+    copy.income = this.income;
+    copy.nonEuShares = this.nonEuShares;
+    copy.statePension = this.statePension;
+    copy.privatePension = this.privatePension;
+    copy.privatePensionLumpSum = this.privatePensionLumpSum;
+    copy.privatePensionLumpSumCount = this.privatePensionLumpSumCount;
+    copy.investmentIncome = this.investmentIncome;
+    copy.pensionContribAmount = this.pensionContribAmount;
+    copy.pensionContribRelief = this.pensionContribRelief;
+    copy.people = this.people;
+    // Clone arrays
+    copy.salaries = this.salaries.slice();
+    // Clone tax liabilities
+    copy.it = this.it;
+    copy.prsi = this.prsi;
+    copy.usc = this.usc;
+    copy.cgt = this.cgt;
+    // Clone marital/dependent flags
+    copy.married = this.married;
+    copy.dependentChildren = this.dependentChildren;
+    return copy;
+  }
 }
