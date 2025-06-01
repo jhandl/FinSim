@@ -1,4 +1,107 @@
 // Simple JavaScript for smooth scrolling and SPA navigation
+
+// Test if basic JavaScript is working on mobile (outside DOMContentLoaded)
+const testText = document.getElementById("podcast-text")
+if (testText) {
+  testText.textContent = "JS running"
+  setTimeout(() => {
+    setupPodcastButton()
+  }, 100)
+}
+
+// Simple podcast button setup outside DOMContentLoaded
+function setupPodcastButton() {
+  const podcastBtn = document.getElementById("podcast-btn")
+  const podcastAudio = document.getElementById("podcast-audio")
+  const podcastIcon = document.getElementById("podcast-icon")
+  const progressFill = document.getElementById("progress-fill")
+  const podcastText = document.getElementById("podcast-text")
+
+  let userHasInteracted = false
+
+  if (podcastBtn && podcastAudio && podcastText) {
+    podcastText.textContent = "Setup complete"
+    
+    const handlePlayPause = () => {
+      podcastText.textContent = "Clicked!"
+      
+      // Prime audio on first interaction for mobile
+      if (!userHasInteracted) {
+        userHasInteracted = true
+        podcastAudio.load()
+        // Small delay to let audio load, then try to play
+        setTimeout(() => {
+          attemptPlay()
+        }, 100)
+        return
+      }
+      
+      attemptPlay()
+    }
+    
+    const attemptPlay = () => {
+      if (podcastAudio.paused) {
+        podcastText.textContent = "Playing..."
+        const playPromise = podcastAudio.play()
+        
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            podcastBtn.classList.add("playing")
+            podcastIcon.className = "fas fa-pause"
+            podcastText.textContent = "0:00 / 0:00"
+          }).catch((error) => {
+            if (error.name === 'NotAllowedError') {
+              // Mobile autoplay restriction - user needs to interact first
+              podcastText.textContent = "Tap again to play"
+              setTimeout(() => {
+                podcastText.textContent = "Listen"
+              }, 2000)
+            } else {
+              podcastText.textContent = `Failed: ${error.name}`
+              setTimeout(() => {
+                podcastText.textContent = "Listen"
+              }, 3000)
+            }
+          })
+        } else {
+          podcastBtn.classList.add("playing")
+          podcastIcon.className = "fas fa-pause"
+          podcastText.textContent = "0:00 / 0:00"
+        }
+      } else {
+        podcastAudio.pause()
+        podcastBtn.classList.remove("playing")
+        podcastIcon.className = "fas fa-play"
+        podcastText.textContent = "Listen"
+      }
+    }
+
+    // Use touchstart for better mobile responsiveness
+    podcastBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      handlePlayPause()
+    })
+    
+    // Keep click for desktop
+    podcastBtn.addEventListener("click", (e) => {
+      // Only fire if this wasn't already handled by touch
+      if (e.detail === 0) { // Mouse click has detail=0, synthetic clicks have detail>0
+        handlePlayPause()
+      }
+    })
+    
+    setTimeout(() => {
+      podcastText.textContent = "Listen"
+    }, 1000)
+  } else {
+    podcastText.textContent = "Elements missing"
+    setTimeout(() => {
+      podcastText.textContent = "Listen"
+    }, 2000)
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   // Handle scroll links
   document.querySelectorAll('[data-scroll-to]').forEach(link => {
@@ -97,18 +200,62 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  // Test if JavaScript and DOM elements are working on mobile
+  if (podcastText) {
+    podcastText.textContent = "Ready"
+    setTimeout(() => {
+      if (podcastBtn && podcastAudio) {
+        podcastText.textContent = "Elements found"
+      } else {
+        podcastText.textContent = "Missing elements"
+      }
+    }, 500)
+    setTimeout(() => {
+      podcastText.textContent = "Listen"
+    }, 1500)
+  }
+
   if (podcastBtn && podcastAudio) {
-    podcastBtn.addEventListener("click", () => {
+    const handlePlayPause = () => {
+      // Show debug info in button text
+      podcastText.textContent = "Clicked..."
+      
       if (podcastAudio.paused) {
-        podcastAudio.play()
-        podcastBtn.classList.add("playing")
-        podcastIcon.className = "fas fa-pause"
+        podcastText.textContent = "Playing..."
+        const playPromise = podcastAudio.play()
+        
+        if (playPromise !== undefined) {
+          playPromise.then(() => {
+            // Success - audio is playing
+            podcastBtn.classList.add("playing")
+            podcastIcon.className = "fas fa-pause"
+            podcastText.textContent = "0:00 / 0:00" // Will be updated by timeupdate
+          }).catch((error) => {
+            // Failed - show error info
+            podcastText.textContent = `Failed: ${error.name}`
+            setTimeout(() => {
+              podcastText.textContent = "Listen"
+            }, 3000)
+          })
+        } else {
+          // Legacy browsers
+          podcastBtn.classList.add("playing")
+          podcastIcon.className = "fas fa-pause"
+          podcastText.textContent = "0:00 / 0:00"
+        }
       } else {
         podcastAudio.pause()
         podcastBtn.classList.remove("playing")
         podcastIcon.className = "fas fa-play"
         podcastText.textContent = "Listen"
       }
+    }
+
+    // Add both click and touch event listeners for mobile compatibility
+    podcastBtn.addEventListener("click", handlePlayPause)
+    podcastBtn.addEventListener("touchend", (e) => {
+      e.preventDefault() // Prevent click event from also firing
+      handlePlayPause()
     })
 
     // Update progress and time display
