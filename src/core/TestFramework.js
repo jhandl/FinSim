@@ -290,7 +290,41 @@ class TestFramework {
         }
         
         MockUIManager.prototype.updateProgress = function(status) {};
-        MockUIManager.prototype.updateDataSheet = function(runs) {};
+        MockUIManager.prototype.updateDataSheet = function(runs) {
+          // Apply Monte Carlo averaging if we did multiple runs
+          if (montecarlo && runs > 1) {
+            for (let i = 1; i <= row; i++) {
+              if (dataSheet[i]) {
+                // Average all accumulated values by dividing by the number of runs
+                dataSheet[i].age = dataSheet[i].age / runs;
+                dataSheet[i].year = dataSheet[i].year / runs;
+                dataSheet[i].incomeSalaries = dataSheet[i].incomeSalaries / runs;
+                dataSheet[i].incomeRSUs = dataSheet[i].incomeRSUs / runs;
+                dataSheet[i].incomeRentals = dataSheet[i].incomeRentals / runs;
+                dataSheet[i].incomePrivatePension = dataSheet[i].incomePrivatePension / runs;
+                dataSheet[i].incomeStatePension = dataSheet[i].incomeStatePension / runs;
+                dataSheet[i].incomeFundsRent = dataSheet[i].incomeFundsRent / runs;
+                dataSheet[i].incomeSharesRent = dataSheet[i].incomeSharesRent / runs;
+                dataSheet[i].incomeCash = dataSheet[i].incomeCash / runs;
+                dataSheet[i].realEstateCapital = dataSheet[i].realEstateCapital / runs;
+                dataSheet[i].netIncome = dataSheet[i].netIncome / runs;
+                dataSheet[i].expenses = dataSheet[i].expenses / runs;
+                dataSheet[i].savings = dataSheet[i].savings / runs;
+                dataSheet[i].pensionFund = dataSheet[i].pensionFund / runs;
+                dataSheet[i].cash = dataSheet[i].cash / runs;
+                dataSheet[i].indexFundsCapital = dataSheet[i].indexFundsCapital / runs;
+                dataSheet[i].sharesCapital = dataSheet[i].sharesCapital / runs;
+                dataSheet[i].pensionContribution = dataSheet[i].pensionContribution / runs;
+                dataSheet[i].withdrawalRate = dataSheet[i].withdrawalRate / runs;
+                dataSheet[i].it = dataSheet[i].it / runs;
+                dataSheet[i].prsi = dataSheet[i].prsi / runs;
+                dataSheet[i].usc = dataSheet[i].usc / runs;
+                dataSheet[i].cgt = dataSheet[i].cgt / runs;
+                dataSheet[i].worth = dataSheet[i].worth / runs;
+              }
+            }
+          }
+        };
         MockUIManager.prototype.updateStatusCell = function(successes, runs) {};
         MockUIManager.prototype.clearWarnings = function() {};
         MockUIManager.prototype.setStatus = function(status, color) {};
