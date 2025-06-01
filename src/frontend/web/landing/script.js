@@ -1,13 +1,9 @@
 // Simple JavaScript for smooth scrolling and SPA navigation
 
-// Test if basic JavaScript is working on mobile (outside DOMContentLoaded)
-const testText = document.getElementById("podcast-text")
-if (testText) {
-  testText.textContent = "JS running"
-  setTimeout(() => {
-    setupPodcastButton()
-  }, 100)
-}
+// Setup podcast button immediately
+setTimeout(() => {
+  setupPodcastButton()
+}, 100)
 
 // Simple podcast button setup outside DOMContentLoaded
 function setupPodcastButton() {
@@ -20,10 +16,7 @@ function setupPodcastButton() {
   let userHasInteracted = false
 
   if (podcastBtn && podcastAudio && podcastText) {
-    podcastText.textContent = "Setup complete"
-    
     const handlePlayPause = () => {
-      podcastText.textContent = "Clicked!"
       
       // Prime audio on first interaction for mobile
       if (!userHasInteracted) {
@@ -76,29 +69,55 @@ function setupPodcastButton() {
       }
     }
 
-    // Use touchstart for better mobile responsiveness
+    // Add both touch and click events - let the browser handle the conflicts
+    podcastBtn.addEventListener("click", handlePlayPause)
     podcastBtn.addEventListener("touchstart", (e) => {
       e.preventDefault()
       e.stopPropagation()
       handlePlayPause()
     })
-    
-    // Keep click for desktop
-    podcastBtn.addEventListener("click", (e) => {
-      // Only fire if this wasn't already handled by touch
-      if (e.detail === 0) { // Mouse click has detail=0, synthetic clicks have detail>0
-        handlePlayPause()
+
+    // Helper function to format time
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60)
+      const secs = Math.floor(seconds % 60)
+      return `${mins}:${secs.toString().padStart(2, '0')}`
+    }
+
+    // Update progress and time display
+    podcastAudio.addEventListener("timeupdate", () => {
+      if (podcastAudio.duration) {
+        const progress = (podcastAudio.currentTime / podcastAudio.duration) * 100
+        progressFill.style.width = `${progress}%`
+        
+        if (podcastBtn.classList.contains("playing")) {
+          const currentTime = formatTime(podcastAudio.currentTime)
+          const duration = formatTime(podcastAudio.duration)
+          podcastText.textContent = `${currentTime} / ${duration}`
+        }
       }
     })
+
+    // Initialize duration display when metadata loads
+    podcastAudio.addEventListener("loadedmetadata", () => {
+      const duration = formatTime(podcastAudio.duration)
+      podcastBtn.title = `Listen to podcast about the simulator (${duration})`
+    })
+
+    // Reset button when audio ends
+    podcastAudio.addEventListener("ended", () => {
+      podcastBtn.classList.remove("playing")
+      podcastIcon.className = "fas fa-play"
+      progressFill.style.width = "0%"
+      podcastText.textContent = "Listen"
+    })
+
+    // Handle audio loading errors gracefully
+    podcastAudio.addEventListener("error", () => {
+      console.warn("Podcast audio could not be loaded")
+      podcastBtn.style.display = "none" // Hide button if audio fails to load
+    })
     
-    setTimeout(() => {
-      podcastText.textContent = "Listen"
-    }, 1000)
-  } else {
-    podcastText.textContent = "Elements missing"
-    setTimeout(() => {
-      podcastText.textContent = "Listen"
-    }, 2000)
   }
 }
 
@@ -193,105 +212,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const progressFill = document.getElementById("progress-fill")
   const podcastText = document.getElementById("podcast-text")
 
-  // Helper function to format time
-  function formatTime(seconds) {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
 
-  // Test if JavaScript and DOM elements are working on mobile
-  if (podcastText) {
-    podcastText.textContent = "Ready"
-    setTimeout(() => {
-      if (podcastBtn && podcastAudio) {
-        podcastText.textContent = "Elements found"
-      } else {
-        podcastText.textContent = "Missing elements"
-      }
-    }, 500)
-    setTimeout(() => {
-      podcastText.textContent = "Listen"
-    }, 1500)
-  }
-
-  if (podcastBtn && podcastAudio) {
-    const handlePlayPause = () => {
-      // Show debug info in button text
-      podcastText.textContent = "Clicked..."
-      
-      if (podcastAudio.paused) {
-        podcastText.textContent = "Playing..."
-        const playPromise = podcastAudio.play()
-        
-        if (playPromise !== undefined) {
-          playPromise.then(() => {
-            // Success - audio is playing
-            podcastBtn.classList.add("playing")
-            podcastIcon.className = "fas fa-pause"
-            podcastText.textContent = "0:00 / 0:00" // Will be updated by timeupdate
-          }).catch((error) => {
-            // Failed - show error info
-            podcastText.textContent = `Failed: ${error.name}`
-            setTimeout(() => {
-              podcastText.textContent = "Listen"
-            }, 3000)
-          })
-        } else {
-          // Legacy browsers
-          podcastBtn.classList.add("playing")
-          podcastIcon.className = "fas fa-pause"
-          podcastText.textContent = "0:00 / 0:00"
-        }
-      } else {
-        podcastAudio.pause()
-        podcastBtn.classList.remove("playing")
-        podcastIcon.className = "fas fa-play"
-        podcastText.textContent = "Listen"
-      }
-    }
-
-    // Add both click and touch event listeners for mobile compatibility
-    podcastBtn.addEventListener("click", handlePlayPause)
-    podcastBtn.addEventListener("touchend", (e) => {
-      e.preventDefault() // Prevent click event from also firing
-      handlePlayPause()
-    })
-
-    // Update progress and time display
-    podcastAudio.addEventListener("timeupdate", () => {
-      if (podcastAudio.duration) {
-        const progress = (podcastAudio.currentTime / podcastAudio.duration) * 100
-        progressFill.style.width = `${progress}%`
-        
-        if (podcastBtn.classList.contains("playing")) {
-          const currentTime = formatTime(podcastAudio.currentTime)
-          const duration = formatTime(podcastAudio.duration)
-          podcastText.textContent = `${currentTime} / ${duration}`
-        }
-      }
-    })
-
-    // Initialize duration display when metadata loads
-    podcastAudio.addEventListener("loadedmetadata", () => {
-      const duration = formatTime(podcastAudio.duration)
-      podcastBtn.title = `Listen to podcast about the simulator (${duration})`
-    })
-
-    // Reset button when audio ends
-    podcastAudio.addEventListener("ended", () => {
-      podcastBtn.classList.remove("playing")
-      podcastIcon.className = "fas fa-play"
-      progressFill.style.width = "0%"
-      podcastText.textContent = "Listen"
-    })
-
-    // Handle audio loading errors gracefully
-    podcastAudio.addEventListener("error", () => {
-      console.warn("Podcast audio could not be loaded")
-      podcastBtn.style.display = "none" // Hide button if audio fails to load
-    })
-  }
 
   // Newsletter form handling
   const newsletterForm = document.getElementById("newsletter-form")
