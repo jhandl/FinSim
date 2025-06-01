@@ -62,8 +62,8 @@ module.exports = {
       target: 'final',
       field: 'sharesCapital',
       expected: {
-        min: 250000,              // Allow for Monte Carlo median variation
-        max: 320000               // Median range based on observed ~€281k result
+        min: 450000,              // Allow for Monte Carlo median variation (updated based on 21-year period)
+        max: 550000               // Median range around deterministic baseline of ~€503k
       }
     },
 
@@ -85,7 +85,7 @@ module.exports = {
       field: 'sharesCapital',
       expected: {
         operator: '<',
-        value: 400000             // No extreme high outliers with median across 5000 runs
+        value: 600000             // No extreme high outliers with median across 5000 runs (updated)
       }
     },
 
@@ -96,7 +96,7 @@ module.exports = {
       field: 'sharesCapital',
       expected: {
         operator: '>',
-        value: 200000             // Median prevents extreme low outliers
+        value: 400000             // Median prevents extreme low outliers (updated)
       }
     },
 
@@ -121,14 +121,14 @@ module.exports = {
     },
 
     // Test 7: Monte Carlo median result should be in realistic range
-    // Based on median calculation showing ~€281k result
+    // Based on median calculation showing updated results for 21-year period
     {
       type: 'comparison',
       target: 'final',
       field: 'sharesCapital',
       expected: {
         operator: '>',
-        value: 220000             // Should be substantially higher than initial €100k
+        value: 400000             // Should be substantially higher than initial €100k (updated)
       }
     },
 
@@ -138,8 +138,8 @@ module.exports = {
       target: 'final',
       field: 'worth',
       expected: {
-        min: 260000,              // Cash (~€10k) + shares (€250k-€320k range)
-        max: 330000
+        min: 460000,              // Cash (~€10k) + shares (€450k-€550k range)
+        max: 560000
       }
     },
 
@@ -168,7 +168,7 @@ module.exports = {
       field: 'sharesCapital',
       expected: {
         operator: '<',
-        value: 400000             // Upper bound - median is more conservative than mean
+        value: 600000             // Upper bound - median is more conservative than mean (updated)
       }
     }
   ]
