@@ -605,16 +605,15 @@ footer .container {
   }
 
   .hero-title {
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
+    justify-content: center;
+    gap: 20px;
   }
 
   /* Mobile podcast button optimizations */
   .podcast-button {
-    padding: 12px 16px; /* Larger touch target */
-    font-size: 0.9rem; /* Slightly larger text */
-    min-height: 44px; /* iOS recommended minimum touch target */
+    padding: 8px 12px; /* Modestly larger touch target */
+    font-size: 0.85rem; /* Slightly larger text */
+    min-height: 40px; /* iOS recommended minimum touch target */
     touch-action: manipulation; /* Prevent double-tap zoom */
     -webkit-tap-highlight-color: transparent; /* Remove iOS tap highlight */
     pointer-events: auto; /* Ensure touch events work */
@@ -690,6 +689,10 @@ footer .container {
     padding: 40px 0;
   }
 
+  .hero-title {
+    gap: 15px;
+  }
+
   .feature-card {
     padding: 20px;
   }
@@ -723,6 +726,10 @@ footer .container {
 
   .hero-content h2 {
     font-size: 1.6rem; /* Less aggressive reduction */
+  }
+
+  .hero-title {
+    gap: 10px;
   }
 }
 
