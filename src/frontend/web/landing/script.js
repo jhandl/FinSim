@@ -75,7 +75,7 @@ function setupPodcastButton() {
       e.preventDefault()
       e.stopPropagation()
       handlePlayPause()
-    })
+    }, { passive: false })
 
     // Helper function to format time
     function formatTime(seconds) {
@@ -144,42 +144,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Simple responsive menu toggle (if needed for smaller screens)
-  const createResponsiveMenu = () => {
-    const headerContainer = document.querySelector("header .container")
-    const nav = document.querySelector("nav")
-
-    if (window.innerWidth <= 768 && !document.querySelector(".menu-toggle")) {
-      const menuToggle = document.createElement("button")
-      menuToggle.classList.add("menu-toggle")
-      menuToggle.innerHTML = '<i class="fas fa-bars"></i>'
-      headerContainer.insertBefore(menuToggle, nav)
-
-      nav.style.display = "none"
-
-      menuToggle.addEventListener("click", () => {
-        if (nav.style.display === "none") {
-          nav.style.display = "block"
-          menuToggle.innerHTML = '<i class="fas fa-times"></i>'
-        } else {
-          nav.style.display = "none"
-          menuToggle.innerHTML = '<i class="fas fa-bars"></i>'
-        }
-      })
-    } else if (window.innerWidth > 768) {
-      const menuToggle = document.querySelector(".menu-toggle")
-      if (menuToggle) {
-        menuToggle.remove()
-      }
-      if (nav) {
-        nav.style.display = "block"
-      }
-    }
-  }
-
-  // Call on load and resize
-  createResponsiveMenu()
-  window.addEventListener("resize", createResponsiveMenu)
+  // Responsive menu toggle removed as requested
 
   // Fix iOS Safari zoom on orientation change
   function preventZoomOnOrientationChange() {
