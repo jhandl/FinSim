@@ -653,7 +653,7 @@
                         showTooltip(this);
                     }
                 }
-            });
+            }, { passive: false });
         });
         
         // Hide tooltip when touching/clicking elsewhere
@@ -664,7 +664,7 @@
                     hideTooltip();
                 }
             }
-        });
+        }, { passive: true });
         
         document.addEventListener('click', function(e) {
             const isColumnHeader = e.target.closest('#Data th[data-tooltip]');
@@ -678,7 +678,7 @@
             if (activeTooltip) {
                 hideTooltip();
             }
-        });
+        }, { passive: true });
         
         // Hide tooltip on orientation change and window resize
         window.addEventListener('orientationchange', function() {

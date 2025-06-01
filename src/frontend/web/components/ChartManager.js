@@ -49,6 +49,8 @@ class ChartManager {
       const commonOptions = {
         responsive: true,
         maintainAspectRatio: false,
+        // Reduce event listeners to minimize non-passive warnings
+        events: ['mousemove', 'mouseout', 'click'],
         interaction: {
           mode: 'index',
           intersect: false
