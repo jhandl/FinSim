@@ -281,7 +281,7 @@ cd /path/to/FinSim/src
 **Gen-AI Coder Prompts:**
 
 8.  "Create regression tests in `TestRegression.js` that establish baseline scenarios and capture their outputs as 'golden' standards. Start with the existing demo.csv scenario and create additional comprehensive scenarios. These tests should detect any unintended changes in future versions while allowing for easy updates when tax rules change."
-    **Status: Not Started**
+    **Status: Complete**
 
 9.  "Implement Irish tax system validation tests in `TestIrishTaxSystem.js` that verify all tax calculations against current Irish tax rules. Structure tests to make tax rates and thresholds easily configurable through constants at the top of test files. Include tests for all tax bands, credits, allowances, and special cases like marriage tax benefits. Document expected tax calculations clearly for future maintenance."
     **Status: Not Started**
