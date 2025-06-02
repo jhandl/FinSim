@@ -341,7 +341,10 @@ class TestFramework {
             // Load the actual config file
             var fs = require('fs');
             var path = require('path');
-            var configPath = '${CONFIG_PATH}';
+            // Use the global CONFIG_PATH defined in TestFramework.js
+            // We need to pass it into this scope or reconstruct it.
+            // Simpler to reconstruct here if __dirname is the TestFramework.js dir
+            var configPath = path.join(__dirname, 'config', 'finance-simulation-config-1.26.json');
             return fs.readFileSync(configPath, 'utf8');
           },
           showAlert: function(msg) { console.warn(msg); },
@@ -835,6 +838,11 @@ class TestFramework {
     const results = await this.runSimulation();
     if (!results) {
       return { success: false, error: 'Simulation failed', report: this.generateReport(reportFormat) };
+    }
+
+    // Call debug output function if it exists in the scenario definition
+    if (scenarioDefinition.debugOutput && typeof scenarioDefinition.debugOutput === 'function') {
+      scenarioDefinition.debugOutput(results.dataSheet);
     }
 
     const validationResults = this.validateAssertions();

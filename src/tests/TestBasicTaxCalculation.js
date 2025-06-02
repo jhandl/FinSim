@@ -7,11 +7,11 @@
  * PRSI is 4% of income, USC is calculated correctly, and net income equals gross minus all taxes."
  *
  * This test validates the core Irish tax system calculations including:
- * - Income Tax (20% standard rate, €42,000 standard rate band for 2024)
+ * - Income Tax (20% standard rate, €44,000 standard rate band for 2025)
  * - PRSI (4% for employees)
  * - USC (Universal Social Charge) on graduated bands
- * - Personal tax credit (€1,875 for 2024)
- * - PRSI tax credit (€12 for 2024)
+ * - Personal tax credit (€2,000 for 2025)
+ * - PRSI tax credit (€12 for 2025)
  */
 
 module.exports = {
@@ -66,7 +66,7 @@ module.exports = {
 
   assertions: [
     // Test Income Tax calculation (actual value from real Irish tax system)
-    // Real calculation using 2026 Irish tax bands and credits
+    // Real calculation using 2025 Irish tax bands and credits
     {
       type: 'exact_value',
       target: 'age',
@@ -76,7 +76,7 @@ module.exports = {
       tolerance: 10                // Allow €10 tolerance for rounding
     },
 
-    // Test PRSI calculation (4.1% of gross income in 2026)
+    // Test PRSI calculation (4.1% of gross income in 2025)
     // €50,000 * 4.1% = €2,050 PRSI
     {
       type: 'exact_value',
@@ -88,7 +88,7 @@ module.exports = {
     },
 
     // Test USC calculation (actual rates from config)
-    // Real USC calculation using 2026 bands
+    // Real USC calculation using 2025 bands
     {
       type: 'exact_value',
       target: 'age',

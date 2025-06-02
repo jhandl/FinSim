@@ -17,6 +17,7 @@
 - New event: period of high inflation.
 - New event: increase pension contribution rate.
 - New event: pay off mortgage.
+- Record the median age of failure in montecarlo runs.
 
 ### SEO
 - "Educational Sandbox", "What if lab", "not a crystal ball", "Personbal Finance Lab", "Learn by doing, experimenting, and visualizing"

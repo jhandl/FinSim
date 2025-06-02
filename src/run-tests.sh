@@ -72,26 +72,49 @@ run_test() {
         const { TestFramework } = require('./TestFramework.js');
         const testDefinition = require('$test_file');
         
-        const framework = new TestFramework();
-        framework.setVerbose(false);
-        
-        framework.runCompleteTest(testDefinition, 'console')
-            .then(result => {
-                if (result.success) {
-                    console.log('✅ PASSED: $test_name');
-                    process.exit(0);
-                } else {
-                    console.log('❌ FAILED: $test_name');
-                    if (result.report) {
-                        console.log(result.report);
+        // Check if this is a custom test
+        if (testDefinition.isCustomTest && testDefinition.runCustomTest) {
+            // Run custom test directly
+            testDefinition.runCustomTest()
+                .then(result => {
+                    if (result.success) {
+                        console.log('✅ PASSED: $test_name');
+                        process.exit(0);
+                    } else {
+                        console.log('❌ FAILED: $test_name');
+                        if (result.errors && result.errors.length > 0) {
+                            result.errors.forEach(error => console.log('  Error: ' + error));
+                        }
+                        process.exit(1);
                     }
+                })
+                .catch(error => {
+                    console.error('❌ ERROR: $test_name - ' + error.message);
                     process.exit(1);
-                }
-            })
-            .catch(error => {
-                console.error('❌ ERROR: $test_name - ' + error.message);
-                process.exit(1);
-            });
+                });
+        } else {
+            // Use standard test framework
+            const framework = new TestFramework();
+            framework.setVerbose(false);
+            
+            framework.runCompleteTest(testDefinition, 'console')
+                .then(result => {
+                    if (result.success) {
+                        console.log('✅ PASSED: $test_name');
+                        process.exit(0);
+                    } else {
+                        console.log('❌ FAILED: $test_name');
+                        if (result.report) {
+                            console.log(result.report);
+                        }
+                        process.exit(1);
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ ERROR: $test_name - ' + error.message);
+                    process.exit(1);
+                });
+        }
     "
 }
 
