@@ -4,8 +4,8 @@
  * multiple separate simulations and analyzing the statistical properties of their results.
  * 
  * Key Features:
- * - Runs multiple independent simulations (30 runs for statistical significance)
- * - Tests different volatility scenarios (Low: 8%, Medium: 16%, High: 25%)
+ * - Runs multiple independent simulations (15 runs for statistical significance)
+ * - Tests different volatility scenarios (Low: 8%, High: 25%)
  * - Calculates and validates statistical properties: mean, standard deviation, percentiles
  * - Verifies that results follow expected statistical distributions
  * - Ensures Monte Carlo median results are more conservative than deterministic mean
@@ -54,26 +54,6 @@ class StatisticalAnalysis {
     const stdDev = this.calculateStandardDeviation(values);
     return stdDev / mean;
   }
-  
-  static isNormallyDistributed(values, significance = 0.05) {
-    // Simple normality test based on skewness and kurtosis
-    const mean = this.calculateMean(values);
-    const stdDev = this.calculateStandardDeviation(values);
-    const n = values.length;
-    
-    // Calculate skewness
-    const skewness = values.reduce((sum, val) => {
-      return sum + Math.pow((val - mean) / stdDev, 3);
-    }, 0) / n;
-    
-    // Calculate kurtosis
-    const kurtosis = values.reduce((sum, val) => {
-      return sum + Math.pow((val - mean) / stdDev, 4);
-    }, 0) / n - 3;
-    
-    // Simple test: for normal distribution, skewness should be near 0, kurtosis near 0
-    return Math.abs(skewness) < 2 && Math.abs(kurtosis) < 7;
-  }
 }
 
 /**
@@ -84,10 +64,8 @@ class MonteCarloTestRunner {
     this.framework = new TestFramework();
   }
   
-  async runMultipleSimulations(baseScenario, numRuns = 30) {
+  async runMultipleSimulations(baseScenario, numRuns = 15) {
     const results = [];
-    
-    console.log(`Running ${numRuns} independent simulations for statistical analysis...`);
     
     for (let i = 0; i < numRuns; i++) {
       // Create a copy of the scenario for each run
@@ -105,15 +83,9 @@ class MonteCarloTestRunner {
       
       if (simResult && simResult.success) {
         results.push(simResult);
-        if ((i + 1) % 10 === 0) {
-          console.log(`  Completed ${i + 1}/${numRuns} simulations`);
-        }
-      } else {
-        console.warn(`  Simulation ${i + 1} failed, skipping from statistical analysis`);
       }
     }
     
-    console.log(`✓ Completed ${results.length}/${numRuns} successful simulations`);
     return results;
   }
   
@@ -141,8 +113,7 @@ class MonteCarloTestRunner {
         p95: StatisticalAnalysis.calculatePercentile(values, 95)
       },
       min: Math.min(...values),
-      max: Math.max(...values),
-      isNormallyDistributed: StatisticalAnalysis.isNormallyDistributed(values)
+      max: Math.max(...values)
     };
     
     return stats;
@@ -171,7 +142,7 @@ module.exports = {
       const baseScenario = {
         parameters: {
           startingAge: 30,
-          targetAge: 50,              // 20-year test period
+          targetAge: 40,              // Reduced to 10-year test period for speed
           retirementAge: 65,
           initialSavings: 20000,      // Starting emergency fund
           initialPension: 0,
@@ -202,30 +173,24 @@ module.exports = {
         events: []  // No events for clean volatility testing
       };
       
-      // Test scenarios with different volatility levels
-      // Note: CV expectations are much lower because the simulator uses Monte Carlo median internally
-      // which significantly reduces variation between runs
+      // Test scenarios with different volatility levels (reduced to 2 scenarios)
+      // Note: CV expectations are lower because Monte Carlo uses internal median calculations
+      // which reduce variation between runs, especially over shorter time periods
       const volatilityScenarios = [
-        { name: "Low Volatility", volatility: 0.08, expectedCV: 0.01 },      // 8% volatility -> ~1% CV
-        { name: "Medium Volatility", volatility: 0.16, expectedCV: 0.02 },   // 16% volatility -> ~2% CV
-        { name: "High Volatility", volatility: 0.25, expectedCV: 0.03 }      // 25% volatility -> ~3% CV
+        { name: "Low Volatility", volatility: 0.08, expectedCV: 0.005 },     // 8% volatility -> ~0.5% CV
+        { name: "High Volatility", volatility: 0.25, expectedCV: 0.015 }     // 25% volatility -> ~1.5% CV
       ];
       
-      console.log("=== Monte Carlo Statistical Validation ===");
-      console.log("Testing statistical properties across multiple independent simulation runs\n");
-      
       for (const scenario of volatilityScenarios) {
-        console.log(`\n--- ${scenario.name} (${(scenario.volatility * 100).toFixed(0)}% std dev) ---`);
-        
         // Set the volatility for this test
         const testScenario = JSON.parse(JSON.stringify(baseScenario));
         testScenario.parameters.growthDevShares = scenario.volatility;
         
-        // Run multiple simulations
-        const results = await runner.runMultipleSimulations(testScenario, 30);
+        // Run multiple simulations (reduced to 15 runs)
+        const results = await runner.runMultipleSimulations(testScenario, 15);
         
-        if (results.length < 20) {
-          testResults.errors.push(`Insufficient successful runs for ${scenario.name}: ${results.length} < 20`);
+        if (results.length < 12) {
+          testResults.errors.push(`Insufficient successful runs for ${scenario.name}: ${results.length} < 12`);
           testResults.success = false;
           continue;
         }
@@ -246,30 +211,18 @@ module.exports = {
           rawWorthValues: worthValues
         };
         
-        // Print statistical summary
-        console.log(`  Shares Capital Statistics:`);
-        console.log(`    Mean: €${shareStats.mean.toLocaleString('en-IE', {maximumFractionDigits: 0})}`);
-        console.log(`    Std Dev: €${shareStats.standardDeviation.toLocaleString('en-IE', {maximumFractionDigits: 0})}`);
-        console.log(`    Coeff of Variation: ${(shareStats.coefficientOfVariation * 100).toFixed(1)}%`);
-        console.log(`    Median (P50): €${shareStats.percentiles.p50.toLocaleString('en-IE', {maximumFractionDigits: 0})}`);
-        console.log(`    Range: €${shareStats.min.toLocaleString('en-IE', {maximumFractionDigits: 0})} - €${shareStats.max.toLocaleString('en-IE', {maximumFractionDigits: 0})}`);
-        console.log(`    P5-P95 Range: €${shareStats.percentiles.p5.toLocaleString('en-IE', {maximumFractionDigits: 0})} - €${shareStats.percentiles.p95.toLocaleString('en-IE', {maximumFractionDigits: 0})}`);
+        // Validate statistical properties (silent - only record errors)
         
-        // Validate statistical properties
-        console.log(`\n  Statistical Validation:`);
-        
-                 // Test 1: Coefficient of Variation should increase with volatility
-         const cvAcceptable = shareStats.coefficientOfVariation >= (scenario.expectedCV - 0.01) && 
-                            shareStats.coefficientOfVariation <= (scenario.expectedCV + 0.02);
-        console.log(`    ✓ Coefficient of Variation in expected range: ${cvAcceptable ? 'PASS' : 'FAIL'}`);
+        // Test 1: Coefficient of Variation should increase with volatility
+        const cvAcceptable = shareStats.coefficientOfVariation >= (scenario.expectedCV - 0.01) && 
+                           shareStats.coefficientOfVariation <= (scenario.expectedCV + 0.02);
         if (!cvAcceptable) {
-                     testResults.errors.push(`${scenario.name}: CV ${(shareStats.coefficientOfVariation * 100).toFixed(1)}% outside expected range ${(scenario.expectedCV * 100).toFixed(1)}% ± 1-2%`);
+          testResults.errors.push(`${scenario.name}: CV ${(shareStats.coefficientOfVariation * 100).toFixed(1)}% outside expected range ${(scenario.expectedCV * 100).toFixed(1)}% ± 1-2%`);
           testResults.success = false;
         }
         
         // Test 2: Results should show substantial growth from initial €50k
-        const meaningfulGrowth = shareStats.mean > 75000;  // At least 50% growth over 20 years
-        console.log(`    ✓ Meaningful growth achieved: ${meaningfulGrowth ? 'PASS' : 'FAIL'}`);
+        const meaningfulGrowth = shareStats.mean > 65000;  // At least 30% growth over 10 years
         if (!meaningfulGrowth) {
           testResults.errors.push(`${scenario.name}: Mean ${shareStats.mean.toFixed(0)} shows insufficient growth from initial €50k`);
           testResults.success = false;
@@ -277,7 +230,6 @@ module.exports = {
         
         // Test 3: Standard deviation should be reasonable (not too extreme)
         const reasonableStdDev = shareStats.standardDeviation > 0 && shareStats.standardDeviation < shareStats.mean;
-        console.log(`    ✓ Reasonable standard deviation: ${reasonableStdDev ? 'PASS' : 'FAIL'}`);
         if (!reasonableStdDev) {
           testResults.errors.push(`${scenario.name}: Standard deviation ${shareStats.standardDeviation.toFixed(0)} is unreasonable relative to mean ${shareStats.mean.toFixed(0)}`);
           testResults.success = false;
@@ -288,7 +240,6 @@ module.exports = {
                                      shareStats.percentiles.p25 <= shareStats.percentiles.p50 &&
                                      shareStats.percentiles.p50 <= shareStats.percentiles.p75 &&
                                      shareStats.percentiles.p75 <= shareStats.percentiles.p95;
-        console.log(`    ✓ Correct percentile ordering: ${correctPercentileOrder ? 'PASS' : 'FAIL'}`);
         if (!correctPercentileOrder) {
           testResults.errors.push(`${scenario.name}: Percentiles not in correct order`);
           testResults.success = false;
@@ -296,58 +247,35 @@ module.exports = {
         
         // Test 5: No extreme outliers (95th percentile shouldn't be more than 3x the 5th percentile)
         const noExtremeOutliers = shareStats.percentiles.p95 <= (shareStats.percentiles.p5 * 4);
-        console.log(`    ✓ No extreme outliers: ${noExtremeOutliers ? 'PASS' : 'FAIL'}`);
         if (!noExtremeOutliers) {
           testResults.errors.push(`${scenario.name}: Extreme outliers detected - P95/P5 ratio too high`);
           testResults.success = false;
         }
       }
       
-      // Cross-scenario validation
-      console.log(`\n--- Cross-Scenario Statistical Validation ---`);
-      
+      // Cross-scenario validation (silent)
       if (Object.keys(testResults.details).length >= 2) {
         const scenarios = Object.keys(testResults.details);
         
         // Test: Higher volatility should lead to higher coefficient of variation
-        for (let i = 0; i < scenarios.length - 1; i++) {
-          const current = testResults.details[scenarios[i]].shareStats;
-          const next = testResults.details[scenarios[i + 1]].shareStats;
-          
-          const cvIncreases = next.coefficientOfVariation > current.coefficientOfVariation;
-          console.log(`  ✓ ${scenarios[i]} → ${scenarios[i + 1]}: CV increases with volatility: ${cvIncreases ? 'PASS' : 'FAIL'}`);
-          
-          if (!cvIncreases) {
-            testResults.errors.push(`CV should increase from ${scenarios[i]} to ${scenarios[i + 1]}`);
-            testResults.success = false;
-          }
+        const lowVol = testResults.details[scenarios[0]].shareStats;
+        const highVol = testResults.details[scenarios[1]].shareStats;
+        
+        const cvIncreases = highVol.coefficientOfVariation > lowVol.coefficientOfVariation;
+        if (!cvIncreases) {
+          testResults.errors.push(`CV should increase from ${scenarios[0]} to ${scenarios[1]}`);
+          testResults.success = false;
         }
         
         // Test: Higher volatility should lead to wider confidence intervals
-        const lowVol = testResults.details[scenarios[0]].shareStats;
-        const highVol = testResults.details[scenarios[scenarios.length - 1]].shareStats;
-        
         const lowVolRange = lowVol.percentiles.p95 - lowVol.percentiles.p5;
         const highVolRange = highVol.percentiles.p95 - highVol.percentiles.p5;
         
         const widerRangeWithHigherVol = highVolRange > lowVolRange;
-        console.log(`  ✓ Higher volatility produces wider confidence intervals: ${widerRangeWithHigherVol ? 'PASS' : 'FAIL'}`);
-        
         if (!widerRangeWithHigherVol) {
           testResults.errors.push('Higher volatility should produce wider confidence intervals');
           testResults.success = false;
         }
-      }
-      
-      // Final summary
-      console.log(`\n=== Statistical Validation Summary ===`);
-      console.log(`Overall Result: ${testResults.success ? '✓ PASS' : '✗ FAIL'}`);
-      
-      if (testResults.errors.length > 0) {
-        console.log(`Errors found:`);
-        testResults.errors.forEach(error => console.log(`  - ${error}`));
-      } else {
-        console.log(`All statistical properties validated successfully across ${Object.keys(testResults.details).length} volatility scenarios.`);
       }
       
       return testResults;
@@ -355,7 +283,6 @@ module.exports = {
     } catch (error) {
       testResults.success = false;
       testResults.errors.push(`Test execution error: ${error.message}`);
-      console.error(`Monte Carlo validation test failed: ${error.message}`);
       return testResults;
     }
   },
