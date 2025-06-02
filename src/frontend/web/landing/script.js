@@ -101,7 +101,7 @@ function setupPodcastButton() {
     // Initialize duration display when metadata loads
     podcastAudio.addEventListener("loadedmetadata", () => {
       const duration = formatTime(podcastAudio.duration)
-      podcastBtn.title = `Listen to podcast about the simulator (${duration})`
+      podcastBtn.title = `A short podcast about the simulator, created with NotebookLM`
     })
 
     // Reset button when audio ends
