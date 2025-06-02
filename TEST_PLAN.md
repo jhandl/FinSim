@@ -284,7 +284,7 @@ cd /path/to/FinSim/src
     **Status: Complete**
 
 9.  "Implement Irish tax system validation tests in `TestIrishTaxSystem.js` that verify all tax calculations against current Irish tax rules. Structure tests to make tax rates and thresholds easily configurable through constants at the top of test files. Include tests for all tax bands, credits, allowances, and special cases like marriage tax benefits. Document expected tax calculations clearly for future maintenance."
-    **Status: Not Started**
+    **Status: Complete**
 
 10. "Create accuracy and robustness tests in `TestAccuracyRobustness.js` that validate calculation precision and system behavior under extreme conditions. Prioritize thoroughness over speed - include comprehensive tests for very long simulations (100+ years), high-value scenarios (millions in assets), and edge cases like very small amounts or unusual combinations of events."
     **Status: Not Started**
