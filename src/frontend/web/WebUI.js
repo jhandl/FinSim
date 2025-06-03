@@ -8,6 +8,9 @@ class WebUI extends AbstractUI {
     try {
       super();
       
+      // Initialize simulation state tracking
+      this.isSimulationRunning = false;
+      
       // Initialize in a specific order to ensure dependencies are met
       this.formatUtils = new FormatUtils();
       this.notificationUtils = new NotificationUtils();
@@ -193,23 +196,39 @@ class WebUI extends AbstractUI {
     const runButton = document.getElementById('runSimulation');
     if (!runButton) return;
 
-    runButton.addEventListener('click', () => {
+    // Use a more comprehensive event handler that prevents multiple rapid triggers
+    this.handleRunSimulation = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (this.isSimulationRunning || runButton.disabled) {
+        return; // Don't start another simulation
+      }
+
+      this.isSimulationRunning = true;
       runButton.disabled = true;
       runButton.classList.add('disabled');
+      runButton.style.pointerEvents = 'none';      
       this.setStatus('Running...');
-      
+      runButton.offsetHeight; // This forces the browser to recalculate layout immediately
+
       // Use setTimeout to run after UI updates
       setTimeout(() => {
         try {
           run();
         } catch (error) {
           this.setError('Simulation failed: ' + error.message);
-        } finally {
+          // Re-enable button on error
+          this.isSimulationRunning = false;
           runButton.disabled = false;
           runButton.classList.remove('disabled');
+          runButton.style.pointerEvents = '';      
         }
+        // Note: Button re-enabling on success is handled in flush when simulation completes
       }, 0);
-    });
+    };
+
+    runButton.addEventListener('click', this.handleRunSimulation);
   }
 
   setupWizardInvocation() {
@@ -274,8 +293,19 @@ class WebUI extends AbstractUI {
     this.fileManager.clearScenarioName();
   }
 
-  flush() {
-    // No-op in web UI as changes are immediate
+  flush() {    
+    // flush() is called at the end of updateStatusCell, which signals simulation completion
+    if (this.isSimulationRunning) {
+      this.isSimulationRunning = false;
+      const runButton = document.getElementById('runSimulation');
+      if (runButton) {
+        setTimeout(() => {
+          runButton.disabled = false;
+          runButton.classList.remove('disabled');
+          runButton.style.pointerEvents = '';
+        }, 100);
+      }
+    }
   }
 }
 

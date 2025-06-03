@@ -102,7 +102,7 @@ footer {
 }
 
 
-@media (max-width: 2268px) {
+@media (max-width: 2110px) {
   main {
     width: 100%;
     grid-template-columns: minmax(auto, max-content) minmax(0, 1fr);
@@ -210,6 +210,23 @@ footer {
   }
 }
 
+@media (max-width: 663px) {
+  .parameters-section {
+    grid-template-columns: 1fr; /* Single column for parameters at smaller screens */
+    justify-content: stretch;
+  }
+
+  .events-section {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .graphs-section {
+    max-width: none;
+  }
+}
+
 @media (max-width: 834px) {
   header {
     flex-direction: column;
@@ -224,6 +241,9 @@ footer {
   /* Add top margin to main content to account for taller mobile header */
   main {
     margin-top: 5.75rem; /* Increased to provide more clearance for mobile header */
+    display: flex; /* Switch from grid to flex for mobile */
+    flex-direction: column; /* Stack items vertically */
+    gap: 1.8rem; /* Maintain spacing */
   }
 
   .header-left {
@@ -311,9 +331,20 @@ footer {
       width: 100%;
   }
 
+  /* Make graphs responsive to mobile screen width */
+  .graph-container {
+    width: 100%;
+    max-width: calc(100vw - 1.5rem); /* Account for main padding */
+    min-height: calc((100vw - 1.5rem) * 0.6); /* Proportional height based on width */
+    max-height: calc((100vw - 1.5rem) * 0.9); /* Proportional max height */
+  }
+
   /* Phase 3: Hide data table on mobile and show helpful message */
   .data-section {
     position: relative;
+    width: calc(100vw - 1.8rem); /* Now free to shrink independently */
+    max-width: calc(100vw - 1.8rem);
+    min-width: 0;
   }
 
   .data-section h2,
@@ -322,13 +353,13 @@ footer {
   }
 
   .data-section::after {
-    content: "📊 Simulation Data\A\AThe detailed data table is available on larger screens.\APlease use desktop mode or rotate your device.";
+    content: "📊 Simulation Data\A\AThe detailed data table is available on larger screens.\APlease use desktop mode or try landscape mode.";
     white-space: pre-line;
     display: block;
     padding: 1rem;
     text-align: center;
     background: var(--card-background);
-    border-radius: 7.2px;
+    border-radius: 4px;
     box-shadow: var(--box-shadow);
     color: #666;
     font-style: italic;
