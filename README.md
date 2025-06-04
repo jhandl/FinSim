@@ -5,7 +5,6 @@
 - The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?
 
 ### Improvements
-- Add tests. Each test is a serialized scenario, and the outcome is the data table and assertions about it.
 - Use both the marriage year and the number of incomes for income tax bands.
 - If year input field is empty or 0 assume infinite (not married, no children).
 - Allow leaving other fields empty, and use "0" if so.
@@ -26,6 +25,9 @@
 - "It empowers you to ask those what if questions and see potential futures, visualized over decades, helps you think through the possibilities. Hopefully you gain valuable insights into your own financial future." 
 - "Less overwhelmed by the sheer complexity of financial planning"
 - Write blog posts, that explain how the simulator can help users answer their specific questions or model their own situation, maybe even linking to example scenarios.
+   - About my history with finances, copy the ones I already sent as guest posts:
+      - https://www.firedave.com/jorge-interview-retirement-simulator/
+      - https://www.firedave.com/interview-2-jorge-dollar-cost-averaging-market-crash-stress-test/
    - Based on the answers to the reddit post, write blog posts about the most common scenarios.
    - About "not affiliated with any financial institution"
    - About "less overwhelmed by the sheer complexity of financial planning"
@@ -33,7 +35,6 @@
    - About "personal finance lab"
    - About "learn by doing, experimenting, and visualizing"
    - About "who is this for?"
-   - About my history with finances (copy the one I already sent as a guest post)
    - About the "Saving for a house deposit"
    - About "Investing vs Saving: an Irish tax perspective"
 - Who is this for? 
@@ -46,6 +47,7 @@
    - Teaching financial literacy.
    - Doing quick high level scenario modeling during client meetings, to illustrate a point visually.
 - Figure out a way to include phrases like:
+   - deemed disposal
    - income tax calculator
    - pension calculator
    - budget planner
