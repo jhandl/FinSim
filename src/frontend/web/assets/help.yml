@@ -107,7 +107,7 @@ steps:
 
   - element: "#PensionContributionCapped"
     popover:
-      description: "<p>Whether your pension contribution is capped to match the maximum amount that you can get tax relief on (${pensionContribEarningLimit,currency}).</p><p>This limit is the same for everyone, it does not depend on age. If you select 'Yes', your pension contributions will be capped at the maximum allowed. If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess.</p>"
+      description: "<p>Whether your pension contribution is capped to match the maximum amount that you can get tax relief on (${pensionContribEarningLimit,currency}).</p><p>This limit is the same for everyone, it does not depend on age. If you select 'Yes', your pension contributions will be capped at the maximum allowed. If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess.</p><p>The cap itself will be adjusted for inflation as the years go by, so you may see the contribution exceed this limit after the first year.</p>"
       side: "right"
       align: "start"
 
