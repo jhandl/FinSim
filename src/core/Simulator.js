@@ -249,10 +249,12 @@ function processEvents() {
         // purchase only (sales were handled in first pass)
         if (age === event.fromAge) {
           realEstate.buy(event.id, amount, event.rate);
-          // Treat the purchase cost entirely as an expense so withdrawals
-          // follow the configured priority order instead of depleting cash first.
-          expenses += amount;
-          //            console.log("Buy property ["+event.id+"] with "+Math.round(amount)+" downpayment (added to expenses) (valued "+Math.round(realEstate.getValue(event.id))+")");
+          // Use available cash first, only add remainder to expensesAdd commentMore actions
+          let cashUsed = Math.min(cash, amount);
+          cash -= cashUsed;
+          let remainingExpense = amount - cashUsed;
+          expenses += remainingExpense;
+          //            console.log("Buy property ["+event.id+"] with "+Math.round(amount)+" downpayment (used "+Math.round(cashUsed)+" cash, "+Math.round(remainingExpense)+" added to expenses) (valued "+Math.round(realEstate.getValue(event.id))+")");
         }
         // Note: sales are now handled in the first pass above to ensure sale proceeds are available before purchases
         break;
