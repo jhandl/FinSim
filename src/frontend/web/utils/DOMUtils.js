@@ -7,21 +7,37 @@ class DOMUtils {
     if (!element) throw new Error(`Element not found: ${elementId}`);
     if (element.value !== undefined) {
       let value = element.value;        
-      // If value is empty string, return undefined
+      // Check if element is in a parameter section (not in events table or other special sections)
+      const isInParameterSection = element.closest('.parameters-section') && 
+                                   !element.closest('#Events, .events-section') &&
+                                   element.type !== 'hidden';
+      
+      // If value is empty string, return 0 for parameter section numeric inputs, undefined for others
       if (value === '') {
+        // For numeric input types in parameter sections only, return 0
+        if (isInParameterSection && (element.type === 'number' || 
+            element.classList.contains('currency') || 
+            element.classList.contains('percentage'))) {
+          return 0;
+        }
         return undefined;
       }
       if (element.classList.contains('currency')) {
-        return FormatUtils.parseCurrency(value);
+        const parsed = FormatUtils.parseCurrency(value);
+        // Return 0 for parameter section if parsing fails
+        return (parsed === undefined && isInParameterSection) ? 0 : parsed;
       }
       if (element.classList.contains('percentage')) {
-        return FormatUtils.parsePercentage(value);
+        const parsed = FormatUtils.parsePercentage(value);
+        // Return 0 for parameter section if parsing fails
+        return (parsed === undefined && isInParameterSection) ? 0 : parsed;
       }
       if (element.classList.contains('boolean')) {
         return value === 'Yes';
       }
       const parsed = parseFloat(value);
-      return isNaN(parsed) ? undefined : parsed;
+      // Return 0 for parameter section numeric inputs if parsing fails, undefined otherwise
+      return isNaN(parsed) ? (isInParameterSection ? 0 : undefined) : parsed;
     } 
     return element.textContent;
   }

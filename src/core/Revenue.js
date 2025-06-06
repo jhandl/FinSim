@@ -75,7 +75,7 @@ class Revenue {
     this.prsi = 0;
     this.usc = 0;
     this.cgt = 0;
-    this.married = ((typeof params.marriageYear === 'number') && (year >= params.marriageYear));
+    this.married = ((typeof params.marriageYear === 'number') && (params.marriageYear > 0) && (year >= params.marriageYear));
     if ((typeof params.oldestChildBorn === 'number') || (typeof params.youngestChildBorn === 'number')) {
       let dependentStartYear = (typeof params.oldestChildBorn === 'number' ? params.oldestChildBorn : params.youngestChildBorn);
       let dependentEndYear = (typeof params.youngestChildBorn === 'number' ? params.youngestChildBorn : params.oldestChildBorn) + 18;

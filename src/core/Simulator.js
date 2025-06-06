@@ -14,16 +14,16 @@ const Phases = {
 
 
 function run() {
-  if (!initializeSimulator()) return;
-  montecarlo = (params.growthDevPension > 0 || params.growthDevFunds > 0 || params.growthDevShares > 0);
-  let runs = (montecarlo ? config.simulationRuns : 1);
-  let successes = 0;
-  uiManager.updateProgress("Running");
-  for (let run = 0; run < runs; run++) {
-    successes += runSimulation(); 
-  }
-  uiManager.updateDataSheet(runs);
-  uiManager.updateStatusCell(successes, runs);
+    if (!initializeSimulator()) return;
+    montecarlo = (params.growthDevPension > 0 || params.growthDevFunds > 0 || params.growthDevShares > 0);
+    let runs = (montecarlo ? config.simulationRuns : 1);
+    let successes = 0;
+    uiManager.updateProgress("Running");
+    for (let run = 0; run < runs; run++) {
+      successes += runSimulation(); 
+    }
+    uiManager.updateDataSheet(runs);
+    uiManager.updateStatusCell(successes, runs);
 }
 
 function initializeUI() {

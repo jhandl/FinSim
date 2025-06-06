@@ -34,7 +34,8 @@ class FormatUtils {
   static parseCurrency(value) {
     if (typeof value !== 'string') return value;
     value = value.replace(/[€,]/g, '');
-    return parseFloat(value);
+    const numValue = parseFloat(value);
+    return isNaN(numValue) ? undefined : numValue;
   }
 
   static formatBoolean(value) {
