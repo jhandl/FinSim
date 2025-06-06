@@ -249,7 +249,7 @@ function processEvents() {
         // purchase only (sales were handled in first pass)
         if (age === event.fromAge) {
           realEstate.buy(event.id, amount, event.rate);
-          // Use available cash first, only add remainder to expensesAdd commentMore actions
+          // Use available cash first, only add remainder to expenses
           let cashUsed = Math.min(cash, amount);
           cash -= cashUsed;
           let remainingExpense = amount - cashUsed;
