@@ -1,21 +1,18 @@
 # Roadmap
 
-### Bugs?
-- When purchasing real estate, the money seems to come from cash first, even though the priority is etf.
-- The demo.csv file shows that when I add $1 to the expenses, it also shows up as income. Why?
-
 ### Improvements
+- Add feedback box.
+- Add registration box? Not CIO.
 - Use both the marriage year and the number of incomes for income tax bands.
-- If year input field is empty or 0 assume infinite (not married, no children).
-- Allow leaving other fields empty, and use "0" if so.
 - Add partner age and retirement age.
 - Add ability to arrange events by start age or event category. Maybe allow drag-and-drop.
 - Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain.
 - In the data table, highlight the "pinch points", with failures in red and near failures in yellow.
-- Add inheritance event.
-- New event: period of high inflation.
-- New event: increase pension contribution rate.
-- New event: pay off mortgage.
+- New events: 
+   - inheritance.
+   - period of high inflation.
+   - increase pension contribution rate.
+   - pay off mortgage.
 - Record the median age of failure in montecarlo runs.
 
 ### SEO
@@ -91,7 +88,7 @@
 
 ## Version 2 - "Web version"
 - Move the urls from the help yaml to the config file and use variables in the yaml
-- Review pension types and minimum retirement ages (ChatGPT “Pension Types in Ireland”) 
+- Review pension types (ChatGPT “Pension Types in Ireland”) 
 - Add ability to fetch data from the web / google sheets
 
 ## Version 3 - "Modernize"
