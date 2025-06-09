@@ -15,7 +15,7 @@ When completing tasks, update the corresponding phase status line to reflect pro
 5.  Implement supporting changes (validation, help text, scenario versioning).
 6.  Flesh out and run all tests, ensuring they pass.
 
-**Overall Progress:** Next step: Task 3 of Phase 3.
+**Overall Progress:** Phase 3 Complete. Next step: Phase 4 - Task 1.
 
 ---
 
@@ -85,7 +85,7 @@ When completing tasks, update the corresponding phase status line to reflect pro
 
 **Phase 3: Core Simulator Logic Refactor (`src/core/Simulator.js`)**
 
-**Status: 🔄 In Progress - Task 2 of 7 completed**
+**Status: ✅ Complete**
 
 *   **Objective:** Refactor `Simulator.js` to use `Person` objects, removing P1/P2 specific global variables where possible and simplifying logic.
 *   **Global variables to adapt/introduce:**
