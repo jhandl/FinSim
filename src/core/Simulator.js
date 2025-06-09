@@ -1,11 +1,13 @@
 /* This file has to work on both the website and Google Sheets */
 
 var uiManager, params, events, config, dataSheet, row, errors;
-var age, year, phase, periods, failedAt, success, montecarlo;
+var year, periods, failedAt, success, montecarlo;
 var revenue, realEstate, stockGrowthOverride;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var incomeStatePension, incomePrivatePension, incomeFundsRent, incomeSharesRent, withdrawalRate;
-var cash, indexFunds, shares, pension;
+var incomeSalaries, incomeShares, incomeRentals, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
+var cash, indexFunds, shares;
+var person1, person2;
 
 const Phases = {
   growth: 'growth',
@@ -67,13 +69,42 @@ function loadFromFile(file) {
 }
 
 function initializeSimulationVariables() {
-  // revenue.reset();
-  pension = new Pension(params.growthRatePension, params.growthDevPension);
+  // Initialize investment instruments
   indexFunds = new IndexFunds(params.growthRateFunds, params.growthDevFunds);
   shares = new Shares(params.growthRateShares, params.growthDevShares);
-  if (params.initialPension > 0) pension.buy(params.initialPension);
   if (params.initialFunds > 0) indexFunds.buy(params.initialFunds);
   if (params.initialShares > 0) shares.buy(params.initialShares);
+
+  // Initialize Person 1 (P1)
+  const p1SpecificParams = {
+    startingAge: params.startingAge,
+    retirementAge: params.retirementAge,
+    statePensionWeekly: params.statePensionWeekly,
+    pensionContributionPercentage: params.pensionPercentage
+  };
+  person1 = new Person('P1', p1SpecificParams, params, { 
+    growthRatePension: params.growthRatePension, 
+    growthDevPension: params.growthDevPension 
+  });
+  if (params.initialPension > 0) person1.pension.buy(params.initialPension);
+
+  // Initialize Person 2 (P2) if exists
+  if (params.p2StartingAge) {
+    const p2PensionContribPercentage = params.pensionPercentageP2 || params.pensionPercentage;
+    const p2SpecificParams = {
+      startingAge: params.p2StartingAge,
+      retirementAge: params.p2RetirementAge,
+      statePensionWeekly: params.p2StatePensionWeekly,
+      pensionContributionPercentage: p2PensionContribPercentage
+    };
+    person2 = new Person('P2', p2SpecificParams, params, { 
+      growthRatePension: params.growthRatePension, 
+      growthDevPension: params.growthDevPension 
+    });
+    if (params.initialPensionP2 > 0) person2.pension.buy(params.initialPensionP2);
+  } else {
+    person2 = null;
+  }
 
   periods = 0;
   success = true;
@@ -81,16 +112,18 @@ function initializeSimulationVariables() {
 
   initializeRealEstate();
 
-  age = params.startingAge - 1;
   year = new Date().getFullYear() - 1;
-  phase = Phases.growth;
   cash = params.initialSavings;
   failedAt = 0;
   row = 0;
 }
 
 function resetYearlyVariables() {
-  // Reset yearly variables here
+  // Call Person-specific yearly variable resets
+  person1.resetYearlyVariables();
+  if (person2) person2.resetYearlyVariables();
+
+  // Reset global yearly accumulators
   incomeSalaries = 0;
   incomeShares = 0;
   incomeRentals = 0;
@@ -106,24 +139,31 @@ function resetYearlyVariables() {
   cashWithdraw = 0;
   savings = 0;
 
-  revenue.reset();
+  // Add year to Person objects (this increments their ages and calls pension.addYear())
+  person1.addYear();
+  if (person2) person2.addYear();
+  
+  // Increment global year
+  year++;
+
+  // Pass Person objects to revenue reset (now using updated ages and year)
+  revenue.reset(person1, person2);
+  
+  // Add year to global investment objects
   indexFunds.addYear();
   shares.addYear();
-  pension.addYear();
   realEstate.addYear();
 }
 
 function runSimulation() {
   initializeSimulationVariables();
 
-  while (age < params.targetAge) {
+  while (person1.age < params.targetAge) {
 
     row++;
-    year++;
-    age++;
     periods = row - 1;
 
-    // console.log("  ======== Age: "+age+" ========");
+    // console.log("  ======== Age: "+person1.age+" ========");
 
     resetYearlyVariables();
     calculatePensionIncome();
@@ -135,21 +175,27 @@ function runSimulation() {
 }
 
 function calculatePensionIncome() {
-  // Private Pension
-  if (age === params.retirementAge) {
-    cash += pension.getLumpsum();
-    phase = Phases.retired;
+  // Calculate pension income for Person 1
+  const p1CalcResults = person1.calculateYearlyPensionIncome(config);
+  if (p1CalcResults.lumpSumAmount > 0) {
+    cash += p1CalcResults.lumpSumAmount;
+    revenue.declarePrivatePensionLumpSum(p1CalcResults.lumpSumAmount);
   }
-  if (phase === Phases.retired) {
-    incomePrivatePension += pension.drawdown();
-  }
-  // State Pension
-  if (age >= config.statePensionQualifyingAge) {
-    incomeStatePension = 52 * adjust(params.statePensionWeekly);
-    if (age >= config.statePensionIncreaseAge) {
-      incomeStatePension += 52 * adjust(config.statePensionIncreaseAmount);
+  incomePrivatePension += person1.yearlyIncomePrivatePension;
+  incomeStatePension += person1.yearlyIncomeStatePension;
+
+  // Calculate pension income for Person 2 (if exists)
+  if (person2) {
+    const p2CalcResults = person2.calculateYearlyPensionIncome(config);
+    if (p2CalcResults.lumpSumAmount > 0) {
+      cash += p2CalcResults.lumpSumAmount;
+      revenue.declarePrivatePensionLumpSum(p2CalcResults.lumpSumAmount);
     }
+    incomePrivatePension += person2.yearlyIncomePrivatePension;
+    incomeStatePension += person2.yearlyIncomeStatePension;
   }
+
+  // Declare total state pension to revenue
   revenue.declareStatePensionIncome(incomeStatePension);
 }
 
@@ -159,7 +205,7 @@ function processEvents() {
   // First pass: Process all real estate sales for the current age
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
-    if (event.type === 'R' && event.toAge && age === event.toAge) {
+    if (event.type === 'R' && event.toAge && person1.age === event.toAge) {
       // console.log("Sell property ["+event.id+"] for "+Math.round(realEstate.getValue(event.id)));            
       cash += realEstate.sell(event.id);
     }
@@ -170,7 +216,7 @@ function processEvents() {
     let event = events[i];
     let amount = adjust(event.amount, event.rate);
     // Default toAge to 999 if not required for this event type
-    let inScope = (age >= event.fromAge && age <= (event.toAge || 999));
+    let inScope = (person1.age >= event.fromAge && person1.age <= (event.toAge || 999));
 
     switch (event.type) {
 
@@ -187,7 +233,7 @@ function processEvents() {
       case 'SI': // Salary income (with private pension contribution if so defined)
         if (inScope) {
           incomeSalaries += amount;
-          let contribRate = params.pensionPercentage * getRateForKey(age, config.pensionContributionRateBands);
+          let contribRate = person1.pensionContributionPercentageParam * getRateForKey(person1.age, config.pensionContributionRateBands);
           if (params.pensionCapped && (amount > adjust(config.pensionContribEarningLimit))) {
             contribRate = contribRate * adjust(config.pensionContribEarningLimit) / amount;
           }
@@ -196,15 +242,30 @@ function processEvents() {
           let companyContrib = companyMatch * amount;
           let totalContrib = personalContrib + companyContrib;
           pensionContribution += totalContrib;
-          pension.buy(totalContrib);
-          revenue.declareSalaryIncome(amount, contribRate);
+          person1.pension.buy(totalContrib);
+          revenue.declareSalaryIncome(amount, contribRate, person1.age);
         }
         break;
 
-      case 'SInp': // Salary income (with no private pension contribution even if pension contribution is > 0)
+      case 'SInp': // Salary income (Partner/Person 2)
         if (inScope) {
           incomeSalaries += amount;
-          revenue.declareSalaryIncome(amount, 0);
+          if (person2) {
+            let contribRate = person2.pensionContributionPercentageParam * getRateForKey(person2.age, config.pensionContributionRateBands);
+            if (params.pensionCapped && (amount > adjust(config.pensionContribEarningLimit))) {
+              contribRate = contribRate * adjust(config.pensionContribEarningLimit) / amount;
+            }
+            let companyMatch = Math.min(event.match || 0, contribRate);
+            let personalContrib = contribRate * amount;
+            let companyContrib = companyMatch * amount;
+            let totalContrib = personalContrib + companyContrib;
+            pensionContribution += totalContrib;
+            person2.pension.buy(totalContrib);
+            revenue.declareSalaryIncome(amount, contribRate, person2.age);
+          } else {
+            // SInp event but no Person 2 defined - treat as salary with no pension for P1
+            revenue.declareSalaryIncome(amount, 0, person1.age);
+          }
         }
         break;
 
@@ -235,7 +296,7 @@ function processEvents() {
         break;
 
       case 'M': // Mortgage
-        if (age == event.fromAge) {
+        if (person1.age == event.fromAge) {
           realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount);
           //            console.log("Borrowed "+Math.round(realEstate.properties[event.id].borrowed)+" on a "+(event.toAge - event.fromAge)+"-year "+(event.rate*100)+"% mortgage for property ["+event.id+"] paying "+Math.round(amount)+"/year");
         }
@@ -247,7 +308,7 @@ function processEvents() {
 
       case 'R': // Real estate
         // purchase only (sales were handled in first pass)
-        if (age === event.fromAge) {
+        if (person1.age === event.fromAge) {
           realEstate.buy(event.id, amount, event.rate);
           // Use available cash first, only add remainder to expenses
           let cashUsed = Math.min(cash, amount);
@@ -260,10 +321,10 @@ function processEvents() {
         break;
 
       case 'SM': // Stock Market Growth override to simulate bull or bear markets
-        if (age == event.fromAge) {
+        if (person1.age == event.fromAge) {
           stockGrowthOverride = Math.pow(1 + event.rate, 1 / (event.toAge - event.fromAge + 1)) - 1;
         }
-        if (age === event.toAge + 1) {
+        if (person1.age === event.toAge + 1) {
           stockGrowthOverride = undefined;
         }
         break;
@@ -292,7 +353,7 @@ function handleInvestments() {
     
   // If deficit, drawdown from where needed
   if (expenses > netIncome) {
-    switch (phase) {
+    switch (person1.phase) {
       case Phases.growth:
         withdraw(params.priorityCash, 0, params.priorityFunds, params.priorityShares);  // taken from user configuration, but without ability to withdraw from pension
         break;
@@ -326,7 +387,7 @@ function handleInvestments() {
 
   if ((netIncome < expenses - 100) && success) {
     success = false;
-    failedAt = age;
+    failedAt = person1.age;
   }
 }
 
@@ -343,7 +404,8 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
   indexFunds.simulateSellAll(clonedRevenue);
   shares.simulateSellAll(clonedRevenue);
   let needed = expenses + cashDeficit - netIncome;
-  let totalAvailable = Math.max(0, cash) + Math.max(0, pension.capital()) + Math.max(0, clonedRevenue.netIncome());
+  let totalPensionCapital = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+  let totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome());
   if (needed > totalAvailable + 0.01) {
     liquidateAll();
     return;
@@ -362,7 +424,8 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
       let keepTrying = false;
       let indexFundsCapital = indexFunds.capital();
       let sharesCapital = shares.capital();
-      let pensionCapital = pension.capital();      
+      let person1PensionCapital = person1.pension.capital();
+      let person2PensionCapital = person2 ? person2.pension.capital() : 0;      
       switch (priority) {
         case cashPriority:
           if (cash > 0.5) {
@@ -372,10 +435,18 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
           };
           break;
         case pensionPriority:
-          if (pensionCapital > 0.5) {
-            let withdraw = Math.min(pensionCapital, needed);
+          // Try Person 1 pension first if retired or at retirement age
+          if (person1PensionCapital > 0.5 && (person1.phase === Phases.retired || person1.age >= person1.retirementAgeParam)) {
+            let withdraw = Math.min(person1PensionCapital, needed);
             totalWithdraw += withdraw;
-            incomePrivatePension += pension.sell(withdraw);
+            incomePrivatePension += person1.pension.sell(withdraw);
+            keepTrying = true;
+          }
+          // If still need more and Person 2 exists, try Person 2 pension
+          else if (person2PensionCapital > 0.5 && person2 && (person2.phase === Phases.retired || person2.age >= person2.retirementAgeParam)) {
+            let withdraw = Math.min(person2PensionCapital, needed);
+            totalWithdraw += withdraw;
+            incomePrivatePension += person2.pension.sell(withdraw);
             keepTrying = true;
           }
           break;
@@ -408,8 +479,11 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
 function liquidateAll() {
   cashWithdraw = cash;
   cash = 0;
-  if (pension.capital() > 0) {
-    incomePrivatePension += pension.sell(pension.capital());
+  if (person1.pension.capital() > 0) {
+    incomePrivatePension += person1.pension.sell(person1.pension.capital());
+  }
+  if (person2 && person2.pension.capital() > 0) {
+    incomePrivatePension += person2.pension.sell(person2.pension.capital());
   }
   if (indexFunds.capital() > 0) {
     incomeFundsRent += indexFunds.sell(indexFunds.capital());
@@ -474,7 +548,7 @@ function updateYearlyData() {
   if (!(row in dataSheet)) {
     dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "savings": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0 };
   }
-  dataSheet[row].age += age;
+  dataSheet[row].age += person1.age;
   dataSheet[row].year += year;
   dataSheet[row].incomeSalaries += incomeSalaries;
   dataSheet[row].incomeRSUs += incomeShares;
@@ -488,7 +562,7 @@ function updateYearlyData() {
   dataSheet[row].netIncome += netIncome;
   dataSheet[row].expenses += expenses;
   dataSheet[row].savings += savings;
-  dataSheet[row].pensionFund += pension.capital();
+  dataSheet[row].pensionFund += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
   dataSheet[row].cash += cash;
   dataSheet[row].indexFundsCapital += indexFunds.capital();
   dataSheet[row].sharesCapital += shares.capital();
@@ -498,10 +572,10 @@ function updateYearlyData() {
   dataSheet[row].prsi += revenue.prsi;
   dataSheet[row].usc += revenue.usc;
   dataSheet[row].cgt += revenue.cgt;
-  dataSheet[row].worth += realEstate.getTotalValue() + pension.capital() + indexFunds.capital() + shares.capital() + cash;
+  dataSheet[row].worth += realEstate.getTotalValue() + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFunds.capital() + shares.capital() + cash;
 
   if (!montecarlo) {
-    uiManager.updateDataRow(row, (age-params.startingAge) / (100-params.startingAge));
+    uiManager.updateDataRow(row, (person1.age-params.startingAge) / (100-params.startingAge));
   }
 }
 

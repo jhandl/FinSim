@@ -102,7 +102,6 @@ class TestFramework {
         cash: 0,
         indexFunds: null,
         shares: null,
-        pension: null,
         
         // More income variables
         incomeSalaries: 0,
@@ -110,7 +109,17 @@ class TestFramework {
         incomeRentals: 0,
         incomeDefinedBenefit: 0,
         incomeTaxFree: 0,
-        pensionContribution: 0
+        pensionContribution: 0,
+        
+        // Person objects for two-person simulation
+        person1: null,
+        person2: null,
+        
+        // Phases enum needed by Person class
+        Phases: {
+          growth: 'growth',
+          retired: 'retired'
+        }
       });
 
       // Read and execute core files in the sandbox
@@ -121,6 +130,7 @@ class TestFramework {
         'Revenue.js',
         'Equities.js', 
         'RealEstate.js',
+        'Person.js',
         'Simulator.js'
       ];
 

@@ -53,12 +53,20 @@ class Revenue {
   netIncome() {
     this.computeTaxes();
     let gross = this.income - this.pensionContribAmount + this.privatePension + this.statePension + this.investmentIncome + this.nonEuShares;
-    let taxCredit = (age < 65) ? 0 : adjust(this.people * config.ageTaxCredit);
-    let tax = Math.max(this.it + this.prsi + this.usc + this.cgt - taxCredit, 0);
+    
+    let totalAgeCredit = 0;
+    if (this.currentAgeP1 !== undefined && this.currentAgeP1 >= 65) {
+      totalAgeCredit += adjust(config.ageTaxCredit);
+    }
+    if (this.people === 2 && this.currentAgeP2 !== undefined && this.currentAgeP2 >= 65) {
+      totalAgeCredit += adjust(config.ageTaxCredit);
+    }
+
+    let tax = Math.max(this.it + this.prsi + this.usc + this.cgt - totalAgeCredit, 0);
     return gross - tax;
   }
   
-  reset() {
+  reset(person1, person2_optional) {
     this.gains = [];
     this.income = 0;
     this.nonEuShares = 0;
@@ -75,6 +83,22 @@ class Revenue {
     this.prsi = 0;
     this.usc = 0;
     this.cgt = 0;
+
+    if (person1) {
+      this.currentAgeP1 = person1.age;
+      this.people = 1;
+    } else {
+      this.currentAgeP1 = undefined;
+      this.people = 0;
+    }
+
+    if (person2_optional) {
+        this.currentAgeP2 = person2_optional.age;
+        this.people = 2;
+    } else {
+        this.currentAgeP2 = undefined;
+    }
+
     this.married = ((typeof params.marriageYear === 'number') && (params.marriageYear > 0) && (year >= params.marriageYear));
     if ((typeof params.oldestChildBorn === 'number') || (typeof params.youngestChildBorn === 'number')) {
       let dependentStartYear = (typeof params.oldestChildBorn === 'number' ? params.oldestChildBorn : params.youngestChildBorn);
@@ -132,16 +156,22 @@ class Revenue {
     }
     let credit = adjust(params.personalTaxCredit + Math.min(this.salaries.length, 2) * config.itEmployeeTaxCredit);
     let exemption = config.itExemptionLimit * (this.married ? 2 : 1);
-    if ((age < config.itExemptionAge) || (taxable > adjust(exemption)) || (this.privatePensionLumpSumCount > 0)) {
-      this.it = Math.max(tax - credit, 0);
-    } else {
+
+    let isEligibleForAgeExemption = (this.currentAgeP1 !== undefined && this.currentAgeP1 >= config.itExemptionAge);
+    
+    if (isEligibleForAgeExemption && taxable <= adjust(exemption) && this.privatePensionLumpSumCount === 0) {
       this.it = 0;
+    } else {
+      this.it = Math.max(tax - credit, 0);
     }
   }
   
   computePRSI() {
     let taxable = this.income + this.nonEuShares;
-    let tax = (age <= config.prsiExcemptAge) ? taxable * config.prsiRate : 0;
+    let tax = 0;
+    if (this.currentAgeP1 !== undefined && this.currentAgeP1 < config.prsiExcemptAge) {
+      tax = taxable * config.prsiRate;
+    }
     this.prsi = tax;
   }
   
@@ -159,7 +189,7 @@ class Revenue {
         let exceed = adjust(config.uscReducedRateMaxIncome);
         let tax = 0;
         if (taxable > exempt) {
-          if ((age >= config.uscRaducedRateAge) && (taxable <= exceed)) {
+          if ((this.currentAgeP1 !== undefined && this.currentAgeP1 >= config.uscRaducedRateAge) && (taxable <= exceed)) {
             tax = this.computeProgressiveTax(config.uscReducedTaxBands, taxable);
           } else {
             tax = this.computeProgressiveTax(config.uscTaxBands, taxable);
@@ -173,7 +203,7 @@ class Revenue {
       let exceed = adjust(config.uscReducedRateMaxIncome);
       let tax = 0;
       if (taxable > exempt) {
-        if ((age >= config.uscRaducedRateAge) && (taxable <= exceed)) {
+        if ((this.currentAgeP1 !== undefined && this.currentAgeP1 >= config.uscRaducedRateAge) && (taxable <= exceed)) {
           tax = this.computeProgressiveTax(config.uscReducedTaxBands, taxable);
         } else {
           tax = this.computeProgressiveTax(config.uscTaxBands, taxable);

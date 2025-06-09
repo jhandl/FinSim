@@ -154,6 +154,9 @@ module.exports = {
     { type: 'exact_value', target: 'age', age: 67, field: 'prsi', expected: calculatePRSI(15000, 67), tolerance: 1 },
     { type: 'exact_value', target: 'age', age: 67, field: 'usc', expected: calculateUSC(15000, 67), tolerance: 1 },
 
+    // --- Age 70 (Married, Senior, Low Income €15,000, PRSI Exempt) -- PRSI should be 0 now
+    { type: 'exact_value', target: 'age', age: 70, field: 'prsi', expected: calculatePRSI(15000, 70), tolerance: 1 },
+
     // --- Age 71 (Married, Senior, Low Income €15,000, PRSI Exempt) ---
     // IT: Expect 0 (as above)
     // PRSI: Expect 0 due to prsiExcemptAge

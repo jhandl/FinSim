@@ -1,26 +1,36 @@
 # Step-by-Step Implementation Plan: Two-Person Simulation Functionality
 
-This plan outlines the implementation steps for adding two-person simulation capability to the FinSim application, based on the requirements specified in `two_peeps.md`.
+This plan outlines the implementation steps for adding two-person simulation capability to the FinSim application, based on the requirements specified in `two_peeps.md`. It incorporates a refactoring to use a `Person` class for better modularity.
+
+Ensure your understand the structure and architecture of the project before making any change. Read the AGENTS.md file.
+
+**Instructions for Status Tracking:**
+When completing tasks, update the corresponding phase status line to reflect progress. Mark completed phases as "Status: ✅ Complete" and phases in progress as "Status: 🔄 In Progress - Task X of Y completed". Also update the "Overall progress" line to indicate what the next step is.
 
 **Overall Approach:**
 1.  Create test files with initial (failing) test cases.
-2.  Implement core logic changes.
-3.  Implement UI changes.
-4.  Implement supporting changes (validation, help text, scenario versioning).
-5.  Flesh out and run all tests, ensuring they pass.
+2.  Define and implement the `Person` class.
+3.  Refactor core simulator logic to use `Person` objects.
+4.  Implement UI changes.
+5.  Implement supporting changes (validation, help text, scenario versioning).
+6.  Flesh out and run all tests, ensuring they pass.
+
+**Overall Progress:** Next step: Task 3 of Phase 3.
 
 ---
 
 **Phase 1: Test Scaffolding (Expected to Fail Initially)**
 
-*   **Objective:** Create the necessary test files and basic test structures. These tests will be fully developed and validated in Phase 8.
-*   **Tasks:**
+**Status: Completed**
+
+*   **Objective:** Create the necessary test files and basic test structures. These tests will be fully developed and validated in Phase 9.
+*   **Tasks:** (File paths updated to common `test/` directory)
     1.  **Create `TestTwoPersonTaxCalculation.js`**:
-        *   File path: `test/core/TestTwoPersonTaxCalculation.js` (assuming a similar structure to existing tests).
-        *   Initial content: Basic test suite structure (e.g., using a testing framework like Mocha or Jest if applicable, otherwise plain JS asserts). Include placeholders or comments for tests related to age-related IT credits, PRSI exemptions, and USC bands for couples with different ages.
+        *   File path: `test/core/TestTwoPersonTaxCalculation.js`.
+        *   Initial content: Basic test suite structure. Include placeholders for tests related to age-related IT credits, PRSI exemptions, and USC bands for couples with different ages.
     2.  **Create `TestSeparatePensionPots.js`**:
         *   File path: `test/core/TestSeparatePensionPots.js`.
-        *   Initial content: Structure for testing individual pension contribution rates, lump sums, separate drawdowns, and conditional P2 pension withdrawals using `SI` and `SInp` events.
+        *   Initial content: Structure for testing individual pension contribution rates, lump sums, separate drawdowns, and conditional P2 pension withdrawals using `SI` and `SInp` events, now considering `Person` objects.
     3.  **Create `TestDualStatePensions.js`**:
         *   File path: `test/core/TestDualStatePensions.js`.
         *   Initial content: Structure for verifying correct timing and calculation of state pensions for two people.
@@ -31,208 +41,215 @@ This plan outlines the implementation steps for adding two-person simulation cap
         *   File path: `test/core/TestScenarioVersioning.js`.
         *   Initial content: Structure for verifying proper detection and error handling for old scenario file formats.
     6.  **Create `TestValidation.js`**:
-        *   File path: `test/ui/TestValidation.js` (or similar, depending on project structure).
+        *   File path: `test/ui/TestValidation.js` (or `test/frontend/TestValidation.js` depending on structure).
         *   Initial content: Structure for testing Person 2 validation logic and error messages in the UI.
-    7.  **Initial Test Run (Optional but Recommended):**
-        *   If possible, run these empty/stubbed tests to ensure the test runner picks them up. They should fail or report no tests found.
+    7.  **Initial Test Run (Optional but Recommended):** Ensure test runner picks them up.
 
 ---
 
-**Phase 2: Core Simulator Logic (`src/core/Simulator.js`)**
+**Phase 2: Define `Person` Class (`src/core/Person.js`)**
 
-*   **Objective:** Implement the backend logic for handling two individuals within the simulation.
-*   **Tasks (referencing Section 3 of `two_peeps.md`):**
-    1.  **Track Person 2's Age:**
-        *   Add `ageP2` to global simulation variables.
-        *   Initialize `ageP2` from `params.p2StartingAge` (if provided) in `initializeSimulationVariables`.
-        *   Increment `ageP2` yearly.
-    2.  **Pension Objects & Initialization:**
-        *   In `initializeSimulationVariables`:
-            *   Create `pensionP1 = new Pension(...)`.
-            *   Conditionally create `pensionP2 = new Pension(...)` if `params.p2StartingAge` is provided.
-        *   Fund pensions:
-            *   `pensionP1.buy(params.initialPension);`
-            *   `if (pensionP2 && params.initialPensionP2 > 0) pensionP2.buy(params.initialPensionP2);`
-    3.  **Yearly Updates:**
-        *   In `resetYearlyVariables`:
-            *   Call `pensionP1.addYear();`
-            *   Call `if (pensionP2) pensionP2.addYear();`.
-        *   Modify `revenue.reset()` call to pass an object: `{ ageP1: age, ageP2: ageP2 }`. (Note: this requires changes in `Revenue.js` first or simultaneously).
-    4.  **Lump Sums & Drawdown (`calculatePensionIncome`):**
-        *   **Person 1:** Implement logic for P1 lump sum from `pensionP1` at `params.retirementAge`, adding to `cash`, declaring to revenue, and starting drawdown from `pensionP1`.
-        *   **Person 2:**
-            *   If P2 exists and `ageP2 === params.p2RetirementAge`, implement P2 lump sum from `pensionP2`, add to `cash`, and declare to revenue.
-            *   If `ageP2 >= params.p2RetirementAge`, P2 draws down from `pensionP2` into `incomePrivatePension`.
-        *   **Person 2's State Pension:** Add logic to calculate and include Person 2's state pension if `params.p2StatePensionWeekly` is provided and `ageP2` meets qualifying conditions.
-    5.  **Pension Contributions (`processEvents` for salary events):**
-        *   Modify the `case 'SInp':` section to route pension contributions to `pensionP2` using `params.pensionPercentageP2` (defaulting to `params.pensionPercentage` if `pensionPercentageP2` is not specified), instead of skipping them.
-    6.  **`withdraw` Function (Deficit Handling):**
-        *   If `pensionPriority` is active:
-            *   Attempt withdrawal from `pensionP1.sell()`.
-            *   If `needed` is still positive, AND `pensionP2` exists, AND `ageP2 >= params.p2RetirementAge`:
-                *   Attempt to withdraw remaining `needed` from `pensionP2.sell()`.
-    7.  **`liquidateAll` Function:**
-        *   If `pensionP2` exists and has capital, add `pensionP2.sell(pensionP2.capital())` to `incomePrivatePension`.
-    8.  **Data Output (`updateYearlyData` - Combined Pension Display):**
-        *   Update `dataSheet[row].pensionFund` calculation: `+= pensionP1.capital() + (pensionP2 ? pensionP2.capital() : 0);`.
-        *   Update `worth` calculation to include both pension pots.
+**Status: ✅ Complete**
+
+*   **Objective:** Create a new `Person` class using ES6 syntax to encapsulate all person-specific data and core logic. This file must work in web and Google Apps Script environments.
+*   **Tasks:**
+    1.  **Create `src/core/Person.js` file.**
+    2.  **Implement the `Person` class with the following structure and logic:**
+        *   **Constructor `constructor(id, personSpecificUIParams, commonSimParams, commonPensionConfig)`:**
+            *   Store `id`.
+            *   Initialize `age` based on `personSpecificUIParams.startingAge` (to be incremented at the start of the first simulation year).
+            *   Initialize `phase` to `Phases.growth` (using `Phases` enum from `Simulator.js`).
+            *   Create and store a `new Pension(...)` object instance, configured with `commonPensionConfig`.
+            *   Store essential person-specific parameters like `retirementAgeParam`, `statePensionWeeklyParam`, and `pensionContributionPercentageParam` from `personSpecificUIParams`.
+            *   Call `this.resetYearlyVariables()` at the end of the constructor.
+        *   **Method `resetYearlyVariables()`:**
+            *   Initialize/reset person-specific yearly income accumulators, such as `this.yearlyIncomeStatePension = 0;` and `this.yearlyIncomePrivatePension = 0;`.
+        *   **Method `addYear()`:**
+            *   Increment `this.age`.
+            *   Call `this.pension.addYear()`.
+        *   **Method `calculateYearlyPensionIncome(config)`:**
+            *   Accepts the global `config` object.
+            *   **Lump Sum:** If `this.age` matches `this.retirementAgeParam` and `this.phase` is `Phases.growth`:
+                *   Calculate lump sum from `this.pension.getLumpsum()`.
+                *   Set `this.phase` to `Phases.retired`.
+                *   Store the calculated lump sum amount for return.
+            *   **Private Pension Drawdown:** If `this.phase` is `Phases.retired`, calculate drawdown from `this.pension.drawdown()` and store in `this.yearlyIncomePrivatePension`.
+            *   **State Pension:** If `this.statePensionWeeklyParam` is valid and `this.age` meets `config.statePensionQualifyingAge`:
+                *   Calculate yearly state pension (52 * weekly amount, using global `adjust()`).
+                *   If `this.age` meets `config.statePensionIncreaseAge`, add the increase amount (52 * `config.statePensionIncreaseAmount`, using `adjust()`).
+                *   Store in `this.yearlyIncomeStatePension`.
+            *   **Return:** An object like `{ lumpSumAmount: /* value or 0 */ }`. This allows the simulator to handle adding the lump sum to global `cash` and declaring it to revenue.
+        *   Ensure the class relies on `Phases` enum and the global `adjust()` function being available from `Simulator.js` or its execution environment.
 
 ---
 
-**Phase 3: Revenue & Tax Calculation (`src/core/Revenue.js`)**
+**Phase 3: Core Simulator Logic Refactor (`src/core/Simulator.js`)**
 
-*   **Objective:** Update the revenue and tax calculation logic to account for two individuals with potentially different ages.
-*   **Tasks (referencing Section 4 of `two_peeps.md`):**
-    1.  **Store Individual Ages:**
-        *   Modify `Revenue.prototype.reset(agesInput = {})` to accept optional `agesInput` (with `ageP1`, `ageP2`).
-        *   Store `this.currentAgeP1` and `this.currentAgeP2`.
-        *   If no ages provided, use existing global `age` for `this.currentAgeP1` and leave `this.currentAgeP2` undefined.
-    2.  **Person 2 Detection:**
-        *   Implement logic where `Revenue.js` detects Person 2 presence by checking if `this.currentAgeP2` is defined.
-    3.  **Update `this.people`:**
-        *   Adjust logic for `this.people` based on `this.salaries.length` and the presence of `this.currentAgeP2` for accurate age-related credit counting.
-    4.  **Refine `computeIT()`:**
-        *   Calculate age-related tax credits based on `this.currentAgeP1` and `this.currentAgeP2` (if applicable, e.g., if married or `this.people === 2`).
-        *   Adjust IT exemption logic to consider `this.currentAgeP1` (and `this.currentAgeP2` if married) for the age condition (`config.itExemptionAge`).
-    5.  **Refine `computePRSI()`:**
-        *   Base PRSI exemption age check (`config.prsiExemptAge`) on `this.currentAgeP1` for non-PAYE income.
+**Status: 🔄 In Progress - Task 2 of 7 completed**
+
+*   **Objective:** Refactor `Simulator.js` to use `Person` objects, removing P1/P2 specific global variables where possible and simplifying logic.
+*   **Global variables to adapt/introduce:**
+    *   `person1` (instance of `Person`)
+    *   `person2` (instance of `Person`, or `null` if not applicable)
+    *   The main simulation loop (`runSimulation`) will be driven by `person1.age` directly. Global `row` and `periods` variables will continue to be updated at the start of each yearly iteration within this loop.
+*   **Tasks:**
+    1.  **Update `initializeSimulationVariables()`:**
+        *   Remove old P1-specific globals that are now in `Person` (e.g., global `age` variable, `phase` for P1 state, `pension` object for P1).
+        *   Define `p1SpecificParams` from the global `params` object (e.g., `params.startingAge`, `params.retirementAge`, `params.statePensionWeekly`, `params.initialPension`, `params.pensionPercentage`).
+        *   Create `person1 = new Person('P1', p1SpecificParams, params, { growthRatePension: params.growthRatePension, growthDevPension: params.growthDevPension });`.
+        *   If `params.initialPension > 0`, fund `person1.pension.buy(params.initialPension);`.
+        *   **Person 2 Initialization:**
+            *   If `params.p2StartingAge` is provided (indicating Person 2 exists):
+                *   Determine `p2PensionContribPercentage` (use `params.pensionPercentageP2` or default to `params.pensionPercentage`).
+                *   Define `p2SpecificParams` (e.g., `params.p2StartingAge`, `params.p2RetirementAge`, `params.p2StatePensionWeekly`, `params.initialPensionP2`, `p2PensionContribPercentage`).
+                *   Create `person2 = new Person('P2', p2SpecificParams, params, { growthRatePension: params.growthRatePension, growthDevPension: params.growthDevPension });`.
+                *   If `params.initialPensionP2 > 0`, fund `person2.pension.buy(params.initialPensionP2);`.
+            *   Else, `person2 = null;`.
+        *   Loop control: `while (person1.age < params.targetAge)`.
+        *   Initialize global `year`.
+    2.  **Update `resetYearlyVariables()`:**
+        *   Call `person1.resetYearlyVariables();`.
+        *   If `person2`, call `person2.resetYearlyVariables();`.
+        *   Reset global yearly accumulators (e.g., `incomeSalaries = 0; incomePrivatePension = 0; incomeStatePension = 0;`).
+        *   Modify `revenue.reset(person1, person2);` // Pass Person objects (or derived data like ages).
+        *   Call `person1.addYear();` (which internally calls `pension.addYear()` and increments `person1.age`). This replaces the old global `age++` logic.
+        *   If `person2`, call `person2.addYear();`.
+        *   Global `year++` remains.
+    3.  **Pension Income Calculation in `runSimulation()` loop (replaces `calculatePensionIncome` call):**
+        *   Before `processEvents()`:
+            *   `const p1CalcResults = person1.calculateYearlyPensionIncome(config);`
+            *   `if (p1CalcResults.lumpSumAmount > 0) { cash += p1CalcResults.lumpSumAmount; revenue.declarePrivatePensionLumpSum(p1CalcResults.lumpSumAmount); }`
+            *   `incomePrivatePension += person1.yearlyIncomePrivatePension;`
+            *   `incomeStatePension += person1.yearlyIncomeStatePension;`
+            *   If `person2` exists:
+                *   `const p2CalcResults = person2.calculateYearlyPensionIncome(config);`
+                *   `if (p2CalcResults.lumpSumAmount > 0) { cash += p2CalcResults.lumpSumAmount; revenue.declarePrivatePensionLumpSum(p2CalcResults.lumpSumAmount); }`
+                *   `incomePrivatePension += person2.yearlyIncomePrivatePension;`
+                *   `incomeStatePension += person2.yearlyIncomeStatePension;`
+            *   After processing both (if applicable), declare total state pension: `revenue.declareStatePensionIncome(incomeStatePension);`
+    4.  **Update Pension Contributions in `processEvents()`:**
+        *   **`case 'SI':` (Salary Income - Person 1)**
+            *   Calculate `contribRate` using `person1.pensionContributionPercentageParam` and `person1.age` for bands.
+            *   Calculate `totalContrib`.
+            *   `person1.pension.buy(totalContrib);`
+            *   `revenue.declareSalaryIncome(amount, contribRate, person1.age);` (Pass P1's age).
+        *   **`case 'SInp':` (Salary Income - Partner/Person 2)**
+            *   If `person2` exists:
+                *   Calculate `contribRate` using `person2.pensionContributionPercentageParam` and `person2.age` for bands.
+                *   Calculate `totalContrib`.
+                *   `person2.pension.buy(totalContrib);`
+                *   `revenue.declareSalaryIncome(amount, contribRate, person2.age);` (Pass P2's age).
+            *   Else (SInp event but no Person 2 defined): Log warning or treat as salary with no pension for P1 (needs clarification based on desired behavior if P2 not present but SInp used).
+        *   **Other event processing:** Update any age-based conditions to use `person1.age` instead of global `age`.
+    5.  **Refactor `withdraw()` function (Deficit Handling):**
+        *   Function may need access to `person1` and `person2` (passed as args or accessed as globals if they are made global in `Simulator.js`).
+        *   When considering pension withdrawal for P1: use `person1.pension.capital()`, `person1.pension.sell()`, `person1.phase`, `person1.age`, `person1.retirementAgeParam`.
+        *   If deficit remains & P2 withdrawal is considered: use `person2.pension.capital()`, `person2.pension.sell()`, check `person2.phase === Phases.retired || person2.age >= person2.retirementAgeParam`.
+        *   Update global `incomePrivatePension` and `cash`.
+    6.  **Refactor `liquidateAll()` function:**
+        *   If `person1.pension.capital() > 0`, add `person1.pension.sell(person1.pension.capital())` to `incomePrivatePension`.
+        *   If `person2 && person2.pension.capital() > 0`, add `person2.pension.sell(person2.pension.capital())` to `incomePrivatePension`.
+    7.  **Update `updateYearlyData()` (Combined Pension Display):**
+        *   Update `dataSheet[row].age += person1.age;` instead of using global `age`.
+        *   `dataSheet[row].pensionFund += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);`
+        *   `dataSheet[row].worth` calculation to sum `person1.pension.capital()`, `person2.pension.capital()` (if P2 exists), along with other assets.
+
+---
+
+**Phase 4: Revenue & Tax Calculation (`src/core/Revenue.js`)**
+
+**Status: ⏸️ Not started**
+
+*   **Objective:** Update revenue and tax logic for two individuals.
+*   **Tasks:**
+    1.  **Adapt `Revenue.prototype.reset(person1, person2_optional)`:**
+        *   Accept `person1` (Person object) and optional `person2` (Person object).
+        *   Store `this.currentAgeP1 = person1.age;`
+        *   Store `this.currentAgeP2 = person2 ? person2.age : undefined;`
+        *   Revenue.js detects Person 2 presence via `this.currentAgeP2`.
+    2.  **Adapt `Revenue.prototype.declareSalaryIncome(amount, contribRate, personAge)`:**
+        *   This function now takes `personAge`. It should store salaries along with the associated `personAge` (e.g., in an array of objects `[{amount, contribRate, age}, ...]`).
+    3.  **Update `this.people`:** Logic based on `this.salaries.length` and presence of `this.currentAgeP2`.
+    4.  **Refine `computeIT()`:** Use `this.currentAgeP1` and `this.currentAgeP2` for age-related credits and exemptions.
+    5.  **Refine `computePRSI()`:** Base PRSI exemption on `this.currentAgeP1` for non-PAYE. For PAYE, it will use ages from stored salaries.
     6.  **Refine `computeUSC()`:**
-        *   When looping through salaries, use `this.currentAgeP1` for the first salary and `this.currentAgeP2` (if available) for the second salary to apply correct USC bands and reduced rates (`config.uscReducedRateAge`).
-        *   Handle USC for non-salary income based on `this.currentAgeP1` if no salaries.
-    7.  **Lump Sum Handling:**
-        *   Ensure `declarePrivatePensionLumpSum(amount)` (called from `Simulator.js`) correctly aggregates multiple lump sums in `this.privatePensionLumpSum` and `this.privatePensionLumpSumCount` for tiered tax bands.
+        *   When looping through stored salaries, use the `age` associated with each salary entry for correct USC bands/rates (`config.uscReducedRateAge`).
+        *   Handle non-salary income USC based on `this.currentAgeP1`.
+    7.  **Lump Sum Handling (`declarePrivatePensionLumpSum`):** The existing aggregation logic should still work as it's called per lump sum event.
 
 ---
 
-**Phase 4: HTML Updates (`src/frontend/web/ifs/index.html`)**
+**Phase 5: HTML Updates (`src/frontend/web/ifs/index.html`)**
+
+**Status: ⏸️ Not started**
 
 *   **Objective:** Add new input fields to the HTML for Person 2's data.
 *   **Tasks (referencing Section 1 of `two_peeps.md`):**
-    1.  **Add Input Fields:**
-        *   `P2StartingAge` (Optional)
-        *   `P2RetirementAge` (Optional)
-        *   `P2StatePensionWeekly` (Optional)
-        *   `InitialPensionP2` (Optional, new field)
-        *   `PensionContributionPercentageP2` (Optional, new field)
-        *   Ensure HTML IDs for new fields match the names above.
-    2.  **Update Labels:**
-        *   Change "Current Age" to "Person 1 Current Age" (for existing `StartingAge`).
-        *   Change "Current Savings" to "Current Savings (Joint)".
-        *   Change "Pension Fund" to "Person 1 Pension Fund" (for existing `InitialPension`).
-        *   Change "Pension %" to "Person 1 Pension %" (for existing `PensionContributionPercentage`).
-    3.  **Data Table:**
-        *   Confirm that the existing output table remains unchanged for now, with `PensionFund` column representing the combined value (as handled in `Simulator.js`).
+    1.  Add Input Fields: `P2StartingAge`, `P2RetirementAge`, `P2StatePensionWeekly`, `InitialPensionP2`, `PensionContributionPercentageP2`. Ensure HTML IDs match.
+    2.  Update Labels for P1 fields and joint fields (e.g., "Person 1 Current Age", "Current Savings (Joint)", "Person 1 Pension Fund").
+    3.  Data Table: Keep existing `PensionFund` column for combined value.
 
 ---
 
-**Phase 5: UI Parameter Reading & Validation (JavaScript - `WebUI.js`)**
+**Phase 6: UI Parameter Reading & Validation (JavaScript - `WebUI.js`)**
 
-*   **Objective:** Update the JavaScript UI logic to read new parameters and implement validation.
+**Status: ⏸️ Not started**
+
+*   **Objective:** Update UI logic to read new parameters and implement validation.
 *   **Tasks (referencing Section 2 of `two_peeps.md`):**
-    1.  **Modify `WebUI.prototype.getParameters`:**
-        *   Read new P2 fields: `P2StartingAge`, `P2RetirementAge`, `P2StatePensionWeekly`.
-        *   Read new pension fields: `InitialPensionP2`, `PensionContributionPercentageP2`.
-        *   Store them in the `params` object as: `p2StartingAge`, `p2RetirementAge`, `p2StatePensionWeekly`, `initialPensionP2`, `pensionPercentageP2`.
-    2.  **Person 1 Validation:**
-        *   Ensure `startingAge` and `retirementAge` must both be provided if either is entered.
-        *   Implement and show validation error if incomplete Person 1 data is entered.
-    3.  **Person 2 Validation:**
-        *   If any Person 2 field (`P2StartingAge`, `P2RetirementAge`, `P2StatePensionWeekly`, `InitialPensionP2`, or `PensionContributionPercentageP2`) is provided, then `P2StartingAge` and `P2RetirementAge` become required.
-        *   Implement and show validation error if incomplete Person 2 data is entered (i.e., some P2 fields provided but not `P2StartingAge` and `P2RetirementAge`).
-    4.  **Person 2 Detection Logic (for UI purposes, if needed):**
-        *   Person 2 exists if `params.p2StartingAge` is provided and valid.
+    1.  Modify `WebUI.prototype.getParameters`: Read new P2 fields and pension fields, store as `p2StartingAge`, `initialPensionP2`, etc. in `params`.
+    2.  Person 1 Validation: `startingAge` and `retirementAge` required if either provided.
+    3.  Person 2 Validation: If any P2 field provided, `p2StartingAge` and `p2RetirementAge` become required.
+    4.  Person 2 Detection Logic (for UI): Based on `params.p2StartingAge`.
 
 ---
 
-**Phase 6: Supporting Updates (Validation, Help, Event Labels)**
+**Phase 7: Supporting Updates (Validation, Help, Event Labels)**
 
-*   **Objective:** Update various supporting parts of the application to reflect the new two-person functionality.
+**Status: ⏸️ Not started**
+
+*   **Objective:** Update various supporting parts of the application.
 *   **Tasks (referencing Sections 3 & 5 of `two_peeps.md`):**
-    1.  **Update Dropdown Labels in `EventsTableManager.getEventTypeOptions()` (from `Simulator.js` section):**
-        *   Change `SI: Salary Income` to `SI: Salary Income (Person 1)`.
-        *   Change `SInp: Salary (No Pension)` to `SInp: Salary Income (Partner)`.
-    2.  **Event Validation (`UIManager.js`):**
-        *   Update the validation description for `SInp` in the `valid` object from "Salary Income (no private pension contribution)" to "Salary Income (Partner)".
-    3.  **Help System (`help.yml`):**
-        *   Update help text and tooltips to reflect the new meaning of `SInp` events.
-        *   Explain the two-person functionality, new input fields, and how Person 2's pension contribution rate defaults if not specified.
-    4.  **Error Messages:**
-        *   Review and update any validation messages that reference the old `SInp` behavior or other assumptions changed by two-person support.
+    1.  Update Dropdown Labels in `EventsTableManager.getEventTypeOptions()`: `SI: Salary Income (Person 1)`, `SInp: Salary Income (Partner)`.
+    2.  Event Validation (`UIManager.js`): Update `SInp` description in `valid` object.
+    3.  Help System (`help.yml`): Update for `SInp` and two-person functionality.
+    4.  Error Messages: Review and update messages related to old `SInp` behavior.
 
 ---
 
-**Phase 7: Scenario File Versioning & Migration**
+**Phase 8: Scenario File Versioning & Migration**
 
-*   **Objective:** Implement a mechanism to handle new scenario file formats and guide users with old files.
+**Status: ⏸️ Not started**
+
+*   **Objective:** Handle new scenario file formats.
 *   **Tasks (referencing Section 6 of `two_peeps.md`):**
-    1.  **Increment Scenario File Version Number:**
-        *   Define and implement a new version number for scenarios that include two-person data.
-    2.  **Old Scenario Detection:**
-        *   When loading a scenario file, check its version number (or lack thereof for very old files).
-    3.  **Migration Error Display:**
-        *   If an old scenario is detected:
-            *   Show a clear, non-technical error message to the user.
-            *   Explain:
-                *   The scenario format has changed for two-person functionality.
-                *   `SInp` events now mean "Partner's Salary" and contribute to Person 2's pension.
-                *   Users must manually review their scenarios:
-                    *   Change any events previously intended as a second salary for Person 1 (but using `SInp` to avoid pension) to `SI` if they still want no pension for P1 on that income, or adjust event types as needed.
-                    *   Identify and convert previous "second person salary" events (likely `SI` events) to `SInp`.
-                    *   Input Person 2's details in the new UI fields.
-            *   Provide specific guidance on what changes are needed in their existing events.
-    4.  **No Automatic Migration:**
-        *   Confirm that no automatic conversion of old scenarios is implemented. The user must perform manual updates.
+    1.  Increment Scenario File Version Number.
+    2.  Old Scenario Detection on load.
+    3.  Migration Error Display: Explain changes, `SInp` meaning, manual review needed.
+    4.  No Automatic Migration.
 
 ---
 
-**Phase 8: Testing & Refinement**
+**Phase 9: Testing & Refinement**
 
-*   **Objective:** Populate the test cases created in Phase 1, run all tests, and ensure all functionality works as expected.
+**Status: ⏸️ Not started**
+
+*   **Objective:** Populate test cases from Phase 1, run all tests, ensure functionality.
 *   **Tasks (referencing Section 8 of `two_peeps.md`):**
-    1.  **Flesh out `TestTwoPersonTaxCalculation.js`**:
-        *   Write specific test cases to validate age-related IT credits, PRSI exemptions, and USC bands for couples with different ages, using various scenarios.
-    2.  **Flesh out `TestSeparatePensionPots.js`**:
-        *   Write test cases for:
-            *   Individual pension contribution rates (`params.pensionPercentage` vs `params.pensionPercentageP2`).
-            *   Correct lump sum calculations and timing for P1 and P2.
-            *   Separate drawdown functionality for P1 and P2.
-            *   Conditional P2 pension withdrawals via the `withdraw` function (deficit handling).
-            *   Use `SI` and `SInp` events to drive P1 and P2 contributions respectively.
-    3.  **Flesh out `TestDualStatePensions.js`**:
-        *   Write test cases to verify correct timing and calculation of state pensions for two people reaching qualifying age at different times, including scenarios where one or both have state pensions.
-    4.  **Flesh out `TestRegressionTwoPerson.js`**:
-        *   Establish and save baseline scenarios for two-person simulations. These will serve as regression tests for future changes. Include scenarios with:
-            *   Only Person 1.
-            *   Person 1 and Person 2 with various age differences.
-            *   Different retirement ages.
-            *   Different pension contribution strategies.
-    5.  **Flesh out `TestScenarioVersioning.js`**:
-        *   Write test cases to verify:
-            *   Proper detection of old scenario file formats.
-            *   Correct display of the migration error message.
-            *   Successful loading of new format scenarios.
-    6.  **Flesh out `TestValidation.js`**:
-        *   Write test cases for UI validation:
-            *   P1 data completion requirements.
-            *   P2 data completion requirements (if any P2 field is present).
-            *   Correct error messages for incomplete data for P1 and P2.
-    7.  **Comprehensive Scenario Testing:**
-        *   Manually test various scenarios as outlined in `two_peeps.md`, focusing on:
-            *   Separate pension pot values throughout the simulation.
-            *   Individual lump sum events and their impact on cash and taxes.
-            *   The new `withdraw` logic correctly tapping into `pensionP2` under specified conditions.
-            *   Proper error handling for incomplete Person 2 data (UI and core).
-            *   Proper error handling for old scenario files.
-    8.  **Iterate and Debug:**
-        *   Run all automated and manual tests.
-        *   Identify, debug, and fix any issues found in the implementation.
-        *   Repeat testing until all tests pass and functionality is confirmed.
+    1.  Flesh out `TestTwoPersonTaxCalculation.js` (age-related credits, PRSI, USC for P1/P2).
+    2.  Flesh out `TestSeparatePensionPots.js` (individual contributions via `Person` objects, lump sums, drawdowns, P2 `withdraw` logic).
+    3.  Flesh out `TestDualStatePensions.js` (timing/calculation for two people).
+    4.  Flesh out `TestRegressionTwoPerson.js` (baseline scenarios).
+    5.  Flesh out `TestScenarioVersioning.js` (old/new format detection, errors).
+    6.  Flesh out `TestValidation.js` (UI validation for P1/P2 data).
+    7.  Comprehensive Scenario Testing: Manual tests for pension pots, lump sums, `withdraw` logic, error handling.
+    8.  Iterate and Debug until all tests pass.
 
 ---
 
 **Key Simplifications (to keep in mind, from Section 7 of `two_peeps.md`):**
-*   Person 2's pension contribution rate (`pensionPercentageP2`) defaults to Person 1's rate (`params.pensionPercentage`) if not specified.
+*   P2's pension contribution rate defaults to P1's if not specified (handled during `Person` object creation for P2).
 *   Financial accounts (savings, funds, shares) remain joint.
-*   The existing event system leverages the `SI`/`SInp` distinction for person identification regarding salary and pension contributions.
-*   Combined pension display in the main output table.
-*   Clear validation errors rather than complex auto-detection for Person 2 data completeness. 
+*   `SI`/`SInp` for person identification in salary events.
+*   Combined pension display in output table.
+*   Clear validation errors for P2 data. 

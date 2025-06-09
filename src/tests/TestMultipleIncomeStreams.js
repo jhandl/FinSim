@@ -35,7 +35,7 @@ const TestMultipleIncomeStreams = {
       priorityPension: 4,
       priorityFunds: 2,
       priorityShares: 3,
-      marriageYear: 2025,          // Married couple - setting marriage year
+      marriageYear: new Date().getFullYear(), // Ensures married status from test start (age 35) with new reset logic
       youngestChildBorn: null,     // No children for simplicity
       oldestChildBorn: null,
       personalTaxCredit: 1875      // Critical missing parameter!
