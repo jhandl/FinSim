@@ -1,3 +1,9 @@
+# Bugs
+
+- Scrolling the table up, the rows show above the floating headers.
+- Running the simulator with empty data (just loaded) shouldn't result in "Success!". It should do nothing, or open the "How to use" help window.
+ 
+
 # Roadmap
 
 ### Improvements

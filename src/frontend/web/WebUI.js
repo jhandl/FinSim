@@ -38,6 +38,8 @@ class WebUI extends AbstractUI {
       this.setStatus("Ready", STATUS_COLORS.INFO);
       this.fileManager.updateLastSavedState(); // Establish baseline for new scenario
       
+      this.updatePerson2FieldsState(); // Set initial state of Person 2 fields
+      
     } catch (error) {
       throw error;
     }
@@ -160,6 +162,12 @@ class WebUI extends AbstractUI {
   setupChangeListener() {
     document.addEventListener('change', (event) => {
       const element = event.target;
+
+      // If P2StartingAge changes, update the state of other P2 fields
+      if (element.id === 'P2StartingAge') {
+        this.updatePerson2FieldsState();
+      }
+
       this.editCallbacks.forEach(callback => {
         callback({
           element: element,
@@ -306,6 +314,31 @@ class WebUI extends AbstractUI {
         }, 100);
       }
     }
+  }
+
+  updatePerson2FieldsState() {
+    const p2StartingAgeValue = this.getValue('P2StartingAge');
+    const p2FieldsEnabled = p2StartingAgeValue !== undefined && p2StartingAgeValue > 0;
+
+    const p2FieldIds = [
+      'P2RetirementAge',
+      'P2StatePensionWeekly',
+      'InitialPensionP2',
+      'PensionContributionPercentageP2'
+    ];
+
+    p2FieldIds.forEach(fieldId => {
+      const inputElement = document.getElementById(fieldId);
+      if (inputElement) {
+        inputElement.disabled = !p2FieldsEnabled;
+        inputElement.style.opacity = p2FieldsEnabled ? '1' : '0.5';
+        // Also consider parent .input-wrapper for visual cues if needed
+        const wrapper = inputElement.closest('.input-wrapper');
+        if (wrapper) {
+          wrapper.style.opacity = p2FieldsEnabled ? '1' : '0.5';
+        }
+      }
+    });
   }
 }
 

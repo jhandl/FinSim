@@ -15,7 +15,7 @@ When completing tasks, update the corresponding phase status line to reflect pro
 5.  Implement supporting changes (validation, help text, scenario versioning).
 6.  Flesh out and run all tests, ensuring they pass.
 
-**Overall Progress:** Phase 4 - Task 1 Complete. Next step: Phase 4 - Task 2.
+**Overall Progress:** Phase 6 Complete. Next step: Phase 7 - Task 1.
 
 ---
 
@@ -181,36 +181,36 @@ When completing tasks, update the corresponding phase status line to reflect pro
 
 **Phase 5: HTML Updates (`src/frontend/web/ifs/index.html`)**
 
-**Status: 🔄 In Progress - Task 1 of 3 (Not Yet Started)**
+**Status: ✅ Complete**
 
 *   **Objective:** Add new input fields to the HTML for Person 2's data.
 *   **Tasks (referencing Section 1 of `two_peeps.md`):**
-    1.  Add Input Fields: `P2StartingAge`, `P2RetirementAge`, `P2StatePensionWeekly`, `InitialPensionP2`, `PensionContributionPercentageP2`. Ensure HTML IDs match.
-    2.  Update Labels for P1 fields and joint fields (e.g., "Person 1 Current Age", "Current Savings (Joint)", "Person 1 Pension Fund").
-    3.  Data Table: Keep existing `PensionFund` column for combined value.
+    1.  Add Input Fields: `P2StartingAge`, `P2RetirementAge`, `P2StatePensionWeekly`, `InitialPensionP2`, `PensionContributionPercentageP2`. Ensure HTML IDs match. **Status: ✅ Complete**
+    2.  Update Labels for P1 fields and joint fields (e.g., "Person 1 Current Age", "Current Savings (Joint)", "Person 1 Pension Fund"). **Status: ✅ Complete**
+    3.  Data Table: Keep existing `PensionFund` column for combined value. **Status: ✅ Complete**
 
 ---
 
 **Phase 6: UI Parameter Reading & Validation (JavaScript - `WebUI.js`)**
 
-**Status: ⏸️ Not started**
+**Status: ✅ Complete**
 
 *   **Objective:** Update UI logic to read new parameters and implement validation.
 *   **Tasks (referencing Section 2 of `two_peeps.md`):**
-    1.  Modify `WebUI.prototype.getParameters`: Read new P2 fields and pension fields, store as `p2StartingAge`, `initialPensionP2`, etc. in `params`.
-    2.  Person 1 Validation: `startingAge` and `retirementAge` required if either provided.
-    3.  Person 2 Validation: If any P2 field provided, `p2StartingAge` and `p2RetirementAge` become required.
-    4.  Person 2 Detection Logic (for UI): Based on `params.p2StartingAge`.
+    1.  Modify `WebUI.prototype.getParameters`: Read new P2 fields and pension fields, store as `p2StartingAge`, `initialPensionP2`, etc. in `params`. **Status: ✅ Complete**
+    2.  Person 1 Validation: `startingAge` and `retirementAge` required if either provided. **Status: ✅ Complete**
+    3.  Person 2 Validation: If any P2 field provided, `p2StartingAge` and `p2RetirementAge` become required. **Status: ✅ Complete**
+    4.  Person 2 Detection Logic (for UI): Based on `params.p2StartingAge`. **Status: ✅ Complete**
 
 ---
 
 **Phase 7: Supporting Updates (Validation, Help, Event Labels)**
 
-**Status: ⏸️ Not started**
+**Status: 🔄 In Progress - Task 1 of 4 (Not Yet Started)**
 
 *   **Objective:** Update various supporting parts of the application.
 *   **Tasks (referencing Sections 3 & 5 of `two_peeps.md`):**
-    1.  Update Dropdown Labels in `EventsTableManager.getEventTypeOptions()`: `SI: Salary Income (Person 1)`, `SInp: Salary Income (Partner)`.
+    1.  Update Dropdown Labels in `EventsTableManager.getEventTypeOptions()`: `SI: Salary Income (You)`, `SInp: Salary Income (Partner)`.
     2.  Event Validation (`UIManager.js`): Update `SInp` description in `valid` object.
     3.  Help System (`help.yml`): Update for `SInp` and two-person functionality.
     4.  Error Messages: Review and update messages related to old `SInp` behavior.
@@ -225,8 +225,9 @@ When completing tasks, update the corresponding phase status line to reflect pro
 *   **Tasks (referencing Section 6 of `two_peeps.md`):**
     1.  Increment Scenario File Version Number.
     2.  Old Scenario Detection on load.
-    3.  Migration Error Display: Explain changes, `SInp` meaning, manual review needed.
-    4.  No Automatic Migration.
+    3.  On load, two options are possible:
+        3.1. Migration Error Display: Explain changes, `SInp` meaning, manual review needed (no automatic migration).
+        3.2. Replicate the P1 settings for P2. This should keep old scenarios working. Open a warning that explains the new settings.
 
 ---
 

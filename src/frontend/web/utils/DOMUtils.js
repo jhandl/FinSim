@@ -58,6 +58,8 @@ class DOMUtils {
     } else {
       element.textContent = value;
     }
+    // Dispatch a change event so that listeners can react to programmatic changes
+    element.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
 } 

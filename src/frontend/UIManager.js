@@ -119,7 +119,14 @@ class UIManager {
       marriageYear: this.ui.getValue("MarriageYear"),
       youngestChildBorn: this.ui.getValue("YoungestChildBorn"),
       oldestChildBorn: this.ui.getValue("OldestChildBorn"),
-      personalTaxCredit: this.ui.getValue("PersonalTaxCredit")
+      personalTaxCredit: this.ui.getValue("PersonalTaxCredit"),
+
+      // Person 2 Parameters
+      p2StartingAge: this.ui.getValue("P2StartingAge"),
+      p2RetirementAge: this.ui.getValue("P2RetirementAge"),
+      p2StatePensionWeekly: this.ui.getValue("P2StatePensionWeekly"),
+      initialPensionP2: this.ui.getValue("InitialPensionP2"),
+      pensionPercentageP2: this.ui.getValue("PensionContributionPercentageP2")
     };
     
     if (validate) {
@@ -128,6 +135,34 @@ class UIManager {
       }
       if (params.retirementAge < config.minPrivatePensionRetirementAge) {
         this.ui.setWarning("RetirementAge", "Warning: Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
+      }
+
+      // Person 1 Validation: startingAge and retirementAge required if either provided.
+      if (params.startingAge !== 0 && params.retirementAge === 0) {
+        this.ui.setWarning("RetirementAge", "Person 1 Retirement Age is required if Person 1 Current Age is provided.");
+        errors = true;
+      }
+      if (params.retirementAge !== 0 && params.startingAge === 0) {
+        this.ui.setWarning("StartingAge", "Person 1 Current Age is required if Person 1 Retirement Age is provided.");
+        errors = true;
+      }
+
+      // Person 2 Validation: If any P2 field provided, p2StartingAge and p2RetirementAge become required.
+      const anyP2FieldProvided = params.p2StartingAge !== 0 || 
+                                 params.p2RetirementAge !== 0 || 
+                                 params.p2StatePensionWeekly !== 0 || 
+                                 params.initialPensionP2 !== 0 || 
+                                 params.pensionPercentageP2 !== 0;
+
+      if (anyP2FieldProvided) {
+        if (params.p2StartingAge === 0) {
+          this.ui.setWarning("P2StartingAge", "Person 2 Current Age is required if any Person 2 detail is provided.");
+          errors = true;
+        }
+        if (params.p2RetirementAge === 0) {
+          this.ui.setWarning("P2RetirementAge", "Person 2 Retirement Age is required if any Person 2 detail is provided.");
+          errors = true;
+        }
       }
 
       if (params.FundsAllocation + params.SharesAllocation > 1.0001) {
