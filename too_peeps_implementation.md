@@ -15,7 +15,7 @@ When completing tasks, update the corresponding phase status line to reflect pro
 5.  Implement supporting changes (validation, help text, scenario versioning).
 6.  Flesh out and run all tests, ensuring they pass.
 
-**Overall Progress:** Phase 3 Complete. Next step: Phase 4 - Task 1.
+**Overall Progress:** Phase 4 - Task 1 Complete. Next step: Phase 4 - Task 2.
 
 ---
 
@@ -158,30 +158,30 @@ When completing tasks, update the corresponding phase status line to reflect pro
 
 **Phase 4: Revenue & Tax Calculation (`src/core/Revenue.js`)**
 
-**Status: ⏸️ Not started**
+**Status: ✅ Complete**
 
 *   **Objective:** Update revenue and tax logic for two individuals.
 *   **Tasks:**
-    1.  **Adapt `Revenue.prototype.reset(person1, person2_optional)`:**
+    1.  **Adapt `Revenue.prototype.reset(person1, person2_optional)`:** **Status: ✅ Complete**
         *   Accept `person1` (Person object) and optional `person2` (Person object).
-        *   Store `this.currentAgeP1 = person1.age;`
-        *   Store `this.currentAgeP2 = person2 ? person2.age : undefined;`
-        *   Revenue.js detects Person 2 presence via `this.currentAgeP2`.
-    2.  **Adapt `Revenue.prototype.declareSalaryIncome(amount, contribRate, personAge)`:**
-        *   This function now takes `personAge`. It should store salaries along with the associated `personAge` (e.g., in an array of objects `[{amount, contribRate, age}, ...]`).
-    3.  **Update `this.people`:** Logic based on `this.salaries.length` and presence of `this.currentAgeP2`.
-    4.  **Refine `computeIT()`:** Use `this.currentAgeP1` and `this.currentAgeP2` for age-related credits and exemptions.
-    5.  **Refine `computePRSI()`:** Base PRSI exemption on `this.currentAgeP1` for non-PAYE. For PAYE, it will use ages from stored salaries.
-    6.  **Refine `computeUSC()`:**
-        *   When looping through stored salaries, use the `age` associated with each salary entry for correct USC bands/rates (`config.uscReducedRateAge`).
-        *   Handle non-salary income USC based on `this.currentAgeP1`.
-    7.  **Lump Sum Handling (`declarePrivatePensionLumpSum`):** The existing aggregation logic should still work as it's called per lump sum event.
+        *   Store `this.currentAgeP1 = person1.age;` // Note: currentAgeP1/P2 later removed, using personRef.age directly
+        *   Store `this.currentAgeP2 = person2 ? person2.age : undefined;` // Note: currentAgeP1/P2 later removed
+        *   Revenue.js detects Person 2 presence via `this.person2Ref`.
+    2.  **Adapt `Revenue.prototype.declareSalaryIncome(amount, contribRate, personAge)`:** **Status: ✅ Complete** // Note: Later changed to accept person object
+        *   This function now takes `personAge`. It should store salaries along with the associated `personAge` (e.g., in an array of objects `[{amount, contribRate, age}, ...]`). // Note: Later changed to store in person-specific arrays without age, using personRef.age for calcs.
+    3.  **Update `this.people`:** Logic based on presence of `this.person1Ref` and `this.person2Ref`. **Status: ✅ Complete**
+    4.  **Refine `computeIT()`:** Use `personRef.age` for age-related credits and exemptions. **Status: ✅ Complete**
+    5.  **Refine `computePRSI()`:** Base PRSI exemption on `personRef.age` for PAYE and non-PAYE. **Status: ✅ Complete**
+    6.  **Refine `computeUSC()`:** Use `personRef.age` for USC bands/rates for each person's total USC-liable income. **Status: ✅ Complete**
+        *   When looping through stored salaries, use the `age` associated with each salary entry for correct USC bands/rates (`config.uscReducedRateAge`). // Note: Logic updated to sum person's salaries and use personRef.age for their total USC income.
+        *   Handle non-salary income USC based on `personRef.age` after attributing income. // Note: Logic updated for per-person non-salary income attribution.
+    7.  **Lump Sum Handling (`declarePrivatePensionLumpSum`):** Refactored for per-person declaration and IT calculation. **Status: ✅ Complete**
 
 ---
 
 **Phase 5: HTML Updates (`src/frontend/web/ifs/index.html`)**
 
-**Status: ⏸️ Not started**
+**Status: 🔄 In Progress - Task 1 of 3 (Not Yet Started)**
 
 *   **Objective:** Add new input fields to the HTML for Person 2's data.
 *   **Tasks (referencing Section 1 of `two_peeps.md`):**

@@ -22,8 +22,8 @@ class Person {
     // Initialize phase to growth phase
     this.phase = Phases.growth;
     
-    // Create and store pension instance
-    this.pension = new Pension(commonPensionConfig.growthRatePension, commonPensionConfig.growthDevPension);
+    // Create and store pension instance, passing the Person instance itself
+    this.pension = new Pension(commonPensionConfig.growthRatePension, commonPensionConfig.growthDevPension, this);
     
     // Store essential person-specific parameters
     this.retirementAgeParam = personSpecificUIParams.retirementAge;

@@ -125,16 +125,17 @@ class Shares extends Equity {
 
 class Pension extends Equity {
 
-  constructor(growth, stdev=0) {
+  constructor(growth, stdev=0, person) {
     super(0, growth, stdev);
     this.lumpSum = false;
+    this.person = person;
   }
 
   declareRevenue(income, gains) {
     if (this.lumpSum) {
-      revenue.declarePrivatePensionLumpSum(income);
+      revenue.declarePrivatePensionLumpSum(income, this.person);
     } else {
-      revenue.declarePrivatePensionIncome(income);
+      revenue.declarePrivatePensionIncome(income, this.person);
     }
   }
   

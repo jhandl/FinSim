@@ -14,38 +14,63 @@ const config = require('../core/config/finance-simulation-config-1.26.json');
 // --- Helper Functions for Tax Calculations (based on config) ---
 
 function calculateIncomeTax(grossIncome, age, isMarried, personalTaxCreditFromParams) {
-    let income = grossIncome;
-    const personalTaxCredit = personalTaxCreditFromParams || 1875; // Personal tax credit parameter
-    const employeeTaxCredit = config.itEmployeeTaxCredit; // From config (2000)
-    // With inflation: 0.0, the adjust() function should return the original value
-    // So total credit = params.personalTaxCredit + Math.min(salaries.length, 2) * config.itEmployeeTaxCredit
-    const totalCredit = personalTaxCredit + employeeTaxCredit; // 1875 + 2000 = 3875
-    // Note: Age credit is applied in netIncome() to total tax, not to IT specifically
+    let income = grossIncome; // This is the taxable income for IT purposes for these tests
+    const personalTaxCredit = personalTaxCreditFromParams || 1875;
+    const employeeTaxCredit = config.itEmployeeTaxCredit; 
+    let totalCredit = personalTaxCredit + employeeTaxCredit; // Base credits for one earner
 
-    if (age >= config.itExemptionAge && income <= config.itExemptionLimit) {
-        return 0; // Exempt from income tax
+    // Add Age Credit for P1 if eligible (matches Revenue.js logic for a single P1 or P1 in a couple where P2 is not specified/eligible)
+    if (age >= config.itExemptionAge) {
+        totalCredit += config.ageTaxCredit;
+    }
+
+    // Age Exemption (full IT waiver)
+    // For married, using a simplified 2x single limit as per existing test/Revenue.js approach for this specific part.
+    const exemptionLimitBase = config.itExemptionLimit;
+    const currentExemptionLimit = isMarried ? exemptionLimitBase * 2 : exemptionLimitBase;
+    if (age >= config.itExemptionAge && income <= currentExemptionLimit) {
+        // Note: Revenue.js also checks for no pension lump sums for this full exemption.
+        // Assuming no lump sums in these specific test scenarios for simplicity in this helper.
+        return 0; 
     }
 
     const rawBands = isMarried ? config.itMarriedBands : config.itSingleNoChildrenBands;
     
-    // Use the exact same logic as computeProgressiveTax in Revenue.js
-    const adjustedBands = Object.fromEntries(Object.entries(rawBands)
-                            .map(([limit, rate]) => {
-                                let newLimit = parseInt(limit);
-                                // No limitShift or multiplier for basic IT calculation
-                                return [String(newLimit), rate];
-                            }));
+    let marriedBandIncrease = 0;
+    if (isMarried && grossIncome > 0) {
+        // Assuming P1 is the earner (grossIncome) and P2 has no salary in these test events.
+        // This matches Revenue.js logic: marriedBandIncrease based on the earning spouse's income up to the max.
+        marriedBandIncrease = Math.min(config.itMaxMarriedBandIncrease, grossIncome);
+    }
     
+    // Adjust bands similar to Revenue.js's computeProgressiveTax (inflation is 0.0 in test, so adjust() is identity)
+    const adjustedBands = Object.fromEntries(Object.entries(rawBands)
+                            .map(([limitStr, rate]) => {
+                                let newLimit = parseInt(limitStr);
+                                if (newLimit > 0) { // Apply shift only to non-zero lower band limits
+                                    newLimit += marriedBandIncrease;
+                                }
+                                // config.inflation is 0 in this test, so adjust(newLimit) = newLimit
+                                // multiplier is 1 for standard IT bands
+                                return [String(newLimit), rate]; 
+                            }));                            
+
+    // Calculate progressive tax based on adjusted bands
+    // Ensured logic mirrors Revenue.js's map/reduce approach on sorted numeric keys
     const tax = Object.keys(adjustedBands)
-      .map((lowerLimit, index, arr) => {
-          const upperLimit = arr[index + 1] || Infinity;
-          const rate = adjustedBands[lowerLimit];
-          const taxable = Math.min(income, upperLimit) - parseFloat(lowerLimit);
-          return Math.max(taxable, 0) * rate;
+      .map(key => parseFloat(key)) // Get numeric keys for sorting and calculation
+      .sort((a, b) => a - b)
+      .map((currentBandLowerLimitNumeric, index, sortedNumericLimits) => {
+          const nextBandLowerLimitNumeric = sortedNumericLimits[index + 1] || Infinity;
+          const rate = adjustedBands[String(currentBandLowerLimitNumeric)]; // Get rate using original string key
+          
+          // Calculate income taxable in this specific segment of the adjusted bands
+          const incomeInThisSegment = Math.max(0, Math.min(income, nextBandLowerLimitNumeric) - currentBandLowerLimitNumeric);
+          return incomeInThisSegment * rate;
       })
       .reduce((sum, amount) => sum + amount, 0);
 
-    const finalTax = Math.max(0, tax - totalCredit); // Removed ageCredit
+    const finalTax = Math.max(0, tax - totalCredit);
     return parseFloat(finalTax.toFixed(2));
 }
 

@@ -243,7 +243,7 @@ function processEvents() {
           let totalContrib = personalContrib + companyContrib;
           pensionContribution += totalContrib;
           person1.pension.buy(totalContrib);
-          revenue.declareSalaryIncome(amount, contribRate, person1.age);
+          revenue.declareSalaryIncome(amount, contribRate, person1);
         }
         break;
 
@@ -261,10 +261,10 @@ function processEvents() {
             let totalContrib = personalContrib + companyContrib;
             pensionContribution += totalContrib;
             person2.pension.buy(totalContrib);
-            revenue.declareSalaryIncome(amount, contribRate, person2.age);
+            revenue.declareSalaryIncome(amount, contribRate, person2);
           } else {
             // SInp event but no Person 2 defined - treat as salary with no pension for P1
-            revenue.declareSalaryIncome(amount, 0, person1.age);
+            revenue.declareSalaryIncome(amount, 0, person1);
           }
         }
         break;
@@ -279,7 +279,7 @@ function processEvents() {
       case 'DBI': // Defined Benefit Pension Income
         if (inScope) {
           incomeDefinedBenefit += amount;
-          revenue.declareSalaryIncome(amount, 0);
+          revenue.declareSalaryIncome(amount, 0, person1);
         }
         break;
 
