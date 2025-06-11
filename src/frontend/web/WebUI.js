@@ -17,7 +17,8 @@ class WebUI extends AbstractUI {
         'InitialPension': { neutral: 'Pension Fund', your: 'Your Pension Fund' },
         'RetirementAge': { neutral: 'Retirement Age', your: 'Your Retirement Age' },
         'PensionContributionPercentage': { neutral: 'Pension Contribution', your: 'Your Pension Contribution' },
-        'StatePensionWeekly': { neutral: 'State Pension (Weekly)', your: 'Your State Pension (Weekly)' }
+        'StatePensionWeekly': { neutral: 'State Pension (Weekly)', your: 'Your State Pension (Weekly)' },
+        'InitialSavings': { neutral: 'Current Savings', your: 'Current Savings (Joint)' }
       };
       this.p2InputIds = ['P2StartingAge', 'InitialPensionP2', 'P2RetirementAge', 'PensionContributionPercentageP2', 'P2StatePensionWeekly'];
       
@@ -50,7 +51,6 @@ class WebUI extends AbstractUI {
       this.fileManager.updateLastSavedState(); // Establish baseline for new scenario
       
       this.updateUIForSimMode(); // Set initial UI state based on mode
-      this.updatePerson2FieldsState(); // Set initial state of Person 2 fields
       
     } catch (error) {
       throw error;
@@ -177,7 +177,7 @@ class WebUI extends AbstractUI {
 
       // If P2StartingAge changes, update the state of other P2 fields
       if (element.id === 'P2StartingAge') {
-        this.updatePerson2FieldsState();
+        // this.updatePerson2FieldsState(); // REMOVED by user request
       }
 
       this.editCallbacks.forEach(callback => {
@@ -376,7 +376,7 @@ class WebUI extends AbstractUI {
     } else {
         // When switching to couple mode, ensure updatePerson2FieldsState is called to correctly set opacity/disabled state
         // This is especially important if P2StartingAge was already 0.
-        this.updatePerson2FieldsState(); 
+        // this.updatePerson2FieldsState(); // REMOVED by user request
     }
 
     // Update P1 Labels
@@ -386,32 +386,14 @@ class WebUI extends AbstractUI {
         labelElement.textContent = isSingleMode ? this.p1Labels[inputId].neutral : this.p1Labels[inputId].your;
       }
     }
+
+    // Update InitialSavings label
+    const initialSavingsLabel = document.querySelector('label[for="InitialSavings"]');
+    if (initialSavingsLabel) {
+      initialSavingsLabel.textContent = isSingleMode ? 'Current Savings' : 'Current Savings (Joint)';
+    }
   }
 
-  updatePerson2FieldsState() {
-    const p2StartingAgeValue = this.getValue('P2StartingAge');
-    const p2FieldsEnabled = p2StartingAgeValue !== undefined && p2StartingAgeValue > 0;
-
-    const p2FieldIds = [
-      'P2RetirementAge',
-      'P2StatePensionWeekly',
-      'InitialPensionP2',
-      'PensionContributionPercentageP2'
-    ];
-
-    p2FieldIds.forEach(fieldId => {
-      const inputElement = document.getElementById(fieldId);
-      if (inputElement) {
-        inputElement.disabled = !p2FieldsEnabled;
-        inputElement.style.opacity = p2FieldsEnabled ? '1' : '0.5';
-        // Also consider parent .input-wrapper for visual cues if needed
-        const wrapper = inputElement.closest('.input-wrapper');
-        if (wrapper) {
-          wrapper.style.opacity = p2FieldsEnabled ? '1' : '0.5';
-        }
-      }
-    });
-  }
 }
 
 window.addEventListener('DOMContentLoaded', async () => { // Add async

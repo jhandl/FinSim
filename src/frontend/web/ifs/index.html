@@ -83,6 +83,40 @@
                 </div>
             </div>
 
+            <div class="card" id="personalCircumstances">
+                <h2>Personal Circumstances</h2>
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <label for="MarriageYear">Marriage Year</label>
+                        <input type="number" id="MarriageYear" autocomplete="off">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="OldestChildBorn">Oldest Child Birth Year</label>
+                        <input type="number" id="OldestChildBorn" autocomplete="off">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="YoungestChildBorn">Youngest Child Birth Year</label>
+                        <input type="number" id="YoungestChildBorn" autocomplete="off">
+                    </div>
+                    
+                    <div class="input-wrapper">
+                        <label for="PersonalTaxCredit">Personal Tax Credit</label>
+                        <input type="number" id="PersonalTaxCredit" class="currency" autocomplete="off">
+                    </div>
+
+                    <div class="input-wrapper">
+                        <label for="StatePensionWeekly">Your State Pension (Weekly)</label>
+                        <input type="number" id="StatePensionWeekly" class="currency" data-1p-ignore autocomplete="off">
+                    </div>
+                    <div class="input-wrapper">
+                        <label for="P2StatePensionWeekly">Their State Pension (Weekly)</label>
+                        <input type="number" id="P2StatePensionWeekly" class="currency" data-1p-ignore autocomplete="off">
+                    </div>
+                </div>
+            </div>
+
             <div class="card" id="targetsAllocations">
                 <h2>Targets</h2>
                 <div class="input-group">
@@ -139,6 +173,36 @@
                 </div>
             </div>
 
+            <div class="card" id="drawdownPriorities">
+                <h2>Drawdown Priorities</h2>
+                <div class="priorities-container">
+                    <div class="priority-item" draggable="true" data-priority-id="PriorityCash">
+                        <div class="drag-handle">⋮⋮</div>
+                        <div class="priority-icon">💰</div>
+                        <div class="priority-label">Cash</div>
+                        <input type="hidden" id="PriorityCash" value="1">
+                    </div>
+                    <div class="priority-item" draggable="true" data-priority-id="PriorityPension">
+                        <div class="drag-handle">⋮⋮</div>
+                        <div class="priority-icon">🏦</div>
+                        <div class="priority-label">Private Pension</div>
+                        <input type="hidden" id="PriorityPension" value="2">
+                    </div>
+                    <div class="priority-item" draggable="true" data-priority-id="PriorityFunds">
+                        <div class="drag-handle">⋮⋮</div>
+                        <div class="priority-icon">📈</div>
+                        <div class="priority-label">Index Funds</div>
+                        <input type="hidden" id="PriorityFunds" value="3">
+                    </div>
+                    <div class="priority-item" draggable="true" data-priority-id="PriorityShares">
+                        <div class="drag-handle">⋮⋮</div>
+                        <div class="priority-icon">🏢</div>
+                        <div class="priority-label">Shares</div>
+                        <input type="hidden" id="PriorityShares" value="4">
+                    </div>
+                </div>
+            </div>
+
             <div class="card" id="growthRates">
                 <h2>Economy Parameters</h2>
                 <table class="growth-rates-table">
@@ -172,70 +236,6 @@
                         </tr>
                     </tbody>
                 </table>
-            </div>
-
-            <div class="card" id="personalCircumstances">
-                <h2>Personal Circumstances</h2>
-                <div class="input-group">
-                    <div class="input-wrapper">
-                        <label for="MarriageYear">Marriage Year</label>
-                        <input type="number" id="MarriageYear" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="OldestChildBorn">Oldest Child Birth Year</label>
-                        <input type="number" id="OldestChildBorn" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="YoungestChildBorn">Youngest Child Birth Year</label>
-                        <input type="number" id="YoungestChildBorn" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="PersonalTaxCredit">Personal Tax Credit</label>
-                        <input type="number" id="PersonalTaxCredit" class="currency" autocomplete="off">
-                    </div>
-
-                    <div class="input-wrapper">
-                        <label for="StatePensionWeekly">Your State Pension (Weekly)</label>
-                        <input type="number" id="StatePensionWeekly" class="currency" data-1p-ignore autocomplete="off">
-                    </div>
-                    <div class="input-wrapper">
-                        <label for="P2StatePensionWeekly">Their State Pension (Weekly)</label>
-                        <input type="number" id="P2StatePensionWeekly" class="currency" data-1p-ignore autocomplete="off">
-                    </div>
-                </div>
-            </div>
-
-            <div class="card" id="drawdownPriorities">
-                <h2>Drawdown Priorities</h2>
-                <div class="priorities-container">
-                    <div class="priority-item" draggable="true" data-priority-id="PriorityCash">
-                        <div class="drag-handle">⋮⋮</div>
-                        <div class="priority-icon">💰</div>
-                        <div class="priority-label">Cash</div>
-                        <input type="hidden" id="PriorityCash" value="1">
-                    </div>
-                    <div class="priority-item" draggable="true" data-priority-id="PriorityPension">
-                        <div class="drag-handle">⋮⋮</div>
-                        <div class="priority-icon">🏦</div>
-                        <div class="priority-label">Private Pension</div>
-                        <input type="hidden" id="PriorityPension" value="2">
-                    </div>
-                    <div class="priority-item" draggable="true" data-priority-id="PriorityFunds">
-                        <div class="drag-handle">⋮⋮</div>
-                        <div class="priority-icon">📈</div>
-                        <div class="priority-label">Index Funds</div>
-                        <input type="hidden" id="PriorityFunds" value="3">
-                    </div>
-                    <div class="priority-item" draggable="true" data-priority-id="PriorityShares">
-                        <div class="drag-handle">⋮⋮</div>
-                        <div class="priority-icon">🏢</div>
-                        <div class="priority-label">Shares</div>
-                        <input type="hidden" id="PriorityShares" value="4">
-                    </div>
-                </div>
             </div>
         </div>
 
