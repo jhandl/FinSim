@@ -131,6 +131,74 @@ header {
     font-size: 1.08rem;
 }
 
+.card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    vertical-align: middle;
+    margin-bottom: 0.675rem;
+    padding-bottom: 0;
+    padding-right: 0rem;
+    border-bottom: 1.8px solid var(--primary-color);
+    position: relative;
+}
+
+.card-header-flex h2 {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.card > h2:not(:first-child) {
+    margin-bottom: 0.675rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1.8px solid var(--primary-color);
+}
+
+.card > .input-group + h2,
+.card > h2:only-child {
+    /* This might be tricky, the original .card h2 might be better just modified slightly */
+}
+
+.card > h2 {
+    margin-bottom: 0.675rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1.8px solid var(--primary-color);
+    font-size: 1.08rem;
+}
+
+.card-header-flex > h2 {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.simulation-mode-toggle {
+    display: flex;
+    align-items: flex-end;
+    border-bottom: none;
+    position: relative;
+    margin-left: auto;
+}
+
+.mode-toggle-option {
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius, 4px);
+    font-size: 1.2rem;
+    color: #888;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.mode-toggle-option:hover {
+    color: #888888;
+}
+
+.mode-toggle-active {
+    color: var(--primary-color, #007bff);
+}
+
 .input-group {
     display: flex;
     flex-direction: column;
@@ -886,5 +954,46 @@ footer {
         white-space: normal;
         margin-bottom: 0;
     }
+}
+
+.simulation-mode-toggle span {
+    cursor: pointer;
+    padding: 0.1rem 0.8rem;
+    margin-left: 0rem;
+    border-radius: 4px 4px 0 0;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+    border-top: 1.8px solid transparent;
+    border-left: 1.8px solid transparent;
+    border-right: 1.8px solid transparent;
+    border-bottom: none;
+    background-color: transparent;
+    position: relative;
+    top: 1.7px;
+}
+
+.simulation-mode-toggle span:first-child {
+    margin-left: 0;
+}
+
+.simulation-mode-toggle span.mode-toggle-active {
+    background-color: var(--card-bg-color, white);
+    border-top: 1.8px solid var(--primary-color);
+    border-left: 1.8px solid var(--primary-color);
+    border-right: 1.8px solid var(--primary-color);
+    z-index: 1;
+}
+
+.simulation-mode-toggle span:not(.mode-toggle-active) i {
+    color: #b0b0b0; /* var(--medium-grey); */
+}
+
+.simulation-mode-toggle span.mode-toggle-active i {
+    color: var(--primary-color);
+}
+
+.simulation-mode-toggle i {
+    font-size: 0.9em;
+    vertical-align: top;
+    padding-top: 0.1rem;
 }
 

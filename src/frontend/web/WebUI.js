@@ -10,6 +10,16 @@ class WebUI extends AbstractUI {
       
       // Initialize simulation state tracking
       this.isSimulationRunning = false;
+      this.currentSimMode = 'single'; // Default to single person mode
+      
+      this.p1Labels = {
+        'StartingAge': { neutral: 'Current Age', your: 'Your Current Age' },
+        'InitialPension': { neutral: 'Pension Fund', your: 'Your Pension Fund' },
+        'RetirementAge': { neutral: 'Retirement Age', your: 'Your Retirement Age' },
+        'PensionContributionPercentage': { neutral: 'Pension Contribution', your: 'Your Pension Contribution' },
+        'StatePensionWeekly': { neutral: 'State Pension (Weekly)', your: 'Your State Pension (Weekly)' }
+      };
+      this.p2InputIds = ['P2StartingAge', 'InitialPensionP2', 'P2RetirementAge', 'PensionContributionPercentageP2', 'P2StatePensionWeekly'];
       
       // Initialize in a specific order to ensure dependencies are met
       this.formatUtils = new FormatUtils();
@@ -31,6 +41,7 @@ class WebUI extends AbstractUI {
       this.setupWizardInvocation();
       this.setupNavigation();
       this.setupLoadDemoScenarioButton();
+      this.setupSimModeToggle(); // Setup the new mode toggle
       
       this.eventsTableManager.addEventRow();
       
@@ -38,6 +49,7 @@ class WebUI extends AbstractUI {
       this.setStatus("Ready", STATUS_COLORS.INFO);
       this.fileManager.updateLastSavedState(); // Establish baseline for new scenario
       
+      this.updateUIForSimMode(); // Set initial UI state based on mode
       this.updatePerson2FieldsState(); // Set initial state of Person 2 fields
       
     } catch (error) {
@@ -312,6 +324,66 @@ class WebUI extends AbstractUI {
           runButton.classList.remove('disabled');
           runButton.style.pointerEvents = '';
         }, 100);
+      }
+    }
+  }
+
+  setupSimModeToggle() {
+    const simModeSingle = document.getElementById('simModeSingle');
+    const simModeCouple = document.getElementById('simModeCouple');
+
+    if (simModeSingle && simModeCouple) {
+      simModeSingle.addEventListener('click', () => {
+        if (this.currentSimMode === 'couple') {
+          this.currentSimMode = 'single';
+          simModeSingle.classList.add('mode-toggle-active');
+          simModeCouple.classList.remove('mode-toggle-active');
+          this.updateUIForSimMode();
+        }
+      });
+
+      simModeCouple.addEventListener('click', () => {
+        if (this.currentSimMode === 'single') {
+          this.currentSimMode = 'couple';
+          simModeCouple.classList.add('mode-toggle-active');
+          simModeSingle.classList.remove('mode-toggle-active');
+          this.updateUIForSimMode();
+        }
+      });
+    }
+  }
+
+  updateUIForSimMode() {
+    const isSingleMode = this.currentSimMode === 'single';
+
+    // Show/Hide P2 Field Wrappers
+    this.p2InputIds.forEach(inputId => {
+      const inputElement = document.getElementById(inputId);
+      if (inputElement) {
+        const wrapper = inputElement.closest('.input-wrapper');
+        if (wrapper) {
+          wrapper.style.display = isSingleMode ? 'none' : 'flex'; // Assuming .input-wrapper uses flex
+        }
+      }
+    });
+
+    // Clear P2StartingAge if switching to single mode to trigger dependent updates
+    if (isSingleMode) {
+      const p2StartingAgeInput = document.getElementById('P2StartingAge');
+      if (p2StartingAgeInput && (p2StartingAgeInput.value !== '' && p2StartingAgeInput.value !== '0')) {
+        this.setValue('P2StartingAge', 0); // This will also dispatch a 'change' event
+      }
+    } else {
+        // When switching to couple mode, ensure updatePerson2FieldsState is called to correctly set opacity/disabled state
+        // This is especially important if P2StartingAge was already 0.
+        this.updatePerson2FieldsState(); 
+    }
+
+    // Update P1 Labels
+    for (const inputId in this.p1Labels) {
+      const labelElement = document.querySelector(`label[for="${inputId}"]`);
+      if (labelElement) {
+        labelElement.textContent = isSingleMode ? this.p1Labels[inputId].neutral : this.p1Labels[inputId].your;
       }
     }
   }
