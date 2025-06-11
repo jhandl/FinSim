@@ -39,15 +39,27 @@ steps:
       side: "right"
       align: "start"
   
+  - element: "#P2StartingAge"
+    popover:
+      description: "<p>Enter your partner's current age.</p>"
+      side: "right"
+      align: "start"
+  
   - element: "#InitialSavings"
     popover:
-      description: "<p>Enter your current savings.</p><p>Any cash you have sitting in your bank accounts or safety box, not earning significant interest.</p>"
+      description: "<p>Enter your current savings.</p><p>Any cash you have sitting in your bank accounts or safety box, not earning significant interest. In two-person mode, this represents the combined savings for both people.</p>"
       side: "right"
       align: "start"
   
   - element: "#InitialPension"
     popover:
-      description: "<p>The total amount in your private pension funds.</p><p>If you haven't contributed to one yet, enter '0'. If you have more than one pension fund, enter the total amount here.</p>"
+      description: "<p>The total amount in your private pension funds.</p><p>If you haven't contributed to one yet, enter '0' or leave it blank. If you have more than one pension fund, enter the total amount here.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#InitialPensionP2"
+    popover:
+      description: "<p>The total amount in your partner's private pension funds.</p><p>If your partner hasn't contributed to a pension yet, enter '0' or leave it blank.</p>"
       side: "right"
       align: "start"
 
@@ -72,6 +84,12 @@ steps:
   - element: "#RetirementAge"
     popover:
       description: "<p>The age at which you plan to retire.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#P2RetirementAge"
+    popover:
+      description: "<p>The age at which your partner plans to retire.</p>"
       side: "right"
       align: "start"
 
@@ -102,6 +120,12 @@ steps:
   - element: "#PensionContributionPercentage"
     popover:
       description: "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age (${pensionContributionRateBands.min, percentage} to ${pensionContributionRateBands.max, percentage}). Do not include employer matching contributions here; there's another place for that.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#PensionContributionPercentageP2"
+    popover:
+      description: "<p>How much of your partner's age-dependent maximum they want to pay out of their gross salary into their private pension scheme.</p><p>If you enter 100% here, your partner will contribute the maximum allowed for their age. If not specified, it defaults to your own pension contribution percentage. This field is only used in two-person simulation mode.</p>"
       side: "right"
       align: "start"
 
@@ -195,6 +219,12 @@ steps:
       side: "right"
       align: "start"
 
+  - element: "#P2StatePensionWeekly"
+    popover:
+      description: "<p>Enter your partner's expected weekly state pension amount.</p><p>There's different ways to calculate your partner's state pension. Refer to [this page](https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/) to find how to calculate theirs.</p>"
+      side: "right"
+      align: "start"
+
   - element: "#drawdownPriorities"
     popover:
       description: "<p>Here you can set the priorities for the drawdown of your assets.</p><p>You can drag and drop the items to change their order of priority. The top item will be the highest priority, meaning that it will be used first to cover your expenses when needed (for example in retirement).</p>"
@@ -234,14 +264,14 @@ steps:
   - element: "#EventType"
     eventTypes: ["SI"]
     popover:
-      description: "<p>A gross salary income.</p>"
+      description: "<p>Your gross salary income.</p><p>This income will contribute to your private pension based on your pension contribution percentage.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventType"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>A gross salary income that doesn't contribute to a pension.</p>"
+      description: "<p>A gross salary income for your partner.</p><p>This income will contribute to your partner's private pension based on their pension contribution percentage.</p>"
       side: "bottom"
       align: "center"
 
@@ -320,14 +350,14 @@ steps:
   - element: "#EventName"
     eventTypes: ["SI"]
     popover:
-      description: "<p>The name of the salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of your salary income event (Person 1).</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>The name of the salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of your partner's salary income event (Person 2).</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
@@ -407,14 +437,14 @@ steps:
   - element: "#EventAmount"
     eventTypes: ["SI"]
     popover:
-      description: "<p>The present value of the gross yearly salary income.</p>"
+      description: "<p>The present value of your gross yearly salary income.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventAmount"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>The present value of the gross yearly salary income.</p>"
+      description: "<p>The present value of your partner's gross yearly salary income.</p>"
       side: "bottom"
       align: "center"
 

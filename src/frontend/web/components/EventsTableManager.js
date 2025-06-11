@@ -122,8 +122,8 @@ class EventsTableManager {
     const eventTypes = [
       'NOP:No Operation',
       'RI:Rental Income',
-      'SI:Salary Income',
-      'SInp:Salary (No Pension)',
+      'SI:Salary Income (You)',
+      'SInp:Salary Income (Partner)',
       'UI:RSU Income',
       'DBI:Defined Benefit Income',
       'FI:Tax-free Income',

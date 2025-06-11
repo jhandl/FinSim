@@ -15,7 +15,7 @@ When completing tasks, update the corresponding phase status line to reflect pro
 5.  Implement supporting changes (validation, help text, scenario versioning).
 6.  Flesh out and run all tests, ensuring they pass.
 
-**Overall Progress:** Phase 6 Complete. Next step: Phase 7 - Task 1.
+**Overall Progress:** Phase 7 Complete. Next step: Phase 8 - Scenario File Versioning & Migration.
 
 ---
 
@@ -206,14 +206,14 @@ When completing tasks, update the corresponding phase status line to reflect pro
 
 **Phase 7: Supporting Updates (Validation, Help, Event Labels)**
 
-**Status: 🔄 In Progress - Task 1 of 4 (Not Yet Started)**
+**Status: ✅ Complete**
 
 *   **Objective:** Update various supporting parts of the application.
 *   **Tasks (referencing Sections 3 & 5 of `two_peeps.md`):**
-    1.  Update Dropdown Labels in `EventsTableManager.getEventTypeOptions()`: `SI: Salary Income (You)`, `SInp: Salary Income (Partner)`.
-    2.  Event Validation (`UIManager.js`): Update `SInp` description in `valid` object.
-    3.  Help System (`help.yml`): Update for `SInp` and two-person functionality.
-    4.  Error Messages: Review and update messages related to old `SInp` behavior.
+    1.  Update Dropdown Labels in `EventsTableManager.getEventTypeOptions()`: `SI: Salary Income (You)`, `SInp: Salary Income (Partner)`. **Status: ✅ Complete**
+    2.  Event Validation (`UIManager.js`): Update `SInp` description in `valid` object. **Status: ✅ Complete**
+    3.  Help System (`help.yml`): Update for `SInp` and two-person functionality. **Status: ✅ Complete**
+    4.  Error Messages: Review and update messages related to old `SInp` behavior. **Status: ✅ Complete**
 
 ---
 

@@ -182,10 +182,9 @@ class UIManager {
   readEvents(validate=true) {
     const events = [];
     errors = false;
-        
     const rows = this.ui.getTableData("Events", 6);
 
-      for (const [i, [name, amount, fromAge, toAge, rate, match]] of rows.entries()) {
+    for (const [i, [name, amount, fromAge, toAge, rate, match]] of rows.entries()) {
       const pos = name.indexOf(":");
       if (pos < 0) {
         if (name === "") break;
@@ -201,8 +200,8 @@ class UIManager {
         const valid = {
           "NOP": "Non-operation: way to make the simulation ignore an event without needing to remove the line",
           "RI": "Rental Income",
-          "SI": "Salary Income (with private pension contribution if so defined)",
-          "SInp": "Salary Income (no private pension contribution)",
+          "SI": "Salary Income (Yours)",
+          "SInp": "Salary Income (Theirs)",
           "UI": "RSU Income",
           "DBI": "Defined Benefit Pension Income",
           "FI": "Tax-free Income",
