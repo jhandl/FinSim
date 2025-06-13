@@ -30,7 +30,7 @@ class Wizard {
   processMarkdownLinks(text) {
     if (!text) return text;
     return text.replace(
-      /\[([^\]]+)\]\(([^\)]+)\)/g,
+      /\[([^\]]+)\]\(([^\)]+)\)(?:\{[^\}]*\})?/g,
       '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
     );
   }
@@ -189,6 +189,28 @@ class Wizard {
     return state;
   }
 
+  // Helper function to check if an element is visible
+  isElementVisible(element) {
+    if (!element) return false;
+    
+    // Check if element is hidden via display: none or visibility: hidden
+    const style = window.getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden') {
+      return false;
+    }
+    
+    // Check if any parent wrapper is hidden (common case for P2 fields)
+    let parent = element.closest('.input-wrapper');
+    if (parent) {
+      const parentStyle = window.getComputedStyle(parent);
+      if (parentStyle.display === 'none' || parentStyle.visibility === 'hidden') {
+        return false;
+      }
+    }
+    
+    return true;
+  }
+
   filterValidSteps() {
     if (!this.config || !this.config.steps) return [];
 
@@ -200,7 +222,8 @@ class Wizard {
       if (!step.element) return true;
 
       if (!step.element.includes('Event')) {
-        return document.querySelector(step.element) !== null;
+        const element = document.querySelector(step.element);
+        return element !== null && this.isElementVisible(element);
       } else {
         step.element = step.element.replace(/Event([A-Za-z]+)/, `Event$1_${this.tableState.rowId}`);
         if (this.tableState.isEmpty) {

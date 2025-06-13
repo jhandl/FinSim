@@ -20,8 +20,10 @@ steps:
         <ul><li>The status box next to the "Run Simulation" button will tell you if your scenario was successful, or at what age it failed (it fails if at any point you can't afford your expenses), or the likelyhood that it succeeds (see volatility below).</li>
         <li>The graphs will show the evolution of your cashflow (how your expenses stack up against your income and where it comes from), and your assets (how much you have accumulated and where), from your current age to your target age.</li>
         <li>The table at the bottom will show you, year by year, the details of your income, taxes, cashflow, and assets.</li></ul></ol>
-        <p><b>Stress testing:</b> You can change the economy parameters to see what happens if inflation is higher, investments grow slower or are more volatile, etc. You can further stress test your scenario by adding a stock market crash or two.</p>
-        <p><b>Volatility:</b> If you introduce volatility in any of your investments (anything higher than 0%), it will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp). This runs the simulation ${simulationRuns} times, each time with random rates of growth according to a normal distribution with the median and standard deviation you provided, and it tells you how likely your scenario will succeed in those conditions (the percentage of those simulations that ended in success).</p><p>&nbsp;&nbsp;The graphs will represent the average of all the runs. You may be surprised to see non-zero amounts of money remaining in the assets graph past the expected failure age. This is due to the percentage of runs that were successful due to random chance. You may also be surprised that a higher volatility lowers the success rate. This is the result of the erosion of returns ($100 - 10% = $90; $90 + 10% = $99).</p><p>&nbsp;&nbsp;If you leave the volatility at 0% for all three investment vehicles, the simulation will run once, without any variability, and it will tell you at what age you ran out of money. If you want to see the effect of a change in your scenario, it's best to set the volatility to zero. That way it's deterministic, and any change in outcome is the direct result of the change to your scenario. Once you introduce volatility, the only meaningful outcome is the percentage of success.</p>
+        <p><b>Simulator modes:</b> The simulator can run in single-person mode (for individual planning) or two-person mode (for couples/partnerships). Use the toggle icons in the Starting Position panel to switch between modes. Two-person mode allows separate pension pots, retirement ages, and state pensions for each person.</p>
+        <p><b>Present value:</b> All monetary amounts should be entered in today's money (present value). For example, if you plan to spend €30,000 per year on living expenses, enter €30,000 even if that expense will start in 10 years. The simulator will automatically adjust these amounts for inflation over time based on the inflation or the growth rate you specify. This makes it easier to think about expenses and income in terms of today's purchasing power.</p>
+        <p><b>Stress testing:</b> You can change the economy parameters to see what happens if inflation is higher, investments grow slower or are more volatile. You can further stress test your scenario by adding a stock market crash or two.</p>
+        <p><b>Volatility:</b> If you introduce volatility in any of your investments (anything higher than 0%), it will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp){Monte Carlo,simulation,random,probability}. This runs the simulation ${simulationRuns} times, each time with random rates of growth according to a normal distribution with the median and standard deviation you provided, and it tells you how likely your scenario will succeed in those conditions (the percentage of those simulations that ended in success).</p><p>&nbsp;&nbsp;The graphs will represent the average of all the runs. You may be surprised to see non-zero amounts of money remaining in the assets graph past the expected failure age. This is due to the percentage of runs that were successful due to random chance. You may also be surprised that a higher volatility lowers the success rate. This is the result of the erosion of returns ($100 - 10% = $90; $90 + 10% = $99).</p><p>&nbsp;&nbsp;If you leave the volatility at 0% for all three investment vehicles, the simulation will run once, without any variability, and it will tell you at what age you ran out of money. If you want to see the effect of a change in your scenario, it's best to set the volatility to zero. That way it's deterministic, and any change in outcome is the direct result of the change to your scenario. Once you introduce volatility, the only meaningful outcome is the percentage of success.</p>
         <p><b>Saving scenarios:</b> To avoid losing your scenario when you close the browser window, use the "Save" button so you can load it again next time from your local hard drive. You can name the file so you can store different scenarios. </p>
         <p><b>Help system:</b> If you are editing a field and press the Help button or the ? key, you will get help for that specific field. You can navigate the help cards with the buttons on the cards, with the arrow keys and with &lt;tab&gt; and &lt;shift-tab&gt;, and you can leave the help system with &lt;Esc&gt; or clicking outside of the help card.</p>
       prevBtnText: ["← Welcome"]
@@ -32,6 +34,18 @@ steps:
       description: "<p>This is where you describe your current financial situation.</p><p>It's the starting point for the simulation.</p>"
       side: "right"
       align: "start"
+
+  - element: "#simModeSingle"
+    popover:
+      description: "<p>Single person simulation mode.</p><p>Use this mode for individual financial planning. In this mode, you'll only enter your own financial information and the simulator will plan for one person's financial future.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#simModeCouple"
+    popover:
+      description: "<p>Two-person simulation mode.</p><p>Use this mode for couples or partnerships. This allows you to enter separate pension pots, retirement ages, and state pension information for both people. Income events can be assigned to either person.</p>"
+      side: "bottom"
+      align: "center"
       
   - element: "#StartingAge"
     popover:
@@ -75,114 +89,6 @@ steps:
       side: "right"
       align: "start"
 
-  - element: "#targetsAllocations"
-    popover:
-      description: "<p>This is where you describe your financial plan.</p>"
-      side: "right"
-      align: "start"
-  
-  - element: "#RetirementAge"
-    popover:
-      description: "<p>The age at which you plan to retire.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#P2RetirementAge"
-    popover:
-      description: "<p>The age at which your partner plans to retire.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#TargetAge"
-    popover:
-      description: "<p>This is your life expectancy.</p><p>The simulation will end at this age, and will be successful if you reach this age without running out of money.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#EmergencyStash"
-    popover:
-      description: "<p>This is the amount of money you plan to have in cash to cover unexpected expenses.</p><p>This will be inflation adjusted.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#FundsAllocation"
-    popover:
-      description: "<p>This is the percentage of your portfolio that you plan to have in index funds (e.g. ETFs).</p><p>Any cash remaining after funding your emergency stash will be invested in index funds in this proportion.</p><p>The sum of index funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#SharesAllocation"
-    popover:
-      description: "<p>This is the percentage of your portfolio that you plan to have in investment trusts or shares.</p><p>Any cash remaining after funding your emergency stash will be invested in trusts or shares in this proportion.</p><p>The sum of index funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#PensionContributionPercentage"
-    popover:
-      description: "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age (${pensionContributionRateBands.min, percentage} to ${pensionContributionRateBands.max, percentage}). Do not include employer matching contributions here; there's another place for that.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#PensionContributionPercentageP2"
-    popover:
-      description: "<p>How much of your partner's age-dependent maximum they want to pay out of their gross salary into their private pension scheme.</p><p>If you enter 100% here, your partner will contribute the maximum allowed for their age. This field is only used in two-person simulation mode.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#PensionContributionCapped"
-    popover:
-      description: "<p>Whether your pension contribution is capped to match the maximum amount that you can get tax relief on (${pensionContribEarningLimit,currency}).</p><p>This limit is the same for everyone, it does not depend on age. If you select 'Yes', your pension contributions will be capped at the maximum allowed. If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess.</p><p>The cap itself will be adjusted for inflation as the years go by, so you may see the contribution exceed this limit after the first year.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#growthRates"
-    popover:
-      description: "<p>Here is where you speculate how the economy will do on average in the future.</p><p>You may want to enter conservative numbers to stress test your scenario. For reference, the average annual growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur) in US dollars (not adjusted for inflation and not including fees).</p><p>If you enter volatility numbers larger than zero, I will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp) using these numbers to calculate the probability of success of your scenario.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#PensionGrowthRate"
-    popover:
-      description: "<p>This is the expected average annual growth rate of your private pension, not adjusted for inflation.</p><p>Keep in mind pension funds tend to invest more conservatively and have higher fees, so take that into account when calculating this number.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#PensionGrowthStdDev"
-    popover:
-      description: "<p>This is the expected standard deviation of the annual growth rate of your private pension.</p><p>Keep in mind that pension funds tend to invest more conservatively so may have lower volatility than the stock market. Take that into account when calculating this number.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#FundsGrowthRate"
-    popover:
-      description: "<p>This is the expected average annual growth rate of your index funds (e.g. ETFs), not adjusted for inflation.</p><p>For reference, the average growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#FundsGrowthStdDev"
-    popover:
-      description: "<p>This is the expected standard deviation of the annual growth rate of your index funds (e.g. ETFs).</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#SharesGrowthRate"
-    popover:
-      description: "<p>This is the expected average annual growth rate of your investment trusts or shares, not adjusted for inflation.</p><p>Keep in mind that investment trusts tend to have higher fees, so take that into account when calculating this number.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#SharesGrowthStdDev"
-    popover:
-      description: "<p>This is the expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur).</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#Inflation"
-    popover:
-      description: "<p>This is the expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of 2% to 3%. However, deviations due to shocks (e.g., pandemics, wars, etc) are skewed towards higher numbers. For example, [in 2019 inflation in Ireland was 1.3%](https://www.cso.ie/en/releasesandpublications/er/cpi/consumerpriceindexdecember2019/), lower than its [30-year average of 2.3%](https://www.officialdata.org/ireland/inflation/1993?endYear=2024&amount=100). In contrast, [in 2022 it rose to 8.2%](https://www.cso.ie/en/releasesandpublications/ep/p-cpi/consumerpriceindexdecember2022/), the highest since 1984.</p>"
-      side: "right"
-      align: "start"
-
   - element: "#personalCircumstances"
     popover:
       description: "<p>Describe your personal circumstances here, as they affect your tax calculations throughout the simulation. This includes current details or future plans for marriage/partnership and children, which influence tax bands and credits.</p>"
@@ -209,19 +115,85 @@ steps:
 
   - element: "#PersonalTaxCredit"
     popover:
-      description: "<p>The amount of personal tax credit you are entitled to according to your personal circumstances (widow, carer, etc).</p><p>This is separate from the employee tax credit, and doesn't factor in dependent children (refer to [this revenue page](https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx)).</p>"
+      description: "<p>The amount of personal tax credit you are entitled to according to your personal circumstances (widow, carer, etc).</p><p>This is separate from the employee tax credit, and doesn't factor in dependent children (refer to [this revenue page](https://www.revenue.ie/en/personal-tax-credits-reliefs-and-exemptions/tax-relief-charts/index.aspx){tax,relief,credit,personal,exemption}).</p>"
       side: "right"
       align: "start"
 
   - element: "#StatePensionWeekly"
     popover:
-      description: "<p>Enter your expected weekly state pension amount.</p><p>There's different ways to calculate your state pension. Refer to [this page](https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/) to find how to calculate yours.</p>"
+      description: "<p>Enter your expected weekly state pension amount.</p><p>There's different ways to calculate your state pension. Refer to [this page](https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/){state pension,contributory,calculate,contribution} to find how to calculate yours.</p>"
       side: "right"
       align: "start"
 
   - element: "#P2StatePensionWeekly"
     popover:
-      description: "<p>Enter your partner's expected weekly state pension amount.</p><p>There's different ways to calculate your partner's state pension. Refer to [this page](https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/) to find how to calculate theirs.</p>"
+      description: "<p>Enter your partner's expected weekly state pension amount.</p><p>There's different ways to calculate your partner's state pension. Refer to [this page](https://www.gov.ie/en/publication/b6193-how-to-calculate-your-state-pension-contributory-rate/){state pension,contributory,calculate,contribution} to find how to calculate theirs.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#Targets"
+    popover:
+      description: "<p>This is where you describe what you're aiming for.</p>"
+      side: "right"
+      align: "start"
+  
+  - element: "#RetirementAge"
+    popover:
+      description: "<p>The age at which you plan to retire.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#P2RetirementAge"
+    popover:
+      description: "<p>The age at which your partner plans to retire.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#TargetAge"
+    popover:
+      description: "<p>This is your life expectancy.</p><p>The simulation will end at this age, and will be successful if you reach this age without running out of money.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#EmergencyStash"
+    popover:
+      description: "<p>The amount of money you plan to have in cash to cover unexpected expenses.</p><p>This will be inflation adjusted.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#Allocations"
+    popover:
+      description: "<p>This is where you decide how much to allocate to each type of investment.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#FundsAllocation"
+    popover:
+      description: "<p>The percentage of your portfolio that you plan to have in index funds (e.g. ETFs).</p><p>Any cash remaining after funding your emergency stash will be invested in index funds in this proportion.</p><p>The sum of index funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#SharesAllocation"
+    popover:
+      description: "<p>The percentage of your portfolio that you plan to have in investment trusts or shares.</p><p>Any cash remaining after funding your emergency stash will be invested in trusts or shares in this proportion.</p><p>The sum of index funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#PensionContributionPercentage"
+    popover:
+      description: "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age (${pensionContributionRateBands.min, percentage} to ${pensionContributionRateBands.max, percentage}). Do not include employer matching contributions here; there's another place for that.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#PensionContributionPercentageP2"
+    popover:
+      description: "<p>How much of your partner's age-dependent maximum they want to pay out of their gross salary into their private pension scheme.</p><p>If you enter 100% here, your partner will contribute the maximum allowed for their age. This field is only used in two-person simulation mode.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#PensionContributionCapped"
+    popover:
+      description: "<p>Whether your pension contribution is capped to match the maximum amount that you can get tax relief on (${pensionContribEarningLimit,currency}).</p><p>This limit is the same for everyone, it does not depend on age. If you select 'Yes', your pension contributions will be capped at the maximum allowed. If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess.</p><p>The cap itself will be adjusted for inflation as the years go by, so you may see the contribution exceed this limit after the first year.</p>"
       side: "right"
       align: "start"
 
@@ -231,9 +203,57 @@ steps:
       side: "right"
       align: "start"
 
+  - element: "#growthRates"
+    popover:
+      description: "<p>Here is where you speculate how the economy will do on average in the future.</p><p>You may want to enter conservative numbers to stress test your scenario. For reference, the average annual growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index} in US dollars (not adjusted for inflation and not including fees).</p><p>If you enter volatility numbers larger than zero, I will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp){Monte Carlo,simulation,random,probability} using these numbers to calculate the probability of success of your scenario.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#PensionGrowthRate"
+    popover:
+      description: "<p>The expected average annual growth rate of your private pension, not adjusted for inflation.</p><p>Keep in mind pension funds tend to invest more conservatively and have higher fees, so take that into account when calculating this number.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#PensionGrowthStdDev"
+    popover:
+      description: "<p>The expected standard deviation of the annual growth rate of your private pension.</p><p>Keep in mind that pension funds tend to invest more conservatively so may have lower volatility than the stock market. Take that into account when calculating this number.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#FundsGrowthRate"
+    popover:
+      description: "<p>The expected average annual growth rate of your index funds (e.g. ETFs), not adjusted for inflation.</p><p>For reference, the average growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#FundsGrowthStdDev"
+    popover:
+      description: "<p>The expected standard deviation of the annual growth rate of your index funds (e.g. ETFs).</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#SharesGrowthRate"
+    popover:
+      description: "<p>The expected average annual growth rate of your investment trusts or shares, not adjusted for inflation.</p><p>Keep in mind that investment trusts tend to have higher fees, so take that into account when calculating this number.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#SharesGrowthStdDev"
+    popover:
+      description: "<p>The expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
+      side: "right"
+      align: "start"
+
+  - element: "#Inflation"
+    popover:
+      description: "<p>The expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of 2% to 3%. However, deviations due to shocks (e.g., pandemics, wars, etc) are skewed towards higher numbers. For example, [in 2019 inflation in Ireland was 1.3%](https://www.cso.ie/en/releasesandpublications/er/cpi/consumerpriceindexdecember2019/){inflation,consumer price index,CPI,2019,annual}, lower than its [30-year average of 2.3%](https://www.officialdata.org/ireland/inflation/1993?endYear=2024&amount=100){inflation,Ireland,average,annual,rate}. In contrast, [in 2022 it rose to 8.2%](https://www.cso.ie/en/releasesandpublications/ep/p-cpi/consumerpriceindexdecember2022/){inflation,consumer price index,CPI,2022,annual}, the highest since 1984.</p>"
+      side: "right"
+      align: "start"
+
   - element: ".events-section"
     popover:
-      description: "<p>Here you can add, remove, and edit the events that make up your scenario.</p>"
+      description: "<p>Here you can add, remove, and edit the events that make up your scenario. If at any time you want to learn more about the different types of event, you can select the event type you're interested in and click Help or press the '?' key.</p>"
       side: "top"
       align: "center"
 
@@ -264,7 +284,21 @@ steps:
   - element: "#EventType"
     eventTypes: ["SInp"]
     popover:
+      description: "<p>A gross salary income that does not contribute to your pension.</p><p>This is useful for modeling salary income that doesn't qualify for pension contributions.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["SI2"]
+    popover:
       description: "<p>A gross salary income for your partner.</p><p>This income will contribute to your partner's private pension based on their pension contribution percentage.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["SI2np"]
+    popover:
+      description: "<p>A gross salary income for your partner that does not contribute to their pension.</p><p>This is useful for modeling salary income that doesn't qualify for pension contributions.</p>"
       side: "bottom"
       align: "center"
 
@@ -350,14 +384,28 @@ steps:
   - element: "#EventName"
     eventTypes: ["SI"]
     popover:
-      description: "<p>The name of your salary income event (Person 1).</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of your salary income .</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventName"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>The name of your partner's salary income event (Person 2).</p><p>You can enter any name you want. It's just for your reference.</p>"
+      description: "<p>The name of your non-pensionable salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["SI2"]
+    popover:
+      description: "<p>The name of your partner's salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventName"
+    eventTypes: ["SI2np"]
+    popover:
+      description: "<p>The name of your partner's non-pensionable salary income event.</p><p>You can enter any name you want. It's just for your reference.</p>"
       side: "bottom"
       align: "center"
 
@@ -444,6 +492,20 @@ steps:
   - element: "#EventAmount"
     eventTypes: ["SInp"]
     popover:
+      description: "<p>The present value of your gross yearly salary income that does not contribute to your pension.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["SI2"]
+    popover:
+      description: "<p>The present value of your partner's gross yearly salary income.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    eventTypes: ["SI2np"]
+    popover:
       description: "<p>The present value of your partner's gross yearly salary income.</p>"
       side: "bottom"
       align: "center"
@@ -494,7 +556,7 @@ steps:
   - element: "#EventAmount"
     eventTypes: ["M"]
     popover:
-      description: "<p>The present value of the yearly amount you will repay on the mortgage.</p><p>You can get this number from a [mortgage calculator](https://www.mortgages.ie/go/first_time_buyers/mortgage_payments_calculator) and multiplying the monthly repayment by 12.</p>"
+      description: "<p>The present value of the yearly amount you will repay on the mortgage.</p><p>You can get this number from a [mortgage calculator](https://www.mortgages.ie/go/first_time_buyers/mortgage_payments_calculator){mortgage calculator,repayments} and multiplying the monthly repayment by 12.</p>"
       side: "bottom"
       align: "center"
 
@@ -530,6 +592,20 @@ steps:
 
   - element: "#EventFromAge"
     eventTypes: ["SInp"]
+    popover:
+      description: "<p>The age at which the salary income event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["SI2"]
+    popover:
+      description: "<p>The age at which the salary income event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    eventTypes: ["SI2np"]
     popover:
       description: "<p>The age at which the salary income event starts.</p>"
       side: "bottom"
@@ -622,6 +698,20 @@ steps:
       align: "center"
 
   - element: "#EventToAge"
+    eventTypes: ["SI2"]
+    popover:
+      description: "<p>The age up to and including which the salary income is received.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    eventTypes: ["SI2np"]
+    popover:
+      description: "<p>The age up to and including which the salary income is received.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
     eventTypes: ["UI"]
     popover:
       description: "<p>The age up to and including which the RSU income is received.</p>"
@@ -708,6 +798,20 @@ steps:
       align: "center"
 
   - element: "#EventRate"
+    eventTypes: ["SI2"]
+    popover:
+      description: "<p>The expected average annual growth rate of the salary income.</p><p>If you leave it blank, it will use the inflation rate.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    eventTypes: ["SI2np"]
+    popover:
+      description: "<p>The expected average annual growth rate of the salary income.</p><p>If you leave it blank, it will use the inflation rate.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
     eventTypes: ["UI"]
     popover:
       description: "<p>The expected average annual growth rate of the RSU income.</p><p>If you leave it blank, it will use the inflation rate.</p>"
@@ -738,7 +842,7 @@ steps:
   - element: "#EventRate"
     eventTypes: ["SM"]
     popover:
-      description: "<p>The total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate an S&P500 dot-com crash when you're 40, you'd enter 40 as the starting age, and 41 as the ending age, and -40% as the rate. This will override the market growth you specified in the economy parameters with a ~29% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p><p>Keep in mind that high volatility values already imply bubbles and crashes, but it's interesting to see what happens if the crash comes at the worst time, for example [just as you retire](https://www.investopedia.com/terms/s/sequence-risk.asp).</p>"
+      description: "<p>The total percentage that the market will fall or rise in the specified period of time.</p><p>For example, to simulate an S&P500 dot-com crash when you're 40, you'd enter 40 as the starting age, and 41 as the ending age, and -40% as the rate. This will override the market growth you specified in the economy parameters with a ~29% drop per year for those two years. For a bull run, you'd use a positive growth percentage.</p><p>Keep in mind that high volatility values already imply bubbles and crashes, but it's interesting to see what happens if the crash comes at the worst time, for example [just as you retire](https://www.investopedia.com/terms/s/sequence-risk.asp){sequence risk,retirement,withdrawal,market,returns}.</p>"
       side: "bottom"
       align: "center"
 
@@ -752,7 +856,7 @@ steps:
   - element: "#EventRate"
     eventTypes: ["M"]
     popover:
-      description: "<p>The mortgage loan rate.</p><p>You can get this number from a [mortgage calculator](https://www.mortgages.ie/go/first_time_buyers/mortgage_payments_calculator).</p>"
+      description: "<p>The mortgage loan rate.</p><p>You can get this number from a [mortgage calculator](https://www.mortgages.ie/go/first_time_buyers/mortgage_payments_calculator){mortgage calculator,amount to borrow,repayment}.</p>"
       side: "bottom"
       align: "center"
 
@@ -789,7 +893,21 @@ steps:
   - element: "#EventMatch"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>Non-contributory salary income events don't use this field.</p>"
+      description: "<p>Non-pensionable salary income events don't use this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["SI2"]
+    popover:
+      description: "<p>The percentage up to which your partner's employer will match their private pension contributions.</p><p>Many employers match contributions up to a certain percentage of your partner's salary. If they contribute less than that, their employer will only match up to that amount. If their employer doesn't offer this, leave it blank or enter 0.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    eventTypes: ["SI2np"]
+    popover:
+      description: "<p>Non-pensionable salary income events don't use this field.</p>"
       side: "bottom"
       align: "center"
 
