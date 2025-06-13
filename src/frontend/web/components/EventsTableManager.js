@@ -181,10 +181,10 @@ class EventsTableManager {
     // Define all possible salary event types with their codes and base labels
     // P1 codes are SI, SInp. P2 codes are SI2, SI2np.
     const salaryTypesConfig = [
-      { code: 'SI', singleLabel: "Salary Income", jointLabel: "Salary (You)" },
-      { code: 'SInp', singleLabel: "Salary (No Pension)", jointLabel: "Salary (You, No Pension)" },
-      { code: 'SI2', singleLabel: null, jointLabel: "Salary (Them, Pensionable)" }, // Not in single mode
-      { code: 'SI2np', singleLabel: null, jointLabel: "Salary (Them, No Pension)" }  // Not in single mode
+      { code: 'SI', singleLabel: "Salary Income", jointLabel: "Your Salary" },
+      { code: 'SInp', singleLabel: "Salary (no pension)", jointLabel: "Your Salary (no pension)" },
+      { code: 'SI2', singleLabel: null, jointLabel: "Their Salary" },
+      { code: 'SI2np', singleLabel: null, jointLabel: "Their Salary (no pension)" }
     ];
 
     const eventTypes = [

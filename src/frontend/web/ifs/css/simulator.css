@@ -427,8 +427,8 @@ th {
 }
 
 #Events select {
-    min-width: 171px;
-    max-width: 171px;
+    min-width: 190px;
+    max-width: 190px;
 }
 
 #Events td:nth-child(2) input {
@@ -436,16 +436,18 @@ th {
 }
 
 #Events td:nth-child(3) input {
-  min-width: 99px;
-  max-width: 99px;
+  min-width: 100px;
+  max-width: 100px;
 }
 
 #Events td:nth-child(6) input {
+    min-width: 72px;
     max-width: 72px;
 }
 
 #Events td:nth-child(7) input {
-    max-width: 72px;
+    min-width: 52px;
+    max-width: 52px;
 }
 
 #Events td:last-child {
