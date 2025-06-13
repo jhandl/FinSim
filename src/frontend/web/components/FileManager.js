@@ -141,6 +141,7 @@ class FileManager {
   }
 
   loadFromString(content, name) {
+    this.webUI.clearAllWarnings();
     this.webUI.tableManager.clearContent('Events');
     this.webUI.tableManager.clearExtraDataRows(0);
     this.webUI.chartManager.clearExtraChartRows(0);

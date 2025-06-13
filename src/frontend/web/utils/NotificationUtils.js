@@ -78,14 +78,6 @@ class NotificationUtils {
     }, timeout * 1000);
   }
 
-  newDataVersion(latestVersion) {
-    // TODO: this is likely not effective.
-    if (this.showAlert(`New configuration version available (${latestVersion}):\n\n${config.dataUpdateMessage})\n\nDo you want to update?`, true)) {
-      this.setVersion(latestVersion);
-      this.showToast(`Configuration updated to version ${latestVersion}`, "", 15);
-    }
-  }
-
   setWarning(elementId, message) {
     const tableMatch = elementId.match(/^(\w+)\[(\d+),(\d+)\]$/);
     let element = null;

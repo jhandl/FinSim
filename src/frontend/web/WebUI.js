@@ -116,8 +116,15 @@ class WebUI extends AbstractUI {
     }
   }
 
-  newDataVersion(latestVersion) {
-    this.notificationUtils.newDataVersion(latestVersion);
+  async newDataVersion(latestVersion, dataUpdateMessage) {
+    const confirmed = await this.showAlert(`New configuration version available (${latestVersion}):\n\n${dataUpdateMessage}\n\nDo you want to update?`, 'New Version Available', true);
+    if (confirmed) {
+      this.setVersion(latestVersion);
+      this.showToast(`Configuration updated to version ${latestVersion}. Please reload the page to apply changes.`, "Reload Pending", 15);
+    } else {
+      this.showToast(`Configuration ${latestVersion} not updated.`, "Update Cancelled", 15);
+    }
+
   }
 
   showAlert(message, title = 'Warning', buttons = false) {
@@ -234,6 +241,10 @@ class WebUI extends AbstractUI {
         return; // Don't start another simulation
       }
 
+      if (this._isScenarioDataMissing()) {
+        return; // Don't run simulation if data is missing
+      }
+
       this.isSimulationRunning = true;
       runButton.disabled = true;
       runButton.classList.add('disabled');
@@ -258,6 +269,35 @@ class WebUI extends AbstractUI {
     };
 
     runButton.addEventListener('click', this.handleRunSimulation);
+  }
+
+  _isScenarioDataMissing() {
+    const startingAge = this.getValue('StartingAge');
+    const retirementAge = this.getValue('RetirementAge');
+    const targetAge = this.getValue('TargetAge');
+
+    if (!startingAge || !retirementAge || !targetAge) {
+      return true;
+    }
+
+    const eventsTable = document.getElementById('Events');
+    const rows = eventsTable.getElementsByTagName('tr');
+    let validEventFound = false;
+
+    for (let i = 1; i < rows.length; i++) { // Start from 1 to skip header row
+      const row = rows[i];
+      if (row.style.display === 'none') {
+        continue;
+      }
+
+      const eventType = row.querySelector('.event-type').value;
+      if (eventType !== 'NOP') {
+        validEventFound = true;
+        break;
+      }
+    }
+
+    return !validEventFound;
   }
 
   setupWizardInvocation() {
