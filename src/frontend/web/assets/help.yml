@@ -193,7 +193,7 @@ steps:
 
   - element: "#PensionContributionCapped"
     popover:
-      description: "<p>Whether your pension contribution is capped to match the maximum amount that you can get tax relief on (${pensionContribEarningLimit,currency}).</p><p>This limit is the same for everyone, it does not depend on age. If you select 'Yes', your pension contributions will be capped at the maximum allowed. If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess.</p><p>The cap itself will be adjusted for inflation as the years go by, so you may see the contribution exceed this limit after the first year.</p>"
+      description: "<p>Whether your pension contribution is capped in some way.</p><p>The maximum amount that you can get tax relief on is ${pensionContribEarningLimit,currency}. This limit is the same for everyone, it does not depend on age.</p><p>If you select 'Yes', your pension contributions will be capped at the maximum allowed.</p><p>If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess. The cap itself will be adjusted for inflation as the years go by, so you may see the contribution exceed this limit after the first year.</p><p>If you select 'Match', you won't contribute more than what your employer matches. So, if your employer matches up to 4%, you would be electing to limit your contribution to 4% of your salary and your employer would match that, for a total of 8% total contribution.</p>"
       side: "right"
       align: "start"
 
