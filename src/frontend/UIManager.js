@@ -126,7 +126,8 @@ class UIManager {
       p2RetirementAge: this.ui.getValue("P2RetirementAge"),
       p2StatePensionWeekly: this.ui.getValue("P2StatePensionWeekly"),
       initialPensionP2: this.ui.getValue("InitialPensionP2"),
-      pensionPercentageP2: this.ui.getValue("PensionContributionPercentageP2")
+      pensionPercentageP2: this.ui.getValue("PensionContributionPercentageP2"),
+      simulation_mode: this.ui.getValue("simulation_mode")
     };
     
     if (validate) {
@@ -197,19 +198,35 @@ class UIManager {
 
       const type = name.substr(0, pos);
       if (validate) {
+        const simulationMode = this.ui.getValue('simulation_mode');
+        let sInpDescriptionSingle = "Salary Income (no pension)";
+        let sInpDescriptionJoint = "Your Salary (no pension)";
+        let siDescriptionSingle = "Salary Income";
+        let siDescriptionJoint = "Salary Income (You)";
+
         const valid = {
-          "NOP": "Non-operation: way to make the simulation ignore an event without needing to remove the line",
-          "RI": "Rental Income",
-          "SI": "Salary Income (Yours)",
-          "SInp": "Salary Income (Theirs)",
+          "NOP": "Non-operation: make the simulation ignore an event without needing to remove the line",
+          "SI": simulationMode === 'couple' ? siDescriptionJoint : siDescriptionSingle,
+          "SInp": simulationMode === 'couple' ? sInpDescriptionJoint : sInpDescriptionSingle,
+          // SI2 and SI2np are only valid in couple mode, so they are added conditionally
+        };
+
+        if (simulationMode === 'couple') {
+          valid["SI2"] = "Salary Income (Them, Pensionable)";
+          valid["SI2np"] = "Salary Income (Them, no pension)";
+        }
+
+        // Add other non-salary event types that are always valid
+        Object.assign(valid, {
           "UI": "RSU Income",
+          "RI": "Rental Income",
           "DBI": "Defined Benefit Pension Income",
           "FI": "Tax-free Income",
           "E": "Expense",
           "R": "Real Estate",
           "M": "Mortgage",
           "SM": "Stock Market"
-        }
+        });
 
         if (!valid.hasOwnProperty(type)) {
           const validTypesMsg = Object.keys(valid)
@@ -337,6 +354,8 @@ class UIManager {
       'RI':  'rrrro-',
       'SI':  'rrrroo',
       'SInp':'rrrro-',
+      'SI2': 'rrrroo',    // Added for Person 2 Pensionable Salary
+      'SI2np':'rrrro-',  // Added for Person 2 Non-Pensionable Salary
       'UI':  'rrrro-',
       'DBI': 'rrroo-',
       'FI':  'rrrro-',

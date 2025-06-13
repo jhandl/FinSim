@@ -1,50 +1,115 @@
-// Test suite for two-person regression tests
+/* Two-Person Regression Test
+ * 
+ * This test validates basic two-person simulation functionality
+ * to ensure the two-person system works correctly.
+ */
 
-console.log('Loading TestRegressionTwoPerson.js');
+module.exports = {
+  name: "Two-Person Regression Test",
+  description: "Validates basic two-person simulation functionality",
+  category: "regression",
+  
+  scenario: {
+    parameters: {
+      startingAge: 30,
+      targetAge: 35,               // Keep it short and simple
+      retirementAge: 65,
+      initialSavings: 0,
+      initialPension: 0,
+      initialFunds: 0,
+      initialShares: 0,
+      emergencyStash: 10000,
+      pensionPercentage: 0,        // No pension to avoid issues
+      pensionCapped: false,
+      statePensionWeekly: 289,
+      growthRatePension: 0.05,
+      growthDevPension: 0.0,
+      growthRateFunds: 0.07,
+      growthDevFunds: 0.0,
+      growthRateShares: 0.08,
+      growthDevShares: 0.0,
+      inflation: 0.02,
+      FundsAllocation: 0,
+      SharesAllocation: 0,
+      priorityCash: 1,
+      priorityPension: 4,
+      priorityFunds: 2,
+      priorityShares: 3,
+      marriageYear: null,
+      youngestChildBorn: null,
+      oldestChildBorn: null,
+      personalTaxCredit: 1875,
+      
+      // Person 2 parameters
+      p2StartingAge: 28,           // Person 2 is 2 years younger
+      p2RetirementAge: 67,
+      p2StatePensionWeekly: 289,
+      initialPensionP2: 0,
+      pensionPercentageP2: 0       // No pension to avoid issues
+    },
+    
+    events: [
+      {
+        type: 'SI',                // Person 1 salary
+        id: 'p1-salary',
+        amount: 50000,
+        fromAge: 30,
+        toAge: 34,
+        rate: 0,                   // No pension
+        match: 0
+      },
+      {
+        type: 'SInp',              // Person 2 salary
+        id: 'p2-salary',
+        amount: 40000,
+        fromAge: 30,
+        toAge: 34,
+        rate: 0,                   // No pension
+        match: 0
+      }
+    ]
+  },
 
-function runTests() {
-    console.log('Running tests for TestRegressionTwoPerson...');
+  assertions: [
+    // Test combined salaries
+    {
+      type: 'exact_value',
+      target: 'age',
+      age: 31,
+      field: 'incomeSalaries',
+      expected: 90000,             // €50,000 + €40,000
+      tolerance: 10
+    },
 
-    // Plan for establishing baseline scenarios:
-    // 1. Scenario: Person 1 only, standard parameters.
-    //    - Capture key output metrics (e.g., final worth, year of ruin if applicable, pension pot value over time).
-    //    - TODO: Define and save baseline_P1_only.json (or similar format)
+    // Test no pension fund (since rate = 0)
+    {
+      type: 'exact_value',
+      target: 'age',
+      age: 31,
+      field: 'pensionFund',
+      expected: 0,
+      tolerance: 10
+    },
 
-    // 2. Scenario: Person 1 and Person 2, similar ages and retirement.
-    //    - P2 has own pension, state pension defined.
-    //    - Capture key output metrics.
-    //    - TODO: Define and save baseline_P1_P2_similarAges.json
+    // Test no state pension income yet (both too young)
+    {
+      type: 'exact_value',
+      target: 'age',
+      age: 31,
+      field: 'incomeStatePension',
+      expected: 0,
+      tolerance: 1
+    },
 
-    // 3. Scenario: Person 1 and Person 2, significant age difference.
-    //    - P2 younger, different retirement age.
-    //    - Capture key output metrics.
-    //    - TODO: Define and save baseline_P1_P2_ageDifference.json
-
-    // 4. Scenario: Person 1 and Person 2, different pension contribution strategies.
-    //    - P1 contributes X%, P2 contributes Y%.
-    //    - Capture key output metrics.
-    //    - TODO: Define and save baseline_P1_P2_diffContributions.json
-
-    // 5. Scenario: Person 1 and Person 2, only P1 has private pension.
-    //    - Capture key output metrics.
-    //    - TODO: Define and save baseline_P1_P2_P1PensionOnly.json
-
-    // 6. Scenario: Person 1 and Person 2, only P2 has private pension.
-    //    - Capture key output metrics.
-    //    - TODO: Define and save baseline_P1_P2_P2PensionOnly.json
-
-    // Actual test functions will load these baselines and compare simulation results.
-    // TODO: Implement functions to load scenarios, run simulation, and compare results against baselines.
-    //       Example: test_regression_P1_only()
-    //       Example: test_regression_P1_P2_similarAges()
-    //       ...and so on for each baseline.
-
-    console.log('TestRegressionTwoPerson tests completed (placeholders and planning).');
-}
-
-// Example of how tests might be run
-if (typeof TestFramework === 'undefined') {
-    runTests();
-} else {
-    // TestFramework.registerTestGroup('RegressionTwoPerson', runTests);
-}
+    // Test simulation completes successfully
+    {
+      type: 'comparison',
+      target: 'final',
+      field: 'age',
+      expected: {
+        operator: '>=',
+        value: 34
+      }
+    }
+  ]
+};

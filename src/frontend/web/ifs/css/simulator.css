@@ -829,8 +829,9 @@ footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.5rem 1.5rem 1rem 1.5rem;
+    padding: 0.75rem 1rem 0.75rem 1rem; /* top, right, bottom, left */
     border-bottom: 1px solid var(--border-color);
+    background-color: var(--background-color);
 }
 
 .modal-header h3 {
@@ -844,7 +845,6 @@ footer {
     font-weight: bold;
     color: #999;
     cursor: pointer;
-    padding: 0.25rem;
     line-height: 1;
     transition: color 0.2s ease;
 }
@@ -859,15 +859,14 @@ footer {
 
 .modal-body p {
     margin: 0;
-    line-height: 1.5;
+    line-height: 1;
     color: var(--text-color);
     word-wrap: break-word;
 }
 
 .modal-footer {
-    padding: 1rem 1.5rem 1.5rem 1.5rem;
+    padding: 0rem 1rem 1rem 1rem; /* top, right, bottom, left */
     text-align: right;
-    border-top: 1px solid var(--border-color);
 }
 
 /* Status indicator clickable when error */
@@ -995,5 +994,22 @@ footer {
     font-size: 0.9em;
     vertical-align: top;
     padding-top: 0.1rem;
+}
+
+.toast-message {
+  position: fixed;
+  left: 50%;
+  bottom: 2rem;
+  transform: translateX(-50%);
+  background: #323232;
+  color: #fff;
+  padding: 1rem 2rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  font-size: 1rem;
+  z-index: 9999;
+  opacity: 0.95;
+  pointer-events: none;
+  transition: opacity 0.3s;
 }
 

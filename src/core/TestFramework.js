@@ -40,6 +40,20 @@ class TestFramework {
   }
 
   /**
+   * Reset the framework to a clean state for isolated tests
+   */
+  reset() {
+    this.testResults = [];
+    this.currentTest = null;
+    this.coreModulesLoaded = false;
+    // Important: Also reset the singleton instance in the VM context
+    if (this.simulationContext && this.simulationContext.Config_instance) {
+      this.simulationContext.Config_instance = null;
+    }
+    this.simulationContext = null;
+  }
+
+  /**
    * Load and execute the core simulation files in a sandbox context
    * @returns {boolean} - True if core modules loaded successfully
    */
@@ -65,6 +79,7 @@ class TestFramework {
         adjust: null,
         gaussian: null,
         getRateForKey: null,
+        Config_instance: null,
         
         // Simulation state variables
         uiManager: null,

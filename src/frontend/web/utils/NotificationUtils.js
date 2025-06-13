@@ -54,16 +54,21 @@ class NotificationUtils {
     }
   }
 
-  showAlert(message, buttons = false) {
-    if (buttons) {
-      return confirm(message); // Returns true for OK/Yes, false for Cancel/No
-    } else {
-      alert(message);
-      return null;
+  async showAlert(message, title = 'Warning', buttons = false) {
+    if (!this.errorModalUtils) {
+      // Fallback to native alert if modal not available
+      if (buttons) {
+        return confirm(message);
+      } else {
+        alert(message);
+        return null;
+      }
     }
+    return this.errorModalUtils.showModal(message, title, buttons);
   }
 
-  showToast(message, title, timeout) {
+  showToast(message, title, timeout=10) {
+    console.log("showToast called", { message, title, timeout });
     const toast = document.createElement('div');
     toast.className = 'toast-message';
     toast.textContent = title ? `${title}: ${message}` : message;
@@ -74,6 +79,7 @@ class NotificationUtils {
   }
 
   newDataVersion(latestVersion) {
+    // TODO: this is likely not effective.
     if (this.showAlert(`New configuration version available (${latestVersion}):\n\n${config.dataUpdateMessage})\n\nDo you want to update?`, true)) {
       this.setVersion(latestVersion);
       this.showToast(`Configuration updated to version ${latestVersion}`, "", 15);

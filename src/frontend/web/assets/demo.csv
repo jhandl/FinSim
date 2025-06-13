@@ -1,4 +1,4 @@
-# Ireland Financial Simulator v1.26 Save File
+# Ireland Financial Simulator v1.27 Save File
 # Parameters
 StartingAge,30
 TargetAge,90
@@ -28,14 +28,20 @@ PriorityCash,4
 PriorityPension,3
 PriorityFunds,1
 PriorityShares,2
+P2StartingAge,28
+P2RetirementAge,65
+P2StatePensionWeekly,270
+InitialPensionP2,0
+PensionContributionPercentageP2,25%
+simulation_mode,couple
 
 # Events
 Type,Name,Amount,FromAge,ToAge,Rate,Extra
-SI, Person1,44000,30,64,0.04,0.06
-SI,Person2,30000,30,64,0.02,0
+SI,Person1,40000,30,64,0.035,0.03
+SI2np,Partner,30000,30,64,0.02,0
 E,Life,40000,30,100,,
 E,Kid,6000,32,52,,
 R,Family House,40000,35,65,,
-M,Family House,18948,35,60,0.035,
+M,Family House,18000,35,60,0.035,
 R,Downsize,280000,65,100,,
 SM,Crash,,70,72,-0.25,

@@ -6,7 +6,7 @@ class TableManager {
     this.webUI = webUI;
   }
 
-  getTableData(groupId, columnCount) {
+  getTableData(groupId, columnCount, includeHiddenEventTypes = false) {
     const table = document.getElementById(groupId);
     if (!table) throw new Error(`Table not found: ${groupId}`);
     
@@ -31,11 +31,19 @@ class TableManager {
       const cells = Array.from(row.getElementsByTagName('td'));
       if (cells.length === 0) continue; // Skip header row
       
+      // Skip hidden rows unless specifically requested to include hidden event types
+      if (groupId === 'Events' && !includeHiddenEventTypes && row.style.display === 'none') {
+        continue;
+      }
+      
       const rowData = [];
       
       if (groupId === 'Events') {
         // Get type from select element and name from input
-        const type = cells[0].querySelector('select')?.value || '';
+        // Use the original stored event type if specifically requested (for serialization), otherwise use current value
+        const selectElement = cells[0].querySelector('select');
+        const originalType = row.dataset.originalEventType;
+        const type = (includeHiddenEventTypes && originalType) ? originalType : (selectElement?.value || '');
         const name = cells[1].querySelector('input')?.value || '';
         rowData.push(`${type}:${name}`);
         

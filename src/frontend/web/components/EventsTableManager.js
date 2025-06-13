@@ -8,6 +8,7 @@ class EventsTableManager {
     this.setupAddEventButton();
     this.setupEventTableRowDelete();
     this.setupEventTypeChangeHandler();
+    this.setupSimulationModeChangeHandler();
   }
 
   setupAddEventButton() {
@@ -37,10 +38,58 @@ class EventsTableManager {
     if (eventsTable) {
       eventsTable.addEventListener('change', (e) => {
         if (e.target.classList.contains('event-type')) {
+          const row = e.target.closest('tr');
+          if (row) {
+            // Update the stored original type to the new user selection
+            row.dataset.originalEventType = e.target.value;
+          }
           this.updateFieldVisibility(e.target);
         }
       });
     }
+  }
+
+  setupSimulationModeChangeHandler() {
+    const simulationModeSelect = document.getElementById('simulation_mode');
+    if (simulationModeSelect) {
+      simulationModeSelect.addEventListener('change', () => {
+        this.updateEventRowsVisibilityAndTypes();
+      });
+      setTimeout(() => this.updateEventRowsVisibilityAndTypes(), 0);
+    }
+  }
+
+  updateEventRowsVisibilityAndTypes() {
+    const simulationMode = this.webUI.getValue('simulation_mode');
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) {
+      return;
+    }
+
+    const rows = tbody.querySelectorAll('tr');
+
+    rows.forEach((row, index) => {
+      const typeSelect = row.querySelector('.event-type');
+      const originalEventType = row.dataset.originalEventType || (typeSelect ? typeSelect.value : '');
+
+      if (typeSelect) {
+
+        // 1. Update row visibility for P2-specific events
+        let shouldHide = simulationMode === 'single' && (originalEventType === 'SI2' || originalEventType === 'SI2np');
+
+        if (shouldHide) {
+          row.style.display = 'none';
+        } else {
+          row.style.display = '';
+        }
+
+        // 2. Refresh event type dropdown options, trying to select the original type
+        const newOptionsHTML = this.getEventTypeOptions(originalEventType);
+        typeSelect.innerHTML = newOptionsHTML;
+        typeSelect.value = originalEventType;
+      } else {
+      }
+    });
   }
 
   updateFieldVisibility(typeSelect) {
@@ -53,7 +102,14 @@ class EventsTableManager {
       if (cell) {
         const input = cell.querySelector('input');
         if (input) {
-          input.style.visibility = required[field] === 'hidden' ? 'hidden' : 'visible';
+          const isHidden = required[field] === 'hidden';
+          input.style.visibility = isHidden ? 'hidden' : 'visible';
+          
+          // For percentage inputs, also hide the container with the % symbol
+          const container = input.closest('.percentage-container');
+          if (container) {
+            container.style.visibility = isHidden ? 'hidden' : 'visible';
+          }
         }
       }
     });
@@ -71,6 +127,7 @@ class EventsTableManager {
     const rowId = this.generateEventRowId();
     const row = document.createElement('tr');
     row.dataset.rowId = rowId;
+    row.dataset.originalEventType = type;
     
     row.innerHTML = `
       <td>
@@ -119,22 +176,55 @@ class EventsTableManager {
   }
 
   getEventTypeOptions(selectedType = '') {
-    const eventTypes = [
-      'NOP:No Operation',
-      'RI:Rental Income',
-      'SI:Salary Income (You)',
-      'SInp:Salary Income (Partner)',
-      'UI:RSU Income',
-      'DBI:Defined Benefit Income',
-      'FI:Tax-free Income',
-      'E:Expense',
-      'R:Real Estate',
-      'M:Mortgage',
-      'SM:Stock Market'
+    const simulationMode = this.webUI.getValue('simulation_mode'); 
+    
+    // Define all possible salary event types with their codes and base labels
+    // P1 codes are SI, SInp. P2 codes are SI2, SI2np.
+    const salaryTypesConfig = [
+      { code: 'SI', singleLabel: "Salary Income", jointLabel: "Salary (You)" },
+      { code: 'SInp', singleLabel: "Salary (No Pension)", jointLabel: "Salary (You, No Pension)" },
+      { code: 'SI2', singleLabel: null, jointLabel: "Salary (Them, Pensionable)" }, // Not in single mode
+      { code: 'SI2np', singleLabel: null, jointLabel: "Salary (Them, No Pension)" }  // Not in single mode
     ];
+
+    const eventTypes = [
+      { value: 'NOP', label: 'No Operation' },
+      // Salary types will be inserted here
+    ];
+
+    salaryTypesConfig.forEach(stc => {
+      if (simulationMode === 'single') {
+        if (stc.singleLabel) { // Only add if it has a label for single mode (SI, SInp)
+          eventTypes.push({ value: stc.code, label: stc.singleLabel });
+        }
+      } else { // joint mode
+        // In joint mode, all configured salary types with a jointLabel are added
+        if (stc.jointLabel) {
+            eventTypes.push({ value: stc.code, label: stc.jointLabel });
+        }
+      }
+    });
+
+    // Add other non-salary event types
+    eventTypes.push(
+      ...[
+        { value: 'UI', label: 'RSU Income' },
+        { value: 'RI', label: 'Rental Income' },
+        { value: 'DBI', label: 'Defined Benefit Income' },
+        { value: 'FI', label: 'Tax-free Income' },
+        { value: 'E', label: 'Expense' },
+        { value: 'R', label: 'Real Estate' },
+        { value: 'M', label: 'Mortgage' },
+        { value: 'SM', label: 'Stock Market' }
+      ]
+    );
+    
+    // Order: NOP, P1 Salarires (SI, SInp), P2 Salaries (SI2, SI2np if joint), then UI, RI, DBI etc.
+    // This order is naturally achieved by current insertion if salaryTypesConfig is ordered SI, SInp, SI2, SI2np.
+    // If a more specific order is required, sort eventTypes array here before mapping.
+
     return eventTypes.map(type => {
-      const [value, label] = type.split(':');
-      return `<option value="${value}" ${value === selectedType ? 'selected' : ''}>${label}</option>`;
+      return `<option value="${type.value}" ${type.value === selectedType ? 'selected' : ''}>${type.label}</option>`;
     }).join('');
   }
 

@@ -125,7 +125,7 @@ steps:
 
   - element: "#PensionContributionPercentageP2"
     popover:
-      description: "<p>How much of your partner's age-dependent maximum they want to pay out of their gross salary into their private pension scheme.</p><p>If you enter 100% here, your partner will contribute the maximum allowed for their age. If not specified, it defaults to your own pension contribution percentage. This field is only used in two-person simulation mode.</p>"
+      description: "<p>How much of your partner's age-dependent maximum they want to pay out of their gross salary into their private pension scheme.</p><p>If you enter 100% here, your partner will contribute the maximum allowed for their age. This field is only used in two-person simulation mode.</p>"
       side: "right"
       align: "start"
 
@@ -185,7 +185,7 @@ steps:
 
   - element: "#personalCircumstances"
     popover:
-      description: "<p>Here you describe your personal circumstances.</p><p>They may affect your income tax bands and tax credits, and would be difficult to capture as events.</p>"
+      description: "<p>Describe your personal circumstances here, as they affect your tax calculations throughout the simulation. This includes current details or future plans for marriage/partnership and children, which influence tax bands and credits.</p>"
       side: "right"
       align: "start"
 
@@ -255,13 +255,6 @@ steps:
       align: "center"
 
   - element: "#EventType"
-    eventTypes: ["RI"]
-    popover:
-      description: "<p>The gross income from a rental property or other non-PAYE income.</p>"
-      side: "bottom"
-      align: "center"
-
-  - element: "#EventType"
     eventTypes: ["SI"]
     popover:
       description: "<p>Your gross salary income.</p><p>This income will contribute to your private pension based on your pension contribution percentage.</p>"
@@ -279,6 +272,13 @@ steps:
     eventTypes: ["UI"]
     popover:
       description: "<p>The gross income from Restricted Stock Units, provided by some employers as part of the compensation package.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    eventTypes: ["RI"]
+    popover:
+      description: "<p>The gross income from a rental property or other non-PAYE income.</p>"
       side: "bottom"
       align: "center"
 

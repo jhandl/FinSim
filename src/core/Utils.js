@@ -63,7 +63,15 @@ function serializeSimulation(ui) {
         PriorityCash: ui.getValue('PriorityCash'),
         PriorityPension: ui.getValue('PriorityPension'),
         PriorityFunds: ui.getValue('PriorityFunds'),
-        PriorityShares: ui.getValue('PriorityShares')
+        PriorityShares: ui.getValue('PriorityShares'),
+        // Person 2 Parameters
+        P2StartingAge: ui.getValue('P2StartingAge'),
+        P2RetirementAge: ui.getValue('P2RetirementAge'),
+        P2StatePensionWeekly: ui.getValue('P2StatePensionWeekly'),
+        InitialPensionP2: ui.getValue('InitialPensionP2'),
+        PensionContributionPercentageP2: ui.getValue('PensionContributionPercentageP2'),
+        // Simulation Mode
+        simulation_mode: ui.getValue('simulation_mode')
     };
 
     // Format special values (percentages and booleans)
@@ -79,11 +87,11 @@ function serializeSimulation(ui) {
         }
     }
 
-    // Get events data
-    const events = ui.getTableData('Events', 6);
+    // Get events data, including hidden event types (like SI2 in single mode)
+    const events = ui.getTableData('Events', 6, true);
 
     // Create CSV content
-    let csvContent = "# Ireland Financial Simulator v1.26 Save File\n";
+    let csvContent = "# Ireland Financial Simulator v" + ui.getVersion() + " Save File\n";
     csvContent += "# Parameters\n";
     for (const [key, value] of Object.entries(parameters)) {
         // Convert undefined values to empty strings to avoid "undefined" in CSV
@@ -114,12 +122,25 @@ function serializeSimulation(ui) {
 function deserializeSimulation(content, ui) {
     const lines = content.split('\n').map(line => line.trim());
 
-    // Verify file format
-    if (!lines[0].includes('Ireland Financial Simulator')) {
-        throw new Error('Invalid file format');
+    // Verify file format and extract version (not used yet)
+    let fileVersion = null;
+    if (lines[0].includes('Ireland Financial Simulator v')) {
+        const versionMatch = lines[0].match(/v(\d+\.\d+)/);
+        if (versionMatch && versionMatch[1]) {
+            fileVersion = parseFloat(versionMatch[1]);
+        }
+    } else {
+        // Not a recognized simulator file or very old format without 'vX.Y'
+        throw new Error('Invalid or unrecognized scenario file format.');
+    }
+    if (fileVersion === null) {
+        throw new Error('Could not determine scenario file version.');
     }
 
     let section = '';
+    let p2StartingAgeExists = false;
+    let simulationModeExists = false;
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (line.startsWith('#')) {
@@ -149,9 +170,38 @@ function deserializeSimulation(content, ui) {
             
             try {
                 ui.setValue(actualKey, value);
+                if (actualKey === 'P2StartingAge' && value && value.trim() !== '') {
+                    p2StartingAgeExists = true;
+                }
+                if (actualKey === 'simulation_mode') {
+                    simulationModeExists = true;
+                }
             } catch (e) {
                 // Skip if parameter doesn't exist
             }
+        }
+    }
+
+    // Set simulation_mode based on P2StartingAge for older files if simulation_mode is not present
+    if (!simulationModeExists) {
+        if (p2StartingAgeExists) {
+            ui.setValue('simulation_mode', 'couple');
+        } else {
+            ui.setValue('simulation_mode', 'single');
+        }
+    }
+
+    // Clear Person 2 fields if they weren't present in the loaded scenario
+    // This prevents old single-person scenarios from retaining Person 2 data from previously loaded joint scenarios
+    if (!p2StartingAgeExists) {
+        try {
+            ui.setValue('P2StartingAge', '');
+            ui.setValue('P2RetirementAge', '');
+            ui.setValue('P2StatePensionWeekly', '');
+            ui.setValue('InitialPensionP2', '');
+            ui.setValue('PensionContributionPercentageP2', '');
+        } catch (e) {
+            // Skip if parameters don't exist in the UI
         }
     }
 

@@ -55,7 +55,7 @@ class GasUI extends AbstractUI {
     this.spreadsheet.getRange(elementId).setValue(value);
   }
 
-  getTableData(groupId, columnCount = 1) {
+  getTableData(groupId, columnCount = 1, includeHiddenEventTypes = false) {
     const elements = [];
     const range = this.namedRanges.get(groupId);
     if (!range) throw new Error(`Group not found: ${groupId}`);
@@ -161,7 +161,7 @@ class GasUI extends AbstractUI {
     return UrlFetchApp.fetch(url).getContentText();
   }
 
-  showAlert(message, buttons = false) {
+  showAlert(message, title = 'Warning', buttons = false) {
     if (buttons) {
         var result = SpreadsheetApp.getUi().alert(
             message, 
@@ -201,7 +201,7 @@ class GasUI extends AbstractUI {
   }
 
   newDataVersion(latestVersion) {
-    const result = this.showAlert(config.dataUpdateMessage+"\n\nDo you want to update?", true);
+    const result = this.showAlert(config.dataUpdateMessage+"\n\nDo you want to update?", '', true);
     if (result === true) {
       this.setVersion(latestVersion);
       this.showToast("Version updated!", "", 15);

@@ -18,7 +18,7 @@ class AbstractUI {
     throw new Error("Method 'setValue' must be implemented");
   }
 
-  getTableData(groupId, columnCount) {
+  getTableData(groupId, columnCount, includeHiddenEventTypes = false) {
     throw new Error("Method 'getTableData' must be implemented");
   }
 
@@ -66,7 +66,7 @@ class AbstractUI {
     throw new Error("Method 'fetchUrl' must be implemented");
   }
 
-  showAlert(message, buttons) {
+  showAlert(message, title, buttons) {
     throw new Error("Method 'showAlert' must be implemented");
   }
 

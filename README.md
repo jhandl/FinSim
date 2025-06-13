@@ -2,6 +2,7 @@
 
 - Scrolling the table up, the rows show above the floating headers.
 - Running the simulator with empty data (just loaded) shouldn't result in "Success!". It should do nothing, or open the "How to use" help window.
+- NotificationUtils.newDataVersion needs reviewing.
  
 
 # Roadmap
@@ -10,7 +11,7 @@
 - Add feedback box.
 - Add registration box? Not CIO.
 - Use both the marriage year and the number of incomes for income tax bands.
-- Add partner age and retirement age.
+- Add a pension contrib cap option: "cap to what your employer matches".
 - Add ability to arrange events by start age or event category. Maybe allow drag-and-drop.
 - Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain.
 - In the data table, highlight the "pinch points", with failures in red and near failures in yellow.

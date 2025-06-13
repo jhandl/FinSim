@@ -51,6 +51,9 @@ class WebUI extends AbstractUI {
       this.fileManager.updateLastSavedState(); // Establish baseline for new scenario
       
       this.updateUIForSimMode(); // Set initial UI state based on mode
+      if (this.eventsTableManager) { // Ensure event table UI is also updated on init
+        this.eventsTableManager.updateEventRowsVisibilityAndTypes();
+      }
       
     } catch (error) {
       throw error;
@@ -89,8 +92,8 @@ class WebUI extends AbstractUI {
     this.notificationUtils.clearAllWarnings();
   }
 
-  getTableData(groupId, columnCount = 1) {
-    return this.tableManager.getTableData(groupId, columnCount);
+  getTableData(groupId, columnCount = 1, includeHiddenEventTypes = false) {
+    return this.tableManager.getTableData(groupId, columnCount, includeHiddenEventTypes);
   }
 
   setDataRow(rowIndex, data) {
@@ -102,7 +105,7 @@ class WebUI extends AbstractUI {
   }
 
   getVersion() {
-    return localStorage.getItem('simulatorVersion') || '1.26'; // TODO: Has to be a better way to get the starting defaultversion
+    return localStorage.getItem('simulatorVersion') || '1.27'; // TODO: Has to be a better way to get the starting defaultversion
   }
 
   setVersion(version) {
@@ -117,8 +120,8 @@ class WebUI extends AbstractUI {
     this.notificationUtils.newDataVersion(latestVersion);
   }
 
-  showAlert(message, buttons = false) {
-    return this.notificationUtils.showAlert(message, buttons);
+  showAlert(message, title = 'Warning', buttons = false) {
+    return this.notificationUtils.showAlert(message, title, buttons);
   }
 
   showToast(message, title, timeout) {
@@ -152,10 +155,22 @@ class WebUI extends AbstractUI {
   }
 
   getValue(elementId) {
+    if (elementId === 'simulation_mode') {
+      return this.currentSimMode;
+    }
     return DOMUtils.getValue(elementId);
   }
 
   setValue(elementId, value) {
+    if (elementId === 'simulation_mode') {
+      if (this.currentSimMode === value) return; // No change, do nothing
+      this.currentSimMode = value;
+      this.updateUIForSimMode(); // Updates main P2 fields, P1 labels, and toggle icon active state
+      if (this.eventsTableManager) { // Ensure eventsTableManager is initialized
+        this.eventsTableManager.updateEventRowsVisibilityAndTypes();
+      }
+      return;
+    }
     DOMUtils.setValue(elementId, value);
   }
 
@@ -195,14 +210,8 @@ class WebUI extends AbstractUI {
     const loadDemoButton = document.getElementById('loadDemoScenarioHeader');
     if (loadDemoButton) {
       loadDemoButton.addEventListener('click', () => {
-        if (this.fileManager.hasUnsavedChanges()) {
-          if (window.confirm("Loading the demo scenario will overwrite any unsaved changes. Are you sure you want to proceed?")) {
-            this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
-          }
-        } else {
-          // No unsaved changes, load directly
-          this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
-        }
+        // Unsaved changes check is now handled in loadFromUrl
+        this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
       });
     } else {
       // It's better to log an error if the button isn't found during development
@@ -334,27 +343,30 @@ class WebUI extends AbstractUI {
 
     if (simModeSingle && simModeCouple) {
       simModeSingle.addEventListener('click', () => {
-        if (this.currentSimMode === 'couple') {
-          this.currentSimMode = 'single';
-          simModeSingle.classList.add('mode-toggle-active');
-          simModeCouple.classList.remove('mode-toggle-active');
-          this.updateUIForSimMode();
-        }
+        this.setValue('simulation_mode', 'single');
       });
 
       simModeCouple.addEventListener('click', () => {
-        if (this.currentSimMode === 'single') {
-          this.currentSimMode = 'couple';
-          simModeCouple.classList.add('mode-toggle-active');
-          simModeSingle.classList.remove('mode-toggle-active');
-          this.updateUIForSimMode();
-        }
+        this.setValue('simulation_mode', 'couple');
       });
     }
   }
 
   updateUIForSimMode() {
     const isSingleMode = this.currentSimMode === 'single';
+
+    // Update toggle icons active state
+    const simModeSingle = document.getElementById('simModeSingle');
+    const simModeCouple = document.getElementById('simModeCouple');
+    if (simModeSingle && simModeCouple) {
+      if (isSingleMode) {
+        simModeSingle.classList.add('mode-toggle-active');
+        simModeCouple.classList.remove('mode-toggle-active');
+      } else {
+        simModeCouple.classList.add('mode-toggle-active');
+        simModeSingle.classList.remove('mode-toggle-active');
+      }
+    }
 
     // Show/Hide P2 Field Wrappers
     this.p2InputIds.forEach(inputId => {
@@ -366,18 +378,6 @@ class WebUI extends AbstractUI {
         }
       }
     });
-
-    // Clear P2StartingAge if switching to single mode to trigger dependent updates
-    if (isSingleMode) {
-      const p2StartingAgeInput = document.getElementById('P2StartingAge');
-      if (p2StartingAgeInput && (p2StartingAgeInput.value !== '' && p2StartingAgeInput.value !== '0')) {
-        this.setValue('P2StartingAge', 0); // This will also dispatch a 'change' event
-      }
-    } else {
-        // When switching to couple mode, ensure updatePerson2FieldsState is called to correctly set opacity/disabled state
-        // This is especially important if P2StartingAge was already 0.
-        // this.updatePerson2FieldsState(); // REMOVED by user request
-    }
 
     // Update P1 Labels
     for (const inputId in this.p1Labels) {

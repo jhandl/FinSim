@@ -42,16 +42,9 @@ class FileManager {
     const fileInput = document.getElementById('loadSimulationDialog');
     if (loadButton && fileInput) {
       loadButton.addEventListener('click', () => {
-        if (this.hasUnsavedChanges()) {
-          if (window.confirm("Loading a new scenario from file will overwrite any unsaved changes. Are you sure you want to proceed?")) {
-            fileInput.click();
-          }
-        } else {
-          // No unsaved changes, proceed directly
-          fileInput.click();
-        }
+        fileInput.click(); // Unsaved changes check is now handled in loadFromFile
       });
-      fileInput.addEventListener('change', (e) => this.webUI.loadFromFile(e.target.files[0])); // This line remains the same
+      fileInput.addEventListener('change', (e) => this.webUI.loadFromFile(e.target.files[0]));
     }
   }
 
@@ -83,7 +76,7 @@ class FileManager {
         if (err.name === 'AbortError') {
           return;
         }
-        this.webUI.notificationUtils.showAlert('Error saving file: ' + err.message);
+        this.webUI.notificationUtils.showAlert('Error saving file: ' + err.message, 'Error');
       }
     } else {
       // Legacy fallback
@@ -102,6 +95,15 @@ class FileManager {
 
   async loadFromFile(file) {
     if (!file) return;
+    
+    // Check for unsaved changes before proceeding
+    if (this.hasUnsavedChanges()) {
+      const proceed = await this.webUI.showAlert("Loading a new scenario will overwrite any unsaved changes. Are you sure you want to proceed?", "Confirm Load", true);
+      if (!proceed) {
+        return; // User cancelled
+      }
+    }
+    
     const scenarioName = file.name.replace('.csv', '');
     const fileInput = document.getElementById('loadSimulationDialog');
     try {
@@ -110,7 +112,7 @@ class FileManager {
       this.updateLastSavedState(); // Ensure this is here
     } catch (error) {
       console.error(error);
-      this.webUI.notificationUtils.showAlert('Error loading file: Please make sure this is a valid simulation save file.');
+      this.webUI.notificationUtils.showAlert('Error loading file: Please make sure this is a valid simulation save file.', 'Error');
       return; // Keep this return to avoid issues in finally if fileInput is crucial
     } finally {
       if (fileInput) fileInput.value = '';
@@ -118,6 +120,14 @@ class FileManager {
   }
 
   async loadFromUrl(url, name) {
+    // Check for unsaved changes before proceeding
+    if (this.hasUnsavedChanges()) {
+      const proceed = await this.webUI.showAlert("Loading the demo scenario will overwrite any unsaved changes. Are you sure you want to proceed?", "Confirm Load", true);
+      if (!proceed) {
+        return; // User cancelled
+      }
+    }
+    
     try {
       const content = await this.fetchUrl(url); // ensure await here
       this.loadFromString(content, name);
@@ -125,7 +135,7 @@ class FileManager {
     } catch (error) {
       // Handle or propagate error, e.g., show a notification via webUI
       console.error(`Error in loadFromUrl for ${name}:`, error);
-      this.webUI.notificationUtils.showAlert(`Error loading demo scenario '${name}'. Please check console for details.`);
+      this.webUI.notificationUtils.showAlert(`Error loading demo scenario '${name}'. Please check console for details.`, 'Error');
       // Optionally, re-throw if WebUI needs to react further
     }
   }
@@ -136,6 +146,10 @@ class FileManager {
     this.webUI.chartManager.clearExtraChartRows(0);
     this.setScenarioName(name);
     const eventData = deserializeSimulation(content, this.webUI);
+
+    // Note: Simulation mode is already set by deserializeSimulation based on file version and P2 data
+    // No need to override it here
+
     const priorityIds = ['PriorityCash', 'PriorityPension', 'PriorityFunds', 'PriorityShares'];
     const prioritiesContainer = document.querySelector('.priorities-container');
     if (prioritiesContainer) {
@@ -169,13 +183,25 @@ class FileManager {
       });
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();
+      this.webUI.eventsTableManager.updateEventRowsVisibilityAndTypes();
     }
     this.webUI.setStatus("Ready");
   }
 
   async fetchUrl(url) {
     try {
-      const response = await fetch(url);
+      // Add cache-busting parameter to ensure fresh content
+      const separator = url.includes('?') ? '&' : '?';
+      const cacheBustUrl = `${url}${separator}_t=${Date.now()}`;
+      
+      const response = await fetch(cacheBustUrl, {
+        cache: 'no-store', // Prevent any caching
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

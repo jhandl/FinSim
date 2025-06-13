@@ -88,14 +88,23 @@ function initializeSimulationVariables() {
   });
   if (params.initialPension > 0) person1.pension.buy(params.initialPension);
 
-  // Initialize Person 2 (P2) if exists
-  if (params.p2StartingAge) {
-    const p2PensionContribPercentage = params.pensionPercentageP2 || params.pensionPercentage;
+  // Initialize Person 2 (P2) if the mode is 'couple'
+  if (params.simulation_mode === 'couple') {
+    // Check if P2 starting age is provided; if not, it's a configuration issue that
+    // should ideally be caught by UI validation, but we proceed with P2 initialization.
+    // The Person class constructor will handle a missing/zero starting age if necessary,
+    // though UI validation aims to prevent this.
+    if (!params.p2StartingAge || params.p2StartingAge === 0) {
+        // Optionally, log a warning here if P2 starting age is missing in couple mode,
+        // though UI should prevent saving/running in this state.
+        // console.warn("Simulator: Person 2 starting age is missing or zero in couple mode.");
+    }
+
     const p2SpecificParams = {
-      startingAge: params.p2StartingAge,
+      startingAge: params.p2StartingAge, // Will be 0 or undefined if not set
       retirementAge: params.p2RetirementAge,
       statePensionWeekly: params.p2StatePensionWeekly,
-      pensionContributionPercentage: p2PensionContribPercentage
+      pensionContributionPercentage: params.pensionPercentageP2
     };
     person2 = new Person('P2', p2SpecificParams, params, { 
       growthRatePension: params.growthRatePension, 
@@ -223,49 +232,58 @@ function processEvents() {
       case "NOP": // No Operation
         break;
 
-      case 'RI': // Rental income
-        if (inScope) {
-          incomeRentals += amount;
-          revenue.declareOtherIncome(amount);
-        }
-        break;
-
-      case 'SI': // Salary income (with private pension contribution if so defined)
+      case 'SI': // Salary income (Person 1, Pensionable)
         if (inScope) {
           incomeSalaries += amount;
-          let contribRate = person1.pensionContributionPercentageParam * getRateForKey(person1.age, config.pensionContributionRateBands);
+          let p1ContribRate = person1.pensionContributionPercentageParam * getRateForKey(person1.age, config.pensionContributionRateBands);
           if (params.pensionCapped && (amount > adjust(config.pensionContribEarningLimit))) {
-            contribRate = contribRate * adjust(config.pensionContribEarningLimit) / amount;
+            p1ContribRate = p1ContribRate * adjust(config.pensionContribEarningLimit) / amount;
           }
-          let companyMatch = Math.min(event.match || 0, contribRate);
-          let personalContrib = contribRate * amount;
-          let companyContrib = companyMatch * amount;
-          let totalContrib = personalContrib + companyContrib;
-          pensionContribution += totalContrib;
-          person1.pension.buy(totalContrib);
-          revenue.declareSalaryIncome(amount, contribRate, person1);
+          let p1CompanyMatchRate = Math.min(event.match || 0, p1ContribRate); // Assuming event.match is a rate
+          let p1PersonalContribAmount = p1ContribRate * amount;
+          let p1CompanyContribAmount = p1CompanyMatchRate * amount;
+          let p1TotalContrib = p1PersonalContribAmount + p1CompanyContribAmount;
+          
+          pensionContribution += p1TotalContrib;
+          person1.pension.buy(p1TotalContrib);
+          revenue.declareSalaryIncome(amount, p1ContribRate, person1); // Pass P1's personal contrib rate
         }
         break;
 
-      case 'SInp': // Salary income (Partner/Person 2)
+      case 'SInp': // Salary income (Person 1, Non-Pensionable)
         if (inScope) {
           incomeSalaries += amount;
-          if (person2) {
-            let contribRate = person2.pensionContributionPercentageParam * getRateForKey(person2.age, config.pensionContributionRateBands);
-            if (params.pensionCapped && (amount > adjust(config.pensionContribEarningLimit))) {
-              contribRate = contribRate * adjust(config.pensionContribEarningLimit) / amount;
-            }
-            let companyMatch = Math.min(event.match || 0, contribRate);
-            let personalContrib = contribRate * amount;
-            let companyContrib = companyMatch * amount;
-            let totalContrib = personalContrib + companyContrib;
-            pensionContribution += totalContrib;
-            person2.pension.buy(totalContrib);
-            revenue.declareSalaryIncome(amount, contribRate, person2);
-          } else {
-            // SInp event but no Person 2 defined - treat as salary with no pension for P1
-            revenue.declareSalaryIncome(amount, 0, person1);
+          revenue.declareSalaryIncome(amount, 0, person1); // No pension contribution for P1
+        }
+        break;
+
+      case 'SI2': // Salary income (Person 2, Pensionable)
+        if (inScope && person2) {
+          incomeSalaries += amount;
+          let p2ContribRate = person2.pensionContributionPercentageParam * getRateForKey(person2.age, config.pensionContributionRateBands);
+          if (params.pensionCapped && (amount > adjust(config.pensionContribEarningLimit))) {
+            p2ContribRate = p2ContribRate * adjust(config.pensionContribEarningLimit) / amount;
           }
+          let p2CompanyMatchRate = Math.min(event.match || 0, p2ContribRate); // Assuming event.match is a rate
+          let p2PersonalContribAmount = p2ContribRate * amount;
+          let p2CompanyContribAmount = p2CompanyMatchRate * amount;
+          let p2TotalContrib = p2PersonalContribAmount + p2CompanyContribAmount;
+
+          pensionContribution += p2TotalContrib;
+          person2.pension.buy(p2TotalContrib);
+          revenue.declareSalaryIncome(amount, p2ContribRate, person2); // Pass P2's personal contrib rate
+        } else if (inScope && !person2) {
+          // Fallback: SI2 event but no Person 2 defined. Treat as P1 non-pensionable salary.
+          incomeSalaries += amount;
+          revenue.declareSalaryIncome(amount, 0, person1);
+          // console.warn("SI2 event encountered but Person 2 is not defined. Treated as P1 non-pensionable salary.");
+        }
+        break;
+
+      case 'SI2np': // Salary income (Person 2, Non-Pensionable)
+        if (inScope && person2) {
+          incomeSalaries += amount;
+          revenue.declareSalaryIncome(amount, 0, person2); // No pension contribution for P2
         }
         break;
 
@@ -273,6 +291,13 @@ function processEvents() {
         if (inScope) {
           incomeShares += amount;
           revenue.declareNonEuSharesIncome(amount);
+        }
+        break;
+
+      case 'RI': // Rental income
+        if (inScope) {
+          incomeRentals += amount;
+          revenue.declareOtherIncome(amount);
         }
         break;
 

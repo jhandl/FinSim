@@ -1,7 +1,5 @@
 // Test suite for UI validation logic, particularly for Person 2
 
-console.log('Loading TestValidation.js');
-
 // Mocking UI elements and functions for testing purposes
 // In a real environment, this might interact with actual UI components or a UI testing framework.
 const mockUI = {
@@ -83,3 +81,109 @@ if (typeof TestFramework === 'undefined') {
 } else {
     // TestFramework.registerTestGroup('Validation', runTests);
 }
+
+/* Validation Test
+ * 
+ * This test validates the two-person functionality with minimal parameters
+ * to ensure that two-person scenarios work correctly.
+ */
+
+module.exports = {
+  name: "Two-Person Validation Test",
+  description: "Validates basic two-person simulation functionality",
+  category: "validation",
+  
+  scenario: {
+    parameters: {
+      startingAge: 30,
+      targetAge: 35,
+      retirementAge: 65,
+      initialSavings: 0,           // Start simple
+      initialPension: 0,
+      initialFunds: 0,
+      initialShares: 0,
+      emergencyStash: 10000,
+      pensionPercentage: 0,        // No pension for simplicity
+      pensionCapped: false,
+      statePensionWeekly: 289,
+      growthRatePension: 0.05,
+      growthDevPension: 0.0,
+      growthRateFunds: 0.07,
+      growthDevFunds: 0.0,
+      growthRateShares: 0.08,
+      growthDevShares: 0.0,
+      inflation: 0.02,
+      FundsAllocation: 0,
+      SharesAllocation: 0,
+      priorityCash: 1,
+      priorityPension: 4,
+      priorityFunds: 2,
+      priorityShares: 3,
+      marriageYear: null,
+      youngestChildBorn: null,
+      oldestChildBorn: null,
+      personalTaxCredit: 1875,
+      
+      // Simple Person 2 parameters
+      p2StartingAge: 32,           // Person 2 is 2 years older
+      p2RetirementAge: 67,         // Person 2 retires at 67
+      p2StatePensionWeekly: 289,   // Same state pension
+      initialPensionP2: 0,         // No initial pension
+      pensionPercentageP2: 0       // No pension contribution
+    },
+    
+    events: [
+      {
+        type: 'SI',                // Person 1 salary
+        id: 'p1-salary',
+        amount: 40000,
+        fromAge: 30,
+        toAge: 34,
+        rate: 0,
+        match: 0
+      },
+      {
+        type: 'SInp',              // Person 2 salary
+        id: 'p2-salary',
+        amount: 30000,
+        fromAge: 30,
+        toAge: 34,
+        rate: 0,
+        match: 0
+      }
+    ]
+  },
+
+  assertions: [
+    // Test that both people's salaries are processed correctly
+    {
+      type: 'exact_value',
+      target: 'age',
+      age: 31,
+      field: 'incomeSalaries',
+      expected: 70000,             // €40,000 + €30,000
+      tolerance: 10
+    },
+
+    // Test that no pension fund accumulates (since rate = 0)
+    {
+      type: 'exact_value',
+      target: 'age',
+      age: 31,
+      field: 'pensionFund',
+      expected: 0,
+      tolerance: 10
+    },
+
+    // Test simulation completes successfully
+    {
+      type: 'comparison',
+      target: 'final',
+      field: 'age',
+      expected: {
+        operator: '>=',
+        value: 34
+      }
+    }
+  ]
+};

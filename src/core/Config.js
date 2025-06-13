@@ -55,6 +55,13 @@ class Config {
   }
 
   checkForUpdates() {
+    // Check if latestVersion field exists in the loaded config
+    if (!this.latestVersion) {
+      console.error('Warning: latestVersion field missing from config file. Skipping update check.');
+      this.clearVersionAlert(); // Clear any existing version alerts
+      return;
+    }
+
     let latest = this.latestVersion.toString().split('.').map(Number);
     let current = this.thisVersion.toString().split('.').map(Number);
     if (latest[0] !== current[0]) {
@@ -71,7 +78,7 @@ class Config {
   }
 
   newDataVersion() {
-    this.ui.newDataVersion(this.latestVersion);
+    this.ui.newDataVersion(this.latestVersion, this.dataUpdateMessage);
   }
 
   clearVersionAlert() {
@@ -80,3 +87,6 @@ class Config {
   }
 
 }
+
+// Make Config available in the context (e.g., for tests)
+this.Config = Config;
