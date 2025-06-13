@@ -35,6 +35,9 @@ class DOMUtils {
       if (element.classList.contains('boolean')) {
         return value === 'Yes';
       }
+      if (element.classList.contains('string')) {
+        return value; // Return string value as-is
+      }
       const parsed = parseFloat(value);
       // Return 0 for parameter section numeric inputs if parsing fails, undefined otherwise
       return isNaN(parsed) ? (isInParameterSection ? 0 : undefined) : parsed;

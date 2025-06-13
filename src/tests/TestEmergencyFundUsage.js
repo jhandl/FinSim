@@ -42,7 +42,7 @@ const TestEmergencyFundUsage = {
       
       // Pension settings
       pensionPercentage: 0,
-      pensionCapped: false,
+      pensionCapped: "No",
       statePensionWeekly: 289,
       
       // Tax settings

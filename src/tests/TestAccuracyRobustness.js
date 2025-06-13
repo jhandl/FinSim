@@ -31,7 +31,7 @@ module.exports = {
       retirementAge: 65,
       emergencyStash: 25000,           // €25K emergency fund
       pensionPercentage: 0.15,         // 15% pension contribution
-      pensionCapped: true,
+      pensionCapped: "Yes",
       statePensionWeekly: 289.30,
       growthRatePension: 0.05,         // Conservative growth rates
       growthDevPension: 0.0,           // No volatility for stability

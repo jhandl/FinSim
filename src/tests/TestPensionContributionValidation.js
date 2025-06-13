@@ -19,7 +19,7 @@ const TestPensionContributionValidation = {
       retirementAge: 65,
       emergencyStash: 10000,
       pensionPercentage: 0.30,  // 30% of maximum allowed (which is 20% at age 30, so 6% actual rate)
-      pensionCapped: false,
+      pensionCapped: "No",
       pensionEmployerMatchMaxRate: 0.06,
       growthRatePension: 0,
       growthDevPension: 0,

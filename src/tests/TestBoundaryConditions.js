@@ -31,7 +31,7 @@ module.exports = {
       retirementAge: 65,
       emergencyStash: 0,                // Test with no emergency fund
       pensionPercentage: 0,
-      pensionCapped: true,
+      pensionCapped: "Yes",
       statePensionWeekly: 289.30,
       growthRatePension: 0.05,
       growthDevPension: 0.0,            // No volatility for consistent testing

@@ -19,7 +19,7 @@ const TestRealEstateTransaction = {
       retirementAge: 65,
       emergencyStash: 10000,
       pensionPercentage: 0,             // No pension contributions to simplify
-      pensionCapped: false,
+      pensionCapped: "No",
       statePensionWeekly: 289,
       growthRatePension: 0,
       growthDevPension: 0.0,

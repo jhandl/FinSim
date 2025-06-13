@@ -19,7 +19,7 @@ const TestStatePensionIntegration = {
       retirementAge: 65,          // Added missing parameter
       emergencyStash: 10000,      // Added missing parameter
       pensionPercentage: 0.2,     // Added missing parameter
-      pensionCapped: false,       // Added missing parameter
+      pensionCapped: "No",        // Added missing parameter
       statePensionWeekly: 289,    // State pension weekly amount
       growthRatePension: 0.05,    // Added missing parameter
       growthDevPension: 0.0,      // Added missing parameter

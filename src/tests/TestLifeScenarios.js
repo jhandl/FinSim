@@ -33,7 +33,7 @@ module.exports = {
         initialShares: 0,
         emergencyStash: 15000,
         pensionPercentage: 0.8,       // 80% of maximum allowed
-        pensionCapped: true,
+        pensionCapped: "Yes",
         statePensionWeekly: 289,
         growthRatePension: 0.06,
         growthDevPension: 0.0,          // No volatility for deterministic testing

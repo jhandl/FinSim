@@ -4,12 +4,11 @@
 # Roadmap
 
 ### Improvements
+- In the data table, highlight the "pinch points", with failures in red and near failures in yellow.
 - Add feedback box.
 - Add registration box? Not CIO.
-- Add a pension contrib cap option: "cap to what your employer matches".
 - Add ability to arrange events by start age or event category. Maybe allow drag-and-drop.
 - Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain.
-- In the data table, highlight the "pinch points", with failures in red and near failures in yellow.
 - New events: 
    - inheritance.
    - period of high inflation.

@@ -19,7 +19,7 @@ const TestMortgageAmortization = {
       retirementAge: 65,
       emergencyStash: 0,               // No emergency fund to simplify
       pensionPercentage: 0,            // No pension contributions
-      pensionCapped: false,
+      pensionCapped: "No",
       statePensionWeekly: 289,
       growthRatePension: 0,            // No growth for simplicity
       growthDevPension: 0,

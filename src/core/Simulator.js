@@ -236,9 +236,14 @@ function processEvents() {
         if (inScope) {
           incomeSalaries += amount;
           let p1ContribRate = person1.pensionContributionPercentageParam * getRateForKey(person1.age, config.pensionContributionRateBands);
-          if (params.pensionCapped && (amount > adjust(config.pensionContribEarningLimit))) {
+
+          // Handle pension capping options
+          if (params.pensionCapped === "Yes" && (amount > adjust(config.pensionContribEarningLimit))) {
             p1ContribRate = p1ContribRate * adjust(config.pensionContribEarningLimit) / amount;
+          } else if (params.pensionCapped === "Match") {
+            p1ContribRate = Math.min(event.match || 0, p1ContribRate);
           }
+
           let p1CompanyMatchRate = Math.min(event.match || 0, p1ContribRate); // Assuming event.match is a rate
           let p1PersonalContribAmount = p1ContribRate * amount;
           let p1CompanyContribAmount = p1CompanyMatchRate * amount;
@@ -261,9 +266,15 @@ function processEvents() {
         if (inScope && person2) {
           incomeSalaries += amount;
           let p2ContribRate = person2.pensionContributionPercentageParam * getRateForKey(person2.age, config.pensionContributionRateBands);
-          if (params.pensionCapped && (amount > adjust(config.pensionContribEarningLimit))) {
+          
+          // Handle pension capping options
+          if (params.pensionCapped === "Yes" && (amount > adjust(config.pensionContribEarningLimit))) {
             p2ContribRate = p2ContribRate * adjust(config.pensionContribEarningLimit) / amount;
+          } else if (params.pensionCapped === "Match") {
+            // Set personal contribution rate to match employer match rate
+            p2ContribRate = Math.min(event.match || 0, p2ContribRate);
           }
+          
           let p2CompanyMatchRate = Math.min(event.match || 0, p2ContribRate); // Assuming event.match is a rate
           let p2PersonalContribAmount = p2ContribRate * amount;
           let p2CompanyContribAmount = p2CompanyMatchRate * amount;

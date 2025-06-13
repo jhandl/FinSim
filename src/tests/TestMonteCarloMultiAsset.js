@@ -28,7 +28,7 @@ module.exports = {
       FundsAllocation: 0.0,       // 0% to funds - avoid deemed disposal expenses
       SharesAllocation: 1.0,      // 100% to shares - no deemed disposal rule
       pensionPercentage: 0.15,    // 15% pension contribution
-      pensionCapped: true,
+      pensionCapped: "Yes",
       growthRatePension: 0.06,    // 6% pension growth
       growthDevPension: 0.12,     // 12% pension volatility
       growthRateFunds: 0.07,      // 7% funds growth

@@ -230,7 +230,7 @@ select {
 }
 
 input {
-    width: 65px;
+    width: 75px;
     padding: 0.225rem;
     text-align: right;
 }
@@ -243,8 +243,8 @@ select {
   background-color: white;
 }
 
-select.boolean {
-  width: 65px;
+select.string {
+  width: 75px;
 }
 
 select option {
@@ -539,7 +539,7 @@ th {
 }
 
 .input-wrapper .percentage-container {
-    width: 65px;
+    width: 75px;
 }
 
 .percentage-container::after {

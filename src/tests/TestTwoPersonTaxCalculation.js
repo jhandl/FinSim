@@ -21,7 +21,7 @@ module.exports = {
       initialShares: 0,
       emergencyStash: 10000,
       pensionPercentage: 0,
-      pensionCapped: false,
+      pensionCapped: "No",
       statePensionWeekly: 289,
       growthRatePension: 0.05,
       growthDevPension: 0.0,

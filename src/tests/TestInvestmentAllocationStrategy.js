@@ -21,7 +21,7 @@ const TestInvestmentAllocationStrategy = {
       FundsAllocation: 0.50,               // Correct parameter name
       SharesAllocation: 0.50,              // Correct parameter name
       pensionPercentage: 0,                // No pension contributions for simplicity
-      pensionCapped: false,
+      pensionCapped: "No",
       statePensionWeekly: 289,
       growthRatePension: 0.05,
       growthDevPension: 0.0,

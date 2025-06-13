@@ -152,7 +152,7 @@ module.exports = {
           FundsAllocation: 0.0,       // Focus on shares for volatility testing
           SharesAllocation: 1.0,      // 100% to shares
           pensionPercentage: 0,       // No pension for clean test
-          pensionCapped: false,
+          pensionCapped: "No",
           growthRatePension: 0.05,
           growthDevPension: 0.0,
           growthRateFunds: 0.07,

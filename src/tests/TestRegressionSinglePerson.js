@@ -33,7 +33,7 @@ module.exports = {
       FundsAllocation: 0.6,         // 60% to index funds
       SharesAllocation: 0.4,        // 40% to shares
       pensionPercentage: 0.8,       // 80% of maximum allowed pension contribution
-      pensionCapped: true,
+      pensionCapped: "Yes",
       statePensionWeekly: 289,
       growthRatePension: 0.06,      // 6% pension growth
       growthDevPension: 0.0,        // No volatility for deterministic testing

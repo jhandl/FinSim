@@ -101,7 +101,7 @@ class UIManager {
       retirementAge: this.ui.getValue("RetirementAge"),
       emergencyStash: this.ui.getValue("EmergencyStash"),
       pensionPercentage: this.ui.getValue("PensionContributionPercentage"),
-      pensionCapped: this.ui.getValue("PensionContributionCapped") === "Yes",
+      pensionCapped: this.ui.getValue("PensionContributionCapped"),
       statePensionWeekly: this.ui.getValue("StatePensionWeekly"),
       growthRatePension: this.ui.getValue("PensionGrowthRate"),
       growthDevPension: this.ui.getValue("PensionGrowthStdDev"),

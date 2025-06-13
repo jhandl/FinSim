@@ -92,7 +92,7 @@ const STANDARD_PARAMETERS = {
     fundsAllocation: 0.6,       // 60% to index funds
     sharesAllocation: 0.4,      // 40% to individual shares
     pensionPercentage: 0.8,     // 80% of maximum allowed pension contribution
-    pensionCapped: true,
+    pensionCapped: "Yes",
     pensionGrowthRate: 0.06,    // 6% pension growth
     pensionGrowthStdDev: 0.15,  // 15% volatility
     fundsGrowthRate: 0.07,      // 7% index funds growth
@@ -124,7 +124,7 @@ const STANDARD_PARAMETERS = {
     fundsAllocation: 0.7,
     sharesAllocation: 0.3,
     pensionPercentage: 1.0,     // Maximum allowed pension contribution
-    pensionCapped: true,
+    pensionCapped: "Yes",
     pensionGrowthRate: 0.05,
     pensionGrowthStdDev: 0.12,
     fundsGrowthRate: 0.065,
@@ -156,7 +156,7 @@ const STANDARD_PARAMETERS = {
     fundsAllocation: 0.5,
     sharesAllocation: 0.2,      // More conservative allocation
     pensionPercentage: 1.0,
-    pensionCapped: true,
+    pensionCapped: "Yes",
     pensionGrowthRate: 0.04,    // More conservative growth
     pensionGrowthStdDev: 0.10,
     fundsGrowthRate: 0.05,
@@ -188,7 +188,7 @@ const STANDARD_PARAMETERS = {
     fundsAllocation: 0.6,
     sharesAllocation: 0.4,
     pensionPercentage: 0.9,
-    pensionCapped: true,
+    pensionCapped: "Yes",
     pensionGrowthRate: 0.06,
     pensionGrowthStdDev: 0.15,
     fundsGrowthRate: 0.07,

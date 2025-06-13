@@ -63,9 +63,7 @@ check_prerequisites() {
 run_test() {
     local test_file="$1"
     local test_name=$(basename "$test_file" .js)
-    
-    echo -e "${BLUE}Running test: ${test_name}${NC}"
-    
+        
     # Create a simple Node.js command to run the test
     cd "$CORE_DIR"
     node -e "
@@ -164,9 +162,6 @@ main() {
 
     if [ $# -eq 0 ]; then
         # Run all tests
-        echo -e "${BLUE}🧪 Running all FinSim tests...${NC}"
-        echo ""
-        
         local test_files=($(find_test_files))
         if [ ${#test_files[@]} -eq 0 ]; then
             echo -e "${YELLOW}No test files found in $TESTS_DIR${NC}"
@@ -184,11 +179,11 @@ main() {
             fi
         done
         
-        echo ""
-        echo -e "${BLUE}Test Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
+        echo
+        echo -e " Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
+        echo
         
         if [ $failed -eq 0 ]; then
-            echo -e "${GREEN}🎉 All tests passed!${NC}"
             exit 0
         else
             exit 1
