@@ -4,11 +4,12 @@
 # Roadmap
 
 ### Improvements
+- Add option to view data table even in narrow screens.
 - In the data table, highlight the "pinch points", with failures in red and near failures in yellow.
 - Add feedback box.
 - Add registration box? Not CIO.
 - Add ability to arrange events by start age or event category. Maybe allow drag-and-drop.
-- Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain.
+- Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain. This would only make sense if that average was shown in present value.
 - New events: 
    - inheritance.
    - period of high inflation.
