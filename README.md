@@ -1,9 +1,11 @@
 # Bugs
-
+- In couple mode, ages for 2nd person events should refer to their age.
 
 # Roadmap
 
 ### Improvements
+- Allow events to be specified in terms of ages or years.
+- In small screens the header takes three rows: one row for the title, and two rows for the buttons. I understand there's not many options if I want to show all the buttons and I don't want to show only some of these buttons. But this must be a common UX problem on phone apps. How do they solve it? Can we get this UX more in line with the standards of phone apps?
 - In the data table, highlight the "pinch points", with failures in red and near failures in yellow.
 - Add feedback box.
 - Add registration box? Not CIO.
@@ -15,6 +17,7 @@
    - increase pension contribution rate.
    - pay off mortgage.
 - Record the median age of failure in montecarlo runs.
+- Add an event to change the pension contribution rate.
 
 ### SEO
 - "Educational Sandbox", "What if lab", "not a crystal ball", "Personbal Finance Lab", "Learn by doing, experimenting, and visualizing"
@@ -79,7 +82,6 @@
 
 ### Ideas
 - I learned about finance and investing late in life. There’s a lot like me. Help them get to where I am. (And plan their retirement? No, that’s financial advice)
-- Add an event to change the pension contribution rate.
 
 ### Feedback
 - Escala para ayudar a calcular el rate de sueldo
@@ -98,7 +100,6 @@
 - Reimplement the UI in React
 
 ## Version 4 - "Complete"
-- Properly handle multiple people's incomes
 - Handle loss harvesting for trusts
 - Did I consider debt (other than mortgage)?
 - Add inflation volatility
@@ -111,7 +112,7 @@
 ## Version 5 - "Expand"
 - Enable sharing with scenario(s) included
 - Add retirement account evolving strategies (stock / bonds proportion changing over time)
-- Add retirement account drawdown strategies (drawdown from bonds when stocks drop)
+- Add retirement account drawdown strategies (drawdown from bonds when stocks drop, 4% rule, etc)
 - Add countries and a way to select a country
 - Add an event to move to a country
 - Add a way for an AI agent to research a country and generate the config file for it

@@ -322,6 +322,10 @@
                 </table>
             </div>
         </div>
+
+        <div id="mobile-data-message" class="card" style="text-align: center;">
+            <p>📊 The detailed data table is available on larger screens. <a href="#" id="show-data-link">Show table anyway</a>.</p>
+        </div>
     </main>
 
     <script src="/src/frontend/AbstractUI.js"></script>
@@ -345,6 +349,22 @@
     <script src="/src/core/RealEstate.js"></script>
     <script src="/src/core/Utils.js"></script>
     <script src="/src/core/Simulator.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const showLink = document.getElementById('show-data-link');
+            const dataSection = document.querySelector('.data-section');
+            const mobileMessage = document.getElementById('mobile-data-message');
+
+            if (showLink && dataSection && mobileMessage) {
+                showLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    dataSection.style.display = 'block';
+                    mobileMessage.style.display = 'none';
+                });
+            }
+        });
+    </script>
     
     <!-- Simple Mobile Header Optimizer -->
     <script>
