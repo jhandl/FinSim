@@ -46,6 +46,8 @@ class EventsTableManager {
             row.dataset.originalEventType = e.target.value;
           }
           this.updateFieldVisibility(e.target);
+          // Update placeholders based on the new event type
+          this.updateInputPlaceholders();
         }
       });
     }
@@ -131,20 +133,35 @@ class EventsTableManager {
     const eventsTable = document.getElementById('Events');
     if (!eventsTable) return;
     
-    // Find all From Age and To Age input fields in the events table
-    const fromAgeInputs = eventsTable.querySelectorAll('.event-from-age');
-    const toAgeInputs = eventsTable.querySelectorAll('.event-to-age');
+    // Find all rows in the events table
+    const tbody = eventsTable.querySelector('tbody');
+    if (!tbody) return;
     
-    // Update placeholders based on current mode
-    const placeholder = this.ageYearMode === 'age' ? '' : 'YYYY';
+    const rows = tbody.querySelectorAll('tr');
     
-    fromAgeInputs.forEach(input => {
-      input.placeholder = placeholder;
+    rows.forEach(row => {
+      const eventTypeSelect = row.querySelector('.event-type');
+      const fromAgeInput = row.querySelector('.event-from-age');
+      const toAgeInput = row.querySelector('.event-to-age');
+      
+      if (eventTypeSelect && fromAgeInput && toAgeInput) {
+        const eventType = eventTypeSelect.value;
+        const placeholder = this.getPlaceholderForEventType(eventType);
+        
+        fromAgeInput.placeholder = placeholder;
+        toAgeInput.placeholder = placeholder;
+      }
     });
+  }
+
+  getPlaceholderForEventType(eventType) {
+    // For NOP (No Operation) events, don't show any placeholder since all fields are ignored
+    if (eventType === 'NOP') {
+      return '';
+    }
     
-    toAgeInputs.forEach(input => {
-      input.placeholder = placeholder;
-    });
+    // For other event types, use placeholder based on current age/year mode
+    return this.ageYearMode === 'age' ? '' : 'YYYY';
   }
 
   updateEventRowsVisibilityAndTypes() {
