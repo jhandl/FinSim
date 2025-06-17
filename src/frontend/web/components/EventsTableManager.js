@@ -109,8 +109,22 @@ class EventsTableManager {
   }
 
   updateTableHeaders() {
-    // TODO: Implement in Step 5
-    // Will update "From Age" ↔ "From Year" and "To Age" ↔ "To Year"
+    const fromHeader = document.getElementById('fromAgeHeader');
+    const toHeader = document.getElementById('toAgeHeader');
+    
+    if (fromHeader && toHeader) {
+      if (this.ageYearMode === 'age') {
+        fromHeader.textContent = 'From Age';
+        toHeader.textContent = 'To Age';
+        fromHeader.classList.remove('year-mode');
+        toHeader.classList.remove('year-mode');
+      } else {
+        fromHeader.textContent = 'From Year';
+        toHeader.textContent = 'To Year';
+        fromHeader.classList.add('year-mode');
+        toHeader.classList.add('year-mode');
+      }
+    }
   }
 
   updateInputPlaceholders() {

@@ -172,7 +172,7 @@ The solution introduces the core feature of allowing year-based inputs by implem
 - [x] 2. Add CSS Styling  
 - [x] 3. Initialize Toggle State
 - [x] 4. Implement Toggle Click Handler
-- [ ] 5. Update Table Headers Dynamically
+- [x] 5. Update Table Headers Dynamically
 - [ ] 6. Update Input Placeholders
 - [ ] 7. Modify Help Configuration
 - [ ] 8. Update Wizard Component
@@ -186,7 +186,7 @@ The solution introduces the core feature of allowing year-based inputs by implem
 - [ ] 16. Handle Dynamic Updates
 
 ### Current Status
-**In Progress** - Step 4 completed: Toggle click handler implemented with visual state management and method calls
+**In Progress** - Step 5 completed: Table headers now dynamically update between "From Age/To Age" and "From Year/To Year"
 
 ### Notes
 - Implementation should follow the existing code patterns and style

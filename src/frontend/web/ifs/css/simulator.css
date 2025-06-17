@@ -411,6 +411,12 @@ th {
 #Events th {
     background-color: #f5f5f5;
     font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Smaller font for year mode headers to fit "From Year" and "To Year" */
+#Events th.year-mode {
+    font-size: 0.95rem;
 }
 
 #Events input,
