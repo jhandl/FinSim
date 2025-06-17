@@ -128,8 +128,23 @@ class EventsTableManager {
   }
 
   updateInputPlaceholders() {
-    // TODO: Implement in Step 6
-    // Will update input placeholders to show "YYYY" in year mode
+    const eventsTable = document.getElementById('Events');
+    if (!eventsTable) return;
+    
+    // Find all From Age and To Age input fields in the events table
+    const fromAgeInputs = eventsTable.querySelectorAll('.event-from-age');
+    const toAgeInputs = eventsTable.querySelectorAll('.event-to-age');
+    
+    // Update placeholders based on current mode
+    const placeholder = this.ageYearMode === 'age' ? '' : 'YYYY';
+    
+    fromAgeInputs.forEach(input => {
+      input.placeholder = placeholder;
+    });
+    
+    toAgeInputs.forEach(input => {
+      input.placeholder = placeholder;
+    });
   }
 
   updateEventRowsVisibilityAndTypes() {
@@ -237,6 +252,9 @@ class EventsTableManager {
 
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
+    
+    // Update placeholders for the new row based on current mode
+    this.updateInputPlaceholders();
     
     // Prevent any automatic focus that might cause scrolling
     // Use setTimeout to ensure this runs after any potential focus events

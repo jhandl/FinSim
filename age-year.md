@@ -173,7 +173,7 @@ The solution introduces the core feature of allowing year-based inputs by implem
 - [x] 3. Initialize Toggle State
 - [x] 4. Implement Toggle Click Handler
 - [x] 5. Update Table Headers Dynamically
-- [ ] 6. Update Input Placeholders
+- [x] 6. Update Input Placeholders
 - [ ] 7. Modify Help Configuration
 - [ ] 8. Update Wizard Component
 - [ ] 9. Implement Year-to-Age Conversion
@@ -186,7 +186,7 @@ The solution introduces the core feature of allowing year-based inputs by implem
 - [ ] 16. Handle Dynamic Updates
 
 ### Current Status
-**In Progress** - Step 5 completed: Table headers now dynamically update between "From Age/To Age" and "From Year/To Year"
+**In Progress** - Step 6 completed: Input placeholders now show "YYYY" in year mode for clear user guidance
 
 ### Notes
 - Implementation should follow the existing code patterns and style
