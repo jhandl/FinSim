@@ -46,8 +46,6 @@ class EventsTableManager {
             row.dataset.originalEventType = e.target.value;
           }
           this.updateFieldVisibility(e.target);
-          // Update placeholders based on the new event type
-          this.updateInputPlaceholders();
         }
       });
     }
@@ -105,9 +103,8 @@ class EventsTableManager {
       }
     }
     
-    // Update table headers and input placeholders
+    // Update table headers
     this.updateTableHeaders();
-    this.updateInputPlaceholders();
   }
 
   updateTableHeaders() {
@@ -129,40 +126,7 @@ class EventsTableManager {
     }
   }
 
-  updateInputPlaceholders() {
-    const eventsTable = document.getElementById('Events');
-    if (!eventsTable) return;
-    
-    // Find all rows in the events table
-    const tbody = eventsTable.querySelector('tbody');
-    if (!tbody) return;
-    
-    const rows = tbody.querySelectorAll('tr');
-    
-    rows.forEach(row => {
-      const eventTypeSelect = row.querySelector('.event-type');
-      const fromAgeInput = row.querySelector('.event-from-age');
-      const toAgeInput = row.querySelector('.event-to-age');
-      
-      if (eventTypeSelect && fromAgeInput && toAgeInput) {
-        const eventType = eventTypeSelect.value;
-        const placeholder = this.getPlaceholderForEventType(eventType);
-        
-        fromAgeInput.placeholder = placeholder;
-        toAgeInput.placeholder = placeholder;
-      }
-    });
-  }
 
-  getPlaceholderForEventType(eventType) {
-    // For NOP (No Operation) events, don't show any placeholder since all fields are ignored
-    if (eventType === 'NOP') {
-      return '';
-    }
-    
-    // For other event types, use placeholder based on current age/year mode
-    return this.ageYearMode === 'age' ? '' : 'YYYY';
-  }
 
   updateEventRowsVisibilityAndTypes() {
     const simulationMode = this.webUI.getValue('simulation_mode');
@@ -269,9 +233,6 @@ class EventsTableManager {
 
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
-    
-    // Update placeholders for the new row based on current mode
-    this.updateInputPlaceholders();
     
     // Prevent any automatic focus that might cause scrolling
     // Use setTimeout to ensure this runs after any potential focus events

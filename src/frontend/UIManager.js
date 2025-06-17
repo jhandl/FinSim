@@ -131,6 +131,9 @@ class UIManager {
     };
     
     if (validate) {
+      // Validate age fields - basic range validation
+      this.validateParameterAgeFields(params);
+      
       if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
         this.ui.setWarning("RetirementAge", "Warning: Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
       }
@@ -250,6 +253,7 @@ class UIManager {
     if (validate) {
       this.validateEventFields(events);
       this.validateMortgageEvents(events);
+      this.validateAgeYearFields(events);
     }
 
     return events;
@@ -314,14 +318,155 @@ class UIManager {
           errors = true;
         }
       });
+    }
+  }
 
-      if (event.fromAge && event.toAge) {
+  validateAgeYearFields(events) {
+    // Get the EventsTableManager instance to check current age/year mode
+    const eventsTableManager = this.ui.eventsTableManager;
+    if (!eventsTableManager) return; // Skip if not available
+    
+    const ageYearMode = eventsTableManager.ageYearMode;
+    const currentYear = new Date().getFullYear();
+    const startingAge = parseInt(this.ui.getValue('StartingAge')) || 0;
+    const p2StartingAge = parseInt(this.ui.getValue('P2StartingAge')) || 0;
+    
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      
+      // Skip validation for NOP events as they ignore all fields
+      if (event.type === 'NOP') continue;
+      
+      // Validate From Age/Year
+      if (event.fromAge !== undefined && event.fromAge !== '') {
+        const validation = this.validateAgeYearValue(event.fromAge, event.type, 'from', 
+                                                     startingAge, p2StartingAge, currentYear, ageYearMode);
+        if (!validation.isValid) {
+          this.ui.setWarning(`Events[${i + 1},3]`, validation.message);
+          errors = true;
+        }
+      }
+      
+      // Validate To Age/Year
+      if (event.toAge !== undefined && event.toAge !== '' && event.toAge !== 999) {
+        const validation = this.validateAgeYearValue(event.toAge, event.type, 'to', 
+                                                     startingAge, p2StartingAge, currentYear, ageYearMode);
+        if (!validation.isValid) {
+          this.ui.setWarning(`Events[${i + 1},4]`, validation.message);
+          errors = true;
+        }
+      }
+      
+      // Validate that toAge is not smaller than fromAge
+      if (event.fromAge && event.toAge && event.toAge !== 999) {
         if (event.toAge < event.fromAge) {
-          this.ui.setWarning(`Events[${i + 1},4]`, "End age can't be less than start age");
+          this.ui.setWarning(`Events[${i + 1},4]`, "End ${ageYearMode} can't be before start ${ageYearMode}");
           errors = true;
         }
       }
     }
+  }
+
+  validateAgeYearValue(value, eventType, field, startingAge, p2StartingAge, currentYear, ageYearMode) {
+    const numValue = parseInt(value);
+    
+    if (isNaN(numValue)) {
+      return { isValid: false, message: "Please enter a valid number" };
+    }
+    
+    if (ageYearMode === 'age') {
+      // Validate age values
+      if (numValue < 0) {
+        return { isValid: false, message: "Age cannot be negative" };
+      }
+      if (numValue > 120) {
+        return { isValid: false, message: "Age seems unreasonably high (over 120)" };
+      }
+      
+      // Check if age makes sense relative to starting age
+      const relevantStartingAge = this.getRelevantStartingAge(eventType, startingAge, p2StartingAge);
+      if (relevantStartingAge > 0) {
+        if (numValue > relevantStartingAge + 70) {
+          return { isValid: false, message: `Age ${numValue} seems very far in the future (${numValue - relevantStartingAge} years from now)` }; 
+        }
+        if (numValue < relevantStartingAge - 70) {
+          return { isValid: false, message: `Age ${numValue} seems very far in the past (${relevantStartingAge - numValue} years ago)` };
+        }
+      }
+    } else {
+      // Validate year values
+      if (numValue > currentYear + 70) {
+        return { isValid: false, message: `Year ${numValue} seems very far in the future (${numValue - currentYear} years from now)` };
+      }
+      if (numValue < currentYear - 70) {
+        return { isValid: false, message: `Year ${numValue} seems very far in the past (${currentYear - numValue} years ago)` };
+      }
+    }
+    
+    return { isValid: true };
+  }
+
+  getRelevantStartingAge(eventType, startingAge, p2StartingAge) {
+    // Determine which person this event applies to based on event type
+    if (eventType === 'SI2' || eventType === 'SI2np') {
+      return p2StartingAge;
+    } else {
+      return startingAge;
+    }
+  }
+
+  validateParameterAgeFields(params) {
+    const allAgeFields = [
+      { value: params.startingAge, fieldId: 'StartingAge', name: 'Current Age', person: 'P1' },
+      { value: params.retirementAge, fieldId: 'RetirementAge', name: 'Retirement Age', person: 'P1' },
+      { value: params.targetAge, fieldId: 'TargetAge', name: 'Target Age', person: 'shared' },
+      { value: params.p2StartingAge, fieldId: 'P2StartingAge', name: 'Partner Current Age', person: 'P2' },
+      { value: params.p2RetirementAge, fieldId: 'P2RetirementAge', name: 'Partner Retirement Age', person: 'P2' }
+    ];
+
+    // Determine which fields to validate
+    const shouldValidateP2 = (params.simulation_mode === 'couple');
+    const fieldsToValidate = allAgeFields.filter(field => 
+      field.person === 'P1' || field.person === 'shared' || shouldValidateP2
+    );
+
+    // Validate individual age fields
+    fieldsToValidate.forEach(field => {
+      if (this.hasValue(field.value)) {
+        const validation = this.validateParameterAgeValue(field.value, field.name);
+        if (!validation.isValid) {
+          this.ui.setWarning(field.fieldId, validation.message);
+          errors = true;
+        }
+      }
+    });
+
+    const validateRelationship = (current, future, fieldId, message) => {
+      if (this.hasValue(current) && this.hasValue(future) && future <= current) {
+        this.ui.setWarning(fieldId, message);
+        errors = true;
+      }
+    };
+    validateRelationship(params.startingAge, params.targetAge, 'TargetAge', 'Target age must be greater than current age');
+
+  }
+
+  hasValue(value) {
+    return value !== undefined && value !== '' && value !== 0;
+  }
+
+  validateParameterAgeValue(value, fieldName) {
+    const numValue = parseInt(value);
+    if (isNaN(numValue)) {
+      return { isValid: false, message: "Please enter a valid number" };
+    }
+    if (numValue < 0) {
+      return { isValid: false, message: "Age cannot be negative" };
+    }
+    if (numValue > 120) {
+      return { isValid: false, message: "Age seems unreasonably high" };
+    }
+    return { isValid: true };
   }
 
   saveToFile() {
