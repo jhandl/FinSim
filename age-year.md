@@ -11,12 +11,13 @@ Currently, the simulator has two main issues related to user inputs for age and 
 
 ## 2. Investigation & Analysis
 
-A thorough review of the codebase, particularly `src/core/Simulator.js`, `src/core/Person.js`, and `src/frontend/web/components/EventsTableManager.js`, has revealed the following:
+A thorough review of the codebase, particularly `src/core/Simulator.js` and `src/core/Person.js`, has revealed a critical distinction in how ages are used:
 
-*   **Simulation Driver is P1's Age**: The main simulation loop is `while (person1.age < params.targetAge)`. This confirms that the simulation's timeline is exclusively driven by Person 1's age. All event triggers (`fromAge`, `toAge`) are evaluated against `person1.age`.
-*   **Correct Data Model**: The parameter model correctly includes `p2StartingAge` and `p2RetirementAge`, and the `Person` objects are initialized with their own respective retirement ages. The underlying data structure is sound.
-*   **Root of Ambiguity**: Because the event loop is tied to Person 1's age, any event for Person 2 must have its `fromAge`/`toAge` set relative to when Person 1 will be that age. This is the core of the usability problem.
-*   **UI Constraints**: The events table UI, managed by `EventsTableManager.js`, is compact. Adding new controls to each row (e.g., a toggle for every age input) would clutter the interface significantly.
+*   **Person-Specific Lifecycle Calculations (Handled Correctly):** The simulation correctly uses `person2.age` for individual lifecycle calculations. This includes triggering their personal retirement, determining their eligibility for the state pension, and calculating their age-based pension contribution rates. The underlying data model is sound.
+
+*   **General Event Timeline (The Usability Issue):** The main event processing loop is driven exclusively by `person1.age`. The `fromAge` and `toAge` values for *all* events in the events table (including those for Person 2 like salary or expenses) are checked against Person 1's age. This is the root of the ambiguity and the specific problem this plan solves.
+
+*   **UI Constraints**: The events table UI, managed by `EventsTableManager.js`, is compact. Adding new controls to each row would clutter the interface significantly, which is why the proposed toggle is placed on the section header.
 
 ## 3. Proposed Solution
 
@@ -63,17 +64,96 @@ The solution introduces the core feature of allowing year-based inputs by implem
 
 ## 4. Implementation Plan
 
-1.  **Modify UI**: Add the `[ Age | Year ]` toggle next to the `<h2>Events</h2>` header in the HTML. Add the necessary CSS to style it like the single/couple toggle.
-2.  **Implement Toggle Logic**: Write JavaScript to manage the toggle state and update the table headers and input placeholders.
-3.  **Update Help System**:
-    *   Modify `help.yml` to use a placeholder (e.g., `{{age_or_year}}`) in relevant help descriptions.
-    *   Update `Wizard.js` to replace this placeholder with the active mode ("age" or "year") when showing help.
-4.  **Implement Conversion Logic**: In `UIManager.js`'s `readEvents` function, add the pre-processing step to detect the toggle's state and perform the year-to-age conversion.
-5.  **Test**: Add unit tests for both the conversion logic and the dynamic help text replacement.
+### Phase 1: UI Infrastructure
+1. **Update HTML Structure** (`src/frontend/web/ifs/index.html`)
+   - Add the `[ Age | Year ]` toggle next to the `<h2>Events</h2>` header
+   - Structure: `<h2>Events <span class="age-year-toggle">[ <span class="toggle-option active">Age</span> | <span class="toggle-option">Year</span> ]</span></h2>`
+   - Assign IDs to the "From Age" and "To Age" table headers for easy manipulation
+
+2. **Add CSS Styling** (`src/frontend/web/ifs/css/simulator.css`)
+   - Style the `.age-year-toggle` to match the existing single/couple toggle design
+   - Ensure proper spacing and visual consistency with existing UI patterns
+
+3. **Initialize Toggle State** (`src/frontend/web/components/EventsTableManager.js`)
+   - Add a property to track current mode: `this.ageYearMode = 'age'`
+   - Create method `setupAgeYearToggle()` to handle click events on toggle elements
+
+### Phase 2: Toggle Functionality
+4. **Implement Toggle Click Handler** (`src/frontend/web/components/EventsTableManager.js`)
+   - Create method `handleAgeYearToggle(newMode)` that:
+     - Updates `this.ageYearMode` property
+     - Updates visual state of toggle (active/inactive classes)
+     - Calls `updateTableHeaders()` and `updateInputPlaceholders()`
+
+5. **Update Table Headers Dynamically**
+   - Create method `updateTableHeaders()` that changes:
+     - "From Age" ↔ "From Year" 
+     - "To Age" ↔ "To Year"
+
+6. **Update Input Placeholders**
+   - Create method `updateInputPlaceholders()` that changes all age input placeholders to "YYYY" in year mode
+
+### Phase 3: Help System Integration
+7. **Modify Help Configuration** (`src/frontend/web/assets/help.yml`)
+   - Replace static "age" references with `{{age_or_year}}` placeholder in relevant help entries
+   - Target fields: `EventFromAge`, `EventToAge`, and related descriptions
+
+8. **Update Wizard Component** (`src/frontend/web/components/Wizard.js`)
+   - Modify help text processing to replace `{{age_or_year}}` with current mode
+   - Add method `replaceAgeYearPlaceholders(helpText)` 
+   - Integrate with existing link replacement logic
+
+### Phase 4: Data Conversion Logic
+9. **Implement Year-to-Age Conversion** (`src/frontend/UIManager.js`)
+   - Modify `readEvents()` method to detect current toggle state
+   - Add conversion logic that:
+     - Calculates birth years for both persons
+     - Converts year inputs to ages based on event type ('SI' vs 'SI2')
+     - Returns standard age-based events array to simulator
+
+10. **Add Conversion Helper Functions**
+    - `calculateBirthYear(startingAge, currentYear)`
+    - `convertEventYearToAge(eventYear, birthYear)`
+    - `determineEventPerson(eventType)` - returns 'P1' or 'P2'
+
+### Phase 5: Testing & Validation
+11. **Create Unit Tests**
+    - Test year-to-age conversion logic with various scenarios
+    - Test help text placeholder replacement
+    - Test toggle state management
+
+12. **Integration Testing**
+    - Verify complete workflow: toggle → input → conversion → simulation
+    - Test edge cases (invalid years, missing data)
+    - Validate that existing age-based workflows remain unchanged
 
 ## 5. Risks and Mitigations
 
 *   **Incorrect Conversion Logic**: The primary risk lies in errors within the year-to-age calculation.
     *   **Mitigation**: Develop a robust suite of unit tests specifically for this conversion function to cover various start ages, age differences, and event years.
 *   **User Confusion**: Mixing modes could be confusing.
-    *   **Mitigation**: By using a single, table-wide toggle, we enforce consistency and make the current input mode clear. 
+    *   **Mitigation**: By using a single, table-wide toggle, we enforce consistency and make the current input mode clear.
+
+## 6. Progress Tracking
+
+### Completed Tasks
+- [ ] 1. Update HTML Structure
+- [ ] 2. Add CSS Styling  
+- [ ] 3. Initialize Toggle State
+- [ ] 4. Implement Toggle Click Handler
+- [ ] 5. Update Table Headers Dynamically
+- [ ] 6. Update Input Placeholders
+- [ ] 7. Modify Help Configuration
+- [ ] 8. Update Wizard Component
+- [ ] 9. Implement Year-to-Age Conversion
+- [ ] 10. Add Conversion Helper Functions
+- [ ] 11. Create Unit Tests
+- [ ] 12. Integration Testing
+
+### Current Status
+**Not Started** - Awaiting approval to begin implementation
+
+### Notes
+- Implementation should follow the existing code patterns and style
+- Each step should be tested individually before proceeding to the next
+- Maintain backward compatibility with existing age-based inputs 
