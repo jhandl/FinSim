@@ -5,10 +5,12 @@ class EventsTableManager {
   constructor(webUI) {
     this.webUI = webUI;
     this.eventRowCounter = 0;
+    this.ageYearMode = 'age'; // Track current toggle mode
     this.setupAddEventButton();
     this.setupEventTableRowDelete();
     this.setupEventTypeChangeHandler();
     this.setupSimulationModeChangeHandler();
+    this.setupAgeYearToggle();
   }
 
   setupAddEventButton() {
@@ -57,6 +59,63 @@ class EventsTableManager {
       });
       setTimeout(() => this.updateEventRowsVisibilityAndTypes(), 0);
     }
+  }
+
+  setupAgeYearToggle() {
+    const ageToggle = document.getElementById('ageYearModeAge');
+    const yearToggle = document.getElementById('ageYearModeYear');
+    
+    if (ageToggle) {
+      ageToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.handleAgeYearToggle('age');
+      });
+    }
+    
+    if (yearToggle) {
+      yearToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.handleAgeYearToggle('year');
+      });
+    }
+  }
+
+  handleAgeYearToggle(newMode) {
+    // Don't do anything if already in the requested mode
+    if (this.ageYearMode === newMode) {
+      return;
+    }
+    
+    // Update the mode
+    this.ageYearMode = newMode;
+    
+    // Update visual state of toggle buttons
+    const ageToggle = document.getElementById('ageYearModeAge');
+    const yearToggle = document.getElementById('ageYearModeYear');
+    
+    if (ageToggle && yearToggle) {
+      if (newMode === 'age') {
+        ageToggle.classList.add('mode-toggle-active');
+        yearToggle.classList.remove('mode-toggle-active');
+      } else {
+        yearToggle.classList.add('mode-toggle-active');
+        ageToggle.classList.remove('mode-toggle-active');
+      }
+    }
+    
+    // Update table headers and input placeholders
+    this.updateTableHeaders();
+    this.updateInputPlaceholders();
+  }
+
+  updateTableHeaders() {
+    // TODO: Implement in Step 5
+    // Will update "From Age" ↔ "From Year" and "To Age" ↔ "To Year"
+  }
+
+  updateInputPlaceholders() {
+    // TODO: Implement in Step 6
+    // Will update input placeholders to show "YYYY" in year mode
   }
 
   updateEventRowsVisibilityAndTypes() {
