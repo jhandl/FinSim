@@ -127,18 +127,49 @@ The solution introduces the core feature of allowing year-based inputs by implem
     - Test edge cases (invalid years, missing data)
     - Validate that existing age-based workflows remain unchanged
 
+### Phase 6: Enhanced User Experience
+13. **Implement Hover Tooltips** (`src/frontend/web/components/EventsTableManager.js` and `src/frontend/web/WebUI.js`)
+    - Add event listeners for `mouseenter` and `mouseleave` on age/year input fields in events table
+    - Extend to parameter age fields: `StartingAge`, `P2StartingAge`, `RetirementAge`, `P2RetirementAge`, `TargetAge`
+    - Create method `showAlternativeTooltip(inputElement, currentValue, fieldType)` that:
+      - Calculates the alternative value (age ↔ year)
+      - For events: determines which person the event applies to based on event type
+      - For parameters: uses field-specific person assignment (P1, P2, or global)
+      - Shows a semi-transparent tooltip with the conversion
+
+14. **Create Tooltip Styling** (`src/frontend/web/ifs/css/simulator.css`)
+    - Add CSS for `.conversion-tooltip` class
+    - Style: semi-transparent background, small font, positioned near cursor
+    - Ensure tooltip doesn't interfere with input interaction
+    - Works consistently across both events table and parameter sections
+
+15. **Add Conversion Helper Methods**
+    - `getAlternativeValue(inputValue, fieldType, personId)` - returns the converted value
+    - `getPersonForField(fieldId)` - determines person for parameter fields (P1/P2/global)
+    - `getPersonForEvent(eventType)` - determines if event applies to P1 or P2
+    - `formatTooltipText(alternativeValue, alternativeMode, personId)` - formats display text
+    - `getCurrentYear()` - gets reference year for conversions
+
+16. **Handle Dynamic Updates**
+    - Update tooltips when toggle mode changes (events table only)
+    - Ensure tooltips work for both existing and newly added event rows
+    - Handle parameter field tooltips independently (always show year equivalent)
+    - Clear tooltips when input loses focus
+
 ## 5. Risks and Mitigations
 
 *   **Incorrect Conversion Logic**: The primary risk lies in errors within the year-to-age calculation.
     *   **Mitigation**: Develop a robust suite of unit tests specifically for this conversion function to cover various start ages, age differences, and event years.
 *   **User Confusion**: Mixing modes could be confusing.
     *   **Mitigation**: By using a single, table-wide toggle, we enforce consistency and make the current input mode clear.
+*   **Tooltip Performance**: Hover tooltips could impact performance if not optimized.
+    *   **Mitigation**: Use efficient event delegation and avoid unnecessary DOM queries.
 
 ## 6. Progress Tracking
 
 ### Completed Tasks
-- [ ] 1. Update HTML Structure
-- [ ] 2. Add CSS Styling  
+- [x] 1. Update HTML Structure
+- [x] 2. Add CSS Styling  
 - [ ] 3. Initialize Toggle State
 - [ ] 4. Implement Toggle Click Handler
 - [ ] 5. Update Table Headers Dynamically
@@ -149,11 +180,16 @@ The solution introduces the core feature of allowing year-based inputs by implem
 - [ ] 10. Add Conversion Helper Functions
 - [ ] 11. Create Unit Tests
 - [ ] 12. Integration Testing
+- [ ] 13. Implement Hover Tooltips
+- [ ] 14. Create Tooltip Styling
+- [ ] 15. Add Conversion Helper Methods
+- [ ] 16. Handle Dynamic Updates
 
 ### Current Status
-**Not Started** - Awaiting approval to begin implementation
+**In Progress** - Step 2 completed: CSS styling fixed to properly match single/couple toggle appearance with active state styling and proper header borders
 
 ### Notes
 - Implementation should follow the existing code patterns and style
 - Each step should be tested individually before proceeding to the next
-- Maintain backward compatibility with existing age-based inputs 
+- Maintain backward compatibility with existing age-based inputs
+- Hover tooltips should be subtle and non-intrusive to maintain clean UX 

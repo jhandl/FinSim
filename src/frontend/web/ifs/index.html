@@ -241,7 +241,13 @@
         </div>
 
         <div class="events-section">
-            <h2>Events</h2>
+            <div class="card-header-flex">
+                <h2>Events</h2>
+                <div class="age-year-toggle">
+                    <span id="ageYearModeAge" class="mode-toggle-option mode-toggle-active">Age</span>
+                    <span id="ageYearModeYear" class="mode-toggle-option">Year</span>
+                </div>
+            </div>
             <div class="table-container">
                 <table id="Events">
                     <thead>
@@ -249,8 +255,8 @@
                             <th>Event Type</th>
                             <th>Name</th>
                             <th>Amount</th>
-                            <th>From Age</th>
-                            <th>To Age</th>
+                            <th id="fromAgeHeader">From Age</th>
+                            <th id="toAgeHeader">To Age</th>
                             <th>Rate</th>
                             <th>Match</th>
                             <th></th>
