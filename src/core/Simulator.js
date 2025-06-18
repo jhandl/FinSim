@@ -16,7 +16,11 @@ const Phases = {
 
 
 function run() {
-  if (!initializeSimulator()) return;
+  if (!initializeSimulator()) {
+    // If initialization fails (validation errors), ensure UI state is reset
+    uiManager.ui.flush();
+    return;
+  }
   montecarlo = (params.growthDevPension > 0 || params.growthDevFunds > 0 || params.growthDevShares > 0);
   let runs = (montecarlo ? config.simulationRuns : 1);
   let successes = 0;

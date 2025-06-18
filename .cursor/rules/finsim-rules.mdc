@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Always read [AGENTS.md](mdc:AGENTS.md) to understand the project. Never assume how the code works, always read the relevant source code files to understand the code. When implementing a change, do it in the most elegant, no-nonsense way possible,while not being overly verbose (don't create unnecessary one-time-use helper methods) and strictly adhering to the way the existing code already works. No hacks please.

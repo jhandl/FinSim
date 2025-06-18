@@ -18,6 +18,7 @@
     --border-radius-large: 8px;
     --input-field-border: 1px;
     --events-line-divider: 0px;
+    --card-header-border-width: 1px;
 }
 
 * {
@@ -127,7 +128,7 @@ header {
 .card h2 {
     margin-bottom: 0.675rem;
     padding-bottom: 0.45rem;
-    border-bottom: 1.8px solid var(--primary-color);
+    border-bottom: var(--card-header-border-width) solid var(--primary-color);
     font-size: 1.08rem;
 }
 
@@ -139,7 +140,7 @@ header {
     margin-bottom: 0.675rem;
     padding-bottom: 0;
     padding-right: 0rem;
-    border-bottom: 1.8px solid var(--primary-color);
+    border-bottom: var(--card-header-border-width) solid var(--primary-color);
     position: relative;
 }
 
@@ -147,30 +148,21 @@ header {
     margin-bottom: 0;
     padding-bottom: 0;
     border-bottom: none;
+    position: relative;
+    top: -3px;
 }
 
 .card > h2:not(:first-child) {
     margin-bottom: 0.675rem;
     padding-bottom: 0.45rem;
-    border-bottom: 1.8px solid var(--primary-color);
-}
-
-.card > .input-group + h2,
-.card > h2:only-child {
-    /* This might be tricky, the original .card h2 might be better just modified slightly */
+    border-bottom: var(--card-header-border-width) solid var(--primary-color);
 }
 
 .card > h2 {
     margin-bottom: 0.675rem;
     padding-bottom: 0.45rem;
-    border-bottom: 1.8px solid var(--primary-color);
+    border-bottom: var(--card-header-border-width) solid var(--primary-color);
     font-size: 1.08rem;
-}
-
-.card-header-flex > h2 {
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
 }
 
 .simulation-mode-toggle {
@@ -179,6 +171,8 @@ header {
     border-bottom: none;
     position: relative;
     margin-left: auto;
+    white-space: normal;
+    margin-bottom: 0;
 }
 
 .mode-toggle-option {
@@ -307,10 +301,18 @@ input:focus {
 
 
 .events-section h2 {
-    margin-bottom: 1.35rem;
+    margin-bottom: 0.675rem;
     padding-bottom: 0.45rem;
-    border-bottom: 1.8px solid var(--primary-color);
+    border-bottom: none;
     font-size: 1.08rem;
+}
+
+.events-section .card-header-flex h2 {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+    position: relative;
+    top: -5px;
 }
 
 th {
@@ -409,6 +411,12 @@ th {
 #Events th {
     background-color: #f5f5f5;
     font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Smaller font for year mode headers to fit "From Year" and "To Year" */
+#Events th.year-mode {
+    font-size: 0.95rem;
 }
 
 #Events input,
@@ -963,13 +971,13 @@ footer {
     margin-left: 0rem;
     border-radius: 4px 4px 0 0;
     transition: background-color 0.3s ease, border-color 0.3s ease;
-    border-top: 1.8px solid transparent;
-    border-left: 1.8px solid transparent;
-    border-right: 1.8px solid transparent;
+    border-top: var(--card-header-border-width) solid transparent;
+    border-left: var(--card-header-border-width) solid transparent;
+    border-right: var(--card-header-border-width) solid transparent;
     border-bottom: none;
     background-color: transparent;
     position: relative;
-    top: 1.7px;
+    top: var(--card-header-border-width);
 }
 
 .simulation-mode-toggle span:first-child {
@@ -978,9 +986,9 @@ footer {
 
 .simulation-mode-toggle span.mode-toggle-active {
     background-color: var(--card-bg-color, white);
-    border-top: 1.8px solid var(--primary-color);
-    border-left: 1.8px solid var(--primary-color);
-    border-right: 1.8px solid var(--primary-color);
+    border-top: var(--card-header-border-width) solid var(--primary-color);
+    border-left: var(--card-header-border-width) solid var(--primary-color);
+    border-right: var(--card-header-border-width) solid var(--primary-color);
     z-index: 1;
 }
 
@@ -996,6 +1004,78 @@ footer {
     font-size: 0.9em;
     vertical-align: top;
     padding-top: 0.1rem;
+}
+
+/* Age/Year Toggle - matches simulation-mode-toggle styling */
+.age-year-toggle {
+    display: flex;
+    align-items: flex-end;
+    border-bottom: none;
+    position: relative;
+    margin-left: auto;
+    white-space: normal;
+    margin-bottom: 0;
+}
+
+.age-year-toggle span {
+    cursor: pointer;
+    padding: 0.1rem 0.8rem;
+    margin-left: 0rem;
+    border-radius: 4px 4px 0 0;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+    border-top: var(--card-header-border-width) solid transparent;
+    border-left: var(--card-header-border-width) solid transparent;
+    border-right: var(--card-header-border-width) solid transparent;
+    border-bottom: none;
+    background-color: transparent;
+    position: relative;
+    top: var(--card-header-border-width);
+    font-size: 1rem;
+}
+
+.age-year-toggle span:first-child {
+    margin-left: 0;
+}
+
+.age-year-toggle span.mode-toggle-active {
+    background-color: var(--card-bg-color, white);
+    border-top: var(--card-header-border-width) solid var(--primary-color);
+    border-left: var(--card-header-border-width) solid var(--primary-color);
+    border-right: var(--card-header-border-width) solid var(--primary-color);
+    z-index: 1;
+}
+
+.events-section .card-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    vertical-align: middle;
+    margin-bottom: 0.675rem;
+    margin-top: 1px;
+    padding-bottom: 0;
+    padding-right: 0rem;
+    border-bottom: var(--card-header-border-width) solid var(--primary-color);
+    position: relative;
+}
+
+/* Conversion Tooltips */
+.conversion-tooltip {
+    position: absolute;
+    background-color: rgba(128, 128, 128, 0.9);
+    color: white;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--border-radius);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -70%);
+    transition: opacity 0.5s ease;
+}
+
+.conversion-tooltip.visible {
+    opacity: 1;
 }
 
 .toast-message {

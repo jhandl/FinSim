@@ -15,11 +15,12 @@ steps:
       description: >
         <p><b>Steps:</b></p>
         <ol><li>First, fill out the panels on the left to describe your current financial situation, your financial plan, expected economic conditions, etc.</li>
-        <li>Then, add rows to the Events table describing your income, expenses, and plans for things like buying a house, changing jobs, etc. Each event has a starting and an ending point in time, and they are expressed in terms of your age. Everything is calculated on a yearly basis, so add up all your expenses for the year and use that number. If you have expenses that have a clear timeframe (like paying for college), add them as separate events.</li>
+        <li>Then, add rows to the Events table describing your income, expenses, and plans for things like buying a house, changing jobs, etc. Each event has a starting and an ending point in time. Everything is calculated on a yearly basis, so add up all your expenses for the year and use that number. If you have expenses that have a clear timeframe (like paying for college), add them as separate events.</li>
         <li>Finally, run the simulation to see how it goes. You will see the outcome in three ways:</li>
         <ul><li>The status box next to the "Run Simulation" button will tell you if your scenario was successful, or at what age it failed (it fails if at any point you can't afford your expenses), or the likelyhood that it succeeds (see volatility below).</li>
         <li>The graphs will show the evolution of your cashflow (how your expenses stack up against your income and where it comes from), and your assets (how much you have accumulated and where), from your current age to your target age.</li>
         <li>The table at the bottom will show you, year by year, the details of your income, taxes, cashflow, and assets.</li></ul></ol>
+        <p><b>Date modes:</b> You can choose to express the events' starting and ending points in terms of your age or the year. Use the toggle in the top right of the Events table to switch between modes. You can switch back and forth at any time, this will give you a better understanding of the dates.</p> 
         <p><b>Simulator modes:</b> The simulator can run in single-person mode (for individual planning) or two-person mode (for couples/partnerships). Use the toggle icons in the Starting Position panel to switch between modes. Two-person mode allows separate pension pots, retirement ages, and state pensions for each person.</p>
         <p><b>Present value:</b> All monetary amounts should be entered in today's money (present value). For example, if you plan to spend €30,000 per year on living expenses, enter €30,000 even if that expense will start in 10 years. The simulator will automatically adjust these amounts for inflation over time based on the inflation or the growth rate you specify. This makes it easier to think about expenses and income in terms of today's purchasing power.</p>
         <p><b>Stress testing:</b> You can change the economy parameters to see what happens if inflation is higher, investments grow slower or are more volatile. You can further stress test your scenario by adding a stock market crash or two.</p>
@@ -260,6 +261,18 @@ steps:
 
 ###########################################################
 # Event Type
+
+  - element: "#ageYearModeAge"
+    popover:
+      description: "<p>Toggle to see the start and end points of events in terms of age.</p><p>In single-person mode, all events will be relative to your age. In two-person mode, some events will refer to the other person's age (e.g. their salary income). You can check what year that represents by switching to the Year mode, or by hovering over an age field: a tooltip will appear with the corresponding year.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#ageYearModeYear"
+    popover:
+      description: "<p>Toggle to see the start and end points of events in terms of year.</p><p>To see the age that corresponds to a given year, hover over a year field. A tooltip will appear with the corresponding age, which might be your age or the other person's age depending on the type of event and if you're in single-person or two-person mode.</p>"
+      side: "bottom"
+      align: "center"
 
   - element: "#EventType"
     popover:
@@ -565,7 +578,7 @@ steps:
 
   - element: "#EventFromAge"
     popover:
-      description: "<p>The age at which the event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the event starts.</p>"
       side: "bottom"
       align: "center"
 
@@ -579,84 +592,84 @@ steps:
   - element: "#EventFromAge"
     eventTypes: ["RI"]
     popover:
-      description: "<p>The age at which the income event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["SI"]
     popover:
-      description: "<p>The age at which the salary income event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the salary income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>The age at which the salary income event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the salary income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["SI2"]
     popover:
-      description: "<p>The age at which the salary income event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the salary income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["SI2np"]
     popover:
-      description: "<p>The age at which the salary income event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the salary income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["UI"]
     popover:
-      description: "<p>The age at which the RSU income event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the RSU income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["DBI"]
     popover:
-      description: "<p>The age at which the Defined Benefit income event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the Defined Benefit income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["FI"]
     popover:
-      description: "<p>The age at which the tax free income event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the tax free income event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["E"]
     popover:
-      description: "<p>The age at which the expense event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the expense event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["SM"]
     popover:
-      description: "<p>The age at which the stock market event starts.</p>"
+      description: "<p>The {{age_or_year}} at which the stock market event starts.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["R"]
     popover:
-      description: "<p>The age at which the property is bought.</p>"
+      description: "<p>The {{age_or_year}} at which the property is bought.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventFromAge"
     eventTypes: ["M"]
     popover:
-      description: "<p>The age at which the mortgage starts. It must match the 'from age' of the corresponding Rental Property event.</p>"
+      description: "<p>The {{age_or_year}} at which the mortgage starts. It must match the 'from {{age_or_year}}' of the corresponding Rental Property event.</p>"
       side: "bottom"
       align: "center"
 
@@ -665,7 +678,7 @@ steps:
 
   - element: "#EventToAge"
     popover:
-      description: "<p>The age up to and including which the event continues.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the event continues.</p>"
       side: "bottom"
       align: "center"
 
@@ -679,84 +692,84 @@ steps:
   - element: "#EventToAge"
     eventTypes: ["RI"]
     popover:
-      description: "<p>The age up to and including which the rental income is received.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the rental income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["SI"]
     popover:
-      description: "<p>The age up to and including which the salary income is received.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the salary income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["SInp"]
     popover:
-      description: "<p>The age up to and including which the salary income is received.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the salary income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["SI2"]
     popover:
-      description: "<p>The age up to and including which the salary income is received.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the salary income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["SI2np"]
     popover:
-      description: "<p>The age up to and including which the salary income is received.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the salary income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["UI"]
     popover:
-      description: "<p>The age up to and including which the RSU income is received.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the RSU income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["DBI"]
     popover:
-      description: "<p>The age up to and including which the Defined Benefit income is received. You can leave it blank if you don't plan to transfer it to another arrangement.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the Defined Benefit income is received. You can leave it blank if you don't plan to transfer it to another arrangement.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["FI"]
     popover:
-      description: "<p>The age up to and including which the tax free income is received.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the tax free income is received.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["E"]
     popover:
-      description: "<p>The age up to and including which the expense is incurred.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the expense is incurred.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["SM"]
     popover:
-      description: "<p>The age up to and including which the stock market event continues.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the stock market event continues.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["R"]
     popover:
-      description: "<p>The age up to and including which the property is held.</p><p>The total value of the property will be computed including mortgage repayments plus the expected appreciation and it will be sold after the age you enter here. The proceeds will be invested according to your chosen allocation</p>"
+      description: "<p>The {{age_or_year}} up to and including which the property is held.</p><p>The total value of the property will be computed including mortgage repayments plus the expected appreciation and it will be sold after the {{age_or_year}} you enter here. The proceeds will be invested according to your chosen allocation</p>"
       side: "bottom"
       align: "center"
 
   - element: "#EventToAge"
     eventTypes: ["M"]
     popover:
-      description: "<p>The age up to and including which the mortgage is repaid. It can't be later than when the corresponding property is sold.</p>"
+      description: "<p>The {{age_or_year}} up to and including which the mortgage is repaid. It can't be later than when the corresponding property is sold.</p>"
       side: "bottom"
       align: "center"
 

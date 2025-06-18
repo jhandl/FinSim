@@ -131,11 +131,22 @@ class UIManager {
     };
     
     if (validate) {
+      // Validate age fields - basic range validation
+      this.validateParameterAgeFields(params);
+      
       if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
-        this.ui.setWarning("RetirementAge", "Warning: Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
+        this.ui.setWarning("RetirementAge", "Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
       }
       if (params.retirementAge < config.minPrivatePensionRetirementAge) {
-        this.ui.setWarning("RetirementAge", "Warning: Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
+        this.ui.setWarning("RetirementAge", "Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
+      }
+
+      // Person 2 retirement age validation against config minimums
+      if (params.p2RetirementAge < config.minOccupationalPensionRetirementAge) {
+        this.ui.setWarning("P2RetirementAge", "Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
+      }
+      if (params.p2RetirementAge < config.minPrivatePensionRetirementAge) {
+        this.ui.setWarning("P2RetirementAge", "Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
       }
 
       // Person 1 Validation: startingAge and retirementAge required if either provided.
@@ -168,9 +179,12 @@ class UIManager {
 
       if (params.FundsAllocation + params.SharesAllocation > 1.0001) {
         this.ui.setWarning("FundsAllocation", "Index Funds + Individual Shares allocations can't exceed 100%");
-        this.ui.setWarning("SharesAllocation", "");
+        this.ui.setWarning("SharesAllocation", "Index Funds + Individual Shares allocations can't exceed 100%");
         errors = true;
       }
+      
+      // Validate percentage fields
+      this.validateParameterPercentageFields(params);
     }
 
     return params;
@@ -182,7 +196,6 @@ class UIManager {
 
   readEvents(validate=true) {
     const events = [];
-    errors = false;
     const rows = this.ui.getTableData("Events", 6);
 
     for (const [i, [name, amount, fromAge, toAge, rate, match]] of rows.entries()) {
@@ -239,9 +252,33 @@ class UIManager {
       }
 
       const id = name.substr(pos + 1);
+      
+      // Convert years to ages if we're in year mode
+      let processedFromAge = fromAge;
+      let processedToAge = toAge;
+      
+      // Check if EventsTableManager exists and is in year mode
+      const eventsTableManager = this.ui.eventsTableManager;
+      if (eventsTableManager && eventsTableManager.ageYearMode === 'year') {
+        const startingAge = parseInt(this.ui.getValue('StartingAge')) || 0;
+        const p2StartingAge = parseInt(this.ui.getValue('P2StartingAge')) || 0;
+        
+        // Convert fromAge from year to age
+        if (fromAge !== "" && !isNaN(fromAge)) {
+          const birthYear = this.calculateBirthYear(type, startingAge, p2StartingAge);
+          processedFromAge = this.convertEventYearToAge(parseInt(fromAge), birthYear);
+        }
+        
+        // Convert toAge from year to age
+        if (toAge !== "" && !isNaN(toAge)) {
+          const birthYear = this.calculateBirthYear(type, startingAge, p2StartingAge);
+          processedToAge = this.convertEventYearToAge(parseInt(toAge), birthYear);
+        }
+      }
+      
       events.push(new SimEvent(
-        type, id, amount, fromAge, 
-        (toAge === "" && (type === "R" || type === "DBI")) ? 999 : toAge,
+        type, id, amount, processedFromAge, 
+        (processedToAge === "" && (type === "R" || type === "DBI")) ? 999 : processedToAge,
         (rate === "") ? undefined : rate,
         (match === "") ? undefined : match
       ))
@@ -250,9 +287,37 @@ class UIManager {
     if (validate) {
       this.validateEventFields(events);
       this.validateMortgageEvents(events);
+      this.validateAgeYearFields(events);
     }
 
     return events;
+  }
+
+  // Helper function to calculate birth year for a person based on event type
+  calculateBirthYear(eventType, startingAge, p2StartingAge) {
+    const currentYear = new Date().getFullYear();
+    const eventPerson = this.determineEventPerson(eventType);
+    
+    if (eventPerson === 'P2') {
+      return currentYear - p2StartingAge;
+    } else {
+      return currentYear - startingAge;
+    }
+  }
+
+  // Helper function to convert a year to an age for a specific person
+  convertEventYearToAge(eventYear, birthYear) {
+    return eventYear - birthYear;
+  }
+
+  // Helper function to determine which person an event applies to
+  determineEventPerson(eventType) {
+    // SI2 and SI2np events apply to Person 2
+    if (eventType === 'SI2' || eventType === 'SI2np') {
+      return 'P2';
+    }
+    // All other events apply to Person 1 (or are global)
+    return 'P1';
   }
 
   validateMortgageEvents(events) {
@@ -314,14 +379,143 @@ class UIManager {
           errors = true;
         }
       });
+    }
+  }
 
-      if (event.fromAge && event.toAge) {
+  validateAgeYearFields(events) {
+    const startingAge = parseInt(this.ui.getValue('StartingAge')) || 0;
+    const p2StartingAge = parseInt(this.ui.getValue('P2StartingAge')) || 0;
+    
+    // Get current UI mode for appropriate error messages
+    const eventsTableManager = this.ui.eventsTableManager;
+    const currentMode = eventsTableManager?.ageYearMode || 'age';
+    
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      
+      // Skip validation for NOP events as they ignore all fields
+      if (event.type === 'NOP') continue;
+      
+      // Validate From Age (events always contain ages after conversion)
+      if (event.fromAge !== undefined && event.fromAge !== '') {
+        const validation = this.validateAgeValue(event.fromAge, event.type, startingAge, p2StartingAge, currentMode);
+        if (!validation.isValid) {
+          this.ui.setWarning(`Events[${i + 1},3]`, validation.message);
+          errors = true;
+        }
+      }
+      
+      // Validate To Age (events always contain ages after conversion)
+      if (event.toAge !== undefined && event.toAge !== '' && event.toAge !== 999) {
+        const validation = this.validateAgeValue(event.toAge, event.type, startingAge, p2StartingAge, currentMode);
+        if (!validation.isValid) {
+          this.ui.setWarning(`Events[${i + 1},4]`, validation.message);
+          errors = true;
+        }
+      }
+      
+      // Validate that toAge is not smaller than fromAge
+      if (event.fromAge && event.toAge && event.toAge !== 999) {
         if (event.toAge < event.fromAge) {
-          this.ui.setWarning(`Events[${i + 1},4]`, "End age can't be less than start age");
+          this.ui.setWarning(`Events[${i + 1},4]`, `End ${currentMode} can't be before start ${currentMode}`);
           errors = true;
         }
       }
     }
+  }
+
+  validateAgeValue(value, eventType, startingAge, p2StartingAge, currentMode) {
+    const numValue = parseInt(value);
+    const modeWord = currentMode || 'age';
+    const capModeWord = modeWord.charAt(0).toUpperCase() + modeWord.slice(1);
+    
+    if (isNaN(numValue)) {
+      return { isValid: false, message: "Please enter a valid number" };
+    }
+    
+    // Validate age values (events always contain ages after conversion)
+    if (numValue < 0) {
+      return { isValid: false, message: `${capModeWord} cannot be negative` };
+    }
+    if (numValue > 120) {
+      return { isValid: false, message: `${capModeWord} seems unreasonably high` };
+    }
+    
+    // Check if age makes sense relative to starting age
+    const relevantStartingAge = this.getRelevantStartingAge(eventType, startingAge, p2StartingAge);
+    if (relevantStartingAge > 0) {
+      if (numValue > relevantStartingAge + 70) {
+        return { isValid: false, message: `${capModeWord} seems very far in the future (${numValue - relevantStartingAge} years from now)` }; 
+      }
+      if (numValue < relevantStartingAge - 70) {
+        return { isValid: false, message: `${capModeWord} seems very far in the past (${relevantStartingAge - numValue} years ago)` };
+      }
+    }
+    
+    return { isValid: true };
+  }
+
+  getRelevantStartingAge(eventType, startingAge, p2StartingAge) {
+    // Determine which person this event applies to based on event type
+    if (eventType === 'SI2' || eventType === 'SI2np') {
+      return p2StartingAge;
+    } else {
+      return startingAge;
+    }
+  }
+
+  validateParameterAgeFields(params) {
+    const allAgeFields = [
+      { value: params.startingAge, fieldId: 'StartingAge', name: 'Current Age', person: 'P1' },
+      { value: params.retirementAge, fieldId: 'RetirementAge', name: 'Retirement Age', person: 'P1' },
+      { value: params.targetAge, fieldId: 'TargetAge', name: 'Target Age', person: 'shared' },
+      { value: params.p2StartingAge, fieldId: 'P2StartingAge', name: 'Partner Current Age', person: 'P2' },
+      { value: params.p2RetirementAge, fieldId: 'P2RetirementAge', name: 'Partner Retirement Age', person: 'P2' }
+    ];
+
+    // Determine which fields to validate
+    const shouldValidateP2 = (params.simulation_mode === 'couple');
+    const fieldsToValidate = allAgeFields.filter(field => 
+      field.person === 'P1' || field.person === 'shared' || shouldValidateP2
+    );
+
+    // Validate individual age fields
+    fieldsToValidate.forEach(field => {
+      if (this.hasValue(field.value)) {
+        const validation = this.validateParameterAgeValue(field.value, field.name);
+        if (!validation.isValid) {
+          this.ui.setWarning(field.fieldId, validation.message);
+          errors = true;
+        }
+      }
+    });
+
+    const validateRelationship = (current, future, fieldId, message) => {
+      if (this.hasValue(current) && this.hasValue(future) && future <= current) {
+        this.ui.setWarning(fieldId, message);
+        errors = true;
+      }
+    };
+    validateRelationship(params.startingAge, params.targetAge, 'TargetAge', 'Target age must be greater than current age');
+
+  }
+
+  hasValue(value) {
+    return value !== undefined && value !== '' && value !== 0;
+  }
+
+  validateParameterAgeValue(value, fieldName) {
+    const numValue = parseInt(value);
+    if (isNaN(numValue)) {
+      return { isValid: false, message: "Please enter a valid number" };
+    }
+    if (numValue < 0) {
+      return { isValid: false, message: "Age cannot be negative" };
+    }
+    if (numValue > 120) {
+      return { isValid: false, message: "Age seems unreasonably high" };
+    }
+    return { isValid: true };
   }
 
   saveToFile() {
@@ -370,6 +564,100 @@ class UIManager {
       field,
       pattern[i] === 'r' ? 'required' : pattern[i] === 'o' ? 'optional' : 'hidden'
     ]));
+  }
+
+  validateParameterPercentageFields(params) {
+    // Define percentage fields with their validation rules
+    const percentageFields = [
+      { 
+        value: params.FundsAllocation, 
+        fieldId: 'FundsAllocation', 
+        name: 'Index Funds Allocation',
+        min: 0, 
+        max: 1,
+        unit: '%'
+      },
+      { 
+        value: params.SharesAllocation, 
+        fieldId: 'SharesAllocation', 
+        name: 'Individual Shares Allocation',
+        min: 0, 
+        max: 1,
+        unit: '%'
+      },
+      { 
+        value: params.pensionPercentage, 
+        fieldId: 'PensionContributionPercentage', 
+        name: 'Pension Contribution Percentage',
+        min: 0, 
+        max: 1,
+        unit: '%',
+        allowExceedMax: true,
+        exceedMaxMessage: "You can contribute more than 100% but you won't get tax relief on the excess"
+      },
+      { 
+        value: params.pensionPercentageP2, 
+        fieldId: 'PensionContributionPercentageP2', 
+        name: 'Partner Pension Contribution Percentage',
+        min: 0, 
+        max: 1,
+        unit: '%',
+        allowExceedMax: true,
+        exceedMaxMessage: "They can contribute more than 100% but they won't get tax relief on the excess"
+      },
+    ];
+
+    // Filter fields based on simulation mode
+    const shouldValidateP2 = (params.simulation_mode === 'couple');
+    const fieldsToValidate = percentageFields.filter(field => 
+      !field.fieldId.includes('P2') || shouldValidateP2
+    );
+
+    // Validate each percentage field
+    fieldsToValidate.forEach(field => {
+      if (this.hasValue(field.value)) {
+        const validation = this.validatePercentageValue(field.value, field.name, field.min, field.max, field.unit, field.allowExceedMax, field.exceedMaxMessage);
+        if (!validation.isValid) {
+          this.ui.setWarning(field.fieldId, validation.message);
+          if (!validation.isWarningOnly) {
+            errors = true;
+          }
+        }
+      }
+    });
+  }
+
+  validatePercentageValue(value, fieldName, min, max, unit, allowExceedMax = false, exceedMaxMessage = null) {
+    const numValue = parseFloat(value);
+    
+    if (isNaN(numValue)) {
+      return { isValid: false, message: "Please enter a valid number", isWarningOnly: false };
+    }
+    
+    if (numValue < min) {
+      return { isValid: false, message: `${fieldName} cannot be less than ${min * 100}${unit}`, isWarningOnly: false };
+    }
+    
+    if (numValue > max) {
+      if (allowExceedMax && exceedMaxMessage) {
+        // Show warning but don't block simulation
+        return { isValid: false, message: exceedMaxMessage, isWarningOnly: true };
+      } else {
+        // Standard error that blocks simulation
+        return { isValid: false, message: `${fieldName} cannot be greater than ${max * 100}${unit}`, isWarningOnly: false };
+      }
+    }
+    
+    // Additional reasonableness checks for specific types (using decimal values)
+    if (fieldName.toLowerCase().includes('growth') && Math.abs(numValue) > 0.3) {
+      return { isValid: false, message: `${fieldName} of ${numValue * 100}${unit} seems unrealistic`, isWarningOnly: false };
+    }
+    
+    if (fieldName.toLowerCase().includes('inflation') && Math.abs(numValue) > 0.1) {
+      return { isValid: false, message: `${fieldName} of ${numValue * 100}${unit} seems very high`, isWarningOnly: false };
+    }
+    
+    return { isValid: true };
   }
 
 } 

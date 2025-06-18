@@ -5,10 +5,15 @@ class EventsTableManager {
   constructor(webUI) {
     this.webUI = webUI;
     this.eventRowCounter = 0;
+    this.ageYearMode = 'age'; // Track current toggle mode
+    this.tooltipElement = null; // Reference to current tooltip
+    this.tooltipTimeout = null; // Reference to tooltip delay timeout
     this.setupAddEventButton();
     this.setupEventTableRowDelete();
     this.setupEventTypeChangeHandler();
     this.setupSimulationModeChangeHandler();
+    this.setupAgeYearToggle();
+    this.setupTooltipHandlers();
   }
 
   setupAddEventButton() {
@@ -57,6 +62,117 @@ class EventsTableManager {
       });
       setTimeout(() => this.updateEventRowsVisibilityAndTypes(), 0);
     }
+  }
+
+  setupAgeYearToggle() {
+    const ageToggle = document.getElementById('ageYearModeAge');
+    const yearToggle = document.getElementById('ageYearModeYear');
+    
+    if (ageToggle) {
+      ageToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.handleAgeYearToggle('age');
+      });
+    }
+    
+    if (yearToggle) {
+      yearToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.handleAgeYearToggle('year');
+      });
+    }
+  }
+
+  handleAgeYearToggle(newMode) {
+    // Don't do anything if already in the requested mode
+    if (this.ageYearMode === newMode) {
+      return;
+    }
+    
+    // Convert existing input values before changing the mode
+    this.convertExistingInputValues(this.ageYearMode, newMode);
+    
+    // Update the mode
+    this.ageYearMode = newMode;
+    
+    // Update visual state of toggle buttons
+    const ageToggle = document.getElementById('ageYearModeAge');
+    const yearToggle = document.getElementById('ageYearModeYear');
+    
+    if (ageToggle && yearToggle) {
+      if (newMode === 'age') {
+        ageToggle.classList.add('mode-toggle-active');
+        yearToggle.classList.remove('mode-toggle-active');
+      } else {
+        yearToggle.classList.add('mode-toggle-active');
+        ageToggle.classList.remove('mode-toggle-active');
+      }
+    }
+    
+    // Update table headers
+    this.updateTableHeaders();
+    
+    // Clear warnings and revalidate events to ensure warning messages 
+    // use the correct terminology (age vs year) for the new mode
+    this.webUI.clearAllWarnings();
+    this.webUI.validateEvents();
+  }
+
+  updateTableHeaders() {
+    const fromHeader = document.getElementById('fromAgeHeader');
+    const toHeader = document.getElementById('toAgeHeader');
+    
+    if (fromHeader && toHeader) {
+      if (this.ageYearMode === 'age') {
+        fromHeader.textContent = 'From Age';
+        toHeader.textContent = 'To Age';
+        fromHeader.classList.remove('year-mode');
+        toHeader.classList.remove('year-mode');
+      } else {
+        fromHeader.textContent = 'From Year';
+        toHeader.textContent = 'To Year';
+        fromHeader.classList.add('year-mode');
+        toHeader.classList.add('year-mode');
+      }
+    }
+  }
+
+  convertExistingInputValues(currentMode, newMode) {
+    const startingAge = parseInt(this.webUI.getValue('StartingAge')) || 0;
+    const p2StartingAge = parseInt(this.webUI.getValue('P2StartingAge')) || 0;
+    
+    if (startingAge === 0) return;
+    
+    const currentYear = new Date().getFullYear();
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return;
+    
+    tbody.querySelectorAll('tr').forEach(row => {
+      if (row.style.display === 'none') return;
+      
+      const eventType = row.querySelector('.event-type')?.value;
+      if (!eventType) return;
+      
+      const isP2Event = eventType === 'SI2' || eventType === 'SI2np';
+      const relevantStartingAge = isP2Event ? p2StartingAge : startingAge;
+      if (relevantStartingAge === 0) return;
+      
+      const birthYear = currentYear - relevantStartingAge;
+      
+      ['.event-from-age', '.event-to-age'].forEach(selector => {
+        const input = row.querySelector(selector);
+        if (!input?.value) return;
+        
+        const currentValue = parseInt(input.value);
+        if (isNaN(currentValue)) return;
+        
+        if (currentMode === 'age' && newMode === 'year') {
+          input.value = birthYear + currentValue;
+        } else if (currentMode === 'year' && newMode === 'age') {
+          input.value = currentValue - birthYear;
+        }
+      });
+    });
   }
 
   updateEventRowsVisibilityAndTypes() {
@@ -137,8 +253,8 @@ class EventsTableManager {
       </td>
       <td><input type="text" id="EventName_${rowId}" class="event-name" value="${name}"></td>
       <td><input type="number" id="EventAmount_${rowId}" class="event-amount currency" inputmode="numeric" pattern="[0-9]*" step="1000" value="${amount}"></td>
-      <td><input type="number" id="EventFromAge_${rowId}" class="event-from-age" min="0" max="100" value="${fromAge}"></td>
-      <td><input type="number" id="EventToAge_${rowId}" class="event-to-age" min="0" max="100" value="${toAge}"></td>
+      <td><input type="number" id="EventFromAge_${rowId}" class="event-from-age" value="${fromAge}"></td>
+      <td><input type="number" id="EventToAge_${rowId}" class="event-to-age" value="${toAge}"></td>
       <td><div class="percentage-container"><input type="number" id="EventRate_${rowId}" class="event-rate percentage" inputmode="numeric" pattern="[0-9]*" placeholder="inflation" value="${rate}"></div></td>
       <td><div class="percentage-container"><input type="number" id="EventMatch_${rowId}" class="event-match percentage" inputmode="numeric" pattern="[0-9]*" value="${match}"></div></td>
       <td>
@@ -226,6 +342,116 @@ class EventsTableManager {
     return eventTypes.map(type => {
       return `<option value="${type.value}" ${type.value === selectedType ? 'selected' : ''}>${type.label}</option>`;
     }).join('');
+  }
+
+  setupTooltipHandlers() {
+    const eventsTable = document.getElementById('Events');
+    if (eventsTable) {
+      // Use event delegation to handle dynamically added rows
+      eventsTable.addEventListener('mouseenter', (e) => {
+        if (e.target.classList.contains('event-from-age') || e.target.classList.contains('event-to-age')) {
+          this.scheduleTooltip(e.target);
+        }
+      }, true);
+
+      eventsTable.addEventListener('mouseleave', (e) => {
+        if (e.target.classList.contains('event-from-age') || e.target.classList.contains('event-to-age')) {
+          this.cancelTooltip();
+        }
+      }, true);
+    }
+  }
+
+  showAlternativeTooltip(inputElement) {
+    const currentValue = parseInt(inputElement.value);
+    if (isNaN(currentValue) || currentValue === 0) return;
+
+    const row = inputElement.closest('tr');
+    const eventType = row.querySelector('.event-type')?.value;
+    if (!eventType) return;
+
+    const alternativeValue = this.getAlternativeValue(currentValue, eventType);
+    if (alternativeValue === null) return;
+
+    const alternativeMode = this.ageYearMode === 'age' ? 'year' : 'age';
+    const tooltipText = this.formatTooltipText(alternativeValue, alternativeMode);
+
+    this.createTooltip(inputElement, tooltipText);
+  }
+
+  getAlternativeValue(inputValue, eventType) {
+    const startingAge = parseInt(this.webUI.getValue('StartingAge')) || 0;
+    const p2StartingAge = parseInt(this.webUI.getValue('P2StartingAge')) || 0;
+    const currentYear = new Date().getFullYear();
+
+    const isP2Event = eventType === 'SI2' || eventType === 'SI2np';
+    const relevantStartingAge = isP2Event ? p2StartingAge : startingAge;
+    
+    if (relevantStartingAge === 0) return null;
+
+    const birthYear = currentYear - relevantStartingAge;
+
+    if (this.ageYearMode === 'age') {
+      // Converting from age to year
+      return birthYear + inputValue;
+    } else {
+      // Converting from year to age
+      return inputValue - birthYear;
+    }
+  }
+
+  formatTooltipText(alternativeValue, alternativeMode) {
+    const modeLabel = alternativeMode === 'year' ? 'Year' : 'Age';
+    return `${modeLabel} ${alternativeValue}`;
+  }
+
+  createTooltip(inputElement, text) {
+    this.hideTooltip(); // Remove any existing tooltip
+
+    this.tooltipElement = document.createElement('div');
+    this.tooltipElement.className = 'conversion-tooltip';
+    this.tooltipElement.textContent = text;
+    document.body.appendChild(this.tooltipElement);
+
+    const rect = inputElement.getBoundingClientRect();
+    this.tooltipElement.style.left = `${rect.left + rect.width / 2}px`;
+    this.tooltipElement.style.top = `${rect.top - 5}px`;
+
+    // Trigger the visible state
+    requestAnimationFrame(() => {
+      if (this.tooltipElement) {
+        this.tooltipElement.classList.add('visible');
+      }
+    });
+  }
+
+  scheduleTooltip(inputElement) {
+    // Clear any existing timeout
+    this.cancelTooltip();
+    
+    // Schedule tooltip to show after delay
+    this.tooltipTimeout = setTimeout(() => {
+      this.showAlternativeTooltip(inputElement);
+      this.tooltipTimeout = null;
+    }, 600); // 600ms delay
+  }
+
+  cancelTooltip() {
+    // Clear any pending timeout
+    if (this.tooltipTimeout) {
+      clearTimeout(this.tooltipTimeout);
+      this.tooltipTimeout = null;
+    }
+    
+    // Hide any visible tooltip
+    this.hideTooltip();
+  }
+
+  hideTooltip() {
+    if (this.tooltipElement) {
+      this.tooltipElement.remove();
+      this.tooltipElement = null;
+    }
   }
 
 } 

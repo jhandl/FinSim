@@ -101,6 +101,10 @@ footer {
   max-width: none;
 }
 
+/* New styles for mobile data table toggle */
+#mobile-data-message {
+  display: none;
+}
 
 @media (max-width: 2110px) {
   main {
@@ -339,31 +343,13 @@ footer {
     max-height: calc((100vw - 1.5rem) * 0.9); /* Proportional max height */
   }
 
-  /* Phase 3: Hide data table on mobile and show helpful message */
   .data-section {
-    position: relative;
-    width: calc(100vw - 1.8rem); /* Now free to shrink independently */
-    max-width: calc(100vw - 1.8rem);
-    min-width: 0;
-  }
-
-  .data-section h2,
-  .data-section .table-container {
     display: none;
   }
 
-  .data-section::after {
-    content: "📊 Simulation Data\A\AThe detailed data table is available on larger screens.\APlease use desktop mode or try landscape mode.";
-    white-space: pre-line;
+  #mobile-data-message {
     display: block;
-    padding: 1rem;
-    text-align: center;
-    background: var(--card-background);
-    border-radius: 4px;
-    box-shadow: var(--box-shadow);
-    color: #666;
-    font-style: italic;
-    line-height: 1.5;
+    max-width: none;
   }
 }
 

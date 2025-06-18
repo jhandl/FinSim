@@ -6,6 +6,7 @@ class Wizard {
     this.driver = window.driver.js.driver;
     this.tour = null;
     this.config = null;
+    this.originalConfig = null; // Store original config with placeholders intact
     this.lastFocusedField = null;
     this.lastFocusedWasInput = false;
     this.lastStepIndex = 0;
@@ -34,6 +35,26 @@ class Wizard {
       '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
     );
   }
+
+  // Replace {{age_or_year}} placeholders with current mode
+  replaceAgeYearPlaceholders(text) {
+    if (!text) return text;
+    
+    // Get current mode from EventsTableManager if available
+    let currentMode = 'age'; // default fallback
+    try {
+      const webUI = WebUI.getInstance();
+      if (webUI && webUI.eventsTableManager && webUI.eventsTableManager.ageYearMode) {
+        currentMode = webUI.eventsTableManager.ageYearMode;
+      }
+    } catch (error) {
+      // Silently fall back to 'age' if EventsTableManager not available
+    }
+    
+    return text.replace(/\{\{age_or_year\}\}/g, currentMode);
+  }
+
+
 
   // Helper function to format numbers based on type
   formatValue(value, format) {
@@ -135,13 +156,25 @@ class Wizard {
       });
       const yamlText = await response.text();
       
-      this.config = this.processVariablesInObject(jsyaml.load(yamlText));
+      // Store original config with variables processed but placeholders intact
+      this.originalConfig = this.processVariablesInObject(jsyaml.load(yamlText));
       
-      // Process markdown links in descriptions
+      // Process markdown links but keep age/year placeholders for later processing
+      if (this.originalConfig.steps) {
+        this.originalConfig.steps = this.originalConfig.steps.map(step => {
+          if (step.popover && step.popover.description) {
+            step.popover.description = this.processMarkdownLinks(step.popover.description);
+          }
+          return step;
+        });
+      }
+      
+      // Create working config with age/year placeholders processed
+      this.config = JSON.parse(JSON.stringify(this.originalConfig));
       if (this.config.steps) {
         this.config.steps = this.config.steps.map(step => {
           if (step.popover && step.popover.description) {
-            step.popover.description = this.processMarkdownLinks(step.popover.description);
+            step.popover.description = this.replaceAgeYearPlaceholders(step.popover.description);
           }
           return step;
         });
@@ -249,6 +282,17 @@ class Wizard {
   async start(fromStep = undefined) {
     if (!this.config) {
       await this.loadConfig();
+    } else {
+      // Refresh working config from original with current age/year mode
+      this.config = JSON.parse(JSON.stringify(this.originalConfig));
+      if (this.config.steps) {
+        this.config.steps = this.config.steps.map(step => {
+          if (step.popover && step.popover.description) {
+            step.popover.description = this.replaceAgeYearPlaceholders(step.popover.description);
+          }
+          return step;
+        });
+      }
     }
 
     this.validSteps = this.filterValidSteps();
