@@ -86,6 +86,9 @@ class EventsTableManager {
       return;
     }
     
+    // Convert existing input values before changing the mode
+    this.convertExistingInputValues(this.ageYearMode, newMode);
+    
     // Update the mode
     this.ageYearMode = newMode;
     
@@ -105,6 +108,11 @@ class EventsTableManager {
     
     // Update table headers
     this.updateTableHeaders();
+    
+    // Clear warnings and revalidate events to ensure warning messages 
+    // use the correct terminology (age vs year) for the new mode
+    this.webUI.clearAllWarnings();
+    this.webUI.validateEvents();
   }
 
   updateTableHeaders() {
@@ -126,7 +134,43 @@ class EventsTableManager {
     }
   }
 
-
+  convertExistingInputValues(currentMode, newMode) {
+    const startingAge = parseInt(this.webUI.getValue('StartingAge')) || 0;
+    const p2StartingAge = parseInt(this.webUI.getValue('P2StartingAge')) || 0;
+    
+    if (startingAge === 0) return;
+    
+    const currentYear = new Date().getFullYear();
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return;
+    
+    tbody.querySelectorAll('tr').forEach(row => {
+      if (row.style.display === 'none') return;
+      
+      const eventType = row.querySelector('.event-type')?.value;
+      if (!eventType) return;
+      
+      const isP2Event = eventType === 'SI2' || eventType === 'SI2np';
+      const relevantStartingAge = isP2Event ? p2StartingAge : startingAge;
+      if (relevantStartingAge === 0) return;
+      
+      const birthYear = currentYear - relevantStartingAge;
+      
+      ['.event-from-age', '.event-to-age'].forEach(selector => {
+        const input = row.querySelector(selector);
+        if (!input?.value) return;
+        
+        const currentValue = parseInt(input.value);
+        if (isNaN(currentValue)) return;
+        
+        if (currentMode === 'age' && newMode === 'year') {
+          input.value = birthYear + currentValue;
+        } else if (currentMode === 'year' && newMode === 'age') {
+          input.value = currentValue - birthYear;
+        }
+      });
+    });
+  }
 
   updateEventRowsVisibilityAndTypes() {
     const simulationMode = this.webUI.getValue('simulation_mode');

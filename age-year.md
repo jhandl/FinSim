@@ -93,42 +93,55 @@ The solution introduces the core feature of allowing year-based inputs by implem
 6. **Update Input Placeholders**
    - Create method `updateInputPlaceholders()` that changes all age input placeholders to "YYYY" in year mode
 
+7. **Convert Existing Input Values**
+   - Create method `convertExistingInputValues(newMode)` that:
+     - Reads all current age/year values from existing event rows
+     - Converts each value to the new mode (age ↔ year) based on event type (Person 1 vs Person 2)
+     - Updates the input field values with converted numbers
+     - Handles empty/invalid values gracefully
+
 ### Phase 3: Help System Integration
-7. **Modify Help Configuration** (`src/frontend/web/assets/help.yml`)
+8. **Modify Help Configuration** (`src/frontend/web/assets/help.yml`)
    - Replace static "age" references with `{{age_or_year}}` placeholder in relevant help entries
    - Target fields: `EventFromAge`, `EventToAge`, and related descriptions
 
-8. **Update Wizard Component** (`src/frontend/web/components/Wizard.js`)
+9. **Update Wizard Component** (`src/frontend/web/components/Wizard.js`)
    - Modify help text processing to replace `{{age_or_year}}` with current mode
    - Add method `replaceAgeYearPlaceholders(helpText)` 
    - Integrate with existing link replacement logic
 
 ### Phase 4: Data Conversion Logic
-9. **Implement Year-to-Age Conversion** (`src/frontend/UIManager.js`)
-   - Modify `readEvents()` method to detect current toggle state
-   - Add conversion logic that:
-     - Calculates birth years for both persons
-     - Converts year inputs to ages based on event type ('SI' vs 'SI2')
-     - Returns standard age-based events array to simulator
+10. **Input Validation System** (`src/frontend/UIManager.js`)
+    - Add validation for year/age inputs based on current mode
+    - Validate reasonable year ranges (e.g., not too far in past/future)
+    - Update existing validation to work with both age and year modes
 
-10. **Add Conversion Helper Functions**
+11. **Implement Year-to-Age Conversion** (`src/frontend/UIManager.js`)
+    - Modify `readEvents()` method to detect current toggle state
+    - Add conversion logic that:
+      - Calculates birth years for both persons
+      - Converts year inputs to ages based on event type ('SI' vs 'SI2')
+      - Returns standard age-based events array to simulator
+
+12. **Add Conversion Helper Functions**
     - `calculateBirthYear(startingAge, currentYear)`
     - `convertEventYearToAge(eventYear, birthYear)`
     - `determineEventPerson(eventType)` - returns 'P1' or 'P2'
 
 ### Phase 5: Testing & Validation
-11. **Create Unit Tests**
+13. **Manual UI Testing**
     - Test year-to-age conversion logic with various scenarios
     - Test help text placeholder replacement
     - Test toggle state management
+    - Test input value conversion when switching modes
 
-12. **Integration Testing**
+14. **Integration Testing**
     - Verify complete workflow: toggle → input → conversion → simulation
     - Test edge cases (invalid years, missing data)
     - Validate that existing age-based workflows remain unchanged
 
 ### Phase 6: Enhanced User Experience
-13. **Implement Hover Tooltips** (`src/frontend/web/components/EventsTableManager.js` and `src/frontend/web/WebUI.js`)
+15. **Implement Hover Tooltips** (`src/frontend/web/components/EventsTableManager.js` and `src/frontend/web/WebUI.js`)
     - Add event listeners for `mouseenter` and `mouseleave` on age/year input fields in events table
     - Extend to parameter age fields: `StartingAge`, `P2StartingAge`, `RetirementAge`, `P2RetirementAge`, `TargetAge`
     - Create method `showAlternativeTooltip(inputElement, currentValue, fieldType)` that:
@@ -137,20 +150,20 @@ The solution introduces the core feature of allowing year-based inputs by implem
       - For parameters: uses field-specific person assignment (P1, P2, or global)
       - Shows a semi-transparent tooltip with the conversion
 
-14. **Create Tooltip Styling** (`src/frontend/web/ifs/css/simulator.css`)
+16. **Create Tooltip Styling** (`src/frontend/web/ifs/css/simulator.css`)
     - Add CSS for `.conversion-tooltip` class
     - Style: semi-transparent background, small font, positioned near cursor
     - Ensure tooltip doesn't interfere with input interaction
     - Works consistently across both events table and parameter sections
 
-15. **Add Conversion Helper Methods**
+17. **Add Conversion Helper Methods**
     - `getAlternativeValue(inputValue, fieldType, personId)` - returns the converted value
     - `getPersonForField(fieldId)` - determines person for parameter fields (P1/P2/global)
     - `getPersonForEvent(eventType)` - determines if event applies to P1 or P2
     - `formatTooltipText(alternativeValue, alternativeMode, personId)` - formats display text
     - `getCurrentYear()` - gets reference year for conversions
 
-16. **Handle Dynamic Updates**
+18. **Handle Dynamic Updates**
     - Update tooltips when toggle mode changes (events table only)
     - Ensure tooltips work for both existing and newly added event rows
     - Handle parameter field tooltips independently (always show year equivalent)
@@ -174,23 +187,25 @@ The solution introduces the core feature of allowing year-based inputs by implem
 - [x] 4. Implement Toggle Click Handler
 - [x] 5. Update Table Headers Dynamically
 - [x] 6. Update Input Placeholders
-- [x] 7. Modify Help Configuration
-- [x] 8. Update Wizard Component
-- [x] 9. Input Validation System
-- [ ] 10. Implement Year-to-Age Conversion
-- [ ] 11. Add Conversion Helper Functions
-- [ ] 12. Create Unit Tests
-- [ ] 13. Integration Testing
-- [ ] 14. Implement Hover Tooltips
-- [ ] 15. Create Tooltip Styling
-- [ ] 16. Add Conversion Helper Methods
-- [ ] 17. Handle Dynamic Updates
+- [x] 7. Convert Existing Input Values
+- [x] 8. Modify Help Configuration
+- [x] 9. Update Wizard Component
+- [x] 10. Input Validation System
+- [x] 11. Implement Year-to-Age Conversion
+- [x] 12. Add Conversion Helper Functions
+- [x] 13. Manual UI Testing
+- [x] 14. Integration Testing
+- [ ] 15. Implement Hover Tooltips
+- [ ] 16. Create Tooltip Styling
+- [ ] 17. Add Conversion Helper Methods
+- [ ] 18. Handle Dynamic Updates
 
 ### Current Status
-**In Progress** - Step 9 completed
+Step 14 completed.
 
 ### Notes
 - Implementation should follow the existing code patterns and style
 - Each step should be tested individually before proceeding to the next
 - Maintain backward compatibility with existing age-based inputs
 - Hover tooltips should be subtle and non-intrusive to maintain clean UX
+

@@ -245,6 +245,9 @@ class WebUI extends AbstractUI {
         return; // Don't run simulation if data is missing
       }
 
+      // Clear all warnings at the start of each simulation attempt
+      this.clearAllWarnings();
+
       this.isSimulationRunning = true;
       runButton.disabled = true;
       runButton.classList.add('disabled');
@@ -360,6 +363,14 @@ class WebUI extends AbstractUI {
 
   clearScenarioName() {
     this.fileManager.clearScenarioName();
+  }
+
+  // Method to trigger event validation (used by EventsTableManager)
+  validateEvents() {
+    // Get the global UIManager instance and trigger event validation
+    if (typeof uiManager !== 'undefined' && uiManager) {
+      uiManager.readEvents(true); // This will validate and set warnings
+    }
   }
 
   flush() {    

@@ -330,6 +330,11 @@ class GasUI extends AbstractUI {
 function onEdit(e) {
   if (e.range.getA1Notation() == 'F2') {
     e.range.setValue("");
+    
+    // Clear all warnings at the start of each simulation attempt
+    const gasUi = GasUI.getInstance();
+    gasUi.clearAllWarnings();
+    
     run()
   }
 }
