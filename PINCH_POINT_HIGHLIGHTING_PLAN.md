@@ -1,201 +1,95 @@
 # Pinch Point Highlighting Feature Plan
 
 ## Overview
-Implement visual highlighting in the simulation data table to identify financial "pinch points" - periods where income and expenses create different financial scenarios. This helps users quickly identify critical periods in their financial simulation.
+Implement a dynamic, unified visual highlighting system in the simulation data table to identify financial "pinch points." This system visually encodes risk, severity, and data relevance for every year of the simulation, providing an intuitive overview of financial health.
 
-## Visual Design
+This approach works for all simulation types, from a single run (`n=1`) to a full Monte Carlo simulation, by using a single, consistent calculation method.
 
-### Color Scheme
-- **Red background**: Simulation failure (NetIncome < Expenses)
-- **Yellow background**: Break-even/pinch point (NetIncome ≈ Expenses) 
-- **Light green background**: Positive cashflow (NetIncome > Expenses)
-- **Gray background**: Post-failure rows (grayed out after first failure)
+## The Core Visualization Metrics
+For every year of a simulation, we calculate three core metrics. These metrics are then mapped to the HSL (Hue, Saturation, Lightness) components of the row's background color, based on the settings in the `VisualizationConfig`.
 
-### CSS Class Naming Convention
-Use `cashflow-` prefix with descriptive suffixes:
-- `cashflow-failure`: Red background for simulation failures
-- `cashflow-pinch-point`: Yellow background for break-even scenarios
-- `cashflow-positive`: Light green background for positive cashflow
-- `cashflow-post-failure`: Gray background for rows after failure
+**Metric 1: Failure Rate (The Risk Profile)**
+This metric quantifies the immediate risk within a given year by measuring the proportion of simulations that failed or nearly failed.
 
-## Implementation Details
+*   `failureRate = (num_failures * 1.0 + num_pinch_points * 0.5) / total_runs_this_year`
+*   **Meaning**: A value of `0` indicates all simulations for that year had a positive cashflow. A value of `1` indicates all of them failed. A value between 0 and 1 indicates a mix of outcomes, or a "pinch point".
 
-### 1. TableManager.js Modifications
+**Metric 2: Normalized Magnitude (The Severity Profile)**
+This metric measures the financial impact or volatility of the outcomes for the year, relative to the expenses for that same year.
 
-#### State Tracking
+*   First, the average absolute financial delta is found: `avgMagnitude = average(|NetIncome - Expenses|)`.
+*   Then, it's normalized: `normalizedMagnitude = avgMagnitude / avgExpenses`.
+*   **Meaning**: This contextualizes the financial swings. A value of `0.5` means the average surplus or deficit was 50% of that year's expenses. A high value signifies a year of extreme financial events (large windfalls or huge shortfalls), while a low value signifies stability.
+
+**Metric 3: Survival Rate (The Relevance Profile)**
+This metric provides the cumulative probability of a simulation run reaching the current year, effectively acting as a "relevance" or "confidence" score for that year's data.
+
+*   `survivalRate = runs_alive_at_start_of_this_year / initial_total_runs`
+*   **Meaning**: A value of `1` means all simulations survived to the start of this year. A value of `0.3` means the data for this year is based on only 30% of the original simulation runs, making its outcome less representative of the overall probability of success.
+
+### Behavior for a Single Run (n=1)
+This system gracefully handles a standard, single-run simulation. The metrics naturally simplify:
+1.  **Failure Rate**: Will be exactly `0.0` (positive), `0.5` (pinch-point), or `1.0` (failure).
+2.  **Normalized Magnitude**: Becomes the single run's absolute delta, normalized by its expenses.
+3.  **Survival Rate**: Is `1.0` for all years until the first failure, after which it becomes `0` for all subsequent years.
+
+When used with the default configuration—which maps Failure Rate to Hue, Magnitude to Lightness, and Survival Rate to Saturation—this produces the desired intuitive result: rows are green/yellow/red, their intensity varies with the size of the surplus/deficit, and they become desaturated (gray) after the simulation fails.
+
+## Implementation Strategy
+
+The implementation requires two distinct phases: a minimal, generic modification to the core simulator to expose per-run data, followed by the creation of a new, self-contained frontend component to process that data and render the visualization.
+
+### Prerequisite: Minimal Core Simulator Modification
+
+To enable this feature, the core simulator must be modified to stop discarding the results of each individual Monte Carlo run. This will be a minimal, feature-agnostic change.
+
+A new data structure, `perRunResults`, will be added to `Simulator.js`. Inside the `updateYearlyData` function, a few lines of code will capture the raw `netIncome` and `expenses` for each year of each run. This structure will then be passed to the `UIManager`. This approach avoids adding any feature-specific logic (like "pinch points") to the core engine.
+
+### Frontend: The `PinchPointVisualizer` Component
+
+This new component will contain the complete logic for the feature, ensuring a clean separation of concerns.
+
+**Workflow:**
+1.  **`UIManager`** receives the aggregated `dataSheet` (for the main table display) and the new `perRunResults` structure from the simulator.
+2.  It instantiates the `PinchPointVisualizer` and passes the raw `perRunResults` to it.
+3.  The `PinchPointVisualizer` first processes the raw data to calculate the three core metrics (Failure Rate, Magnitude, Survival Rate) for each year.
+4.  It then uses its internal `RowColorCalculator` to convert these metrics into a map of `{ year: 'hsl(...)' }`.
+5.  `UIManager` passes the final colors to `TableManager`, which remains a simple renderer.
+
+**Visualizer Logic Snippet:**
 ```javascript
-class TableManager {
-  constructor(webUI) {
-    this.webUI = webUI;
-    // Track simulation failure state
-    this.simulationFailed = false;
-    this.failureRowIndex = -1;
-  }
-}
-```
+// Located in src/frontend/web/components/PinchPointVisualizer.js
 
-#### Reset Method
-```javascript
-resetSimulationState() {
-  this.simulationFailed = false;
-  this.failureRowIndex = -1;
-}
-```
-
-#### Enhanced setDataRow Method
-- Compare `NetIncome` vs `Expenses` with €1 tolerance
-- Apply appropriate CSS classes based on financial status
-- Track failure state to gray out subsequent rows
-- Clear existing cashflow classes before applying new ones
-
-### 2. CSS Styles (simulator.css)
-
-#### Primary States
-```css
-/* Simulation failure - red background */
-#Data tbody tr.cashflow-failure {
-    background-color: #ffebee !important;
-}
-
-#Data tbody tr.cashflow-failure:hover {
-    background-color: #ffcdd2 !important;
-}
-
-/* Break-even/pinch point - yellow background */
-#Data tbody tr.cashflow-pinch-point {
-    background-color: #fff8e1 !important;
-}
-
-#Data tbody tr.cashflow-pinch-point:hover {
-    background-color: #ffecb3 !important;
-}
-
-/* Positive cashflow - light green background */
-#Data tbody tr.cashflow-positive {
-    background-color: #e8f5e8 !important;
-}
-
-#Data tbody tr.cashflow-positive:hover {
-    background-color: #c8e6c9 !important;
-}
-
-/* Post-failure grayed out rows */
-#Data tbody tr.cashflow-post-failure {
-    background-color: #f5f5f5 !important;
-    opacity: 0.6;
-    color: #888;
-}
-
-#Data tbody tr.cashflow-post-failure:hover {
-    background-color: #eeeeee !important;
-}
-```
-
-### 3. UIManager.js Integration
-
-Modify `updateDataSheet()` to reset pinch point state:
-```javascript
-updateDataSheet(runs) {
-  // Reset cashflow highlighting state at simulation start
-  this.ui.tableManager.resetSimulationState();
-  
-  // ... existing code continues
-}
-```
-
-## Logic Flow
-
-### Financial Status Determination
-1. **Extract values**: Get `NetIncome` and `Expenses` from data object
-2. **Apply tolerance**: Use €1 tolerance for break-even detection to handle rounding
-3. **Determine status**:
-   - If `NetIncome < Expenses - tolerance` → `cashflow-failure`
-   - If `|NetIncome - Expenses| <= tolerance` → `cashflow-pinch-point`  
-   - If `NetIncome > Expenses + tolerance` → `cashflow-positive`
-
-### Failure State Tracking
-1. **Track first failure**: When first `cashflow-failure` occurs, record the row index
-2. **Gray out subsequent rows**: All rows after first failure get `cashflow-post-failure`
-3. **Reset on new simulation**: Clear failure state when simulation restarts
-
-## Technical Considerations
-
-### Compatibility
-- Maintain existing table functionality
-- Work with current data structure from UIManager
-
-### Performance  
-- Minimal performance impact as logic runs only during row creation
-- CSS classes are lightweight and leverage existing table styling
-- State tracking uses simple boolean and index variables
-
-### Scope (Non-Monte Carlo)
-This initial implementation focuses on standard (non-Monte Carlo) simulations where:
-- Single simulation run produces deterministic results
-- Clear sequential row-by-row analysis is possible
-- Failure state can be definitively tracked
-
-## Files to Modify
-
-1. **src/frontend/web/components/TableManager.js**
-   - Add state tracking properties
-   - Add `resetSimulationState()` method
-   - Enhance `setDataRow()` with cashflow analysis logic
-
-2. **src/frontend/web/ifs/css/simulator.css**
-   - Add cashflow highlighting CSS classes
-   - Include hover states for better UX
-
-3. **src/frontend/UIManager.js**
-   - Add reset call in `updateDataSheet()` method
-
-## Monte Carlo Implementation Strategy
-
-### Three-Dimensional Color Encoding
-For Monte Carlo simulations, we need to encode three variables simultaneously:
-1. **Failure Rate** (among surviving scenarios in current year)
-2. **Survival Rate** (cumulative from simulation start) 
-3. **Delta Magnitude** (average size of NetIncome - Expenses gap)
-
-### Flexible Testing Framework
-
-#### Configuration Class
-```javascript
-class MonteCarloVisualizationConfig {
+class VisualizationConfig {
   constructor() {
-    // Core approach selection
-    this.coloringMethod = 'hsl-three-dimensional'; // 'hsl-three-dimensional', 'border-thickness', 'brightness-variation'
+    // Step 1: Define which metric drives which HSL component.
+    // `invert: true` flips the metric's meaning, mapping high values to the 'from' of the range.
+    this.hueMap        = { metric: 'failureRate',  invert: false };
+    this.saturationMap = { metric: 'survivalRate', invert: false };
+    this.lightnessMap  = { metric: 'magnitude',    invert: false };
     
-    // HSL Mapping
-    this.hueMapping = 'failure-rate'; // 'failure-rate', 'delta-magnitude'
-    this.saturationMapping = 'survival-rate'; // 'survival-rate', 'confidence-level'
-    this.lightnessMapping = 'delta-magnitude'; // 'delta-magnitude', 'failure-rate'
-    
-    // Curve types for each dimension
-    this.failureRateCurve = 'linear'; // 'linear', 'sqrt', 'exponential'
-    this.survivalRateCurve = 'linear'; // 'linear', 'sqrt', 'log'
-    this.deltaCurve = 'linear'; // 'linear', 'sqrt', 'log', 'exponential'
-    
-    // Bounds and limits
-    this.minSaturation = 0.2; // Never go below 20% saturation for readability
-    this.lightnessRange = { min: 30, max: 85 }; // Dark to light range
-    this.hueRange = { success: 120, warning: 45, failure: 0 }; // Green, yellow, red
-    
-    // Failure definitions
+    // Step 2: Configure the behavior of each HSL component.
+    this.hue = {
+        curve: 'linear',
+        range: { from: 120, to: 0 } // e.g., Green to Red
+    };
+    this.saturation = {
+        curve: 'linear',
+        range: { from: 0.2, to: 1.0 } // e.g., 20% to 100% saturation
+    };
+    this.lightness = {
+        curve: 'linear',
+        range: { from: 90, to: 30 } // e.g., Pale to Dark/Intense
+    };
+
+    // Financial Definitions
+    this.pinchPointTolerance = 1; // € tolerance for break-even
     this.failureThreshold = 0; // NetIncome < Expenses + threshold
-    this.survivalDefinition = 'permanent-death'; // 'permanent-death', 'recovery-allowed'
-    
-    // Delta calculation
-    this.deltaCalculation = 'mean'; // 'mean', 'median', 'percentile-25'
-    this.deltaReference = 'expenses'; // 'expenses', 'income', 'larger-value'
   }
 }
-```
 
-#### Modular Color Calculator
-```javascript
-class MonteCarloColorCalculator {
-  constructor(config = new MonteCarloVisualizationConfig()) {
+class RowColorCalculator {
+  constructor(config = new VisualizationConfig()) {
     this.config = config;
     this.curveFunctions = {
       linear: x => x,
@@ -208,106 +102,142 @@ class MonteCarloColorCalculator {
   calculateRowColor(rowData) {
     const metrics = this.calculateMetrics(rowData);
     
-    switch(this.config.coloringMethod) {
-      case 'hsl-three-dimensional':
-        return this.calculateHSLColor(metrics);
-      case 'border-thickness':
-        return this.calculateBorderColor(metrics);
-      case 'brightness-variation':
-        return this.calculateBrightnessColor(metrics);
-      default:
-        return this.calculateHSLColor(metrics);
-    }
-  }
-
-  calculateMetrics(rowData) {
-    return {
-      failureRate: this.calculateFailureRate(rowData.runs),
-      survivalRate: this.calculateSurvivalRate(rowData.cumulativeRuns),
-      avgDelta: this.calculateAverageDelta(rowData.runs),
-      deltaRange: this.calculateDeltaRange(rowData.runs)
+    // Calculate the base, un-curved, normalized metric values
+    const normalizedMagnitude = metrics.avgMagnitude > 0 ? metrics.avgMagnitude / metrics.avgExpenses : 0;
+    const rawMetricValues = {
+      failureRate: metrics.failureRate,
+      survivalRate: metrics.survivalRate,
+      magnitude: Math.min(normalizedMagnitude, 1.5) // Cap magnitude to prevent extreme values
     };
-  }
 
-  calculateHSLColor(metrics) {
-    // Apply curve transformations
-    const failureValue = this.curveFunctions[this.config.failureRateCurve](metrics.failureRate);
-    const survivalValue = this.curveFunctions[this.config.survivalRateCurve](metrics.survivalRate);
-    const deltaValue = this.curveFunctions[this.config.deltaCurve](metrics.avgDelta / metrics.deltaRange);
+    // A generic function to get, process, and map a metric to its final HSL value
+    const getFinalValue = (hslComponent) => {
+      const map = this.config[hslComponent + 'Map'];       // e.g., config.hueMap
+      const componentConfig = this.config[hslComponent]; // e.g., config.hue
 
-    // Map to HSL dimensions based on configuration
-    const hue = this.mapToHue(failureValue);
-    const saturation = Math.max(survivalValue, this.config.minSaturation);
-    const lightness = this.mapToLightness(deltaValue);
+      // 1. Get raw value and apply curve
+      const rawValue = rawMetricValues[map.metric] || 0;
+      const curve = this.curveFunctions[componentConfig.curve];
+      let processedValue = curve(rawValue);
+
+      // 2. Invert if needed
+      if (map.invert) {
+        processedValue = 1 - processedValue;
+      }
+      
+      // 3. Linearly interpolate across the configured range
+      return componentConfig.range.from * (1 - processedValue) + componentConfig.range.to * processedValue;
+    };
+
+    const hue = getFinalValue('hue');
+    const lightness = getFinalValue('lightness');
+    const saturation = getFinalValue('saturation');
 
     return {
       color: `hsl(${hue}, ${saturation * 100}%, ${lightness}%)`,
-      className: this.generateClassName(metrics)
+      className: this.generateClassName(metrics) // Optional: for tooltips or debugging
     };
   }
 
-  // Additional calculation methods...
+  calculateMetrics(rowData) {
+    // ... logic to calculate failureRate, survivalRate, avgMagnitude, avgExpenses from rowData.runs ...
+    return {
+      failureRate: this.calculateFailureRate(rowData.runs),
+      survivalRate: this.calculateSurvivalRate(rowData.cumulativeRuns),
+      avgMagnitude: this.calculateAverageMagnitude(rowData.runs),
+      avgExpenses: this.calculateAverageExpenses(rowData.runs)
+    };
+  }
+
+  // ... other calculation helper methods ...
+}
+
+export class PinchPointVisualizer {
+  constructor(config = new VisualizationConfig()) {
+    this.config = config;
+    this.calculator = new RowColorCalculator(config);
+  }
+
+  // Step 1: Process raw data into aggregated metrics for each year
+  aggregateYearlyMetrics(perRunResults) {
+    const yearlyAggregates = {};
+    const pinchPointTolerance = 1; // Should come from config
+
+    for (const run of perRunResults) {
+      for (let i = 0; i < run.length; i++) {
+        const row = i + 1; // 1-indexed row
+        const yearData = run[i];
+
+        if (!yearlyAggregates[row]) {
+          yearlyAggregates[row] = { failures: 0, pinchPoints: 0, survivals: 0, sumOfMagnitude: 0, sumOfExpenses: 0, totalRuns: 0 };
+        }
+        
+        yearlyAggregates[row].totalRuns++;
+
+        if (yearData.success) {
+          yearlyAggregates[row].survivals++;
+          if (yearData.netIncome < yearData.expenses - pinchPointTolerance) {
+            yearlyAggregates[row].failures++;
+          } else if (yearData.netIncome <= yearData.expenses + pinchPointTolerance) {
+            yearlyAggregates[row].pinchPoints++;
+          }
+          yearlyAggregates[row].sumOfMagnitude += Math.abs(yearData.netIncome - yearData.expenses);
+          yearlyAggregates[row].sumOfExpenses += yearData.expenses;
+        }
+      }
+    }
+    return yearlyAggregates;
+  }
+
+  // Step 2: Calculate final colors from the aggregated metrics
+  calculateRowColors(perRunResults) {
+    const yearlyAggregates = this.aggregateYearlyMetrics(perRunResults);
+    const colors = {};
+    const totalRuns = perRunResults.length;
+
+    for (const row in yearlyAggregates) {
+      const yearlyData = yearlyAggregates[row];
+      // The RowColorCalculator needs the aggregated data for a single year
+      colors[row] = this.calculator.calculateRowColor(yearlyData, totalRuns).color;
+    }
+    return colors;
+  }
 }
 ```
 
-#### Testing Interface
-```javascript
-class MonteCarloVisualizationTester {
-  constructor(tableManager) {
-    this.tableManager = tableManager;
-    this.config = new MonteCarloVisualizationConfig();
-    this.calculator = new MonteCarloColorCalculator(this.config);
-    this.testData = null;
-  }
+### Files to Modify
 
-  // Easy parameter switching for live testing
-  setColoringMethod(method) {
-    this.config.coloringMethod = method;
-    this.refreshVisualization();
-  }
+1.  **`src/core/Simulator.js` (Minimal Change)**
+    *   Introduce a `perRunResults = []` variable, cleared at the start of `run()`.
+    *   Introduce a `currentRun` index variable, incremented in the `run()` loop.
+    *   In `updateYearlyData()`, add a small, generic block that pushes `{netIncome, expenses, success}` into `perRunResults[currentRun]` for each year.
+    *   Modify `uiManager.updateDataSheet()` call to pass this new raw data structure to the UI.
 
-  setCurveType(dimension, curveType) {
-    switch(dimension) {
-      case 'failure': this.config.failureRateCurve = curveType; break;
-      case 'survival': this.config.survivalRateCurve = curveType; break;
-      case 'delta': this.config.deltaCurve = curveType; break;
-    }
-    this.refreshVisualization();
-  }
+2.  **NEW FILE: `src/frontend/web/components/PinchPointVisualizer.js`**
+    *   Will contain the `VisualizationConfig`, `RowColorCalculator`, and the main `PinchPointVisualizer` class.
+    *   It will now be responsible for the primary data aggregation (`aggregateYearlyMetrics`) before calculating colors.
 
-  setMinSaturation(value) {
-    this.config.minSaturation = value;
-    this.refreshVisualization();
-  }
+3.  **`src/frontend/UIManager.js`**
+    *   Import `PinchPointVisualizer`.
+    *   In `updateDataSheet()`, accept `perRunResults` and pass it to the visualizer.
+    *   Pass the resulting color map to `TableManager` as before.
 
-  // Apply current configuration to existing table data
-  refreshVisualization() {
-    if (this.testData) {
-      this.tableManager.applyMonteCarloColoring(this.testData, this.calculator);
-    }
-  }
+4.  **`src/frontend/web/components/TableManager.js`**
+    *   Modify `setDataRow()` to accept and apply a `backgroundColor` string (no change from previous plan).
 
-  // Load test scenarios for experimentation
-  loadTestScenario(scenario) {
-    this.testData = scenario;
-    this.refreshVisualization();
-  }
-}
-```
+5.  **`src/frontend/web/ifs/css/simulator.css`**
+    *   Remove obsolete `cashflow-*` classes and add a generic hover style (no change from previous plan).
+
+## Testing and Development
+
+A developer panel could be invaluable for tuning the visualization.
 
 #### Developer Testing UI (Optional)
 ```html
 <!-- Hidden developer panel for testing visualization options -->
-<div id="monte-carlo-viz-tester" style="display: none;">
-  <h4>Monte Carlo Visualization Tester</h4>
+<div id="viz-tester" style="display: none;">
+  <h4>Visualization Tester</h4>
   
-  <label>Coloring Method:</label>
-  <select id="coloring-method">
-    <option value="hsl-three-dimensional">HSL Three-Dimensional</option>
-    <option value="border-thickness">Border Thickness</option>
-    <option value="brightness-variation">Brightness Variation</option>
-  </select>
-
   <label>Failure Rate Curve:</label>
   <select id="failure-curve">
     <option value="linear">Linear</option>
@@ -315,15 +245,8 @@ class MonteCarloVisualizationTester {
     <option value="exponential">Exponential</option>
   </select>
 
-  <label>Survival Rate Curve:</label>
-  <select id="survival-curve">
-    <option value="linear">Linear</option>
-    <option value="sqrt">Square Root</option>
-    <option value="log">Logarithmic</option>
-  </select>
-
-  <label>Delta Curve:</label>
-  <select id="delta-curve">
+  <label>Magnitude Curve:</label>
+  <select id="magnitude-curve">
     <option value="linear">Linear</option>
     <option value="sqrt">Square Root</option>
     <option value="log">Logarithmic</option>
@@ -335,73 +258,12 @@ class MonteCarloVisualizationTester {
 
   <button onclick="tester.loadTestScenario('cliff-failure')">Test: Cliff Failure</button>
   <button onclick="tester.loadTestScenario('gradual-failure')">Test: Gradual Failure</button>
-  <button onclick="tester.loadTestScenario('mixed-outcomes')">Test: Mixed Outcomes</button>
 </div>
 ```
 
-#### Implementation Strategy
-1. **Start with HSL three-dimensional approach** as baseline
-2. **Make all parameters easily configurable** through the config class
-3. **Implement live-switching** between different approaches and parameters
-4. **Create test scenarios** representing different failure patterns
-5. **A/B test with users** to determine optimal default settings
-
-#### The Three-Step Unified Calculation
-The coloring for every year (for any number of runs, `n>=1`) is determined by a clear, three-step process. This process uses data from all simulations that were **alive at the start of the current year**.
-
-**Step 1: Calculate Hue (The Risk Profile)**
-The base color is determined by the *failure rate* of the current year's outcomes, which correctly accounts for pinch-points.
-
-*   `failureRate = (num_failures * 1.0 + num_pinch_points * 0.5) / total_runs_this_year`
-*   This score is mapped to a continuous hue gradient: `hue = 120 * (1 - failureRate)`
-*   **Result**: 0% failure -> Green, 50% failure -> Yellow, 100% failure -> Red.
-
-**Step 2: Calculate Lightness (The Severity of Outcomes)**
-The intensity of the color is determined by the average *magnitude* of the financial outcomes across **ALL** scenarios (both successes and failures) for the current year. This ensures that large failures produce intense colors.
-
-*   For each run, calculate `delta = |NetIncome - Expenses|`.
-*   Calculate `avg_magnitude = average(all_deltas)`.
-*   This average magnitude is normalized and mapped to a lightness value (e.g., from 90% down to 30%). A larger average magnitude results in a darker, more intense color.
-*   **Result**: A year with small surpluses/deficits will be pale. A year with huge surpluses/deficits will be dark and intense.
-
-**Step 3: Calculate Saturation (The Data's Relevance)**
-Finally, the color's vibrancy is determined by the *cumulative survival rate* from the very start of the simulation.
-
-*   `survivalRate = runs_alive_at_start_of_this_year / initial_total_runs`
-*   The final color's saturation is set to this rate (with a minimum floor for readability, e.g., 20%).
-*   **Result**: If only 30% of simulations survived to this year, the color will be 70% desaturated (grayed out), indicating its low relevance to the overall success probability.
-
-##### Natural Convergence with n=1
-This three-step system works for a single run without special code:
-1.  **Hue**: The `failureRate` will be exactly 0.0 (Green), 0.5 (Yellow), or 1.0 (Red).
-2.  **Lightness**: `avg_magnitude` is simply the absolute delta of that single run.
-3.  **Saturation**: `survivalRate` is 100% until the first failure year, after which it becomes 0%, causing subsequent years to be desaturated (gray).
-
-## Future Considerations
-
-### User Preferences
-- Potential future feature: Allow users to toggle highlighting on/off
-- Color customization for accessibility needs
-- Threshold adjustment (currently €1 tolerance)
-
-## Testing Strategy
-
-### Manual Testing
-- Test with scenarios that have clear failure points
-- Verify break-even detection with various tolerance scenarios
-- Ensure post-failure graying works correctly
-- Test hover states and visual feedback
-
-### Edge Cases
-- Zero income/expenses scenarios
-- Very small differences near tolerance threshold
-- Simulations with no failures (all positive)
-- Single-year simulations
-
 ## Success Criteria
 
-1. **Visual Clarity**: Users can immediately identify financial stress points
-2. **Accurate Detection**: Proper classification of failure/pinch-point/positive scenarios
-3. **Performance**: No noticeable impact on simulation speed
-4. **Compatibility**: Works with existing simulator functionality
-5. **User Experience**: Intuitive color scheme and hover interactions 
+1.  **Visual Clarity**: Users can immediately identify financial stress points through color intensity and hue.
+2.  **Unified Logic**: A single, robust calculation handles all simulation types (`n>=1`).
+3.  **Performance**: No noticeable impact on simulation speed.
+4.  **Configurability**: Visualization parameters are easily tunable for future improvements.
