@@ -1,10 +1,8 @@
 # Bugs
-- In couple mode, ages for 2nd person events should refer to their age.
 
 # Roadmap
 
 ### Improvements
-- Allow events to be specified in terms of ages or years.
 - In small screens the header takes three rows: one row for the title, and two rows for the buttons. I understand there's not many options if I want to show all the buttons and I don't want to show only some of these buttons. But this must be a common UX problem on phone apps. How do they solve it? Can we get this UX more in line with the standards of phone apps?
 - In the data table, highlight the "pinch points", with failures in red and near failures in yellow.
 - Add feedback box.
