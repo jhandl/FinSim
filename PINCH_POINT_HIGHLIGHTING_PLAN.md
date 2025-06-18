@@ -346,133 +346,36 @@ class MonteCarloVisualizationTester {
 4. **Create test scenarios** representing different failure patterns
 5. **A/B test with users** to determine optimal default settings
 
-#### Unified Deterministic/Monte Carlo System
-The Monte Carlo coloring system should gracefully degrade to produce identical results to the deterministic system when there's only one simulation run.
+#### The Three-Step Unified Calculation
+The coloring for every year (for any number of runs, `n>=1`) is determined by a clear, three-step process. This process uses data from all simulations that were **alive at the start of the current year**.
 
-##### Single-Run Behavior Mapping
-```javascript
-class UnifiedColorCalculator extends MonteCarloColorCalculator {
-  calculateRowColor(rowData) {
-    const isSingleRun = rowData.runs.length === 1;
-    
-    if (isSingleRun) {
-      return this.calculateDeterministicColor(rowData.runs[0], rowData.cumulativeRuns);
-    } else {
-      return super.calculateRowColor(rowData);
-    }
-  }
+**Step 1: Calculate Hue (The Risk Profile)**
+The base color is determined by the *failure rate* of the current year's outcomes, which correctly accounts for pinch-points.
 
-  calculateDeterministicColor(singleRun, cumulativeRuns) {
-    const netIncome = singleRun.netIncome;
-    const expenses = singleRun.expenses;
-    const tolerance = 1; // €1 tolerance for break-even
-    const delta = netIncome - expenses;
-    
-    // Map deterministic states to Monte Carlo parameters
-    let failureRate, hue, isDead;
-    
-    if (Math.abs(delta) <= tolerance) {
-      // Break-even case: Special yellow hue regardless of "failure"
-      failureRate = 0.5; // Represents uncertainty/risk
-      hue = this.config.hueRange.warning; // 45° yellow
-      isDead = false;
-    } else if (delta < -tolerance) {
-      // Failure case
-      failureRate = 1.0;  
-      hue = this.config.hueRange.failure; // 0° red
-      isDead = true;
-    } else {
-      // Success case  
-      failureRate = 0.0;
-      hue = this.config.hueRange.success; // 120° green
-      isDead = false;
-    }
+*   `failureRate = (num_failures * 1.0 + num_pinch_points * 0.5) / total_runs_this_year`
+*   This score is mapped to a continuous hue gradient: `hue = 120 * (1 - failureRate)`
+*   **Result**: 0% failure -> Green, 50% failure -> Yellow, 100% failure -> Red.
 
-    // Calculate survival rate (cumulative)
-    const totalScenarios = cumulativeRuns.totalStarted;
-    const survivingScenarios = cumulativeRuns.stillAlive;
-    const survivalRate = survivingScenarios / totalScenarios;
-    
-    // Calculate lightness from delta magnitude
-    const maxDelta = cumulativeRuns.maxDeltaSeen || Math.abs(delta);
-    const normalizedDelta = Math.abs(delta) / maxDelta;
-    const lightness = this.mapToLightness(normalizedDelta);
-    
-    // Apply saturation with minimum threshold
-    const saturation = Math.max(survivalRate, this.config.minSaturation);
-    
-    return {
-      color: `hsl(${hue}, ${saturation * 100}%, ${lightness}%)`,
-      className: this.generateDeterministicClassName(delta, tolerance, survivalRate)
-    };
-  }
+**Step 2: Calculate Lightness (The Severity of Outcomes)**
+The intensity of the color is determined by the average *magnitude* of the financial outcomes across **ALL** scenarios (both successes and failures) for the current year. This ensures that large failures produce intense colors.
 
-  generateDeterministicClassName(delta, tolerance, survivalRate) {
-    if (survivalRate < 0.2) {
-      return 'cashflow-post-failure'; // Gray out after major failure
-    } else if (Math.abs(delta) <= tolerance) {
-      return 'cashflow-pinch-point'; // Break-even
-    } else if (delta < -tolerance) {
-      return 'cashflow-failure'; // Failure
-    } else {
-      return 'cashflow-positive'; // Success
-    }
-  }
-}
-```
+*   For each run, calculate `delta = |NetIncome - Expenses|`.
+*   Calculate `avg_magnitude = average(all_deltas)`.
+*   This average magnitude is normalized and mapped to a lightness value (e.g., from 90% down to 30%). A larger average magnitude results in a darker, more intense color.
+*   **Result**: A year with small surpluses/deficits will be pale. A year with huge surpluses/deficits will be dark and intense.
 
-##### Parameter Equivalence
-When `runs.length === 1`, the Monte Carlo parameters map to deterministic logic:
+**Step 3: Calculate Saturation (The Data's Relevance)**
+Finally, the color's vibrancy is determined by the *cumulative survival rate* from the very start of the simulation.
 
-| Deterministic State | Failure Rate | Survival Rate | Hue | Saturation | Lightness | Class Name |
-|---------------------|--------------|---------------|-----|------------|-----------|------------|
-| Success (NetIncome > Expenses + €1) | 0.0 | 1.0 → 0.0* | 120° | 100% → 20%* | Based on Δ | `cashflow-positive` |
-| Break-even (|NetIncome - Expenses| ≤ €1) | 0.5 | 1.0 → 0.0* | 45° | 100% → 20%* | Based on Δ | `cashflow-pinch-point` |  
-| Failure (NetIncome < Expenses - €1) | 1.0 | 1.0 → 0.0* | 0° | 100% → 20%* | Based on Δ | `cashflow-failure` |
-| Post-failure (any state after failure) | N/A | < 0.2 | Any | 20% | Any | `cashflow-post-failure` |
+*   `survivalRate = runs_alive_at_start_of_this_year / initial_total_runs`
+*   The final color's saturation is set to this rate (with a minimum floor for readability, e.g., 20%).
+*   **Result**: If only 30% of simulations survived to this year, the color will be 70% desaturated (grayed out), indicating its low relevance to the overall success probability.
 
-*Survival rate drops from 100% to minimum after first failure, creating the post-failure graying effect.
-
-##### Validation Strategy
-```javascript
-// Test that single-run Monte Carlo === deterministic output
-function validateUnifiedSystem() {
-  const testScenarios = [
-    { netIncome: 50000, expenses: 40000 }, // Success
-    { netIncome: 40000, expenses: 40000 }, // Break-even  
-    { netIncome: 35000, expenses: 40000 }, // Failure
-  ];
-
-  testScenarios.forEach(scenario => {
-    // Run deterministic coloring
-    const deterministicResult = deterministicCalculator.calculateColor(scenario);
-    
-    // Run Monte Carlo coloring with single run
-    const monteCarloResult = unifiedCalculator.calculateRowColor({
-      runs: [scenario],
-      cumulativeRuns: { totalStarted: 1, stillAlive: 1, maxDeltaSeen: 10000 }
-    });
-    
-    // Results should be identical
-    assert(deterministicResult.color === monteCarloResult.color);
-    assert(deterministicResult.className === monteCarloResult.className);
-  });
-}
-```
-
-##### Benefits of Unified System
-1. **Single codebase**: No need to maintain separate deterministic and Monte Carlo logic
-2. **Consistent behavior**: Users see identical colors whether they run 1 simulation or 15
-3. **Smooth scaling**: Can gradually increase simulation runs without visual discontinuities  
-4. **Easier testing**: Test suite only needs to validate one system
-5. **Future-proof**: Any improvements to Monte Carlo coloring automatically benefit deterministic cases
-
-#### Test Scenarios to Create
-1. **Cliff Failure**: Most scenarios succeed until age 70, then 80% fail suddenly
-2. **Gradual Attrition**: Scenarios fail steadily, 10% per year from age 60-75
-3. **Mixed Outcomes**: Complex pattern with recoveries and multiple failure points
-4. **High Variance**: Large differences in NetIncome-Expenses deltas between scenarios
-5. **Low Variance**: All scenarios perform similarly with small deltas
+##### Natural Convergence with n=1
+This three-step system works for a single run without special code:
+1.  **Hue**: The `failureRate` will be exactly 0.0 (Green), 0.5 (Yellow), or 1.0 (Red).
+2.  **Lightness**: `avg_magnitude` is simply the absolute delta of that single run.
+3.  **Saturation**: `survivalRate` is 100% until the first failure year, after which it becomes 0%, causing subsequent years to be desaturated (gray).
 
 ## Future Considerations
 
