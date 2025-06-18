@@ -312,7 +312,7 @@ input:focus {
     padding-bottom: 0;
     border-bottom: none;
     position: relative;
-    top: -3px;
+    top: -5px;
 }
 
 th {
@@ -1051,6 +1051,7 @@ footer {
     align-items: center;
     vertical-align: middle;
     margin-bottom: 0.675rem;
+    margin-top: 1px;
     padding-bottom: 0;
     padding-right: 0rem;
     border-bottom: var(--card-header-border-width) solid var(--primary-color);
