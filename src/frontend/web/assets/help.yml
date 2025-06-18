@@ -15,11 +15,12 @@ steps:
       description: >
         <p><b>Steps:</b></p>
         <ol><li>First, fill out the panels on the left to describe your current financial situation, your financial plan, expected economic conditions, etc.</li>
-        <li>Then, add rows to the Events table describing your income, expenses, and plans for things like buying a house, changing jobs, etc. Each event has a starting and an ending point in time, and they are expressed in terms of your age. Everything is calculated on a yearly basis, so add up all your expenses for the year and use that number. If you have expenses that have a clear timeframe (like paying for college), add them as separate events.</li>
+        <li>Then, add rows to the Events table describing your income, expenses, and plans for things like buying a house, changing jobs, etc. Each event has a starting and an ending point in time. Everything is calculated on a yearly basis, so add up all your expenses for the year and use that number. If you have expenses that have a clear timeframe (like paying for college), add them as separate events.</li>
         <li>Finally, run the simulation to see how it goes. You will see the outcome in three ways:</li>
         <ul><li>The status box next to the "Run Simulation" button will tell you if your scenario was successful, or at what age it failed (it fails if at any point you can't afford your expenses), or the likelyhood that it succeeds (see volatility below).</li>
         <li>The graphs will show the evolution of your cashflow (how your expenses stack up against your income and where it comes from), and your assets (how much you have accumulated and where), from your current age to your target age.</li>
         <li>The table at the bottom will show you, year by year, the details of your income, taxes, cashflow, and assets.</li></ul></ol>
+        <p><b>Date modes:</b> You can choose to express the events' starting and ending points in terms of your age or the year. Use the toggle in the top right of the Events table to switch between modes. You can switch back and forth at any time, this will give you a better understanding of the dates.</p> 
         <p><b>Simulator modes:</b> The simulator can run in single-person mode (for individual planning) or two-person mode (for couples/partnerships). Use the toggle icons in the Starting Position panel to switch between modes. Two-person mode allows separate pension pots, retirement ages, and state pensions for each person.</p>
         <p><b>Present value:</b> All monetary amounts should be entered in today's money (present value). For example, if you plan to spend €30,000 per year on living expenses, enter €30,000 even if that expense will start in 10 years. The simulator will automatically adjust these amounts for inflation over time based on the inflation or the growth rate you specify. This makes it easier to think about expenses and income in terms of today's purchasing power.</p>
         <p><b>Stress testing:</b> You can change the economy parameters to see what happens if inflation is higher, investments grow slower or are more volatile. You can further stress test your scenario by adding a stock market crash or two.</p>
@@ -260,6 +261,18 @@ steps:
 
 ###########################################################
 # Event Type
+
+  - element: "#ageYearModeAge"
+    popover:
+      description: "<p>Toggle to see the start and end points of events in terms of age.</p><p>In single-person mode, all events will be relative to your age. In two-person mode, some events will refer to the other person's age (e.g. their salary income). You can check what year that represents by switching to the Year mode, or by hovering over an age field: a tooltip will appear with the corresponding year.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#ageYearModeYear"
+    popover:
+      description: "<p>Toggle to see the start and end points of events in terms of year.</p><p>To see the age that corresponds to a given year, hover over a year field. A tooltip will appear with the corresponding age, which might be your age or the other person's age depending on the type of event and if you're in single-person or two-person mode.</p>"
+      side: "bottom"
+      align: "center"
 
   - element: "#EventType"
     popover:

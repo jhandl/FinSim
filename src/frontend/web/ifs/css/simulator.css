@@ -1070,8 +1070,8 @@ footer {
     z-index: 1000;
     pointer-events: none;
     opacity: 0;
-    transform: translate(-50%, -100%);
-    transition: opacity 0.2s ease;
+    transform: translate(-50%, -70%);
+    transition: opacity 0.5s ease;
 }
 
 .conversion-tooltip.visible {
