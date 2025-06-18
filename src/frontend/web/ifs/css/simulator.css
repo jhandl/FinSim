@@ -1057,6 +1057,26 @@ footer {
     position: relative;
 }
 
+/* Conversion Tooltips */
+.conversion-tooltip {
+    position: absolute;
+    background-color: rgba(128, 128, 128, 0.9);
+    color: white;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--border-radius);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -100%);
+    transition: opacity 0.2s ease;
+}
+
+.conversion-tooltip.visible {
+    opacity: 1;
+}
+
 .toast-message {
   position: fixed;
   left: 50%;

@@ -195,17 +195,27 @@ The solution introduces the core feature of allowing year-based inputs by implem
 - [x] 12. Add Conversion Helper Functions
 - [x] 13. Manual UI Testing
 - [x] 14. Integration Testing
-- [ ] 15. Implement Hover Tooltips
-- [ ] 16. Create Tooltip Styling
-- [ ] 17. Add Conversion Helper Methods
-- [ ] 18. Handle Dynamic Updates
+- [x] 15. Implement Hover Tooltips
+- [x] 16. Create Tooltip Styling
+- [x] 17. Add Conversion Helper Methods
+- [x] 18. Handle Dynamic Updates
 
 ### Current Status
-Step 14 completed.
+Step 18 completed. All planned features have been successfully implemented.
+
+### Implementation Summary
+The complete Age vs. Year toggle system has been implemented with the following features:
+1. **Toggle Functionality**: Age/Year toggle in the Events section header allows switching input modes
+2. **Dynamic Conversion**: Input values are automatically converted when switching modes
+3. **Help System Integration**: Dynamic help text that adapts to current mode
+4. **Data Conversion**: Year inputs are converted to ages before simulation for backend compatibility
+5. **Hover Tooltips**: Intelligent tooltips show alternative values (age ↔ year) on hover
+   - Events table: Shows the alternative value for the correct person (P1/P2) based on event type
+   - Parameter fields: Shows birth year equivalent for age inputs
 
 ### Notes
-- Implementation should follow the existing code patterns and style
-- Each step should be tested individually before proceeding to the next
-- Maintain backward compatibility with existing age-based inputs
-- Hover tooltips should be subtle and non-intrusive to maintain clean UX
+- Implementation follows existing code patterns and style
+- Maintains backward compatibility with existing age-based inputs
+- Tooltips are subtle and non-intrusive to maintain clean UX
+- All conversion logic is handled in the frontend before simulation
 

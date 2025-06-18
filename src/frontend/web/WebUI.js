@@ -43,6 +43,8 @@ class WebUI extends AbstractUI {
       this.setupNavigation();
       this.setupLoadDemoScenarioButton();
       this.setupSimModeToggle(); // Setup the new mode toggle
+      this.setupParameterTooltips(); // Setup parameter age field tooltips
+      this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
       
       this.eventsTableManager.addEventRow();
       
@@ -442,6 +444,110 @@ class WebUI extends AbstractUI {
     const initialSavingsLabel = document.querySelector('label[for="InitialSavings"]');
     if (initialSavingsLabel) {
       initialSavingsLabel.textContent = isSingleMode ? 'Current Savings' : 'Current Savings (Joint)';
+    }
+  }
+
+  setupParameterTooltips() {
+    const parameterAgeFields = ['StartingAge', 'P2StartingAge', 'RetirementAge', 'P2RetirementAge', 'TargetAge'];
+    
+    parameterAgeFields.forEach(fieldId => {
+      const input = document.getElementById(fieldId);
+      if (input) {
+        input.addEventListener('mouseenter', () => {
+          this.scheduleParameterTooltip(input, fieldId);
+        });
+        
+        input.addEventListener('mouseleave', () => {
+          this.cancelParameterTooltip();
+        });
+      }
+    });
+  }
+
+  showParameterTooltip(inputElement, fieldId) {
+    const currentValue = parseInt(inputElement.value);
+    if (isNaN(currentValue) || currentValue === 0) return;
+
+    const alternativeValue = this.getParameterAlternativeValue(currentValue, fieldId);
+    if (alternativeValue === null) return;
+
+    let tooltipText;
+    if (fieldId === 'StartingAge' || fieldId === 'P2StartingAge') {
+      tooltipText = `Born in ${alternativeValue}`;
+    } else if (fieldId === 'RetirementAge' || fieldId === 'P2RetirementAge') {
+      tooltipText = `Retire in ${alternativeValue}`;
+    } else if (fieldId === 'TargetAge') {
+      tooltipText = `Year ${alternativeValue}`;
+    }
+
+    this.createParameterTooltip(inputElement, tooltipText);
+  }
+
+  getParameterAlternativeValue(inputValue, fieldId) {
+    const currentYear = new Date().getFullYear();
+
+    if (fieldId === 'StartingAge' || fieldId === 'P2StartingAge') {
+      return currentYear - inputValue; // Birth year
+    } else if (fieldId === 'RetirementAge' || fieldId === 'P2RetirementAge') {
+      const startingAge = parseInt(this.getValue(fieldId.includes('P2') ? 'P2StartingAge' : 'StartingAge')) || 0;
+      if (startingAge === 0) return null;
+      const birthYear = currentYear - startingAge;
+      return birthYear + inputValue; // Retirement year
+    } else if (fieldId === 'TargetAge') {
+      const startingAge = parseInt(this.getValue('StartingAge')) || 0;
+      if (startingAge === 0) return null;
+      const birthYear = currentYear - startingAge;
+      return birthYear + inputValue; // Target year
+    }
+    return null;
+  }
+
+  createParameterTooltip(inputElement, text) {
+    this.hideParameterTooltip(); // Remove any existing tooltip
+
+    this.parameterTooltipElement = document.createElement('div');
+    this.parameterTooltipElement.className = 'conversion-tooltip';
+    this.parameterTooltipElement.textContent = text;
+    document.body.appendChild(this.parameterTooltipElement);
+
+    const rect = inputElement.getBoundingClientRect();
+    this.parameterTooltipElement.style.left = `${rect.left + rect.width / 2}px`;
+    this.parameterTooltipElement.style.top = `${rect.top - 5}px`;
+
+    // Trigger the visible state
+    requestAnimationFrame(() => {
+      if (this.parameterTooltipElement) {
+        this.parameterTooltipElement.classList.add('visible');
+      }
+    });
+  }
+
+  scheduleParameterTooltip(inputElement, fieldId) {
+    // Clear any existing timeout
+    this.cancelParameterTooltip();
+    
+    // Schedule tooltip to show after delay
+    this.parameterTooltipTimeout = setTimeout(() => {
+      this.showParameterTooltip(inputElement, fieldId);
+      this.parameterTooltipTimeout = null;
+    }, 600); // 600ms delay
+  }
+
+  cancelParameterTooltip() {
+    // Clear any pending timeout
+    if (this.parameterTooltipTimeout) {
+      clearTimeout(this.parameterTooltipTimeout);
+      this.parameterTooltipTimeout = null;
+    }
+    
+    // Hide any visible tooltip
+    this.hideParameterTooltip();
+  }
+
+  hideParameterTooltip() {
+    if (this.parameterTooltipElement) {
+      this.parameterTooltipElement.remove();
+      this.parameterTooltipElement = null;
     }
   }
 
