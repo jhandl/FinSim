@@ -4,10 +4,15 @@ class VisualizationConfig {
   constructor() {
     // Step 1: Define which metric drives which HSL component.
     // `invert: true` flips the metric's meaning, mapping high values to the 'from' of the range.
-    this.hueMap        = { metric: 'failureRate',  invert: false };
-    this.saturationMap = { metric: 'survivalRate', invert: false };
-    this.lightnessMap  = { metric: 'magnitude',    invert: false };
+
+    // this.hueMap        = { metric: 'failureRate',  invert: false };
+    // this.saturationMap = { metric: 'survivalRate', invert: false };
+    // this.lightnessMap  = { metric: 'magnitude',    invert: false };
     
+    this.hueMap        = { metric: 'survivalRate',  invert: true };
+    this.saturationMap = { metric: 'none', invert: false };
+    this.lightnessMap  = { metric: 'none', invert: true };
+
     // Step 2: Configure the behavior of each HSL component.
     this.hue = {
         curve: 'linear',
@@ -19,7 +24,7 @@ class VisualizationConfig {
     };
     this.lightness = {
         curve: 'linear',
-        range: { from: 90, to: 30 } // e.g., Pale to Dark/Intense
+        range: { from: 90, to: 50 } // e.g., Pale to Dark/Intense
     };
 
     // Financial Definitions
@@ -47,13 +52,18 @@ class RowColorCalculator {
     const rawMetricValues = {
       failureRate: metrics.failureRate,
       survivalRate: metrics.survivalRate,
-      magnitude: Math.min(normalizedMagnitude, 1.5) // Cap magnitude to prevent extreme values
+      magnitude: Math.min(normalizedMagnitude, 1.5) / 1.5 // Cap magnitude and normalize to 0-1 range
     };
 
     // A generic function to get, process, and map a metric to its final HSL value
     const getFinalValue = (hslComponent) => {
       const map = this.config[hslComponent + 'Map'];       // e.g., config.hueMap
       const componentConfig = this.config[hslComponent]; // e.g., config.hue
+
+      // If metric is 'none', return constant value based on invert flag
+      if (map.metric === 'none') {
+        return map.invert ? componentConfig.range.from : componentConfig.range.to;
+      }
 
       // 1. Get raw value and apply curve
       const rawValue = rawMetricValues[map.metric] || 0;
@@ -123,7 +133,7 @@ class RowColorCalculator {
   }
 }
 
-export class PinchPointVisualizer {
+class PinchPointVisualizer {
   constructor(config = new VisualizationConfig()) {
     this.config = config;
     this.calculator = new RowColorCalculator(config);

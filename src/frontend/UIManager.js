@@ -20,9 +20,9 @@ class UIManager {
     
     // Calculate pinch point colors if we have per-run results
     if (perRunResults && perRunResults.length > 0) {
-      // Import the PinchPointVisualizer dynamically for web UI
-      if (typeof window !== 'undefined' && window.PinchPointVisualizer) {
-        const visualizer = new window.PinchPointVisualizer();
+      // Use PinchPointVisualizer if available (web UI only)
+      if (typeof PinchPointVisualizer !== 'undefined') {
+        const visualizer = new PinchPointVisualizer();
         rowColors = visualizer.calculateRowColors(perRunResults);
       }
     }
