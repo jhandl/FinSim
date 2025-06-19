@@ -18,11 +18,20 @@ class UIManager {
   updateDataSheet(runs, perRunResults) {
     let rowColors = {};
     
+    // Store simulation results for later visualization changes (web UI only)
+    if (this.ui.storeSimulationResults && perRunResults && perRunResults.length > 0) {
+      this.ui.storeSimulationResults(runs, perRunResults);
+    }
+    
     // Calculate pinch point colors if we have per-run results
     if (perRunResults && perRunResults.length > 0) {
       // Use PinchPointVisualizer if available (web UI only)
       if (typeof PinchPointVisualizer !== 'undefined') {
-        const visualizer = new PinchPointVisualizer();
+        // Get selected configuration from UI
+        const selectedPreset = this.ui.getValue('visualizationPreset') || 'default';
+        const config = this.createVisualizationConfig(selectedPreset);
+        
+        const visualizer = new PinchPointVisualizer(config);
         rowColors = visualizer.calculateRowColors(perRunResults);
       }
     }
@@ -70,6 +79,14 @@ class UIManager {
 
   setStatus(message, color) {
     this.ui.setStatus(message, color);
+  }
+
+  createVisualizationConfig(presetName) {
+    if (typeof VisualizationConfig !== 'undefined' && VisualizationConfig.createFromPreset) {
+      return VisualizationConfig.createFromPreset(presetName);
+    }
+    // Fallback to default config if VisualizationConfig is not available
+    return new VisualizationConfig();
   }
 
   updateDataRow(row, progress, scale = 1, backgroundColor = null) {

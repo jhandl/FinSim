@@ -44,6 +44,7 @@ class WebUI extends AbstractUI {
       this.setupLoadDemoScenarioButton();
       this.setupSimModeToggle(); // Setup the new mode toggle
       this.setupParameterTooltips(); // Setup parameter age field tooltips
+      this.setupVisualizationControls(); // Setup visualization controls
       this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
       
       this.eventsTableManager.addEventRow();
@@ -552,6 +553,155 @@ class WebUI extends AbstractUI {
     if (this.parameterTooltipElement) {
       this.parameterTooltipElement.remove();
       this.parameterTooltipElement = null;
+    }
+  }
+
+  setupVisualizationControls() {
+    // Populate the dropdown with available presets
+    this.populateVisualizationPresets();
+    
+    // Toggle panel visibility
+    const toggleButton = document.getElementById('toggleVisualizationControls');
+    const panel = document.getElementById('visualizationControlsPanel');
+    
+    if (toggleButton && panel) {
+      toggleButton.addEventListener('click', () => {
+        this.toggleVisualizationPanel();
+      });
+    }
+    
+    // Handle preset changes
+    const presetSelect = document.getElementById('visualizationPreset');
+    if (presetSelect) {
+      presetSelect.addEventListener('change', (e) => {
+        this.onVisualizationPresetChange(e.target.value);
+      });
+      
+      // Set initial description for the default selected value
+      if (presetSelect.value) {
+        this.onVisualizationPresetChange(presetSelect.value);
+      }
+    }
+  }
+
+  populateVisualizationPresets() {
+    const presetSelect = document.getElementById('visualizationPreset');
+    if (!presetSelect) return;
+    
+    // Clear existing options
+    presetSelect.innerHTML = '';
+    
+    // Get presets from VisualizationConfig
+    if (typeof VisualizationConfig !== 'undefined' && VisualizationConfig.getPresets) {
+      const presets = VisualizationConfig.getPresets();
+      
+      // Add options for each preset
+      for (const [presetKey, presetData] of Object.entries(presets)) {
+        const option = document.createElement('option');
+        option.value = presetKey;
+        option.textContent = presetData.name;
+        presetSelect.appendChild(option);
+      }
+      
+      // Set default selection
+      presetSelect.value = 'default';
+    } else {
+      // Fallback if VisualizationConfig is not available
+      const option = document.createElement('option');
+      option.value = 'default';
+      option.textContent = 'Default';
+      presetSelect.appendChild(option);
+    }
+  }
+
+  toggleVisualizationPanel() {
+    const panel = document.getElementById('visualizationControlsPanel');
+    const button = document.getElementById('toggleVisualizationControls');
+    
+    if (!panel || !button) return;
+    
+    const isVisible = panel.style.display !== 'none';
+    panel.style.display = isVisible ? 'none' : 'block';
+    
+    // Update button icon
+    const icon = button.querySelector('i');
+    if (icon) {
+      icon.className = isVisible ? 'fas fa-palette' : 'fas fa-times';
+    }
+  }
+
+  onVisualizationPresetChange(presetName) {
+    console.log('Visualization preset changed to:', presetName);
+    
+    // Update description
+    if (typeof VisualizationConfig !== 'undefined' && VisualizationConfig.getPresets) {
+      const presets = VisualizationConfig.getPresets();
+      const preset = presets[presetName];
+      const descriptionElement = document.getElementById('presetDescription');
+      
+      if (descriptionElement && preset) {
+        descriptionElement.textContent = preset.description;
+      }
+    }
+    
+    // Only redraw table colors if we have valid simulation results
+    // The table data itself doesn't need to be redrawn, just the colors
+    if (this.lastSimulationResults && this.lastSimulationResults.perRunResults && this.lastSimulationResults.perRunResults.length > 0) {
+      console.log('Attempting to redraw table colors...');
+      try {
+        this.redrawTableColors(this.lastSimulationResults.perRunResults, presetName);
+      } catch (error) {
+        console.error('Error redrawing table colors:', error);
+        // Don't show error to user, just log it
+      }
+    } else {
+      console.log('No simulation results available for redraw');
+    }
+  }
+
+  // Store simulation results for later use with visualization changes
+  storeSimulationResults(runs, perRunResults) {
+    this.lastSimulationResults = {
+      runs: runs,
+      perRunResults: perRunResults
+    };
+  }
+
+  // Redraw only the table row colors without changing the data
+  redrawTableColors(perRunResults, presetName) {
+    console.log('redrawTableColors called with:', perRunResults?.length, 'results');
+    
+    if (!window.uiManager || !perRunResults || perRunResults.length === 0) {
+      console.log('Skipping redraw: no data available');
+      return;
+    }
+
+    // Use the passed preset name instead of trying to get it from DOM
+    const selectedPreset = presetName || 'default';
+    console.log('Using preset:', selectedPreset);
+    
+    const config = window.uiManager.createVisualizationConfig(selectedPreset);
+    console.log('Created config:', config);
+    
+    // Calculate new colors
+    if (typeof PinchPointVisualizer !== 'undefined') {
+      try {
+        const visualizer = new PinchPointVisualizer(config);
+        const rowColors = visualizer.calculateRowColors(perRunResults);
+        console.log('Calculated colors:', Object.keys(rowColors).length, 'rows');
+        
+        // Apply colors to existing table rows
+        for (const row in rowColors) {
+          const rowIndex = parseInt(row);
+          const color = rowColors[row];
+          console.log(`Setting row ${rowIndex} to color ${color}`);
+          this.setDataRowBackgroundColor(rowIndex, color);
+        }
+      } catch (error) {
+        console.error('Error in PinchPointVisualizer:', error);
+      }
+    } else {
+      console.log('PinchPointVisualizer not available');
     }
   }
 

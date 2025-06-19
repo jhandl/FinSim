@@ -31,6 +31,56 @@ class VisualizationConfig {
     this.pinchPointTolerance = 1; // € tolerance for break-even
     this.failureThreshold = 0; // NetIncome < Expenses + threshold
   }
+
+  static getPresets() {
+    return {
+      'default': {
+        name: 'Survival Rate',
+        description: 'Greener: more scenarios survive this far',
+        hueMap: { metric: 'survivalRate', invert: true },
+        saturationMap: { metric: 'none', invert: false },
+        lightnessMap: { metric: 'none', invert: true },
+        hue: { curve: 'linear', range: { from: 120, to: 0 } },
+        saturation: { curve: 'linear', range: { from: 0.2, to: 1.0 } },
+        lightness: { curve: 'linear', range: { from: 90, to: 50 } }
+      },
+      'classic': {
+        name: 'Failure Rate',
+        description: 'Redder: higher failure rate this year;',
+        hueMap: { metric: 'failureRate', invert: false },
+        saturationMap: { metric: 'none', invert: false },
+        lightnessMap: { metric: 'none', invert: true },
+        hue: { curve: 'linear', range: { from: 120, to: 0 } },
+        saturation: { curve: 'linear', range: { from: 0.8, to: 0.8 } },
+        lightness: { curve: 'linear', range: { from: 75, to: 45 } }
+      },
+      'combined': {
+        name: 'Combined',
+        description: 'Greener: lower chance of failing this year; brighter: more excess money; grayer: lower chance of reaching this year with money',
+        hueMap: { metric: 'failureRate', invert: false },
+        saturationMap: { metric: 'survivalRate', invert: false },
+        lightnessMap: { metric: 'magnitude', invert: false },
+        hue: { curve: 'linear', range: { from: 120, to: 0 } },
+        saturation: { curve: 'linear', range: { from: 0.05, to: 0.8 } },
+        lightness: { curve: 'linear', range: { from: 75, to: 30 } }
+      }
+    };
+  }
+
+  static createFromPreset(presetName) {
+    const presets = this.getPresets();
+    const preset = presets[presetName] || presets['default'];
+    
+    const config = new VisualizationConfig();
+    config.hueMap = preset.hueMap;
+    config.saturationMap = preset.saturationMap;
+    config.lightnessMap = preset.lightnessMap;
+    config.hue = preset.hue;
+    config.saturation = preset.saturation;
+    config.lightness = preset.lightness;
+    
+    return config;
+  }
 }
 
 class RowColorCalculator {
