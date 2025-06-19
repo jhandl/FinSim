@@ -8,6 +8,7 @@ var incomeStatePension, incomePrivatePension, incomeFundsRent, incomeSharesRent,
 var incomeSalaries, incomeShares, incomeRentals, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
 var cash, indexFunds, shares;
 var person1, person2;
+var perRunResults, currentRun;
 
 const Phases = {
   growth: 'growth',
@@ -24,11 +25,17 @@ function run() {
   montecarlo = (params.growthDevPension > 0 || params.growthDevFunds > 0 || params.growthDevShares > 0);
   let runs = (montecarlo ? config.simulationRuns : 1);
   let successes = 0;
+
+  // Initialize per-run results tracking
+  perRunResults = [];
+
   uiManager.updateProgress("Running");
   for (let run = 0; run < runs; run++) {
-    successes += runSimulation(); 
+    currentRun = run;
+    perRunResults[currentRun] = [];
+    successes += runSimulation();
   }
-  uiManager.updateDataSheet(runs);
+  uiManager.updateDataSheet(runs, perRunResults);
   uiManager.updateStatusCell(successes, runs);
 }
 
@@ -613,6 +620,15 @@ function updateYearlyData() {
   dataSheet[row].usc += revenue.usc;
   dataSheet[row].cgt += revenue.cgt;
   dataSheet[row].worth += realEstate.getTotalValue() + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFunds.capital() + shares.capital() + cash;
+
+  // Capture per-run data for pinch point visualization
+  if (perRunResults && perRunResults[currentRun]) {
+    perRunResults[currentRun].push({
+      netIncome: netIncome,
+      expenses: expenses,
+      success: success
+    });
+  }
 
   if (!montecarlo) {
     uiManager.updateDataRow(row, (person1.age-params.startingAge) / (100-params.startingAge));

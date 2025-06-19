@@ -98,8 +98,8 @@ class WebUI extends AbstractUI {
     return this.tableManager.getTableData(groupId, columnCount, includeHiddenEventTypes);
   }
 
-  setDataRow(rowIndex, data) {
-    this.tableManager.setDataRow(rowIndex, data);
+  setDataRow(rowIndex, data, backgroundColor = null) {
+    this.tableManager.setDataRow(rowIndex, data, backgroundColor);
   }
 
   setChartsRow(rowIndex, data) {

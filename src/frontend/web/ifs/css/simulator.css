@@ -655,8 +655,15 @@ th {
     background-color: #f9f9f9;
 }
 
+/* Hover effect for data rows - works with pinch point visualization */
 #Data tbody tr:hover {
-    background-color: #f0f0f0;
+    filter: brightness(1.1) saturate(1.2);
+    transition: filter 0.2s ease;
+}
+
+/* Ensure rows with custom background colors don't get overridden by nth-child */
+#Data tbody tr[style*="background-color"]:nth-child(even) {
+    /* Custom background color takes precedence */
 }
 
 

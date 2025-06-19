@@ -15,10 +15,22 @@ class UIManager {
     this.ui = ui;
   }
 
-  updateDataSheet(runs) {
-    if (montecarlo) {   
+  updateDataSheet(runs, perRunResults = null) {
+    let rowColors = {};
+
+    // Calculate pinch point colors if we have per-run data
+    if (perRunResults && typeof PinchPointVisualizer !== 'undefined') {
+      try {
+        const visualizer = new PinchPointVisualizer();
+        rowColors = visualizer.calculateRowColors(perRunResults);
+      } catch (error) {
+        console.warn('Failed to calculate pinch point colors:', error);
+      }
+    }
+
+    if (montecarlo) {
       for (let i = 1; i <= row; i++) {
-        this.updateDataRow(i, i/row, runs);
+        this.updateDataRow(i, i/row, runs, rowColors[i]);
       }
     }
     this.ui.clearExtraDataRows(params.targetAge);
@@ -54,7 +66,7 @@ class UIManager {
     this.ui.setStatus(message, color);
   }
 
-  updateDataRow(row, progress, scale = 1) {
+  updateDataRow(row, progress, scale = 1, backgroundColor = null) {
     const data = {
       Age: dataSheet[row].age / scale,
       Year: dataSheet[row].year / scale,
@@ -83,7 +95,7 @@ class UIManager {
       Worth: dataSheet[row].worth / scale
     };
 
-    this.ui.setDataRow(row, data);
+    this.ui.setDataRow(row, data, backgroundColor);
     this.ui.setChartsRow(row, data);
     if (row % 5 === 0) {
       this.updateProgress("Updating "+Math.round(100 * progress) + "%");
