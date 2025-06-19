@@ -22,16 +22,16 @@ This metric measures the financial impact or volatility of the outcomes for the 
 *   **Meaning**: This contextualizes the financial swings. A value of `0.5` means the average surplus or deficit was 50% of that year's expenses. A high value signifies a year of extreme financial events (large windfalls or huge shortfalls), while a low value signifies stability.
 
 **Metric 3: Survival Rate (The Relevance Profile)**
-This metric provides the cumulative probability of a simulation run reaching the current year, effectively acting as a "relevance" or "confidence" score for that year's data.
+This metric provides the cumulative probability of a simulation run being "alive" (still successful) at the start of the current year, effectively acting as a "relevance" or "confidence" score for that year's data. A run is considered "alive" at the start of a year only if it has had `success=true` for ALL previous years. Once a run fails (gets `success=false`) in any year, it is permanently considered "dead" for all subsequent years.
 
 *   `survivalRate = runs_alive_at_start_of_this_year / initial_total_runs`
-*   **Meaning**: A value of `1` means all simulations survived to the start of this year. A value of `0.3` means the data for this year is based on only 30% of the original simulation runs, making its outcome less representative of the overall probability of success.
+*   **Meaning**: A value of `1` means all simulations were still successful at the start of this year. A value of `0.3` means only 30% of the original simulation runs were still successful at the start of this year, making the year's data less representative of long-term success scenarios.
 
 ### Behavior for a Single Run (n=1)
 This system gracefully handles a standard, single-run simulation. The metrics naturally simplify:
 1.  **Failure Rate**: Will be exactly `0.0` (positive), `0.5` (pinch-point), or `1.0` (failure).
 2.  **Normalized Magnitude**: Becomes the single run's absolute delta, normalized by its expenses.
-3.  **Survival Rate**: Is `1.0` for all years until the first failure, after which it becomes `0` for all subsequent years.
+3.  **Survival Rate**: Is `1.0` for all years until the first failure, after which it becomes `0.0` for all subsequent years (even though the simulation continues generating data with `success=false`).
 
 When used with the default configuration—which maps Failure Rate to Hue, Magnitude to Lightness, and Survival Rate to Saturation—this produces the desired intuitive result: rows are green/yellow/red, their intensity varies with the size of the surplus/deficit, and they become desaturated (gray) after the simulation fails.
 
@@ -43,7 +43,9 @@ The implementation requires two distinct phases: a minimal, generic modification
 
 To enable this feature, the core simulator must be modified to stop discarding the results of each individual Monte Carlo run. This will be a minimal, feature-agnostic change.
 
-A new data structure, `perRunResults`, will be added to `Simulator.js`. Inside the `updateYearlyData` function, a few lines of code will capture the raw `netIncome` and `expenses` for each year of each run. This structure will then be passed to the `UIManager`. This approach avoids adding any feature-specific logic (like "pinch points") to the core engine.
+A new data structure, `perRunResults`, will be added to `Simulator.js`. Inside the `updateYearlyData` function, a few lines of code will capture the raw `netIncome`, `expenses`, and `success` status for each year of each run. This structure will then be passed to the `UIManager`. This approach avoids adding any feature-specific logic (like "pinch points") to the core engine.
+
+**Important Implementation Detail**: The simulator continues running failed simulations until the target age, but marks them with `success=false`. The captured `success` status is crucial for calculating survival rates correctly.
 
 ### Frontend: The `PinchPointVisualizer` Component
 
@@ -161,28 +163,47 @@ export class PinchPointVisualizer {
   // Step 1: Process raw data into aggregated metrics for each year
   aggregateYearlyMetrics(perRunResults) {
     const yearlyAggregates = {};
-    const pinchPointTolerance = 1; // Should come from config
+    const pinchPointTolerance = this.config.pinchPointTolerance;
 
     for (const run of perRunResults) {
+      let runIsStillAlive = true; // Track if this run is still alive
+
       for (let i = 0; i < run.length; i++) {
         const row = i + 1; // 1-indexed row
         const yearData = run[i];
 
         if (!yearlyAggregates[row]) {
-          yearlyAggregates[row] = { failures: 0, pinchPoints: 0, survivals: 0, sumOfMagnitude: 0, sumOfExpenses: 0, totalRuns: 0 };
+          yearlyAggregates[row] = {
+            failures: 0,
+            pinchPoints: 0,
+            runsAliveAtStartOfYear: 0, // Runs that were still alive at start of this year
+            sumOfMagnitude: 0,
+            sumOfExpenses: 0,
+            totalRunsReachedThisYear: 0
+          };
         }
-        
-        yearlyAggregates[row].totalRuns++;
 
-        if (yearData.success) {
-          yearlyAggregates[row].survivals++;
-          if (yearData.netIncome < yearData.expenses - pinchPointTolerance) {
-            yearlyAggregates[row].failures++;
-          } else if (yearData.netIncome <= yearData.expenses + pinchPointTolerance) {
-            yearlyAggregates[row].pinchPoints++;
-          }
-          yearlyAggregates[row].sumOfMagnitude += Math.abs(yearData.netIncome - yearData.expenses);
-          yearlyAggregates[row].sumOfExpenses += yearData.expenses;
+        // All runs reach all years (simulator continues even after failure)
+        yearlyAggregates[row].totalRunsReachedThisYear++;
+
+        // Count this run as alive at the start of this year if it hasn't failed yet
+        if (runIsStillAlive) {
+          yearlyAggregates[row].runsAliveAtStartOfYear++;
+        }
+
+        // Process financial metrics for all years (regardless of success status)
+        if (yearData.netIncome < yearData.expenses - pinchPointTolerance) {
+          yearlyAggregates[row].failures++;
+        } else if (yearData.netIncome <= yearData.expenses + pinchPointTolerance) {
+          yearlyAggregates[row].pinchPoints++;
+        }
+
+        yearlyAggregates[row].sumOfMagnitude += Math.abs(yearData.netIncome - yearData.expenses);
+        yearlyAggregates[row].sumOfExpenses += yearData.expenses;
+
+        // Update the alive status for next year: once a run fails, it's permanently dead
+        if (!yearData.success) {
+          runIsStillAlive = false;
         }
       }
     }
