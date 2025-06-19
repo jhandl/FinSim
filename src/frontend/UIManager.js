@@ -1,6 +1,7 @@
 /* This file has to work on both the website and Google Sheets */
 
-STATUS_COLORS = {
+// Restore global STATUS_COLORS definition
+var STATUS_COLORS = {
   ERROR: "#ff8080",
   WARNING: "#ffe066",
   SUCCESS: "#9fdf9f",
@@ -8,17 +9,22 @@ STATUS_COLORS = {
   WHITE: "#FFFFFF"
 };
 
-
 class UIManager {
 
   constructor(ui) {
     this.ui = ui;
+    // Use window.PinchPointVisualizer for browser compatibility
+    this.pinchPointVisualizer = new window.PinchPointVisualizer();
   }
 
-  updateDataSheet(runs) {
-    if (montecarlo) {   
+  updateDataSheet(runs, perRunResults) {
+    if (montecarlo) {
+      let rowColors = {};
+      if (perRunResults) {
+        rowColors = this.pinchPointVisualizer.calculateRowColors(perRunResults);
+      }
       for (let i = 1; i <= row; i++) {
-        this.updateDataRow(i, i/row, runs);
+        this.updateDataRow(i, i/row, runs, rowColors[i]);
       }
     }
     this.ui.clearExtraDataRows(params.targetAge);
@@ -54,7 +60,7 @@ class UIManager {
     this.ui.setStatus(message, color);
   }
 
-  updateDataRow(row, progress, scale = 1) {
+  updateDataRow(row, progress, scale = 1, backgroundColor) {
     const data = {
       Age: dataSheet[row].age / scale,
       Year: dataSheet[row].year / scale,
@@ -83,7 +89,7 @@ class UIManager {
       Worth: dataSheet[row].worth / scale
     };
 
-    this.ui.setDataRow(row, data);
+    this.ui.setDataRow(row, data, backgroundColor);
     this.ui.setChartsRow(row, data);
     if (row % 5 === 0) {
       this.updateProgress("Updating "+Math.round(100 * progress) + "%");

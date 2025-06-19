@@ -8,6 +8,8 @@ var incomeStatePension, incomePrivatePension, incomeFundsRent, incomeSharesRent,
 var incomeSalaries, incomeShares, incomeRentals, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
 var cash, indexFunds, shares;
 var person1, person2;
+// Pinch Point Highlighting: Store per-run, per-year results
+var perRunResults;
 
 const Phases = {
   growth: 'growth',
@@ -24,11 +26,16 @@ function run() {
   montecarlo = (params.growthDevPension > 0 || params.growthDevFunds > 0 || params.growthDevShares > 0);
   let runs = (montecarlo ? config.simulationRuns : 1);
   let successes = 0;
+  // Pinch Point Highlighting: clear perRunResults at the start
+  perRunResults = [];
   uiManager.updateProgress("Running");
-  for (let run = 0; run < runs; run++) {
-    successes += runSimulation(); 
+  for (let runIdx = 0; runIdx < runs; runIdx++) {
+    // Pinch Point Highlighting: initialize current run's results
+    perRunResults[runIdx] = [];
+    successes += runSimulation(runIdx);
   }
-  uiManager.updateDataSheet(runs);
+  // Pass perRunResults to UIManager
+  uiManager.updateDataSheet(runs, perRunResults);
   uiManager.updateStatusCell(successes, runs);
 }
 
@@ -168,21 +175,18 @@ function resetYearlyVariables() {
   realEstate.addYear();
 }
 
-function runSimulation() {
+function runSimulation(currentRunIdx) {
   initializeSimulationVariables();
-
+  let yearIdx = 0;
   while (person1.age < params.targetAge) {
-
     row++;
     periods = row - 1;
-
-    // console.log("  ======== Age: "+person1.age+" ========");
-
     resetYearlyVariables();
     calculatePensionIncome();
     processEvents();
     handleInvestments();
-    updateYearlyData();
+    updateYearlyData(currentRunIdx, yearIdx);
+    yearIdx++;
   }
   return success;
 }
@@ -580,7 +584,7 @@ function initializeRealEstate() {
 }
 
 
-function updateYearlyData() {
+function updateYearlyData(currentRunIdx, yearIdx) {
   // This is used below to hide the deemed disposal tax payments, otherwise they're shown as income.
   let FundsTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.cgt * incomeFundsRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
   let SharesTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.cgt * incomeSharesRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
@@ -616,6 +620,16 @@ function updateYearlyData() {
 
   if (!montecarlo) {
     uiManager.updateDataRow(row, (person1.age-params.startingAge) / (100-params.startingAge));
+  }
+
+  // Pinch Point Highlighting: capture per-run, per-year results
+  if (typeof currentRunIdx === 'number' && typeof yearIdx === 'number' && Array.isArray(perRunResults)) {
+    if (!perRunResults[currentRunIdx]) perRunResults[currentRunIdx] = [];
+    perRunResults[currentRunIdx][yearIdx] = {
+      netIncome: netIncome,
+      expenses: expenses,
+      success: success
+    };
   }
 }
 

@@ -81,7 +81,7 @@ class TableManager {
     });
   }
 
-  setDataRow(rowIndex, data) {
+  setDataRow(rowIndex, data, backgroundColor) {
     const tbody = document.querySelector('#Data tbody');
     if (!tbody) return;
 
@@ -91,6 +91,13 @@ class TableManager {
       row = document.createElement('tr');
       row.id = `data_row_${rowIndex}`;
       tbody.appendChild(row);
+    }
+
+    // Pinch Point Highlighting: set background color if provided
+    if (backgroundColor) {
+      row.style.backgroundColor = backgroundColor;
+    } else {
+      row.style.backgroundColor = '';
     }
 
     // Clear existing cells
