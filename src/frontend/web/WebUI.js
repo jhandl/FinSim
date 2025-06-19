@@ -102,6 +102,10 @@ class WebUI extends AbstractUI {
     this.tableManager.setDataRow(rowIndex, data);
   }
 
+  setDataRowBackgroundColor(rowIndex, backgroundColor) {
+    this.tableManager.setDataRowBackgroundColor(rowIndex, backgroundColor);
+  }
+
   setChartsRow(rowIndex, data) {
     this.chartManager.updateChartsRow(rowIndex, data);
   }

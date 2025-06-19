@@ -118,6 +118,13 @@ class TableManager {
     });
   }
 
+  setDataRowBackgroundColor(rowIndex, backgroundColor) {
+    const row = document.getElementById(`data_row_${rowIndex}`);
+    if (row) {
+      row.style.backgroundColor = backgroundColor;
+    }
+  }
+
   clearExtraDataRows(maxAge) {
     const headerRow = document.querySelector('#Data thead tr:nth-child(2)');
     const headers = Array.from(headerRow.cells);

@@ -8,6 +8,8 @@ var incomeStatePension, incomePrivatePension, incomeFundsRent, incomeSharesRent,
 var incomeSalaries, incomeShares, incomeRentals, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
 var cash, indexFunds, shares;
 var person1, person2;
+// Variables for pinch point visualization
+var perRunResults, currentRun;
 
 const Phases = {
   growth: 'growth',
@@ -24,11 +26,17 @@ function run() {
   montecarlo = (params.growthDevPension > 0 || params.growthDevFunds > 0 || params.growthDevShares > 0);
   let runs = (montecarlo ? config.simulationRuns : 1);
   let successes = 0;
+  
+  // Initialize per-run results tracking
+  perRunResults = [];
+  
   uiManager.updateProgress("Running");
   for (let run = 0; run < runs; run++) {
+    currentRun = run;
+    perRunResults[currentRun] = [];
     successes += runSimulation(); 
   }
-  uiManager.updateDataSheet(runs);
+  uiManager.updateDataSheet(runs, perRunResults);
   uiManager.updateStatusCell(successes, runs);
 }
 
@@ -584,6 +592,15 @@ function updateYearlyData() {
   // This is used below to hide the deemed disposal tax payments, otherwise they're shown as income.
   let FundsTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.cgt * incomeFundsRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
   let SharesTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.cgt * incomeSharesRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
+
+  // Capture per-run data for pinch point visualization
+  if (typeof currentRun !== 'undefined' && perRunResults[currentRun]) {
+    perRunResults[currentRun].push({
+      netIncome: netIncome,
+      expenses: expenses,
+      success: success
+    });
+  }
 
   if (!(row in dataSheet)) {
     dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "savings": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0 };
