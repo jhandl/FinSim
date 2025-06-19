@@ -135,13 +135,14 @@ class GasUI extends AbstractUI {
     SpreadsheetApp.flush();
   }
 
-  setDataRow(rowIndex, data) {
+  setDataRow(rowIndex, data, backgroundColor = null) {
     Object.entries(data).forEach(([field, value]) => {
       const range = this.namedRanges.get(field);
       if (range) {
         range.getCell(rowIndex, 1).setValue(value);
+        // Background color not applied in GAS version for now.
       } else {
-        throw "Missing range name!"
+        throw "Missing range name!";
       }
     });
   }

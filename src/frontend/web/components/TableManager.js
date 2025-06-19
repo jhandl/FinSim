@@ -81,7 +81,7 @@ class TableManager {
     });
   }
 
-  setDataRow(rowIndex, data) {
+  setDataRow(rowIndex, data, backgroundColor = null) {
     const tbody = document.querySelector('#Data tbody');
     if (!tbody) return;
 
@@ -116,6 +116,11 @@ class TableManager {
         row.appendChild(td);
       }
     });
+
+    // Apply background color if provided
+    if (backgroundColor) {
+      row.style.backgroundColor = backgroundColor;
+    }
   }
 
   clearExtraDataRows(maxAge) {
