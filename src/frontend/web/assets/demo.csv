@@ -2,7 +2,7 @@
 # Parameters
 StartingAge,30
 TargetAge,90
-InitialSavings,0
+InitialSavings,20000
 InitialPension,0
 InitialFunds,0
 InitialShares,0
@@ -37,8 +37,8 @@ simulation_mode,couple
 
 # Events
 Type,Name,Amount,FromAge,ToAge,Rate,Extra
-SI,Person1,40000,30,64,0.035,0.03
-SI2np,Partner,30000,30,64,0.02,0
+SI,You,40000,30,64,0.035,0.03
+SI2np,Your Partner,30000,30,64,0.02,0
 E,Life,40000,30,100,,
 E,Kid,6000,32,52,,
 R,Family House,40000,35,65,,
