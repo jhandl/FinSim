@@ -23,51 +23,51 @@ class VisualizationConfig {
         name: 'Plain',
         description: 'No color highlighting.',
         hueMap: { metric: 'none', invert: false },
-        saturationMap: { metric: 'none', invert: false },
         lightnessMap: { metric: 'none', invert: false },
+        saturationMap: { metric: 'none', invert: false },
         hue: { curve: 'linear', range: { from: 120, to: 120 } },
-        saturation: { curve: 'linear', range: { from: 0.0, to: 0.0 } },
-        lightness: { curve: 'linear', range: { from: 100, to: 100 } }
+        lightness: { curve: 'linear', range: { from: 100, to: 100 } },
+        saturation: { curve: 'linear', range: { from: 0.0, to: 0.0 } }
       },
       'cashflow': {
         name: 'Cash Flow',
         description: '### Cash Flow Health\n\n- **Green**: income covers expenses without asset sales.\n\n- **Red**: assets need to be sold to cover expenses.\n\n- **Color intensity**: the surplus / deficit size.',
         hueMap: { metric: 'cashflowDeficitRate', invert: false },
-        saturationMap: { metric: 'cashflowDeficitMagnitude', invert: false },
         lightnessMap: { metric: 'cashflowDeficitMagnitude', invert: false },
+        saturationMap: { metric: 'cashflowDeficitMagnitude', invert: false },
         hue: { curve: 'linear', range: { from: 120, to: 0 } },
-        saturation: { curve: 'sqrt', range: { from: 0.4, to: 0.8 } },
-        lightness: { curve: 'sqrt', range: { from: 95, to: 65 } }
+        lightness: { curve: 'sqrt', range: { from: 95, to: 65 } },
+        saturation: { curve: 'sqrt', range: { from: 0.4, to: 0.8 } }
       },
       'survival': {
         name: 'Survival',
         description: '### Survival Rate\n\n- **Greener**: more scenarios survived up to this point.\n\n- **Redder**: fewer scenarios survived this far.',
         hueMap: { metric: 'survivalRate', invert: true },
-        saturationMap: { metric: 'none', invert: false },
         lightnessMap: { metric: 'none', invert: true },
+        saturationMap: { metric: 'none', invert: false },
         hue: { curve: 'linear', range: { from: 120, to: 0 } },
-        saturation: { curve: 'linear', range: { from: 0.2, to: 1.0 } },
-        lightness: { curve: 'linear', range: { from: 90, to: 50 } }
+        lightness: { curve: 'linear', range: { from: 90, to: 50 } },
+        saturation: { curve: 'linear', range: { from: 0.2, to: 1.0 } }
       },
-      'classic': {
+      'failure': {
         name: 'Failure',
         description: '### Failure Rate\n\n- **Greener**: lower chance of failing this year.\n\n- **Redder**: higher chance of failing this year.',
         hueMap: { metric: 'failureRate', invert: false },
-        saturationMap: { metric: 'none', invert: false },
         lightnessMap: { metric: 'none', invert: true },
+        saturationMap: { metric: 'none', invert: false },
         hue: { curve: 'linear', range: { from: 120, to: 0 } },
-        saturation: { curve: 'linear', range: { from: 0.8, to: 0.8 } },
-        lightness: { curve: 'linear', range: { from: 75, to: 45 } }
+        lightness: { curve: 'linear', range: { from: 75, to: 45 } },
+        saturation: { curve: 'linear', range: { from: 0.8, to: 0.8 } }
       },
       'combined': {
         name: 'Combined',
         description: '### Combined\n\n- **Greener**: lower chance of failing this year.\n\n- **Brighter**: more excess money.\n\n- **Grayer**: lower chance of reaching this year with money.',
         hueMap: { metric: 'failureRate', invert: false },
+        lightnessMap: { metric: 'cashflowDeficitRate', invert: false },
         saturationMap: { metric: 'survivalRate', invert: false },
-        lightnessMap: { metric: 'magnitude', invert: false },
         hue: { curve: 'linear', range: { from: 120, to: 0 } },
-        saturation: { curve: 'linear', range: { from: 0.05, to: 0.8 } },
-        lightness: { curve: 'linear', range: { from: 75, to: 30 } }
+        lightness: { curve: 'linear', range: { from: 90, to: 60 } },
+        saturation: { curve: 'linear', range: { from: 0.03, to: 0.7 } }
       }
     };
   }

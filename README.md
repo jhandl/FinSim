@@ -1,4 +1,10 @@
 # Bugs
+- In the demo scenario the first year expenses are higher than they should.
+- Tooltips for age/year don't move with the page.
+- The row headers of the data table should float when scrolling sideways.
+- Help text for the data table color schemes.
+- Make the color scheme icon colorful.
+- Fix data table header tooltips to account for single/couple modes.
 
 # Roadmap
 
