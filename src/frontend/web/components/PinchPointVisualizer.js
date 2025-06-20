@@ -1,31 +1,16 @@
 /* Pinch Point Visualization Component */
 
 class VisualizationConfig {
-  constructor() {
-    // Step 1: Define which metric drives which HSL component.
-    // `invert: true` flips the metric's meaning, mapping high values to the 'from' of the range.
-
-    // this.hueMap        = { metric: 'failureRate',  invert: false };
-    // this.saturationMap = { metric: 'survivalRate', invert: false };
-    // this.lightnessMap  = { metric: 'magnitude',    invert: false };
+  constructor(presetName = 'default') {
+    const presets = VisualizationConfig.getPresets();
+    const preset = presets[presetName] || presets['default'];
     
-    this.hueMap        = { metric: 'survivalRate',  invert: true };
-    this.saturationMap = { metric: 'none', invert: false };
-    this.lightnessMap  = { metric: 'none', invert: true };
-
-    // Step 2: Configure the behavior of each HSL component.
-    this.hue = {
-        curve: 'linear',
-        range: { from: 120, to: 0 } // e.g., Green to Red
-    };
-    this.saturation = {
-        curve: 'linear',
-        range: { from: 0.2, to: 1.0 } // e.g., 20% to 100% saturation
-    };
-    this.lightness = {
-        curve: 'linear',
-        range: { from: 90, to: 50 } // e.g., Pale to Dark/Intense
-    };
+    this.hueMap = preset.hueMap;
+    this.saturationMap = preset.saturationMap;
+    this.lightnessMap = preset.lightnessMap;
+    this.hue = preset.hue;
+    this.saturation = preset.saturation;
+    this.lightness = preset.lightness;
 
     // Financial Definitions
     this.pinchPointTolerance = 1; // € tolerance for break-even
@@ -35,8 +20,28 @@ class VisualizationConfig {
   static getPresets() {
     return {
       'default': {
-        name: 'Survival Rate',
-        description: 'Greener: more scenarios survive this far',
+        name: 'Plain',
+        description: 'No color highlighting.',
+        hueMap: { metric: 'none', invert: false },
+        saturationMap: { metric: 'none', invert: false },
+        lightnessMap: { metric: 'none', invert: false },
+        hue: { curve: 'linear', range: { from: 120, to: 120 } },
+        saturation: { curve: 'linear', range: { from: 0.0, to: 0.0 } },
+        lightness: { curve: 'linear', range: { from: 100, to: 100 } }
+      },
+      'cashflow': {
+        name: 'Cash Flow',
+        description: '### Cash Flow Health\n\n- **Green**: income covers expenses without asset sales.\n\n- **Red**: assets need to be sold to cover expenses.\n\n- **Color intensity**: the surplus / deficit size.',
+        hueMap: { metric: 'cashflowDeficitRate', invert: false },
+        saturationMap: { metric: 'cashflowDeficitMagnitude', invert: false },
+        lightnessMap: { metric: 'cashflowDeficitMagnitude', invert: false },
+        hue: { curve: 'linear', range: { from: 120, to: 0 } },
+        saturation: { curve: 'sqrt', range: { from: 0.4, to: 0.8 } },
+        lightness: { curve: 'sqrt', range: { from: 95, to: 65 } }
+      },
+      'survival': {
+        name: 'Survival',
+        description: '### Survival Rate\n\n- **Greener**: more scenarios survived up to this point.\n\n- **Redder**: fewer scenarios survived this far.',
         hueMap: { metric: 'survivalRate', invert: true },
         saturationMap: { metric: 'none', invert: false },
         lightnessMap: { metric: 'none', invert: true },
@@ -45,8 +50,8 @@ class VisualizationConfig {
         lightness: { curve: 'linear', range: { from: 90, to: 50 } }
       },
       'classic': {
-        name: 'Failure Rate',
-        description: 'Redder: higher failure rate this year;',
+        name: 'Failure',
+        description: '### Failure Rate\n\n- **Greener**: lower chance of failing this year.\n\n- **Redder**: higher chance of failing this year.',
         hueMap: { metric: 'failureRate', invert: false },
         saturationMap: { metric: 'none', invert: false },
         lightnessMap: { metric: 'none', invert: true },
@@ -56,7 +61,7 @@ class VisualizationConfig {
       },
       'combined': {
         name: 'Combined',
-        description: 'Greener: lower chance of failing this year; brighter: more excess money; grayer: lower chance of reaching this year with money',
+        description: '### Combined\n\n- **Greener**: lower chance of failing this year.\n\n- **Brighter**: more excess money.\n\n- **Grayer**: lower chance of reaching this year with money.',
         hueMap: { metric: 'failureRate', invert: false },
         saturationMap: { metric: 'survivalRate', invert: false },
         lightnessMap: { metric: 'magnitude', invert: false },
@@ -68,18 +73,7 @@ class VisualizationConfig {
   }
 
   static createFromPreset(presetName) {
-    const presets = this.getPresets();
-    const preset = presets[presetName] || presets['default'];
-    
-    const config = new VisualizationConfig();
-    config.hueMap = preset.hueMap;
-    config.saturationMap = preset.saturationMap;
-    config.lightnessMap = preset.lightnessMap;
-    config.hue = preset.hue;
-    config.saturation = preset.saturation;
-    config.lightness = preset.lightness;
-    
-    return config;
+    return new VisualizationConfig(presetName);
   }
 }
 
@@ -99,10 +93,13 @@ class RowColorCalculator {
     
     // Calculate the base, un-curved, normalized metric values
     const normalizedMagnitude = metrics.avgMagnitude > 0 ? metrics.avgMagnitude / metrics.avgExpenses : 0;
+    const normalizedCashflowDeficit = metrics.avgCashflowDeficit > 0 ? metrics.avgCashflowDeficit / metrics.avgExpenses : 0;
     const rawMetricValues = {
       failureRate: metrics.failureRate,
       survivalRate: metrics.survivalRate,
-      magnitude: Math.min(normalizedMagnitude, 1.5) / 1.5 // Cap magnitude and normalize to 0-1 range
+      magnitude: Math.min(normalizedMagnitude, 1.5) / 1.5, // Cap magnitude and normalize to 0-1 range
+      cashflowDeficitRate: metrics.cashflowDeficitRate,
+      cashflowDeficitMagnitude: Math.min(normalizedCashflowDeficit, 1.5) / 1.5
     };
 
     // A generic function to get, process, and map a metric to its final HSL value
@@ -144,12 +141,16 @@ class RowColorCalculator {
     const survivalRate = this.calculateSurvivalRate(yearlyData, totalRuns);
     const avgMagnitude = this.calculateAverageMagnitude(yearlyData);
     const avgExpenses = this.calculateAverageExpenses(yearlyData);
+    const cashflowDeficitRate = this.calculateCashflowDeficitRate(yearlyData, totalRuns);
+    const avgCashflowDeficit = this.calculateAverageCashflowDeficit(yearlyData);
 
     return {
       failureRate,
       survivalRate,
       avgMagnitude,
-      avgExpenses
+      avgExpenses,
+      cashflowDeficitRate,
+      avgCashflowDeficit
     };
   }
 
@@ -171,6 +172,16 @@ class RowColorCalculator {
   calculateAverageExpenses(yearlyData) {
     if (yearlyData.totalRunsReachedThisYear === 0) return 1; // Avoid division by zero
     return yearlyData.sumOfExpenses / yearlyData.totalRunsReachedThisYear;
+  }
+
+  calculateCashflowDeficitRate(yearlyData, totalRuns) {
+    if (totalRuns === 0) return 0;
+    return yearlyData.cashflowDeficits / totalRuns;
+  }
+
+  calculateAverageCashflowDeficit(yearlyData) {
+    if (yearlyData.cashflowDeficits === 0) return 0;
+    return yearlyData.sumOfCashflowDeficit / yearlyData.cashflowDeficits;
   }
 
   generateClassName(metrics) {
@@ -208,7 +219,9 @@ class PinchPointVisualizer {
             runsAliveAtStartOfYear: 0, // Runs that were still alive at start of this year
             sumOfMagnitude: 0,
             sumOfExpenses: 0,
-            totalRunsReachedThisYear: 0
+            totalRunsReachedThisYear: 0,
+            cashflowDeficits: 0, // Count of runs with cashflow deficit
+            sumOfCashflowDeficit: 0
           };
         }
 
@@ -225,6 +238,12 @@ class PinchPointVisualizer {
           yearlyAggregates[row].failures++;
         } else if (yearData.netIncome <= yearData.expenses + pinchPointTolerance) {
           yearlyAggregates[row].pinchPoints++;
+        }
+
+        // Check for cashflow deficit during growth phase
+        if (yearData.householdPhase === 'growth' && yearData.earnedNetIncome < yearData.expenses) {
+          yearlyAggregates[row].cashflowDeficits++;
+          yearlyAggregates[row].sumOfCashflowDeficit += yearData.expenses - yearData.earnedNetIncome;
         }
 
         yearlyAggregates[row].sumOfMagnitude += Math.abs(yearData.netIncome - yearData.expenses);

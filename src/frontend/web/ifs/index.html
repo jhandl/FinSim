@@ -15,6 +15,7 @@
     <script src="/src/frontend/web/ifs/libs/driver.js"></script>
     <script src="/src/frontend/web/ifs/libs/js-yaml.min.js"></script>
     <script src="/src/frontend/web/ifs/libs/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <header>
@@ -283,28 +284,24 @@
 
         <div class="data-section card">
             <h2>Simulation Data</h2>
-            
-            <!-- Visualization Controls -->
-            <div class="visualization-controls">
-                <button id="toggleVisualizationControls" class="secondary-button">
-                    <i class="fas fa-palette"></i> Visualization Settings
-                </button>
-                <div id="visualizationControlsPanel" class="visualization-panel" style="display: none;">
-                    <div class="visualization-presets">
-                        <label for="visualizationPreset">Color Scheme:</label>
-                        <select id="visualizationPreset">
-                            <!-- Options will be populated dynamically -->
-                        </select>
-                        <span class="preset-description" id="presetDescription">Select a color scheme to visualize financial data</span>
-                    </div>
-                </div>
-            </div>
-            
+
             <div class="table-container">
                 <table id="Data">
                     <thead>
                         <tr class="header-groups">
-                            <th colspan="2"></th>
+                            <th colspan="2">
+                                <div class="visualization-control">
+                                    <button id="visualizationToggle" class="visualization-icon-btn" title="Visualization Settings">
+                                        <i class="fas fa-palette"></i>
+                                    </button>
+                                    <span id="selectedPresetDisplay" class="selected-preset-display">Default</span>
+                                </div>
+                                <!-- Direct Dropdown Menu -->
+                                <div class="visualization-dropdown" id="presetOptions" style="display: none;">
+                                    <div class="dropdown-header">Color Scheme</div>
+                                    <!-- Options will be populated dynamically -->
+                                </div>
+                            </th>
                             <th colspan="8">Income</th>
                             <th colspan="4">Taxes</th>
                             <th colspan="4">Cashflow</th>
@@ -336,7 +333,7 @@
                             <th data-key="FundsCapital" title="Total value of your index fund investments">Index Funds</th>
                             <th data-key="SharesCapital" title="Total value of your Investment Trusts or individual share investments">Shares</th>
                             <th data-key="WithdrawalRate" title="Percentage of your investments (Index Funds + Shares) that you're withdrawing to cover your expenses.">Withdraw%</th>
-                            <th data-key="Worth" title="Your total net worth (sum of all assets)">Worth</th>
+                            <th data-key="Worth" title="Your total net worth (sum of all assets)">Net Worth</th>
                         </tr>
                     </thead>
                     <tbody>

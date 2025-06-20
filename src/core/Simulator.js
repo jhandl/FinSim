@@ -10,6 +10,8 @@ var cash, indexFunds, shares;
 var person1, person2;
 // Variables for pinch point visualization
 var perRunResults, currentRun;
+// Variables for earned net income tracking
+var earnedNetIncome, householdPhase;
 
 const Phases = {
   growth: 'growth',
@@ -384,6 +386,15 @@ function processEvents() {
 
 function handleInvestments() {
   netIncome = revenue.netIncome() + incomeTaxFree;
+  
+  // Track "Earned Net Income" before any asset sales
+  earnedNetIncome = netIncome;
+  
+  // Determine household phase
+  householdPhase = 'growth'; // Default to growth
+  if (person1.phase === Phases.retired && (!person2 || person2.phase === Phases.retired)) {
+    householdPhase = 'retired';
+  }
 
   if (netIncome > expenses) {
     savings = netIncome - expenses;
@@ -597,6 +608,8 @@ function updateYearlyData() {
   }
   perRunResults[currentRun].push({
     netIncome: netIncome,
+    earnedNetIncome: earnedNetIncome,
+    householdPhase: householdPhase,
     expenses: expenses,
     success: success
   });

@@ -28,7 +28,7 @@ class UIManager {
       // Use PinchPointVisualizer if available (web UI only)
       if (typeof PinchPointVisualizer !== 'undefined') {
         // Get selected configuration from UI
-        const selectedPreset = this.ui.getValue('visualizationPreset') || 'default';
+        const selectedPreset = this.getSelectedVisualizationPreset();
         const config = this.createVisualizationConfig(selectedPreset);
         
         const visualizer = new PinchPointVisualizer(config);
@@ -79,6 +79,20 @@ class UIManager {
 
   setStatus(message, color) {
     this.ui.setStatus(message, color);
+  }
+
+  getSelectedVisualizationPreset() {
+    // Try to get the selected preset from the custom select
+    const optionsContainer = document.getElementById('presetOptions');
+    if (optionsContainer) {
+      const selectedOption = optionsContainer.querySelector('.selected');
+      if (selectedOption) {
+        return selectedOption.getAttribute('data-value') || 'default';
+      }
+    }
+
+    // Fallback to default
+    return 'default';
   }
 
   createVisualizationConfig(presetName) {

@@ -559,103 +559,318 @@ class WebUI extends AbstractUI {
   setupVisualizationControls() {
     // Populate the dropdown with available presets
     this.populateVisualizationPresets();
-    
-    // Toggle panel visibility
-    const toggleButton = document.getElementById('toggleVisualizationControls');
-    const panel = document.getElementById('visualizationControlsPanel');
-    
-    if (toggleButton && panel) {
-      toggleButton.addEventListener('click', () => {
-        this.toggleVisualizationPanel();
-      });
-    }
-    
-    // Handle preset changes
-    const presetSelect = document.getElementById('visualizationPreset');
-    if (presetSelect) {
-      presetSelect.addEventListener('change', (e) => {
-        this.onVisualizationPresetChange(e.target.value);
-      });
-      
-      // Set initial description for the default selected value
-      if (presetSelect.value) {
-        this.onVisualizationPresetChange(presetSelect.value);
-      }
-    }
+
+    // Setup direct dropdown functionality
+    this.setupDirectDropdown();
+
+    // Set initial preset
+    this.onVisualizationPresetChange('default');
   }
 
   populateVisualizationPresets() {
-    const presetSelect = document.getElementById('visualizationPreset');
-    if (!presetSelect) return;
-    
-    // Clear existing options
-    presetSelect.innerHTML = '';
-    
+    const dropdown = document.getElementById('presetOptions');
+    if (!dropdown) return;
+
+    // Only populate if not already populated (check for options, not just any children)
+    if (dropdown.querySelector('[data-value]')) return;
+
+    // Ensure header exists
+    let header = dropdown.querySelector('.dropdown-header');
+    if (!header) {
+      header = document.createElement('div');
+      header.className = 'dropdown-header';
+      header.textContent = 'Color Scheme';
+      dropdown.appendChild(header);
+    }
+
     // Get presets from VisualizationConfig
     if (typeof VisualizationConfig !== 'undefined' && VisualizationConfig.getPresets) {
       const presets = VisualizationConfig.getPresets();
-      
+
       // Add options for each preset
       for (const [presetKey, presetData] of Object.entries(presets)) {
-        const option = document.createElement('option');
-        option.value = presetKey;
+        const option = document.createElement('div');
+        option.setAttribute('data-value', presetKey);
         option.textContent = presetData.name;
-        presetSelect.appendChild(option);
+        option.setAttribute('data-description', presetData.description);
+
+        if (presetKey === 'default') {
+          option.classList.add('selected');
+          // Update the display next to the icon
+          const displayElement = document.getElementById('selectedPresetDisplay');
+          if (displayElement) {
+            displayElement.textContent = presetData.name;
+          }
+        }
+
+        dropdown.appendChild(option);
       }
-      
-      // Set default selection
-      presetSelect.value = 'default';
     } else {
       // Fallback if VisualizationConfig is not available
-      const option = document.createElement('option');
-      option.value = 'default';
+      const option = document.createElement('div');
+      option.setAttribute('data-value', 'default');
       option.textContent = 'Default';
-      presetSelect.appendChild(option);
+      option.classList.add('selected');
+      dropdown.appendChild(option);
     }
   }
 
-  toggleVisualizationPanel() {
-    const panel = document.getElementById('visualizationControlsPanel');
-    const button = document.getElementById('toggleVisualizationControls');
-    
-    if (!panel || !button) return;
-    
-    const isVisible = panel.style.display !== 'none';
-    panel.style.display = isVisible ? 'none' : 'block';
-    
-    // Update button icon
-    const icon = button.querySelector('i');
-    if (icon) {
-      icon.className = isVisible ? 'fas fa-palette' : 'fas fa-times';
-    }
+  setupDirectDropdown() {
+    const toggleButton = document.getElementById('visualizationToggle');
+    const dropdown = document.getElementById('presetOptions');
+    const controlContainer = document.querySelector('.visualization-control');
+
+    if (!toggleButton || !dropdown || !controlContainer) return;
+
+    let activeTooltip = null;
+    let tooltipTimeout = null;
+
+    // Function to create tooltip element
+    const createTooltip = (text) => {
+      const tooltip = document.createElement('div');
+      tooltip.className = 'visualization-tooltip';
+
+      // Use marked.js to parse markdown if available, otherwise fall back to plain text
+      if (typeof marked !== 'undefined') {
+        tooltip.innerHTML = marked.parse(text);
+      } else {
+        tooltip.textContent = text;
+      }
+
+      document.body.appendChild(tooltip);
+      return tooltip;
+    };
+
+    // Function to position tooltip
+    const positionTooltip = (tooltip, targetRect) => {
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile) {
+        // Mobile uses fixed positioning (handled by CSS)
+        return;
+      }
+
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+
+      // Position above the target
+      let left = targetRect.left + (targetRect.width - tooltipRect.width) / 2;
+      let top = targetRect.top - tooltipRect.height - 10;
+
+      const margin = 10;
+
+      // Adjust for left clipping
+      if (left < margin) {
+        left = margin;
+      }
+      // Adjust for right clipping
+      else if (left + tooltipRect.width > viewportWidth - margin) {
+        left = viewportWidth - tooltipRect.width - margin;
+      }
+
+      tooltip.style.position = 'fixed';
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+    };
+
+    // Function to show tooltip with delay
+    const showTooltipDelayed = (text, targetRect) => {
+      // Clear any existing timeout
+      if (tooltipTimeout) {
+        clearTimeout(tooltipTimeout);
+        tooltipTimeout = null;
+      }
+
+      // Hide any existing tooltip immediately
+      hideTooltip();
+
+      if (!text) return;
+
+      // Set timeout for 600ms delay
+      tooltipTimeout = setTimeout(() => {
+        const tooltip = createTooltip(text);
+        activeTooltip = tooltip;
+
+        requestAnimationFrame(() => {
+          positionTooltip(tooltip, targetRect);
+          tooltip.classList.add('visible');
+        });
+        tooltipTimeout = null;
+      }, 600);
+    };
+
+    // Function to hide tooltip
+    const hideTooltip = () => {
+      // Clear any pending tooltip
+      if (tooltipTimeout) {
+        clearTimeout(tooltipTimeout);
+        tooltipTimeout = null;
+      }
+
+      if (activeTooltip) {
+        activeTooltip.classList.remove('visible');
+        if (activeTooltip.parentNode) {
+          activeTooltip.parentNode.removeChild(activeTooltip);
+        }
+        activeTooltip = null;
+      }
+    };
+
+    // Toggle dropdown when clicking anywhere in the control area
+    controlContainer.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isVisible = dropdown.style.display !== 'none';
+
+      if (isVisible) {
+        dropdown.style.display = 'none';
+        return;
+      }
+
+      // Hide any existing tooltip when opening dropdown
+      hideTooltip();
+
+      // Show dropdown and position it smartly
+      dropdown.style.display = 'block';
+      dropdown.style.visibility = 'hidden'; // Hide while measuring
+
+      // Get measurements
+      const iconRect = toggleButton.getBoundingClientRect();
+      const dropdownRect = dropdown.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+
+      // Calculate available space
+      const spaceBelow = viewportHeight - iconRect.bottom;
+      const spaceAbove = iconRect.top;
+      const dropdownHeight = dropdownRect.height;
+
+      // Reset position styles
+      dropdown.style.position = 'absolute';
+      dropdown.style.left = '0';
+      dropdown.style.zIndex = '1000';
+
+      // Choose position based on available space
+      if (spaceBelow >= dropdownHeight + 10) {
+        // Enough space below - position below icon (default)
+        dropdown.style.top = '100%';
+        dropdown.style.bottom = 'auto';
+      } else if (spaceAbove >= dropdownHeight + 10) {
+        // Not enough space below but enough above - position above icon
+        dropdown.style.top = 'auto';
+        dropdown.style.bottom = '100%';
+      } else {
+        // Not enough space either way - use fixed positioning to fit in viewport
+        dropdown.style.position = 'fixed';
+        dropdown.style.left = iconRect.left + 'px';
+        const maxTop = viewportHeight - dropdownHeight - 10;
+        dropdown.style.top = Math.max(10, maxTop) + 'px';
+      }
+
+      // Make visible
+      dropdown.style.visibility = 'visible';
+
+      // When opening, highlight the currently selected option
+      const selectedOption = dropdown.querySelector('.selected');
+      if (selectedOption) {
+        // Clear any existing highlights
+        dropdown.querySelectorAll('.highlighted').forEach(opt => opt.classList.remove('highlighted'));
+        // Highlight the selected option
+        selectedOption.classList.add('highlighted');
+      }
+    });
+
+    // Handle option selection
+    dropdown.addEventListener('click', (e) => {
+      if (e.target.hasAttribute('data-value')) {
+        const value = e.target.getAttribute('data-value');
+        const text = e.target.textContent;
+
+        // Update selected state
+        dropdown.querySelectorAll('div[data-value]').forEach(opt => opt.classList.remove('selected'));
+        e.target.classList.add('selected');
+
+        // Update the display next to the icon
+        const displayElement = document.getElementById('selectedPresetDisplay');
+        if (displayElement) {
+          displayElement.textContent = text;
+        }
+
+        // Hide dropdown
+        dropdown.style.display = 'none';
+
+        // Trigger change
+        this.onVisualizationPresetChange(value);
+      }
+    });
+
+    // Handle mouse movement over options (highlight follows mouse)
+    dropdown.addEventListener('mouseover', (e) => {
+      if (e.target.hasAttribute('data-value')) {
+        // Clear all highlights
+        dropdown.querySelectorAll('.highlighted').forEach(opt => opt.classList.remove('highlighted'));
+        // Highlight the hovered option
+        e.target.classList.add('highlighted');
+
+        // Show tooltip on desktop with delay
+        if (window.innerWidth > 768) {
+          const description = e.target.getAttribute('data-description');
+          if (description) {
+            const targetRect = e.target.getBoundingClientRect();
+            showTooltipDelayed(description, targetRect);
+          }
+        }
+      }
+    });
+
+    // Hide tooltip on mouse out
+    dropdown.addEventListener('mouseout', () => {
+      if (window.innerWidth <= 768) return; // Skip on mobile
+      hideTooltip();
+    });
+
+    // Show tooltip when hovering over the control container
+    controlContainer.addEventListener('mouseover', () => {
+      if (window.innerWidth > 768) {
+        const selectedOption = dropdown.querySelector('.selected');
+        if (selectedOption) {
+          const description = selectedOption.getAttribute('data-description');
+          if (description) {
+            const targetRect = controlContainer.getBoundingClientRect();
+            showTooltipDelayed(description, targetRect);
+          }
+        }
+      }
+    });
+
+    // Hide tooltip when leaving the control container
+    controlContainer.addEventListener('mouseout', () => {
+      if (window.innerWidth <= 768) return; // Skip on mobile
+      hideTooltip();
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!dropdown.contains(e.target) && !controlContainer.contains(e.target)) {
+        dropdown.style.display = 'none';
+        // Clear highlights when closing
+        dropdown.querySelectorAll('.highlighted').forEach(opt => opt.classList.remove('highlighted'));
+        hideTooltip();
+      }
+    });
+
+    // Hide tooltip on scroll or resize
+    document.addEventListener('scroll', hideTooltip, { passive: true });
+    window.addEventListener('resize', hideTooltip);
   }
 
   onVisualizationPresetChange(presetName) {
-    console.log('Visualization preset changed to:', presetName);
-    
-    // Update description
-    if (typeof VisualizationConfig !== 'undefined' && VisualizationConfig.getPresets) {
-      const presets = VisualizationConfig.getPresets();
-      const preset = presets[presetName];
-      const descriptionElement = document.getElementById('presetDescription');
-      
-      if (descriptionElement && preset) {
-        descriptionElement.textContent = preset.description;
-      }
-    }
-    
     // Only redraw table colors if we have valid simulation results
     // The table data itself doesn't need to be redrawn, just the colors
     if (this.lastSimulationResults && this.lastSimulationResults.perRunResults && this.lastSimulationResults.perRunResults.length > 0) {
-      console.log('Attempting to redraw table colors...');
       try {
         this.redrawTableColors(this.lastSimulationResults.perRunResults, presetName);
       } catch (error) {
         console.error('Error redrawing table colors:', error);
         // Don't show error to user, just log it
       }
-    } else {
-      console.log('No simulation results available for redraw');
     }
   }
 
@@ -669,39 +884,30 @@ class WebUI extends AbstractUI {
 
   // Redraw only the table row colors without changing the data
   redrawTableColors(perRunResults, presetName) {
-    console.log('redrawTableColors called with:', perRunResults?.length, 'results');
-    
     if (!window.uiManager || !perRunResults || perRunResults.length === 0) {
-      console.log('Skipping redraw: no data available');
       return;
     }
 
     // Use the passed preset name instead of trying to get it from DOM
     const selectedPreset = presetName || 'default';
-    console.log('Using preset:', selectedPreset);
     
     const config = window.uiManager.createVisualizationConfig(selectedPreset);
-    console.log('Created config:', config);
     
     // Calculate new colors
     if (typeof PinchPointVisualizer !== 'undefined') {
       try {
         const visualizer = new PinchPointVisualizer(config);
         const rowColors = visualizer.calculateRowColors(perRunResults);
-        console.log('Calculated colors:', Object.keys(rowColors).length, 'rows');
         
         // Apply colors to existing table rows
         for (const row in rowColors) {
           const rowIndex = parseInt(row);
           const color = rowColors[row];
-          console.log(`Setting row ${rowIndex} to color ${color}`);
           this.setDataRowBackgroundColor(rowIndex, color);
         }
       } catch (error) {
         console.error('Error in PinchPointVisualizer:', error);
       }
-    } else {
-      console.log('PinchPointVisualizer not available');
     }
   }
 
