@@ -439,7 +439,6 @@ function handleInvestments() {
   if ((netIncome > expenses + invested) && (targetCash - cash > 0.001)) {
     let addToStash = netIncome - (expenses + invested);
     cash += addToStash;
-    expenses += addToStash;
   }
 
   if ((netIncome < expenses - 100) && success) {
