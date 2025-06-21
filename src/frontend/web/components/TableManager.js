@@ -152,5 +152,94 @@ class TableManager {
     }
   }
 
+  exportDataTableAsCSV() {
+    const table = document.getElementById('Data');
+    if (!table) {
+      throw new Error('Data table not found');
+    }
+
+    // Get headers from the second header row (the one with data-key attributes)
+    const headerRow = table.querySelector('thead tr:nth-child(2)');
+    if (!headerRow) {
+      throw new Error('Data table headers not found');
+    }
+
+    const headers = Array.from(headerRow.cells)
+      .filter(cell => cell.hasAttribute('data-key'))
+      .map(cell => cell.textContent.trim());
+
+    // Get data rows
+    const dataRows = Array.from(table.querySelectorAll('tbody tr'));
+
+    if (dataRows.length === 0) {
+      throw new Error('No data to export. Please run a simulation first.');
+    }
+
+    // Build CSV content
+    let csvContent = headers.join(',') + '\n';
+
+    dataRows.forEach(row => {
+      const cells = Array.from(row.cells);
+      const rowData = cells.map(cell => {
+        let value = cell.textContent.trim();
+
+        // Handle values that contain commas by wrapping in quotes
+        if (value.includes(',')) {
+          value = `"${value}"`;
+        }
+
+        return value;
+      });
+
+      csvContent += rowData.join(',') + '\n';
+    });
+
+    return csvContent;
+  }
+
+  async downloadDataTableCSV() {
+    try {
+      const csvContent = this.exportDataTableAsCSV();
+      const scenarioName = this.webUI.getScenarioName() || 'scenario';
+      const suggestedName = `${scenarioName.trim()}_simulation-data.csv`;
+
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: suggestedName,
+            types: [{
+              description: 'CSV Files',
+              accept: {
+                'text/csv': ['.csv'],
+              },
+            }],
+          });
+
+          const writable = await handle.createWritable();
+          await writable.write(csvContent);
+          await writable.close();
+        } catch (err) {
+          if (err.name === 'AbortError') {
+            return; // User cancelled
+          }
+          throw err;
+        }
+      } else {
+        // Legacy fallback
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = suggestedName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      this.webUI.notificationUtils.showAlert(error.message, 'Error');
+    }
+  }
+
 }
  

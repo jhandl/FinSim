@@ -191,3 +191,36 @@
     max-height: calc(60vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
   }
 }
+
+/* Make Driver.js highlighting subtle and non-distracting */
+.driver-active-element {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.driver-highlighted-element {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* The stage element is what creates the highlighting border - make it transparent */
+#driver-highlighted-element-stage {
+  border: 2px solid transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Ensure driver overlays don't add visual noise */
+.driver-overlay {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Icon buttons should never have borders - prevent Driver.js from adding them */
+#exportDataCSV,
+#visualizationToggle {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}

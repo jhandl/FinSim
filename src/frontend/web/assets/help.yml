@@ -194,7 +194,7 @@ steps:
 
   - element: "#PensionContributionCapped"
     popover:
-      description: "<p>Whether your pension contribution is capped in some way.</p><p>The maximum amount that you can get tax relief on is ${pensionContribEarningLimit,currency}. This limit is the same for everyone, it does not depend on age.</p><p>If you select 'Yes', your pension contributions will be capped at the maximum allowed.</p><p>If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess. The cap itself will be adjusted for inflation as the years go by, so you may see the contribution exceed this limit after the first year.</p><p>If you select 'Match', you won't contribute more than what your employer matches. So, if your employer matches up to 4%, you would be electing to limit your contribution to 4% of your salary and your employer would match that, for a total of 8% total contribution.</p>"
+      description: "<p>Whether your pension contribution is capped in some way.</p><p>The maximum amount that you can get tax relief on is ${pensionContribEarningLimit,currency}. This limit is the same for everyone, it does not depend on age.</p><p>If you select 'Yes', your pension contributions will be capped at the maximum allowed. The cap itself will be adjusted for inflation as the years go by, so you may see the contribution exceed this limit after the first year.</p><p>If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess.</p><p>If you select 'Match', you won't contribute more than what your employer matches. So, if your employer matches up to 4%, you would be electing to limit your contribution to 4% (plus your employer's 4%, for a total of 8%).</p>"
       side: "right"
       align: "start"
 
@@ -477,7 +477,7 @@ steps:
 
   - element: "#EventAmount"
     popover:
-      description: "<p>The yearly amount for the event</p><p>For 'Real Estate' events, enter the down payment. For 'Mortgage' events, enter the amount you will repay each year. For 'Stock' events, you don't enter anything here.</p>"
+      description: "<p>The yearly amount for the event</p><p>For 'Real Estate' events, enter the down payment. For 'Mortgage' events, enter the amount you will repay each year.</p>"
       side: "bottom"
       align: "center"
 
@@ -990,7 +990,7 @@ steps:
 
   - element: "#saveSimulation"
     popover:
-      description: "<p>Click here to save your scenario to a file.</p>"
+      description: "<p>Click here to save your scenario to a file in your local disk.</p>"
       side: "bottom"
       align: "end"
   
@@ -1002,7 +1002,7 @@ steps:
   
   - element: "#loadDemoScenarioHeader"
     popover:
-      description: "<p>Click this button to load a pre-configured example scenario into the simulator.</p><p>If you have made any unsaved changes to your current scenario, you will be asked to confirm before the demo data is loaded.</p>"
+      description: "<p>Click this button to load a pre-configured example scenario into the simulator.</p>"
       side: "bottom"
       align: "end"
   
@@ -1026,6 +1026,30 @@ steps:
 
   - element: ".data-section"
     popover:
-      description: "<p>Here you will see the actual numbers as they are computed by the simulator, year by year, from your current age to the target age.</p><p>The columns are mostly self-explanatory. The cash column under income may raise some eyebrows: it shows withdrawals from cash savings to cover expenses when the net income is not enough.</p>"
+      description: "<p>Here you will see the actual numbers as they are computed by the simulator, year by year, from your current age to the final age.</p><p>The columns are mostly self-explanatory. The cash column under income may raise some eyebrows: it shows withdrawals from cash savings to cover expenses when the net income is not enough.</p>"
       side: "top"
       align: "left"
+
+  - element: "#visualizationToggle"
+    popover:
+      description: "<p>Click this button to change the color scheme used to highlight the data table rows.</p><p>Different color schemes help you visualize different aspects of your financial plan, such as cash flow patterns and potential problem areas. The colors are applied to table rows based on the financial data for that year.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#exportDataCSV"
+    popover:
+      description: "<p>Click this button to export the simulation data table as a CSV file.</p><p>This allows you to save the detailed year-by-year financial data to analyze in spreadsheet applications like Excel or Google Sheets.</p>"
+      side: "bottom"
+      align: "center"
+
+  - popover:
+      popoverClass: "tour-complete-popover"
+      title: "Tour Complete!"
+      description: >
+        <p><b>Congratulations!</b> You've completed the tour of the Ireland Financial Simulator.</p>
+        <p>You can always come back by clicking the Help button, or pressing the ? key on any field you find confusing.</p>
+        <p>I hope you find this tool helpful. Remember, this is an educational tool and not financial advice.</p>
+        <p><b>Happy planning!</b> 🎯</p>
+      # showButtons: ["back", "close"]
+      prevBtnText: ["← Back"]
+      nextBtnText: ["Get Started!"]

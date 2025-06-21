@@ -335,6 +335,9 @@ class Wizard {
       },
       onDestroyStarted: () => this.finishTour(),
       onHighlighted: (element) => {
+        // Clean up any residual inline border styles from the previous element
+        this.cleanupInlineStyles();
+
         const popover = document.querySelector('.driver-popover');
         if (popover) {
           // Existing logic for the #load-example-scenario button
@@ -418,6 +421,56 @@ class Wizard {
     document.removeEventListener('keydown', this.handleKeys);
     this.lastStepIndex = this.tour.getActiveIndex()
     this.tour.destroy();
+
+    // Ensure all highlighting is cleaned up after tour ends
+    this.cleanupHighlighting();
+  }
+
+  cleanupInlineStyles() {
+    // Fix specific elements that Driver.js adds inline border styles to
+    const problematicElements = [
+      '#simModeSingle', '#simModeCouple',
+      '#ageYearModeAge', '#ageYearModeYear',
+      '#exportDataCSV', '#visualizationToggle'
+    ];
+
+    problematicElements.forEach(selector => {
+      const element = document.querySelector(selector);
+      if (element) {
+        // Remove any inline border styles that Driver.js might have added
+        element.style.removeProperty('border');
+        element.style.removeProperty('border-top');
+        element.style.removeProperty('border-left');
+        element.style.removeProperty('border-right');
+        element.style.removeProperty('border-bottom');
+        element.style.removeProperty('outline');
+        element.style.removeProperty('box-shadow');
+      }
+    });
+  }
+
+  cleanupHighlighting() {
+    // Gentle cleanup - only remove leftover Driver.js elements and classes
+
+    // Remove any leftover driver overlay elements
+    const overlayElements = document.querySelectorAll('#driver-highlighted-element-stage, .driver-overlay, .driver-popover');
+    overlayElements.forEach(element => {
+      if (element.parentNode) {
+        element.parentNode.removeChild(element);
+      }
+    });
+
+    // Remove Driver.js classes that might be stuck on elements
+    const driverClasses = ['driver-active-element', 'driver-highlighted-element', 'driver-stage-element'];
+    driverClasses.forEach(className => {
+      const elements = document.querySelectorAll(`.${className}`);
+      elements.forEach(element => {
+        element.classList.remove(className);
+      });
+    });
+
+    // Also clean up inline styles
+    this.cleanupInlineStyles();
   }
 
   handleKeys(event) {
@@ -425,7 +478,17 @@ class Wizard {
       this.finishTour();
       return;
     }
-    
+
+    // Handle Enter key on the final tour complete popover
+    if (event.key === 'Enter') {
+      const popover = document.querySelector('.driver-popover');
+      if (popover && popover.classList.contains('tour-complete-popover')) {
+        event.preventDefault();
+        this.finishTour();
+        return;
+      }
+    }
+
     const moveActions = {
       'Tab': (event) => event.shiftKey ? 'previous' : 'next',
       'ArrowRight': () => 'next',

@@ -1110,6 +1110,15 @@ footer {
     z-index: 5;
 }
 
+/* Table Controls Container */
+.table-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+}
+
 /* Visualization Control Container */
 .visualization-control {
     display: flex;
@@ -1119,6 +1128,35 @@ footer {
     margin: 0;
     padding: 0;
     cursor: pointer;
+}
+
+/* Export Control Container */
+.export-control {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    padding-right: 0.5rem;
+}
+
+/* Colored Icons for Table Controls */
+#visualizationToggle .fa-palette {
+    background: linear-gradient(45deg,
+        #fe0000 0%,
+        #f34201 20%,
+        #eda600 40%,
+        #e0cd00 60%,
+        #94ac29 80%,
+        #00e000 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+}
+
+#exportDataCSV .fa-download {
+    color: #2196F3;
 }
 
 /* Visualization Icon Button */
@@ -1138,11 +1176,6 @@ footer {
     height: 20px;
     flex-shrink: 0;
     margin: 0;
-}
-
-.visualization-icon-btn:hover {
-    background: rgba(0, 0, 0, 0.1);
-    color: var(--primary-color);
 }
 
 .visualization-icon-btn:active {

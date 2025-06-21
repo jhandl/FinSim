@@ -45,6 +45,7 @@ class WebUI extends AbstractUI {
       this.setupSimModeToggle(); // Setup the new mode toggle
       this.setupParameterTooltips(); // Setup parameter age field tooltips
       this.setupVisualizationControls(); // Setup visualization controls
+      this.setupDataExportButton(); // Setup data table CSV export button
       this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
       
       this.eventsTableManager.addEventRow();
@@ -109,6 +110,10 @@ class WebUI extends AbstractUI {
 
   setChartsRow(rowIndex, data) {
     this.chartManager.updateChartsRow(rowIndex, data);
+  }
+
+  downloadDataTableCSV() {
+    return this.tableManager.downloadDataTableCSV();
   }
 
   getVersion() {
@@ -232,6 +237,17 @@ class WebUI extends AbstractUI {
       // but for production, we might not want to throw an error or log excessively.
       // For now, let's log it as it helps in debugging.
       console.error("loadDemoScenarioHeader button not found");
+    }
+  }
+
+  setupDataExportButton() {
+    const exportButton = document.getElementById('exportDataCSV');
+    if (exportButton) {
+      exportButton.addEventListener('click', () => {
+        this.downloadDataTableCSV();
+      });
+    } else {
+      console.error("exportDataCSV button not found");
     }
   }
 
