@@ -470,19 +470,24 @@ class WebUI extends AbstractUI {
 
   setupParameterTooltips() {
     const parameterAgeFields = ['StartingAge', 'P2StartingAge', 'RetirementAge', 'P2RetirementAge', 'TargetAge'];
-    
+
     parameterAgeFields.forEach(fieldId => {
       const input = document.getElementById(fieldId);
       if (input) {
         input.addEventListener('mouseenter', () => {
           this.scheduleParameterTooltip(input, fieldId);
         });
-        
+
         input.addEventListener('mouseleave', () => {
           this.cancelParameterTooltip();
         });
       }
     });
+
+    // Hide parameter tooltips on scroll
+    document.addEventListener('scroll', () => {
+      this.cancelParameterTooltip();
+    }, { passive: true });
   }
 
   showParameterTooltip(inputElement, fieldId) {
@@ -533,7 +538,7 @@ class WebUI extends AbstractUI {
 
     const rect = inputElement.getBoundingClientRect();
     this.parameterTooltipElement.style.left = `${rect.left + rect.width / 2}px`;
-    this.parameterTooltipElement.style.top = `${rect.top - 5}px`;
+    this.parameterTooltipElement.style.top = `${rect.top}px`;
 
     // Trigger the visible state
     requestAnimationFrame(() => {

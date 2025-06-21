@@ -14,6 +14,20 @@
 - **Entry point**: `index.html` - Main application with SPA routing between landing page and simulator
 - **Initialized globals**: `params`, `config`, `events`, `revenue`, `uiManager`
 
+## Core Simulation Mechanics
+
+### Person/Variable Naming Conventions  
+- **SI** and **SInp**: Always refer to the 1st person
+- **S2** and **S2np**: Always refer to the 2nd person  
+- **'np' postfix**: In SInp and S2np, 'np' always means "no pension contribution"
+- These conventions apply regardless of whether Monte Carlo mode is used or not
+
+### Monte Carlo Simulation Method
+The simulator uses an accumulation-then-average approach for Monte Carlo runs:
+1. **Accumulation Phase**: For each simulation run, all yearly outcomes (salaries, taxes, assets, etc.) are accumulated into running totals
+2. **Averaging Phase**: After all runs complete, the accumulated sums are divided by the number of runs to produce average values
+3. **Result**: The final data sheet contains averaged values across all Monte Carlo iterations, not individual run results
+
 ## Testing
 - All tests are in `./src/tests/`
 - Run all tests: `./src/run-tests.sh` from project root

@@ -360,6 +360,11 @@ class EventsTableManager {
         }
       }, true);
     }
+
+    // Hide event tooltips on scroll
+    document.addEventListener('scroll', () => {
+      this.cancelTooltip();
+    }, { passive: true });
   }
 
   showAlternativeTooltip(inputElement) {
@@ -415,7 +420,7 @@ class EventsTableManager {
 
     const rect = inputElement.getBoundingClientRect();
     this.tooltipElement.style.left = `${rect.left + rect.width / 2}px`;
-    this.tooltipElement.style.top = `${rect.top - 5}px`;
+    this.tooltipElement.style.top = `${rect.top}px`;
 
     // Trigger the visible state
     requestAnimationFrame(() => {

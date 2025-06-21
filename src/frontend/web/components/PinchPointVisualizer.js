@@ -39,19 +39,9 @@ class VisualizationConfig {
         lightness: { curve: 'sqrt', range: { from: 95, to: 65 } },
         saturation: { curve: 'sqrt', range: { from: 0.4, to: 0.8 } }
       },
-      'survival': {
-        name: 'Survival',
-        description: '### Survival Rate\n\n- **Greener**: more scenarios survived up to this point.\n\n- **Redder**: fewer scenarios survived this far.',
-        hueMap: { metric: 'survivalRate', invert: true },
-        lightnessMap: { metric: 'none', invert: true },
-        saturationMap: { metric: 'none', invert: false },
-        hue: { curve: 'linear', range: { from: 120, to: 0 } },
-        lightness: { curve: 'linear', range: { from: 90, to: 50 } },
-        saturation: { curve: 'linear', range: { from: 0.2, to: 1.0 } }
-      },
       'failure': {
         name: 'Failure',
-        description: '### Failure Rate\n\n- **Greener**: lower chance of failing this year.\n\n- **Redder**: higher chance of failing this year.',
+        description: '### Failure Rate\n\n- **Redder**: higher chance that this is the year that you run out of money.',
         hueMap: { metric: 'failureRate', invert: false },
         lightnessMap: { metric: 'none', invert: true },
         saturationMap: { metric: 'none', invert: false },
@@ -59,16 +49,16 @@ class VisualizationConfig {
         lightness: { curve: 'linear', range: { from: 75, to: 45 } },
         saturation: { curve: 'linear', range: { from: 0.8, to: 0.8 } }
       },
-      'combined': {
-        name: 'Combined',
-        description: '### Combined\n\n- **Greener**: lower chance of failing this year.\n\n- **Brighter**: more excess money.\n\n- **Grayer**: lower chance of reaching this year with money.',
-        hueMap: { metric: 'failureRate', invert: false },
-        lightnessMap: { metric: 'cashflowDeficitRate', invert: false },
-        saturationMap: { metric: 'survivalRate', invert: false },
+      'survival': {
+        name: 'Survival',
+        description: '### Survival Rate\n\n- **Redder**: higher chance that you ran out of money this or any previous year.',
+        hueMap: { metric: 'survivalRate', invert: true },
+        lightnessMap: { metric: 'none', invert: true },
+        saturationMap: { metric: 'none', invert: false },
         hue: { curve: 'linear', range: { from: 120, to: 0 } },
-        lightness: { curve: 'linear', range: { from: 90, to: 60 } },
-        saturation: { curve: 'linear', range: { from: 0.03, to: 0.7 } }
-      }
+        lightness: { curve: 'linear', range: { from: 90, to: 50 } },
+        saturation: { curve: 'linear', range: { from: 0.2, to: 1.0 } }
+      },
     };
   }
 
