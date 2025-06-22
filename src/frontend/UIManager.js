@@ -8,13 +8,16 @@ STATUS_COLORS = {
   WHITE: "#FFFFFF"
 };
 
-
 class UIManager {
+
+  // Constants
+  static REQUIRED_FIELD_MESSAGE = "Required field";
 
   constructor(ui) {
     this.ui = ui;
   }
 
+  // Constants
   updateDataSheet(runs, perRunResults) {
     let rowColors = {};
     
@@ -189,6 +192,9 @@ class UIManager {
     };
     
     if (validate) {
+      // Check mandatory fields first
+      this.validateRequiredFields(params);
+      
       // Validate age fields - basic range validation
       this.validateParameterAgeFields(params);
       
@@ -250,6 +256,28 @@ class UIManager {
 
   clearWarnings() {
     this.ui.clearAllWarnings();
+  }
+
+  validateRequiredFields(params) {
+    // Check absolute minimum required fields to run a simulation
+    
+    // Starting Age is mandatory
+    if (!this.hasValue(params.startingAge)) {
+      this.ui.setWarning("StartingAge", UIManager.REQUIRED_FIELD_MESSAGE);
+      errors = true;
+    }
+    
+    // Target Age is mandatory
+    if (!this.hasValue(params.targetAge)) {
+      this.ui.setWarning("TargetAge", UIManager.REQUIRED_FIELD_MESSAGE);
+      errors = true;
+    }
+    
+    // Retirement Age is mandatory
+    if (!this.hasValue(params.retirementAge)) {
+      this.ui.setWarning("RetirementAge", UIManager.REQUIRED_FIELD_MESSAGE);
+      errors = true;
+    }
   }
 
   readEvents(validate=true) {
@@ -346,6 +374,7 @@ class UIManager {
       this.validateEventFields(events);
       this.validateMortgageEvents(events);
       this.validateAgeYearFields(events);
+      this.validateRequiredEvents(events);
     }
 
     return events;
@@ -716,6 +745,17 @@ class UIManager {
     }
     
     return { isValid: true };
+  }
+
+  validateRequiredEvents(events) {
+    // Check that at least one valid (non-NOP) event exists
+    const validEvents = events.filter(event => event.type !== 'NOP');
+    
+    if (validEvents.length === 0) {
+      // Set warning on first row of events table if no valid events exist
+      this.ui.setWarning("Events[1,1]", "At least one event is required (e.g., salary income or expenses)");
+      errors = true;
+    }
   }
 
 } 
