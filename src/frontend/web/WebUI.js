@@ -912,6 +912,16 @@ class WebUI extends AbstractUI {
     // Use the passed preset name instead of trying to get it from DOM
     const selectedPreset = presetName || 'default';
     
+    // For "Plain" color scheme, clear all background colors to allow CSS zebra striping
+    if (selectedPreset === 'default') {
+      // Clear background colors from all data rows to let CSS zebra striping take over
+      const maxRowsToCheck = Math.max(...perRunResults.map(run => run.length));
+      for (let rowIndex = 1; rowIndex <= maxRowsToCheck; rowIndex++) {
+        this.setDataRowBackgroundColor(rowIndex, '');
+      }
+      return;
+    }
+    
     const config = window.uiManager.createVisualizationConfig(selectedPreset);
     
     // Calculate new colors

@@ -658,6 +658,11 @@ th {
     background-color: #f9f9f9;
 }
 
+/* Disable zebra striping when color scheme is active */
+#Data[data-color-scheme]:not([data-color-scheme="default"]) tbody tr:nth-child(even) {
+    background-color: transparent;
+}
+
 #Data tbody tr:hover {
     background-image: 
         linear-gradient(rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.3)),
@@ -1322,5 +1327,80 @@ footer {
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
         white-space: normal;
     }
+}
+
+/* Sticky left columns for horizontal scrolling */
+/* First header row - first cell (spans 2 columns, contains controls) */
+#Data thead tr:first-child th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 6; /* Higher than existing z-index: 5 to appear above other elements */
+}
+
+/* Second header row - Age and Year columns */
+#Data thead tr:last-child th:nth-child(1) {
+    position: sticky;
+    left: 0;
+    z-index: 4; /* Higher than existing z-index: 2 for proper layering */
+}
+
+#Data thead tr:last-child th:nth-child(2) {
+    position: sticky;
+    left: var(--age-column-width, 70px); /* Dynamic width, fallback to 70px */
+    z-index: 4;
+}
+
+/* Data rows - first two columns */
+#Data tbody td:nth-child(1) {
+    position: sticky;
+    left: 0;
+    background-color: white; /* Default opaque background */
+    z-index: 1;
+}
+
+#Data tbody td:nth-child(2) {
+    position: sticky;
+    left: var(--age-column-width, 70px); /* Match Age column width dynamically */
+    background-color: white; /* Default opaque background */
+    z-index: 1;
+}
+
+/* Ensure proper background colors for sticky elements */
+#Data tbody tr:nth-child(even) td:nth-child(1),
+#Data tbody tr:nth-child(even) td:nth-child(2) {
+    background-color: #f9f9f9; /* Match even row background */
+}
+
+/* When color scheme is active, sticky columns should inherit the color scheme background */
+#Data[data-color-scheme]:not([data-color-scheme="default"]) tbody td:nth-child(1),
+#Data[data-color-scheme]:not([data-color-scheme="default"]) tbody td:nth-child(2) {
+    background-color: inherit; /* Use the color scheme background instead of white/zebra */
+}
+
+/* Ensure hover effects work properly on sticky columns */
+#Data tbody tr:hover td:nth-child(1) {
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.3)),
+        linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.1)) !important;
+    background-blend-mode: overlay, multiply !important;
+    box-shadow: 
+        inset 0 1px 0 0 rgba(0, 0, 0, 0.3),  /* Top border */
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.3) !important; /* Bottom border */
+}
+
+#Data tbody tr:hover td:nth-child(2) {
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.3)),
+        linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.1)) !important;
+    background-blend-mode: overlay, multiply !important;
+    box-shadow: 
+        inset 0 1px 0 0 rgba(0, 0, 0, 0.3),  /* Top border */
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.3) !important; /* Bottom border */
+}
+
+/* Fix border visibility for sticky headers */
+#Data thead tr:last-child th:nth-child(1),
+#Data thead tr:last-child th:nth-child(2) {
+    border-bottom: 3px solid #666;
 }
 

@@ -29,10 +29,13 @@ class UIManager {
       if (typeof PinchPointVisualizer !== 'undefined') {
         // Get selected configuration from UI
         const selectedPreset = this.getSelectedVisualizationPreset();
-        const config = this.createVisualizationConfig(selectedPreset);
         
-        const visualizer = new PinchPointVisualizer(config);
-        rowColors = visualizer.calculateRowColors(perRunResults);
+        // Skip color calculation for "Plain" color scheme to allow CSS zebra striping
+        if (selectedPreset !== 'default') {
+          const config = this.createVisualizationConfig(selectedPreset);
+          const visualizer = new PinchPointVisualizer(config);
+          rowColors = visualizer.calculateRowColors(perRunResults);
+        }
       }
     }
     

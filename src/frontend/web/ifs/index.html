@@ -606,6 +606,83 @@
     });
     </script>
 
+    <!-- Dynamic Sticky Column Width Calculator -->
+    <script>
+    // Calculate and set dynamic Age column width for sticky positioning
+    function updateStickyColumnWidths() {
+        const dataTable = document.getElementById('Data');
+        if (!dataTable) return;
+        
+        const ageHeader = dataTable.querySelector('thead tr:last-child th:nth-child(1)');
+        if (!ageHeader) return;
+        
+        // Get the computed width of the Age column including borders and padding
+        const ageWidth = ageHeader.offsetWidth;
+        
+        // Set CSS custom property for dynamic positioning
+        dataTable.style.setProperty('--age-column-width', `${ageWidth}px`);
+    }
+    
+    // Update on DOM content loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initial calculation with a small delay to ensure table is rendered
+        setTimeout(updateStickyColumnWidths, 100);
+    });
+    
+    // Update on window resize
+    window.addEventListener('resize', updateStickyColumnWidths);
+    
+    // Update when table content changes (observe for changes)
+    const observer = new MutationObserver(function(mutations) {
+        let shouldUpdate = false;
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' && 
+                (mutation.target.closest('#Data') || mutation.target.id === 'Data')) {
+                shouldUpdate = true;
+            }
+        });
+        if (shouldUpdate) {
+            setTimeout(updateStickyColumnWidths, 50);
+        }
+    });
+    
+    // Start observing when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        const dataTable = document.getElementById('Data');
+        if (dataTable) {
+            observer.observe(dataTable, {
+                childList: true,
+                subtree: true
+            });
+        }
+    });
+    
+    // Track color scheme changes for zebra striping control
+    function updateColorSchemeAttribute(presetName) {
+        const dataTable = document.getElementById('Data');
+        if (dataTable) {
+            dataTable.setAttribute('data-color-scheme', presetName || 'default');
+        }
+    }
+    
+    // Listen for color scheme dropdown changes
+    document.addEventListener('DOMContentLoaded', function() {
+        const dropdown = document.getElementById('presetOptions');
+        if (dropdown) {
+            dropdown.addEventListener('click', function(e) {
+                const option = e.target.closest('[data-value]');
+                if (option) {
+                    const presetName = option.getAttribute('data-value');
+                    updateColorSchemeAttribute(presetName);
+                }
+            });
+        }
+        
+        // Set initial color scheme attribute
+        updateColorSchemeAttribute('default');
+    });
+    </script>
+
     <!-- Column Header Tooltip Manager -->
     <script>
     // Handle column header tooltips with real DOM elements and accurate positioning
