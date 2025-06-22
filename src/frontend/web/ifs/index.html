@@ -206,7 +206,29 @@
             </div>
 
             <div class="card" id="growthRates">
-                <h2>Economy Parameters</h2>
+                <div class="card-header-flex">
+                    <h2>Economy</h2>
+                    <div class="simulation-mode-toggle" id="economyModeToggle">
+                        <span id="economyModeDeterministic" class="mode-toggle-option mode-toggle-active">
+                            <svg width="20" height="16" viewBox="0 0 20 16" fill="currentColor">
+                                <!-- Chart axes -->
+                                <line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1"/>
+                                <line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1"/>
+                                <!-- Data line -->
+                                <line x1="3" y1="12" x2="19" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </span>
+                        <span id="economyModeMonteCarlo" class="mode-toggle-option">
+                            <svg width="20" height="16" viewBox="0 0 20 16" fill="currentColor">
+                                <!-- Chart axes -->
+                                <line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1"/>
+                                <line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1"/>
+                                <!-- Data line -->
+                                <path d="M3 12 L6 9 L9 11 L12 7 L15 10 L19 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                            </svg>
+                        </span>
+                    </div>
+                </div>
                 <table class="growth-rates-table">
                     <thead>
                         <tr>

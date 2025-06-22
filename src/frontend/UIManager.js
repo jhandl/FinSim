@@ -184,7 +184,8 @@ class UIManager {
       p2StatePensionWeekly: this.ui.getValue("P2StatePensionWeekly"),
       initialPensionP2: this.ui.getValue("InitialPensionP2"),
       pensionPercentageP2: this.ui.getValue("PensionContributionPercentageP2"),
-      simulation_mode: this.ui.getValue("simulation_mode")
+      simulation_mode: this.ui.getValue("simulation_mode"),
+      economyMode: this.ui.getValue("economy_mode")
     };
     
     if (validate) {

@@ -71,7 +71,9 @@ function serializeSimulation(ui) {
         InitialPensionP2: ui.getValue('InitialPensionP2'),
         PensionContributionPercentageP2: ui.getValue('PensionContributionPercentageP2'),
         // Simulation Mode
-        simulation_mode: ui.getValue('simulation_mode')
+        simulation_mode: ui.getValue('simulation_mode'),
+        // Economy Mode
+        economy_mode: ui.getValue('economy_mode')
     };
 
     // Format special values (percentages and booleans)
@@ -140,6 +142,8 @@ function deserializeSimulation(content, ui) {
     let section = '';
     let p2StartingAgeExists = false;
     let simulationModeExists = false;
+    let economyModeExists = false;
+    let hasVolatilityInFile = false;
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -176,6 +180,14 @@ function deserializeSimulation(content, ui) {
                 if (actualKey === 'simulation_mode') {
                     simulationModeExists = true;
                 }
+                if (actualKey === 'economy_mode') {
+                    economyModeExists = true;
+                }
+                // Track if file has volatility values
+                if ((actualKey === 'PensionGrowthStdDev' || actualKey === 'FundsGrowthStdDev' || actualKey === 'SharesGrowthStdDev') 
+                    && value && parseFloat(value) > 0) {
+                    hasVolatilityInFile = true;
+                }
             } catch (e) {
                 // Skip if parameter doesn't exist
             }
@@ -188,6 +200,15 @@ function deserializeSimulation(content, ui) {
             ui.setValue('simulation_mode', 'couple');
         } else {
             ui.setValue('simulation_mode', 'single');
+        }
+    }
+
+    // Set economy_mode based on volatility values for older files if economy_mode is not present
+    if (!economyModeExists) {
+        if (hasVolatilityInFile) {
+            ui.setValue('economy_mode', 'montecarlo');
+        } else {
+            ui.setValue('economy_mode', 'deterministic');
         }
     }
 

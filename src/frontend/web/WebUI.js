@@ -11,6 +11,8 @@ class WebUI extends AbstractUI {
       // Initialize simulation state tracking
       this.isSimulationRunning = false;
       this.currentSimMode = 'single'; // Default to single person mode
+      this.currentEconomyMode = 'deterministic'; // Default to deterministic mode
+      this.preservedVolatilityValues = {}; // Store volatility values when switching modes
       
       this.p1Labels = {
         'StartingAge': { neutral: 'Current Age', your: 'Your Current Age' },
@@ -42,7 +44,8 @@ class WebUI extends AbstractUI {
       this.setupWizardInvocation();
       this.setupNavigation();
       this.setupLoadDemoScenarioButton();
-      this.setupSimModeToggle(); // Setup the new mode toggle
+      this.setupSimModeToggle(); // Setup the single/couple mode toggle
+      this.setupEconomyModeToggle(); // Setup the deterministic/Monte Carlo mode toggle
       this.setupParameterTooltips(); // Setup parameter age field tooltips
       this.setupVisualizationControls(); // Setup visualization controls
       this.setupDataExportButton(); // Setup data table CSV export button
@@ -55,6 +58,7 @@ class WebUI extends AbstractUI {
       this.fileManager.updateLastSavedState(); // Establish baseline for new scenario
       
       this.updateUIForSimMode(); // Set initial UI state based on mode
+      this.updateUIForEconomyMode(); // Set initial UI state for economy mode
       if (this.eventsTableManager) { // Ensure event table UI is also updated on init
         this.eventsTableManager.updateEventRowsVisibilityAndTypes();
       }
@@ -177,6 +181,9 @@ class WebUI extends AbstractUI {
     if (elementId === 'simulation_mode') {
       return this.currentSimMode;
     }
+    if (elementId === 'economy_mode') {
+      return this.currentEconomyMode;
+    }
     return DOMUtils.getValue(elementId);
   }
 
@@ -188,6 +195,11 @@ class WebUI extends AbstractUI {
       if (this.eventsTableManager) { // Ensure eventsTableManager is initialized
         this.eventsTableManager.updateEventRowsVisibilityAndTypes();
       }
+      return;
+    }
+    if (elementId === 'economy_mode') {
+      if (this.currentEconomyMode === value) return; // No change, do nothing
+      this.switchEconomyMode(value);
       return;
     }
     DOMUtils.setValue(elementId, value);
@@ -466,6 +478,88 @@ class WebUI extends AbstractUI {
     if (initialSavingsLabel) {
       initialSavingsLabel.textContent = isSingleMode ? 'Current Savings' : 'Current Savings (Joint)';
     }
+  }
+
+  setupEconomyModeToggle() {
+    const deterministic = document.getElementById('economyModeDeterministic');
+    const monteCarlo = document.getElementById('economyModeMonteCarlo');
+
+    if (deterministic && monteCarlo) {
+      deterministic.addEventListener('click', () => {
+        this.switchEconomyMode('deterministic');
+      });
+
+      monteCarlo.addEventListener('click', () => {
+        this.switchEconomyMode('montecarlo');
+      });
+    }
+  }
+
+  switchEconomyMode(mode) {
+    if (this.currentEconomyMode === mode) return;
+    
+    this.preserveVolatilityValues();
+    this.currentEconomyMode = mode;
+    this.updateUIForEconomyMode();
+  }
+
+  updateUIForEconomyMode() {
+    const isDeterministic = this.currentEconomyMode === 'deterministic';
+    
+    // Update toggle visual state
+    const deterministic = document.getElementById('economyModeDeterministic');
+    const monteCarlo = document.getElementById('economyModeMonteCarlo');
+    
+    if (deterministic && monteCarlo) {
+      if (isDeterministic) {
+        deterministic.classList.add('mode-toggle-active');
+        monteCarlo.classList.remove('mode-toggle-active');
+      } else {
+        monteCarlo.classList.add('mode-toggle-active');
+        deterministic.classList.remove('mode-toggle-active');
+      }
+    }
+    
+    // Show/hide volatility column - use visibility to maintain table layout
+    const volatilityHeader = document.querySelector('#growthRates th:nth-child(3)');
+    const volatilityCells = document.querySelectorAll('#growthRates td:nth-child(3)');
+    
+    if (volatilityHeader) {
+      volatilityHeader.style.visibility = isDeterministic ? 'hidden' : '';
+    }
+    
+    volatilityCells.forEach(cell => {
+      cell.style.visibility = isDeterministic ? 'hidden' : '';
+    });
+    
+    // Restore or preserve values
+    if (isDeterministic) {
+      // Values are already preserved above
+    } else {
+      this.restoreVolatilityValues();
+    }
+  }
+
+  preserveVolatilityValues() {
+    const volatilityFields = ['PensionGrowthStdDev', 'FundsGrowthStdDev', 'SharesGrowthStdDev'];
+    
+    volatilityFields.forEach(fieldId => {
+      const element = document.getElementById(fieldId);
+      if (element && element.value) {
+        this.preservedVolatilityValues[fieldId] = element.value;
+      }
+    });
+  }
+
+  restoreVolatilityValues() {
+    const volatilityFields = ['PensionGrowthStdDev', 'FundsGrowthStdDev', 'SharesGrowthStdDev'];
+    
+    volatilityFields.forEach(fieldId => {
+      const element = document.getElementById(fieldId);
+      if (element && this.preservedVolatilityValues[fieldId]) {
+        element.value = this.preservedVolatilityValues[fieldId];
+      }
+    });
   }
 
   setupParameterTooltips() {

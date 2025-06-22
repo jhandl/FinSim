@@ -206,9 +206,21 @@ steps:
 
   - element: "#growthRates"
     popover:
-      description: "<p>Here is where you speculate how the economy will do on average in the future.</p><p>You may want to enter conservative numbers to stress test your scenario. For reference, the average annual growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index} in US dollars (not adjusted for inflation and not including fees).</p><p>If you enter volatility numbers larger than zero, I will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp){Monte Carlo,simulation,random,probability} using these numbers to calculate the probability of success of your scenario.</p>"
+      description: "<p>Here is where you speculate how the economy will do on average in the future.</p><p>Use the toggle in the top right to switch between deterministic and Monte Carlo simulation modes. In deterministic mode, fixed growth rates are used for a single predictable outcome. In Monte Carlo mode, volatility is added to run ${simulationRuns} scenarios providing a probability of success.</p><p>You may want to enter conservative numbers to stress test your scenario. For reference, the average annual growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index} in US dollars (not adjusted for inflation and not including fees).</p>"
       side: "right"
       align: "start"
+
+  - element: "#economyModeDeterministic"
+    popover:
+      description: "<p>Deterministic simulation mode.</p><p>In this mode, the simulation uses fixed growth rates without volatility. This provides a single, predictable outcome based on your specified growth rates. Volatility fields are hidden in this mode.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#economyModeMonteCarlo"
+    popover:
+      description: "<p>Monte Carlo simulation mode.</p><p>In this mode, the simulation runs ${simulationRuns} times using both growth rates and volatility. This provides a probability of success rather than a single outcome, accounting for market uncertainty and fluctuations.</p>"
+      side: "bottom"
+      align: "center"
 
   - element: "#PensionGrowthRate"
     popover:
@@ -218,7 +230,7 @@ steps:
 
   - element: "#PensionGrowthStdDev"
     popover:
-      description: "<p>The expected standard deviation of the annual growth rate of your private pension.</p><p>Keep in mind that pension funds tend to invest more conservatively so may have lower volatility than the stock market. Take that into account when calculating this number.</p>"
+      description: "<p>The expected standard deviation of the annual growth rate of your private pension.</p><p>This field is only used in Monte Carlo simulation mode. Keep in mind that pension funds tend to invest more conservatively so may have lower volatility than the stock market. Take that into account when calculating this number.</p>"
       side: "right"
       align: "start"
 
@@ -230,7 +242,7 @@ steps:
 
   - element: "#FundsGrowthStdDev"
     popover:
-      description: "<p>The expected standard deviation of the annual growth rate of your index funds (e.g. ETFs).</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
+      description: "<p>The expected standard deviation of the annual growth rate of your index funds (e.g. ETFs).</p><p>This field is only used in Monte Carlo simulation mode. For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
       side: "right"
       align: "start"
 
@@ -242,7 +254,7 @@ steps:
 
   - element: "#SharesGrowthStdDev"
     popover:
-      description: "<p>The expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
+      description: "<p>The expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>This field is only used in Monte Carlo simulation mode. For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
       side: "right"
       align: "start"
 

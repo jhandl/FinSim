@@ -177,7 +177,7 @@ header {
 
 .mode-toggle-option {
     cursor: pointer;
-    padding: 0.2rem 0.5rem;
+    padding: 0.2rem 0.25rem;
     border: 1px solid transparent;
     border-radius: var(--border-radius, 4px);
     font-size: 1.2rem;

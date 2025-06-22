@@ -25,7 +25,16 @@ function run() {
     uiManager.ui.flush();
     return;
   }
-  montecarlo = (params.growthDevPension > 0 || params.growthDevFunds > 0 || params.growthDevShares > 0);
+  // Check if we have volatility values
+  const hasVolatility = (params.growthDevPension > 0 || params.growthDevFunds > 0 || params.growthDevShares > 0);
+  
+  // Monte Carlo mode is enabled when user selects it AND there are volatility values
+  // For backward compatibility, if economyMode is undefined, infer from volatility values
+  if (params.economyMode === undefined || params.economyMode === null) {
+    montecarlo = hasVolatility; // Backward compatibility: auto-detect from volatility
+  } else {
+    montecarlo = (params.economyMode === 'montecarlo' && hasVolatility);
+  }
   let runs = (montecarlo ? config.simulationRuns : 1);
   let successes = 0;
   
