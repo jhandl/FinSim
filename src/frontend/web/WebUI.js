@@ -814,11 +814,44 @@ class WebUI extends AbstractUI {
     // Function to position tooltip
     const positionTooltip = (tooltip, targetRect) => {
       const isMobile = window.innerWidth <= 768;
+      
       if (isMobile) {
-        // Mobile uses fixed positioning (handled by CSS)
+        // Mobile positioning - place near the target but with more spacing
+        const tooltipRect = tooltip.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const margin = 20;
+        const spacing = 15; // More spacing than desktop
+        
+        // Try to position above the target first
+        let left = targetRect.left + (targetRect.width - tooltipRect.width) / 2;
+        let top = targetRect.top - tooltipRect.height - spacing;
+        
+        // If tooltip goes off the top, position below instead
+        if (top < margin) {
+          top = targetRect.bottom + spacing;
+        }
+        
+        // If tooltip goes off the bottom, keep it above but closer
+        if (top + tooltipRect.height > viewportHeight - margin) {
+          top = targetRect.top - tooltipRect.height - 5;
+        }
+        
+        // Adjust horizontal position to stay within viewport
+        if (left < margin) {
+          left = margin;
+        } else if (left + tooltipRect.width > viewportWidth - margin) {
+          left = viewportWidth - tooltipRect.width - margin;
+        }
+        
+        tooltip.style.position = 'fixed';
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+        tooltip.style.transform = 'none'; // Override CSS transform
         return;
       }
 
+      // Desktop positioning
       const tooltipRect = tooltip.getBoundingClientRect();
       const viewportWidth = window.innerWidth;
 
@@ -1024,6 +1057,191 @@ class WebUI extends AbstractUI {
         dropdown.querySelectorAll('.highlighted').forEach(opt => opt.classList.remove('highlighted'));
         hideTooltip();
       }
+    });
+
+    // Handle mobile touch events to hide tooltips when touching elsewhere
+    document.addEventListener('touchstart', (e) => {
+      if (window.innerWidth > 768) return; // Only on mobile
+      
+      // If dropdown is open, don't hide tooltips - let dropdown handle its own interactions
+      if (dropdown.style.display !== 'none') return;
+      
+      // Hide tooltip if touching outside the control container and no tooltip is being long-pressed
+      if (!controlContainer.contains(e.target) && activeTooltip) {
+        hideTooltip();
+      }
+    }, { passive: true });
+
+    // Mobile touch events for long press tooltips
+    let touchStartTime = 0;
+    let longPressTimer = null;
+    let touchStartTarget = null;
+    const LONG_PRESS_DURATION = 500; // 500ms for long press
+
+    // Handle mobile touch events on dropdown options
+    dropdown.addEventListener('touchstart', (e) => {
+      if (window.innerWidth > 768) return; // Only on mobile
+      
+      const target = e.target;
+      if (!target.hasAttribute('data-value')) return;
+
+      touchStartTime = Date.now();
+      touchStartTarget = target;
+      
+      // Clear existing timer and tooltip
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      hideTooltip();
+
+      // Add visual feedback for long press
+      target.classList.add('long-pressing');
+
+      // Set up long press timer
+      longPressTimer = setTimeout(() => {
+        const description = target.getAttribute('data-description');
+        if (description) {
+          const targetRect = target.getBoundingClientRect();
+          const tooltip = createTooltip(description);
+          activeTooltip = tooltip;
+
+          requestAnimationFrame(() => {
+            positionTooltip(tooltip, targetRect);
+            tooltip.classList.add('visible');
+          });
+        }
+        longPressTimer = null;
+      }, LONG_PRESS_DURATION);
+      
+      // Don't prevent default - this might be causing issues
+    }, { passive: true });
+
+    dropdown.addEventListener('touchend', (e) => {
+      if (window.innerWidth > 768) return; // Only on mobile
+      
+      // Clear long press timer
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
+      const target = e.target;
+      if (!target.hasAttribute('data-value')) return;
+
+      // Remove visual feedback
+      target.classList.remove('long-pressing');
+
+      const touchDuration = Date.now() - touchStartTime;
+      
+      // If it was a quick tap (not a long press), treat as click
+      if (touchStartTarget === target && touchDuration < LONG_PRESS_DURATION) {
+        // Hide any existing tooltip
+        hideTooltip();
+        
+        // Let the existing click handler take care of the selection
+        // Simulate a click event
+        const clickEvent = new MouseEvent('click', {
+          view: window,
+          bubbles: true,
+          cancelable: true
+        });
+        target.dispatchEvent(clickEvent);
+      }
+    });
+
+    dropdown.addEventListener('touchmove', (e) => {
+      if (window.innerWidth > 768) return; // Only on mobile
+      
+      // Cancel long press if finger moves too much
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+
+      // Remove visual feedback
+      const target = e.target;
+      if (target && target.hasAttribute('data-value')) {
+        target.classList.remove('long-pressing');
+      }
+    });
+
+    // Handle mobile touch events on control container (for showing current selection tooltip)
+    let controlTouchStartTime = 0;
+    let controlLongPressTimer = null;
+    let controlTouchStartTarget = null;
+
+    controlContainer.addEventListener('touchstart', (e) => {
+      if (window.innerWidth > 768) return; // Only on mobile
+      
+      // Don't interfere if dropdown is open
+      if (dropdown.style.display !== 'none') return;
+
+      controlTouchStartTime = Date.now();
+      controlTouchStartTarget = e.target;
+      
+      // Clear existing timer and tooltip
+      if (controlLongPressTimer) {
+        clearTimeout(controlLongPressTimer);
+        controlLongPressTimer = null;
+      }
+      hideTooltip();
+
+      // Add visual feedback for long press
+      controlContainer.classList.add('long-pressing');
+
+      // Set up long press timer for showing current selection tooltip
+      controlLongPressTimer = setTimeout(() => {
+        const selectedOption = dropdown.querySelector('.selected');
+        if (selectedOption) {
+          const description = selectedOption.getAttribute('data-description');
+          if (description) {
+            const targetRect = controlContainer.getBoundingClientRect();
+            const tooltip = createTooltip(description);
+            activeTooltip = tooltip;
+
+            requestAnimationFrame(() => {
+              positionTooltip(tooltip, targetRect);
+              tooltip.classList.add('visible');
+            });
+          }
+        }
+        controlLongPressTimer = null;
+      }, LONG_PRESS_DURATION);
+    }, { passive: true });
+
+    controlContainer.addEventListener('touchend', (e) => {
+      if (window.innerWidth > 768) return; // Only on mobile
+      
+      // Clear long press timer
+      if (controlLongPressTimer) {
+        clearTimeout(controlLongPressTimer);
+        controlLongPressTimer = null;
+      }
+
+      // Remove visual feedback
+      controlContainer.classList.remove('long-pressing');
+
+      const touchDuration = Date.now() - controlTouchStartTime;
+      
+      // If it was a quick tap, let the normal click handler take over
+      if (controlTouchStartTarget && e.target === controlTouchStartTarget && touchDuration < LONG_PRESS_DURATION) {
+        hideTooltip(); // Hide tooltip if showing
+        // Normal click behavior will be handled by the existing click listener
+      }
+    });
+
+    controlContainer.addEventListener('touchmove', (e) => {
+      if (window.innerWidth > 768) return; // Only on mobile
+      
+      // Cancel long press if finger moves too much
+      if (controlLongPressTimer) {
+        clearTimeout(controlLongPressTimer);
+        controlLongPressTimer = null;
+      }
+
+      // Remove visual feedback
+      controlContainer.classList.remove('long-pressing');
     });
 
     // Hide tooltip on scroll or resize
