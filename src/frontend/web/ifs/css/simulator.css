@@ -612,7 +612,8 @@ th {
 #Data .header-groups th:nth-child(2),
 #Data .header-groups th:nth-child(3),
 #Data .header-groups th:nth-child(4),
-#Data .header-groups th:nth-child(5) {
+#Data .header-groups th:nth-child(5),
+#Data .header-groups th:nth-child(6) {
     border-right: 3px solid #666;
 }
 
@@ -641,14 +642,14 @@ th {
 #Data th:nth-child(2),
 #Data td:nth-child(10),
 #Data th:nth-child(10), 
-#Data td:nth-child(14),
-#Data th:nth-child(14),
-#Data td:nth-child(18),
-#Data th:nth-child(18),
-#Data td:nth-child(23),
-#Data th:nth-child(23),
-#Data th:nth-child(25),
-#Data td:nth-child(25)
+#Data td:nth-child(15),
+#Data th:nth-child(15),
+#Data td:nth-child(17),
+#Data th:nth-child(17),
+#Data td:nth-child(22),
+#Data th:nth-child(22),
+#Data th:nth-child(24),
+#Data td:nth-child(24)
 {
     border-right: 3px solid #666;
 }

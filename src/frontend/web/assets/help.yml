@@ -1032,7 +1032,7 @@ steps:
 
   - element: "#visualizationToggle"
     popover:
-      description: "<p>Click this button to change the color scheme used to highlight the data table rows.</p><p>Different color schemes help you visualize different aspects of your financial plan, such as cash flow patterns and potential problem areas. The colors are applied to table rows based on the financial data for that year.</p>"
+      description: "<p>Click this button to change the color scheme used to highlight the data table rows.</p><p>Different color schemes help you visualize different aspects of your financial plan, such as cash flow patterns and potential problem areas. The colors are applied to table rows based on the financial data for that year. To get more info on each color scheme, click the icon and hover over each color scheme name.</p>"
       side: "bottom"
       align: "center"
 

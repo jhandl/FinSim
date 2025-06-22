@@ -334,7 +334,7 @@ class TestFramework {
                 dataSheet[i].realEstateCapital = dataSheet[i].realEstateCapital / runs;
                 dataSheet[i].netIncome = dataSheet[i].netIncome / runs;
                 dataSheet[i].expenses = dataSheet[i].expenses / runs;
-                dataSheet[i].savings = dataSheet[i].savings / runs;
+          
                 dataSheet[i].pensionFund = dataSheet[i].pensionFund / runs;
                 dataSheet[i].cash = dataSheet[i].cash / runs;
                 dataSheet[i].indexFundsCapital = dataSheet[i].indexFundsCapital / runs;

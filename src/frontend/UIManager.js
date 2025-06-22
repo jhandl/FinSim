@@ -121,7 +121,6 @@ class UIManager {
       RealEstateCapital: dataSheet[row].realEstateCapital / scale,
       NetIncome: dataSheet[row].netIncome / scale,
       Expenses: dataSheet[row].expenses / scale,
-      Savings: dataSheet[row].savings / scale,
       PensionFund: dataSheet[row].pensionFund / scale,
       Cash: dataSheet[row].cash / scale,
       FundsCapital: dataSheet[row].indexFundsCapital / scale,

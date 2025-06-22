@@ -614,7 +614,7 @@ function updateYearlyData() {
   });
   
   if (!(row in dataSheet)) {
-    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "savings": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0 };
+    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0 };
   }
   dataSheet[row].age += person1.age;
   dataSheet[row].year += year;
@@ -629,7 +629,6 @@ function updateYearlyData() {
   dataSheet[row].realEstateCapital += realEstate.getTotalValue();
   dataSheet[row].netIncome += netIncome;
   dataSheet[row].expenses += expenses;
-  dataSheet[row].savings += savings;
   dataSheet[row].pensionFund += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
   dataSheet[row].cash += cash;
   dataSheet[row].indexFundsCapital += indexFunds.capital();
