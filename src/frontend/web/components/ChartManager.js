@@ -91,7 +91,7 @@ class ChartManager {
           labels: [],
           datasets: [
             {
-              label: 'Net Income',
+              label: 'Inflows',
               borderColor: '#4CAF50',
               backgroundColor: '#4CAF50',
               fill: false,
@@ -102,7 +102,7 @@ class ChartManager {
               order: 0
             },
             {
-              label: 'Expenses',
+              label: 'Outflows',
               borderColor: '#f44336',
               backgroundColor: '#f44336',
               fill: false,
