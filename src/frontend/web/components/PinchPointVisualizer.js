@@ -30,8 +30,8 @@ class VisualizationConfig {
         saturation: { curve: 'linear', range: { from: 0.0, to: 0.0 } }
       },
       'cashflow': {
-        name: 'Cash Flow',
-        description: '### Cash Flow Health\n\n- **Green**: income covers expenses without asset sales.\n\n- **Red**: assets need to be sold to cover expenses.\n\n- **Color intensity**: the surplus / deficit size.',
+        name: 'Cashflow',
+        description: '### Cashflow Health\n\nShows the cashflow pinch points in your plan.\n\n- **Green**: Income covers expenses without asset sales.\n\n- **Red**: Assets need to be sold to cover expenses.\n\n- **Color intensity**: The size of the surplus / deficit.',
         hueMap: { metric: 'cashflowDeficitRate', invert: false },
         lightnessMap: { metric: 'cashflowDeficitMagnitude', invert: false },
         saturationMap: { metric: 'cashflowDeficitMagnitude', invert: false },
@@ -41,7 +41,7 @@ class VisualizationConfig {
       },
       'failure': {
         name: 'Failure',
-        description: '### Failure Rate\n\n- **Redder**: higher chance that this is the year that you run out of money.',
+        description: '### Failure Rate\n\nShows where your plan is most likely to fail.\n\n- **Greener**: You\'re likely not running out of money this year.\n\n- **Redder**: You\'re more likely to run out of money this year.',
         hueMap: { metric: 'failureRate', invert: false },
         lightnessMap: { metric: 'none', invert: true },
         saturationMap: { metric: 'none', invert: false },
@@ -51,7 +51,7 @@ class VisualizationConfig {
       },
       'survival': {
         name: 'Survival',
-        description: '### Survival Rate\n\n- **Redder**: higher chance that you ran out of money this or any previous year.',
+        description: '### Survival Rate\n\nShows the overall success likelyhood of your plan year by year.\n\n- **Greener**: Your plan is more likely to survive up to this year.\n\n- **Redder**: Your plan is more likely to have failed by this year.',
         hueMap: { metric: 'survivalRate', invert: true },
         lightnessMap: { metric: 'none', invert: true },
         saturationMap: { metric: 'none', invert: false },
