@@ -20,21 +20,18 @@ module.exports = {
     
     try {
       // Test 1: Basic simulation functionality (ensure baseline works)
-      console.log("Running basic simulation functionality test...");
       const basicTestResult = await this.testBasicSimulationFunctionality();
       if (!basicTestResult.success) {
         errors.push(...basicTestResult.errors);
       }
       
       // Test 2: Version compatibility test (if serialization functions are available)
-      console.log("Testing version compatibility...");
       const versionTestResult = await this.testVersionCompatibility();
       if (!versionTestResult.success) {
         errors.push(...versionTestResult.errors);
       }
       
       // Test 3: Configuration version test 
-      console.log("Testing configuration versioning...");
       const configTestResult = await this.testConfigurationVersioning();
       if (!configTestResult.success) {
         errors.push(...configTestResult.errors);
@@ -129,8 +126,6 @@ module.exports = {
         }
       }
       
-      console.log("Basic scenario structure validation passed");
-      
     } catch (error) {
       errors.push(`Basic simulation test error: ${error.message}`);
     }
@@ -150,14 +145,8 @@ module.exports = {
       for (const version of testVersions) {
         const versionNumber = parseFloat(version);
         
-        if (versionNumber < CURRENT_VERSION) {
-          console.log(`Version ${version} is older than current version ${CURRENT_VERSION}`);
-          // In a real scenario, this would trigger migration logic
-        } else if (versionNumber === CURRENT_VERSION) {
-          console.log(`Version ${version} is current`);
-        } else {
-          console.log(`Version ${version} is newer than current version ${CURRENT_VERSION}`);
-          // This would typically show a warning or error
+        if (isNaN(versionNumber)) {
+          errors.push(`Invalid version number format: ${version}`);
         }
       }
       
@@ -169,9 +158,10 @@ module.exports = {
         'P2StartingAge': 'p2StartingAge' // Newer field
       };
       
+      // Validate that mappings are properly defined
       for (const [legacyField, modernField] of Object.entries(legacyFieldMappings)) {
-        if (legacyField !== modernField) {
-          console.log(`Legacy field mapping: ${legacyField} -> ${modernField}`);
+        if (!legacyField || !modernField) {
+          errors.push(`Invalid field mapping: ${legacyField} -> ${modernField}`);
         }
       }
       
@@ -202,42 +192,21 @@ module.exports = {
           try {
             const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
             
-                         // Validate basic config structure  
-             const hasVersion = configData.version !== undefined || configData.latestVersion !== undefined;
-             if (!hasVersion) {
-               errors.push(`Config file ${configFile} missing version/latestVersion field`);
-             }
-             
-             // Check for key tax-related fields (handle different formats)
-             const hasIncomeTaxConfig = configData.itLowerBandRate || configData.itSingleNoChildrenBands || configData.itMarriedBands;
-             if (!hasIncomeTaxConfig) {
-               errors.push(`Config file ${configFile} missing income tax configuration`);
-             }
-             
-             if (!configData.prsiRate) {
-               errors.push(`Config file ${configFile} missing prsiRate field`);
-             }
-             
-             // Report which version format is being used
-             const versionValue = configData.version || configData.latestVersion;
-             console.log(`Config ${configFile} uses version: ${versionValue} (field: ${configData.version !== undefined ? 'version' : 'latestVersion'})`);
-             
-             // Test versioning logic
-             if (versionValue) {
-               const isOlder = versionValue < 1.27;
-               const isCurrent = versionValue === 1.27;
-               const isNewer = versionValue > 1.27;
-               
-               if (isOlder) {
-                 console.log(`Config ${configFile} is older format (${versionValue} < 1.27)`);
-               } else if (isCurrent) {
-                 console.log(`Config ${configFile} is current format (${versionValue})`);
-               } else if (isNewer) {
-                 console.log(`Config ${configFile} is newer format (${versionValue} > 1.27)`);
-               }
-             }
+            // Validate basic config structure  
+            const hasVersion = configData.version !== undefined || configData.latestVersion !== undefined;
+            if (!hasVersion) {
+              errors.push(`Config file ${configFile} missing version/latestVersion field`);
+            }
             
-            console.log(`Successfully loaded config: ${configFile} (version: ${configData.version})`);
+            // Check for key tax-related fields (handle different formats)
+            const hasIncomeTaxConfig = configData.itLowerBandRate || configData.itSingleNoChildrenBands || configData.itMarriedBands;
+            if (!hasIncomeTaxConfig) {
+              errors.push(`Config file ${configFile} missing income tax configuration`);
+            }
+            
+            if (!configData.prsiRate) {
+              errors.push(`Config file ${configFile} missing prsiRate field`);
+            }
             
           } catch (parseError) {
             errors.push(`Failed to parse config file ${configFile}: ${parseError.message}`);
@@ -245,8 +214,7 @@ module.exports = {
         }
         
       } catch (dirError) {
-        // Config directory might not exist in test environment
-        console.log(`Config directory not accessible: ${dirError.message}`);
+        // Config directory might not exist in test environment - this is not an error
       }
       
     } catch (error) {
