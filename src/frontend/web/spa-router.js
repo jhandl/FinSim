@@ -112,7 +112,7 @@ async function loadPage(routeConfig) {
         container.appendChild(newFrame);
         
         // Load the page into the new iframe
-        newFrame.src = routeConfig.contentPath;
+        newFrame.src = routeConfig.contentPath + '?v=' + new Date().getTime();
         
     } catch (error) {
         document.getElementById('app-container').innerHTML = `
