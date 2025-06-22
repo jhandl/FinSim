@@ -15,6 +15,11 @@ class Wizard {
     this.followFocus = this.followFocus.bind(this);
     this.handleKeys = this.handleKeys.bind(this);
     this.handleClick = this.handleClick.bind(this);
+    this.isMobile = this.detectMobile();
+    this.originalInputStates = new Map(); // Store original readonly states
+    this.wizardActive = false;
+    this.preventFocus = this.preventFocus.bind(this);
+    this.preventTouch = this.preventTouch.bind(this);
     document.addEventListener('focusin', this.followFocus);
     document.addEventListener('click', this.handleClick);
   }
@@ -298,9 +303,10 @@ class Wizard {
     this.validSteps = this.filterValidSteps();
 
     let startingStepIndex = fromStep !== undefined ? fromStep : (this.lastFocusedWasInput ? (this.getLastFocusedFieldIndex() || this.lastStepIndex) : this.lastStepIndex);
-    if (startingStepIndex > 1 && startingStepIndex < this.validSteps.length) {
+    if (startingStepIndex > 1 && startingStepIndex < this.validSteps.length && !this.isMobile) {
       const element = document.querySelector(this.validSteps[startingStepIndex].element);
       if (element) {
+        // Only focus on desktop to avoid keyboard issues on mobile
         element.focus();
       }
     }
@@ -317,7 +323,8 @@ class Wizard {
         const nextIndex = this.tour.getActiveIndex() + 1;
         if (nextIndex < this.validSteps.length) {
           const nextElement = document.querySelector(this.validSteps[nextIndex].element);
-          if (nextElement) {
+          if (nextElement && !this.isMobile) {
+            // Only focus on desktop to avoid keyboard issues on mobile
             nextElement.focus();
           }
         }
@@ -327,7 +334,8 @@ class Wizard {
         const prevIndex = this.tour.getActiveIndex() - 1;
         if (prevIndex >= 0) {
           const prevElement = document.querySelector(this.validSteps[prevIndex].element);
-          if (prevElement) {
+          if (prevElement && !this.isMobile) {
+            // Only focus on desktop to avoid keyboard issues on mobile
             prevElement.focus();
           }
         }
@@ -383,6 +391,19 @@ class Wizard {
 
     document.addEventListener('keydown', this.handleKeys);
     
+    // Disable mobile keyboard to prevent it from covering the wizard popover
+    this.disableMobileKeyboard();
+    
+    // Add visual indicator that wizard is active and set up focus prevention
+    this.wizardActive = true;
+    if (this.isMobile) {
+      document.body.setAttribute('data-wizard-active', 'true');
+      // Add multiple event prevention layers
+      document.addEventListener('focusin', this.preventFocus, true);
+      document.addEventListener('touchstart', this.preventTouch, true);
+      document.addEventListener('click', this.preventTouch, true);
+    }
+    
     this.tour.drive(startingStepIndex);
   }
 
@@ -421,6 +442,18 @@ class Wizard {
     document.removeEventListener('keydown', this.handleKeys);
     this.lastStepIndex = this.tour.getActiveIndex()
     this.tour.destroy();
+    
+    // Re-enable mobile keyboard after wizard ends
+    this.enableMobileKeyboard();
+    
+    // Remove visual indicator that wizard is active and cleanup focus prevention
+    this.wizardActive = false;
+    if (this.isMobile) {
+      document.body.removeAttribute('data-wizard-active');
+      document.removeEventListener('focusin', this.preventFocus, true);
+      document.removeEventListener('touchstart', this.preventTouch, true);
+      document.removeEventListener('click', this.preventTouch, true);
+    }
 
     // Ensure all highlighting is cleaned up after tour ends
     this.cleanupHighlighting();
@@ -516,7 +549,8 @@ class Wizard {
           direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
           const currentIndex = this.tour.getActiveIndex();
           const currentElement = document.querySelector(this.validSteps[currentIndex].element);
-          if (currentElement) {
+          if (currentElement && !this.isMobile) {
+            // Only focus on desktop to avoid keyboard issues on mobile
             currentElement.focus();
           }
         }
@@ -570,7 +604,8 @@ class Wizard {
           const fieldType = currentFieldId.split('_')[0];
           const targetField = targetRow.querySelector(`#${fieldType}_${targetRowId}`);
           
-          if (targetField) {
+          if (targetField && !this.isMobile) {
+            // Only focus on desktop to avoid keyboard issues on mobile
             targetField.focus();
             // If the field is hidden, focus will not succeed, so focus the Event Type field instead
             if (document.activeElement !== targetField) {
@@ -585,11 +620,115 @@ class Wizard {
               this.start(this.tour.getActiveIndex());
               return null;
             }
+          } else if (targetField && this.isMobile) {
+            // On mobile, restart wizard at current step without focusing
+            this.start(this.tour.getActiveIndex());
+            return null;
           }
         }
       }
     }
     return direction === 'up' ? 'previous' : 'next';
+  }
+
+  // Detect if we're on a mobile device
+  detectMobile() {
+    const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const hasTouchSupport = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    const isSmallScreen = window.innerWidth <= 768;
+    const isMobileViewport = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    
+    return isMobileUserAgent || (hasTouchSupport && (isSmallScreen || isMobileViewport));
+  }
+
+  // Prevent focus on input elements during wizard on mobile
+  preventFocus(event) {
+    if (!this.wizardActive || !this.isMobile) return;
+    
+    const target = event.target;
+    if (target && (target.matches('input[type="text"], input[type="number"], textarea, select'))) {
+      event.preventDefault();
+      event.stopPropagation();
+      target.blur();
+      return false;
+    }
+  }
+
+  // Prevent touch/click on input elements during wizard on mobile
+  preventTouch(event) {
+    if (!this.wizardActive || !this.isMobile) return;
+    
+    const target = event.target;
+    if (target && (target.matches('input[type="text"], input[type="number"], textarea, select'))) {
+      event.preventDefault();
+      event.stopPropagation();
+      return false;
+    }
+  }
+
+  // Prevent mobile keyboard from showing during wizard
+  disableMobileKeyboard() {
+    if (!this.isMobile) return;
+    
+    const inputs = document.querySelectorAll('input[type="text"], input[type="number"], textarea, select');
+    
+    inputs.forEach(input => {
+      // Store original states
+      this.originalInputStates.set(input, {
+        readonly: input.readOnly,
+        inputMode: input.inputMode || input.getAttribute('inputmode') || '',
+        tabIndex: input.tabIndex,
+        pointerEvents: input.style.pointerEvents,
+        userSelect: input.style.userSelect
+      });
+      
+      if (input.tagName.toLowerCase() !== 'select') {
+        // Multiple approaches to prevent keyboard
+        input.setAttribute('inputmode', 'none');
+        input.readOnly = true;
+        input.tabIndex = -1;
+        input.style.pointerEvents = 'none';
+        input.style.userSelect = 'none';
+        input.setAttribute('autocomplete', 'off');
+      } else {
+        // For select elements
+        input.style.pointerEvents = 'none';
+        input.tabIndex = -1;
+        input.style.userSelect = 'none';
+      }
+    });
+  }
+
+  // Restore inputs to their original state
+  enableMobileKeyboard() {
+    if (!this.isMobile || this.originalInputStates.size === 0) return;
+    
+    const inputs = document.querySelectorAll('input[type="text"], input[type="number"], textarea, select');
+    inputs.forEach(input => {
+      const originalState = this.originalInputStates.get(input);
+      if (originalState) {
+        if (input.tagName.toLowerCase() !== 'select') {
+          // Restore original inputMode
+          if (originalState.inputMode) {
+            input.setAttribute('inputmode', originalState.inputMode);
+          } else {
+            input.removeAttribute('inputmode');
+          }
+          // Restore all original states
+          input.readOnly = originalState.readonly;
+          input.tabIndex = originalState.tabIndex;
+          input.style.pointerEvents = originalState.pointerEvents || '';
+          input.style.userSelect = originalState.userSelect || '';
+        } else {
+          // Restore select element
+          input.style.pointerEvents = originalState.pointerEvents || '';
+          input.tabIndex = originalState.tabIndex;
+          input.style.userSelect = originalState.userSelect || '';
+        }
+      }
+    });
+    
+    this.originalInputStates.clear();
   }
 
 }

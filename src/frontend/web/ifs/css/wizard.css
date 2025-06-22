@@ -198,6 +198,20 @@
   box-shadow: none !important;
 }
 
+/* Mobile-specific styles for wizard mode */
+@media (max-width: 768px), (hover: none) {
+  /* Subtle visual indication that inputs are temporarily disabled during wizard */
+  body[data-wizard-active] input[readonly] {
+    background-color: rgba(0, 0, 0, 0.02) !important;
+    cursor: default !important;
+  }
+  
+  body[data-wizard-active] select[style*="pointer-events: none"] {
+    opacity: 0.8 !important;
+    cursor: default !important;
+  }
+}
+
 .driver-highlighted-element {
   outline: none !important;
   box-shadow: none !important;
