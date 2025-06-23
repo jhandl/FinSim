@@ -63,6 +63,7 @@ module.exports = {
                     if (!response.ok) {
                         testResults.errors.push(`${url}: HTTP ${response.status} - ${response.statusText}`);
                         testResults.success = false;
+                        console.log(`    ❌ FAILED: ${url} - HTTP ${response.status}`);
                         continue;
                     }
 
@@ -97,6 +98,15 @@ module.exports = {
                                 `Matched: [${matchedKeywords.join(', ')}]. Expected: [${keywords.join(', ')}]`
                             );
                             testResults.success = false;
+                            
+                            console.log(`   ❌ KEYWORD VALIDATION FAILED: ${url}`);
+                            console.log(`      Expected keywords: [${keywords.join(', ')}]`);
+                            console.log(`      Found keywords: [${matchedKeywords.join(', ')}]`);
+                            console.log(`      Required: ${minRequired}/${keywords.length}, Found: ${matchingKeywords}/${keywords.length}`);
+                            console.log(`      --- CONTENT PREVIEW (first 800 chars) ---`);
+                            const contentPreview = content.substring(0, 800).replace(/\s+/g, ' ').trim();
+                            console.log(`      ${contentPreview}${content.length > 800 ? '...' : ''}`);
+                            console.log(`      --- END CONTENT PREVIEW ---\n`);
                         }
                     } else {
                         // For links without keywords, just check basic accessibility
@@ -104,12 +114,15 @@ module.exports = {
                         if (content.length < 500) {
                             testResults.errors.push(`${url}: Suspiciously short content (${content.length} chars)`);
                             testResults.success = false;
+                            console.log(`   ❌ FAILED: ${url} - Content too short (${content.length} chars)`);
+                        } else {
                         }
                     }
 
                 } catch (error) {
                     testResults.errors.push(`${url}: ${error.message}`);
                     testResults.success = false;
+                    console.log(`❌ ERROR: ${url} - ${error.message}`);
                 }
             }
 
@@ -151,7 +164,22 @@ async function fetchWithTimeout(url, timeout = 15000) {
         const response = await fetchFunc(url, {
             signal: controller.signal,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; FinSim-LinkChecker/1.0)'
+                'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'accept-encoding': 'gzip, deflate, br',
+                'accept-language': 'en-IE,en;q=0.9,es-AR;q=0.8,es;q=0.7,de-DE;q=0.6,de;q=0.5,en-US;q=0.4,en-GB;q=0.3',
+                'cache-control': 'max-age=0',
+                'cookie': 'csrftoken=BEQECdp88UPpFjkKFBS3Q8wlE3UN4BLo9OUdRMm9L488QkKno7GZC70Zr3g0EkWM; cookie_preferences={"embeds":false,"preferences_selected":false}',
+                'dnt': '1',
+                'priority': 'u=0, i',
+                'sec-ch-ua': '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': '"macOS"',
+                'sec-fetch-dest': 'document',
+                'sec-fetch-mode': 'navigate',
+                'sec-fetch-site': 'none',
+                'sec-fetch-user': '?1',
+                'upgrade-insecure-requests': '1',
+                'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
             },
             // Add redirect following
             redirect: 'follow'

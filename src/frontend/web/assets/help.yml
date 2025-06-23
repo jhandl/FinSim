@@ -5,8 +5,8 @@ steps:
       description: >
         <p><b>What it is: </b>This is a tool to help you understand how different decisions and scenarios can affect your long term financial future, within the context of the Irish tax system.</p>
         <p><b>What it's not:</b> This is not a budgeting tool nor financial advice. Don't make serious life decisions based on this. It's not a substitute for a good financial advisor.</p>
-        <p><b>Complementary tools:</b> Consider other tools like Irish Tax Hub's [tax calculators](https://www.irishtaxhub.ie/tools){tax calculators,suite,net income,free,pension,try calculator} and PWC's [income tax calculator](https://download.pwc.com/ie/budget-2025/income-tax-calculator.html){income tax calculator,your status,are you entitled}.</p>
         <p><b>Privacy notice:</b> I don't collect any data from you. The simulator runs entirely in your browser so the information you enter stays in your computer.</p>
+        <p style="text-align: center;"><span style="font-size: smaller;">Consider complementary tools like Irish Tax Hub's [tax calculators](https://www.irishtaxhub.ie/tools){tax calculators,suite,net income,free,pension,try calculator} and PWC's [income tax calculator](https://download.pwc.com/ie/budget-2025/income-tax-calculator.html){income tax calculator,your status,are you entitled}.</span></p>
       showButtons: ["next"]
       nextBtnText: ["How to use →"]
 
