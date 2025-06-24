@@ -19,6 +19,15 @@
     --input-field-border: 1px;
     --events-line-divider: 0px;
     --card-header-border-width: 1px;
+    
+    /* Responsive Breakpoints for Progressive Header */
+    --breakpoint-large-tablet: 1110px;
+    --breakpoint-small-tablet: 770px;
+    --breakpoint-large-mobile: 730px;
+    --breakpoint-small-mobile: 520px;
+    
+    /* Header positioning control */
+    --header-height: 60px;
 }
 
 * {
@@ -41,7 +50,7 @@ body {
 
 header {
     background-color: var(--card-background);
-    padding: 0.9rem 1.8rem;
+    padding: 0.75rem 1.2rem;
     box-shadow: 0 1.8px 3.6px rgba(0, 0, 0, 0.1);
     position: fixed;
     top: 0;
@@ -50,12 +59,14 @@ header {
     z-index: 1000;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.9rem;
+    gap: 0.5rem;
     align-items: center;
+    height: 60px;
+    justify-content: space-between;
 }
 
 .header-left {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-width: 200px;
     color: #2563eb;
     display: flex;
@@ -72,6 +83,12 @@ header {
     text-decoration: none;
 }
 
+.header-left .app-icon {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}
+
 .header-left .version {
     color: #666;
     font-size: 0.9rem;
@@ -81,26 +98,30 @@ header {
 }
 
 .header-center-right {
-    flex: 5 1 auto;
+    flex: 1 1 auto;
     min-width: 450px;
     display: flex;
-    justify-content: flex-start;
+    justify-content: center;
     align-items: center;
-    gap: 0.9rem;
+    gap: 0.5rem;
 }
 
 .header-center {
     margin: 0 auto;
     display: flex;
-    gap: 0.9rem;
+    gap: 0.5rem;
     align-items: center;
 }
 
 .header-right {
     margin-left: auto;
     display: flex;
-    gap: 0.9rem;
+    gap: 0.5rem;
     align-items: center;
+}
+
+.mobile-menu-toggle {
+    flex: 0 0 auto;
 }
 
 
@@ -753,13 +774,13 @@ input.percentage::placeholder {
 
 #Data thead tr:first-child {
     position: sticky;
-    top: 65px;
+    top: var(--header-height);
     z-index: 3;
 }
 
 #Data thead tr:first-child th {
     position: sticky;
-    top: 65px;
+    top: var(--header-height);
 }
 
 /* Preserve the original background colors for grouped headers when sticky */
@@ -774,14 +795,14 @@ input.percentage::placeholder {
 
 #Data thead tr:last-child {
     position: sticky;
-    top: 103px; /* Adjusted to account for the height of the first header row */
+    top: calc(var(--header-height) + 38px); /* Header height + first table header row height */
     background-color: #f5f5f5;
     z-index: 2;
 }
 
 #Data thead tr:last-child th {
     position: sticky;
-    top: 103px; /* Adjusted to account for the height of the first header row */
+    top: calc(var(--header-height) + 38px); /* Header height + first table header row height */
     background-color: #f5f5f5;
 }
 
@@ -1112,7 +1133,7 @@ footer {
 #Data thead tr.header-groups th:last-child {
     background-color: #fff !important;
     position: sticky;
-    top: 65px;
+    top: var(--header-height);
     z-index: 5;
 }
 
@@ -1298,17 +1319,6 @@ footer {
         max-width: 90vw;
         z-index: 10000;
     }
-
-    /* .visualization-dropdown::before {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.3);
-        z-index: -1;
-    } */
 
     /* Mobile tooltip adjustments */
     .visualization-tooltip {

@@ -231,126 +231,134 @@ footer {
   }
 }
 
-@media (max-width: 834px) {
-  header {
+/* Mobile Burger Menu Styles */
+.mobile-menu-toggle {
+  display: none;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 0 !important; /* Remove all header padding */
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    width: 100vw;
-  }
-
-  /* Add top margin to main content to account for taller mobile header */
-  main {
-    margin-top: 5.75rem; /* Increased to provide more clearance for mobile header */
-    display: flex; /* Switch from grid to flex for mobile */
-    flex-direction: column; /* Stack items vertically */
-    gap: 1.8rem; /* Maintain spacing */
-  }
-
-  .header-left {
-    width: 100%;
-    min-width: 0 !important; /* Override desktop min-width: 200px */
-    flex: none !important; /* Override desktop flex: 1 1 auto */
-    justify-content: center; /* Center the logo text */
-    margin: 0; /* Remove any margins */
-    padding: 0.3rem 0 0.1rem 0; /* Add top padding, reduce bottom padding */
-  }
-
-  .header-center-right {
-    width: 100%;
-    min-width: 0 !important; /* Override desktop min-width: 450px */
-    flex: none !important; /* Override desktop flex: 5 1 auto */
-    flex-direction: column !important; /* Stack green and orange boxes vertically */
-    gap: 0.25rem; /* Reduce space between the rows */
-    margin: 0; /* Remove any margins */
-    padding: 0; /* Remove side margins completely */
-  }
-
-  .header-center {
-    width: 100%;
-    margin: 0 !important; /* Override desktop margin: 0 auto */
-    justify-content: center; /* Center the buttons */
-    flex-wrap: wrap; /* Allow buttons to wrap */
-    gap: 0.6rem !important; /* Increase gap more for better spacing */
-    padding: 0; /* Remove any padding */
-  }
-
-  .header-right {
-    width: 100%;
-    margin: 0 !important; /* Override desktop margin-left: auto */
-    justify-content: center; /* Center the buttons */
-    flex-wrap: wrap; /* Allow buttons to wrap */
-    gap: 0.6rem; /* Match the header-center gap for consistency */
-    padding: 0 0 0.5rem 0; /* Add bottom padding to create space below buttons */
-  }
-
-  /* Make buttons smaller to fit better */
-  .primary-button, .secondary-button {
-    font-size: 0.85rem;
-    padding: 0.35rem 0.3rem; /* Reduce horizontal padding further for narrower buttons */
-    margin: 0 !important; /* Remove any default button margins */
-  }
-
-  /* Also remove margins from status indicator */
-  .status-indicator {
-    margin: 0 !important;
-  }
-
-  .header-left h1 {
-    font-size: 1.2rem;
-  }
-
-  .header-left .version {
-    font-size: 0.9rem;
-  }
-
-  #runSimulation {
-    font-size: 1rem;
-  }
-
-  #runSimulation::before {
-    content: "Run";  /* Replace "Run Simulation" with just "Run" */
-  }
-
-  #runSimulation span {
-    display: none;  /* Hide the original text */
-  }
-
-  .status-indicator {
-    min-width: 100px;
-  }
-
-  .events-section {
-      width: 810px; /* Fixed width for consistency - same as max-width used elsewhere */
-      max-width: 810px;
-      justify-self: left;
-      overflow-x: auto; /* Allow horizontal scroll if needed on very small screens */
-  }
-
-  /* Events table will automatically size to container width */
-  .events-section table {
-      width: 100%;
-  }
-
-  /* Make graphs responsive to mobile screen width */
-  .graph-container {
-    width: 100%;
-    max-width: calc(100vw - 1.5rem); /* Account for main padding */
-    min-height: calc((100vw - 1.5rem) * 0.6); /* Proportional height based on width */
-    max-height: calc((100vw - 1.5rem) * 0.9); /* Proportional max height */
-  }
-
-  .data-section {
-    display: none;
-  }
-
-  #mobile-data-message {
-    display: block;
-    max-width: none;
-  }
+  justify-content: space-around;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  z-index: 1001;
 }
+
+.mobile-menu-toggle span {
+  display: block;
+  height: 3px;
+  width: 100%;
+  background-color: var(--primary-color);
+  border-radius: 3px;
+  transition: all 0.3s ease;
+  transform-origin: center;
+}
+
+.mobile-menu-toggle.active span:nth-child(1) {
+  transform: rotate(45deg) translate(6px, 6px);
+}
+
+.mobile-menu-toggle.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.mobile-menu-toggle.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
+.mobile-menu {
+  display: none;
+  position: fixed;
+  top: 60px; /* Position below the header */
+  right: 0;
+  width: 220px;
+  background-color: var(--card-background);
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-20px); /* Drop from top animation */
+  transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+
+.mobile-menu.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.mobile-menu-content {
+  padding: 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 80px); /* Ensure it doesn't exceed viewport */
+}
+
+.mobile-menu-divider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 16px 0;
+}
+
+.mobile-menu-button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-color);
+  text-decoration: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-menu-button i {
+  margin-right: 12px;
+  width: 16px;
+  text-align: center;
+}
+
+.mobile-menu-button:hover {
+  background-color: var(--background-color);
+}
+
+.mobile-menu-button.primary-button {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.mobile-menu-button.primary-button:hover {
+  background-color: var(--secondary-color);
+}
+
+.mobile-menu-button.coffee-button {
+  background-color: #ff813f;
+  color: white;
+  border-color: #ff813f;
+}
+
+.mobile-menu-button.coffee-button:hover {
+  background-color: #e5722d;
+}
+
+.mobile-menu-status {
+  background-color: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--text-color);
+}
+
+/* Header responsive CSS will be dynamically generated from CSS custom properties */
 
 

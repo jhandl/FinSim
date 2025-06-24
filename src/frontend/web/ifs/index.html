@@ -20,7 +20,8 @@
 <body>
     <header>
         <div class="header-left">
-            <h1><a href="/">Ireland Financial Simulator</a></h1>
+            <img src="/src/frontend/web/ifs/IFS.ico" alt="Ireland Financial Simulator" class="app-icon" style="display: none;">
+            <h1 class="app-name"><a href="/">Ireland Financial Simulator</a></h1>
         </div>
         <div class="header-center-right">
             <div class="header-center">
@@ -36,6 +37,53 @@
                 <a href="https://www.buymeacoffee.com/jhandl" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png" alt="Buy Me A Coffee" style="height: 36px !important;width: 130px !important; vertical-align: middle;" ></a>
             </div>
         </div>
+        
+        <!-- Mobile Burger Menu -->
+        <button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Toggle mobile menu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        
+        <!-- Mobile Navigation Menu -->
+        <nav id="mobileMenu" class="mobile-menu">
+            <div class="mobile-menu-content">
+                <button id="runSimulationMobile" class="mobile-menu-button primary-button">
+                    <i class="fas fa-play"></i>
+                    <span>Run Simulation</span>
+                </button>
+                <div id="progressMobile" class="mobile-menu-status">Ready</div>
+                
+                <div class="mobile-menu-divider"></div>
+                
+                <button id="saveSimulationMobile" class="mobile-menu-button secondary-button">
+                    <i class="fas fa-save"></i>
+                    <span>Save Scenario</span>
+                </button>
+                <button id="loadSimulationMobile" class="mobile-menu-button secondary-button">
+                    <i class="fas fa-folder-open"></i>
+                    <span>Load Scenario</span>
+                </button>
+                
+                <div class="mobile-menu-divider"></div>
+                
+                <button id="loadDemoScenarioMobile" class="mobile-menu-button secondary-button">
+                    <i class="fas fa-play-circle"></i>
+                    <span>Load Demo</span>
+                </button>
+                <button id="startWizardMobile" class="mobile-menu-button secondary-button">
+                    <i class="fas fa-question-circle"></i>
+                    <span>Help</span>
+                </button>
+                
+                <div class="mobile-menu-divider"></div>
+                
+                <a href="https://www.buymeacoffee.com/jhandl" target="_blank" class="mobile-menu-button coffee-button">
+                    <i class="fas fa-coffee"></i>
+                    <span>Buy Me A Coffee</span>
+                </a>
+            </div>
+        </nav>
     </header>
 
     <main>
@@ -415,164 +463,303 @@
         });
     </script>
     
-    <!-- Simple Mobile Header Optimizer -->
+    <!-- Mobile Burger Menu Controller -->
     <script>
-    function optimizeMobileHeader() {
-        const currentWidth = window.innerWidth;
-        const currentHeight = window.innerHeight;
-                
-        if (currentWidth > 915) {
-            resetButtonStyles();
-            return;
+    class MobileBurgerMenu {
+        constructor() {
+            this.menuToggle = document.getElementById('mobileMenuToggle');
+            this.mobileMenu = document.getElementById('mobileMenu');
+            this.menuContent = document.querySelector('.mobile-menu-content');
+            this.isOpen = false;
+            
+            this.init();
         }
         
-        const isMobileLandscape = currentWidth > currentHeight && currentWidth <= 915 && currentWidth >= 568;
-        resetButtonStyles();
-        
-        // This adds a small delay to ensure styles are reset before measuring
-        setTimeout(() => {
-        
-            function detectWrapping(container) {
-                const buttons = container.querySelectorAll('button, .status-indicator');
-                if (buttons.length <= 1) return false;
-                
-                // Get the top position of the first button
-                const firstButtonTop = buttons[0].getBoundingClientRect().top;
-                
-                // Check if any other button is on a different row
-                for (let i = 1; i < buttons.length; i++) {
-                    const buttonTop = buttons[i].getBoundingClientRect().top;
-                    if (Math.abs(buttonTop - firstButtonTop) > 5) { // 5px tolerance for minor alignment differences
-                        return true;
-                    }
+        init() {
+            // Bind event listeners
+            this.menuToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleMenu();
+            });
+            
+            // Close menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (this.isOpen && !this.mobileMenu.contains(e.target) && !this.menuToggle.contains(e.target)) {
+                    this.closeMenu();
                 }
-                return false;
+            });
+            
+            // Handle ESC key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && this.isOpen) {
+                    this.closeMenu();
+                }
+            });
+            
+            // Update menu content on resize
+            window.addEventListener('resize', () => {
+                this.updateMenuContent();
+            });
+            
+            // Sync mobile menu buttons with desktop actions
+            this.syncMenuButtons();
+            
+            // Update mobile status indicator
+            this.syncStatusIndicator();
+        }
+        
+        toggleMenu() {
+            if (this.isOpen) {
+                this.closeMenu();
+            } else {
+                this.openMenu();
             }
-
-            function fitContainer(container) {
-                const containerClass = container.className;
-                const buttons = container.querySelectorAll('button, .status-indicator');
-                if (buttons.length <= 1) {
-                    return;
-                }
-                
-                const containerWidth = container.offsetWidth;
-                let totalButtonWidth = 0;
-                buttons.forEach(btn => totalButtonWidth += btn.offsetWidth);
-                
-                const gaps = buttons.length - 1;
-                const availableGapSpace = containerWidth - totalButtonWidth;
-                const naturalGap = availableGapSpace / gaps;
-                
-                const landscapeReduction = isMobileLandscape ? 0.9 : 1.0;
-                
-                // Check for wrapping first - if buttons are wrapping, we need to be more aggressive
-                const isWrapping = detectWrapping(container);
-                
-                // If natural gap is good (4px+ for safety margin) AND no wrapping, use it (max 0.6rem)
-                if (naturalGap >= 4 && !isWrapping) {
-                    const gapRem = Math.min(naturalGap / 16, 0.6) * landscapeReduction;
-                    container.style.setProperty('gap', `${gapRem}rem`, 'important');
-                    
-                    // Apply padding reduction for landscape mode
-                    if (isMobileLandscape) {
-                        buttons.forEach(btn => {
-                            if (btn.tagName === 'BUTTON') {
-                                const currentPaddingPx = parseFloat(getComputedStyle(btn).paddingLeft);
-                                const reducedPaddingPx = currentPaddingPx * landscapeReduction;
-                                const currentVerticalPadding = parseFloat(getComputedStyle(btn).paddingTop);
-                                btn.style.setProperty('padding', `${currentVerticalPadding / 16}rem ${reducedPaddingPx / 16}rem`, 'important');
-                            }
-                        });
-                    }
-                    return;
-                }
-                
-                // Gap too small OR wrapping detected - use aggressive reduction
-                const targetGap = isWrapping ? 2 : 3; // Even smaller gap if wrapping
-                const targetGapWithReduction = targetGap * landscapeReduction;
-                const totalTargetGapSpace = targetGapWithReduction * gaps;
-                const totalOverflow = totalButtonWidth + totalTargetGapSpace - containerWidth;
-                
-                // Calculate how much to reduce each button's padding (both sides)
-                const buttonCount = container.querySelectorAll('button').length;
-                const paddingReductionPerSide = totalOverflow / (buttonCount * 2);
-                
-                // Get current padding from computed style
-                const sampleButton = container.querySelector('button');
-                const currentPaddingPx = parseFloat(getComputedStyle(sampleButton).paddingLeft);
-                let newPaddingPx = Math.max(2, currentPaddingPx - paddingReductionPerSide);
-                
-                // Apply landscape reduction to padding
-                newPaddingPx = newPaddingPx * landscapeReduction;
-                
-                // If wrapping detected or still not enough reduction, apply moderate reduction
-                if (isWrapping || (newPaddingPx > 10 && totalOverflow > 5)) {
-                    const reductionPx = Math.max(3, currentPaddingPx * (isWrapping ? 0.7 : 0.8) * landscapeReduction);
-                    newPaddingPx = reductionPx;
-                }
-                
-                buttons.forEach(btn => {
-                    if (btn.tagName === 'BUTTON') {
-                        const currentVerticalPadding = parseFloat(getComputedStyle(btn).paddingTop);
-                        btn.style.setProperty('padding', `${currentVerticalPadding / 16}rem ${newPaddingPx / 16}rem`, 'important');
-                    }
+        }
+        
+        openMenu() {
+            this.isOpen = true;
+            this.menuToggle.classList.add('active');
+            this.mobileMenu.classList.add('active');
+            this.updateMenuContent();
+        }
+        
+        closeMenu() {
+            this.isOpen = false;
+            this.menuToggle.classList.remove('active');
+            this.mobileMenu.classList.remove('active');
+        }
+        
+        updateMenuContent() {
+            const currentWidth = window.innerWidth;
+            const breakpoints = getBreakpoints();
+            const runButton = document.getElementById('runSimulationMobile');
+            const statusDiv = document.getElementById('progressMobile');
+            const saveButton = document.getElementById('saveSimulationMobile');
+            const loadButton = document.getElementById('loadSimulationMobile');
+            const firstDivider = document.querySelector('.mobile-menu-divider');
+            const secondDivider = document.querySelectorAll('.mobile-menu-divider')[1];
+            
+            if (currentWidth > breakpoints.smallTablet) {
+                // Large tablet mode: Hide all buttons from menu (they're all visible in header)
+                if (runButton) runButton.style.display = 'none';
+                if (statusDiv) statusDiv.style.display = 'none';
+                if (saveButton) saveButton.style.display = 'none';
+                if (loadButton) loadButton.style.display = 'none';
+                if (firstDivider) firstDivider.style.display = 'none';
+                if (secondDivider) secondDivider.style.display = 'none';
+            } else if (currentWidth > breakpoints.smallMobile) {
+                // Small tablet & Large mobile modes: Hide all buttons from menu (they're all visible in header)
+                if (runButton) runButton.style.display = 'none';
+                if (statusDiv) statusDiv.style.display = 'none';
+                if (saveButton) saveButton.style.display = 'none';
+                if (loadButton) loadButton.style.display = 'none';
+                if (firstDivider) firstDivider.style.display = 'none';
+                if (secondDivider) secondDivider.style.display = 'none';
+            } else {
+                // Small mobile mode: Hide Run and Status from menu (they're visible in header)
+                // Show Save and Load in menu (they're hidden from header)
+                if (runButton) runButton.style.display = 'none';
+                if (statusDiv) statusDiv.style.display = 'none';
+                if (saveButton) saveButton.style.display = 'flex';
+                if (loadButton) loadButton.style.display = 'flex';
+                if (firstDivider) firstDivider.style.display = 'none';
+                if (secondDivider) secondDivider.style.display = 'block';
+            }
+        }
+        
+        syncMenuButtons() {
+            // Run Simulation
+            const runSimMobile = document.getElementById('runSimulationMobile');
+            const runSimDesktop = document.getElementById('runSimulation');
+            if (runSimMobile && runSimDesktop) {
+                runSimMobile.addEventListener('click', () => {
+                    this.closeMenu();
+                    runSimDesktop.click();
                 });
-                container.style.setProperty('gap', `${targetGapWithReduction / 16}rem`, 'important');
-                
-                // After applying changes, iteratively reduce until no wrapping occurs
-                setTimeout(() => {
-                    let iterations = 0;
-                    const maxIterations = 10; // Prevent infinite loops
-                    
-                    function iterativelyReduce() {
-                        if (iterations >= maxIterations || !detectWrapping(container)) {
-                            return; // Stop if max iterations reached or no wrapping detected
-                        }
-                        
-                        iterations++;
-                        
-                        // Get current values
-                        const currentButtons = container.querySelectorAll('button');
-                        const currentGapPx = parseFloat(getComputedStyle(container).gap) || 0;
-                        
-                        // Make small incremental reductions
-                        const paddingReduction = 0.05; // Reduce by 5% each iteration
-                        const gapReduction = Math.max(1, currentGapPx * 0.9); // Reduce gap by 10% but minimum 1px
-                        
-                        currentButtons.forEach(btn => {
-                            const currentHorizontalPadding = parseFloat(getComputedStyle(btn).paddingLeft);
-                            const currentVerticalPadding = parseFloat(getComputedStyle(btn).paddingTop);
-                            const newHorizontalPadding = Math.max(2, currentHorizontalPadding * (1 - paddingReduction));
-                            
-                            btn.style.setProperty('padding', `${currentVerticalPadding / 16}rem ${newHorizontalPadding / 16}rem`, 'important');
-                        });
-                        
-                        // Reduce gap slightly
-                        container.style.setProperty('gap', `${gapReduction / 16}rem`, 'important');
-                        
-                        // Check again after a small delay to allow layout to settle
-                        setTimeout(iterativelyReduce, 5);
-                    }
-                    
-                    iterativelyReduce();
-                }, 5);
             }
             
-            const headerCenter = document.querySelector('.header-center');
-            const headerRight = document.querySelector('.header-right');
+            // Save Simulation
+            const saveMobile = document.getElementById('saveSimulationMobile');
+            const saveDesktop = document.getElementById('saveSimulation');
+            if (saveMobile && saveDesktop) {
+                saveMobile.addEventListener('click', () => {
+                    this.closeMenu();
+                    saveDesktop.click();
+                });
+            }
             
-            if (headerCenter) fitContainer(headerCenter);
-            if (headerRight) fitContainer(headerRight);
-
-        }, 10); // End of setTimeout
+            // Load Simulation
+            const loadMobile = document.getElementById('loadSimulationMobile');
+            const loadDesktop = document.getElementById('loadSimulation');
+            if (loadMobile && loadDesktop) {
+                loadMobile.addEventListener('click', () => {
+                    this.closeMenu();
+                    loadDesktop.click();
+                });
+            }
+            
+            // Demo
+            const demoMobile = document.getElementById('loadDemoScenarioMobile');
+            const demoDesktop = document.getElementById('loadDemoScenarioHeader');
+            if (demoMobile && demoDesktop) {
+                demoMobile.addEventListener('click', () => {
+                    this.closeMenu();
+                    demoDesktop.click();
+                });
+            }
+            
+            // Help/Wizard
+            const helpMobile = document.getElementById('startWizardMobile');
+            const helpDesktop = document.getElementById('startWizard');
+            if (helpMobile && helpDesktop) {
+                helpMobile.addEventListener('click', () => {
+                    this.closeMenu();
+                    helpDesktop.click();
+                });
+            }
+        }
+        
+        syncStatusIndicator() {
+            const progressDesktop = document.getElementById('progress');
+            const progressMobile = document.getElementById('progressMobile');
+            
+            if (progressDesktop && progressMobile) {
+                // Initial sync
+                progressMobile.textContent = progressDesktop.textContent;
+                progressMobile.className = progressDesktop.className.replace('status-indicator', 'mobile-menu-status');
+                
+                // Watch for changes using MutationObserver
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.type === 'childList' || mutation.type === 'characterData') {
+                            progressMobile.textContent = progressDesktop.textContent;
+                        }
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                            progressMobile.className = progressDesktop.className.replace('status-indicator', 'mobile-menu-status');
+                        }
+                    });
+                });
+                
+                observer.observe(progressDesktop, {
+                    childList: true,
+                    characterData: true,
+                    attributes: true,
+                    subtree: true
+                });
+            }
+        }
     }
     
-    function resetButtonStyles() {
+        // Get breakpoint values from CSS custom properties
+    function getBreakpoints() {
+        const style = getComputedStyle(document.documentElement);
+        return {
+            largeTablet: parseInt(style.getPropertyValue('--breakpoint-large-tablet')),
+            smallTablet: parseInt(style.getPropertyValue('--breakpoint-small-tablet')),
+            largeMobile: parseInt(style.getPropertyValue('--breakpoint-large-mobile')),
+            smallMobile: parseInt(style.getPropertyValue('--breakpoint-small-mobile'))
+        };
+    }
+
+    // Generate header responsive CSS from centralized breakpoints
+    function generateHeaderResponsiveCSS() {
+        const bp = getBreakpoints();
+        
+        const css = `
+        /* Large Tablet Mode: Show Run + Status + Save + Load + Burger Menu */
+        @media (max-width: ${bp.largeTablet}px) and (min-width: ${bp.smallTablet + 1}px) {
+          header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
+          .header-left { flex: 0 0 auto !important; min-width: 0 !important; justify-content: flex-start !important; }
+          .header-center-right { flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
+          .header-center { margin: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
+          .mobile-menu-toggle { display: flex; flex-shrink: 0; }
+          .mobile-menu { display: block; }
+          .header-right { display: none !important; }
+          #saveSimulation, #loadSimulation { display: inline-block !important; }
+          #runSimulation::before { content: "Run"; }
+          #runSimulation span { display: none; }
+        }
+
+        /* Small Tablet Mode: Show Run + Status + Save + Load + Burger Menu */
+        @media (max-width: ${bp.smallTablet}px) and (min-width: ${bp.largeMobile + 1}px) {
+          header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
+          .header-left { flex: 0 0 auto !important; min-width: 0 !important; margin: 0 !important; justify-content: flex-start !important; }
+          .header-left h1 { font-size: 1.2rem; margin: 0; white-space: nowrap; }
+          .header-center-right { flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
+          .header-center { margin: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
+          .mobile-menu-toggle { display: flex; flex-shrink: 0; }
+          .mobile-menu { display: block; }
+          .header-right { display: none !important; }
+          #saveSimulation, #loadSimulation { display: inline-block !important; }
+          #runSimulation::before { content: "Run"; }
+          #runSimulation span { display: none; }
+        }
+
+        /* Large Mobile Mode: Show Icon + Run + Status + Save + Load + Burger Menu */
+        @media (max-width: ${bp.largeMobile}px) and (min-width: ${bp.smallMobile + 1}px) {
+          header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
+          .header-left { flex: 0 0 auto !important; min-width: 0 !important; margin: 0 !important; justify-content: flex-start !important; }
+          .header-left .app-name { display: none !important; }
+          .header-left .app-icon { display: block !important; width: 32px; height: 32px; }
+          .header-center-right { flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
+          .header-center { margin: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
+          .mobile-menu-toggle { display: flex; flex-shrink: 0; }
+          .mobile-menu { display: block; }
+          .header-right { display: none !important; }
+          #saveSimulation, #loadSimulation { display: inline-block !important; }
+          #runSimulation::before { content: "Run"; }
+          #runSimulation span { display: none; }
+        }
+
+                 /* Small Mobile Mode: Show Icon + Run + Status + Burger Menu */
+         @media (max-width: ${bp.smallMobile}px) {
+           body { padding-top: 0 !important; }
+           header { flex-direction: row !important; flex-wrap: nowrap !important; justify-content: space-between !important; align-items: center; padding: 0.75rem 1.2rem !important; position: sticky; top: 0; z-index: 1000; width: 100vw; height: 60px !important; gap: 0.5rem !important; }
+           .mobile-menu-toggle { display: flex; }
+           .mobile-menu { display: block; }
+           .header-center-right { display: flex !important; flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
+           .header-center { margin: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
+           .header-right { display: none !important; }
+           .header-left { flex: 0 0 auto !important; min-width: 0 !important; justify-content: flex-start !important; margin: 0 !important; padding: 0 !important; }
+           .header-left .app-name { display: none !important; }
+           .header-left .app-icon { display: block !important; width: 32px; height: 32px; }
+           #saveSimulation, #loadSimulation { display: none !important; }
+           #runSimulation { display: inline-block !important; }
+           #runSimulation::before { content: "Run"; }
+           #runSimulation span { display: none; }
+           #progress { display: inline-block !important; }
+           main { margin-top: 1.8rem; display: flex; flex-direction: column; gap: 1.8rem; }
+           .events-section { width: 100%; max-width: 810px; justify-self: left; overflow-x: auto; }
+           .events-section table { width: 100%; }
+           .graph-container { width: 100%; max-width: calc(100vw - 1.5rem); min-height: calc((100vw - 1.5rem) * 0.6); max-height: calc((100vw - 1.5rem) * 0.9); }
+           .data-section { display: none; }
+           #mobile-data-message { display: block; max-width: none; }
+         }
+        `;
+
+        // Inject CSS into the page
+        let styleElement = document.getElementById('dynamic-header-responsive-css');
+        if (!styleElement) {
+            styleElement = document.createElement('style');
+            styleElement.id = 'dynamic-header-responsive-css';
+            document.head.appendChild(styleElement);
+        }
+        styleElement.textContent = css;
+    }
+            
+    document.addEventListener('DOMContentLoaded', () => {
+        // Generate header responsive CSS from centralized breakpoints
+        generateHeaderResponsiveCSS();
+        
+        new MobileBurgerMenu();
+        initializeResponsiveHeader();
+    });
+    
+        // Clean up any previous squeeze adjustments on load
+    function cleanupButtonStyles() {
         const allButtons = document.querySelectorAll('.header-center button, .header-right button');
         const allContainers = document.querySelectorAll('.header-center, .header-right');
         
-        // Remove all custom styles applied by the optimizer
         allButtons.forEach(btn => {
             btn.style.removeProperty('padding');
             btn.style.removeProperty('font-size');
@@ -583,8 +770,10 @@
         });
     }
     
-    document.addEventListener('DOMContentLoaded', () => setTimeout(optimizeMobileHeader, 100));
-    window.addEventListener('resize', () => setTimeout(optimizeMobileHeader, 100));
+    function initializeResponsiveHeader() {
+        // Clean up any existing squeeze adjustments
+        cleanupButtonStyles();
+    }
     
     // Fix iOS Safari zoom on orientation change
     let lastOrientation = window.orientation;

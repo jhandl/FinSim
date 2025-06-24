@@ -131,6 +131,23 @@ Common event types used in simulation scenarios:
 - When adding a new feature create failing tests first (TDD) 
 - Run tests frequently during development to catch issues early
 
+## UI/UX Features
+
+### Progressive Header Design
+The web interface uses a progressive responsive header that adapts to different screen sizes to prevent button wrapping:
+- **Desktop**: Full app name + all buttons visible in header
+- **Large Tablet**: Full app name + Run + Status + Save + Load + burger menu
+- **Small Tablet**: App name (smaller font) + Run + Status + Save + Load + burger menu  
+- **Large Mobile**: App icon + Run + Status + Save + Load + burger menu
+- **Small Mobile**: App icon + Run + Status + burger menu (Save + Load move to menu)
+
+### Mobile Burger Menu
+- Slide-in navigation menu for mobile/tablet devices
+- Breakpoint values centralized in CSS custom properties (breakpoint-large-tablet, breakpoint-small-tablet, breakpoint-large-mobile, --breakpoint-small-mobile: 480px)
+- JavaScript `MobileBurgerMenu` class handles menu behavior and synchronization
+- Dynamic CSS generation from centralized breakpoint values for maintainability
+- Action buttons are centered in header across all breakpoints
+
 ## Important Guidelines
 - **File headers**: Check compatibility notes in file headers before making changes
 - **Core compatibility**: All changes to `src/core/` must maintain compatibility between web and Google Sheets versions
