@@ -300,7 +300,16 @@ class WebUI extends AbstractUI {
       this.isSimulationRunning = true;
       runButton.disabled = true;
       runButton.classList.add('disabled');
-      runButton.style.pointerEvents = 'none';      
+      runButton.style.pointerEvents = 'none';
+      
+      // Also disable the mobile run button if it exists
+      const mobileRunButton = document.getElementById('runSimulationMobile');
+      if (mobileRunButton) {
+        mobileRunButton.disabled = true;
+        mobileRunButton.classList.add('disabled');
+        mobileRunButton.style.pointerEvents = 'none';
+      }
+      
       this.setStatus('Running...');
       runButton.offsetHeight; // This forces the browser to recalculate layout immediately
       this.scrollToGraphs();
@@ -314,7 +323,15 @@ class WebUI extends AbstractUI {
           this.isSimulationRunning = false;
           runButton.disabled = false;
           runButton.classList.remove('disabled');
-          runButton.style.pointerEvents = '';      
+          runButton.style.pointerEvents = '';
+          
+          // Also re-enable mobile button on error
+          const mobileRunButton = document.getElementById('runSimulationMobile');
+          if (mobileRunButton) {
+            mobileRunButton.disabled = false;
+            mobileRunButton.classList.remove('disabled');
+            mobileRunButton.style.pointerEvents = '';
+          }      
         }
       }, 500);
     };
@@ -483,6 +500,14 @@ class WebUI extends AbstractUI {
           runButton.disabled = false;
           runButton.classList.remove('disabled');
           runButton.style.pointerEvents = '';
+          
+          // Also re-enable the mobile run button if it exists
+          const mobileRunButton = document.getElementById('runSimulationMobile');
+          if (mobileRunButton) {
+            mobileRunButton.disabled = false;
+            mobileRunButton.classList.remove('disabled');
+            mobileRunButton.style.pointerEvents = '';
+          }
         }, 100);
       }
     }
