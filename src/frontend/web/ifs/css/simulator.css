@@ -1350,6 +1350,8 @@ footer {
     left: 0;
     z-index: 4; /* Higher than existing z-index: 2 for proper layering */
     background-color: #f5f5f5; /* Match table header background */
+    width: 70px;
+    max-width: 70px;
 }
 
 #Data thead tr:last-child th:nth-child(2) {
@@ -1357,6 +1359,8 @@ footer {
     left: var(--age-column-width, 70px); /* Dynamic width, fallback to 70px */
     z-index: 4;
     background-color: #f5f5f5; /* Match table header background */
+    width: 70px;
+    max-width: 70px;
 }
 
 /* Data rows - first two columns */
@@ -1365,6 +1369,8 @@ footer {
     left: 0;
     background-color: white; /* Default opaque background */
     z-index: 1;
+    width: 70px;
+    max-width: 70px;
 }
 
 #Data tbody td:nth-child(2) {
@@ -1372,6 +1378,8 @@ footer {
     left: var(--age-column-width, 70px); /* Match Age column width dynamically */
     background-color: white; /* Default opaque background */
     z-index: 1;
+    width: 70px;
+    max-width: 70px;
 }
 
 /* Ensure proper background colors for sticky elements */
