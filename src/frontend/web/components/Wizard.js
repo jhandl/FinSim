@@ -434,7 +434,8 @@ class Wizard {
   }
 
   followFocus(event) {
-    if (!event.target.matches('#startWizard')) {
+    if (!event.target.matches('#startWizard') && 
+        !event.target.closest('#mobileMenuToggle, #mobileMenu')) {
       if (event.target.matches('input, textarea, select')) {
         this.lastFocusedField = event.target;
         this.lastFocusedWasInput = true;
