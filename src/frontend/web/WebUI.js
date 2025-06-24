@@ -240,9 +240,20 @@ class WebUI extends AbstractUI {
   setupLoadDemoScenarioButton() {
     const loadDemoButton = document.getElementById('loadDemoScenarioHeader');
     if (loadDemoButton) {
-      loadDemoButton.addEventListener('click', () => {
-        // Unsaved changes check is now handled in loadFromUrl
-        this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
+      loadDemoButton.addEventListener('click', async () => {
+        try {
+          // Unsaved changes check is now handled in loadFromUrl
+          await this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
+          // After successfully loading the demo scenario, automatically run the simulation
+          const runButton = document.getElementById('runSimulation');
+          if (runButton && !this.isSimulationRunning) {
+            // Trigger the simulation using the same method as the Run button
+            runButton.click();
+          }
+        } catch (error) {
+          console.error("Error loading demo scenario:", error);
+          // Don't auto-run simulation if demo loading failed
+        }
       });
     } else {
       // It's better to log an error if the button isn't found during development
@@ -292,8 +303,8 @@ class WebUI extends AbstractUI {
       runButton.style.pointerEvents = 'none';      
       this.setStatus('Running...');
       runButton.offsetHeight; // This forces the browser to recalculate layout immediately
+      this.scrollToGraphs();
 
-      // Use setTimeout to run after UI updates
       setTimeout(() => {
         try {
           run();
@@ -305,8 +316,7 @@ class WebUI extends AbstractUI {
           runButton.classList.remove('disabled');
           runButton.style.pointerEvents = '';      
         }
-        // Note: Button re-enabling on success is handled in flush when simulation completes
-      }, 0);
+      }, 500);
     };
 
     runButton.addEventListener('click', this.handleRunSimulation);
@@ -475,6 +485,21 @@ class WebUI extends AbstractUI {
           runButton.style.pointerEvents = '';
         }, 100);
       }
+    }
+  }
+
+  scrollToGraphs() {
+    // Auto-scroll to graphs section to show simulation results
+    const graphsSection = document.querySelector('.graphs-section');
+    if (graphsSection) {
+      // Add a small delay to ensure graphs are rendered
+      setTimeout(() => {
+        graphsSection.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'start',
+          inline: 'nearest'
+        });
+      }, 200);
     }
   }
 
