@@ -1226,16 +1226,15 @@ footer {
 
 /* Direct Visualization Dropdown */
 .visualization-dropdown {
-    position: absolute;
-    top: 100%;
+    position: fixed;
+    top: 0;
     left: 0;
-    z-index: 1000;
+    z-index: 10001;
     background: white;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     width: 140px;
-    margin-top: -2px;
     padding: 0;
 }
 

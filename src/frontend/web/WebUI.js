@@ -970,26 +970,27 @@ class WebUI extends AbstractUI {
       const spaceAbove = iconRect.top;
       const dropdownHeight = dropdownRect.height;
 
-      // Reset position styles
-      dropdown.style.position = 'absolute';
-      dropdown.style.left = '0';
-      dropdown.style.zIndex = '1000';
+      // Use fixed positioning to avoid being clipped by table container
+      dropdown.style.position = 'fixed';
+      dropdown.style.zIndex = '10001';
 
       // Choose position based on available space
       if (spaceBelow >= dropdownHeight + 10) {
         // Enough space below - position below icon (default)
-        dropdown.style.top = '100%';
+        dropdown.style.left = iconRect.left + 'px';
+        dropdown.style.top = (iconRect.bottom + 2) + 'px';
         dropdown.style.bottom = 'auto';
       } else if (spaceAbove >= dropdownHeight + 10) {
         // Not enough space below but enough above - position above icon
-        dropdown.style.top = 'auto';
-        dropdown.style.bottom = '100%';
+        dropdown.style.left = iconRect.left + 'px';
+        dropdown.style.top = (iconRect.top - dropdownHeight - 2) + 'px';
+        dropdown.style.bottom = 'auto';
       } else {
-        // Not enough space either way - use fixed positioning to fit in viewport
-        dropdown.style.position = 'fixed';
+        // Not enough space either way - position to fit in viewport
         dropdown.style.left = iconRect.left + 'px';
         const maxTop = viewportHeight - dropdownHeight - 10;
         dropdown.style.top = Math.max(10, maxTop) + 'px';
+        dropdown.style.bottom = 'auto';
       }
 
       // Make visible
