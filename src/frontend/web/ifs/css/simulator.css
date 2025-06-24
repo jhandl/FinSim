@@ -346,8 +346,12 @@ th {
 /* Make table scrollable on mobile */
 .table-container {
     overflow-x: auto;
-    margin: 0.9rem 0;
+    margin: 0;
     width: 100%;
+    max-width: calc(100vw - 1rem);
+    position: sticky;
+    max-height: calc(100vh - var(--header-height) - 60px - 2.9rem);
+    overflow-y: auto;
 }
 
 
@@ -774,13 +778,13 @@ input.percentage::placeholder {
 
 #Data thead tr:first-child {
     position: sticky;
-    top: var(--header-height);
+    top: 0;
     z-index: 3;
 }
 
 #Data thead tr:first-child th {
     position: sticky;
-    top: var(--header-height);
+    top: 0;
 }
 
 /* Preserve the original background colors for grouped headers when sticky */
@@ -795,14 +799,14 @@ input.percentage::placeholder {
 
 #Data thead tr:last-child {
     position: sticky;
-    top: calc(var(--header-height) + 38px); /* Header height + first table header row height */
+    top: 38px; /* First table header row height */
     background-color: #f5f5f5;
     z-index: 2;
 }
 
 #Data thead tr:last-child th {
     position: sticky;
-    top: calc(var(--header-height) + 38px); /* Header height + first table header row height */
+    top: 38px; /* First table header row height */
     background-color: #f5f5f5;
 }
 
@@ -815,9 +819,7 @@ input.percentage::placeholder {
     border-bottom: 3px solid #666;
 }
 
-.table-container {
-    overflow: visible;
-}
+
 
 
 
@@ -1133,7 +1135,7 @@ footer {
 #Data thead tr.header-groups th:last-child {
     background-color: #fff !important;
     position: sticky;
-    top: var(--header-height);
+    top: 0;
     z-index: 5;
 }
 
@@ -1340,6 +1342,7 @@ footer {
     position: sticky;
     left: 0;
     z-index: 6; /* Higher than existing z-index: 5 to appear above other elements */
+    background-color: #fff; /* Ensure opaque background */
 }
 
 /* Second header row - Age and Year columns */
@@ -1347,12 +1350,14 @@ footer {
     position: sticky;
     left: 0;
     z-index: 4; /* Higher than existing z-index: 2 for proper layering */
+    background-color: #f5f5f5; /* Match table header background */
 }
 
 #Data thead tr:last-child th:nth-child(2) {
     position: sticky;
     left: var(--age-column-width, 70px); /* Dynamic width, fallback to 70px */
     z-index: 4;
+    background-color: #f5f5f5; /* Match table header background */
 }
 
 /* Data rows - first two columns */
