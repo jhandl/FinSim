@@ -753,7 +753,8 @@
         // Generate header responsive CSS from centralized breakpoints
         generateHeaderResponsiveCSS();
         
-        new MobileBurgerMenu();
+        // Create global instance for wizard access
+        window.mobileBurgerMenuInstance = new MobileBurgerMenu();
         initializeResponsiveHeader();
     });
     

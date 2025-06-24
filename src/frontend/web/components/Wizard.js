@@ -319,10 +319,12 @@ class Wizard {
       overlayOpacity: 0.5,
       allowKeyboardControl: false,
       steps: this.validSteps,
-      onNextClick: (element) => {
+      onNextClick: async (element) => {
         const nextIndex = this.tour.getActiveIndex() + 1;
         if (nextIndex < this.validSteps.length) {
           const nextElement = document.querySelector(this.validSteps[nextIndex].element);
+          // Handle burger menu BEFORE moving to next step
+          await this.handleBurgerMenuBeforeStep(nextElement, nextIndex);
           if (nextElement && !this.isMobile) {
             // Only focus on desktop to avoid keyboard issues on mobile
             nextElement.focus();
@@ -330,10 +332,12 @@ class Wizard {
         }
         this.tour.moveNext();
       },
-      onPrevClick: (element) => {
+      onPrevClick: async (element) => {
         const prevIndex = this.tour.getActiveIndex() - 1;
         if (prevIndex >= 0) {
           const prevElement = document.querySelector(this.validSteps[prevIndex].element);
+          // Handle burger menu BEFORE moving to previous step
+          await this.handleBurgerMenuBeforeStep(prevElement, prevIndex);
           if (prevElement && !this.isMobile) {
             // Only focus on desktop to avoid keyboard issues on mobile
             prevElement.focus();
@@ -345,6 +349,9 @@ class Wizard {
       onHighlighted: (element) => {
         // Clean up any residual inline border styles from the previous element
         this.cleanupInlineStyles();
+
+        // Simple burger menu handling - just open it if element needs it
+        this.handleBurgerMenuSimple(element);
 
         const popover = document.querySelector('.driver-popover');
         if (popover) {
@@ -404,7 +411,17 @@ class Wizard {
       document.addEventListener('click', this.preventTouch, true);
     }
     
-    this.tour.drive(startingStepIndex);
+    
+    
+    // Handle burger menu for initial step before starting
+    if (startingStepIndex < this.validSteps.length) {
+      const initialElement = document.querySelector(this.validSteps[startingStepIndex].element);
+      this.handleBurgerMenuBeforeStep(initialElement, startingStepIndex).then(() => {
+        this.tour.drive(startingStepIndex);
+      });
+    } else {
+      this.tour.drive(startingStepIndex);
+    }
   }
 
   getLastFocusedFieldIndex() {
@@ -439,14 +456,21 @@ class Wizard {
   }
 
   finishTour() {
+    this.cleanupHighlighting();
+    if (this.tour) {
+      this.tour.destroy();
+      this.tour = null;
+    }
+    
+    // Close burger menu if we opened it for the wizard
+    const burgerMenu = window.mobileBurgerMenuInstance;
+    if (this.wizardOpenedBurgerMenu && burgerMenu && burgerMenu.isOpen) {
+      burgerMenu.closeMenu();
+      this.wizardOpenedBurgerMenu = false;
+    }
+    
     document.removeEventListener('keydown', this.handleKeys);
-    this.lastStepIndex = this.tour.getActiveIndex()
-    this.tour.destroy();
     
-    // Re-enable mobile keyboard after wizard ends
-    this.enableMobileKeyboard();
-    
-    // Remove visual indicator that wizard is active and cleanup focus prevention
     this.wizardActive = false;
     if (this.isMobile) {
       document.body.removeAttribute('data-wizard-active');
@@ -454,9 +478,13 @@ class Wizard {
       document.removeEventListener('touchstart', this.preventTouch, true);
       document.removeEventListener('click', this.preventTouch, true);
     }
-
-    // Ensure all highlighting is cleaned up after tour ends
-    this.cleanupHighlighting();
+    
+    this.enableMobileKeyboard();
+    
+    // Only update lastStepIndex if tour was completed normally
+    if (this.tour && typeof this.tour.getActiveIndex === 'function') {
+      this.lastStepIndex = this.tour.getActiveIndex();
+    }
   }
 
   cleanupInlineStyles() {
@@ -546,12 +574,24 @@ class Wizard {
             this.lastFocusedField = null;
           }
           
-          direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
-          const currentIndex = this.tour.getActiveIndex();
-          const currentElement = document.querySelector(this.validSteps[currentIndex].element);
-          if (currentElement && !this.isMobile) {
-            // Only focus on desktop to avoid keyboard issues on mobile
-            currentElement.focus();
+          // Handle burger menu before navigation
+          const targetIndex = direction === 'next' 
+            ? this.tour.getActiveIndex() + 1 
+            : this.tour.getActiveIndex() - 1;
+          
+          if (targetIndex >= 0 && targetIndex < this.validSteps.length) {
+            const targetElement = document.querySelector(this.validSteps[targetIndex].element);
+            this.handleBurgerMenuBeforeStep(targetElement, targetIndex).then(() => {
+              direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
+              const currentIndex = this.tour.getActiveIndex();
+              const currentElement = document.querySelector(this.validSteps[currentIndex].element);
+              if (currentElement && !this.isMobile) {
+                // Only focus on desktop to avoid keyboard issues on mobile
+                currentElement.focus();
+              }
+            });
+          } else {
+            direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
           }
         }
       }
@@ -730,5 +770,141 @@ class Wizard {
     
     this.originalInputStates.clear();
   }
+
+  // Handle burger menu BEFORE highlighting a step
+  async handleBurgerMenuBeforeStep(element, stepIndex = null) {
+    const burgerMenu = window.mobileBurgerMenuInstance;
+    if (!burgerMenu) return;
+    
+    // Check if burger menu toggle is visible (indicates mobile mode)
+    const burgerToggle = document.getElementById('mobileMenuToggle');
+    if (!burgerToggle) return;
+    
+    const burgerToggleStyle = window.getComputedStyle(burgerToggle);
+    const burgerMenuAvailable = burgerToggleStyle.display !== 'none';
+    
+    if (!burgerMenuAvailable) {
+      // Close burger menu if we opened it and we're back to desktop
+      if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
+        burgerMenu.closeMenu();
+        this.wizardOpenedBurgerMenu = false;
+      }
+      return;
+    }
+    
+    // Get the step configuration to determine which element we should target
+    const step = stepIndex !== null ? this.validSteps[stepIndex] : null;
+    if (!step) {
+      // Close burger menu if we opened it and we're moving to an invalid step
+      if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
+        burgerMenu.closeMenu();
+        this.wizardOpenedBurgerMenu = false;
+      }
+      return;
+    }
+    
+    // Extract the base element ID from the step configuration
+    const stepElementSelector = step.element;
+    if (!stepElementSelector || typeof stepElementSelector !== 'string') {
+      // Close burger menu if we opened it and step has invalid element selector
+      if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
+        burgerMenu.closeMenu();
+        this.wizardOpenedBurgerMenu = false;
+      }
+      return;
+    }
+    
+    const baseElementId = stepElementSelector.replace('#', '').replace('Mobile', '').replace('Header', '');
+    
+    // Define burger menu buttons by their base IDs
+    const burgerMenuButtons = ['saveSimulation', 'loadSimulation', 'loadDemoScenario', 'startWizard'];
+    const isBurgerMenuButton = burgerMenuButtons.includes(baseElementId);
+    
+    if (!isBurgerMenuButton) {
+      // Close burger menu if we opened it and we're moving to a non-burger-menu element
+      if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
+        burgerMenu.closeMenu();
+        this.wizardOpenedBurgerMenu = false;
+      }
+      return;
+    }
+    
+    // Determine the correct desktop element ID
+    let desktopElementId = baseElementId;
+    if (baseElementId === 'loadDemoScenario') {
+      desktopElementId = 'loadDemoScenarioHeader';
+    }
+    
+    // Check if the desktop element is currently visible
+    const desktopElement = document.getElementById(desktopElementId);
+    if (!desktopElement) return;
+    
+    const elementStyle = window.getComputedStyle(desktopElement);
+    const elementVisible = elementStyle.display !== 'none' && 
+                          elementStyle.visibility !== 'hidden' && 
+                          elementStyle.opacity !== '0' &&
+                          desktopElement.offsetWidth > 0 && 
+                          desktopElement.offsetHeight > 0;
+    
+    if (!elementVisible) {
+      // Element is hidden, so it's in the burger menu - open it and target mobile version
+      if (!burgerMenu.isOpen) {
+        burgerMenu.openMenu();
+        this.wizardOpenedBurgerMenu = true;
+        // Wait for animation to complete before proceeding
+        await new Promise(resolve => setTimeout(resolve, 350));
+      }
+      
+      // Switch to the mobile element in the step configuration
+      let mobileElementId = baseElementId + 'Mobile';
+      if (baseElementId === 'loadDemoScenario') {
+        mobileElementId = 'loadDemoScenarioMobile';
+      }
+      
+      const mobileElement = document.getElementById(mobileElementId);
+      if (mobileElement) {
+        this.validSteps[stepIndex].element = `#${mobileElementId}`;
+      }
+    } else {
+      // Element is visible in header, use desktop version and close burger menu if we opened it
+      if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
+        burgerMenu.closeMenu();
+        this.wizardOpenedBurgerMenu = false;
+      }
+      // Ensure we're using the desktop element
+      this.validSteps[stepIndex].element = `#${desktopElementId}`;
+    }
+  }
+
+  // Simple burger menu handler for onHighlighted (non-async)
+  handleBurgerMenuSimple(element) {
+    // This is now just for cleanup or fallback cases
+    if (!element || !element.id) return;
+    
+    const burgerMenuButtons = ['saveSimulation', 'loadSimulation', 'loadDemoScenarioHeader', 'startWizard'];
+    const isBurgerMenuButton = burgerMenuButtons.includes(element.id);
+    
+    if (!isBurgerMenuButton) return;
+    
+    const burgerMenu = window.mobileBurgerMenuInstance;
+    if (!burgerMenu) return;
+    
+    // Check if burger menu toggle is visible (indicates mobile mode)
+    const burgerToggle = document.getElementById('mobileMenuToggle');
+    if (!burgerToggle) return;
+    
+    const burgerToggleStyle = window.getComputedStyle(burgerToggle);
+    const burgerMenuAvailable = burgerToggleStyle.display !== 'none';
+    
+    if (!burgerMenuAvailable) {
+      // Close burger menu if we opened it and we're back to desktop
+      if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
+        burgerMenu.closeMenu();
+        this.wizardOpenedBurgerMenu = false;
+      }
+    }
+  }
+
+
 
 }
