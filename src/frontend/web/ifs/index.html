@@ -458,6 +458,9 @@
                     e.preventDefault();
                     dataSection.style.display = 'block';
                     mobileMessage.style.display = 'none';
+                    
+                    // Recalculate sticky column widths after table is shown
+                    setTimeout(updateStickyColumnWidths, 100);
                 });
             }
         });

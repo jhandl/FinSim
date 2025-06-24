@@ -3,6 +3,8 @@ description:
 globs: 
 alwaysApply: true
 ---
-Always read [AGENTS.md](mdc:AGENTS.md) to understand the project. Never assume how the code works, always read the relevant source code files to understand the code. When implementing a change, do it in the most elegant, no-nonsense way possible,while not being overly verbose (don't create unnecessary one-time-use helper methods) and strictly adhering to the way the existing code already works. No hacks please.
-When fixing an issue don't just jump to conclusions and start making sweeping changes based on absolutely no information as you usually do. Elaborate hipotheses and seek to prove which one it is. Once you have positive proof of the root cause, only then fix it. 
-The user is always running a local webserver, so there's no need to start a new one to run some UI tests.
+Always read [AGENTS.md](mdc:AGENTS.md) to understand the project. Never assume how the code works, always read the relevant source code files to understand the code. When implementing a change, do it in the most elegant, no-nonsense way possible, while not being overly verbose (don't create unnecessary one-time-use helper methods) and strictly adhering to the way the existing code already works. No hacks please.
+
+When fixing an issue don't just jump to conclusions and start making sweeping changes based on absolutely no information. Elaborate hipotheses and seek to prove which one it is. Once you have positive proof of the root cause, only then fix it. 
+
+A local webserver is always running, so there's never need to start a new one to.
