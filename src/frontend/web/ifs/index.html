@@ -25,16 +25,19 @@
         </div>
         <div class="header-center-right">
             <div class="header-center">
-                <button id="runSimulation" class="primary-button"><span>Run Simulation</span></button>
-                <div id="progress" class="status-indicator">Ready</div>
-                <button id="saveSimulation" class="secondary-button">Save</button>
-                <input type="file" id="loadSimulationDialog" accept=".csv" style="display: none;">
-                <button id="loadSimulation" class="secondary-button">Load</button>
+                <div class="button-group-primary">
+                    <button id="runSimulation" class="primary-button"><span>Run Simulation</span></button>
+                    <div id="progress" class="status-indicator">Ready</div>
+                    <button id="saveSimulation" class="secondary-button">Save</button>
+                    <input type="file" id="loadSimulationDialog" accept=".csv" style="display: none;">
+                    <button id="loadSimulation" class="secondary-button">Load</button>
+                </div>
+                <div class="button-group-secondary">
+                    <button id="loadDemoScenarioHeader" class="secondary-button">Demo</button>
+                    <button id="startWizard" class="secondary-button">Help</button>
+                </div>
             </div>
             <div class="header-right">
-                <button id="loadDemoScenarioHeader" class="secondary-button">Demo</button>
-                <button id="startWizard" class="secondary-button">Help</button>
-                <a href="https://www.buymeacoffee.com/jhandl" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png" alt="Buy Me A Coffee" style="height: 36px !important;width: 130px !important; vertical-align: middle;" ></a>
             </div>
         </div>
         
@@ -74,6 +77,11 @@
                 <button id="startWizardMobile" class="mobile-menu-button secondary-button">
                     <i class="fas fa-question-circle"></i>
                     <span>Help</span>
+                </button>
+                
+                <button id="experimentalToggleMobile" class="mobile-menu-button secondary-button toggle-button" data-toggle-state="off">
+                    <i class="fas fa-toggle-off"></i>
+                    <span>Tooltips: <strong>off</strong></span>
                 </button>
                 
                 <div class="mobile-menu-divider"></div>
@@ -508,6 +516,9 @@
             
             // Update mobile status indicator
             this.syncStatusIndicator();
+            
+            // Initialize toggle state from localStorage
+            this.initializeToggleState();
         }
         
         toggleMenu() {
@@ -538,34 +549,79 @@
             const statusDiv = document.getElementById('progressMobile');
             const saveButton = document.getElementById('saveSimulationMobile');
             const loadButton = document.getElementById('loadSimulationMobile');
+            const demoButton = document.getElementById('loadDemoScenarioMobile');
+            const helpButton = document.getElementById('startWizardMobile');
+            const toggleButton = document.getElementById('experimentalToggleMobile');
             const firstDivider = document.querySelector('.mobile-menu-divider');
             const secondDivider = document.querySelectorAll('.mobile-menu-divider')[1];
+            const thirdDivider = document.querySelectorAll('.mobile-menu-divider')[2];
             
-            if (currentWidth > breakpoints.smallTablet) {
-                // Large tablet mode: Hide all buttons from menu (they're all visible in header)
+            // Hardcoded toggle to show/hide the toggle button
+            const SHOW_TOGGLE_BUTTON = false;
+            
+            // Track which sections have visible content
+            let hasRunSection = false;
+            let hasSaveLoadSection = false;
+            let hasDemoHelpSection = false;
+            let hasToggleSection = SHOW_TOGGLE_BUTTON;
+            
+            if (currentWidth > breakpoints.tablet) {
+                // Desktop mode: Only show Demo/Help/Coffee buttons that are visible in header but burger menu is always available
                 if (runButton) runButton.style.display = 'none';
                 if (statusDiv) statusDiv.style.display = 'none';
                 if (saveButton) saveButton.style.display = 'none';
                 if (loadButton) loadButton.style.display = 'none';
-                if (firstDivider) firstDivider.style.display = 'none';
-                if (secondDivider) secondDivider.style.display = 'none';
-            } else if (currentWidth > breakpoints.smallMobile) {
-                // Small tablet & Large mobile modes: Hide all buttons from menu (they're all visible in header)
+                if (demoButton) demoButton.style.display = 'none';
+                if (helpButton) helpButton.style.display = 'none';
+                
+                hasRunSection = false;
+                hasSaveLoadSection = false;
+                hasDemoHelpSection = false;
+            } else if (currentWidth > breakpoints.mobile) {
+                // Tablet mode: Show Demo/Help buttons (moved to burger menu)
                 if (runButton) runButton.style.display = 'none';
                 if (statusDiv) statusDiv.style.display = 'none';
                 if (saveButton) saveButton.style.display = 'none';
                 if (loadButton) loadButton.style.display = 'none';
-                if (firstDivider) firstDivider.style.display = 'none';
-                if (secondDivider) secondDivider.style.display = 'none';
+                if (demoButton) demoButton.style.display = 'flex';
+                if (helpButton) helpButton.style.display = 'flex';
+                
+                hasRunSection = false;
+                hasSaveLoadSection = false;
+                hasDemoHelpSection = true;
             } else {
-                // Small mobile mode: Hide Run and Status from menu (they're visible in header)
-                // Show Save and Load in menu (they're hidden from header)
+                // Mobile mode: Show Save/Load + Demo/Help (all hidden from header)
                 if (runButton) runButton.style.display = 'none';
                 if (statusDiv) statusDiv.style.display = 'none';
                 if (saveButton) saveButton.style.display = 'flex';
                 if (loadButton) loadButton.style.display = 'flex';
-                if (firstDivider) firstDivider.style.display = 'none';
-                if (secondDivider) secondDivider.style.display = 'block';
+                if (demoButton) demoButton.style.display = 'flex';
+                if (helpButton) helpButton.style.display = 'flex';
+                
+                hasRunSection = false;
+                hasSaveLoadSection = true;
+                hasDemoHelpSection = true;
+            }
+            
+            // Show dividers only when they separate visible content
+            // First divider: between Run/Status and Save/Load
+            if (firstDivider) {
+                firstDivider.style.display = (hasRunSection && hasSaveLoadSection) ? 'block' : 'none';
+            }
+            
+            // Second divider: between Save/Load and Demo/Help/Toggle
+            if (secondDivider) {
+                secondDivider.style.display = (hasSaveLoadSection && hasDemoHelpSection) ? 'block' : 'none';
+            }
+            
+            // Show/hide toggle button based on the hardcoded boolean
+            if (toggleButton) {
+                toggleButton.style.display = SHOW_TOGGLE_BUTTON ? 'flex' : 'none';
+            }
+            
+            // Third divider: between Demo/Help/Toggle and Coffee (Coffee is always visible)
+            if (thirdDivider) {
+                thirdDivider.style.display = (hasDemoHelpSection || hasToggleSection) ? 'block' : 'none';
             }
         }
         
@@ -619,6 +675,14 @@
                     helpDesktop.click();
                 });
             }
+            
+            // Experimental Toggle
+            const toggleMobile = document.getElementById('experimentalToggleMobile');
+            if (toggleMobile) {
+                toggleMobile.addEventListener('click', () => {
+                    this.handleToggle(toggleMobile);
+                });
+            }
         }
         
         syncStatusIndicator() {
@@ -650,16 +714,75 @@
                 });
             }
         }
+        
+        handleToggle(toggleButton) {
+            const currentState = toggleButton.getAttribute('data-toggle-state');
+            const newState = currentState === 'off' ? 'on' : 'off';
+            const icon = toggleButton.querySelector('i');
+            const textSpan = toggleButton.querySelector('span');
+            
+            // Update the button state
+            toggleButton.setAttribute('data-toggle-state', newState);
+            
+            // Update the icon
+            if (newState === 'on') {
+                icon.classList.remove('fa-toggle-off');
+                icon.classList.add('fa-toggle-on');
+                textSpan.innerHTML = 'Tooltips: <strong>on</strong>';
+            } else {
+                icon.classList.remove('fa-toggle-on');
+                icon.classList.add('fa-toggle-off');
+                textSpan.innerHTML = 'Tooltips: <strong>off</strong>';
+            }
+            
+            // Store the state in localStorage for persistence
+            localStorage.setItem('experimentalFeatureState', newState);
+            
+            // Trigger custom event that other parts of the app can listen to
+            window.dispatchEvent(new CustomEvent('experimentalFeatureToggle', {
+                detail: { state: newState, enabled: newState === 'on' }
+            }));
+            
+            // Optional: Show notification
+            console.log(`Tooltips ${newState === 'on' ? 'enabled' : 'disabled'}`);
+        }
+        
+        initializeToggleState() {
+            const toggleButton = document.getElementById('experimentalToggleMobile');
+            if (!toggleButton) return;
+            
+            // Get saved state from localStorage
+            const savedState = localStorage.getItem('experimentalFeatureState') || 'off';
+            const icon = toggleButton.querySelector('i');
+            const textSpan = toggleButton.querySelector('span');
+            
+            // Set the initial state
+            toggleButton.setAttribute('data-toggle-state', savedState);
+            
+            // Update the icon and text based on saved state
+            if (savedState === 'on') {
+                icon.classList.remove('fa-toggle-off');
+                icon.classList.add('fa-toggle-on');
+                textSpan.innerHTML = 'Tooltips: <strong>on</strong>';
+            } else {
+                icon.classList.remove('fa-toggle-on');
+                icon.classList.add('fa-toggle-off');
+                textSpan.innerHTML = 'Tooltips: <strong>off</strong>';
+            }
+            
+            // Dispatch initial event for any listeners
+            window.dispatchEvent(new CustomEvent('experimentalFeatureToggle', {
+                detail: { state: savedState, enabled: savedState === 'on' }
+            }));
+        }
     }
     
         // Get breakpoint values from CSS custom properties
     function getBreakpoints() {
         const style = getComputedStyle(document.documentElement);
         return {
-            largeTablet: parseInt(style.getPropertyValue('--breakpoint-large-tablet')),
-            smallTablet: parseInt(style.getPropertyValue('--breakpoint-small-tablet')),
-            largeMobile: parseInt(style.getPropertyValue('--breakpoint-large-mobile')),
-            smallMobile: parseInt(style.getPropertyValue('--breakpoint-small-mobile'))
+            tablet: parseInt(style.getPropertyValue('--breakpoint-tablet')),
+            mobile: parseInt(style.getPropertyValue('--breakpoint-mobile'))
         };
     }
 
@@ -685,65 +808,73 @@
           margin: 0 auto;
         }
         
-        /* Large Tablet Mode: Show Run + Status + Save + Load + Burger Menu */
-        @media (max-width: ${bp.largeTablet}px) and (min-width: ${bp.smallTablet}px) {
-          header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
-          .header-left { flex: 0 0 auto !important; min-width: 0 !important; justify-content: flex-start !important; }
-          .header-center-right { flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
-          .header-center { margin: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
-          .mobile-menu-toggle { display: flex; flex-shrink: 0; }
-          .mobile-menu { display: block; }
-          .header-right { display: none !important; }
-          #saveSimulation, #loadSimulation { display: inline-block !important; }
-          #runSimulation::before { content: "Run"; }
-          #runSimulation span { display: none; }
+        /* DEBUG: Breakpoint indicator */
+        body::before {
+          content: "Desktop";
+          position: fixed;
+          top: 10px;
+          left: 10px;
+          background: rgba(0, 0, 0, 0.8);
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-family: monospace;
+          z-index: 10000;
+          pointer-events: none;
         }
-
-        /* Small Tablet Mode: Show Run + Status + Save + Load + Burger Menu */
-        @media (max-width: ${bp.smallTablet - 0.01}px) and (min-width: ${bp.largeMobile}px) {
-          header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
-          .header-left { flex: 0 0 auto !important; min-width: 0 !important; margin: 0 !important; justify-content: flex-start !important; }
-          .header-left h1 { font-size: 1.2rem; margin: 0; white-space: nowrap; }
-          .header-center-right { flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
-          .header-center { margin: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
-          .mobile-menu-toggle { display: flex; flex-shrink: 0; }
-          .mobile-menu { display: block; }
-          .header-right { display: none !important; }
-          #saveSimulation, #loadSimulation { display: inline-block !important; }
-          #runSimulation::before { content: "Run"; }
-          #runSimulation span { display: none; }
-        }
-
-        /* Large Mobile Mode: Show Icon + Run + Status + Save + Load + Burger Menu */
-        @media (max-width: ${bp.largeMobile - 0.01}px) and (min-width: ${bp.smallMobile}px) {
-          header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
-          .header-left { flex: 0 0 auto !important; min-width: 0 !important; margin: 0 !important; justify-content: flex-start !important; }
+        
+        /* Desktop Mode: Show all buttons with grouping */
+        @media (min-width: ${bp.tablet + 1}px) {
+          header { display: flex !important; flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; align-items: center !important; }
+          .header-left { flex: 0 0 auto !important; min-width: 40px !important; justify-content: flex-start !important; }
           .header-left .app-name { display: none !important; }
           .header-left .app-icon-link { display: flex !important; }
           .header-left .app-icon { display: block !important; width: 32px; height: 32px; }
-          .header-center-right { flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
-          .header-center { margin: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
-          .mobile-menu-toggle { display: flex; flex-shrink: 0; }
-          .mobile-menu { display: block; }
+          .header-center-right { flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; display: flex !important; }
+          .header-center { margin: 0 auto !important; gap: 1rem !important; justify-content: center !important; display: flex !important; }
+          .button-group-primary { display: flex !important; gap: 0.5rem !important; justify-content: center !important; }
+          .button-group-secondary { display: flex !important; gap: 0.5rem !important; justify-content: center !important; }
           .header-right { display: none !important; }
-          #saveSimulation, #loadSimulation { display: inline-block !important; }
+          .mobile-menu-toggle { flex: 0 0 auto !important; min-width: 40px !important; }
+          .mobile-menu { display: block; }
+        }
+        
+        /* Tablet Mode: Move secondary buttons to burger menu */
+        @media (max-width: ${bp.tablet}px) and (min-width: ${bp.mobile + 1}px) {
+          body::before { content: "Tablet"; }
+          header { display: flex !important; flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; align-items: center !important; }
+          .header-left { flex: 0 0 auto !important; min-width: 40px !important; justify-content: flex-start !important; }
+          .header-left .app-name { display: none !important; }
+          .header-left .app-icon-link { display: flex !important; }
+          .header-left .app-icon { display: block !important; width: 32px; height: 32px; }
+          .header-center-right { flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; display: flex !important; }
+          .header-center { margin: 0 auto !important; gap: 0 !important; justify-content: center !important; display: flex !important; }
+          .button-group-primary { display: flex !important; gap: 0.5rem !important; justify-content: center !important; }
+          .button-group-secondary { display: none !important; }
+          .header-right { display: none !important; }
+          .mobile-menu-toggle { flex: 0 0 auto !important; min-width: 40px !important; }
+          .mobile-menu { display: block; }
           #runSimulation::before { content: "Run"; }
           #runSimulation span { display: none; }
         }
 
-                 /* Small Mobile Mode: Show Icon + Run + Status + Burger Menu */
-         @media (max-width: ${bp.smallMobile - 0.01}px) {
+                 /* Mobile Mode: Show Icon + Run + Status + burger menu */
+         @media (max-width: ${bp.mobile}px) {
+           body::before { content: "Mobile"; }
            body { padding-top: 0 !important; }
-           header { flex-direction: row !important; flex-wrap: nowrap !important; justify-content: space-between !important; align-items: center; padding: 0.75rem 1.2rem !important; position: fixed !important; top: 0; left: 0; right: 0; z-index: 1000; width: 100%; height: 60px !important; gap: 0.5rem !important; }
-           .mobile-menu-toggle { display: flex; }
-           .mobile-menu { display: block; }
-           .header-center-right { display: flex !important; flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
-           .header-center { margin: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
-           .header-right { display: none !important; }
-           .header-left { flex: 0 0 auto !important; min-width: 0 !important; justify-content: flex-start !important; margin: 0 !important; padding: 0 !important; }
+           header { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; justify-content: space-between !important; align-items: center !important; padding: 0.75rem 1.2rem !important; position: fixed !important; top: 0; left: 0; right: 0; z-index: 1000; width: 100%; height: 60px !important; gap: 0.5rem !important; }
+           .header-left { flex: 0 0 auto !important; min-width: 40px !important; justify-content: flex-start !important; margin: 0 !important; padding: 0 !important; }
            .header-left .app-name { display: none !important; }
            .header-left .app-icon-link { display: flex !important; }
            .header-left .app-icon { display: block !important; width: 32px; height: 32px; }
+           .header-center-right { display: flex !important; flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
+           .header-center { margin: 0 auto !important; gap: 0 !important; justify-content: center !important; display: flex !important; }
+           .button-group-primary { display: flex !important; gap: 0.5rem !important; justify-content: center !important; }
+           .button-group-secondary { display: none !important; }
+           .header-right { display: none !important; }
+           .mobile-menu-toggle { flex: 0 0 auto !important; min-width: 40px !important; }
+           .mobile-menu { display: block; }
            #saveSimulation, #loadSimulation { display: none !important; }
            #runSimulation { display: inline-block !important; }
            #runSimulation::before { content: "Run"; }

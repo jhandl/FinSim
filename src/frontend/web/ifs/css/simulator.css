@@ -21,10 +21,8 @@
     --card-header-border-width: 1px;
     
     /* Responsive Breakpoints for Progressive Header */
-    --breakpoint-large-tablet: 1110px;
-    --breakpoint-small-tablet: 770px;
-    --breakpoint-large-mobile: 730px;
-    --breakpoint-small-mobile: 520px;
+    --breakpoint-tablet: 800px;
+    --breakpoint-mobile: 540px;
     
     /* Header positioning control */
     --header-height: 60px;
@@ -73,10 +71,11 @@ header {
 
 .header-left {
     flex: 0 0 auto;
-    min-width: 200px;
+    min-width: 40px;
     color: #2563eb;
     display: flex;
     align-items: center;
+    justify-content: flex-start;
 }
 
 .header-left h1 {
@@ -105,7 +104,7 @@ header {
 
 .header-center-right {
     flex: 1 1 auto;
-    min-width: 450px;
+    min-width: 0;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -114,6 +113,18 @@ header {
 
 .header-center {
     margin: 0 auto;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.button-group-primary {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.button-group-secondary {
     display: flex;
     gap: 0.5rem;
     align-items: center;
@@ -128,11 +139,12 @@ header {
 
 .mobile-menu-toggle {
     flex: 0 0 auto;
-    display: none;
+    display: flex;
     flex-direction: column;
     justify-content: space-around;
     width: 40px;
     height: 40px;
+    min-width: 40px;
     background: transparent;
     border: none;
     cursor: pointer;
@@ -232,6 +244,8 @@ header {
 .mobile-menu-button.primary-button:hover {
     background-color: var(--secondary-color);
 }
+
+
 
 .coffee-button {
     display: block;
