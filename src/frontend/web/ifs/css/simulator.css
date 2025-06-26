@@ -36,6 +36,10 @@
     padding: 0;
 }
 
+html {
+    overflow-x: hidden;
+}
+
 body {
     font-family: 'Roboto', sans-serif;
     background-color: var(--background-color);
@@ -46,6 +50,8 @@ body {
     flex-direction: column;
     padding-top: 60px;
     padding-bottom: 60px;
+    overflow-x: hidden;
+    width: 100%;
 }
 
 header {
@@ -105,6 +111,8 @@ header {
     align-items: center;
     gap: 0.5rem;
 }
+
+
 
 .header-center {
     margin: 0 auto;
@@ -476,7 +484,7 @@ th {
     overflow-x: auto;
     margin: 0;
     width: 100%;
-    max-width: calc(100vw - 1rem);
+    max-width: calc(100% - 1rem);
     position: sticky;
     max-height: calc(100vh - var(--header-height) - 60px - 2.9rem);
     overflow-y: auto;

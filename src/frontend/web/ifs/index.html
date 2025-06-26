@@ -727,7 +727,7 @@
                  /* Small Mobile Mode: Show Icon + Run + Status + Burger Menu */
          @media (max-width: ${bp.smallMobile - 0.01}px) {
            body { padding-top: 0 !important; }
-           header { flex-direction: row !important; flex-wrap: nowrap !important; justify-content: space-between !important; align-items: center; padding: 0.75rem 1.2rem !important; position: fixed !important; top: 0; left: 0; right: 0; z-index: 1000; width: 100vw; height: 60px !important; gap: 0.5rem !important; }
+           header { flex-direction: row !important; flex-wrap: nowrap !important; justify-content: space-between !important; align-items: center; padding: 0.75rem 1.2rem !important; position: fixed !important; top: 0; left: 0; right: 0; z-index: 1000; width: 100%; height: 60px !important; gap: 0.5rem !important; }
            .mobile-menu-toggle { display: flex; }
            .mobile-menu { display: block; }
            .header-center-right { display: flex !important; flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
@@ -744,7 +744,7 @@
            main { margin-top: 1.8rem; display: flex; flex-direction: column; gap: 1.8rem; }
            .events-section { width: 100%; max-width: 810px; justify-self: left; overflow-x: auto; }
            .events-section table { width: 100%; }
-           .graph-container { width: 100%; max-width: calc(100vw - 1.5rem); min-height: calc((100vw - 1.5rem) * 0.6); max-height: calc((100vw - 1.5rem) * 0.9); }
+           .graph-container { width: 100%; max-width: calc(100% - 1.5rem); min-height: calc((100vw - 1.5rem) * 0.6); max-height: calc((100vw - 1.5rem) * 0.9); }
            .data-section { display: none; }
            #mobile-data-message { display: block; max-width: none; }
          }
@@ -818,7 +818,7 @@
                 "events"
                 "graphs"
                 "data-section";
-            max-width: 100vw;
+            max-width: 100%;
             overflow-x: hidden;
             justify-content: center;
           }
@@ -845,7 +845,7 @@
           }
 
           .data-section {
-            max-width: 100vw;
+            max-width: 100%;
             overflow-x: auto;
             justify-self: center;
           }

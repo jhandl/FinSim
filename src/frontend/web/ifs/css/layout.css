@@ -31,7 +31,7 @@ footer {
   position: sticky;
   bottom: 0;
   z-index: 1000;
-  width: 100vw;
+  width: 100%;
 }
 
 /* Parameters section layout */
@@ -103,7 +103,7 @@ footer {
   border-radius: 7.2px;
   padding: 0;
   box-shadow: var(--box-shadow);
-  max-width: 100vw;
+  max-width: 100%;
 }
 
 /* Remove card class constraints from data section */
