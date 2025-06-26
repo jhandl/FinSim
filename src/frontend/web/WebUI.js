@@ -244,11 +244,15 @@ class WebUI extends AbstractUI {
         try {
           // Unsaved changes check is now handled in loadFromUrl
           await this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
-          // After successfully loading the demo scenario, automatically run the simulation
+          // After successfully loading the demo scenario, scroll to graphs and run the simulation
           const runButton = document.getElementById('runSimulation');
           if (runButton && !this.isSimulationRunning) {
-            // Trigger the simulation using the same method as the Run button
-            runButton.click();
+            // Scroll to graphs before running the demo
+            this.scrollToGraphs();
+            // Add delay to allow scroll to complete before simulation
+            setTimeout(() => {
+              runButton.click();
+            }, 500);
           }
         } catch (error) {
           console.error("Error loading demo scenario:", error);
@@ -312,7 +316,6 @@ class WebUI extends AbstractUI {
       
       this.setStatus('Running...');
       runButton.offsetHeight; // This forces the browser to recalculate layout immediately
-      this.scrollToGraphs();
 
       setTimeout(() => {
         try {
@@ -333,7 +336,7 @@ class WebUI extends AbstractUI {
             mobileRunButton.style.pointerEvents = '';
           }      
         }
-      }, 500);
+      }, 0);
     };
 
     runButton.addEventListener('click', this.handleRunSimulation);
@@ -519,10 +522,20 @@ class WebUI extends AbstractUI {
     if (graphsSection) {
       // Add a small delay to ensure graphs are rendered
       setTimeout(() => {
-        graphsSection.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'start',
-          inline: 'nearest'
+        // Calculate header height to avoid clipping
+        const header = document.querySelector('header');
+        const headerHeight = header ? header.offsetHeight : 60; // fallback to 60px
+        const additionalPadding = 20; // Extra space for visual comfort
+        
+        // Get the graphs section position
+        const graphsRect = graphsSection.getBoundingClientRect();
+        const currentScrollY = window.scrollY;
+        const targetScrollY = currentScrollY + graphsRect.top - headerHeight - additionalPadding;
+        
+        // Smooth scroll to the calculated position
+        window.scrollTo({
+          top: Math.max(0, targetScrollY), // Don't scroll above the page
+          behavior: 'smooth'
         });
       }, 200);
     }

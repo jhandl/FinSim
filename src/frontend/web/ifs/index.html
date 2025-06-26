@@ -663,13 +663,24 @@
         };
     }
 
+    // Get layout breakpoint values from CSS custom properties
+    function getLayoutBreakpoints() {
+        const style = getComputedStyle(document.documentElement);
+        return {
+            wide: parseInt(style.getPropertyValue('--layout-breakpoint-wide')),
+            medium: parseInt(style.getPropertyValue('--layout-breakpoint-medium')),
+            narrow: parseInt(style.getPropertyValue('--layout-breakpoint-narrow')),
+            mobile: parseInt(style.getPropertyValue('--layout-breakpoint-mobile'))
+        };
+    }
+
     // Generate header responsive CSS from centralized breakpoints
     function generateHeaderResponsiveCSS() {
         const bp = getBreakpoints();
         
         const css = `
         /* Large Tablet Mode: Show Run + Status + Save + Load + Burger Menu */
-        @media (max-width: ${bp.largeTablet}px) and (min-width: ${bp.smallTablet + 1}px) {
+        @media (max-width: ${bp.largeTablet}px) and (min-width: ${bp.smallTablet}px) {
           header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
           .header-left { flex: 0 0 auto !important; min-width: 0 !important; justify-content: flex-start !important; }
           .header-center-right { flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
@@ -683,7 +694,7 @@
         }
 
         /* Small Tablet Mode: Show Run + Status + Save + Load + Burger Menu */
-        @media (max-width: ${bp.smallTablet}px) and (min-width: ${bp.largeMobile + 1}px) {
+        @media (max-width: ${bp.smallTablet - 0.01}px) and (min-width: ${bp.largeMobile}px) {
           header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
           .header-left { flex: 0 0 auto !important; min-width: 0 !important; margin: 0 !important; justify-content: flex-start !important; }
           .header-left h1 { font-size: 1.2rem; margin: 0; white-space: nowrap; }
@@ -698,7 +709,7 @@
         }
 
         /* Large Mobile Mode: Show Icon + Run + Status + Save + Load + Burger Menu */
-        @media (max-width: ${bp.largeMobile}px) and (min-width: ${bp.smallMobile + 1}px) {
+        @media (max-width: ${bp.largeMobile - 0.01}px) and (min-width: ${bp.smallMobile}px) {
           header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
           .header-left { flex: 0 0 auto !important; min-width: 0 !important; margin: 0 !important; justify-content: flex-start !important; }
           .header-left .app-name { display: none !important; }
@@ -714,7 +725,7 @@
         }
 
                  /* Small Mobile Mode: Show Icon + Run + Status + Burger Menu */
-         @media (max-width: ${bp.smallMobile}px) {
+         @media (max-width: ${bp.smallMobile - 0.01}px) {
            body { padding-top: 0 !important; }
            header { flex-direction: row !important; flex-wrap: nowrap !important; justify-content: space-between !important; align-items: center; padding: 0.75rem 1.2rem !important; position: fixed !important; top: 0; left: 0; right: 0; z-index: 1000; width: 100vw; height: 60px !important; gap: 0.5rem !important; }
            .mobile-menu-toggle { display: flex; }
@@ -748,10 +759,162 @@
         }
         styleElement.textContent = css;
     }
+
+    // Generate layout responsive CSS from centralized breakpoints
+    function generateLayoutResponsiveCSS() {
+        const lbp = getLayoutBreakpoints();
+        const bp = getBreakpoints();
+        
+        const css = `
+        /* Wide Screen to 2-column layout */
+        @media (max-width: ${lbp.wide}px) {
+          main {
+            width: 100%;
+            max-width: calc(2 * 306px + 1.35rem + 810px + 3 * 1.8rem);
+            margin: 1.8rem auto;
+            grid-template-columns: minmax(auto, max-content) minmax(0, 1fr);
+            grid-template-areas: 
+                "parameters events"
+                "graphs graphs"
+                "data-section data-section";
+          }
+
+          .parameters-section {
+            justify-content: center;
+          }
+
+          .events-section {
+            width: 100%;
+            max-width: 810px;
+            min-width: 810px;
+            justify-self: center;
+            margin-right: 0;
+            margin-left: 0;
+          }
+
+          .graphs-section {
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: stretch;
+            gap: 1.8rem;
+            width: 100%;
+            max-height: none;
+          }
+
+          .graph-container {
+            flex: 1 1 calc(50% - 1rem);
+            min-width: 0;
+            max-width: 100%;
+            width: 100%;
+          }
+        }
+
+        /* Medium Screen to single column layout */
+        @media (max-width: ${lbp.medium}px) {
+          main {
+            grid-template-columns: 1fr;
+            grid-template-areas: 
+                "parameters"
+                "events"
+                "graphs"
+                "data-section";
+            max-width: 100vw;
+            overflow-x: hidden;
+            justify-content: center;
+          }
+
+          .parameters-section {
+            grid-template-columns: repeat(3, minmax(306px, 306px));
+            justify-content: center;
+            max-width: 100%;
+            justify-self: center;
+          }
+
+          .graphs-section {
+            flex-direction: column;
+            max-width: 810px;
+            justify-self: center;
+          }
+
+          .events-section {
+            width: 100%;
+            min-width: 0;
+            max-width: 810px;
+            margin: 0;
+            justify-self: center;
+          }
+
+          .data-section {
+            max-width: 100vw;
+            overflow-x: auto;
+            justify-self: center;
+          }
+        }
+
+        /* Parameters section back to 2 columns */
+        @media (max-width: ${lbp.narrow}px) {
+          .parameters-section {
+            grid-template-columns: repeat(2, minmax(306px, 306px));
+            justify-content: center;
+          }
+        }
+
+        /* Mobile Screen adjustments */
+        @media (max-width: ${lbp.mobile}px) {
+          main {
+            margin: 1.8rem auto;
+            max-width: none;
+          }
+
+          .parameters-section {
+            grid-template-columns: 1fr;
+            justify-content: center;
+            justify-self: center;
+            justify-items: center;
+          }
+
+          .events-section {
+            width: 100%;
+            min-width: 0;
+            max-width: none;
+            justify-self: center;
+          }
+
+          .graphs-section {
+            max-width: none;
+            justify-self: center;
+          }
+
+          .data-section {
+            justify-self: center;
+          }
+        }
+        
+        /* Small mobile header compensation */
+        @media (max-width: ${bp.smallMobile}px) {
+          main {
+            margin-top: calc(60px + 1.8rem);
+            margin-bottom: 1.8rem;
+          }
+        }
+        `;
+
+        // Inject CSS into the page
+        let styleElement = document.getElementById('dynamic-layout-responsive-css');
+        if (!styleElement) {
+            styleElement = document.createElement('style');
+            styleElement.id = 'dynamic-layout-responsive-css';
+            document.head.appendChild(styleElement);
+        }
+        styleElement.textContent = css;
+    }
             
     document.addEventListener('DOMContentLoaded', () => {
         // Generate header responsive CSS from centralized breakpoints
         generateHeaderResponsiveCSS();
+        
+        // Generate layout responsive CSS from centralized breakpoints
+        generateLayoutResponsiveCSS();
         
         // Create global instance for wizard access
         window.mobileBurgerMenuInstance = new MobileBurgerMenu();

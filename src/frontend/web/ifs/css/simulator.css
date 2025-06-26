@@ -122,6 +122,134 @@ header {
 
 .mobile-menu-toggle {
     flex: 0 0 auto;
+    display: none;
+    flex-direction: column;
+    justify-content: space-around;
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    z-index: 1001;
+}
+
+.mobile-menu-toggle span {
+    display: block;
+    height: 3px;
+    width: 100%;
+    background-color: var(--primary-color);
+    border-radius: 3px;
+    transition: all 0.3s ease;
+    transform-origin: center;
+}
+
+.mobile-menu-toggle.active span:nth-child(1) {
+    transform: rotate(45deg) translate(6px, 6px);
+}
+
+.mobile-menu-toggle.active span:nth-child(2) {
+    opacity: 0;
+}
+
+.mobile-menu-toggle.active span:nth-child(3) {
+    transform: rotate(-45deg) translate(6px, -6px);
+}
+
+.mobile-menu {
+    display: none;
+    position: fixed;
+    top: var(--header-height); /* Position below the header */
+    right: 0;
+    width: 220px;
+    background-color: var(--card-background);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-20px); /* Drop from top animation */
+    transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+}
+
+.mobile-menu.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.mobile-menu-content {
+    padding: 16px 16px 0px 16px;
+    overflow-y: auto;
+    max-height: calc(100vh - var(--header-height) - 20px); /* Ensure it doesn't exceed viewport */
+}
+
+.mobile-menu-divider {
+    height: 1px;
+    background-color: var(--border-color);
+    margin: 12px 0;
+}
+
+.mobile-menu-button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mobile-menu-button i {
+    margin-right: 12px;
+    width: 16px;
+    text-align: center;
+}
+
+.mobile-menu-button:hover {
+    background-color: var(--background-color);
+}
+
+.mobile-menu-button.primary-button {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.mobile-menu-button.primary-button:hover {
+    background-color: var(--secondary-color);
+}
+
+.coffee-button {
+    display: block;
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.coffee-button img {
+    transition: opacity 0.2s ease;
+}
+
+.coffee-button:hover img {
+    opacity: 0.8;
+}
+
+.mobile-menu-status {
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    text-align: center;
+    color: var(--text-color);
 }
 
 
@@ -768,6 +896,14 @@ input[data-tooltip] {
 .primary-button:disabled:hover,
 .primary-button.disabled:hover {
     background-color: #cccccc;
+}
+
+#runSimulation:disabled,
+#runSimulation.disabled {
+    background-color: #aaaaaa !important;
+    cursor: not-allowed !important;
+    opacity: 0.7 !important;
+    transition: none !important; /* This is the key fix */
 }
 
 input.percentage::placeholder {
