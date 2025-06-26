@@ -342,7 +342,7 @@ class WebUI extends AbstractUI {
             mobileRunButton.style.pointerEvents = '';
           }      
         }
-      }, 0);
+      }, 50); // Increased from 0 to 50ms to allow browser to render visual changes before CPU-intensive simulation
     };
 
     runButton.addEventListener('click', this.handleRunSimulation);
@@ -543,17 +543,22 @@ class WebUI extends AbstractUI {
         const currentScrollY = window.scrollY;
         const targetScrollY = currentScrollY + graphsRect.top - headerHeight - additionalPadding;
         
-        // Smooth scroll to the calculated position
-        window.scrollTo({
-          top: Math.max(0, targetScrollY), // Don't scroll above the page
-          behavior: 'smooth'
-        });
-
-        // Wait for scroll animation to complete
-        // Use a combination of scroll event listener and timeout fallback
-        let scrollTimer = null;
-        let hasResolved = false;
+        // Check if we need to scroll at all
+        const scrollDistance = Math.abs(targetScrollY - currentScrollY);
         
+        // Robust check: simulate what the browser will actually do
+        const maxScrollY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+        const clampedTargetScrollY = Math.max(0, Math.min(targetScrollY, maxScrollY));
+        const wouldActuallyScroll = Math.abs(clampedTargetScrollY - currentScrollY) > 1; // 1px tolerance for rounding
+        
+        if (!wouldActuallyScroll) {
+          // Browser won't actually scroll, resolve immediately
+          resolve();
+          return;
+        }
+
+        // Use modern scrollend event for precise scroll completion detection
+        let hasResolved = false;
         const resolveOnce = () => {
           if (!hasResolved) {
             hasResolved = true;
@@ -561,26 +566,50 @@ class WebUI extends AbstractUI {
           }
         };
 
-        const handleScroll = () => {
-          // Clear previous timer
+        // Try modern scrollend event first (best option)
+        const handleScrollEnd = () => {
+          window.removeEventListener('scrollend', handleScrollEnd);
+          resolveOnce();
+        };
+
+        // Fallback for browsers without scrollend support
+        let scrollTimer = null;
+        const handleScrollFallback = () => {
           if (scrollTimer) {
             clearTimeout(scrollTimer);
           }
-          // Set new timer - resolve if no scroll events for 100ms
-          scrollTimer = setTimeout(resolveOnce, 100);
+          scrollTimer = setTimeout(() => {
+            window.removeEventListener('scroll', handleScrollFallback);
+            resolveOnce();
+          }, 150);
         };
 
-        // Listen for scroll events
-        window.addEventListener('scroll', handleScroll, { passive: true });
+        // Check if scrollend is supported
+        const supportsScrollEnd = 'onscrollend' in window;
         
-        // Fallback timeout in case scroll event doesn't fire or gets stuck
-        setTimeout(() => {
-          window.removeEventListener('scroll', handleScroll);
-          resolveOnce();
-        }, 2000); // Max 2 seconds wait
+        if (supportsScrollEnd) {
+          // Modern browsers with scrollend support
+          window.addEventListener('scrollend', handleScrollEnd, { once: true });
+        } else {
+          // Fallback for older browsers
+          window.addEventListener('scroll', handleScrollFallback, { passive: true });
+        }
 
-        // Start the scroll detection
-        handleScroll();
+        // Safety timeout to prevent hanging
+        setTimeout(() => {
+          window.removeEventListener('scrollend', handleScrollEnd);
+          window.removeEventListener('scroll', handleScrollFallback);
+          if (scrollTimer) {
+            clearTimeout(scrollTimer);
+          }
+          resolveOnce();
+        }, 3000);
+
+        // Start the smooth scroll
+        window.scrollTo({
+          top: Math.max(0, targetScrollY),
+          behavior: 'smooth'
+        });
       }, 200);
     });
   }
