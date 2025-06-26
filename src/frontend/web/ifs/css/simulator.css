@@ -482,7 +482,6 @@ th {
     overflow-x: auto;
     margin: 0;
     width: 100%;
-    max-width: calc(100% - 1rem);
     position: sticky;
     max-height: calc(100vh - var(--header-height) - 60px - 2.9rem);
     overflow-y: auto;
