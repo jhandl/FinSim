@@ -71,7 +71,7 @@ header .container {
 }
 
 .logo h1 {
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   font-weight: 700;
   color: var(--primary-color);
 }
@@ -634,7 +634,7 @@ footer .container {
   }
 
   .logo h1 {
-    font-size: 1.7rem; /* Closer to original 1.8rem */
+    font-size: 1.5rem;
   }
 
   nav ul {
@@ -670,7 +670,7 @@ footer .container {
   }
 
   .logo h1 {
-    font-size: 1.6rem; /* Keep it closer to original size */
+    font-size: 1.4rem;
   }
 
   nav ul li a {
@@ -713,7 +713,7 @@ footer .container {
   }
 
   .logo h1 {
-    font-size: 1.5rem; /* Keep it closer to original size */
+    font-size: 1.3rem;
   }
 
   nav ul li a {

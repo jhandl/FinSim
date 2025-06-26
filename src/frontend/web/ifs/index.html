@@ -20,7 +20,7 @@
 <body>
     <header>
         <div class="header-left">
-            <img src="/src/frontend/web/ifs/IFS.ico" alt="Ireland Financial Simulator" class="app-icon" style="display: none;">
+            <a href="/" class="app-icon-link" style="display: none;"><img src="/src/frontend/web/ifs/IFS.ico" alt="Ireland Financial Simulator" class="app-icon"></a>
             <h1 class="app-name"><a href="/">Ireland Financial Simulator</a></h1>
         </div>
         <div class="header-center-right">
@@ -713,6 +713,7 @@
           header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
           .header-left { flex: 0 0 auto !important; min-width: 0 !important; margin: 0 !important; justify-content: flex-start !important; }
           .header-left .app-name { display: none !important; }
+          .header-left .app-icon-link { display: flex !important; }
           .header-left .app-icon { display: block !important; width: 32px; height: 32px; }
           .header-center-right { flex: 1 1 auto !important; min-width: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
           .header-center { margin: 0 !important; gap: 0.5rem !important; justify-content: center !important; }
@@ -735,6 +736,7 @@
            .header-right { display: none !important; }
            .header-left { flex: 0 0 auto !important; min-width: 0 !important; justify-content: flex-start !important; margin: 0 !important; padding: 0 !important; }
            .header-left .app-name { display: none !important; }
+           .header-left .app-icon-link { display: flex !important; }
            .header-left .app-icon { display: block !important; width: 32px; height: 32px; }
            #saveSimulation, #loadSimulation { display: none !important; }
            #runSimulation { display: inline-block !important; }
