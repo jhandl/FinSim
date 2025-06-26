@@ -247,12 +247,18 @@ class WebUI extends AbstractUI {
           // After successfully loading the demo scenario, scroll to graphs and run the simulation
           const runButton = document.getElementById('runSimulation');
           if (runButton && !this.isSimulationRunning) {
-            // Scroll to graphs before running the demo
-            this.scrollToGraphs();
-            // Add delay to allow scroll to complete before simulation
+            // Wait for scroll to complete before running the demo
+            await this.scrollToGraphs();
+            // Add a small delay after scroll completes to allow DOM to settle
             setTimeout(() => {
-              runButton.click();
-            }, 500);
+              // Instead of programmatic click, directly call the handler method
+              // Create a mock event object to avoid issues with preventDefault/stopPropagation
+              const mockEvent = {
+                preventDefault: () => {},
+                stopPropagation: () => {}
+              };
+              this.handleRunSimulation(mockEvent);
+            }, 200);
           }
         } catch (error) {
           console.error("Error loading demo scenario:", error);
@@ -518,8 +524,13 @@ class WebUI extends AbstractUI {
 
   scrollToGraphs() {
     // Auto-scroll to graphs section to show simulation results
-    const graphsSection = document.querySelector('.graphs-section');
-    if (graphsSection) {
+    return new Promise((resolve) => {
+      const graphsSection = document.querySelector('.graphs-section');
+      if (!graphsSection) {
+        resolve(); // No graphs section found, resolve immediately
+        return;
+      }
+
       // Add a small delay to ensure graphs are rendered
       setTimeout(() => {
         // Calculate header height to avoid clipping
@@ -537,8 +548,41 @@ class WebUI extends AbstractUI {
           top: Math.max(0, targetScrollY), // Don't scroll above the page
           behavior: 'smooth'
         });
+
+        // Wait for scroll animation to complete
+        // Use a combination of scroll event listener and timeout fallback
+        let scrollTimer = null;
+        let hasResolved = false;
+        
+        const resolveOnce = () => {
+          if (!hasResolved) {
+            hasResolved = true;
+            resolve();
+          }
+        };
+
+        const handleScroll = () => {
+          // Clear previous timer
+          if (scrollTimer) {
+            clearTimeout(scrollTimer);
+          }
+          // Set new timer - resolve if no scroll events for 100ms
+          scrollTimer = setTimeout(resolveOnce, 100);
+        };
+
+        // Listen for scroll events
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        
+        // Fallback timeout in case scroll event doesn't fire or gets stuck
+        setTimeout(() => {
+          window.removeEventListener('scroll', handleScroll);
+          resolveOnce();
+        }, 2000); // Max 2 seconds wait
+
+        // Start the scroll detection
+        handleScroll();
       }, 200);
-    }
+    });
   }
 
   setupSimModeToggle() {
