@@ -679,6 +679,12 @@
         const bp = getBreakpoints();
         
         const css = `
+        /* Global max-width constraint for header to align with main content */
+        header {
+          max-width: 2350px;
+          margin: 0 auto;
+        }
+        
         /* Large Tablet Mode: Show Run + Status + Save + Load + Burger Menu */
         @media (max-width: ${bp.largeTablet}px) and (min-width: ${bp.smallTablet}px) {
           header { flex-wrap: nowrap !important; gap: 0.5rem !important; padding: 0.75rem 1.2rem !important; height: 60px !important; justify-content: space-between !important; }
@@ -768,6 +774,11 @@
         const bp = getBreakpoints();
         
         const css = `
+        /* Global max-width constraint for all screen sizes */
+        main {
+          max-width: 2350px;
+        }
+        
         /* Wide Screen to 2-column layout */
         @media (max-width: ${lbp.wide}px) {
           main {
