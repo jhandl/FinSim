@@ -485,8 +485,6 @@ class Wizard {
       document.addEventListener('click', this.preventTouch, true);
     }
     
-    
-    
     // Handle burger menu for initial step before starting
     if (startingStepIndex < this.validSteps.length) {
       const initialElement = document.querySelector(this.validSteps[startingStepIndex].element);
@@ -1316,6 +1314,6 @@ class Wizard {
     }
   }
 
-
+  
 
 }
