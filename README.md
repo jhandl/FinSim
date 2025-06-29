@@ -3,8 +3,6 @@
 # Roadmap
 
 ### Improvements
-- In small screens the header takes three rows: one row for the title, and two rows for the buttons. I understand there's not many options if I want to show all the buttons and I don't want to show only some of these buttons. But this must be a common UX problem on phone apps. How do they solve it? Can we get this UX more in line with the standards of phone apps?
-- Separate the tutorial from the individual field help text. Those should show up as tooltips.
 - Add feedback box.
 - Add registration box? Not CIO.
 - Add ability to arrange events by start age or event category. Maybe allow drag-and-drop.
