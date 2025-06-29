@@ -218,7 +218,12 @@ class PinchPointVisualizer {
         // All runs reach all years (simulator continues even after failure)
         yearlyAggregates[row].totalRunsReachedThisYear++;
 
-        // Count this run as alive at the start of this year if it hasn't failed yet
+        // Update the alive status first: once a run fails, it's permanently dead
+        if (!yearData.success) {
+          runIsStillAlive = false;
+        }
+
+        // Count this run as alive for this year if it survived through the year
         if (runIsStillAlive) {
           yearlyAggregates[row].runsAliveAtStartOfYear++;
         }
@@ -238,11 +243,6 @@ class PinchPointVisualizer {
 
         yearlyAggregates[row].sumOfMagnitude += Math.abs(yearData.netIncome - yearData.expenses);
         yearlyAggregates[row].sumOfExpenses += yearData.expenses;
-
-        // Update the alive status for next year: once a run fails, it's permanently dead
-        if (!yearData.success) {
-          runIsStillAlive = false;
-        }
       }
     }
     return yearlyAggregates;

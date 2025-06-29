@@ -302,6 +302,34 @@ class Wizard {
 
     this.validSteps = this.filterValidSteps();
 
+    // Replace old welcome/how-to steps with welcome modal triggers
+    this.validSteps = this.validSteps.map(step => {
+      if (!step.element && step.popover &&
+          (step.popover.popoverClass === 'welcome-popover' ||
+           step.popover.popoverClass === 'howto-popover')) {
+        // Replace with a special step that triggers the welcome modal
+        return {
+          element: 'body', // Use body as a dummy element
+          popover: {
+            title: 'Welcome',
+            description: 'Loading welcome information...',
+            showButtons: ['close'],
+            onPopoverRender: () => {
+              // When this step is shown, immediately show the welcome modal instead
+              setTimeout(() => {
+                this.finishTour();
+                const webUI = WebUI.getInstance();
+                if (webUI) {
+                  webUI.showWelcomeModal();
+                }
+              }, 100);
+            }
+          }
+        };
+      }
+      return step;
+    });
+
     let startingStepIndex = fromStep !== undefined ? fromStep : (this.lastFocusedWasInput ? (this.getLastFocusedFieldIndex() || this.lastStepIndex) : this.lastStepIndex);
     if (startingStepIndex > 1 && startingStepIndex < this.validSteps.length && !this.isMobile) {
       const element = document.querySelector(this.validSteps[startingStepIndex].element);
@@ -312,12 +340,11 @@ class Wizard {
     }
 
     this.tour = this.driver({
-      showProgress: true,
+      showProgress: false,
       animate: true,
       smoothScroll: true,
-      showProgress: false,
       overlayOpacity: 0.5,
-      allowKeyboardControl: false,
+      allowKeyboardControl: true,
       steps: this.validSteps,
       onNextClick: async (element) => {
         const nextIndex = this.tour.getActiveIndex() + 1;
@@ -352,6 +379,8 @@ class Wizard {
 
         // Simple burger menu handling - just open it if element needs it
         this.handleBurgerMenuSimple(element);
+
+
 
         const popover = document.querySelector('.driver-popover');
         if (popover) {
@@ -433,6 +462,341 @@ class Wizard {
     return index >= 0 ? index : null;
   }
 
+  /**
+   * Filter help.yml content by card type and level
+   * @param {string} cardType - The card type (e.g., 'startingPosition', 'personalCircumstances', etc.)
+   * @param {string} level - The level: 'overview', 'full', or 'tour'
+   * @returns {Array} Filtered steps
+   */
+  filterHelpContent(cardType, level) {
+    if (!this.originalConfig || !this.originalConfig.steps) {
+      return [];
+    }
+
+    const cardMapping = {
+      'startingPosition': ['#startingPosition', '#simModeSingle', '#simModeCouple', '#StartingAge', '#P2StartingAge', '#InitialSavings', '#InitialPension', '#InitialPensionP2', '#InitialFunds', '#InitialShares'],
+      'personalCircumstances': ['#personalCircumstances', '#MarriageYear', '#OldestChildBorn', '#YoungestChildBorn', '#PersonalTaxCredit', '#StatePensionWeekly', '#P2StatePensionWeekly'],
+      'Targets': ['#Targets', '#RetirementAge', '#P2RetirementAge', '#TargetAge', '#EmergencyStash'],
+      'Allocations': ['#Allocations', '#FundsAllocation', '#SharesAllocation', '#PensionContributionPercentage', '#PensionContributionPercentageP2', '#PensionContributionCapped'],
+      'drawdownPriorities': ['#drawdownPriorities'],
+      'growthRates': ['#growthRates', '#economyModeDeterministic', '#economyModeMonteCarlo', '#PensionGrowthRate', '#PensionGrowthStdDev', '#FundsGrowthRate', '#FundsGrowthStdDev', '#SharesGrowthRate', '#SharesGrowthStdDev', '#Inflation'],
+      'events': ['.events-section', '#ageYearModeAge', '#ageYearModeYear', '#EventType', '#EventName', '#EventAmount', '#EventFromAge', '#EventToAge', '#EventRate', '#EventMatch'],
+      'graphs': ['#cashflowGraph', '#assetsGraph'],
+      'data': ['#visualizationToggle', '#exportDataCSV']
+    };
+
+    if (level === 'tour') {
+      // Return overview steps for all major cards (quick tour)
+      const overviewElements = [
+        '.header-center',        // Header buttons grouped together (start at top)
+        '.parameters-section',   // All parameter cards grouped together
+        '.events-section',       // Events table
+        '.graphs-section',       // Both graphs grouped together
+        '.data-section'          // Data table (end at bottom)
+      ];
+      return this.originalConfig.steps.filter(step =>
+        step.element && overviewElements.includes(step.element)
+      );
+    }
+
+    if (!cardType || !cardMapping[cardType]) {
+      return [];
+    }
+
+    const cardElements = cardMapping[cardType];
+
+    if (level === 'overview') {
+      // Return only the main card overview step
+      return this.originalConfig.steps.filter(step =>
+        step.element && step.element === cardElements[0]
+      );
+    }
+
+    if (level === 'full') {
+      // Return all steps for the card (overview + all fields)
+      return this.originalConfig.steps.filter(step =>
+        step.element && cardElements.includes(step.element)
+      );
+    }
+
+    return [];
+  }
+
+  /**
+   * Show card overview with Fields Help button (if fields exist)
+   * @param {string} cardType - The card type to show overview for
+   */
+  async showCardOverview(cardType) {
+    if (!this.config) {
+      await this.loadConfig();
+    }
+
+    const overviewSteps = this.filterHelpContent(cardType, 'overview');
+    if (overviewSteps.length === 0) {
+      console.warn(`No overview found for card type: ${cardType}`);
+      return;
+    }
+
+    // Check if there are field steps available for this card
+    // Some cards like 'drawdownPriorities' and 'graphs' don't have input fields
+    const cardsWithoutFields = ['drawdownPriorities', 'graphs'];
+    const hasFields = !cardsWithoutFields.includes(cardType);
+
+    // Process the overview step with current age/year mode
+    const processedSteps = overviewSteps.map(step => {
+      const processedStep = JSON.parse(JSON.stringify(step));
+      if (processedStep.popover && processedStep.popover.description) {
+        processedStep.popover.description = this.replaceAgeYearPlaceholders(processedStep.popover.description);
+      }
+      return processedStep;
+    });
+
+    const overviewStep = processedSteps[0];
+
+    // Add Fields Help button only if there are field steps available
+    if (overviewStep.popover) {
+      if (hasFields) {
+        // Show both Close and Fields Help buttons
+        overviewStep.popover.showButtons = ["close", "next"];
+        overviewStep.popover.nextBtnText = ["Fields Help"];
+      } else {
+        // Show only Close button
+        overviewStep.popover.showButtons = ["close"];
+      }
+    }
+
+    // Create a single-step tour with conditional next button behavior
+    const tourConfig = {
+      showProgress: false,
+      animate: true,
+      smoothScroll: true,
+      overlayOpacity: 0.5,
+      allowKeyboardControl: true,
+      steps: [overviewStep],
+      onDestroyStarted: () => this.finishTour()
+    };
+
+    // Only add onNextClick if there are fields to show
+    if (hasFields) {
+      tourConfig.onNextClick = () => {
+        // When "Fields Help" is clicked, destroy this tour and start mini-wizard
+        singleStepTour.destroy();
+        this.startMiniWizard(cardType);
+      };
+    }
+
+    const singleStepTour = this.driver(tourConfig);
+
+    // Set up wizard state and keyboard handling like other tours
+    document.addEventListener('keydown', this.handleKeys);
+    this.wizardActive = true;
+    if (this.isMobile) {
+      document.body.setAttribute('data-wizard-active', 'true');
+      document.addEventListener('focusin', this.preventFocus, true);
+      document.addEventListener('touchstart', this.preventTouch, true);
+      document.addEventListener('click', this.preventTouch, true);
+    }
+    this.disableMobileKeyboard();
+
+    // Store reference to tour for cleanup
+    this.tour = singleStepTour;
+
+    // Start the tour
+    singleStepTour.drive();
+  }
+
+  /**
+   * Start focused wizard for specific card's fields
+   * @param {string} cardType - The card type to show mini-wizard for
+   */
+  async startMiniWizard(cardType) {
+    if (!this.config) {
+      await this.loadConfig();
+    }
+
+    const cardSteps = this.filterHelpContent(cardType, 'full');
+    if (cardSteps.length === 0) {
+      console.warn(`No steps found for card type: ${cardType}`);
+      return;
+    }
+
+    // Filter out the overview step since we just showed it
+    // The overview step is the one that matches the card's main element
+    const cardMapping = {
+      'startingPosition': '#startingPosition',
+      'personalCircumstances': '#personalCircumstances',
+      'Targets': '#Targets',
+      'Allocations': '#Allocations',
+      'drawdownPriorities': '#drawdownPriorities',
+      'growthRates': '#growthRates',
+      'events': '.events-section',
+      'graphs': '#cashflowGraph',
+      'data': '#visualizationToggle'
+    };
+
+    const overviewElement = cardMapping[cardType];
+    const fieldSteps = cardSteps.filter(step => step.element !== overviewElement);
+
+    // Process steps with current age/year mode and filter valid ones
+    const processedSteps = fieldSteps.map(step => {
+      const processedStep = JSON.parse(JSON.stringify(step));
+      if (processedStep.popover && processedStep.popover.description) {
+        processedStep.popover.description = this.replaceAgeYearPlaceholders(processedStep.popover.description);
+      }
+      return processedStep;
+    });
+
+    // Use the proper filterValidSteps method to handle hidden fields correctly
+    // But first, we need to temporarily set the config steps to only our card steps
+    const originalSteps = this.config.steps;
+    this.config.steps = processedSteps;
+
+    this.validSteps = this.filterValidSteps(processedSteps);
+
+    // Restore original config steps
+    this.config.steps = originalSteps;
+
+    if (this.validSteps.length === 0) {
+      console.warn(`No valid steps found for card type: ${cardType}`);
+      return;
+    }
+
+    // Create and start the mini-wizard tour
+    this.tour = this.driver({
+      showProgress: true,
+      animate: true,
+      smoothScroll: true,
+      overlayOpacity: 0.5,
+      allowKeyboardControl: true,
+      steps: this.validSteps,
+      onNextClick: async (element) => {
+        const nextIndex = this.tour.getActiveIndex() + 1;
+        if (nextIndex < this.validSteps.length) {
+          const nextElement = document.querySelector(this.validSteps[nextIndex].element);
+          await this.handleBurgerMenuBeforeStep(nextElement, nextIndex);
+          if (nextElement && !this.isMobile) {
+            nextElement.focus();
+          }
+        }
+        this.tour.moveNext();
+      },
+      onPrevClick: async (element) => {
+        const prevIndex = this.tour.getActiveIndex() - 1;
+        if (prevIndex >= 0) {
+          const prevElement = document.querySelector(this.validSteps[prevIndex].element);
+          await this.handleBurgerMenuBeforeStep(prevElement, prevIndex);
+          if (prevElement && !this.isMobile) {
+            prevElement.focus();
+          }
+        }
+        this.tour.movePrevious();
+      },
+      onDestroyStarted: () => this.finishTour(),
+      onHighlighted: (element) => {
+        this.cleanupInlineStyles();
+        this.handleBurgerMenuSimple(element);
+      }
+    });
+
+    // Start the mini-wizard
+    this.tour.drive();
+  }
+
+  /**
+   * Start quick tour of all major UI cards
+   */
+  async startQuickTour() {
+    if (!this.config) {
+      await this.loadConfig();
+    }
+
+    const tourSteps = this.filterHelpContent(null, 'tour');
+    if (tourSteps.length === 0) {
+      console.warn('No tour steps found');
+      return;
+    }
+
+    // Process steps with current age/year mode and add proper close buttons
+    const processedSteps = tourSteps.map(step => {
+      const processedStep = JSON.parse(JSON.stringify(step));
+      if (processedStep.popover && processedStep.popover.description) {
+        processedStep.popover.description = this.replaceAgeYearPlaceholders(processedStep.popover.description);
+      }
+
+      // Quick tour steps should have navigation buttons, not just close
+      // Driver.js will automatically show appropriate prev/next/close buttons based on step position
+
+      return processedStep;
+    });
+
+    // Use the proper filterValidSteps method to handle hidden fields correctly
+    const originalSteps = this.config.steps;
+    this.config.steps = processedSteps;
+
+    this.validSteps = this.filterValidSteps(processedSteps);
+
+    // Restore original config steps
+    this.config.steps = originalSteps;
+
+    if (this.validSteps.length === 0) {
+      console.warn('No valid tour steps found');
+      return;
+    }
+
+    // Create and start the quick tour
+    this.tour = this.driver({
+      showProgress: true,
+      animate: true,
+      smoothScroll: true,
+      overlayOpacity: 0.5,
+      allowKeyboardControl: true,
+      steps: this.validSteps,
+      onNextClick: async (element) => {
+        const nextIndex = this.tour.getActiveIndex() + 1;
+        if (nextIndex < this.validSteps.length) {
+          const nextElement = document.querySelector(this.validSteps[nextIndex].element);
+          await this.handleBurgerMenuBeforeStep(nextElement, nextIndex);
+          if (nextElement && !this.isMobile) {
+            nextElement.focus();
+          }
+        }
+        this.tour.moveNext();
+      },
+      onPrevClick: async (element) => {
+        const currentIndex = this.tour.getActiveIndex();
+        const prevIndex = currentIndex - 1;
+
+        // If we're at the first step of the quick tour and trying to go back,
+        // show the welcome modal instead
+        if (currentIndex === 0) {
+          this.finishTour();
+          const webUI = WebUI.getInstance();
+          if (webUI) {
+            webUI.showWelcomeModal();
+          }
+          return;
+        }
+
+        if (prevIndex >= 0) {
+          const prevElement = document.querySelector(this.validSteps[prevIndex].element);
+          await this.handleBurgerMenuBeforeStep(prevElement, prevIndex);
+          if (prevElement && !this.isMobile) {
+            prevElement.focus();
+          }
+        }
+        this.tour.movePrevious();
+      },
+      onDestroyStarted: () => this.finishTour(),
+      onHighlighted: (element) => {
+        this.cleanupInlineStyles();
+        this.handleBurgerMenuSimple(element);
+      }
+    });
+
+    // Start the quick tour
+    this.tour.drive();
+  }
+
   followFocus(event) {
     if (!event.target.matches('#startWizard') && 
         !event.target.closest('#mobileMenuToggle, #mobileMenu')) {
@@ -458,11 +822,12 @@ class Wizard {
 
   finishTour() {
     this.cleanupHighlighting();
+
     if (this.tour) {
       this.tour.destroy();
       this.tour = null;
     }
-    
+
     // Close burger menu if we opened it for the wizard
     const burgerMenu = window.mobileBurgerMenuInstance;
     if (this.wizardOpenedBurgerMenu && burgerMenu && burgerMenu.isOpen) {

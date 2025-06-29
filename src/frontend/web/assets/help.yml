@@ -31,6 +31,54 @@ steps:
       prevBtnText: ["← Welcome"]
       nextBtnText: ["Start tour →"]
 
+  - element: ".header-center"
+    popover:
+      description: "<p>These are the main action buttons.</p><p>Use <strong>Run Simulation</strong> to calculate your financial projections, <strong>Save</strong> and <strong>Load</strong> to manage your scenarios, and <strong>Help</strong> to get assistance with any field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#runSimulation"
+    popover:
+      description: "<p>Once you have entered all the data,<br/> click here to run the simulation.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#progress"
+    popover:
+      description: "<p>The outcome of the simulation will be shown here.</p><p>If you specified zero volatility in all investment vehicles, this will show either 'Success' or the age at which you ran out of money. If you specified some volatility, it will show the probability of success of your scenario.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#saveSimulation"
+    popover:
+      description: "<p>Click here to save your scenario to a file in your local disk.</p>"
+      side: "bottom"
+      align: "end"
+
+  - element: "#loadSimulation"
+    popover:
+      description: "<p>Click here to load a scenario from a file.</p>"
+      side: "bottom"
+      align: "end"
+
+  - element: "#loadDemoScenarioHeader"
+    popover:
+      description: "<p>Click this button to load a pre-configured example scenario into the simulator.</p>"
+      side: "bottom"
+      align: "end"
+
+  - element: "#startWizard"
+    popover:
+      description: "<p>You can get help with any field by pressing the Help button or the ? key while on that field.</p>"
+      side: "left"
+      align: "center"
+
+  - element: ".parameters-section"
+    popover:
+      description: "<p>These panels contain all the parameters for your financial simulation.</p><p>Fill out your current financial situation, targets, investment allocations, and economic assumptions. You can get detailed help for individual fields by clicking the info icons on each panel.</p>"
+      side: "right"
+      align: "start"
+
   - element: "#startingPosition"
     popover:
       description: "<p>This is where you describe your current financial situation.</p><p>It's the starting point for the simulation.</p>"
@@ -207,19 +255,19 @@ steps:
 
   - element: "#growthRates"
     popover:
-      description: "<p>Here is where you speculate how the economy will do on average in the future.</p><p>Use the toggle in the top right to switch between deterministic and Monte Carlo simulation modes. In deterministic mode, fixed growth rates are used for a single predictable outcome. In Monte Carlo mode, volatility is added to run ${simulationRuns} scenarios providing a probability of success.</p><p>You may want to enter conservative numbers to stress test your scenario. For reference, the average annual growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index} in US dollars (not adjusted for inflation and not including fees).</p>"
+      description: "<p>Here is where you speculate how the economy will do on average in the future.</p><p>Use the toggle in the top right to switch between fixed and variable growth modes.</p><p>You may want to enter conservative growth numbers to stress test your scenario.</p>"
       side: "right"
       align: "start"
 
   - element: "#economyModeDeterministic"
     popover:
-      description: "<p>Deterministic simulation mode.</p><p>In this mode, the simulation uses fixed growth rates without volatility. This provides a single, predictable outcome based on your specified growth rates. Volatility fields are hidden in this mode.</p>"
+      description: "<p>Fixed growth mode.</p><p>In this mode, the simulation uses fixed growth rates without volatility. This provides a single, predictable outcome based on your specified growth rates. Volatility fields are hidden in this mode.</p>"
       side: "bottom"
       align: "center"
 
   - element: "#economyModeMonteCarlo"
     popover:
-      description: "<p>Monte Carlo simulation mode.</p><p>In this mode, the simulation runs ${simulationRuns} times using both growth rates and volatility. This provides a probability of success rather than a single outcome, accounting for market uncertainty and fluctuations.</p>"
+      description: "<p>Variable growth mode.</p><p>In this mode, the simulation runs ${simulationRuns} times using both growth rates and volatility. This provides a probability of success rather than a single outcome, accounting for market uncertainty and fluctuations. At least one of the volatiliy rates must be greater than 0%.</p>"
       side: "bottom"
       align: "center"
 
@@ -231,7 +279,7 @@ steps:
 
   - element: "#PensionGrowthStdDev"
     popover:
-      description: "<p>The expected standard deviation of the annual growth rate of your private pension.</p><p>This field is only used in Monte Carlo simulation mode. Keep in mind that pension funds tend to invest more conservatively so may have lower volatility than the stock market. Take that into account when calculating this number.</p>"
+      description: "<p>The expected standard deviation of the annual growth rate of your private pension.</p><p>This field is only used in variable rate simulation mode. Keep in mind that pension funds tend to invest more conservatively so may have lower volatility than the stock market. Take that into account when calculating this number.</p>"
       side: "right"
       align: "start"
 
@@ -243,7 +291,7 @@ steps:
 
   - element: "#FundsGrowthStdDev"
     popover:
-      description: "<p>The expected standard deviation of the annual growth rate of your index funds (e.g. ETFs).</p><p>This field is only used in Monte Carlo simulation mode. For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
+      description: "<p>The expected standard deviation of the annual growth rate of your index funds (e.g. ETFs).</p><p>This field is only used in variable rate simulation mode. For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
       side: "right"
       align: "start"
 
@@ -255,7 +303,7 @@ steps:
 
   - element: "#SharesGrowthStdDev"
     popover:
-      description: "<p>The expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>This field is only used in Monte Carlo simulation mode. For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
+      description: "<p>The expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>This field is only used in variable rate simulation mode. For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
       side: "right"
       align: "start"
 
@@ -988,41 +1036,10 @@ steps:
 
 ###########################################################
 
-
-  - element: "#runSimulation"
+  - element: ".graphs-section"
     popover:
-      description: "<p>Once you have entered all the data,<br/> click here to run the simulation.</p>"
-      side: "bottom"
-      align: "center"
-
-  - element: "#progress"
-    popover:
-      description: "<p>The outcome of the simulation will be shown here.</p><p>If you specified zero volatility in all investment vehicles, this will show either 'Success' or the age at which you ran out of money. If you specified some volatility, it will show the probability of success of your scenario.</p>"
-      side: "bottom"
-      align: "center"
-
-  - element: "#saveSimulation"
-    popover:
-      description: "<p>Click here to save your scenario to a file in your local disk.</p>"
-      side: "bottom"
-      align: "end"
-  
-  - element: "#loadSimulation"
-    popover:
-      description: "<p>Click here to load a scenario from a file.</p>"
-      side: "bottom"
-      align: "end"
-  
-  - element: "#loadDemoScenarioHeader"
-    popover:
-      description: "<p>Click this button to load a pre-configured example scenario into the simulator.</p>"
-      side: "bottom"
-      align: "end"
-  
-  - element: "#startWizard"
-    popover:
-      description: "<p>You can get help with any field by pressing the Help button or the ? key while on that field.</p>"
-      side: "left"
+      description: "<p>These graphs show your financial projections over time.</p><p>The <strong>cashflow graph</strong> shows your income and expenses by category, with a line showing your net cashflow. The <strong>assets graph</strong> shows how your wealth grows and is distributed across different asset types.</p>"
+      side: "top"
       align: "center"
 
   - element: "#cashflowGraph"
@@ -1030,7 +1047,7 @@ steps:
       description: "<p>This graph shows your projected cashflow over time.</p>"
       side: "top"
       align: "center"
-  
+
   - element: "#assetsGraph"
     popover:
       description: "<p>This graph shows your projected assets over time.</p>"

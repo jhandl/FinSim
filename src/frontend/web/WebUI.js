@@ -33,6 +33,15 @@ class WebUI extends AbstractUI {
       this.fileManager = new FileManager(this);
       this.eventsTableManager = new EventsTableManager(this);
       this.dragAndDrop = new DragAndDrop();
+
+      // Initialize WelcomeModal with error checking
+      try {
+        this.welcomeModal = new WelcomeModal();
+      } catch (error) {
+        console.error('Error creating WelcomeModal:', error);
+        this.welcomeModal = null;
+      }
+
       this.editCallbacks = new Map();
       
       // Connect error modal to notification utils
@@ -48,6 +57,7 @@ class WebUI extends AbstractUI {
       this.setupEconomyModeToggle(); // Setup the deterministic/Monte Carlo mode toggle
       this.setupParameterTooltips(); // Setup parameter age field tooltips
       this.setupVisualizationControls(); // Setup visualization controls
+      this.setupCardInfoIcons(); // Setup info icons on cards
       this.setupDataExportButton(); // Setup data table CSV export button
       this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
       
@@ -149,6 +159,36 @@ class WebUI extends AbstractUI {
 
   showToast(message, title, timeout) {
     this.notificationUtils.showToast(message, title, timeout);
+  }
+
+  showWelcomeModal() {
+    if (!this.welcomeModal) {
+      console.error('WelcomeModal not available');
+      return;
+    }
+
+    try {
+      // Show welcome modal with callbacks for quick tour and full tour
+      this.welcomeModal.show(
+        () => {
+          // Callback for "Quick Tour" button - start the quick tour
+          console.log('Quick Tour clicked');
+          const wizard = Wizard.getInstance();
+          if (wizard) {
+            wizard.startQuickTour(); // Start the quick tour that shows card overviews
+          }
+        },
+        () => {
+          // Callback for "Full Tour" button - start the original wizard tour from header buttons
+          const wizard = Wizard.getInstance();
+          if (wizard) {
+            wizard.start(2); // Start from step 2 (header buttons), skipping welcome and how-to popovers
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error showing welcome modal:', error);
+    }
   }
 
   setVersionNote(message) {
@@ -433,15 +473,16 @@ class WebUI extends AbstractUI {
     const wizard = Wizard.getInstance();
     const helpButton = document.getElementById('startWizard');
     if (helpButton) {
-      helpButton.addEventListener('click', () => {
+      helpButton.addEventListener('click', (e) => {
+        e.preventDefault();
         // Use wizard's built-in logic only if there was a recently focused input field
         // lastStepIndex > 0 alone doesn't indicate field context, just previous wizard usage
         if (wizard.lastFocusedWasInput && wizard.lastFocusedField) {
           // There was recent field interaction - use wizard's built-in logic
           wizard.start();
         } else {
-          // No recent field interaction - start from step 1 (how to use the simulator)
-          wizard.start(1);
+          // No recent field interaction - show welcome modal
+          this.showWelcomeModal();
         }
       });
     }
@@ -449,18 +490,20 @@ class WebUI extends AbstractUI {
     if (userManualButton) {
       userManualButton.addEventListener('click', () => wizard.start(0));
     }
-    document.addEventListener('keydown', function(event) {
+    document.addEventListener('keydown', (event) => {
       if (event.key === '?') {
         event.preventDefault();
         // For keyboard shortcut, use same logic as Help button
         if (wizard.lastFocusedWasInput && wizard.lastFocusedField) {
           wizard.start();
         } else {
-          wizard.start(1);
+          this.showWelcomeModal();
         }
       }
     });
   }
+
+
 
   setupNavigation() {
     document.querySelectorAll('a[href^="/"]').forEach(link => {
@@ -469,6 +512,132 @@ class WebUI extends AbstractUI {
         window.parent.postMessage({ type: 'navigate', href: link.getAttribute('href') }, '*');
       });
     });
+  }
+
+  setupCardInfoIcons() {
+    const cardSelectors = [
+      '.card',                    // Standard parameter cards
+      '.events-section',          // Events section
+      '.graph-container',         // Graph containers
+      '.data-section'            // Data table section
+    ];
+
+    cardSelectors.forEach(selector => {
+      const cards = document.querySelectorAll(selector);
+      cards.forEach(card => {
+        // Special handling for graph containers
+        if (card.classList.contains('graph-container')) {
+          this.setupGraphContainerIcon(card);
+          return;
+        }
+
+        // Find the h2 element within this card
+        const h2Element = card.querySelector('h2');
+        if (!h2Element) {
+          return; // Skip if no h2 found
+        }
+
+        // Skip if icon already exists
+        if (h2Element.querySelector('.card-info-icon')) {
+          return;
+        }
+
+        // Create and configure info icon
+        const infoIcon = document.createElement('div');
+        infoIcon.className = 'card-info-icon';
+        infoIcon.textContent = 'i';
+        infoIcon.title = 'Information';
+
+        // Add click event listener
+        infoIcon.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.handleInfoIconClick(card);
+        });
+
+        // Append to the h2 element
+        h2Element.appendChild(infoIcon);
+      });
+    });
+  }
+
+  setupGraphContainerIcon(graphContainer) {
+    // Skip if icon already exists
+    if (graphContainer.querySelector('.card-info-icon')) {
+      return;
+    }
+
+    // Determine graph title based on canvas ID
+    const canvas = graphContainer.querySelector('canvas');
+    let title = 'Graph';
+    if (canvas) {
+      if (canvas.id === 'cashflowGraph') {
+        title = 'Cashflow';
+      } else if (canvas.id === 'assetsGraph') {
+        title = 'Assets';
+      }
+    }
+
+    // Create title element
+    const titleElement = document.createElement('h2');
+    titleElement.textContent = title;
+    titleElement.style.position = 'absolute';
+    titleElement.style.top = '1.2rem';
+    titleElement.style.left = '50%';
+    titleElement.style.transform = 'translateX(-50%)';
+    titleElement.style.margin = '0';
+    titleElement.style.fontSize = '1.08rem';
+    titleElement.style.fontWeight = '600';
+    titleElement.style.zIndex = '20';
+    titleElement.style.pointerEvents = 'none';
+    titleElement.style.color = 'var(--text-color)';
+    titleElement.style.textAlign = 'center';
+
+    // Create and configure info icon
+    const infoIcon = document.createElement('div');
+    infoIcon.className = 'card-info-icon';
+    infoIcon.textContent = 'i';
+    infoIcon.title = 'Information';
+    infoIcon.style.pointerEvents = 'auto'; // Allow clicks on the icon
+
+    // Add click event listener
+    infoIcon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.handleInfoIconClick(graphContainer);
+    });
+
+    // Append icon to title, then title to graph container
+    titleElement.appendChild(infoIcon);
+    graphContainer.appendChild(titleElement);
+
+    // Add class to trigger CSS adjustments for canvas positioning
+    graphContainer.classList.add('has-html-title');
+  }
+
+  handleInfoIconClick(cardElement) {
+    // Determine card type from parent element
+    let cardType = 'unknown';
+
+    if (cardElement.id) {
+      cardType = cardElement.id;
+    } else if (cardElement.classList.contains('events-section')) {
+      cardType = 'events';
+    } else if (cardElement.classList.contains('graph-container')) {
+      cardType = 'graphs';
+    } else if (cardElement.classList.contains('data-section')) {
+      cardType = 'data';
+    }
+
+    // Now call the wizard's showCardOverview method
+    const wizard = Wizard.getInstance();
+    if (wizard && cardType !== 'unknown') {
+      try {
+        wizard.showCardOverview(cardType);
+      } catch (error) {
+        console.error('Error calling wizard.showCardOverview:', error);
+      }
+    } else {
+      console.warn(`Cannot show overview for card type: ${cardType}`);
+    }
   }
 
   clearExtraDataRows(maxAge) {
@@ -1452,12 +1621,9 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
   try {
     const webUi = WebUI.getInstance(); // Get WebUI instance
     await Config.initialize(webUi);   // Initialize Config and wait for it
-    
-    // Automatically start the wizard
-    const wizard = Wizard.getInstance();
-    if (wizard) {
-      wizard.start(0); // Start wizard from the first step (welcome popover)
-    }
+
+    // Show welcome modal instead of automatically starting wizard
+    webUi.showWelcomeModal();
 
     // Any further app initialization that depends on Config being ready can go here.
     // For example, if WebUI needs to refresh something based on config:

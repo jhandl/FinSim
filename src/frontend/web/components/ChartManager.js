@@ -199,11 +199,7 @@ class ChartManager {
           plugins: {
             ...commonOptions.plugins,
             title: {
-              display: true,
-              text: 'Cashflow',
-              font: {
-                size: 20
-              }
+              display: false  // Disabled since we now use HTML titles with info icons
             },
             legend: {
               position: 'right',
@@ -276,11 +272,7 @@ class ChartManager {
           plugins: {
             ...commonOptions.plugins,
             title: {
-              display: true,
-              text: 'Assets',
-              font: {
-                size: 20
-              }
+              display: false  // Disabled since we now use HTML titles with info icons
             },
             legend: {
               position: 'right',

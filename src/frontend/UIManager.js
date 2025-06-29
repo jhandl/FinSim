@@ -190,6 +190,14 @@ class UIManager {
       simulation_mode: this.ui.getValue("simulation_mode"),
       economyMode: this.ui.getValue("economy_mode")
     };
+
+    // In deterministic mode, override volatility parameters to 0 to ensure fixed growth rates
+    // This ensures equity classes receive 0 standard deviation and use only the mean growth rate
+    if (params.economyMode === 'deterministic') {
+      params.growthDevPension = 0;
+      params.growthDevFunds = 0;
+      params.growthDevShares = 0;
+    }
     
     if (validate) {
       // Check mandatory fields first
@@ -249,6 +257,16 @@ class UIManager {
       
       // Validate percentage fields
       this.validateParameterPercentageFields(params);
+
+      // Validate volatility parameters for variable rate mode
+      if (params.economyMode === 'montecarlo') {
+        if (params.growthDevPension === 0 && params.growthDevFunds === 0 && params.growthDevShares === 0) {
+          this.ui.setWarning("PensionGrowthStdDev", "At least one volatility rate must be greater than 0% in variable growth mode");
+          this.ui.setWarning("FundsGrowthStdDev", "At least one volatility rate must be greater than 0% in variable growth mode");
+          this.ui.setWarning("SharesGrowthStdDev", "At least one volatility rate must be greater than 0% in variable growth mode");
+          errors = true;
+        }
+      }
     }
 
     return params;

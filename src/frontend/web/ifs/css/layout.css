@@ -92,6 +92,14 @@ footer {
   padding: 1.35rem;
 }
 
+/* Adjust canvas for graph containers with HTML titles */
+.graph-container.has-html-title canvas {
+  top: 3.5rem !important;
+  height: calc(100% - 3.5rem) !important;
+  padding-top: 0 !important;
+  padding-bottom: 1.35rem !important;
+}
+
 
 /* Add these styles for the data table */
 .data-section {
