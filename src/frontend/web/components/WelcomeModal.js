@@ -58,6 +58,12 @@ class WelcomeModal {
     this.modal = document.createElement('div');
     this.modal.className = 'welcome-modal';
     this.modal.setAttribute('tabindex', '-1'); // Make modal focusable
+
+    // Start completely invisible for measurement
+    this.modal.style.visibility = 'hidden';
+    this.modal.style.opacity = '0';
+    this.modal.style.display = 'flex'; // But still rendered for measurement
+
     this.modal.innerHTML = `
       <div class="welcome-modal-content">
         <div class="welcome-modal-header">
@@ -78,6 +84,14 @@ class WelcomeModal {
     `;
 
     document.body.appendChild(this.modal);
+
+    // Measure and apply dynamic height while invisible
+    this.applyDynamicHeight();
+
+    // Now make it ready for the show animation
+    this.modal.style.visibility = '';  // Clear the visibility override
+    this.modal.style.opacity = '';     // Clear the opacity override to let CSS handle it
+    this.modal.style.display = 'none'; // Reset for show() method
   }
 
   createTabs() {
@@ -170,7 +184,7 @@ class WelcomeModal {
 
   hide() {
     if (!this.modal) return;
-    
+
     this.modal.classList.remove('visible');
     setTimeout(() => {
       this.modal.style.display = 'none';
@@ -180,6 +194,104 @@ class WelcomeModal {
         this.keydownHandler = null;
       }
     }, 300);
+  }
+
+  measureAllTabHeights() {
+    if (!this.contentData.tabs) return [];
+
+    const heights = [];
+
+    // Get the actual modal content width to match the real tab content area
+    const modalContent = this.modal.querySelector('.welcome-modal-content');
+    const actualWidth = modalContent ? modalContent.offsetWidth : 600;
+
+    this.contentData.tabs.forEach(tab => {
+      // Create a test container that mimics the modal structure
+      const testContainer = document.createElement('div');
+      testContainer.style.position = 'absolute';
+      testContainer.style.top = '-9999px';
+      testContainer.style.left = '0';
+      testContainer.style.width = `${actualWidth}px`;
+      testContainer.style.visibility = 'hidden';
+
+      // Create the content div with the same structure as the real tab content
+      const testContent = document.createElement('div');
+      testContent.style.padding = '20px';
+      testContent.style.position = 'relative'; // Use relative instead of absolute for measurement
+      testContent.style.width = '100%';
+      testContent.style.boxSizing = 'border-box';
+      testContent.innerHTML = tab.content;
+
+      testContainer.appendChild(testContent);
+      document.body.appendChild(testContainer);
+
+      // Force layout and measure
+      testContainer.offsetHeight;
+      const testHeight = testContent.scrollHeight;
+
+      document.body.removeChild(testContainer);
+
+      heights.push({ id: tab.id, height: testHeight });
+    });
+
+    return heights;
+  }
+
+  calculateOptimalHeight() {
+    if (!this.modal) return null;
+
+    // Get fixed elements heights
+    const header = this.modal.querySelector('.welcome-modal-header');
+    const footer = this.modal.querySelector('.welcome-modal-footer');
+    const tabs = this.modal.querySelector('.welcome-tabs');
+
+    const headerHeight = header ? header.offsetHeight : 0;
+    const footerHeight = footer ? footer.offsetHeight : 0;
+    const tabsHeight = tabs ? tabs.offsetHeight : 0;
+
+    // Find the tallest tab content
+    const tabHeights = this.measureAllTabHeights();
+    const maxContentHeight = Math.max(...tabHeights.map(t => t.height), 0);
+
+    // The measured content height already includes padding (20px), so we don't need to add extra
+    // Just add a minimal buffer for any spacing between tabs and content
+    const buffer = 5;
+
+    return headerHeight + footerHeight + tabsHeight + maxContentHeight + buffer;
+  }
+
+  applyDynamicHeight() {
+    const optimalHeight = this.calculateOptimalHeight();
+
+    if (optimalHeight) {
+      const isMobile = window.innerWidth <= 768;
+      const maxHeightRatio = isMobile ? 0.90 : 0.85;
+      const maxHeight = window.innerHeight * maxHeightRatio;
+      const finalHeight = Math.min(optimalHeight, maxHeight);
+
+      const modalContent = this.modal.querySelector('.welcome-modal-content');
+      const header = this.modal.querySelector('.welcome-modal-header');
+      const footer = this.modal.querySelector('.welcome-modal-footer');
+      const modalBody = this.modal.querySelector('.welcome-modal-body');
+
+      // Get current header and footer heights before changing modal height
+      const headerHeight = header ? header.offsetHeight : 0;
+      const footerHeight = footer ? footer.offsetHeight : 0;
+
+      // Set the total modal height
+      modalContent.style.height = `${finalHeight}px`;
+
+      // Calculate the body height by subtracting header and footer
+      const bodyHeight = finalHeight - headerHeight - footerHeight;
+
+      modalBody.style.height = `${bodyHeight}px`;
+      modalBody.style.minHeight = 'auto'; // Override the CSS min-height constraint
+
+      // If content is taller than max height, enable scrolling
+      if (optimalHeight > maxHeight) {
+        modalBody.style.overflowY = 'auto';
+      }
+    }
   }
 
   destroy() {
