@@ -172,7 +172,6 @@ class WebUI extends AbstractUI {
       this.welcomeModal.show(
         () => {
           // Callback for "Quick Tour" button - start the quick tour
-          console.log('Quick Tour clicked');
           const wizard = Wizard.getInstance();
           if (wizard) {
             wizard.startQuickTour(); // Start the quick tour that shows card overviews

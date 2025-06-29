@@ -230,13 +230,20 @@ class Wizard {
   // Helper function to check if an element is visible
   isElementVisible(element) {
     if (!element) return false;
-    
+
     // Check if element is hidden via display: none or visibility: hidden
     const style = window.getComputedStyle(element);
     if (style.display === 'none' || style.visibility === 'hidden') {
       return false;
     }
-    
+
+    // Additional check for opacity and dimensions
+    if (style.opacity === '0' ||
+        element.offsetWidth === 0 ||
+        element.offsetHeight === 0) {
+      return false;
+    }
+
     // Check if any parent wrapper is hidden (common case for P2 fields)
     let parent = element.closest('.input-wrapper');
     if (parent) {
@@ -245,7 +252,14 @@ class Wizard {
         return false;
       }
     }
-    
+
+    // Special case for header element: always consider it visible if it exists
+    // since it might be position: fixed on mobile and standard visibility checks
+    // might not work correctly
+    if (element.tagName && element.tagName.toLowerCase() === 'header') {
+      return true;
+    }
+
     return true;
   }
 
@@ -275,6 +289,22 @@ class Wizard {
           return false;
         }
 
+        // Overview elements (major UI sections) should always be valid if they exist
+        // No need to check visibility for these structural elements
+        const overviewElements = [
+          'header',
+          '.parameters-section',
+          '.events-section',
+          '.graphs-section',
+          '.data-section'
+        ];
+
+        if (overviewElements.includes(step.element)) {
+          const element = document.querySelector(step.element);
+          return element !== null;
+        }
+
+        // For other elements (form fields, buttons), check both existence and visibility
         const element = document.querySelector(step.element);
         return element !== null && this.isElementVisible(element);
       } else {
@@ -503,7 +533,7 @@ class Wizard {
     if (level === 'tour') {
       // Return overview steps for all major cards (quick tour)
       const overviewElements = [
-        '.header-center',        // Header buttons grouped together (start at top)
+        'header',                // Header buttons and burger menu grouped together (start at top)
         '.parameters-section',   // All parameter cards grouped together
         '.events-section',       // Events table
         '.graphs-section',       // Both graphs grouped together

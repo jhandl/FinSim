@@ -31,9 +31,9 @@ steps:
       prevBtnText: ["← Welcome"]
       nextBtnText: ["Start tour →"]
 
-  - element: ".header-center"
+  - element: "header"
     popover:
-      description: "<p>These are the main action buttons.</p><p>Use <strong>Run Simulation</strong> to calculate your financial projections, <strong>Save</strong> and <strong>Load</strong> to manage your scenarios, and <strong>Help</strong> to get assistance with any field.</p>"
+      description: "<p>These are the main action buttons.</p><p>Use <strong>Run</strong> to calculate your financial projections, <strong>Save</strong> and <strong>Load</strong> to manage your scenarios, and <strong>Help</strong> to get assistance with any field.</p><p><strong>Demo</strong> loads and runs a pre-configured example scenario into the simulator.</p><p>On smaller screens, some buttons move to the burger menu (☰) for better mobile experience.</p>"
       side: "bottom"
       align: "center"
 
@@ -75,7 +75,7 @@ steps:
 
   - element: ".parameters-section"
     popover:
-      description: "<p>These panels contain all the parameters for your financial simulation.</p><p>Fill out your current financial situation, targets, investment allocations, and economic assumptions. You can get detailed help for individual fields by clicking the info icons on each panel.</p>"
+      description: "<p>These panels contain all the parameters for your financial simulation.</p><p>Fill out your current financial situation, targets, investment allocations, and economic assumptions.</p><p>You can get detailed help for each panel and fields by clicking the info icons on each panel.</p>"
       side: "right"
       align: "start"
 
@@ -315,7 +315,7 @@ steps:
 
   - element: ".events-section"
     popover:
-      description: "<p>Here you can add, remove, and edit the events that make up your scenario. If at any time you want to learn more about the different types of event, you can select the event type you're interested in and click Help or press the '?' key.</p>"
+      description: "<p>Here you can add, remove, and edit the events that make up your scenario.</p><p>If at any time you want to learn more about the different types of event, you can select the event type you're interested in and click Help or press the '?' key.</p>"
       side: "top"
       align: "center"
 
@@ -1056,7 +1056,7 @@ steps:
 
   - element: ".data-section"
     popover:
-      description: "<p>Here you will see the actual numbers as they are computed by the simulator, year by year, from your current age to the final age.</p><p>The columns are mostly self-explanatory. The cash column under income may raise some eyebrows: it shows withdrawals from cash savings to cover expenses when the net income is not enough.</p>"
+      description: "<p>Here you will see the actual numbers as they are computed by the simulator, year by year, from your current age to the final age.</p><p>On smaller screens the table is hidden but you can tap 'Show anyway' to see it.</p>"
       side: "top"
       align: "left"
 

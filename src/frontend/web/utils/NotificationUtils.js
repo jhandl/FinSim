@@ -68,7 +68,6 @@ class NotificationUtils {
   }
 
   showToast(message, title, timeout=10) {
-    console.log("showToast called", { message, title, timeout });
     const toast = document.createElement('div');
     toast.className = 'toast-message';
     toast.textContent = title ? `${title}: ${message}` : message;

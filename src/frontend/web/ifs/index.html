@@ -743,9 +743,6 @@
             window.dispatchEvent(new CustomEvent('experimentalFeatureToggle', {
                 detail: { state: newState, enabled: newState === 'on' }
             }));
-            
-            // Optional: Show notification
-            console.log(`Tooltips ${newState === 'on' ? 'enabled' : 'disabled'}`);
         }
         
         initializeToggleState() {
