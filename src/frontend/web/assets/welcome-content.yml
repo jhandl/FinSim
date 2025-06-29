@@ -51,8 +51,8 @@ tabs:
     content: |
       <div class="welcome-list">
         <div class="list-item">
-          <strong>Present Value</strong>
-          <p>Enter all amounts in today's purchasing power - the simulator automatically adjusts for inflation over time.</p>
+          <strong>Demo Scenario</strong>
+          <p>The best way to get familiar with the simulator is to try the demo scenario. Hit the Demo button to load and run it.</p>
         </div>
         <div class="list-item">
           <strong>Stress Testing</strong>

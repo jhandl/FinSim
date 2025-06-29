@@ -504,6 +504,10 @@ header {
     z-index: 2;
 }
 
+.welcome-tab:focus {
+    outline: none;
+}
+
 
 
 .welcome-tab-content {
