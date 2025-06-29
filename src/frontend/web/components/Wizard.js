@@ -254,12 +254,27 @@ class Wizard {
 
     this.tableState = this.getEventTableState();
     const configCopy = JSON.parse(JSON.stringify(this.config));
-    
+
     return configCopy.steps.filter(step => {
       // Steps without elements are always valid
       if (!step.element) return true;
 
       if (!step.element.includes('Event')) {
+        // Special case for data-section: find the visible element and update selector
+        if (step.element === '.data-section') {
+          const elements = document.querySelectorAll(step.element);
+          const visibleElement = Array.from(elements).find(el => this.isElementVisible(el));
+          if (visibleElement) {
+            // Update the step to point to the specific visible element if it has an ID
+            // Otherwise keep the class selector (it will target the first visible one)
+            if (visibleElement.id) {
+              step.element = `#${visibleElement.id}`;
+            }
+            return true;
+          }
+          return false;
+        }
+
         const element = document.querySelector(step.element);
         return element !== null && this.isElementVisible(element);
       } else {
