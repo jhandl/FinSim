@@ -38,20 +38,27 @@ When the guided tour (bubbles.js) highlights a field inside a form *card*, the b
 
 ---
 
-## Testing Checklist
-- [ ] Desktop ≥1024px: Tour through a short card; verify the card stays fully visible.
-- [ ] Desktop: Very tall card; verify behaviour falls back gracefully.
-- [ ] Tablet & Mobile breakpoints (portrait + landscape).
-- [ ] Regression test: Tour steps targeting detached elements (no `.card`) still work.
+## Weird issue with cards jumping up and down
+
+This works perfectly for some cards: Starting Position and Allocations. But it has a weird behaviour in the Personal Circumstances, Targets, Economy and Events cards. On those cards the page shifts up for the odd fields (1, 3, 5), exactly to the position they were placed in before we implemented this plan, and then goes back to the position we implemented in this plan (whole card visible) for the even fields (2, 4).
+
+I already investigated the issue and discarded a number of potential root causes:
+
+- It's not that some cards may have fields arranged in two columns. The cards with the issue have only one column.
+- It's not that the cards are taller than the viewport. All the cards are shorter than 1/3 of the viewport height. Also they don't exceed the viewport width.
+- It's not that some cards have extra elements in their headers. Starting Position has extra elements, but Allocations and Targets don't, so that doesn't explain the issue.
+- It's not that the browser is scrolling the field into view asynchronously. The field is already in view: This happens after the card has been brought entirely into view at the top of the viewport under the header, with all its fields perfectly visible.
+- It's not that the cards are too tall for fitsVertically to be false. Starting Position and Personal Circumstances both have 5 fields (in one column), so are the same height, yet one works and the other doesn't. Targets and Allocations are both shorter card, yet one works and the other doesn't.
 
 ---
 
-## Progress Tracking
-- [ ] Confirm `.card` selector is correct for all wizard cards.
-- [ ] Implement logic in `scrollIntoView`.
-- [ ] Manual cross-device tests (checklist above).
-- [ ] Code review & merge.
+## Root Cause (confirmed)
 
----
+The alternating up-and-down scroll was a race condition:
 
-Once approved, we can proceed to implementation following this guide. 
+1. `Wizard.js` sets focus on the next input → browsers start an **implicit smooth scroll** to bring that input into view.
+2. Almost immediately our `scrollIntoView()` runs. If it measures the card *before* the smooth-scroll ends, the card header still sits at ≈0 px, so `topVisible` is `false`. One frame later the scroll completes and the card lands at 80 px, but we never re-measure.
+3. When `topVisible` is `true` (measurement happened *after* the implicit scroll settled) the predicate `fitsVertically && !(topVisible && bottomVisible)` chooses the **field** rectangle → the page scrolls down, hiding the header.
+4. On the next step `topVisible` becomes `false` and the predicate flips back to the **card** rectangle, restoring the correct position.
+
+Which branch we took depended on sub-frame timing and fractional-pixel rounding, hence the odd/even behaviour.  Waiting two `requestAnimationFrame`s before measuring guarantees the browser's own scroll has finished, eliminating the race entirely.

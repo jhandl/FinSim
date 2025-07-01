@@ -203,25 +203,24 @@
             this.cbHighlight(target);
         }
 
-        scrollIntoView(target) {
+        async scrollIntoView(target) {
+            // Wait two animation frames to let any implicit browser scroll
+            // triggered by element.focus() settle before we take measurements.
+            await new Promise(requestAnimationFrame);
+            await new Promise(requestAnimationFrame);
             const hdrH = this.header ? this.header.offsetHeight : 0;
             const margin = 20;
 
             const rect = target.getBoundingClientRect();
-            const card = target.closest('.card, .events-section, .data-section, .graphs-section');
+            const card = target.closest('.card');
             const cardRect = card ? card.getBoundingClientRect() : null;
 
             // Decide which rectangle we want to keep in view (card if possible, otherwise target)
             let desiredRect = rect;
             if (cardRect) {
                 const fitsVertically = cardRect.height <= (window.innerHeight - hdrH - 2 * margin);
-                const topVisible = cardRect.top >= hdrH;
+                const topVisible = cardRect.top >= hdrH + margin;
                 const bottomVisible = cardRect.bottom <= window.innerHeight - margin;
-
-                // If the entire card is already visible, no vertical scroll is required
-                if (fitsVertically && topVisible && bottomVisible) {
-                    return Promise.resolve();
-                }
 
                 // If card fits and is not already fully visible, scroll to reveal full card
                 if (fitsVertically && !(topVisible && bottomVisible)) {
@@ -229,24 +228,9 @@
                 }
             }
 
-            // Compute scroll destination only if necessary
-            let dest = window.scrollY; // default: no scroll
-
-            const topViewport = hdrH;
-            const bottomViewport = window.innerHeight - margin;
-
-            if (desiredRect.top < topViewport) {
-                // Element is above visible area => scroll up so its top sits at topViewport
-                dest = desiredRect.top + window.scrollY - topViewport;
-            } else if (desiredRect.bottom > bottomViewport) {
-                // Element is below visible area => scroll down just enough to show its bottom
-                const offset = desiredRect.bottom - bottomViewport;
-                dest = window.scrollY + offset;
-            }
-
-            // Clamp destination within document bounds
+            const rawDest = desiredRect.top + window.scrollY - hdrH - margin;
             const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-            dest = Math.min(maxScroll, Math.max(0, dest));
+            const dest = Math.min(maxScroll, Math.max(0, rawDest));
 
             return new Promise(res => {
                 const distance = Math.abs(window.scrollY - dest);
@@ -424,7 +408,7 @@
                 // Determine anchor rect: card container for mobile if exists, otherwise element itself
                 let anchorRect = tr;
                 if (isMobile) {
-                    const card = target.closest('.card, .events-section, .data-section, .graphs-section');
+                    const card = target.closest('.card');
                     if (card) anchorRect = card.getBoundingClientRect();
                 }
 
