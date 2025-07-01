@@ -867,10 +867,18 @@ class Wizard {
 
   handleClick(event) {
     // Clear field tracking when clicking on non-input elements
-    // This handles cases where clicking on non-focusable elements doesn't trigger focusin
+    // This ensures clicks on non-focusable elements reset last focused state
     if (!event.target.matches('input, textarea, select')) {
       this.lastFocusedField = null;
       this.lastFocusedWasInput = false;
+    }
+
+    // Close the wizard if the click/tap is outside the tour popover
+    if (this.wizardActive) {
+      const popoverEl = document.querySelector('.driver-popover');
+      if (popoverEl && !event.target.closest('.driver-popover')) {
+        this.finishTour();
+      }
     }
   }
 

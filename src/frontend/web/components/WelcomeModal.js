@@ -133,11 +133,15 @@ class WelcomeModal {
       }
     });
 
-    skipBtn.addEventListener('click', () => {
+    skipBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       this.hide();
       if (this.onSkipCallback) this.onSkipCallback();
     });
-    tourBtn.addEventListener('click', () => {
+    tourBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       this.hide();
       if (this.onTourStartCallback) this.onTourStartCallback();
     });

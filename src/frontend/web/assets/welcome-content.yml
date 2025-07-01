@@ -56,10 +56,10 @@ tabs:
         </div>
         <div class="list-item">
           <strong>Stress Testing</strong>
-          <p>Try different economic scenarios - higher inflation, lower investment returns, or market crashes - to see how robust your plan is.</p>
+          <p>Try different economic scenarios such as higher inflation, lower investment returns and market crashes to see how robust your plan is.</p>
         </div>
         <div class="list-item">
           <strong>Pinch Point Visualization</strong>
-          <p>Use the color scheme dropdown to highlight critical periods in your plan.</p>
+          <p>Use the color scheme dropdown in the data table to highlight critical periods in your plan.</p>
         </div>
       </div>

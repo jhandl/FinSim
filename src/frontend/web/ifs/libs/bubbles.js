@@ -265,6 +265,13 @@
         }
 
         applyHighlight(target) {
+            // Guard against cases where the tour was destroyed while asynchronous
+            // work (eg. smooth-scroll promises) was still pending. In such a case
+            // the overlay elements get cleaned up and this.overlay is reset to
+            // null inside destroy(). Trying to access it would throw.
+            if (!this.overlay) {
+                return; // Nothing to highlight – the walkthrough has ended.
+            }
             // clear previous
             document.querySelectorAll('.driver-active-element').forEach(el => el.classList.remove('driver-active-element'));
             target.classList.add('driver-active-element');
@@ -281,6 +288,13 @@
         }
 
         updatePopover(step, target) {
+            // It is possible that the tour has been destroyed (eg. by an
+            // onDestroyStarted callback) while an awaited task inside showStep
+            // was still in flight. Bail out early if the popover DOM nodes have
+            // already been removed.
+            if (!this.pop) {
+                return;
+            }
             const { root, title, desc, btnPrev, btnNext, btnClose } = this.pop;
             // content
             title.textContent = step.popover?.title || '';

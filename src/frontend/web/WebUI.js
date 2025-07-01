@@ -474,20 +474,22 @@ class WebUI extends AbstractUI {
     if (helpButton) {
       helpButton.addEventListener('click', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         // Use wizard's built-in logic only if there was a recently focused input field
-        // lastStepIndex > 0 alone doesn't indicate field context, just previous wizard usage
         if (wizard.lastFocusedWasInput && wizard.lastFocusedField) {
-          // There was recent field interaction - use wizard's built-in logic
           wizard.start();
         } else {
-          // No recent field interaction - show welcome modal
           this.showWelcomeModal();
         }
       });
     }
     const userManualButton = document.getElementById('userManual');
     if (userManualButton) {
-      userManualButton.addEventListener('click', () => wizard.start(0));
+      userManualButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        wizard.start(0);
+      });
     }
     document.addEventListener('keydown', (event) => {
       if (event.key === '?') {
@@ -501,8 +503,6 @@ class WebUI extends AbstractUI {
       }
     });
   }
-
-
 
   setupNavigation() {
     document.querySelectorAll('a[href^="/"]').forEach(link => {
