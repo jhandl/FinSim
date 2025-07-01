@@ -73,8 +73,8 @@ function navigateTo(path) {
 /**
  * Handle routing based on the current path
  */
-function handleRoute(route) {    
-    // Route handling
+function handleRoute(route) {
+    // Basic route handling based on hash
     if (route === '' || route === '/') {
         loadPage(routes['/']);
     } else if (route === '#ifs') {
@@ -111,7 +111,7 @@ async function loadPage(routeConfig) {
         // Add the new iframe to the container
         container.appendChild(newFrame);
         
-        // Load the page into the new iframe
+        // Build iframe source (cache-busted)
         newFrame.src = routeConfig.contentPath + '?v=' + new Date().getTime();
         
     } catch (error) {

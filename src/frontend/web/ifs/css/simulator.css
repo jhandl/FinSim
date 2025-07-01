@@ -71,6 +71,14 @@ header {
     align-items: center;
     height: 60px;
     justify-content: space-between;
+    transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+}
+
+/* Initially hide header until JS removes this class */
+header.header-hidden {
+    transform: translateY(-120%);
+    opacity: 0;
+    pointer-events: none;
 }
 
 .header-left {
@@ -448,9 +456,9 @@ header {
     align-items: center;
     justify-content: center;
     position: absolute;
-    right: 20px;
-    top: 50%;
-    transform: translateY(-50%);
+    right: 0px;
+    top: 0px;
+    transform: none;
 }
 
 .welcome-modal-close:hover {
@@ -607,7 +615,7 @@ header {
 
 .step-content p,
 .list-item p {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     line-height: 1.3;
     color: #666;
     margin: 0;
@@ -775,7 +783,7 @@ body.modal-open {
 
     .step-content p,
     .list-item p {
-        font-size: 0.8rem;
+        font-size: 0.9rem;
     }
 }
 

@@ -34,6 +34,7 @@ steps:
   - element: "header"
     popover:
       description: "<p>These are the main action buttons.</p><p>Use <strong>Run</strong> to calculate your financial projections, <strong>Save</strong> and <strong>Load</strong> to manage your scenarios, and <strong>Help</strong> to get assistance with any field.</p><p><strong>Demo</strong> loads and runs a pre-configured example scenario into the simulator.</p><p>On smaller screens, some buttons move to the burger menu (☰) for better mobile experience.</p>"
+      showButtons: ["next", "close"]
       side: "bottom"
       align: "center"
 

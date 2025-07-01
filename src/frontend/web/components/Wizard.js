@@ -836,6 +836,17 @@ class Wizard {
       }
     });
 
+    // Attach keyboard handlers and mobile tweaks like in main start()
+    document.addEventListener('keydown', this.handleKeys);
+    this.disableMobileKeyboard();
+    this.wizardActive = true;
+    if (this.isMobile) {
+      document.body.setAttribute('data-wizard-active', 'true');
+      document.addEventListener('focusin', this.preventFocus, true);
+      document.addEventListener('touchstart', this.preventTouch, true);
+      document.addEventListener('click', this.preventTouch, true);
+    }
+
     // Start the quick tour
     this.tour.drive();
   }

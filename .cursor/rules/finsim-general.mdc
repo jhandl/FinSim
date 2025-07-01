@@ -3,8 +3,8 @@ description:
 globs: 
 alwaysApply: true
 ---
-Always read [AGENTS.md](mdc:AGENTS.md) to understand the project. Never assume how the code works, always read the relevant source code files to understand the code. When implementing a change, do it in the most elegant, no-nonsense way possible, while not being overly verbose (don't create unnecessary one-time-use helper methods) and strictly adhering to the way the existing code already works. No hacks please.
+Always read [AGENTS.md](mdc:AGENTS.md) to understand the project. Never assume how the code works, always read the relevant source code files to understand the code. When implementing a change, do it in the most elegant, no-nonsense way possible, while not being overly verbose (don't create unnecessary one-time-use helper methods) and strictly adhering to the way the existing code already works. NO HACKS!
 
-When fixing an issue don't just jump to conclusions and start making sweeping changes based on absolutely no information. Elaborate hipotheses and seek to prove which one it is. Once you have positive proof of the root cause, only then fix it. 
+When fixing an issue you tend to jump to conclusions and start making sweeping changes based on absolutely no information. Don't do that. You should always debug first. That means that you need to formulate 5 to 7 hypothesis, select the one or two most likely, add logging to confirm, and only when the root cause has been unequivocally proven, only then apply a fix, without removing the logging. Then test the fix by checking the logs. Once you have confirmed that it works, only then remove the logging. Once that is done, you can declare that you fixed the issue. No sooner than that. DO NOT MAKE ASSUMPTIONS ABOUT THE CAUSE OF AN ISSUE. ALWAYS DEBUG!
 
-A local webserver is always running, so there's never need to start a new one to.
+A local webserver is always running, so there's never need to start a new one to. DO NOT ASK THE USER TO RUN A SERVER. IT'S ALWAYS ALREADY RUNNING!
