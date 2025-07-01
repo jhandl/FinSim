@@ -153,4 +153,80 @@ class FormatUtils {
     });
   }
 
+  static processMarkdownLinks(text) {
+    if (!text) return text;
+    return text.replace(
+      /\[([^\]]+)\]\(([^\)]+)\)(?:\{[^\}]*\})?/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+    );
+  }
+
+  // Generic formatter that defers to existing helpers
+  static formatValue(value, format) {
+    if (format === 'currency') {
+      return FormatUtils.formatCurrency(value);
+    }
+    if (format === 'percentage') {
+      return FormatUtils.formatPercentage(value);
+    }
+    return value;
+  }
+
+  // Expand ${var,format} placeholders using Config values
+  static processVariables(text) {
+    const config = (typeof Config !== 'undefined') ? Config.getInstance(typeof WebUI !== 'undefined' ? WebUI.getInstance() : null) : null;
+    if (!config || !text || typeof text !== 'string') return text;
+
+    return text.replace(/\${([^}]+)}/g, (match, variable) => {
+      let [varToken, format] = variable.split(',').map(s => s.trim());
+
+      // Support nested paths like pensionContributionRateBands.min
+      if (varToken.includes('.')) {
+        const tokens = varToken.split('.');
+        let value = config;
+        for (let i = 0; i < tokens.length && value; i++) {
+          value = value[tokens[i]];
+        }
+        if (typeof value === 'undefined') return match;
+        return FormatUtils.formatValue(value, format);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(config, varToken)) {
+        return FormatUtils.formatValue(config[varToken], format);
+      }
+      console.warn(`Variable ${varToken} not found in config`);
+      return match;
+    });
+  }
+
+  // Recursively process variables in strings within an object/array structure
+  static processVariablesInObject(obj) {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'string') return FormatUtils.processVariables(obj);
+    if (Array.isArray(obj)) return obj.map(item => FormatUtils.processVariablesInObject(item));
+    if (typeof obj === 'object') {
+      const processed = {};
+      for (const [key, value] of Object.entries(obj)) {
+        processed[key] = FormatUtils.processVariablesInObject(value);
+      }
+      return processed;
+    }
+    return obj;
+  }
+
+  // Replace {{age_or_year}} placeholders with the current Events table mode
+  static replaceAgeYearPlaceholders(text) {
+    if (!text) return text;
+    let currentMode = 'age';
+    try {
+      const webUI = (typeof WebUI !== 'undefined') ? WebUI.getInstance() : null;
+      if (webUI && webUI.eventsTableManager && webUI.eventsTableManager.ageYearMode) {
+        currentMode = webUI.eventsTableManager.ageYearMode;
+      }
+    } catch (err) {
+      // Silently ignore errors and keep default
+    }
+    return text.replace(/\{\{age_or_year\}\}/g, currentMode);
+  }
+
 } 

@@ -32,121 +32,24 @@ class Wizard {
     return wizard_instance;
   }
 
-  
   processMarkdownLinks(text) {
-    if (!text) return text;
-    return text.replace(
-      /\[([^\]]+)\]\(([^\)]+)\)(?:\{[^\}]*\})?/g,
-      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-    );
+    return FormatUtils.processMarkdownLinks(text);
   }
 
-  // Replace {{age_or_year}} placeholders with current mode
   replaceAgeYearPlaceholders(text) {
-    if (!text) return text;
-    
-    // Get current mode from EventsTableManager if available
-    let currentMode = 'age'; // default fallback
-    try {
-      const webUI = WebUI.getInstance();
-      if (webUI && webUI.eventsTableManager && webUI.eventsTableManager.ageYearMode) {
-        currentMode = webUI.eventsTableManager.ageYearMode;
-      }
-    } catch (error) {
-      // Silently fall back to 'age' if EventsTableManager not available
-    }
-    
-    return text.replace(/\{\{age_or_year\}\}/g, currentMode);
+    return FormatUtils.replaceAgeYearPlaceholders(text);
   }
 
-
-
-  // Helper function to format numbers based on type
   formatValue(value, format) {
-    if (format === 'currency') {
-      return new Intl.NumberFormat('en-IE', { 
-        style: 'currency', 
-        currency: 'EUR',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(value);
-    }
-    if (format === 'percentage') {
-      return new Intl.NumberFormat('en-IE', { 
-        style: 'percent',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(value);
-    }
-    return value;
+    return FormatUtils.formatValue(value, format);
   }
 
-  // Process variables in text using config values
   processVariables(text) {
-    const config = Config.getInstance(WebUI.getInstance()); // the Wizard only runs in the website so it's safe to assume that the UI is the WebUI
-    if (!config || !text || typeof text !== 'string') return text;
-    return text.replace(/\${([^}]+)}/g, (match, variable) => {
-      let [varToken, format] = variable.split(',').map(s => s.trim());
-      if (varToken.includes('.')) {
-        const tokens = varToken.split('.');
-        let value = config;
-        for (let i = 0; i < tokens.length - 1; i++) {
-          if (value && typeof value === 'object' && tokens[i] in value) {
-            value = value[tokens[i]];
-          } else {
-            return match;
-          }
-        }
-        const lastToken = tokens[tokens.length - 1];
-        if (value && typeof value === 'object') {
-          if (lastToken in value) {
-            value = value[lastToken];
-          } else if (lastToken === 'min' || lastToken === 'max') {
-            let keys = Object.keys(value).filter(k => !isNaN(parseFloat(k)));
-            if (keys.length === 0) {
-              keys = Object.keys(value);
-            }
-            if (keys.length > 0) {
-              keys.sort((a, b) => parseFloat(a) - parseFloat(b));
-              const chosenKey = lastToken === 'min' ? keys[0] : keys[keys.length - 1];
-              value = value[chosenKey];
-            } else {
-              return match;
-            }
-          } else {
-            return match;
-          }
-        } else {
-          return match;
-        }
-        return this.formatValue(value, format);
-      }
-      if (config.hasOwnProperty(varToken)) {
-        const value = config[varToken];
-        return this.formatValue(value, format);
-      }
-      console.warn(`Variable ${varToken} not found in config`);
-      return match; // Keep original if variable not found
-    });
+    return FormatUtils.processVariables(text);
   }
 
-  // Recursively process variables in an object
   processVariablesInObject(obj) {
-    if (!obj || typeof obj !== 'object') return obj;
-    if (Array.isArray(obj)) {
-      return obj.map(item => this.processVariablesInObject(item));
-    }
-    const processed = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (typeof value === 'string') {
-        processed[key] = this.processVariables(value);
-      } else if (typeof value === 'object') {
-        processed[key] = this.processVariablesInObject(value);
-      } else {
-        processed[key] = value;
-      }
-    }
-    return processed;
+    return FormatUtils.processVariablesInObject(obj);
   }
 
   async loadConfig() {
@@ -160,26 +63,32 @@ class Wizard {
         }
       });
       const yamlText = await response.text();
-      
+      const rawConfig = jsyaml.load(yamlText);
+
+      // Allow legacy "steps" key but prefer "WizardSteps"
+      if (rawConfig && rawConfig.WizardSteps && !rawConfig.steps) {
+        rawConfig.steps = rawConfig.WizardSteps;
+      }
+
       // Store original config with variables processed but placeholders intact
-      this.originalConfig = this.processVariablesInObject(jsyaml.load(yamlText));
-      
+      this.originalConfig = FormatUtils.processVariablesInObject(rawConfig);
+
       // Process markdown links but keep age/year placeholders for later processing
       if (this.originalConfig.steps) {
         this.originalConfig.steps = this.originalConfig.steps.map(step => {
           if (step.popover && step.popover.description) {
-            step.popover.description = this.processMarkdownLinks(step.popover.description);
+            step.popover.description = FormatUtils.processMarkdownLinks(step.popover.description);
           }
           return step;
         });
       }
-      
+
       // Create working config with age/year placeholders processed
       this.config = JSON.parse(JSON.stringify(this.originalConfig));
       if (this.config.steps) {
         this.config.steps = this.config.steps.map(step => {
           if (step.popover && step.popover.description) {
-            step.popover.description = this.replaceAgeYearPlaceholders(step.popover.description);
+            step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
           }
           return step;
         });
@@ -338,7 +247,7 @@ class Wizard {
       if (this.config.steps) {
         this.config.steps = this.config.steps.map(step => {
           if (step.popover && step.popover.description) {
-            step.popover.description = this.replaceAgeYearPlaceholders(step.popover.description);
+            step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
           }
           return step;
         });
@@ -424,8 +333,6 @@ class Wizard {
 
         // Simple burger menu handling - just open it if element needs it
         this.handleBurgerMenuSimple(element);
-
-
 
         const popover = document.querySelector('.driver-popover');
         if (popover) {
@@ -589,7 +496,7 @@ class Wizard {
     const processedSteps = overviewSteps.map(step => {
       const processedStep = JSON.parse(JSON.stringify(step));
       if (processedStep.popover && processedStep.popover.description) {
-        processedStep.popover.description = this.replaceAgeYearPlaceholders(processedStep.popover.description);
+        processedStep.popover.description = FormatUtils.replaceAgeYearPlaceholders(processedStep.popover.description);
       }
       return processedStep;
     });
@@ -684,7 +591,7 @@ class Wizard {
     const processedSteps = fieldSteps.map(step => {
       const processedStep = JSON.parse(JSON.stringify(step));
       if (processedStep.popover && processedStep.popover.description) {
-        processedStep.popover.description = this.replaceAgeYearPlaceholders(processedStep.popover.description);
+        processedStep.popover.description = FormatUtils.replaceAgeYearPlaceholders(processedStep.popover.description);
       }
       return processedStep;
     });
@@ -763,7 +670,7 @@ class Wizard {
     const processedSteps = tourSteps.map(step => {
       const processedStep = JSON.parse(JSON.stringify(step));
       if (processedStep.popover && processedStep.popover.description) {
-        processedStep.popover.description = this.replaceAgeYearPlaceholders(processedStep.popover.description);
+        processedStep.popover.description = FormatUtils.replaceAgeYearPlaceholders(processedStep.popover.description);
       }
 
       // Quick tour steps should have navigation buttons, not just close
@@ -1332,7 +1239,4 @@ class Wizard {
       }
     }
   }
-
-  
-
 }

@@ -9,7 +9,7 @@ class WelcomeModal {
   async loadContent() {
     try {
       const timestamp = new Date().getTime();
-      const response = await fetch(`/src/frontend/web/assets/welcome-content.yml?t=${timestamp}`, {
+      const response = await fetch(`/src/frontend/web/assets/help.yml?t=${timestamp}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
@@ -17,7 +17,23 @@ class WelcomeModal {
         }
       });
       const yamlText = await response.text();
-      this.contentData = jsyaml.load(yamlText);
+      const raw = jsyaml.load(yamlText);
+
+      // Expand ${} variables first
+      const processed = FormatUtils.processVariablesInObject(raw);
+
+      // Extract WelcomeTabs (fallback to legacy tabs if needed)
+      const tabsArray = (processed && processed.WelcomeTabs) ? processed.WelcomeTabs : (processed.tabs || []);
+
+      // Convert markdown links inside tab content
+      tabsArray.forEach(tab => {
+        if (tab.content) {
+          tab.content = FormatUtils.processMarkdownLinks(tab.content);
+        }
+      });
+
+      // Store in the existing structure expected by createTabs()/createTabContent()
+      this.contentData = { tabs: tabsArray };
     } catch (error) {
       console.error('Failed to load welcome content:', error);
       // Fallback content

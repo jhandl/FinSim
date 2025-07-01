@@ -1,35 +1,4 @@
-steps:
-  - popover:
-      popoverClass: "welcome-popover"
-      title: "Welcome to the Ireland Financial Simulator"
-      description: >
-        <p><b>What it is: </b>This is a tool to help you understand how different decisions and scenarios can affect your long term financial future, within the context of the Irish tax system.</p>
-        <p><b>What it's not:</b> This is not a budgeting tool nor financial advice. Don't make serious life decisions based on this. It's not a substitute for a good financial advisor.</p>
-        <p><b>Privacy notice:</b> I don't collect any data from you. The simulator runs entirely in your browser so the information you enter stays in your computer.</p>
-        <p style="text-align: center;"><span style="font-size: smaller;">Consider complementary tools like Irish Tax Hub's [tax calculators](https://www.irishtaxhub.ie/tools){tax calculators,suite,net income,free,pension,try calculator} and PWC's [income tax calculator](https://download.pwc.com/ie/budget-2025/income-tax-calculator.html){income tax calculator,your status,are you entitled}.</span></p>
-      showButtons: ["next"]
-      nextBtnText: ["How to use →"]
-
-  - popover:
-      popoverClass: "howto-popover"
-      title: "How to use the simulator"
-      description: >
-        <p><b>Steps:</b></p>
-        <ol><li>First, fill out the panels on the left to describe your current financial situation, your financial plan, expected economic conditions, etc.</li>
-        <li>Then, add rows to the Events table describing your income, expenses, and plans for things like buying a house, changing jobs, etc. Each event has a starting and an ending point in time. Everything is calculated on a yearly basis, so add up all your expenses for the year and use that number. If you have expenses that have a clear timeframe (like paying for college), add them as separate events.</li>
-        <li>Finally, run the simulation to see how it goes. You will see the outcome in three ways:</li>
-        <ul><li>The status box next to the "Run Simulation" button will tell you if your scenario was successful, or at what age it failed (it fails if at any point you can't afford your expenses), or the likelyhood that it succeeds (see volatility below).</li>
-        <li>The graphs will show the evolution of your cashflow (how your expenses stack up against your income and where it comes from), and your assets (how much you have accumulated and where), from your current age to your target age.</li>
-        <li>The table at the bottom will show you, year by year, the details of your income, taxes, cashflow, and assets. You can save this data as a CSV file to use in other programs. You can select a color scheme to highlight pinch points in your plan.</li></ul></ol>
-        <p><b>Date modes:</b> You can choose to express the events' starting and ending points in terms of your age or the year. Use the toggle in the top right of the Events table to switch between modes. You can switch back and forth at any time, this will give you a better understanding of the dates.</p> 
-        <p><b>Simulator modes:</b> The simulator can run in single-person mode (for individual planning) or two-person mode (for couples/partnerships). Use the toggle icons in the Starting Position panel to switch between modes. Two-person mode allows separate pension pots, retirement ages, and state pensions for each person.</p>
-        <p><b>Present value:</b> All monetary amounts should be entered in today's money (present value). For example, if you plan to spend €30,000 per year on living expenses, enter €30,000 even if that expense will start in 10 years. The simulator will automatically adjust these amounts for inflation over time based on the inflation or the growth rate you specify. This makes it easier to think about expenses and income in terms of today's purchasing power.</p>
-        <p><b>Stress testing:</b> You can change the economy parameters to see what happens if inflation is higher, investments grow slower or are more volatile. You can further stress test your scenario by adding a stock market crash or two.</p>
-        <p><b>Volatility:</b> If you introduce volatility in any of your investments (anything higher than 0%), it will run a [Monte Carlo simulation](https://www.investopedia.com/terms/m/montecarlosimulation.asp){Monte Carlo,simulation,random,probability}. This runs the simulation ${simulationRuns} times, each time with random rates of growth according to a normal distribution with the median and standard deviation you provided, and it tells you how likely your scenario will succeed in those conditions (the percentage of those simulations that ended in success).</p><p>&nbsp;&nbsp;The graphs will represent the average of all the runs. You may be surprised to see non-zero amounts of money remaining in the assets graph past the expected failure age. This is due to the percentage of runs that were successful due to random chance. You may also be surprised that a higher volatility lowers the success rate. This is the result of the erosion of returns ($100 - 10% = $90; $90 + 10% = $99).</p><p>&nbsp;&nbsp;If you leave the volatility at 0% for all three investment vehicles, the simulation will run once, without any variability, and it will tell you at what age you ran out of money. If you want to see the effect of a change in your scenario, it's best to set the volatility to zero. That way it's deterministic, and any change in outcome is the direct result of the change to your scenario. Once you introduce volatility, the only meaningful outcome is the percentage of success.</p>
-        <p><b>Saving scenarios:</b> To avoid losing your scenario when you close the browser window, use the "Save" button so you can load it again next time from your local hard drive. You can name the file so you can store different scenarios. </p>
-        <p><b>Help system:</b> If you are editing a field and press the Help button or the ? key, you will get help for that specific field. You can navigate the help cards with the buttons on the cards, with the arrow keys and with &lt;tab&gt; and &lt;shift-tab&gt;, and you can leave the help system with &lt;Esc&gt; or clicking outside of the help card.</p>
-      prevBtnText: ["← Welcome"]
-      nextBtnText: ["Start tour →"]
+WizardSteps:
 
   - element: "header"
     popover:
@@ -46,7 +15,7 @@ steps:
 
   - element: "#progress"
     popover:
-      description: "<p>The outcome of the simulation will be shown here.</p><p>If you specified zero volatility in all investment vehicles, this will show either 'Success' or the age at which you ran out of money. If you specified some volatility, it will show the probability of success of your scenario.</p>"
+      description: "<p>The outcome of the simulation will be shown here.</p><p>If you specified linear growth rates, this will show either 'Success' or the age at which you ran out of money. If you specified some volatility, it will show the probability of success of your scenario.</p>"
       side: "bottom"
       align: "center"
 
@@ -1040,7 +1009,7 @@ steps:
   - element: ".graphs-section"
     popover:
       description: "<p>These graphs show your financial projections over time.</p><p>The <strong>cashflow graph</strong> shows your income and expenses by category, with a line showing your net cashflow. The <strong>assets graph</strong> shows how your wealth grows and is distributed across different asset types.</p>"
-      side: "top"
+      side: "left"
       align: "center"
 
   - element: "#cashflowGraph"
@@ -1084,3 +1053,86 @@ steps:
       # showButtons: ["back", "close"]
       prevBtnText: ["← Back"]
       nextBtnText: ["Get Started!"]
+
+WelcomeTabs:
+  - id: intro
+    title: Intro
+    content: |
+      <div class="welcome-list">
+        <div class="list-item">
+          <strong>Disclaimer</strong>
+          <p>This is a tool to help you understand how different decisions and scenarios can affect your long term financial future. It is not financial advice. Don't make serious life decisions based on this. It's not a substitute for a good financial advisor.</p>
+        </div>
+        <div class="list-item">
+          <strong>Privacy notice</strong>
+          <p>I don't collect any data from you. The simulator runs entirely in your browser so the information you enter stays in your computer.</p>
+        </div>
+        <div class="list-item">
+          <p>Consider complementary tools like Irish Tax Hub's [tax calculators](https://www.irishtaxhub.ie/tools){tax calculators,suite,net income,free,pension,try calculator} and PWC's [income tax calculator](https://download.pwc.com/ie/budget-2025/income-tax-calculator.html){income tax calculator,your status,are you entitled}.</p>
+        </div>
+      </div>
+
+  - id: getting-started
+    title: Start
+    content: |
+      <div class="welcome-workflow">
+        <div class="workflow-steps">
+          <div class="workflow-step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <strong>Setup Your Situation</strong>
+              <p>Fill in your current financial position, personal circumstances, and targets in the input panels.</p>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <strong>Add Your Plans</strong>
+              <p>Use the Events table to add any time-bound financial events, such as your income, expenses, buying or selling a property, etc.</p>
+            </div>
+          </div>
+          <div class="workflow-step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <strong>Run & Analyze</strong>
+              <p>Run the simulator to see how your plan unfolds. You'll see graphs showing your cashflow and asset growth, plus a detailed year-by-year breakdown.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+  - id: key-concepts
+    title: Modes
+    content: |
+      <div class="welcome-list">
+        <div class="list-item">
+          <strong>Single vs Two-Person Mode</strong>
+          <p>Use the toggle icons to switch between individual planning and couples/partnerships with separate pensions and retirement ages.</p>
+        </div>
+        <div class="list-item">
+          <strong>Fixed vs Variable Growth</strong>
+          <p>Toggle between a fixed growth rate and a variable growth rate to simulate different market conditions and understand the probability of success.</p>
+        </div>
+        <div class="list-item">
+          <strong>Age vs Year Mode</strong>
+          <p>Toggle between age-based and year-based planning in the Events table to better understand your timeline.</p>
+        </div>
+      </div>
+
+  - id: tips-tricks
+    title: Tips
+    content: |
+      <div class="welcome-list">
+        <div class="list-item">
+          <strong>Demo Scenario</strong>
+          <p>The best way to get familiar with the simulator is to try the demo scenario. Hit the Demo button to load and run it.</p>
+        </div>
+        <div class="list-item">
+          <strong>Stress Testing</strong>
+          <p>Try different economic scenarios such as higher inflation, lower investment returns and market crashes to see how robust your plan is.</p>
+        </div>
+        <div class="list-item">
+          <strong>Pinch Point Visualization</strong>
+          <p>Use the color scheme dropdown in the data table to highlight critical periods in your plan.</p>
+        </div>
+      </div>
