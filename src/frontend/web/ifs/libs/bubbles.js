@@ -58,6 +58,7 @@
             // DOM refs (lazy)
             this.overlay = null; // {container, t,b,l,r}
             this.pop = null;     // {root,title,desc,btnPrev,btnNext,btnClose}
+            this.highlightBox = null; // rectangular halo around the active element
 
             // bindings
             this.onResize = this.onResize.bind(this);
@@ -126,6 +127,20 @@
             const segRight = makeSeg("right");
             document.body.appendChild(cont);
             this.overlay = { container: cont, segTop, segBottom, segLeft, segRight };
+
+            // Decorative highlight box with soft halo
+            const hl = createEl("div", "bubbles-highlight-box");
+            Object.assign(hl.style, {
+                position: "absolute",
+                pointerEvents: "none",
+                border: "2px solid rgba(255,255,255,0.9)",
+                borderRadius: "6px",
+                boxShadow: "0 0 12px 4px rgba(255,255,255,0.75)",
+                transition: "all .15s ease",
+                zIndex: 1 // above the overlay segments, below the popover
+            });
+            cont.appendChild(hl);
+            this.highlightBox = hl;
 
             // Popover
             const pop = createEl("div", "driver-popover", "bubbles-popover");
@@ -196,6 +211,9 @@
                     // cover whole viewport with segTop; collapse others
                     segTop.style.top = 0; segTop.style.left = 0; segTop.style.width = '100%'; segTop.style.height = '100%';
                     segBottom.style.height = '0'; segLeft.style.height = '0'; segRight.style.height = '0';
+                }
+                if (this.highlightBox) {
+                    this.highlightBox.style.display = 'none';
                 }
             }
 
@@ -301,11 +319,27 @@
             const vw = window.innerWidth;
             const vh = window.innerHeight;
 
+            const pad = this.opts.highlightPadding ?? 6; // extra space around the target for nicer halo (default reduced by 25%)
+            const topEdge = Math.max(0, r.top - pad);
+            const bottomEdge = Math.min(vh, r.bottom + pad);
+            const leftEdge = Math.max(0, r.left - pad);
+            const rightEdge = Math.min(vw, r.right + pad);
+
+            // Update overlay segments to carve a slightly larger hole
             const { segTop: t, segBottom: b, segLeft: l, segRight: rgt } = this.overlay;
-            t.style.top = 0; t.style.left = 0; t.style.width = '100%'; t.style.height = `${r.top}px`;
-            b.style.top = `${r.bottom}px`; b.style.left = 0; b.style.width = '100%'; b.style.height = `${vh - r.bottom}px`;
-            l.style.top = `${r.top}px`; l.style.left = 0; l.style.width = `${r.left}px`; l.style.height = `${r.height}px`;
-            rgt.style.top = `${r.top}px`; rgt.style.left = `${r.right}px`; rgt.style.width = `${vw - r.right}px`; rgt.style.height = `${r.height}px`;
+            t.style.top = 0; t.style.left = 0; t.style.width = '100%'; t.style.height = `${topEdge}px`;
+            b.style.top = `${bottomEdge}px`; b.style.left = 0; b.style.width = '100%'; b.style.height = `${vh - bottomEdge}px`;
+            l.style.top = `${topEdge}px`; l.style.left = 0; l.style.width = `${leftEdge}px`; l.style.height = `${bottomEdge - topEdge}px`;
+            rgt.style.top = `${topEdge}px`; rgt.style.left = `${rightEdge}px`; rgt.style.width = `${vw - rightEdge}px`; rgt.style.height = `${bottomEdge - topEdge}px`;
+
+            // Position / size decorative highlight box
+            if (this.highlightBox) {
+                this.highlightBox.style.display = 'block';
+                this.highlightBox.style.top = `${topEdge}px`;
+                this.highlightBox.style.left = `${leftEdge}px`;
+                this.highlightBox.style.width = `${rightEdge - leftEdge}px`;
+                this.highlightBox.style.height = `${bottomEdge - topEdge}px`;
+            }
         }
 
         updatePopover(step, target) {
@@ -489,6 +523,7 @@
             this.cbDestroy();
 
             if (this.overlay) { this.overlay.container.remove(); this.overlay = null; }
+            if (this.highlightBox) { this.highlightBox.remove(); this.highlightBox = null; }
             if (this.pop) { this.pop.root.remove(); this.pop = null; }
             document.querySelectorAll('.driver-active-element').forEach(el => el.classList.remove('driver-active-element'));
         }
