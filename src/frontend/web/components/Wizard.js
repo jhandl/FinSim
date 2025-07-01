@@ -20,6 +20,8 @@ class Wizard {
     this.wizardActive = false;
     this.preventFocus = this.preventFocus.bind(this);
     this.preventTouch = this.preventTouch.bind(this);
+    this.scrollFrozen = false;
+    this.savedScrollPos = 0;
     document.addEventListener('focusin', this.followFocus);
     document.addEventListener('click', this.handleClick);
   }
@@ -178,9 +180,23 @@ class Wizard {
     this.tableState = this.getEventTableState();
     const configCopy = JSON.parse(JSON.stringify(this.config));
 
+    // Header buttons that might live inside the burger menu on mobile
+    const burgerMenuHeaderButtons = [
+      '#saveSimulation',
+      '#loadSimulation',
+      '#loadDemoScenarioHeader',
+      '#startWizard'
+    ];
+
     return configCopy.steps.filter(step => {
       // Steps without elements are always valid
       if (!step.element) return true;
+
+      // Always keep header-button steps (we will open the burger menu on demand)
+      if (burgerMenuHeaderButtons.includes(step.element)) {
+        // Make sure the element exists in the DOM at least once
+        return document.querySelector(step.element) !== null;
+      }
 
       if (!step.element.includes('Event')) {
         // Special case for data-section: find the visible element and update selector
@@ -188,8 +204,6 @@ class Wizard {
           const elements = document.querySelectorAll(step.element);
           const visibleElement = Array.from(elements).find(el => this.isElementVisible(el));
           if (visibleElement) {
-            // Update the step to point to the specific visible element if it has an ID
-            // Otherwise keep the class selector (it will target the first visible one)
             if (visibleElement.id) {
               step.element = `#${visibleElement.id}`;
             }
@@ -199,7 +213,6 @@ class Wizard {
         }
 
         // Overview elements (major UI sections) should always be valid if they exist
-        // No need to check visibility for these structural elements
         const overviewElements = [
           'header',
           '.parameters-section',
@@ -225,17 +238,42 @@ class Wizard {
             return !step.eventTypes && !step.noEventTypes;
           } else {
             if (step.eventTypes) {
-              // Only show this step if it matches the current event type
               return step.eventTypes.includes(this.tableState.eventType);
             }
             if (step.noEventTypes) {
-              // Only show this step if it doesn't match the current event type
               return !step.noEventTypes.includes(this.tableState.eventType);
             }
           }
         }
       }
     });
+  }
+
+  // Freeze page scroll while wizard is active
+  freezeScroll() {
+    if (this.scrollFrozen) return;
+    this.savedScrollPos = window.scrollY || window.pageYOffset;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${this.savedScrollPos}px`;
+    document.body.style.width = '100%';
+    // Compensate for scrollbar to avoid content shift
+    const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollBarWidth > 0) {
+      document.body.style.paddingRight = `${scrollBarWidth}px`;
+    }
+    this.scrollFrozen = true;
+  }
+
+  // Restore page scroll state when wizard ends
+  unfreezeScroll() {
+    if (!this.scrollFrozen) return;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    document.body.style.paddingRight = '';
+    window.scrollTo(0, this.savedScrollPos || 0);
+    this.scrollFrozen = false;
+    this.savedScrollPos = null;
   }
 
   async start(fromStep = undefined) {
@@ -382,11 +420,13 @@ class Wizard {
     // Disable mobile keyboard to prevent it from covering the wizard popover
     this.disableMobileKeyboard();
     
+    // Freeze page scroll so it does not jump between steps
+    this.freezeScroll();
+    
     // Add visual indicator that wizard is active and set up focus prevention
     this.wizardActive = true;
     if (this.isMobile) {
       document.body.setAttribute('data-wizard-active', 'true');
-      // Add multiple event prevention layers
       document.addEventListener('focusin', this.preventFocus, true);
       document.addEventListener('touchstart', this.preventTouch, true);
       document.addEventListener('click', this.preventTouch, true);
@@ -539,6 +579,8 @@ class Wizard {
 
     // Set up wizard state and keyboard handling like other tours
     document.addEventListener('keydown', this.handleKeys);
+    // Freeze page scroll so it does not jump while the wizard is active
+    this.freezeScroll();
     this.wizardActive = true;
     if (this.isMobile) {
       document.body.setAttribute('data-wizard-active', 'true');
@@ -563,6 +605,10 @@ class Wizard {
     if (!this.config) {
       await this.loadConfig();
     }
+
+    // Ensure page scroll is frozen and mobile keyboard disabled during mini wizard
+    this.freezeScroll();
+    this.disableMobileKeyboard();
 
     const cardSteps = this.filterHelpContent(cardType, 'full');
     if (cardSteps.length === 0) {
@@ -743,8 +789,11 @@ class Wizard {
       }
     });
 
-    // Attach keyboard handlers and mobile tweaks like in main start()
+    // Set up wizard state and keyboard handling like other tours
     document.addEventListener('keydown', this.handleKeys);
+    // Freeze page scroll during quick tour
+    this.freezeScroll();
+    // Prevent mobile keyboard
     this.disableMobileKeyboard();
     this.wizardActive = true;
     if (this.isMobile) {
@@ -815,6 +864,9 @@ class Wizard {
     }
     
     this.enableMobileKeyboard();
+    
+    // Restore page scroll after wizard finishes
+    this.unfreezeScroll();
     
     // Only update lastStepIndex if tour was completed normally
     if (this.tour && typeof this.tour.getActiveIndex === 'function') {

@@ -181,7 +181,7 @@ class WebUI extends AbstractUI {
           // Callback for "Full Tour" button - start the original wizard tour from header buttons
           const wizard = Wizard.getInstance();
           if (wizard) {
-            wizard.start(2); // Start from step 2 (header buttons), skipping welcome and how-to popovers
+            wizard.start(0); // Start at header overview
           }
         }
       );

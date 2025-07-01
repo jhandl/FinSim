@@ -445,6 +445,11 @@
                     const card = target.closest('.card');
                     if (card) anchorRect = card.getBoundingClientRect();
                 }
+                // Anchor to burger menu container if target resides inside it (regardless of viewport)
+                const burgerMenu = target.closest('#mobileMenu');
+                if (burgerMenu) {
+                    anchorRect = burgerMenu.getBoundingClientRect();
+                }
 
                 const defaultLeft = anchorRect.left + anchorRect.width/2 - measuredWidth/2 + window.scrollX;
                 const centredLeft = window.scrollX + vw/2 - measuredWidth/2; // center of viewport
