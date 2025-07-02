@@ -1469,7 +1469,7 @@ class WebUI extends AbstractUI {
       if (target && target.hasAttribute('data-value')) {
         target.classList.remove('long-pressing');
       }
-    });
+    }, { passive: true });
 
     // Handle mobile touch events on control container (for showing current selection tooltip)
     let controlTouchStartTime = 0;
@@ -1547,7 +1547,7 @@ class WebUI extends AbstractUI {
 
       // Remove visual feedback
       controlContainer.classList.remove('long-pressing');
-    });
+    }, { passive: true });
 
     // Hide tooltip on scroll or resize
     document.addEventListener('scroll', hideTooltip, { passive: true });

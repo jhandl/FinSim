@@ -1050,9 +1050,9 @@ WizardSteps:
         <p>You can always come back by clicking the Help button, or pressing the ? key on any field you find confusing.</p>
         <p>I hope you find this tool helpful. Remember, this is an educational tool and not financial advice.</p>
         <p><b>Happy planning!</b> 🎯</p>
-      # showButtons: ["back", "close"]
+      showButtons: ["prev", "next"]
       prevBtnText: ["← Back"]
-      nextBtnText: ["Get Started!"]
+      nextBtnText: ["Done"]
 
 WelcomeTabs:
 
@@ -1091,11 +1091,11 @@ WelcomeTabs:
       <div class="welcome-list">
         <div class="list-item">
           <strong>Single vs Two-Person Mode</strong>
-          <p>Use the toggle icons to switch between individual planning and couples/partnerships with separate pensions and retirement ages.</p>
+          <p>Use the toggle icons to switch between individual planning (<i class="fas fa-user"></i>) and couples/partnerships (<i class="fas fa-user-friends"></i>) with separate pensions and retirement ages.</p>
         </div>
         <div class="list-item">
           <strong>Fixed vs Variable Growth</strong>
-          <p>Toggle between a fixed growth rate and a variable growth rate to simulate different market conditions and understand the probability of success.</p>
+          <p>Toggle between a fixed growth rate (<svg width="18" height="14" viewBox="0 0 20 16" style="vertical-align: middle;"><line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1"/><line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1"/><line x1="3" y1="12" x2="19" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>) and a variable growth rate (<svg width="18" height="14" viewBox="0 0 20 16" style="vertical-align: middle;"><line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1"/><line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1"/><path d="M3 12 L6 9 L9 11 L12 7 L15 10 L19 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>) to simulate different market conditions and understand the probability of success.</p>
         </div>
         <div class="list-item">
           <strong>Age vs Year Mode</strong>
@@ -1116,8 +1116,8 @@ WelcomeTabs:
           <p>Try different economic scenarios such as higher inflation, lower investment returns and market crashes to see how robust your plan is.</p>
         </div>
         <div class="list-item">
-          <strong>Pinch Point Visualization</strong>
-          <p>Use the color scheme dropdown in the data table to highlight critical periods in your plan.</p>
+          <strong>Pinch Point Visualisation</strong>
+          <p>Use the color scheme dropdown (<i class="fas fa-palette" style="background: linear-gradient(45deg,#fe0000 0%,#f34201 20%,#eda600 40%,#e0cd00 60%,#94ac29 80%,#00e000 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;"></i>) in the data table to highlight critical periods in your plan.</p>
         </div>
       </div>
 

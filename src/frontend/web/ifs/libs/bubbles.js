@@ -396,6 +396,15 @@
                 return;
             }
             const { root, title, desc, btnPrev, btnNext, btnClose } = this.pop;
+            // Apply custom popover class for this step (e.g., "tour-complete-popover") so
+            // external handlers can identify specific popovers (used by Wizard.js for the
+            // final step Enter-key shortcut).
+            const customClasses = ['tour-complete-popover', 'welcome-popover', 'howto-popover'];
+            // Remove any previously applied custom classes
+            customClasses.forEach(cls => root.classList.remove(cls));
+            if (step.popover?.popoverClass) {
+                root.classList.add(step.popover.popoverClass);
+            }
             // content
             title.textContent = step.popover?.title || '';
             title.style.display = title.textContent ? '' : 'none';
@@ -405,6 +414,19 @@
             } else {
                 desc.style.display = 'none';
             }
+
+            // Allow per-step customisation of button labels (e.g. show "Done" on the
+            // final step instead of "Next"). Accept either a plain string or a
+            // single-element array for compatibility with YAML syntax used in
+            // help.yml.
+            const normaliseLabel = (lbl, fallback) => {
+                if (Array.isArray(lbl)) return lbl.length > 0 ? String(lbl[0]) : fallback;
+                if (typeof lbl === 'string') return lbl;
+                return fallback;
+            };
+
+            btnPrev.textContent = normaliseLabel(step.popover?.prevBtnText, 'Previous');
+            btnNext.textContent = normaliseLabel(step.popover?.nextBtnText, 'Next');
 
             // button visibility
             let buttons = step.popover?.showButtons;
