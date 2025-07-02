@@ -420,9 +420,6 @@ class Wizard {
     // Disable mobile keyboard to prevent it from covering the wizard popover
     this.disableMobileKeyboard();
     
-    // Freeze page scroll so it does not jump between steps
-    this.freezeScroll();
-    
     // Add visual indicator that wizard is active and set up focus prevention
     this.wizardActive = true;
     if (this.isMobile) {
@@ -579,8 +576,8 @@ class Wizard {
 
     // Set up wizard state and keyboard handling like other tours
     document.addEventListener('keydown', this.handleKeys);
-    // Freeze page scroll so it does not jump while the wizard is active
-    this.freezeScroll();
+    // Prevent mobile keyboard from covering popover on mobile
+    this.disableMobileKeyboard();
     this.wizardActive = true;
     if (this.isMobile) {
       document.body.setAttribute('data-wizard-active', 'true');
@@ -588,7 +585,6 @@ class Wizard {
       document.addEventListener('touchstart', this.preventTouch, true);
       document.addEventListener('click', this.preventTouch, true);
     }
-    this.disableMobileKeyboard();
 
     // Store reference to tour for cleanup
     this.tour = singleStepTour;
@@ -605,10 +601,6 @@ class Wizard {
     if (!this.config) {
       await this.loadConfig();
     }
-
-    // Ensure page scroll is frozen and mobile keyboard disabled during mini wizard
-    this.freezeScroll();
-    this.disableMobileKeyboard();
 
     const cardSteps = this.filterHelpContent(cardType, 'full');
     if (cardSteps.length === 0) {
@@ -694,7 +686,17 @@ class Wizard {
       }
     });
 
-    // Start the mini-wizard
+    // Keyboard and mobile tweaks
+    document.addEventListener('keydown', this.handleKeys);
+    this.disableMobileKeyboard();
+    this.wizardActive = true;
+    if (this.isMobile) {
+      document.body.setAttribute('data-wizard-active', 'true');
+      document.addEventListener('focusin', this.preventFocus, true);
+      document.addEventListener('touchstart', this.preventTouch, true);
+      document.addEventListener('click', this.preventTouch, true);
+    }
+
     this.tour.drive();
   }
 
@@ -791,9 +793,7 @@ class Wizard {
 
     // Set up wizard state and keyboard handling like other tours
     document.addEventListener('keydown', this.handleKeys);
-    // Freeze page scroll during quick tour
-    this.freezeScroll();
-    // Prevent mobile keyboard
+    // Prevent mobile keyboard from covering popover on mobile
     this.disableMobileKeyboard();
     this.wizardActive = true;
     if (this.isMobile) {
@@ -851,6 +851,7 @@ class Wizard {
     if (this.wizardOpenedBurgerMenu && burgerMenu && burgerMenu.isOpen) {
       burgerMenu.closeMenu();
       this.wizardOpenedBurgerMenu = false;
+      this.unfreezeScroll();
     }
     
     document.removeEventListener('keydown', this.handleKeys);
@@ -1175,6 +1176,7 @@ class Wizard {
       if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
         burgerMenu.closeMenu();
         this.wizardOpenedBurgerMenu = false;
+        this.unfreezeScroll();
       }
       return;
     }
@@ -1186,6 +1188,7 @@ class Wizard {
       if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
         burgerMenu.closeMenu();
         this.wizardOpenedBurgerMenu = false;
+        this.unfreezeScroll();
       }
       return;
     }
@@ -1197,6 +1200,7 @@ class Wizard {
       if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
         burgerMenu.closeMenu();
         this.wizardOpenedBurgerMenu = false;
+        this.unfreezeScroll();
       }
       return;
     }
@@ -1212,6 +1216,7 @@ class Wizard {
       if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
         burgerMenu.closeMenu();
         this.wizardOpenedBurgerMenu = false;
+        this.unfreezeScroll();
       }
       return;
     }
@@ -1238,6 +1243,8 @@ class Wizard {
       if (!burgerMenu.isOpen) {
         burgerMenu.openMenu();
         this.wizardOpenedBurgerMenu = true;
+        // Freeze page scroll while burger menu is visible
+        this.freezeScroll();
         // Wait for animation to complete before proceeding
         await new Promise(resolve => setTimeout(resolve, 350));
       }
@@ -1257,6 +1264,7 @@ class Wizard {
       if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
         burgerMenu.closeMenu();
         this.wizardOpenedBurgerMenu = false;
+        this.unfreezeScroll();
       }
       // Ensure we're using the desktop element
       this.validSteps[stepIndex].element = `#${desktopElementId}`;
@@ -1288,6 +1296,7 @@ class Wizard {
       if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
         burgerMenu.closeMenu();
         this.wizardOpenedBurgerMenu = false;
+        this.unfreezeScroll();
       }
     }
   }

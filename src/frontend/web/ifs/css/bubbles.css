@@ -1,5 +1,10 @@
 /* bubbles.css – base styles for Bubbles guided-tour library */
 
+/* Color variables specific to the tour UI */
+:root {
+  --popover-background: #fdf8eb; /* very-light blue tint for bubbles */
+}
+
 /* Overlay segments share common style, unique sizing done via inline styles */
 .driver-overlay {
   background: rgba(0, 0, 0, 0.5);
@@ -20,6 +25,8 @@
   font-family: var(--font-family, sans-serif);
   color: #333;
   line-height: 1.4;
+  /* Use a subtle blue tint for the popover so that it stands out from the highlighted element */
+  background-color: var(--popover-background) !important;
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
