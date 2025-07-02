@@ -213,7 +213,7 @@ WizardSteps:
 
   - element: "#PensionContributionCapped"
     popover:
-      description: "<p>Whether your pension contribution is capped in some way.</p><p>The maximum amount that you can get tax relief on is ${pensionContribEarningLimit,currency}. This limit is the same for everyone, it does not depend on age.</p><p>If you select 'Yes', your pension contributions will be capped at the maximum allowed. The cap itself will be adjusted for inflation as the years go by, so you may see the contribution exceed this limit after the first year.</p><p>If you select 'No' and your contribution is greater than that limit, you pay income tax on the excess.</p><p>If you select 'Match', you won't contribute more than what your employer matches. So, if your employer matches up to 4%, you would be electing to limit your contribution to 4% (plus your employer's 4%, for a total of 8%).</p>"
+      description: "<p>Limit on your pension contribution. Tax relief applies only up to ${pensionContribEarningLimit,currency}.<ul><li><b>Yes</b>: stop at this cap (inflation-adjusted).</li><li><b>No</b>: pay tax on amounts above it.</li><li><b>Match</b>: contribute only what your employer matches (e.g. 4% you + 4% employer).</li></ul></p>"
       side: "right"
       align: "start"
 
