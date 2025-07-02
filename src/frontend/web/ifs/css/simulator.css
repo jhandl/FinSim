@@ -2062,3 +2062,7 @@ footer {
     margin-bottom: 0 !important;
 }
 
+.events-section.card {
+    max-width: 810px; /* Override .card's 306px to allow full-width events table */
+}
+
