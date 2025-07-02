@@ -936,6 +936,24 @@ class Wizard {
         this.finishTour();
         return;
       }
+
+      // Try to trigger the custom "next" action for single-step overview
+      // tours ("Fields Help" button). Depending on the tour engine version
+      // we may not have direct access to the callback via tour.options, so
+      // fall back to simulating a click on the visible next button.
+      const handledEnter = (() => {
+        if (this.tour && typeof this.tour.options?.onNextClick === 'function') {
+          this.tour.options.onNextClick();
+          return true;
+        }
+        const btn = document.querySelector('.driver-popover-next-btn');
+        if (btn) { btn.click(); return true; }
+        return false;
+      })();
+      if (handledEnter) {
+        event.preventDefault();
+        return;
+      }
     }
 
     const moveActions = {
@@ -981,6 +999,20 @@ class Wizard {
           } else {
             direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
           }
+        } else {
+          // We are likely on a single-step overview (no real navigation
+          // possible). Treat navigation keys as a shortcut to activate the
+          // "Fields Help" button.
+          const invoked = (() => {
+            if (this.tour && typeof this.tour.options?.onNextClick === 'function') {
+              this.tour.options.onNextClick();
+              return true;
+            }
+            const btn = document.querySelector('.driver-popover-next-btn');
+            if (btn) { btn.click(); return true; }
+            return false;
+          })();
+          if (invoked) return; // action handled
         }
       }
     }
