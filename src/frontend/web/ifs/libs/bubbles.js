@@ -65,6 +65,8 @@
             this.handleNext = this.handleNext.bind(this);
             this.handlePrev = this.handlePrev.bind(this);
             this.handleClose = this.handleClose.bind(this);
+            this.onScroll = this.onScroll.bind(this);
+            this._scrollRaf = null;
 
             this._destroying = false; // guard against recursive destroy
         }
@@ -77,6 +79,7 @@
             this.buildDOM();
 
             window.addEventListener("resize", this.onResize);
+            window.addEventListener("scroll", this.onScroll, { passive: true });
             this.showStep(clamp(start, 0, this.steps.length - 1));
         }
 
@@ -203,6 +206,7 @@
             if (target) {
                 await this.scrollIntoView(target);
                 await this.ensureHorizontalVisibility(target);
+                await this.waitForScrollSettled();
                 this.applyHighlight(target);
             } else {
                 // detach overlays (full dim) with no transparent hole
@@ -235,13 +239,19 @@
 
             // Decide which rectangle we want to keep in view (card if possible, otherwise target)
             let desiredRect = rect;
+            let fitsVertically = false, topVisible = false, bottomVisible = false;
             if (cardRect) {
-                const fitsVertically = cardRect.height <= (window.innerHeight - hdrH - 2 * margin);
-                const topVisible = cardRect.top >= hdrH + margin;
-                const bottomVisible = cardRect.bottom <= window.innerHeight - margin;
+                fitsVertically = cardRect.height <= (window.innerHeight - hdrH - 2 * margin);
+                topVisible = cardRect.top >= hdrH + margin;
+                bottomVisible = cardRect.bottom <= window.innerHeight - margin;
 
-                // If card fits and is not already fully visible, scroll to reveal full card
-                if (fitsVertically && !(topVisible && bottomVisible)) {
+                // If the entire card already fits and is fully visible, no scrolling needed
+                if (fitsVertically && topVisible && bottomVisible) {
+                    return; // early exit, skip any vertical scrolling
+                }
+
+                // Otherwise, scroll to reveal full card when it fits
+                if (fitsVertically) {
                     desiredRect = cardRect;
                 }
             }
@@ -301,6 +311,41 @@
                     return new Promise(r=>setTimeout(r,300));
                 }
             }
+        }
+
+        waitForScrollSettled() {
+            return new Promise(resolve => {
+                const idleFramesRequired = 2; // consecutive frames with no scroll change
+                const maxWaitMs = 1000; // upper bound to avoid hanging indefinitely
+                let idleFrames = 0;
+                let lastX = window.scrollX;
+                let lastY = window.scrollY;
+                const start = Date.now();
+
+                const check = () => {
+                    const curX = window.scrollX;
+                    const curY = window.scrollY;
+
+                    if (Math.abs(curX - lastX) < 1 && Math.abs(curY - lastY) < 1) {
+                        idleFrames++;
+                        if (idleFrames >= idleFramesRequired) {
+                            return resolve();
+                        }
+                    } else {
+                        idleFrames = 0;
+                        lastX = curX;
+                        lastY = curY;
+                    }
+
+                    if (Date.now() - start > maxWaitMs) {
+                        return resolve(); // give up waiting – should be close enough
+                    }
+
+                    requestAnimationFrame(check);
+                };
+
+                requestAnimationFrame(check);
+            });
         }
 
         applyHighlight(target) {
@@ -392,6 +437,8 @@
             }
 
             const prefSide = step.popover?.side || 'right';
+            // DEBUG: capture info about viewport and popover metrics
+            const debugInfo = { stepIndex: this.activeIdx, prefSide, vw: window.innerWidth, vh: window.innerHeight };
             const margin = 12;
             const pop = this.pop.root;
             pop.style.opacity = 0;
@@ -401,34 +448,61 @@
             const measuredWidth = pop.offsetWidth;
             const measuredHeight = pop.offsetHeight;
 
+            Object.assign(debugInfo, { measuredWidth, measuredHeight });
+
             // restore initial scale for animation
             pop.style.transform = 'scale(0.95)';
 
             const tr = target.getBoundingClientRect();
+            debugInfo.targetRect = { top: tr.top, right: tr.right, bottom: tr.bottom, left: tr.left, width: tr.width, height: tr.height };
             const vw = window.innerWidth;
             const vh = window.innerHeight;
 
-            // On some mobile browsers (e.g. Android Chrome) a bottom navigation bar overlays
-            // part of the visual viewport. The height of that bar is *not* included in
-            // window.innerHeight, so popovers positioned flush with the bottom edge can become
-            // partially hidden.  We approximate this inset as the difference between the full
-            // screen height and the reported viewport height. If that value is negative we clamp
-            // it to 0 to avoid distorting layout on desktop browsers.
-            const bottomInset = Math.max(0, window.screen.height - vh);
-            const chinPadding = 12; // extra offset to keep popovers away from phone UI chin
+            // Prefer the parent card as anchor; fall back to the element rect
+            let anchorRect = tr;
+            const cardEl = target.closest('.card');
+            if (cardEl) anchorRect = cardEl.getBoundingClientRect();
+
+            // Anchor to burger menu container if target resides inside it (overrides card)
+            const burgerMenu = target.closest('#mobileMenu');
+            if (burgerMenu) {
+                anchorRect = burgerMenu.getBoundingClientRect();
+            }
+
+            // Compute safe bottom inset only on narrow/mobile viewports where bottom
+            // navigation bars may overlay the visual viewport.
+            const isNarrow = vw < 500;
+            const bottomInset = isNarrow ? Math.max(0, window.screen.height - vh) : 0;
+            const chinPadding = isNarrow ? 12 : 0;
             const effectiveInset = bottomInset + chinPadding;
+            debugInfo.bottomInset = bottomInset;
+
+            const defaultLeft = anchorRect.left + anchorRect.width/2 - measuredWidth/2;
+            const centredLeft = vw/2 - measuredWidth/2; // center of viewport
+
+            // If the anchor rectangle is narrower than the popover itself (common on desktop)
+            // or when anchoring to header buttons, horizontally centre the popover.
+            let leftPos = defaultLeft;
+            if (anchorRect.width < measuredWidth || target.tagName === 'HEADER') {
+                leftPos = centredLeft;
+            }
 
             const sides = [prefSide, opposite(prefSide), 'bottom', 'top', 'right', 'left'];
             let placed = false;
             for (const side of sides) {
                 const pos = coords(side);
-                if (fits(pos)) { apply(pos); placed = true; break; }
+                if (fits(pos)) { apply(pos); placed = true; debugInfo.chosenSide = side; debugInfo.finalPos = pos; break; }
             }
             if (!placed) {
                 // As a last-ditch effort detach the popover and pin it above the bottom inset
                 // so that it is always fully visible.
-                apply({ fixed: true, top: vh - measuredHeight - margin - effectiveInset, left: Math.max(margin, (vw - measuredWidth) / 2) });
+                const fallback = { fixed: true, top: vh - measuredHeight - margin - effectiveInset, left: Math.max(margin, (vw - measuredWidth) / 2) };
+                apply(fallback);
+                debugInfo.chosenSide = 'detached';
+                debugInfo.finalPos = fallback;
             }
+
+            try { console.log('[Bubbles] positionPopover', debugInfo); } catch (_) {}
 
             requestAnimationFrame(()=>{
                 pop.style.opacity = 1;
@@ -438,36 +512,30 @@
             /* helpers */
             function opposite(s) { return { top: 'bottom', bottom: 'top', left: 'right', right: 'left' }[s] || 'right'; }
             function coords(side) {
-                const isMobile = window.innerWidth < 500;
-                // Determine anchor rect: card container for mobile if exists, otherwise element itself
+                // Prefer the parent card as anchor; fall back to the element rect
                 let anchorRect = tr;
-                if (isMobile) {
-                    const card = target.closest('.card');
-                    if (card) anchorRect = card.getBoundingClientRect();
-                }
-                // Anchor to burger menu container if target resides inside it (regardless of viewport)
-                const burgerMenu = target.closest('#mobileMenu');
-                if (burgerMenu) {
-                    anchorRect = burgerMenu.getBoundingClientRect();
-                }
+                const cardEl = target.closest('.card');
+                if (cardEl) anchorRect = cardEl.getBoundingClientRect();
 
-                const defaultLeft = anchorRect.left + anchorRect.width/2 - measuredWidth/2 + window.scrollX;
-                const centredLeft = window.scrollX + vw/2 - measuredWidth/2; // center of viewport
+                const defaultLeft = anchorRect.left + anchorRect.width/2 - measuredWidth/2;
+                const centredLeft = vw/2 - measuredWidth/2; // center of viewport
 
+                // If the anchor rectangle is narrower than the popover itself (common on desktop)
+                // or when anchoring to header buttons, horizontally centre the popover.
                 let leftPos = defaultLeft;
-                if (isMobile && (anchorRect.width < measuredWidth || target.tagName === 'HEADER')) {
+                if (anchorRect.width < measuredWidth || target.tagName === 'HEADER') {
                     leftPos = centredLeft;
                 }
 
                 switch (side) {
                     case 'top':
-                        return { top: anchorRect.top - measuredHeight - margin + window.scrollY, left: leftPos };
+                        return { fixed: true, top: anchorRect.top - measuredHeight - margin, left: leftPos };
                     case 'bottom':
-                        return { top: anchorRect.bottom + margin + window.scrollY, left: leftPos };
+                        return { fixed: true, top: anchorRect.bottom + margin, left: leftPos };
                     case 'left':
-                        return { top: tr.top + tr.height/2 - measuredHeight/2 + window.scrollY, left: tr.left - measuredWidth - margin + window.scrollX };
+                        return { fixed: true, top: anchorRect.top + anchorRect.height/2 - measuredHeight/2, left: anchorRect.left - measuredWidth - margin };
                     case 'right':
-                        return { top: tr.top + tr.height/2 - measuredHeight/2 + window.scrollY, left: tr.right + margin + window.scrollX };
+                        return { fixed: true, top: anchorRect.top + anchorRect.height/2 - measuredHeight/2, left: anchorRect.right + margin };
                     default:
                         return null;
                 }
@@ -478,25 +546,21 @@
                 // Ensure the popover rect is fully within the viewport *and* does not
                 // overlap the bottom inset area.
                 return (
-                    top >= window.scrollY &&
-                    left >= window.scrollX &&
-                    (left + measuredWidth) <= window.scrollX + vw &&
-                    (top + measuredHeight) <= window.scrollY + vh - effectiveInset
+                    top >= 0 &&
+                    left >= 0 &&
+                    (left + measuredWidth) <= vw &&
+                    (top + measuredHeight) <= vh - effectiveInset
                 );
             }
             function apply(p) {
-                if (p.fixed) {
-                    pop.style.position = 'fixed';
-                    pop.style.top = p.top + 'px';
-                    pop.style.left = p.left + 'px';
-                } else {
-                    pop.style.position = 'absolute';
-                    // Clamp top so the popover never intrudes into the bottom inset area.
-                    const clampedTop = Math.min(Math.max(window.scrollY, p.top), window.scrollY + vh - measuredHeight - effectiveInset - margin);
-                    pop.style.top = clampedTop + 'px';
-                    const clampedLeft = Math.max(window.scrollX + 8, Math.min(p.left, window.scrollX + vw - measuredWidth - 8));
-                    pop.style.left = clampedLeft + 'px';
-                }
+                // Always use fixed positioning so bubble remains viewport-locked
+                pop.style.position = 'fixed';
+                const rawTop = p.top ?? 0;
+                const rawLeft = p.left ?? 0;
+                const clampedTop = clamp(rawTop, margin, vh - measuredHeight - effectiveInset - margin);
+                const clampedLeft = clamp(rawLeft, 8, vw - measuredWidth - 8);
+                pop.style.top = clampedTop + 'px';
+                pop.style.left = clampedLeft + 'px';
             }
         }
 
@@ -517,12 +581,28 @@
             if (target) { this.applyHighlight(target); this.positionPopover(step, target); }
         }
 
+        // Called on every scroll (throttled with rAF) to keep highlight aligned.
+        onScroll() {
+            if (this._scrollRaf) return; // throttle to animation frame
+            this._scrollRaf = requestAnimationFrame(()=>{
+                this._scrollRaf = null;
+                if (this.activeIdx < 0) return;
+                const step = this.steps[this.activeIdx];
+                const target = step?.element ? document.querySelector(step.element) : null;
+                if (target) {
+                    this.applyHighlight(target);
+                    // Intentionally NOT repositioning popover so it remains fixed in viewport
+                }
+            });
+        }
+
         /************** Cleanup **************/
         destroy() {
             if (this._destroying) return;
             this._destroying = true;
 
             window.removeEventListener("resize", this.onResize);
+            window.removeEventListener("scroll", this.onScroll);
 
             // fire callback once
             this.cbDestroy();

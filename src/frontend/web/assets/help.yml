@@ -58,13 +58,13 @@ WizardSteps:
   - element: "#simModeSingle"
     popover:
       description: "<p>Single person simulation mode.</p><p>Use this mode for individual financial planning. In this mode, you'll only enter your own financial information and the simulator will plan for one person's financial future.</p>"
-      side: "bottom"
+      side: "right"
       align: "center"
 
   - element: "#simModeCouple"
     popover:
       description: "<p>Two-person simulation mode.</p><p>Use this mode for couples or partnerships. This allows you to enter separate pension pots, retirement ages, and state pension information for both people. Income events can be assigned to either person.</p>"
-      side: "bottom"
+      side: "right"
       align: "center"
       
   - element: "#StartingAge"
@@ -117,7 +117,7 @@ WizardSteps:
 
   - element: "#MarriageYear"
     popover:
-      description: "<p>The year that you got married or entered into a civil partnership, or that you plan to.</p><p>Your income tax band limits change if you are married or in a civil partnership. You can enter any year in the past if you were already married or in partnership, or a year in the future if you plan to get married or enter into a civil partnership then.</p>"
+      description: "<p>The year that you got married or entered into a civil partnership, or that you plan to.</p><p>Your income tax band limits change if you are married or in a civil partnership.</p>"
       side: "right"
       align: "start"
 
@@ -232,13 +232,13 @@ WizardSteps:
   - element: "#economyModeDeterministic"
     popover:
       description: "<p>Fixed growth mode.</p><p>In this mode, the simulation uses fixed growth rates without volatility. This provides a single, predictable outcome based on your specified growth rates. Volatility fields are hidden in this mode.</p>"
-      side: "bottom"
+      side: "right"
       align: "center"
 
   - element: "#economyModeMonteCarlo"
     popover:
       description: "<p>Variable growth mode.</p><p>In this mode, the simulation runs ${simulationRuns} times using both growth rates and volatility. This provides a probability of success rather than a single outcome, accounting for market uncertainty and fluctuations. At least one of the volatiliy rates must be greater than 0%.</p>"
-      side: "bottom"
+      side: "right"
       align: "center"
 
   - element: "#PensionGrowthRate"
@@ -1055,22 +1055,6 @@ WizardSteps:
       nextBtnText: ["Get Started!"]
 
 WelcomeTabs:
-  - id: intro
-    title: Intro
-    content: |
-      <div class="welcome-list">
-        <div class="list-item">
-          <strong>Disclaimer</strong>
-          <p>This is a tool to help you understand how different decisions and scenarios can affect your long term financial future. It is not financial advice. Don't make serious life decisions based on this. It's not a substitute for a good financial advisor.</p>
-        </div>
-        <div class="list-item">
-          <strong>Privacy notice</strong>
-          <p>I don't collect any data from you. The simulator runs entirely in your browser so the information you enter stays in your computer.</p>
-        </div>
-        <div class="list-item">
-          <p>Consider complementary tools like Irish Tax Hub's [tax calculators](https://www.irishtaxhub.ie/tools){tax calculators,suite,net income,free,pension,try calculator} and PWC's [income tax calculator](https://download.pwc.com/ie/budget-2025/income-tax-calculator.html){income tax calculator,your status,are you entitled}.</p>
-        </div>
-      </div>
 
   - id: getting-started
     title: Start
@@ -1136,3 +1120,22 @@ WelcomeTabs:
           <p>Use the color scheme dropdown in the data table to highlight critical periods in your plan.</p>
         </div>
       </div>
+
+  - id: notes
+    title: Notes
+    content: |
+      <div class="welcome-list">
+        <div class="list-item">
+          <strong>Disclaimer</strong>
+          <p>This is not financial advice. It's a tool to help you understand how different decisions and scenarios can affect your long term financial future. Don't make serious financial decisions without talking to a financial advisor.</p>
+        </div>
+        <div class="list-item">
+          <strong>Privacy notice</strong>
+          <p>I don't collect any data from you. The information you enter stays in your computer.</p>
+        </div>
+        <div class="list-item">
+          <strong>Complementary tools</strong>
+          <p>Consider also using Irish Tax Hub's [tax calculators](https://www.irishtaxhub.ie/tools){tax calculators,suite,net income,free,pension,try calculator} and PWC's [income tax calculator](https://download.pwc.com/ie/budget-2025/income-tax-calculator.html){income tax calculator,your status,are you entitled}.</p>
+        </div>
+      </div>
+

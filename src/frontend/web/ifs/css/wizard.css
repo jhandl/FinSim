@@ -1,7 +1,8 @@
 .driver-popover {
   padding-top: 30px !important;
-  min-width: 300px !important;
-  max-width: clamp(300px, 50vw, 600px)  !important;
+  min-width: 456px !important;
+  /* Linear scaling: 456 px at 480 px viewport → 524 px at 1200 px viewport. */
+  max-width: clamp(456px, calc(9.445vw + 411px), 524px) !important;
   max-height: 90vh !important;
   overflow-y: auto !important;
 }

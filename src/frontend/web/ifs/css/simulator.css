@@ -528,6 +528,8 @@ header.header-hidden {
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.2s ease, visibility 0.2s ease;
+    display: flex;
+    flex-direction: column;
 }
 
 .welcome-tab-content.active {
@@ -549,6 +551,7 @@ header.header-hidden {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    flex: 1;
 }
 
 .workflow-step {
@@ -2027,5 +2030,35 @@ footer {
 #Data thead tr:last-child th:nth-child(1),
 #Data thead tr:last-child th:nth-child(2) {
     border-bottom: 3px solid #666;
+}
+
+/* Footnote item style for Welcome Modal */
+.footnote-item {
+    font-size: 0.8rem;
+    line-height: 1.3;
+    text-align: center;
+    color: #666;
+    padding: 0;
+    margin: 0.5rem 0 0 0;
+    border: none;
+    margin-top: auto;
+    align-self: center;
+}
+
+/* Ensure no bullet point or number appears */
+.footnote-item::before {
+    content: none;
+}
+
+/* Ensure last list-item before footnote has no separator */
+.welcome-list > .list-item:last-child {
+    border-bottom: none !important;
+    margin-bottom: 0 !important;
+}
+
+/* Remove separator line from the list-item that is immediately before a footnote-item */
+.welcome-list .list-item:has(+ .footnote-item) {
+    border-bottom: none !important;
+    margin-bottom: 0 !important;
 }
 

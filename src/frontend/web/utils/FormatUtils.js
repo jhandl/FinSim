@@ -184,10 +184,21 @@ class FormatUtils {
       if (varToken.includes('.')) {
         const tokens = varToken.split('.');
         let value = config;
-        for (let i = 0; i < tokens.length && value; i++) {
-          value = value[tokens[i]];
+        for (let i = 0; i < tokens.length && value !== undefined; i++) {
+          const token = tokens[i];
+
+          // Handle synthetic properties like .min and .max on objects
+          if ((token === 'min' || token === 'max') && i === tokens.length - 1 && typeof value === 'object' && value !== null) {
+            const numericValues = Object.values(value).map(v => parseFloat(v)).filter(v => !isNaN(v));
+            if (numericValues.length === 0) {
+              return match; // Can't compute
+            }
+            value = token === 'min' ? Math.min(...numericValues) : Math.max(...numericValues);
+          } else {
+            value = value[token];
+          }
         }
-        if (typeof value === 'undefined') return match;
+        if (value === undefined) return match;
         return FormatUtils.formatValue(value, format);
       }
 

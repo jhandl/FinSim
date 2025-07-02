@@ -318,7 +318,7 @@
             </div>
         </div>
 
-        <div class="events-section">
+        <div class="events-section card">
             <div class="card-header-flex">
                 <h2>Events</h2>
                 <div class="age-year-toggle">
@@ -495,9 +495,21 @@
             
             // Close menu when clicking outside
             document.addEventListener('click', (e) => {
-                if (this.isOpen && !this.mobileMenu.contains(e.target) && !this.menuToggle.contains(e.target)) {
-                    this.closeMenu();
+                if (!this.isOpen) return;
+
+                // Ignore clicks inside the burger menu itself or on its toggle
+                if (this.mobileMenu.contains(e.target) || this.menuToggle.contains(e.target)) {
+                    return;
                 }
+
+                // If the on-screen wizard is active, ignore clicks inside its popover
+                const wizardActive = document.body.getAttribute('data-wizard-active') === 'true';
+                if (wizardActive && e.target.closest('.driver-popover')) {
+                    return;
+                }
+
+                // Otherwise treat it as an outside click
+                this.closeMenu();
             });
             
             // Handle ESC key
