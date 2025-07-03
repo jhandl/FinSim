@@ -438,7 +438,7 @@ WizardSteps:
     tours: [full, mini]
     card: events
     popover:
-      description: "<p>Select the type of event.</p>"
+      description: "<p>Choose what kind of event this row represents: income, expense, property, market crash, etc. The fields to the right will automatically adapt to your selection.</p>"
       side: "bottom"
       align: "center"
 
