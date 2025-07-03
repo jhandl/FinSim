@@ -1383,7 +1383,7 @@ WizardSteps:
       side: "top"
       align: "left"
 
-  - element: "#visualizationToggle"
+  - element: ".visualization-control"
     tours: [full, mini]
     card: data
     popover:
