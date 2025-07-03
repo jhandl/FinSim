@@ -174,7 +174,7 @@ class WebUI extends AbstractUI {
           // Callback for "Quick Tour" button - start the quick tour
           const wizard = Wizard.getInstance();
           if (wizard) {
-            wizard.startQuickTour(); // Start the quick tour that shows card overviews
+            wizard.startTour('quick'); // Start the quick tour
           }
         },
         () => {
@@ -621,7 +621,13 @@ class WebUI extends AbstractUI {
     } else if (cardElement.classList.contains('events-section')) {
       cardType = 'events';
     } else if (cardElement.classList.contains('graph-container')) {
-      cardType = 'graphs';
+      // Determine specific graph based on contained canvas id
+      const canvas = cardElement.querySelector('canvas');
+      if (canvas && (canvas.id === 'cashflowGraph' || canvas.id === 'assetsGraph')) {
+        cardType = canvas.id; // 'cashflowGraph' or 'assetsGraph'
+      } else {
+        cardType = 'graphs'; // fallback (should not happen if DOM is correct)
+      }
     } else if (cardElement.classList.contains('data-section')) {
       cardType = 'data';
     }
@@ -630,9 +636,9 @@ class WebUI extends AbstractUI {
     const wizard = Wizard.getInstance();
     if (wizard && cardType !== 'unknown') {
       try {
-        wizard.showCardOverview(cardType);
+        wizard.startTour('mini', cardType);
       } catch (error) {
-        console.error('Error calling wizard.showCardOverview:', error);
+        console.error('Error starting mini tour:', error);
       }
     } else {
       console.warn(`Cannot show overview for card type: ${cardType}`);

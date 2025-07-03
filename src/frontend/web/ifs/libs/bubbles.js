@@ -428,6 +428,12 @@
             btnPrev.textContent = normaliseLabel(step.popover?.prevBtnText, 'Previous');
             btnNext.textContent = normaliseLabel(step.popover?.nextBtnText, 'Next');
 
+            const prevLbl = btnPrev.textContent.trim().toLowerCase();
+            const nextLbl = btnNext.textContent.trim().toLowerCase();
+
+            btnPrev.classList.toggle('arrow-prev', prevLbl === 'previous' || prevLbl === 'back');
+            btnNext.classList.toggle('arrow-next', nextLbl === 'next');
+
             // button visibility
             let buttons = step.popover?.showButtons;
             if (!Array.isArray(buttons)) {
@@ -523,9 +529,7 @@
                 debugInfo.chosenSide = 'detached';
                 debugInfo.finalPos = fallback;
             }
-
-            try { console.log('[Bubbles] positionPopover', debugInfo); } catch (_) {}
-
+            
             requestAnimationFrame(()=>{
                 pop.style.opacity = 1;
                 pop.style.transform = 'scale(1)';

@@ -239,3 +239,12 @@
   outline: none !important;
   box-shadow: none !important;
 }
+
+/* Add directional arrows to tour navigation buttons */
+.driver-popover-prev-btn::before {
+  content: "← ";
+}
+
+.driver-popover-next-btn:not(.done)::after {
+  content: " →";
+}

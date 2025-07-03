@@ -90,4 +90,12 @@
 
 .driver-popover-close-btn:hover {
   color: #000;
+}
+
+/* Directional arrows for navigation buttons */
+.driver-popover-prev-btn.arrow-prev::before {
+  content: "← ";
+}
+.driver-popover-next-btn.arrow-next::after {
+  content: " →";
 } 
