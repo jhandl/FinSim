@@ -88,9 +88,6 @@
         setTimeout(() => row.classList.remove('flash'), 1000);
       }
     });
-
-    // DEBUG
-    console.debug('RowSorter: applying sort; deltas', Array.from(firstPos.keys()).map(r=>firstPos.get(r)-lastPos.get(r)).filter(d=>d!==0));
   }
 
   global.RowSorter = { sortRows };

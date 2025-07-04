@@ -1896,7 +1896,7 @@ footer {
     font-size: 0.8rem;
     font-weight: normal;
     white-space: nowrap;
-    z-index: 10050;
+    z-index: 10052;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.2s ease-out;
@@ -2106,5 +2106,43 @@ footer {
 @keyframes loading-spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* ------------------------------------------------------------------
+   Pseudo <select> styling for Event Type dropdown (DropdownUtils)
+-------------------------------------------------------------------*/
+.pseudo-select {
+  display: block;
+  width: 100%;
+  min-width: 190px;
+  max-width: 190px;
+  padding: 0.225rem 1.2rem 0.225rem 6px;
+  border: var(--input-field-border) solid var(--border-color);
+  border-radius: 3.6px;
+  font-size: 0.9rem;
+  line-height: 1.2rem;
+  background-color: #fff;
+  position: relative;
+  user-select: none;
+  color: var(--text-color);
+}
+
+.pseudo-select::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #555;
+  transform: translateY(-45%);
+  pointer-events: none;
+}
+
+/* Hide ▼ text version if any from earlier build */
+.pseudo-select[data-arrow="hidden"]::after {
+  display: none;
 }
 

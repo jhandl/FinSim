@@ -41,6 +41,38 @@
         return el;
     }
 
+    /************** Help Data Loader (shared) **************/
+    // Cache for parsed help.yml so we only fetch & parse once per page load
+    let __helpDataCache = null;
+
+    /**
+     * Synchronously fetches and parses help.yml the first time it is requested.
+     * Subsequent calls return the cached object.
+     * We purposefully keep this synchronous so callers (dropdown builders, etc.)
+     * can obtain the data without promises or callbacks.
+     */
+    function loadHelpDataSync() {
+        if (__helpDataCache !== null) return __helpDataCache;
+        try {
+            const ts = Date.now(); // cache-bust in dev / refresh scenarios
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `/src/frontend/web/assets/help.yml?t=${ts}`, false); // synchronous
+            xhr.send(null);
+            if (xhr.status === 200) {
+                __helpDataCache = (typeof jsyaml !== 'undefined' && jsyaml.load)
+                    ? jsyaml.load(xhr.responseText)
+                    : {};
+            } else {
+                console.warn('bubbles.js – failed to load help.yml:', xhr.status);
+                __helpDataCache = {};
+            }
+        } catch (err) {
+            console.error('bubbles.js – error loading help.yml:', err);
+            __helpDataCache = {};
+        }
+        return __helpDataCache;
+    }
+
     /************** Core Engine **************/
     class BubblesEngine {
         constructor(options = {}) {
@@ -74,12 +106,14 @@
         /************** Public API **************/
         drive(start = 0) {
             if (!this.steps.length) return;
-            if (this.overlay) this.destroy();
-            // Build DOM once
-            this.buildDOM();
 
-            window.addEventListener("resize", this.onResize);
-            window.addEventListener("scroll", this.onScroll, { passive: true });
+            // Build DOM only on first run
+            if (!this.overlay) {
+                this.buildDOM();
+                window.addEventListener("resize", this.onResize);
+                window.addEventListener("scroll", this.onScroll, { passive: true });
+            }
+
             this.showStep(clamp(start, 0, this.steps.length - 1));
         }
 
@@ -190,19 +224,9 @@
 
         /************** Step Handling **************/
         async showStep(idx) {
-            if (idx < 0 || idx >= this.steps.length) {
-                this.destroy();
-                return;
-            }
-            
             this.activeIdx = idx;
             const step = this.steps[idx];
             let target = step.element ? document.querySelector(step.element) : null;
-            if (!target) {
-                // If element missing but defined, skip step, otherwise treat as detached full popover
-                if (step.element) { this.showStep(idx + 1); return; }
-            }
-
             if (target) {
                 await this.scrollIntoView(target);
                 await this.ensureHorizontalVisibility(target);
@@ -623,6 +647,15 @@
         }
 
         /************** Cleanup **************/
+        updateOptions(options = {}) {
+            this.opts = options;
+            this.steps = Array.isArray(options.steps) ? options.steps : [];
+            this.cbNext = typeof options.onNextClick === "function" ? options.onNextClick : () => {};
+            this.cbPrev = typeof options.onPrevClick === "function" ? options.onPrevClick : () => {};
+            this.cbDestroy = typeof options.onDestroyStarted === "function" ? options.onDestroyStarted : () => {};
+            this.cbHighlight = typeof options.onHighlighted === "function" ? options.onHighlighted : () => {};
+        }
+
         destroy() {
             if (this._destroying) return;
             this._destroying = true;
@@ -637,23 +670,43 @@
             if (this.highlightBox) { this.highlightBox.remove(); this.highlightBox = null; }
             if (this.pop) { this.pop.root.remove(); this.pop = null; }
             document.querySelectorAll('.driver-active-element').forEach(el => el.classList.remove('driver-active-element'));
+            
+            // Nullify the singleton so a fresh one is created next time
+            if (bubblesSingleton === this) {
+                bubblesSingleton = null;
+            }
         }
     }
 
     /************** Public shim **************/
+    let bubblesSingleton = null;
+
     if (!window.driver) window.driver = {};
     if (!window.driver.js) window.driver.js = {};
     window.driver.js.driver = function (opts) {
-        const engine = new BubblesEngine(opts);
+        if (!bubblesSingleton) {
+            bubblesSingleton = new BubblesEngine(opts);
+        } else {
+            bubblesSingleton.updateOptions(opts);
+        }
+
         return {
-            drive: idx => engine.drive(idx),
-            moveNext: () => engine.moveNext(),
-            movePrevious: () => engine.movePrevious(),
-            getActiveIndex: () => engine.getActiveIndex(),
-            getStepsCount: () => engine.getStepsCount(),
-            hasNextStep: () => engine.hasNextStep(),
-            hasPreviousStep: () => engine.hasPreviousStep(),
-            destroy: () => engine.destroy()
+            drive: idx => bubblesSingleton.drive(idx),
+            moveNext: () => bubblesSingleton.moveNext(),
+            movePrevious: () => bubblesSingleton.movePrevious(),
+            getActiveIndex: () => bubblesSingleton.getActiveIndex(),
+            getStepsCount: () => bubblesSingleton.getStepsCount(),
+            hasNextStep: () => bubblesSingleton.hasNextStep(),
+            hasPreviousStep: () => bubblesSingleton.hasPreviousStep(),
+            destroy: () => bubblesSingleton.destroy()
         };
     };
+
+    // --------------------------------------------------------------
+    // Public helper: expose synchronous help.yml access for any UI
+    // component (Events table, etc.) that needs contextual text.
+    // --------------------------------------------------------------
+    if (typeof window.driver.js.getHelpData !== 'function') {
+        window.driver.js.getHelpData = () => loadHelpDataSync();
+    }
 })(); 

@@ -1391,7 +1391,7 @@ WizardSteps:
       side: "top"
       align: "left"
 
-  - element: ".visualization-control"
+  - element: "#visualizationToggle"
     tours: [full, mini]
     card: data
     popover:

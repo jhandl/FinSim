@@ -41,9 +41,9 @@ class TableManager {
       if (groupId === 'Events') {
         // Get type from select element and name from input
         // Use the original stored event type if specifically requested (for serialization), otherwise use current value
-        const selectElement = cells[0].querySelector('select');
+        const typeInput = cells[0].querySelector('.event-type');
         const originalType = row.dataset.originalEventType;
-        const type = (includeHiddenEventTypes && originalType) ? originalType : (selectElement?.value || '');
+        const type = (includeHiddenEventTypes && originalType) ? originalType : (typeInput?.value || '');
         const name = cells[1].querySelector('input')?.value || '';
         rowData.push(`${type}:${name}`);
         

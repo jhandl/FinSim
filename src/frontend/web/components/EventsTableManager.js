@@ -14,32 +14,13 @@ class EventsTableManager {
     this.setupSimulationModeChangeHandler();
     this.setupAgeYearToggle();
     this.setupTooltipHandlers();
-    // Sorting preset and handlers
-    this.sortPreset = localStorage.getItem('eventsSortPreset') || 'none';
     this.sortColumn = null;
     this.sortDir = null;
     this.sortKeys = [];
-    this.populateSortPresets();
-    this.sortDropdown = DropdownUtils.create({
-      toggleEl: document.getElementById('eventsSortToggle'),
-      dropdownEl: document.getElementById('eventsSortOptions'),
-      selectedValue: this.sortPreset,
-      onSelect: (val, label) => {
-        this.sortPreset = val;
-        localStorage.setItem('eventsSortPreset', this.sortPreset);
-        // Update selected label next to icon
-        const displayEl = document.getElementById('selectedSortDisplay');
-        if (displayEl) displayEl.textContent = label;
-        this.updateSelectedSortDisplay();
-        setTimeout(() => this.applyPresetSort(true), 0);
-      },
-    });
-    // Refresh display once during init
-    this.updateSelectedSortDisplay();
     this.setupColumnSortHandlers();
     this.setupAutoSortOnBlur();
     // Apply initial sort after DOM settles
-    setTimeout(() => this.applyPresetSort(), 0);
+    setTimeout(() => this.applySort(), 0);
     this.initializeCarets();
   }
 
@@ -206,32 +187,25 @@ class EventsTableManager {
   updateEventRowsVisibilityAndTypes() {
     const simulationMode = this.webUI.getValue('simulation_mode');
     const tbody = document.querySelector('#Events tbody');
-    if (!tbody) {
-      return;
-    }
+    if (!tbody) return;
 
-    const rows = tbody.querySelectorAll('tr');
+    tbody.querySelectorAll('tr').forEach((row) => {
+      const typeInput = row.querySelector('.event-type');
+      const originalEventType = row.dataset.originalEventType || (typeInput ? typeInput.value : '');
 
-    rows.forEach((row, index) => {
-      const typeSelect = row.querySelector('.event-type');
-      const originalEventType = row.dataset.originalEventType || (typeSelect ? typeSelect.value : '');
+      /* Handle row visibility for P2-specific events */
+      const shouldHide = simulationMode === 'single' && (originalEventType === 'SI2' || originalEventType === 'SI2np');
+      row.style.display = shouldHide ? 'none' : '';
 
-      if (typeSelect) {
-
-        // 1. Update row visibility for P2-specific events
-        let shouldHide = simulationMode === 'single' && (originalEventType === 'SI2' || originalEventType === 'SI2np');
-
-        if (shouldHide) {
-          row.style.display = 'none';
-        } else {
-          row.style.display = '';
-        }
-
-        // 2. Refresh event type dropdown options, trying to select the original type
-        const newOptionsHTML = this.getEventTypeOptions(originalEventType);
-        typeSelect.innerHTML = newOptionsHTML;
-        typeSelect.value = originalEventType;
-      } else {
+      /* Refresh dropdown options to reflect simulation mode */
+      const dropdown = row._eventTypeDropdown;
+      if (dropdown) {
+        const newOpts = this.getEventTypeOptionObjects();
+        dropdown.setOptions(newOpts);
+        const curVal = typeInput.value;
+        const curOpt = newOpts.find((o) => o.value === curVal);
+        const toggleEl = row.querySelector(`#EventTypeToggle_${row.dataset.rowId}`);
+        if (toggleEl && curOpt) toggleEl.textContent = curOpt.label;
       }
     });
   }
@@ -272,12 +246,19 @@ class EventsTableManager {
     const row = document.createElement('tr');
     row.dataset.rowId = rowId;
     row.dataset.originalEventType = type;
-    
+
+    // Build dropdown options & find label for current selection
+    const optionObjects = this.getEventTypeOptionObjects();
+    const selectedObj = optionObjects.find((o) => o.value === type) || optionObjects[0];
+    const selectedLabel = selectedObj.label;
+
     row.innerHTML = `
       <td>
-          <select id="EventType_${rowId}" class="event-type">
-              ${this.getEventTypeOptions(type)}
-          </select>
+          <input type="hidden" id="EventTypeValue_${rowId}" class="event-type" value="${selectedObj.value}">
+          <div class="event-type-dd visualization-control" id="EventType_${rowId}">
+              <span id="EventTypeToggle_${rowId}" class="dd-toggle pseudo-select">${selectedLabel}</span>
+              <div id="EventTypeOptions_${rowId}" class="visualization-dropdown" style="display:none;"></div>
+          </div>
       </td>
       <td><input type="text" id="EventName_${rowId}" class="event-name" value="${name}"></td>
       <td><input type="number" id="EventAmount_${rowId}" class="event-amount currency" inputmode="numeric" pattern="[0-9]*" step="1000" value="${amount}"></td>
@@ -289,9 +270,34 @@ class EventsTableManager {
           <button class="delete-event" title="Delete event">×</button>
       </td>
     `;
-    if (type) {
-      this.updateFieldVisibility(row.querySelector(`#EventType_${rowId}`));
-    }
+
+    /* =============================================================
+       Instantiate dropdown for this row
+    ============================================================= */
+    const typeInput   = row.querySelector(`#EventTypeValue_${rowId}`);
+    const toggleEl    = row.querySelector(`#EventTypeToggle_${rowId}`);
+    const dropdownEl  = row.querySelector(`#EventTypeOptions_${rowId}`);
+
+    const dropdown = DropdownUtils.create({
+      toggleEl,
+      dropdownEl,
+      options: optionObjects,
+      selectedValue: selectedObj.value,
+      width: 200,
+      header: 'Event Type',
+      onSelect: (val, label) => {
+        typeInput.value = val;
+        toggleEl.textContent = label;
+        row.dataset.originalEventType = val;
+        this.updateFieldVisibility(typeInput);
+        typeInput.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+    });
+    // Keep reference for later refreshes
+    row._eventTypeDropdown = dropdown;
+
+    // Initial visibility update
+    this.updateFieldVisibility(typeInput);
 
     return row;
   }
@@ -319,40 +325,31 @@ class EventsTableManager {
     }, 0);
 
     // Re-apply preset sort if active
-    this.applyPresetSort();
+    this.applySort();
   }
 
-  getEventTypeOptions(selectedType = '') {
-    const simulationMode = this.webUI.getValue('simulation_mode'); 
-    
-    // Define all possible salary event types with their codes and base labels
-    // P1 codes are SI, SInp. P2 codes are SI2, SI2np.
+  getEventTypeOptionObjects() {
+    const simulationMode = this.webUI.getValue('simulation_mode');
+
     const salaryTypesConfig = [
-      { code: 'SI', singleLabel: "Salary Income", jointLabel: "Your Salary" },
-      { code: 'SInp', singleLabel: "Salary (no pension)", jointLabel: "Your Salary (no pension)" },
-      { code: 'SI2', singleLabel: null, jointLabel: "Their Salary" },
-      { code: 'SI2np', singleLabel: null, jointLabel: "Their Salary (no pension)" }
+      { code: 'SI', singleLabel: 'Salary Income', jointLabel: 'Your Salary' },
+      { code: 'SInp', singleLabel: 'Salary (no pension)', jointLabel: 'Your Salary (no pension)' },
+      { code: 'SI2', singleLabel: null, jointLabel: 'Their Salary' },
+      { code: 'SI2np', singleLabel: null, jointLabel: 'Their Salary (no pension)' },
     ];
 
     const eventTypes = [
       { value: 'NOP', label: 'No Operation' },
-      // Salary types will be inserted here
     ];
 
-    salaryTypesConfig.forEach(stc => {
+    salaryTypesConfig.forEach((stc) => {
       if (simulationMode === 'single') {
-        if (stc.singleLabel) { // Only add if it has a label for single mode (SI, SInp)
-          eventTypes.push({ value: stc.code, label: stc.singleLabel });
-        }
-      } else { // joint mode
-        // In joint mode, all configured salary types with a jointLabel are added
-        if (stc.jointLabel) {
-            eventTypes.push({ value: stc.code, label: stc.jointLabel });
-        }
+        if (stc.singleLabel) eventTypes.push({ value: stc.code, label: stc.singleLabel });
+      } else if (stc.jointLabel) {
+        eventTypes.push({ value: stc.code, label: stc.jointLabel });
       }
     });
 
-    // Add other non-salary event types
     eventTypes.push(
       ...[
         { value: 'UI', label: 'RSU Income' },
@@ -362,17 +359,33 @@ class EventsTableManager {
         { value: 'E', label: 'Expense' },
         { value: 'R', label: 'Real Estate' },
         { value: 'M', label: 'Mortgage' },
-        { value: 'SM', label: 'Stock Market' }
-      ]
+        { value: 'SM', label: 'Stock Market' },
+      ],
     );
-    
-    // Order: NOP, P1 Salarires (SI, SInp), P2 Salaries (SI2, SI2np if joint), then UI, RI, DBI etc.
-    // This order is naturally achieved by current insertion if salaryTypesConfig is ordered SI, SInp, SI2, SI2np.
-    // If a more specific order is required, sort eventTypes array here before mapping.
 
-    return eventTypes.map(type => {
-      return `<option value="${type.value}" ${type.value === selectedType ? 'selected' : ''}>${type.label}</option>`;
-    }).join('');
+    /* ------------------------------------------------------------
+       Enrich option objects with real descriptions from help.yml
+    -------------------------------------------------------------*/
+    let descMap = {};
+    try {
+      const help = window.driver?.js?.getHelpData?.();
+      if (help && Array.isArray(help.WizardSteps)) {
+        help.WizardSteps.forEach((step) => {
+          if (step.element === '#EventType' && Array.isArray(step.eventTypes) && step.eventTypes.length === 1) {
+            const code = step.eventTypes[0];
+            let desc = step.popover && step.popover.description ? step.popover.description : '';
+            // Strip HTML tags for plain-text tooltip
+            desc = desc.replace(/<[^>]+>/g, '').trim();
+            if (desc) descMap[code] = desc;
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('EventsTableManager: failed to extract event type descriptions', err);
+    }
+
+    // Attach description so DropdownUtils can show tooltips
+    return eventTypes.map((et) => ({ ...et, description: descMap[et.value] || et.label }));
   }
 
   setupTooltipHandlers() {
@@ -492,41 +505,6 @@ class EventsTableManager {
 
   /* ---------------- Sorting Helpers ---------------- */
 
-  populateSortPresets() {
-    const dropdown = document.getElementById('eventsSortOptions');
-    if (!dropdown) return;
-
-    // Avoid repopulation
-    if (dropdown.querySelector('[data-value]')) return;
-
-    const presets = [
-      { value: 'none', label: 'None', description: 'Disable automatic sorting' },
-      { value: 'age', label: 'Age (asc)', description: 'Sort by starting age ascending' },
-      { value: 'amount', label: 'Amount (desc)', description: 'Sort by amount descending' },
-      { value: 'type-age', label: 'Type → Age', description: 'Sort by event type then age' },
-      { value: 'type-amount', label: 'Type → Amount', description: 'Sort by event type then amount' },
-      { value: 'custom', label: 'Custom', description: 'Ordering set via column headers' }
-    ];
-
-    presets.forEach(p => {
-      const opt = document.createElement('div');
-      opt.setAttribute('data-value', p.value);
-      opt.textContent = p.label;
-      opt.setAttribute('data-description', p.description);
-      if (p.value === this.sortPreset) opt.classList.add('selected');
-      dropdown.appendChild(opt);
-    });
-  }
-
-  updateSelectedSortDisplay() {
-    const displayEl = document.getElementById('selectedSortDisplay');
-    if (!displayEl) return;
-    const dropdown = document.getElementById('eventsSortOptions');
-    if (!dropdown) return;
-    const selected = dropdown.querySelector(`div[data-value="${this.sortPreset}"]`);
-    if (selected) displayEl.textContent = selected.textContent;
-  }
-
   setupColumnSortHandlers() {
     const headers = document.querySelectorAll('#Events thead th.sortable');
     headers.forEach(header => {
@@ -548,11 +526,8 @@ class EventsTableManager {
           }
         }
 
-        // Switch to custom preset
-        this.sortPreset = 'custom';
-        localStorage.setItem('eventsSortPreset', this.sortPreset);
-        this.updateSelectedSortDisplay();
-        setTimeout(()=>this.applyPresetSort(true),0);
+        // Apply the sort
+        setTimeout(()=>this.applySort(true),0);
       });
     });
   }
@@ -562,39 +537,19 @@ class EventsTableManager {
     if (!eventsTable) return;
     eventsTable.addEventListener('blur', (e) => {
       if (e.target.matches('input') && this.sortKeys.length > 0) {
-        this.applyPresetSort();
+        this.applySort();
       }
     }, true);
   }
 
-  applyPresetSort(flashRows = false) {
+  applySort(flashRows = false) {
     const tbody = document.querySelector('#Events tbody');
     if (!tbody) return;
 
-    // Determine sort keys
-    if (this.sortPreset === 'none') {
-      this.sortKeys = [];
-    } else if (this.sortPreset === 'age') {
-      this.sortKeys = [{ col: 'from-age', dir: 'asc' }];
-    } else if (this.sortPreset === 'amount') {
-      this.sortKeys = [{ col: 'event-amount', dir: 'desc' }];
-    } else if (this.sortPreset === 'type-age') {
-      this.sortKeys = [
-        { col: 'event-type', dir: 'asc' },
-        { col: 'from-age', dir: 'asc' }
-      ];
-    } else if (this.sortPreset === 'type-amount') {
-      this.sortKeys = [
-        { col: 'event-type', dir: 'asc' },
-        { col: 'event-amount', dir: 'asc' }
-      ];
-    } else if (this.sortPreset === 'custom') {
-      if (this.sortColumn && this.sortDir) {
-        this.sortKeys = [{ col: this.sortColumn, dir: this.sortDir }];
-      } else {
-        this.sortKeys = [];
-      }
-    }
+    // Build sortKeys array from current column/dir selection
+    this.sortKeys = (this.sortColumn && this.sortDir)
+      ? [{ col: this.sortColumn, dir: this.sortDir }]
+      : [];
 
     if (this.sortKeys.length === 0) {
       this.updateHeaderIndicators();
@@ -638,22 +593,6 @@ class EventsTableManager {
         }
       });
     }
-  }
-
-  /**
-   * Set sort preset programmatically (e.g., when loading a scenario)
-   */
-  setSortPreset(preset) {
-    if (!preset) return;
-    this.sortPreset = preset;
-    // Reset custom columns if preset not custom
-    if (preset !== 'custom') {
-      this.sortColumn = null;
-      this.sortDir = null;
-    }
-    localStorage.setItem('eventsSortPreset', this.sortPreset);
-    this.updateSelectedSortDisplay();
-    this.applyPresetSort();
   }
 
   // After constructor, ensure unsorted carets show correctly

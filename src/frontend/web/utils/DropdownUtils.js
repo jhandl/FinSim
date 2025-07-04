@@ -13,6 +13,8 @@ class DropdownUtils {
    * @param {string}        [cfg.selectedValue]– Initially selected value.
    * @param {Function}      [cfg.onSelect]     – Callback(value, label) when user selects.
    * @param {Function}      [cfg.tooltipFormatter] – fn(text) → html/string for tooltips.
+   * @param {string}        [cfg.width]        – Optional width for the dropdown.
+   * @param {string}        [cfg.header]       – Optional header text for the dropdown.
    * @returns {Object} { open, close, getSelected, setOptions }
    */
   static create(cfg = {}) {
@@ -23,11 +25,41 @@ class DropdownUtils {
       selectedValue,
       onSelect,
       tooltipFormatter,
+      width,
+      header,
     } = cfg;
+
+    // Track all open dropdowns globally
+    if (!window.__openDropdowns) window.__openDropdowns = new Set();
 
     if (!toggleEl || !dropdownEl) {
       console.error('DropdownUtils: toggleEl and dropdownEl are required');
       return null;
+    }
+
+    // Apply custom width if provided
+    if (width) {
+      dropdownEl.style.width = typeof width === 'number' ? `${width}px` : width;
+    }
+
+    // -----------------------------------------------------------------
+    // Header handling
+    // -----------------------------------------------------------------
+    const ensureHeader = (text) => {
+      if (!text) return;
+      if (!dropdownEl.querySelector('.dropdown-header')) {
+        const div = document.createElement('div');
+        div.className = 'dropdown-header';
+        dropdownEl.prepend(div);
+      }
+      const hdr = dropdownEl.querySelector('.dropdown-header');
+      if (hdr) hdr.textContent = text;
+    };
+    ensureHeader(header);
+
+    // Keep dropdown hidden until explicitly opened
+    if (dropdownEl.style.display === '' || dropdownEl.style.display === 'block') {
+      dropdownEl.style.display = 'none';
     }
 
     // --- Internal state ---------------------------------------------------
@@ -35,13 +67,16 @@ class DropdownUtils {
     const format = tooltipFormatter || ((txt) => txt);
     let tooltipEl = null;
     let tooltipTimer = null;
+    const originalParent = dropdownEl.parentNode;
 
     // ---------------------------------------------------------------------
     // DOM helpers
     // ---------------------------------------------------------------------
     const rebuildOptions = (opts) => {
       if (!Array.isArray(opts)) return;
+      const hdrNode = dropdownEl.querySelector('.dropdown-header');
       dropdownEl.innerHTML = '';
+      if (hdrNode) dropdownEl.appendChild(hdrNode);
       opts.forEach((opt) => {
         if (!opt) return;
         const div = document.createElement('div');
@@ -130,6 +165,9 @@ class DropdownUtils {
     // Dropdown opening / closing
     // ---------------------------------------------------------------------
     const open = () => {
+      // Close any other open dropdowns first
+      window.__openDropdowns.forEach((closer) => closer());
+
       dropdownEl.style.display = 'block';
       dropdownEl.style.visibility = 'hidden';
 
@@ -141,7 +179,7 @@ class DropdownUtils {
       const ddH = ddRect.height;
 
       dropdownEl.style.position = 'fixed';
-      dropdownEl.style.zIndex = '10001';
+      dropdownEl.style.zIndex = '10051';
 
       if (spaceBelow >= ddH + 10) {
         dropdownEl.style.left = `${iconRect.left}px`;
@@ -154,16 +192,27 @@ class DropdownUtils {
         dropdownEl.style.top = `${Math.max(10, vpH - ddH - 10)}px`;
       }
 
+      // Override mobile CSS centering by clearing transform so we keep calculated position
+      dropdownEl.style.transform = 'none';
+
       dropdownEl.style.visibility = 'visible';
 
       const sel = dropdownEl.querySelector('.selected');
       dropdownEl.querySelectorAll('.highlighted').forEach((n) => n.classList.remove('highlighted'));
       if (sel) sel.classList.add('highlighted');
+
+      window.__openDropdowns.add(close);
+
+      // Move dropdownEl to body to avoid clipping/stacking issues
+      if (dropdownEl.parentNode !== document.body) {
+        document.body.appendChild(dropdownEl);
+      }
     };
 
     const close = () => {
       dropdownEl.style.display = 'none';
       dropdownEl.querySelectorAll('.highlighted').forEach((n) => n.classList.remove('highlighted'));
+      window.__openDropdowns.delete(close);
     };
 
     // ---------------------------------------------------------------------
@@ -194,6 +243,7 @@ class DropdownUtils {
       tgt.classList.add('selected');
       close();
       if (typeof onSelect === 'function') onSelect(val, label);
+      e.stopPropagation();
     });
 
     // Hover highlight + tooltip (desktop)

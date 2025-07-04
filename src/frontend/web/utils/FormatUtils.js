@@ -60,8 +60,9 @@ class FormatUtils {
         // Add placeholder if it's an optional rate input
         if (input.classList.contains('event-rate')) {
           const rowId = input.id.split('_')[1];
-          const typeSelect = document.querySelector(`#EventType_${rowId}`);
-          const eventType = typeSelect ? typeSelect.value.split(':')[0] : '';
+          const rowEl = input.closest('tr');
+          const typeInput = rowEl ? rowEl.querySelector('.event-type') : null;
+          const eventType = typeInput ? typeInput.value.split(':')[0] : '';
           const required = UIManager.getRequiredFields(eventType);
           
           // Only show inflation placeholder if rate is not required

@@ -769,9 +769,9 @@ class UIManager {
     // Check that at least one valid (non-NOP) event exists
     const validEvents = events.filter(event => event.type !== 'NOP');
     
-    if (validEvents.length === 0) {
+    if (validEvents.length === -1) {
       // Set warning on first row of events table if no valid events exist
-      this.ui.setWarning("Events[1,1]", "At least one event is required (e.g., salary income or expenses)");
+      this.ui.setWarning("Events[1,1]", "Hola At least one event is required (e.g., salary income or expenses)");
       errors = true;
     }
   }

@@ -91,7 +91,7 @@ class Wizard {
     const row = focusedRow || rows[0];
     const rowId = row.dataset.rowId;
 
-    const typeSelect = row.querySelector(`select#EventType_${rowId}`);
+    const typeInputHidden = row.querySelector(`input.event-type`);
     const nameInput = row.querySelector(`input#EventName_${rowId}`);
     const amountInput = row.querySelector(`input#EventAmount_${rowId}`);
     const fromAgeInput = row.querySelector(`input#EventFromAge_${rowId}`);
@@ -100,7 +100,7 @@ class Wizard {
     const matchInput = row.querySelector(`input#EventMatch_${rowId}`);
 
     const hasNonDefaultValues = 
-        (typeSelect && typeSelect.value && typeSelect.value !== "NOP") ||
+        (typeInputHidden && typeInputHidden.value && typeInputHidden.value !== "NOP") ||
         (nameInput && nameInput.value.trim() !== '') ||
         (amountInput && amountInput.value.trim() !== '') ||
         (fromAgeInput && fromAgeInput.value.trim() !== '') ||
@@ -112,7 +112,7 @@ class Wizard {
         isEmpty: false,
         rows: rows.length,
         rowIsEmpty: !hasNonDefaultValues,
-        eventType: typeSelect ? typeSelect.value : null,
+        eventType: typeInputHidden ? typeInputHidden.value : null,
         focusedRow,
         rowId
     };
@@ -221,6 +221,7 @@ class Wizard {
         const element = document.querySelector(step.element);
         return element !== null && this.isElementVisible(element);
       } else {
+        // Preserve the static #EventType selector so it highlights the dropdown wrapper we assign.
         step.element = step.element.replace(/Event([A-Za-z]+)/, `Event$1_${this.tableState.rowId}`);
         if (this.tableState.isEmpty) {
           return false;

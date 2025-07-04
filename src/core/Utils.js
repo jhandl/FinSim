@@ -73,9 +73,7 @@ function serializeSimulation(ui) {
         // Simulation Mode
         simulation_mode: ui.getValue('simulation_mode'),
         // Economy Mode
-        economy_mode: ui.getValue('economy_mode'),
-        // Events sort preset
-        EventsSortPreset: (ui.eventsTableManager && ui.eventsTableManager.sortPreset) || ''
+        economy_mode: ui.getValue('economy_mode')
     };
 
     // Format special values (percentages and booleans)
@@ -146,7 +144,6 @@ function deserializeSimulation(content, ui) {
     let simulationModeExists = false;
     let economyModeExists = false;
     let hasVolatilityInFile = false;
-    let eventsSortPresetValue = null;
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -175,10 +172,6 @@ function deserializeSimulation(content, ui) {
             
             const actualKey = legacyFieldMap[key] || key;
             
-            if (actualKey === 'EventsSortPreset') {
-                eventsSortPresetValue = value;
-                continue;
-            }
             try {
                 ui.setValue(actualKey, value);
                 if (actualKey === 'P2StartingAge' && value && value.trim() !== '') {
@@ -249,11 +242,6 @@ function deserializeSimulation(content, ui) {
             }
             eventData.push(parts);
         }
-    }
-
-    // Apply events sort preset after tables are loaded
-    if (eventsSortPresetValue && ui.eventsTableManager) {
-        ui.eventsTableManager.setSortPreset(eventsSortPresetValue);
     }
 
     return eventData;
