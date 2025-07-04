@@ -324,8 +324,8 @@ class EventsTableManager {
       }
     }, 0);
 
-    // Re-apply preset sort if active
-    this.applySort();
+    // Do not apply sort immediately.
+    // The row will be sorted on blur after being edited.
   }
 
   getEventTypeOptionObjects() {

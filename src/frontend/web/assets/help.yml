@@ -1333,7 +1333,7 @@ WizardSteps:
 # Sorting and Age/Year mode
 
   - element: "#fromAgeHeader"
-    tours: [mini]
+    tours: [full, mini]
     card: events
     popover:
       description: "<p>Click the ⇅ icon to keep the table sorted by any column. Click once for ascending ▲, twice for descending ▼, thrice to stop sorting.</p>"

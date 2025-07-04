@@ -26,11 +26,21 @@
     return el.textContent || '';
   }
 
-  function compareValues(aVal, bVal) {
+  function compareValues(aVal, bVal, dir) {
     const aNum = parseFloat(aVal);
     const bNum = parseFloat(bVal);
-    const bothNumeric = !isNaN(aNum) && !isNaN(bNum);
-    if (bothNumeric) {
+    const aIsNum = !isNaN(aNum);
+    const bIsNum = !isNaN(bNum);
+
+    // If sorting ascending, treat empty/zero as high values to sink them
+    if (dir === 'asc') {
+      if (aIsNum && aNum === 0 && bIsNum && bNum !== 0) return 1;
+      if (bIsNum && bNum === 0 && aIsNum && aNum !== 0) return -1;
+      if (!aVal && bVal) return 1;
+      if (aVal && !bVal) return -1;
+    }
+
+    if (aIsNum && bIsNum) {
       if (aNum < bNum) return -1;
       if (aNum > bNum) return 1;
       return 0;
@@ -51,7 +61,7 @@
     // Sort rows
     const sorted = rows.slice().sort((a, b) => {
       for (const { col, dir } of sortKeys) {
-        const cmp = compareValues(getCellValue(a, col), getCellValue(b, col));
+        const cmp = compareValues(getCellValue(a, col), getCellValue(b, col), dir);
         if (cmp !== 0) return dir === 'desc' ? -cmp : cmp;
       }
       return 0;
