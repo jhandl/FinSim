@@ -19,6 +19,10 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+    <!-- Loading overlay above will be hidden by JS once initialization completes -->
     <header class="header-hidden">
         <div class="header-left">
             <a href="/" class="app-icon-link" style="display: none;"><img src="/src/frontend/web/ifs/IFS.ico" alt="Ireland Financial Simulator" class="app-icon"></a>
@@ -376,7 +380,7 @@
                                         <span id="selectedPresetDisplay" class="selected-preset-display">Default</span>
                                     </div>
                                     <div class="export-control">
-                                        <button id="exportDataCSV" class="visualization-icon-btn" title="Export data table as CSV">
+                                        <button id="exportDataCSV" class="visualization-icon-btn" data-description="Export data table as CSV">
                                             <i class="fas fa-download"></i>
                                         </button>
                                     </div>
@@ -436,6 +440,7 @@
     <script src="/src/frontend/UIManager.js"></script>
     <script src="/src/frontend/web/utils/DOMUtils.js"></script>
     <script src="/src/frontend/web/utils/FormatUtils.js"></script>
+    <script src="/src/frontend/web/utils/TooltipUtils.js"></script>
     <script src="/src/frontend/web/utils/RowSorter.js"></script>
     <script src="/src/frontend/web/utils/NotificationUtils.js"></script>
     <script src="/src/frontend/web/utils/ErrorModalUtils.js"></script>

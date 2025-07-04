@@ -59,6 +59,7 @@ class WebUI extends AbstractUI {
       this.setupVisualizationControls(); // Setup visualization controls
       this.setupCardInfoIcons(); // Setup info icons on cards
       this.setupDataExportButton(); // Setup data table CSV export button
+      this.setupIconTooltips(); // Setup tooltips for various mode toggle icons
       this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
       
       this.eventsTableManager.addEventRow();
@@ -314,13 +315,20 @@ class WebUI extends AbstractUI {
 
   setupDataExportButton() {
     const exportButton = document.getElementById('exportDataCSV');
-    if (exportButton) {
-      exportButton.addEventListener('click', () => {
-        this.downloadDataTableCSV();
-      });
-    } else {
+
+    if (!exportButton) {
       console.error("exportDataCSV button not found");
+      return;
     }
+
+    // Primary click behaviour – download CSV
+    exportButton.addEventListener('click', () => {
+      this.downloadDataTableCSV();
+    });
+
+    // Reusable tooltip
+    const description = exportButton.getAttribute('data-description') || 'Export data table as CSV';
+    TooltipUtils.attachTooltip(exportButton, description);
   }
 
   setupRunSimulationButton() {
@@ -635,6 +643,10 @@ class WebUI extends AbstractUI {
     // Now call the wizard's showCardOverview method
     const wizard = Wizard.getInstance();
     if (wizard && cardType !== 'unknown') {
+      // Prevent opening multiple mini-tours simultaneously
+      if (wizard.wizardActive) {
+        return; // A tour is already active, ignore additional clicks
+      }
       try {
         wizard.startTour('mini', cardType);
       } catch (error) {
@@ -1620,6 +1632,26 @@ class WebUI extends AbstractUI {
     }
   }
 
+  /* -------------------------------------------------------------
+   * Icon Tooltips (single/couple, age/year, economy modes)
+   * ------------------------------------------------------------- */
+
+  setupIconTooltips() {
+    const tooltipMappings = {
+      'simModeSingle': 'Single person mode',
+      'simModeCouple': 'Couple/partnership mode',
+      'ageYearModeAge': 'Show time in terms of age',
+      'ageYearModeYear': 'Show time in terms of year',
+      'economyModeDeterministic': 'Linear growth (no volatility)',
+      'economyModeMonteCarlo': 'Volatility mode (Monte Carlo)'
+    };
+
+    Object.entries(tooltipMappings).forEach(([id, txt]) => {
+      const el = document.getElementById(id);
+      if (el) TooltipUtils.attachTooltip(el, txt);
+    });
+  }
+
 }
 
 window.addEventListener('DOMContentLoaded', async () => { // Add async
@@ -1629,6 +1661,12 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
 
     // Show welcome modal instead of automatically starting wizard
     webUi.showWelcomeModal();
+
+    // Hide loading overlay when initialization completes successfully
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
 
     // Any further app initialization that depends on Config being ready can go here.
     // For example, if WebUI needs to refresh something based on config:
@@ -1644,6 +1682,12 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
                           <p>Could not initialize application configuration. Please try again later.</p>
                           <p>Details: ${error.message}</p>
                        </div>`;
+    }
+
+    // Hide loading overlay in error scenario as well
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
     }
   }
 });

@@ -45,6 +45,16 @@ class ChartManager {
         }
       };
       
+      // NEW: Define legend label sizing based on screen width
+      const isSmallScreen = (typeof window !== 'undefined') ? window.innerWidth <= 600 : false;
+      const legendLabelsConfig = {
+        padding: 14,
+        boxWidth: isSmallScreen ? 15 : 30,
+        font: {
+          size: isSmallScreen ? 12 : 13
+        }
+      };
+      
       // Add common tooltip configuration
       const commonOptions = {
         responsive: true,
@@ -203,7 +213,8 @@ class ChartManager {
             },
             legend: {
               position: 'right',
-              onClick: null
+              onClick: null,
+              labels: legendLabelsConfig
             }
           }
         }
@@ -239,7 +250,7 @@ class ChartManager {
               order: 3
             },
             {
-              label: 'Pension fund',
+              label: 'Pension',
               borderColor: '#64B5F6',
               backgroundColor: '#BBDEFB',
               fill: true,
@@ -276,7 +287,8 @@ class ChartManager {
             },
             legend: {
               position: 'right',
-              onClick: null
+              onClick: null,
+              labels: legendLabelsConfig
             }
           }
         }
