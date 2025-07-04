@@ -20,7 +20,22 @@ class EventsTableManager {
     this.sortDir = null;
     this.sortKeys = [];
     this.populateSortPresets();
-    this.setupSortDirectDropdown();
+    this.sortDropdown = DropdownUtils.create({
+      toggleEl: document.getElementById('eventsSortToggle'),
+      dropdownEl: document.getElementById('eventsSortOptions'),
+      selectedValue: this.sortPreset,
+      onSelect: (val, label) => {
+        this.sortPreset = val;
+        localStorage.setItem('eventsSortPreset', this.sortPreset);
+        // Update selected label next to icon
+        const displayEl = document.getElementById('selectedSortDisplay');
+        if (displayEl) displayEl.textContent = label;
+        this.updateSelectedSortDisplay();
+        setTimeout(() => this.applyPresetSort(true), 0);
+      },
+    });
+    // Refresh display once during init
+    this.updateSelectedSortDisplay();
     this.setupColumnSortHandlers();
     this.setupAutoSortOnBlur();
     // Apply initial sort after DOM settles
@@ -510,133 +525,6 @@ class EventsTableManager {
     if (!dropdown) return;
     const selected = dropdown.querySelector(`div[data-value="${this.sortPreset}"]`);
     if (selected) displayEl.textContent = selected.textContent;
-  }
-
-  setupSortDirectDropdown() {
-    const toggleButton = document.getElementById('eventsSortToggle');
-    const dropdown = document.getElementById('eventsSortOptions');
-    const controlContainer = toggleButton ? toggleButton.closest('.visualization-control') : null;
-
-    if (!toggleButton || !dropdown || !controlContainer) return;
-
-    let activeTooltip = null;
-    let tooltipTimeout = null;
-
-    const createTooltip = (text) => {
-      const tooltip = document.createElement('div');
-      tooltip.className = 'visualization-tooltip';
-      tooltip.textContent = text;
-      document.body.appendChild(tooltip);
-      return tooltip;
-    };
-
-    const positionTooltip = (tooltip, targetRect) => {
-      const tooltipRect = tooltip.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const margin = 10;
-      let left = targetRect.left + (targetRect.width - tooltipRect.width) / 2;
-      let top = targetRect.top - tooltipRect.height - 10;
-      if (left < margin) left = margin;
-      if (left + tooltipRect.width > viewportWidth - margin) left = viewportWidth - tooltipRect.width - margin;
-      if (top < margin) top = targetRect.bottom + 10;
-      tooltip.style.position = 'fixed';
-      tooltip.style.left = left + 'px';
-      tooltip.style.top = top + 'px';
-    };
-
-    const showTooltipDelayed = (text, targetRect) => {
-      if (tooltipTimeout) clearTimeout(tooltipTimeout);
-      if (activeTooltip) { activeTooltip.remove(); activeTooltip = null; }
-      if (!text) return;
-      tooltipTimeout = setTimeout(() => {
-        const tt = createTooltip(text);
-        activeTooltip = tt;
-        requestAnimationFrame(() => {
-          positionTooltip(tt, targetRect);
-          tt.classList.add('visible');
-        });
-        tooltipTimeout = null;
-      }, 600);
-    };
-
-    const hideTooltip = () => {
-      if (tooltipTimeout) { clearTimeout(tooltipTimeout); tooltipTimeout = null; }
-      if (activeTooltip) { activeTooltip.remove(); activeTooltip = null; }
-    };
-
-    // Toggle dropdown on click
-    controlContainer.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const visible = dropdown.style.display !== 'none';
-      if (visible) { dropdown.style.display = 'none'; return; }
-
-      hideTooltip();
-      dropdown.style.display = 'block';
-      dropdown.style.visibility = 'hidden';
-
-      const iconRect = toggleButton.getBoundingClientRect();
-      const dropdownRect = dropdown.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const spaceBelow = viewportHeight - iconRect.bottom;
-      const spaceAbove = iconRect.top;
-      const dropdownHeight = dropdownRect.height;
-      dropdown.style.position = 'fixed';
-      dropdown.style.zIndex = '10001';
-      if (spaceBelow >= dropdownHeight + 10) {
-        dropdown.style.left = iconRect.left + 'px';
-        dropdown.style.top = (iconRect.bottom + 2) + 'px';
-      } else if (spaceAbove >= dropdownHeight + 10) {
-        dropdown.style.left = iconRect.left + 'px';
-        dropdown.style.top = (iconRect.top - dropdownHeight - 2) + 'px';
-      } else {
-        dropdown.style.left = iconRect.left + 'px';
-        dropdown.style.top = Math.max(10, viewportHeight - dropdownHeight - 10) + 'px';
-      }
-      dropdown.style.visibility = 'visible';
-
-      // highlight selected
-      const sel = dropdown.querySelector('.selected');
-      dropdown.querySelectorAll('.highlighted').forEach(o=>o.classList.remove('highlighted'));
-      if (sel) sel.classList.add('highlighted');
-    });
-
-    // Option click
-    dropdown.addEventListener('click', (e) => {
-      if (!e.target.hasAttribute('data-value')) return;
-      const val = e.target.getAttribute('data-value');
-      this.sortPreset = val;
-      localStorage.setItem('eventsSortPreset', this.sortPreset);
-      // Update UI selections
-      dropdown.querySelectorAll('[data-value]').forEach(opt=>opt.classList.remove('selected'));
-      e.target.classList.add('selected');
-      dropdown.style.display = 'none';
-      this.updateSelectedSortDisplay();
-      setTimeout(()=>this.applyPresetSort(true),0);
-    });
-
-    // Option hover tooltip (desktop)
-    dropdown.addEventListener('mouseover', (e) => {
-      if (window.innerWidth <= 768) return;
-      if (!e.target.hasAttribute('data-value')) return;
-      dropdown.querySelectorAll('.highlighted').forEach(opt=>opt.classList.remove('highlighted'));
-      e.target.classList.add('highlighted');
-      const desc = e.target.getAttribute('data-description');
-      if (desc) {
-        showTooltipDelayed(desc, e.target.getBoundingClientRect());
-      }
-    });
-    dropdown.addEventListener('mouseout', () => { if (window.innerWidth > 768) hideTooltip(); });
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', (e) => {
-      if (!dropdown.contains(e.target) && !controlContainer.contains(e.target)) {
-        dropdown.style.display = 'none';
-        hideTooltip();
-      }
-    });
-
-    // Initial display
-    this.updateSelectedSortDisplay();
   }
 
   setupColumnSortHandlers() {
