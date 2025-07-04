@@ -342,8 +342,10 @@ class Wizard {
             // Only focus on desktop to avoid keyboard issues on mobile
             nextElement.focus();
           }
+          this.tour.moveNext();
+        } else {
+          this.finishTour();
         }
-        this.tour.moveNext();
       },
       onPrevClick: async (element) => {
         const prevIndex = this.tour.getActiveIndex() - 1;
@@ -519,8 +521,10 @@ class Wizard {
           const nextEl = document.querySelector(this.validSteps[nextIdx].element);
           await this.handleBurgerMenuBeforeStep(nextEl, nextIdx);
           if (nextEl && !this.isMobile) nextEl.focus();
+          this.tour.moveNext();
+        } else {
+          this.finishTour();
         }
-        this.tour.moveNext();
       },
       onPrevClick: async () => {
         const prevIdx = this.tour.getActiveIndex() - 1;
