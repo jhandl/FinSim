@@ -1072,8 +1072,8 @@ th {
 }
 
 #Events td:nth-child(3) input {
-  min-width: 100px;
-  max-width: 100px;
+  min-width: 90px;
+  max-width: 90px;
 }
 
 #Events td:nth-child(6) input {
@@ -1869,6 +1869,7 @@ footer {
     font-size: 0.8rem;
     color: var(--text-color);
     border-bottom: 1px solid #f0f0f0;
+    font-weight: bold;
 }
 
 .visualization-dropdown div[data-value]:last-child {
@@ -1895,7 +1896,7 @@ footer {
     font-size: 0.8rem;
     font-weight: normal;
     white-space: nowrap;
-    z-index: 1000;
+    z-index: 10050;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.2s ease-out;
@@ -2064,5 +2065,18 @@ footer {
 
 .events-section.card {
     max-width: 810px; /* Override .card's 306px to allow full-width events table */
+}
+
+/* Center-align dropdown header and items so they look identical regardless of parent alignment */
+.visualization-dropdown,
+.visualization-dropdown .dropdown-header,
+.visualization-dropdown div[data-value] {
+    text-align: center;
+}
+
+.visualization-dropdown div[data-value].highlighted {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: bold; /* keep weight consistent with selected */
 }
 

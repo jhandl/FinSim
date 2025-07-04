@@ -10,6 +10,7 @@
     <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css">
+    <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css">
     <!-- <link rel="stylesheet" href="/src/frontend/web/ifs/css/layout-debugger.css"> --> 
     <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css"/>
     <script src="/src/frontend/web/ifs/libs/bubbles.js"></script>
@@ -330,13 +331,13 @@
                 <table id="Events">
                     <thead>
                         <tr>
-                            <th>Event Type</th>
-                            <th>Name</th>
-                            <th>Amount</th>
-                            <th id="fromAgeHeader">From Age</th>
-                            <th id="toAgeHeader">To Age</th>
-                            <th>Rate</th>
-                            <th>Match</th>
+                            <th class="sortable" data-col="event-type">Event Type <span class="sort-caret">⇅</span></th>
+                            <th class="sortable" data-col="event-name">Name <span class="sort-caret">⇅</span></th>
+                            <th class="sortable" data-col="event-amount">Amount <span class="sort-caret">⇅</span></th>
+                            <th id="fromAgeHeader" class="sortable" data-col="from-age"><span class="header-text">From Age </span><span class="sort-caret">⇅</span></th>
+                            <th id="toAgeHeader" class="sortable" data-col="to-age"><span class="header-text">To Age </span><span class="sort-caret">⇅</span></th>
+                            <th class="sortable" data-col="event-rate">Rate <span class="sort-caret">⇅</span></th>
+                            <th class="sortable" data-col="event-match">Match <span class="sort-caret">⇅</span></th>
                             <th></th>
                         </tr>
                     </thead>
@@ -435,6 +436,7 @@
     <script src="/src/frontend/UIManager.js"></script>
     <script src="/src/frontend/web/utils/DOMUtils.js"></script>
     <script src="/src/frontend/web/utils/FormatUtils.js"></script>
+    <script src="/src/frontend/web/utils/RowSorter.js"></script>
     <script src="/src/frontend/web/utils/NotificationUtils.js"></script>
     <script src="/src/frontend/web/utils/ErrorModalUtils.js"></script>
     <script src="/src/frontend/web/components/TableManager.js"></script>

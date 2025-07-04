@@ -15,19 +15,23 @@ class FileManager {
 
   hasUnsavedChanges() {
       const currentState = serializeSimulation(this.webUI);
-      // If lastSavedState is null, it means either it's a fresh session
-      // or state tracking hasn't been initialized by a load/save.
-      // In a fresh session, we need WebUI to call updateLastSavedState()
-      // with the serialized empty form.
-      // If it's still null here, we can't be sure, so err on the side of caution.
+
+      // If we haven't saved yet, treat as unsaved only if real data differs
       if (this.lastSavedState === null) {
-          // This case should ideally be handled by WebUI initializing lastSavedState.
-          // If current state is "empty" (however defined by serializeSimulation),
-          // then no unsaved changes. This is hard to define here.
-          // Safest is to assume true if not explicitly set.
           return true;
       }
-      return currentState !== this.lastSavedState;
+
+      const normalize = (csv) => {
+          return csv
+              .split('\n')
+              .filter(line => {
+                  if (line.startsWith('EventsSortPreset,')) return false;
+                  return true;
+              })
+              .join('\n');
+      };
+
+      return normalize(currentState) !== normalize(this.lastSavedState);
   }
 
   setupSaveButton() {

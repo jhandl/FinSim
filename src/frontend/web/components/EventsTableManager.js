@@ -14,6 +14,18 @@ class EventsTableManager {
     this.setupSimulationModeChangeHandler();
     this.setupAgeYearToggle();
     this.setupTooltipHandlers();
+    // Sorting preset and handlers
+    this.sortPreset = localStorage.getItem('eventsSortPreset') || 'none';
+    this.sortColumn = null;
+    this.sortDir = null;
+    this.sortKeys = [];
+    this.populateSortPresets();
+    this.setupSortDirectDropdown();
+    this.setupColumnSortHandlers();
+    this.setupAutoSortOnBlur();
+    // Apply initial sort after DOM settles
+    setTimeout(() => this.applyPresetSort(), 0);
+    this.initializeCarets();
   }
 
   setupAddEventButton() {
@@ -123,14 +135,15 @@ class EventsTableManager {
     const toHeader = document.getElementById('toAgeHeader');
     
     if (fromHeader && toHeader) {
+      const setText=(el,txt)=>{const span=el.querySelector('.header-text'); if(span){span.textContent=txt;} else {el.childNodes[0].textContent=txt;}};
       if (this.ageYearMode === 'age') {
-        fromHeader.textContent = 'From Age';
-        toHeader.textContent = 'To Age';
+        setText(fromHeader,'From Age');
+        setText(toHeader,'To Age');
         fromHeader.classList.remove('year-mode');
         toHeader.classList.remove('year-mode');
       } else {
-        fromHeader.textContent = 'From Year';
-        toHeader.textContent = 'To Year';
+        setText(fromHeader,'From Year');
+        setText(toHeader,'To Year');
         fromHeader.classList.add('year-mode');
         toHeader.classList.add('year-mode');
       }
@@ -289,6 +302,9 @@ class EventsTableManager {
         window.scrollTo(0, currentScrollY);
       }
     }, 0);
+
+    // Re-apply preset sort if active
+    this.applyPresetSort();
   }
 
   getEventTypeOptions(selectedType = '') {
@@ -457,6 +473,306 @@ class EventsTableManager {
       this.tooltipElement.remove();
       this.tooltipElement = null;
     }
+  }
+
+  /* ---------------- Sorting Helpers ---------------- */
+
+  populateSortPresets() {
+    const dropdown = document.getElementById('eventsSortOptions');
+    if (!dropdown) return;
+
+    // Avoid repopulation
+    if (dropdown.querySelector('[data-value]')) return;
+
+    const presets = [
+      { value: 'none', label: 'None', description: 'Disable automatic sorting' },
+      { value: 'age', label: 'Age (asc)', description: 'Sort by starting age ascending' },
+      { value: 'amount', label: 'Amount (desc)', description: 'Sort by amount descending' },
+      { value: 'type-age', label: 'Type → Age', description: 'Sort by event type then age' },
+      { value: 'type-amount', label: 'Type → Amount', description: 'Sort by event type then amount' },
+      { value: 'custom', label: 'Custom', description: 'Ordering set via column headers' }
+    ];
+
+    presets.forEach(p => {
+      const opt = document.createElement('div');
+      opt.setAttribute('data-value', p.value);
+      opt.textContent = p.label;
+      opt.setAttribute('data-description', p.description);
+      if (p.value === this.sortPreset) opt.classList.add('selected');
+      dropdown.appendChild(opt);
+    });
+  }
+
+  updateSelectedSortDisplay() {
+    const displayEl = document.getElementById('selectedSortDisplay');
+    if (!displayEl) return;
+    const dropdown = document.getElementById('eventsSortOptions');
+    if (!dropdown) return;
+    const selected = dropdown.querySelector(`div[data-value="${this.sortPreset}"]`);
+    if (selected) displayEl.textContent = selected.textContent;
+  }
+
+  setupSortDirectDropdown() {
+    const toggleButton = document.getElementById('eventsSortToggle');
+    const dropdown = document.getElementById('eventsSortOptions');
+    const controlContainer = toggleButton ? toggleButton.closest('.visualization-control') : null;
+
+    if (!toggleButton || !dropdown || !controlContainer) return;
+
+    let activeTooltip = null;
+    let tooltipTimeout = null;
+
+    const createTooltip = (text) => {
+      const tooltip = document.createElement('div');
+      tooltip.className = 'visualization-tooltip';
+      tooltip.textContent = text;
+      document.body.appendChild(tooltip);
+      return tooltip;
+    };
+
+    const positionTooltip = (tooltip, targetRect) => {
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const margin = 10;
+      let left = targetRect.left + (targetRect.width - tooltipRect.width) / 2;
+      let top = targetRect.top - tooltipRect.height - 10;
+      if (left < margin) left = margin;
+      if (left + tooltipRect.width > viewportWidth - margin) left = viewportWidth - tooltipRect.width - margin;
+      if (top < margin) top = targetRect.bottom + 10;
+      tooltip.style.position = 'fixed';
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+    };
+
+    const showTooltipDelayed = (text, targetRect) => {
+      if (tooltipTimeout) clearTimeout(tooltipTimeout);
+      if (activeTooltip) { activeTooltip.remove(); activeTooltip = null; }
+      if (!text) return;
+      tooltipTimeout = setTimeout(() => {
+        const tt = createTooltip(text);
+        activeTooltip = tt;
+        requestAnimationFrame(() => {
+          positionTooltip(tt, targetRect);
+          tt.classList.add('visible');
+        });
+        tooltipTimeout = null;
+      }, 600);
+    };
+
+    const hideTooltip = () => {
+      if (tooltipTimeout) { clearTimeout(tooltipTimeout); tooltipTimeout = null; }
+      if (activeTooltip) { activeTooltip.remove(); activeTooltip = null; }
+    };
+
+    // Toggle dropdown on click
+    controlContainer.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const visible = dropdown.style.display !== 'none';
+      if (visible) { dropdown.style.display = 'none'; return; }
+
+      hideTooltip();
+      dropdown.style.display = 'block';
+      dropdown.style.visibility = 'hidden';
+
+      const iconRect = toggleButton.getBoundingClientRect();
+      const dropdownRect = dropdown.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - iconRect.bottom;
+      const spaceAbove = iconRect.top;
+      const dropdownHeight = dropdownRect.height;
+      dropdown.style.position = 'fixed';
+      dropdown.style.zIndex = '10001';
+      if (spaceBelow >= dropdownHeight + 10) {
+        dropdown.style.left = iconRect.left + 'px';
+        dropdown.style.top = (iconRect.bottom + 2) + 'px';
+      } else if (spaceAbove >= dropdownHeight + 10) {
+        dropdown.style.left = iconRect.left + 'px';
+        dropdown.style.top = (iconRect.top - dropdownHeight - 2) + 'px';
+      } else {
+        dropdown.style.left = iconRect.left + 'px';
+        dropdown.style.top = Math.max(10, viewportHeight - dropdownHeight - 10) + 'px';
+      }
+      dropdown.style.visibility = 'visible';
+
+      // highlight selected
+      const sel = dropdown.querySelector('.selected');
+      dropdown.querySelectorAll('.highlighted').forEach(o=>o.classList.remove('highlighted'));
+      if (sel) sel.classList.add('highlighted');
+    });
+
+    // Option click
+    dropdown.addEventListener('click', (e) => {
+      if (!e.target.hasAttribute('data-value')) return;
+      const val = e.target.getAttribute('data-value');
+      this.sortPreset = val;
+      localStorage.setItem('eventsSortPreset', this.sortPreset);
+      // Update UI selections
+      dropdown.querySelectorAll('[data-value]').forEach(opt=>opt.classList.remove('selected'));
+      e.target.classList.add('selected');
+      dropdown.style.display = 'none';
+      this.updateSelectedSortDisplay();
+      setTimeout(()=>this.applyPresetSort(true),0);
+    });
+
+    // Option hover tooltip (desktop)
+    dropdown.addEventListener('mouseover', (e) => {
+      if (window.innerWidth <= 768) return;
+      if (!e.target.hasAttribute('data-value')) return;
+      dropdown.querySelectorAll('.highlighted').forEach(opt=>opt.classList.remove('highlighted'));
+      e.target.classList.add('highlighted');
+      const desc = e.target.getAttribute('data-description');
+      if (desc) {
+        showTooltipDelayed(desc, e.target.getBoundingClientRect());
+      }
+    });
+    dropdown.addEventListener('mouseout', () => { if (window.innerWidth > 768) hideTooltip(); });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!dropdown.contains(e.target) && !controlContainer.contains(e.target)) {
+        dropdown.style.display = 'none';
+        hideTooltip();
+      }
+    });
+
+    // Initial display
+    this.updateSelectedSortDisplay();
+  }
+
+  setupColumnSortHandlers() {
+    const headers = document.querySelectorAll('#Events thead th.sortable');
+    headers.forEach(header => {
+      header.addEventListener('click', () => {
+        const col = header.dataset.col;
+        if (!col) return;
+
+        if (this.sortColumn !== col) {
+          this.sortColumn = col;
+          this.sortDir = 'asc';
+        } else {
+          if (this.sortDir === 'asc') {
+            this.sortDir = 'desc';
+          } else if (this.sortDir === 'desc') {
+            this.sortColumn = null;
+            this.sortDir = null;
+          } else {
+            this.sortDir = 'asc';
+          }
+        }
+
+        // Switch to custom preset
+        this.sortPreset = 'custom';
+        localStorage.setItem('eventsSortPreset', this.sortPreset);
+        this.updateSelectedSortDisplay();
+        setTimeout(()=>this.applyPresetSort(true),0);
+      });
+    });
+  }
+
+  setupAutoSortOnBlur() {
+    const eventsTable = document.getElementById('Events');
+    if (!eventsTable) return;
+    eventsTable.addEventListener('blur', (e) => {
+      if (e.target.matches('input') && this.sortKeys.length > 0) {
+        this.applyPresetSort();
+      }
+    }, true);
+  }
+
+  applyPresetSort(flashRows = false) {
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return;
+
+    // Determine sort keys
+    if (this.sortPreset === 'none') {
+      this.sortKeys = [];
+    } else if (this.sortPreset === 'age') {
+      this.sortKeys = [{ col: 'from-age', dir: 'asc' }];
+    } else if (this.sortPreset === 'amount') {
+      this.sortKeys = [{ col: 'event-amount', dir: 'desc' }];
+    } else if (this.sortPreset === 'type-age') {
+      this.sortKeys = [
+        { col: 'event-type', dir: 'asc' },
+        { col: 'from-age', dir: 'asc' }
+      ];
+    } else if (this.sortPreset === 'type-amount') {
+      this.sortKeys = [
+        { col: 'event-type', dir: 'asc' },
+        { col: 'event-amount', dir: 'asc' }
+      ];
+    } else if (this.sortPreset === 'custom') {
+      if (this.sortColumn && this.sortDir) {
+        this.sortKeys = [{ col: this.sortColumn, dir: this.sortDir }];
+      } else {
+        this.sortKeys = [];
+      }
+    }
+
+    if (this.sortKeys.length === 0) {
+      this.updateHeaderIndicators();
+      return;
+    }
+
+    if (window.RowSorter) {
+      RowSorter.sortRows(tbody, this.sortKeys, { flash: flashRows });
+    }
+
+    this.updateHeaderIndicators();
+  }
+
+  updateHeaderIndicators() {
+    const headers = document.querySelectorAll('#Events thead th.sortable');
+    headers.forEach(h => {
+      h.classList.remove('sorted-asc', 'sorted-desc', 'sorted-secondary');
+      const caret = h.querySelector('.sort-caret');
+      if (caret) caret.textContent = '⇅';
+    });
+
+    if (!this.sortKeys.length) return;
+
+    // Primary key
+    const primary = this.sortKeys[0];
+    const primaryHeader = document.querySelector(`#Events thead th.sortable[data-col="${primary.col}"]`);
+    if (primaryHeader) {
+      primaryHeader.classList.add(primary.dir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+      const caret = primaryHeader.querySelector('.sort-caret');
+      if (caret) caret.textContent = primary.dir === 'asc' ? '▼' : '▲';
+    }
+
+    // Secondary keys (if any)
+    if (this.sortKeys.length > 1) {
+      this.sortKeys.slice(1).forEach(sec => {
+        const secHeader = document.querySelector(`#Events thead th.sortable[data-col="${sec.col}"]`);
+        if (secHeader) {
+          secHeader.classList.add('sorted-secondary');
+          const caret = secHeader.querySelector('.sort-caret');
+          if (caret) caret.textContent = sec.dir === 'asc' ? '▼' : '▲';
+        }
+      });
+    }
+  }
+
+  /**
+   * Set sort preset programmatically (e.g., when loading a scenario)
+   */
+  setSortPreset(preset) {
+    if (!preset) return;
+    this.sortPreset = preset;
+    // Reset custom columns if preset not custom
+    if (preset !== 'custom') {
+      this.sortColumn = null;
+      this.sortDir = null;
+    }
+    localStorage.setItem('eventsSortPreset', this.sortPreset);
+    this.updateSelectedSortDisplay();
+    this.applyPresetSort();
+  }
+
+  // After constructor, ensure unsorted carets show correctly
+  initializeCarets() {
+    document.querySelectorAll('#Events thead th.sortable .sort-caret').forEach(c => {
+      c.textContent = '⇅';
+    });
   }
 
 } 

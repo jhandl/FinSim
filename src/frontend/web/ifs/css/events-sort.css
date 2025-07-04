@@ -1,0 +1,58 @@
+th.sortable {
+  cursor: pointer;
+  position: relative;
+}
+
+.sort-caret {
+  opacity: 0.6;
+  transition: transform 0.2s, opacity 0.2s;
+  margin-left: 2px;
+  font-size: 0.7rem;
+}
+
+th.sortable:hover .sort-caret {
+  opacity: 0.5;
+}
+
+th.sorted-asc,
+th.sorted-desc {
+  background: #f1f6ff;
+  font-weight: 500;
+}
+
+th.sorted-asc .sort-caret,
+th.sorted-desc .sort-caret {
+  opacity: 1;
+}
+
+th.sorted-asc .sort-caret {
+  transform: rotate(180deg);
+}
+
+th.sorted-desc .sort-caret {
+  transform: rotate(0deg);
+}
+
+th.sorted-secondary .sort-caret {
+  opacity: 0.75;
+  color: #555;
+}
+
+/* Flash highlight for moved rows */
+@keyframes flash-bg {
+  from {
+    background-color: #ffffd8;
+  }
+  to {
+    background-color: inherit;
+  }
+}
+
+tr.flash {
+  animation: flash-bg 1s ease-out;
+}
+
+/* Smooth translate transition for FLIP */
+#Events tbody tr {
+  transition: transform 0.35s ease;
+} 

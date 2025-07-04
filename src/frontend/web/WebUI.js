@@ -1098,7 +1098,7 @@ class WebUI extends AbstractUI {
   setupDirectDropdown() {
     const toggleButton = document.getElementById('visualizationToggle');
     const dropdown = document.getElementById('presetOptions');
-    const controlContainer = document.querySelector('.visualization-control');
+    const controlContainer = toggleButton ? toggleButton.closest('.visualization-control') : null;
 
     if (!toggleButton || !dropdown || !controlContainer) return;
 
