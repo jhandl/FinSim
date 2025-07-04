@@ -426,7 +426,7 @@ WizardSteps:
     tours: [quick, full, mini]
     card: events
     popover:
-      description: "<p>Add, remove, and edit the events that make up your scenario.</p><ul><li>An event is anything that is time-bound and has a financial impact, such as income, expenses, or a market crash.</li><li>Select an event type and press Help (or the ? key) for details.</li></ul>"
+      description: "<p>Add, remove, and edit the events that make up your scenario.</p><ul><li>An event is anything that is time-bound and has a financial impact, such as income, expenses, or a market crash.</li><li>Select an event type and press Help or the ? key for details.</li><li>Sort ⇅ the table by clicking a column header.</li></ul>"
       side: "top"
       align: "center"
 
@@ -1330,7 +1330,15 @@ WizardSteps:
       align: "center"
 
 ###########################################################
-# Age/Year mode
+# Sorting and Age/Year mode
+
+  - element: "#fromAgeHeader"
+    tours: [mini]
+    card: events
+    popover:
+      description: "<p>Click the ⇅ icon to keep the table sorted by any column. Click once for ascending ▲, twice for descending ▼, thrice to stop sorting.</p>"
+      side: "top"
+      align: "center"
 
   - element: "#ageYearModeAge"
     tours: [full, mini]

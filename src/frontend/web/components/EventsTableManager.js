@@ -736,7 +736,7 @@ class EventsTableManager {
     if (primaryHeader) {
       primaryHeader.classList.add(primary.dir === 'asc' ? 'sorted-asc' : 'sorted-desc');
       const caret = primaryHeader.querySelector('.sort-caret');
-      if (caret) caret.textContent = primary.dir === 'asc' ? '▼' : '▲';
+      if (caret) caret.textContent = primary.dir === 'asc' ? '▲' : '▼';
     }
 
     // Secondary keys (if any)
@@ -746,7 +746,7 @@ class EventsTableManager {
         if (secHeader) {
           secHeader.classList.add('sorted-secondary');
           const caret = secHeader.querySelector('.sort-caret');
-          if (caret) caret.textContent = sec.dir === 'asc' ? '▼' : '▲';
+          if (caret) caret.textContent = sec.dir === 'asc' ? '▲' : '▼';
         }
       });
     }

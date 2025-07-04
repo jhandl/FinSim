@@ -36,27 +36,27 @@ class VisualizationConfig {
         lightnessMap: { metric: 'cashflowDeficitMagnitude', invert: false },
         saturationMap: { metric: 'cashflowDeficitMagnitude', invert: false },
         hue: { curve: 'linear', range: { from: 120, to: 0 } },
-        lightness: { curve: 'sqrt', range: { from: 95, to: 65 } },
+        lightness: { curve: 'sqrt', range: { from: 85, to: 50 } },
         saturation: { curve: 'sqrt', range: { from: 0.4, to: 0.8 } }
       },
       'failure': {
         name: 'Failure',
-        description: '### Failure Rate\n\nShows where your plan is most likely to fail.\n\n- **Greener**: You\'re likely not running out of money this year.\n\n- **Redder**: You\'re more likely to run out of money this year.',
+        description: '### Failure Rate\n\nShows where your plan is most likely to fail.\n\n- **Green**: You\'re likely not running out of money this year.\n\n- **Red**: You\'re more likely to run out of money this year.',
         hueMap: { metric: 'failureRate', invert: false },
         lightnessMap: { metric: 'none', invert: true },
         saturationMap: { metric: 'none', invert: false },
         hue: { curve: 'linear', range: { from: 120, to: 0 } },
-        lightness: { curve: 'linear', range: { from: 75, to: 45 } },
+        lightness: { curve: 'linear', range: { from: 85, to: 50 } },
         saturation: { curve: 'linear', range: { from: 0.8, to: 0.8 } }
       },
       'survival': {
         name: 'Survival',
-        description: '### Survival Rate\n\nShows the overall success likelyhood of your plan year by year.\n\n- **Greener**: Your plan is more likely to survive up to this year.\n\n- **Redder**: Your plan is more likely to have failed by this year.',
+        description: '### Survival Rate\n\nShows the overall success likelyhood of your plan year by year.\n\n- **Green**: Your plan is more likely to survive up to this year.\n\n- **Red**: Your plan is more likely to have failed by this year.',
         hueMap: { metric: 'survivalRate', invert: true },
         lightnessMap: { metric: 'none', invert: true },
         saturationMap: { metric: 'none', invert: false },
         hue: { curve: 'linear', range: { from: 120, to: 0 } },
-        lightness: { curve: 'linear', range: { from: 90, to: 50 } },
+        lightness: { curve: 'linear', range: { from: 85, to: 50 } },
         saturation: { curve: 'linear', range: { from: 0.2, to: 1.0 } }
       },
     };
