@@ -528,7 +528,7 @@ WizardSteps:
     card: events
     eventTypes: ["E"]
     popover:
-      description: "<p>An expense item.</p>"
+      description: "<p>An expense item. You can add an expense event for your total yearly cost of living, another one for a transcient or one-off expenses like college tuition, a car, etc.</p>"
       side: "bottom"
       align: "center"
 
@@ -546,7 +546,7 @@ WizardSteps:
     card: events
     eventTypes: ["R"]
     popover:
-      description: "<p>The ownership of a real estate property.</p>"
+      description: "<p>The ownership of a real estate property. If you buy a property with a mortgage, you must also add a 'Mortgage' event with the same name.</p>"
       side: "bottom"
       align: "center"
 
@@ -555,7 +555,7 @@ WizardSteps:
     card: events
     eventTypes: ["M"]
     popover:
-      description: "<p>A mortgage on a real estate property.</p>"
+      description: "<p>A mortgage on a real estate property. The name must match the name of the corresponding 'Real Estate' event.</p>"
       side: "bottom"
       align: "center"
 
