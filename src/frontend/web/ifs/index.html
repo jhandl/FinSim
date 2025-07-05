@@ -414,7 +414,7 @@
                             <th data-key="CGT" title="Capital Gains Tax (and Exit Tax) paid on investment gains.">CGT</th>
                             <th data-key="PensionContribution" title="Amount contributed to private pensions (including employer match)">P. Contrib</th>
                             <th data-key="NetIncome" title="Total income after all taxes and deductions (except employer pension match)">Inflows</th>
-                            <th data-key="Expenses" title="Your annual living expenses">Outflows</th>
+                            <th data-key="Expenses" title="Your annual total expenses">Outflows</th>
                             <th data-key="PensionFund" title="Total value of private pension funds">P.Fund</th>
                             <th data-key="Cash" title="Total cash savings balance">Cash</th>
                             <th data-key="RealEstateCapital" title="Total value of your owned real estate">R.Estate</th>
@@ -1209,6 +1209,24 @@
         
         // Set initial color scheme attribute
         updateColorSchemeAttribute('default');
+    });
+    </script>
+
+    <!-- App Icon Version Tooltip -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const appIcon = document.querySelector('.app-icon');
+        if (appIcon) {
+            // Get current version from localStorage or default
+            const currentVersion = localStorage.getItem('simulatorVersion') || '1.27';
+            const tooltipText = `Ireland Financial Simulator\nVersion ${currentVersion}`;
+            
+            // Use TooltipUtils to attach tooltip with 5-second delay
+            TooltipUtils.attachTooltip(appIcon, tooltipText, {
+                hoverDelay: 5000,  // 5 seconds
+                touchDelay: 5000   // 5 seconds for touch devices too
+            });
+        }
     });
     </script>
 

@@ -8,11 +8,10 @@
 - Add ability to arrange events by start age or event category. Maybe allow drag-and-drop.
 - Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain. This would only make sense if that average was shown in present value.
 - New events: 
-   - inheritance.
-   - period of high inflation.
    - increase pension contribution rate.
    - pay off mortgage.
-- Add an event to change the pension contribution rate.
+   - inheritance.
+   - period of high inflation.
 
 ### SEO
 - "Educational Sandbox", "What if lab", "not a crystal ball", "Personbal Finance Lab", "Learn by doing, experimenting, and visualizing"

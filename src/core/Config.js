@@ -1,4 +1,4 @@
-/* This file has to work on both the website and Google Sheets */
+/* This file has to work on both the website and Google Apps Script */
 
 var Config_instance = null;
 
@@ -64,9 +64,9 @@ class Config {
 
     let latest = this.latestVersion.toString().split('.').map(Number);
     let current = this.thisVersion.toString().split('.').map(Number);
-    if (latest[0] !== current[0]) {
+    if (latest.length > 0 && current.length > 0 && latest[0] !== current[0]) {
       this.newCodeVersion();
-    } else if (latest[1] !== current[1]) {
+    } else if (latest.length > 1 && current.length > 1 && latest[1] !== current[1]) {
       this.newDataVersion();
     } else {
       this.clearVersionAlert();
