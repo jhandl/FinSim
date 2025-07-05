@@ -93,6 +93,7 @@ class WelcomeModal {
           ${this.createTabContent()}
         </div>
         <div class="welcome-modal-footer">
+          <button class="welcome-demo-btn welcome-modal-button secondary">Demo</button>
           <button class="welcome-tour-btn welcome-modal-button primary">Quick Tour</button>
           <button class="welcome-skip-btn welcome-modal-button secondary">Full Tour</button>
         </div>
@@ -139,6 +140,7 @@ class WelcomeModal {
     const closeBtn = this.modal.querySelector('.welcome-modal-close');
     const skipBtn = this.modal.querySelector('.welcome-skip-btn');
     const tourBtn = this.modal.querySelector('.welcome-tour-btn');
+    const demoBtn = this.modal.querySelector('.welcome-demo-btn');
 
     closeBtn.addEventListener('click', () => this.hide());
 
@@ -160,6 +162,17 @@ class WelcomeModal {
       e.stopPropagation();
       this.hide();
       if (this.onTourStartCallback) this.onTourStartCallback();
+    });
+    
+    demoBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.hide();
+      // Emulate clicking the header demo button
+      const headerDemoBtn = document.getElementById('loadDemoScenarioHeader');
+      if (headerDemoBtn) {
+        headerDemoBtn.click();
+      }
     });
     
     // Tab switching
