@@ -60,6 +60,7 @@ class WebUI extends AbstractUI {
       this.setupCardInfoIcons(); // Setup info icons on cards
       this.setupDataExportButton(); // Setup data table CSV export button
       this.setupIconTooltips(); // Setup tooltips for various mode toggle icons
+      this.setupCursorEndOnFocus(); // Ensure caret is placed at the end when inputs receive focus
       this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
       
       this.eventsTableManager.addEventRow();
@@ -1196,6 +1197,45 @@ class WebUI extends AbstractUI {
     Object.entries(tooltipMappings).forEach(([id, txt]) => {
       const el = document.getElementById(id);
       if (el) TooltipUtils.attachTooltip(el, txt);
+    });
+  }
+
+  /**
+   * Automatically moves the caret to the end of the text inside an input/textarea
+   * whenever it gains focus for the first time. This improves usability on
+   * mobile where tapping a field typically positions the cursor at the start.
+   *
+   * The listener is registered once for the whole document using the
+   * `focusin` event (which bubbles) so that it works for dynamically created
+   * inputs as well. We only target common text-like inputs to avoid impacting
+   * controls such as checkboxes or buttons.
+   */
+  setupCursorEndOnFocus() {
+    document.addEventListener('focusin', (event) => {
+      const el = event.target;
+      if (!el) return;
+
+      // Consider INPUT types that accept free text plus TEXTAREA
+      const textInputTypes = ['text', 'search', 'url', 'tel', 'password', 'email', 'number'];
+      const isTextInput = (el.tagName === 'INPUT' && textInputTypes.includes(el.type)) || el.tagName === 'TEXTAREA';
+
+      if (!isTextInput) return;
+
+      // Defer to allow other focus handlers (e.g. FormatUtils) to adjust value first
+      setTimeout(() => {
+        try {
+          const length = el.value?.length ?? 0;
+          if (typeof el.setSelectionRange === 'function') {
+            el.setSelectionRange(length, length);
+          } else if (typeof el.createTextRange === 'function') { // IE fallback
+            const range = el.createTextRange();
+            range.collapse(false);
+            range.select();
+          }
+        } catch (err) {
+          // Silently ignore errors (e.g. unsupported input type)
+        }
+      }, 0);
     });
   }
 
