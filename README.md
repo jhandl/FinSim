@@ -3,15 +3,18 @@
 # Roadmap
 
 ### Improvements
-- Add feedback box.
-- Add registration box? Not CIO.
-- Add ability to arrange events by start age or event category. Maybe allow drag-and-drop.
-- Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain. This would only make sense if that average was shown in present value.
+- Add tooltips to the data table cells showing the origin of the numbers.
+- Allow three options for retirement lump sum: not take it, limit to tax-free allowance, take it all.
+- Auto save of changes to a scenario? A toggle maybe?
+- Forms-like data input. While highlighting the relevant section in the background, ask questions and populate fields, with a nice animation showing the entered data moving to the corresponding sections. Auto saving along the way so if you go back it goes to step 2 etc.
 - New events: 
    - increase pension contribution rate.
    - pay off mortgage.
    - inheritance.
    - period of high inflation.
+- Add feedback box.
+- Add registration box? Not CIO.
+- Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain. This would only make sense if that average was shown in present value.
 
 ### SEO
 - "Educational Sandbox", "What if lab", "not a crystal ball", "Personbal Finance Lab", "Learn by doing, experimenting, and visualizing"
