@@ -2,8 +2,9 @@
 
 class Revenue {
 
-  declareSalaryIncome(amount, contribRate, person) {
+  declareSalaryIncome(amount, contribRate, person, eventId) {
     this.income += amount; // Total gross income
+    this.tracer.trace(this.year, 'salary', 'income', amount, eventId);
 
     const contribution = contribRate * amount;
     const relief = contribRate * Math.min(amount, adjust(config.pensionContribEarningLimit));
@@ -11,18 +12,20 @@ class Revenue {
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
       this.pensionContribAmountP1 += contribution;
       this.pensionContribReliefP1 += relief;
-      this.salariesP1.push({amount: amount, contribRate: contribRate});
+      this.salariesP1.push({amount: amount, contribRate: contribRate, eventId: eventId});
       this.salariesP1.sort((a,b) => a.amount - b.amount);
     } else if (person && this.person2Ref && person.id === this.person2Ref.id) {
       this.pensionContribAmountP2 += contribution;
       this.pensionContribReliefP2 += relief;
-      this.salariesP2.push({amount: amount, contribRate: contribRate});
+      this.salariesP2.push({amount: amount, contribRate: contribRate, eventId: eventId});
       this.salariesP2.sort((a,b) => a.amount - b.amount);
    }
+   this.tracer.trace(this.year, 'salary', 'pensionContribution', contribution, eventId);
   };
   
-  declareNonEuSharesIncome(amount) {
+  declareNonEuSharesIncome(amount, eventId) {
     this.nonEuShares += amount;
+    this.tracer.trace(this.year, 'rsu', 'income', amount, eventId);
   };
   
   declarePrivatePensionIncome(amount, person) {
@@ -55,14 +58,16 @@ class Revenue {
   
   declareStatePensionIncome(amount) {
     this.statePension += amount;
+    this.tracer.trace(this.year, 'statePension', 'income', amount, 'State Pension');
   };
   
   declareInvestmentIncome(amount) {
     this.investmentIncome += amount;
   };
   
-  declareOtherIncome(amount) {
+  declareOtherIncome(amount, eventId) {
     this.income += amount;
+    this.tracer.trace(this.year, 'other', 'income', amount, eventId);
   };
     
   declareInvestmentGains(amount, taxRate) {
@@ -89,9 +94,11 @@ class Revenue {
     return gross - tax;
   };
   
-  reset(person1, person2_optional) {
+  reset(person1, person2_optional, tracer, year) {
     this.gains = [];
     this.income = 0;
+    this.tracer = tracer;
+    this.year = year;
     this.nonEuShares = 0;
     this.statePension = 0;
     this.privatePensionP1 = 0;
@@ -155,7 +162,7 @@ class Revenue {
       })
       .reduce((sum, amount) => sum + amount, 0);
   };
-  
+
   computeIT() {
     // standard income
     let taxable = this.income + (this.privatePensionP1 + this.privatePensionP2) + 
@@ -205,6 +212,7 @@ class Revenue {
     } else {
       this.it = Math.max(tax - credit, 0);
     }
+    this.tracer.trace(this.year, 'income', 'it', this.it, 'Income Tax');
   };
   
   computePRSI() {
@@ -215,14 +223,18 @@ class Revenue {
     // Calculate PRSI for P1's PAYE income (salaries)
     p1TotalSalaryIncome = this.salariesP1.reduce((sum, s) => sum + s.amount, 0);
     if (this.person1Ref && this.person1Ref.age < config.prsiExcemptAge) {
-      this.prsi += p1TotalSalaryIncome * config.prsiRate;
+      let tax = p1TotalSalaryIncome * config.prsiRate;
+      this.prsi += tax;
+      this.tracer.trace(this.year, 'salary', 'prsi', tax, 'PRSI');
     }
 
     // Calculate PRSI for P2's PAYE income (salaries)
     if (this.person2Ref) {
       p2TotalSalaryIncome = this.salariesP2.reduce((sum, s) => sum + s.amount, 0);
       if (this.person2Ref.age < config.prsiExcemptAge) {
-        this.prsi += p2TotalSalaryIncome * config.prsiRate;
+        let tax = p2TotalSalaryIncome * config.prsiRate;
+        this.prsi += tax;
+        this.tracer.trace(this.year, 'salary', 'prsi', tax, 'PRSI');
       }
     }
     
@@ -243,10 +255,14 @@ class Revenue {
     }
 
     if (this.person1Ref && this.person1Ref.age < config.prsiExcemptAge) {
-      this.prsi += nonPAYEIncomeP1 * config.prsiRate;
+      let tax = nonPAYEIncomeP1 * config.prsiRate;
+      this.prsi += tax;
+      this.tracer.trace(this.year, 'nonPaye', 'prsi', tax, 'PRSI');
     }
     if (this.person2Ref && this.person2Ref.age < config.prsiExcemptAge) {
-      this.prsi += nonPAYEIncomeP2 * config.prsiRate;
+      let tax = nonPAYEIncomeP2 * config.prsiRate;
+      this.prsi += tax;
+      this.tracer.trace(this.year, 'nonPaye', 'prsi', tax, 'PRSI');
     }
   };
   
@@ -278,11 +294,15 @@ class Revenue {
       if (!this.person2Ref) { // Person 1 is single for tax purposes here (or P2 not present)
         // If single, P1 gets all nonEuShares for USC calculation.
         p1TotalUscLiableIncome += this.nonEuShares; 
-        this.usc += calculateUscForPerson(p1TotalUscLiableIncome, (this.person1Ref ? this.person1Ref.age : undefined));
+        let tax = calculateUscForPerson(p1TotalUscLiableIncome, (this.person1Ref ? this.person1Ref.age : undefined));
+        this.usc += tax;
+        this.tracer.trace(this.year, 'income', 'usc', tax, 'USC');
       } else {
         // If two people, P1 gets half of nonEuShares for USC calculation.
         p1TotalUscLiableIncome += (this.nonEuShares / 2);
-        this.usc += calculateUscForPerson(p1TotalUscLiableIncome, (this.person1Ref ? this.person1Ref.age : undefined));
+        let tax = calculateUscForPerson(p1TotalUscLiableIncome, (this.person1Ref ? this.person1Ref.age : undefined));
+        this.usc += tax;
+        this.tracer.trace(this.year, 'income', 'usc', tax, 'USC');
       }
     }
 
@@ -292,7 +312,9 @@ class Revenue {
       let p2TotalUscLiableIncome = p2TotalSalaryIncome + this.privatePensionP2;
       p2TotalUscLiableIncome += (this.nonEuShares / 2); // Person 2 gets their half of non-EU shares for USC
 
-      this.usc += calculateUscForPerson(p2TotalUscLiableIncome, (this.person2Ref ? this.person2Ref.age : undefined));
+      let tax = calculateUscForPerson(p2TotalUscLiableIncome, (this.person2Ref ? this.person2Ref.age : undefined));
+      this.usc += tax;
+      this.tracer.trace(this.year, 'income', 'usc', tax, 'USC');
     }
   };
 
@@ -311,7 +333,9 @@ computeCGT() {
         totalLosses = Math.max(totalLosses - gains, 0);
         let taxableGains = Math.max(gainAfterLosses - remainingRelief, 0);
         remainingRelief = Math.max(remainingRelief - gainAfterLosses, 0);
-        tax += taxableGains * taxRate;
+        let cgtTax = taxableGains * taxRate;
+        tax += cgtTax;
+        this.tracer.trace(this.year, 'gains', 'cgt', cgtTax, 'CGT');
       }
     }
     this.cgt = tax;
@@ -359,6 +383,10 @@ computeCGT() {
     // Clone marital/dependent flags
     copy.married = this.married;
     copy.dependentChildren = this.dependentChildren;
+    
+    copy.tracer = this.tracer;
+    copy.year = this.year;
+
     return copy;
   };
 }

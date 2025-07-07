@@ -2,7 +2,7 @@
 
 var uiManager, params, events, config, dataSheet, row, errors;
 var year, periods, failedAt, success, montecarlo;
-var revenue, realEstate, stockGrowthOverride;
+var revenue, realEstate, stockGrowthOverride, tracer;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var incomeStatePension, incomePrivatePension, incomeFundsRent, incomeSharesRent, withdrawalRate;
 var incomeSalaries, incomeShares, incomeRentals, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
@@ -43,7 +43,8 @@ function run() {
   
   uiManager.updateProgress("Running");
   for (currentRun = 0; currentRun < runs; currentRun++) {
-    successes += runSimulation(); 
+    tracer.setActive(currentRun === 0);
+    successes += runSimulation();
   }
   uiManager.updateDataSheet(runs, perRunResults);
   uiManager.updateStatusCell(successes, runs);
@@ -73,6 +74,7 @@ function initializeSimulator() {
   uiManager.setStatus("Initializing", STATUS_COLORS.INFO);
   config = Config.getInstance(uiManager.ui);
   revenue = new Revenue();
+  tracer = new Tracer();
   dataSheet = [];
   return readScenario(validate = true);
 }
@@ -90,6 +92,7 @@ function loadFromFile(file) {
 }
 
 function initializeSimulationVariables() {
+  tracer.reset();
   // Initialize investment instruments
   indexFunds = new IndexFunds(params.growthRateFunds, params.growthDevFunds);
   shares = new Shares(params.growthRateShares, params.growthDevShares);
@@ -177,7 +180,7 @@ function resetYearlyVariables() {
   year++;
 
   // Pass Person objects to revenue reset (now using updated ages and year)
-  revenue.reset(person1, person2);
+  revenue.reset(person1, person2, tracer, year);
   
   // Add year to global investment objects
   indexFunds.addYear();
@@ -272,14 +275,14 @@ function processEvents() {
           
           pensionContribution += p1TotalContrib;
           person1.pension.buy(p1TotalContrib);
-          revenue.declareSalaryIncome(amount, p1ContribRate, person1); // Pass P1's personal contrib rate
+          revenue.declareSalaryIncome(amount, p1ContribRate, person1, event.id); // Pass P1's personal contrib rate
         }
         break;
 
       case 'SInp': // Salary income (Person 1, Non-Pensionable)
         if (inScope) {
           incomeSalaries += amount;
-          revenue.declareSalaryIncome(amount, 0, person1); // No pension contribution for P1
+          revenue.declareSalaryIncome(amount, 0, person1, event.id); // No pension contribution for P1
         }
         break;
 
@@ -303,11 +306,11 @@ function processEvents() {
 
           pensionContribution += p2TotalContrib;
           person2.pension.buy(p2TotalContrib);
-          revenue.declareSalaryIncome(amount, p2ContribRate, person2); // Pass P2's personal contrib rate
+          revenue.declareSalaryIncome(amount, p2ContribRate, person2, event.id); // Pass P2's personal contrib rate
         } else if (inScope && !person2) {
           // Fallback: SI2 event but no Person 2 defined. Treat as P1 non-pensionable salary.
           incomeSalaries += amount;
-          revenue.declareSalaryIncome(amount, 0, person1);
+          revenue.declareSalaryIncome(amount, 0, person1, event.id);
           // console.warn("SI2 event encountered but Person 2 is not defined. Treated as P1 non-pensionable salary.");
         }
         break;
@@ -315,28 +318,28 @@ function processEvents() {
       case 'SI2np': // Salary income (Person 2, Non-Pensionable)
         if (inScope && person2) {
           incomeSalaries += amount;
-          revenue.declareSalaryIncome(amount, 0, person2); // No pension contribution for P2
+          revenue.declareSalaryIncome(amount, 0, person2, event.id); // No pension contribution for P2
         }
         break;
 
       case 'UI': // RSU income
         if (inScope) {
           incomeShares += amount;
-          revenue.declareNonEuSharesIncome(amount);
+          revenue.declareNonEuSharesIncome(amount, event.id);
         }
         break;
 
       case 'RI': // Rental income
         if (inScope) {
           incomeRentals += amount;
-          revenue.declareOtherIncome(amount);
+          revenue.declareOtherIncome(amount, event.id);
         }
         break;
 
       case 'DBI': // Defined Benefit Pension Income
         if (inScope) {
           incomeDefinedBenefit += amount;
-          revenue.declareSalaryIncome(amount, 0, person1);
+          revenue.declareSalaryIncome(amount, 0, person1, event.id);
         }
         break;
 
@@ -349,6 +352,7 @@ function processEvents() {
       case 'E': // Expenses
         if (inScope) {
           expenses += amount;
+          tracer.trace(year, 'expenses', 'Expenses', amount, event.id);
         }
         break;
 
@@ -623,7 +627,7 @@ function updateYearlyData() {
   });
   
   if (!(row in dataSheet)) {
-    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0 };
+    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0, "traces": {} };
   }
   dataSheet[row].age += person1.age;
   dataSheet[row].year += year;
@@ -649,6 +653,13 @@ function updateYearlyData() {
   dataSheet[row].usc += revenue.usc;
   dataSheet[row].cgt += revenue.cgt;
   dataSheet[row].worth += realEstate.getTotalValue() + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFunds.capital() + shares.capital() + cash;
+
+  dataSheet[row].traces.it = tracer.getFormattedTraces(year, 'it');
+  dataSheet[row].traces.prsi = tracer.getFormattedTraces(year, 'prsi');
+  dataSheet[row].traces.usc = tracer.getFormattedTraces(year, 'usc');
+  dataSheet[row].traces.cgt = tracer.getFormattedTraces(year, 'cgt');
+  dataSheet[row].traces.pensionContribution = tracer.getFormattedTraces(year, 'pensionContribution');
+  dataSheet[row].traces.expenses = tracer.getFormattedTraces(year, 'expenses');
 
   if (!montecarlo) {
     uiManager.updateDataRow(row, (person1.age-params.startingAge) / (100-params.startingAge));

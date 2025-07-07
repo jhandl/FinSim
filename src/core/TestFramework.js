@@ -101,6 +101,7 @@ class TestFramework {
         revenue: null,
         realEstate: null,
         stockGrowthOverride: undefined,
+        tracer: null,
         
         // Financial variables
         netIncome: 0,
@@ -142,8 +143,9 @@ class TestFramework {
         'Events.js',
         'Utils.js',
         'Config.js',
+        'Tracer.js',
         'Revenue.js',
-        'Equities.js', 
+        'Equities.js',
         'RealEstate.js',
         'Person.js',
         'Simulator.js'
@@ -346,6 +348,11 @@ class TestFramework {
                 dataSheet[i].usc = dataSheet[i].usc / runs;
                 dataSheet[i].cgt = dataSheet[i].cgt / runs;
                 dataSheet[i].worth = dataSheet[i].worth / runs;
+                // Traces are not averaged, we just keep the first run's traces.
+                // This logic assumes perRunResults[0] has the traces.
+                if (perRunResults[0] && perRunResults[0][i-1] && perRunResults[0][i-1].traces) {
+                    dataSheet[i].traces = perRunResults[0][i-1].traces;
+                }
               }
             }
           }
@@ -593,7 +600,8 @@ class TestFramework {
     if (validRows.length === 0) {
       throw new Error('No valid data rows found');
     }
-    return validRows[validRows.length - 1][field];
+    const lastRow = validRows[validRows.length - 1];
+    return field.split('.').reduce((o, k) => (o || {})[k], lastRow);
   }
 
   /**
@@ -605,7 +613,11 @@ class TestFramework {
     if (!row) {
       throw new Error(`No data found for age ${age}`);
     }
-    return row[field];
+    const value = field.split('.').reduce((o, k) => (o || {})[k], row);
+    if (value === undefined) {
+      // throw new Error(`Field '${field}' not found for age ${age}`);
+    }
+    return value;
   }
 
   /**
@@ -617,13 +629,25 @@ class TestFramework {
     if (rowIndex >= validRows.length) {
       throw new Error(`Row index ${rowIndex} out of bounds (valid rows: ${validRows.length})`);
     }
-    return validRows[rowIndex][field];
+    const row = validRows[rowIndex];
+    return field.split('.').reduce((o, k) => (o || {})[k], row);
   }
 
   /**
    * Validate exact value with tolerance
    */
   validateExactValue(actual, expected, tolerance) {
+    if (typeof expected === 'string') {
+      const success = actual === expected;
+      return {
+        success: success,
+        actual: actual,
+        expected: expected,
+        message: success ? `String "${actual}" matches expected "${expected}"` : `String "${actual}" does not match expected "${expected}"`,
+        error: success ? null : `Expected "${expected}", got "${actual}"`
+      };
+    }
+
     const diff = Math.abs(actual - expected);
     const success = diff <= tolerance;
     

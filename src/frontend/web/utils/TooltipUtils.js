@@ -25,7 +25,7 @@ class TooltipUtils {
     const createTooltip = (msg) => {
       const el = document.createElement('div');
       el.className = 'visualization-tooltip';
-      el.textContent = msg;
+      el.innerHTML = msg.replace(/\n/g, '<br>');
       document.body.appendChild(el);
       return el;
     };
@@ -46,6 +46,7 @@ class TooltipUtils {
       el.style.left     = `${left}px`;
       el.style.top      = `${top}px`;
       el.style.transform = 'none';
+      el.style.whiteSpace = 'normal';
     };
 
     const showTooltip = () => {

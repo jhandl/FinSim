@@ -113,6 +113,12 @@ class TableManager {
         } else {
           td.textContent = value.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
         }
+
+        // Add tooltip for traceable columns
+        if (data.traces && data.traces[key]) {
+            TooltipUtils.attachTooltip(td, data.traces[key]);
+        }
+        
         row.appendChild(td);
       }
     });

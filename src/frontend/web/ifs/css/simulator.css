@@ -1895,7 +1895,6 @@ footer {
     border-radius: 4px;
     font-size: 0.8rem;
     font-weight: normal;
-    white-space: nowrap;
     z-index: 10052;
     pointer-events: none;
     opacity: 0;
