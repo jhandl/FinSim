@@ -45,6 +45,19 @@ class Equity {
       amountToSell -= sale;
     }
     this.declareRevenue(sold, gains);
+    // Tax breakdown recording for CGT
+    if (typeof taxRecorder !== 'undefined' && taxRecorder && params && params.enableTaxBreakdown && gains > 0) {
+      // Determine a readable source key based on equity subclass
+      let sourceKey = 'EquitySale';
+      if (this instanceof IndexFunds) {
+        sourceKey = 'IndexFundsSale';
+      } else if (this instanceof Shares) {
+        sourceKey = 'SharesSale';
+      } else if (this instanceof Pension && this.person) {
+        sourceKey = `PensionWithdrawal:${this.person.id}`;
+      }
+      taxRecorder.recordIncome(sourceKey, gains, { cgt: 1 });
+    }
     return sold;
   }
   
@@ -106,6 +119,9 @@ class IndexFunds extends Equity {
         this.portfolio[i].age = 0;
         if (gains > 0 || this.canOffsetLosses) {
           revenue.declareInvestmentGains(gains, this.taxRate);
+        }
+        if (typeof taxRecorder !== 'undefined' && taxRecorder && params && params.enableTaxBreakdown && gains > 0) {
+          taxRecorder.recordIncome('DeemedDisposal', gains, { cgt: 1 });
         }
       }
     }

@@ -114,6 +114,20 @@ class TableManager {
           td.textContent = value.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
         }
         row.appendChild(td);
+
+        // Attach tax breakdown tooltip if enabled and data provided
+        if (['IT','PRSI','USC','CGT'].includes(key) && data.taxBreakdown) {
+          const taxKey = key.toLowerCase();
+          const breakdownMap = data.taxBreakdown && data.taxBreakdown[taxKey];
+          if (breakdownMap && Object.keys(breakdownMap).length > 0) {
+            const total = Object.values(breakdownMap).reduce((s,v)=>s+v,0);
+            const lines = Object.entries(breakdownMap)
+              .sort((a,b)=>b[1]-a[1])
+              .map(([src,val])=>`${(100*val/total).toFixed(0)} % – ${src}`);
+            const tooltipText = lines.join('\n');
+            TooltipUtils.attachTooltip(td, tooltipText);
+          }
+        }
       }
     });
   }

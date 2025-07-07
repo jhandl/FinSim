@@ -178,7 +178,9 @@ class Revenue {
     } else if (this.dependentChildren) {
       itBands = config.itSingleDependentChildrenBands;
     }
-    let tax = this.computeProgressiveTax(itBands, taxable, 1, marriedBandIncrease);
+    const itSlicesObj = this._computeITWithBreakdown(itBands, this._buildIncomeSlices(), marriedBandIncrease);
+    let tax = itSlicesObj.tax;
+    const itSplit = itSlicesObj.split;
 
     if (this.privatePensionLumpSumCountP1 > 0 || this.privatePensionLumpSumCountP2 > 0) {
       tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, this.privatePensionLumpSumP1, this.privatePensionLumpSumCountP1) +
@@ -204,6 +206,13 @@ class Revenue {
       this.it = 0;
     } else {
       this.it = Math.max(tax - credit, 0);
+    }
+
+    if (typeof taxRecorder !== 'undefined' && taxRecorder && this.it > 0) {
+      const factor = this.it / tax;
+      for (const [src, paid] of Object.entries(itSplit)) {
+        taxRecorder.logPaid('it', src, paid * factor);
+      }
     }
   };
   
@@ -361,4 +370,82 @@ computeCGT() {
     copy.dependentChildren = this.dependentChildren;
     return copy;
   };
+
+  /**
+   * Progressive-band tax with attribution per income slice.
+   * Reuses computeProgressiveTax – we just pour each slice sequentially.
+   * @param {Object} itBands Progressive bands object
+   * @param {Array}  slices  Array of { amount:number, src:string }
+   * @param {number} shift   Married band shift passed to computeProgressiveTax
+   * @returns {Object} { tax: totalEuroTax, split: { srcKey: euroTax } }
+   */
+  _computeITWithBreakdown(itBands, slices, shift = 0) {
+    let runningIncome = 0;
+    let runningTax    = 0;
+    let bySrc         = {};
+    for (const { amount, src } of slices) {
+      if (!amount) continue;
+      const newIncome = runningIncome + amount;
+      const newTax    = this.computeProgressiveTax(itBands, newIncome, 1, shift);
+      const incTax    = newTax - runningTax;
+      if (incTax !== 0) {
+        bySrc[src] = (bySrc[src] || 0) + incTax;
+      }
+      runningIncome = newIncome;
+      runningTax    = newTax;
+    }
+    return { tax: runningTax, split: bySrc };
+  }
+
+  /**
+   * Build the ordered list of income slices for IT calculation.
+   * Salaries first (FIFO within person), then pension income, RSU, other income.
+   */
+  _buildIncomeSlices() {
+    const slices = [];
+
+    // Salaries – keep order already sorted (ascending) when stored
+    for (const s of this.salariesP1) slices.push({ amount: s.amount, src: 'Salary:P1' });
+    for (const s of this.salariesP2) slices.push({ amount: s.amount, src: 'Salary:P2' });
+
+    // Private pension drawdowns
+    if (this.privatePensionP1) slices.push({ amount: this.privatePensionP1, src: 'PensionIncome:P1' });
+    if (this.privatePensionP2) slices.push({ amount: this.privatePensionP2, src: 'PensionIncome:P2' });
+
+    // RSU / Non-EU shares income
+    if (this.nonEuShares)       slices.push({ amount: this.nonEuShares, src: 'RSU' });
+
+    // Other miscellaneous income (rental, DBI, etc.) is whatever remains in this.income after salaries
+    const salaryP1Total = this.salariesP1.reduce((sum, s) => sum + s.amount, 0);
+    const salaryP2Total = this.salariesP2.reduce((sum, s) => sum + s.amount, 0);
+    const otherIncome   = this.income - salaryP1Total - salaryP2Total;
+    if (otherIncome)    slices.push({ amount: otherIncome, src: 'OtherIncome' });
+
+    return slices;
+  }
 }
+
+// === Tax breakdown helper mapping ===
+// Centralised definition of which taxes apply to each income/gain kind.
+const TAX_PROFILES = {
+  Salary:          { it: 1, prsi: 1, usc: 1 },
+  SalaryNP:        { it: 1, prsi: 1, usc: 1 },
+  RSU:             { it: 1, prsi: 1, usc: 1 },
+  RentalIncome:    { it: 1, prsi: 1, usc: 1 },
+  PensionIncome:   { it: 1, usc: 1 }, // Pension income subject to USC
+  PensionLumpSum:  { it: 1 },
+  StatePension:    { it: 1 },
+  DeemedDisposal:  { cgt: 1 },
+  IndexFundsSale:  { cgt: 1 },
+  SharesSale:      { cgt: 1 },
+  RealEstateSale:  { cgt: 1 }
+};
+
+/**
+ * Return a tax profile object indicating which taxes apply to a given income kind.
+ * @param {string} kind – e.g. "Salary", "IndexFundsSale"
+ * @returns {Object} e.g. {it:1, prsi:1, usc:1}
+ */
+Revenue.getTaxProfile = function(kind) {
+  return TAX_PROFILES[kind] || {};
+};

@@ -43,59 +43,58 @@
                 </div>
             </div>
             <div class="header-right">
+                <!-- Mobile Burger Menu -->
+                <button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Toggle mobile menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                
+                <!-- Mobile Navigation Menu -->
+                <nav id="mobileMenu" class="mobile-menu">
+                    <div class="mobile-menu-content">
+                        <button id="runSimulationMobile" class="mobile-menu-button primary-button">
+                            <i class="fas fa-play"></i>
+                            <span>Run Simulation</span>
+                        </button>
+                        <div id="progressMobile" class="mobile-menu-status">Ready</div>
+                        
+                        <div class="mobile-menu-divider"></div>
+                        
+                        <button id="saveSimulationMobile" class="mobile-menu-button secondary-button">
+                            <i class="fas fa-save"></i>
+                            <span>Save Scenario</span>
+                        </button>
+                        <button id="loadSimulationMobile" class="mobile-menu-button secondary-button">
+                            <i class="fas fa-folder-open"></i>
+                            <span>Load Scenario</span>
+                        </button>
+                        
+                        <div class="mobile-menu-divider"></div>
+                        
+                        <button id="loadDemoScenarioMobile" class="mobile-menu-button secondary-button">
+                            <i class="fas fa-play-circle"></i>
+                            <span>Demo</span>
+                        </button>
+                        <button id="startWizardMobile" class="mobile-menu-button secondary-button">
+                            <i class="fas fa-question-circle"></i>
+                            <span>Help</span>
+                        </button>
+                        
+                        <button id="experimentalToggleMobile" class="mobile-menu-button secondary-button toggle-button" data-toggle-state="off">
+                            <i class="fas fa-toggle-off"></i>
+                            <span>Tooltips: <strong>off</strong></span>
+                        </button>
+                        
+                        <div class="mobile-menu-divider"></div>
+                        
+                        <a href="https://www.buymeacoffee.com/jhandl" target="_blank" class="coffee-button">
+                            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png" alt="Buy Me A Coffee" style="height: 36px; width: auto;">
+                        </a>
+                    </div>
+                </nav>
             </div>
         </div>
-        
-        <!-- Mobile Burger Menu -->
-        <button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Toggle mobile menu">
-            <span></span>
-            <span></span>
-            <span></span>
-        </button>
-        
-        <!-- Mobile Navigation Menu -->
-        <nav id="mobileMenu" class="mobile-menu">
-            <div class="mobile-menu-content">
-                <button id="runSimulationMobile" class="mobile-menu-button primary-button">
-                    <i class="fas fa-play"></i>
-                    <span>Run Simulation</span>
-                </button>
-                <div id="progressMobile" class="mobile-menu-status">Ready</div>
-                
-                <div class="mobile-menu-divider"></div>
-                
-                <button id="saveSimulationMobile" class="mobile-menu-button secondary-button">
-                    <i class="fas fa-save"></i>
-                    <span>Save Scenario</span>
-                </button>
-                <button id="loadSimulationMobile" class="mobile-menu-button secondary-button">
-                    <i class="fas fa-folder-open"></i>
-                    <span>Load Scenario</span>
-                </button>
-                
-                <div class="mobile-menu-divider"></div>
-                
-                <button id="loadDemoScenarioMobile" class="mobile-menu-button secondary-button">
-                    <i class="fas fa-play-circle"></i>
-                    <span>Demo</span>
-                </button>
-                <button id="startWizardMobile" class="mobile-menu-button secondary-button">
-                    <i class="fas fa-question-circle"></i>
-                    <span>Help</span>
-                </button>
-                
-                <button id="experimentalToggleMobile" class="mobile-menu-button secondary-button toggle-button" data-toggle-state="off">
-                    <i class="fas fa-toggle-off"></i>
-                    <span>Tooltips: <strong>off</strong></span>
-                </button>
-                
-                <div class="mobile-menu-divider"></div>
-                
-                <a href="https://www.buymeacoffee.com/jhandl" target="_blank" class="coffee-button">
-                    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png" alt="Buy Me A Coffee" style="height: 36px; width: auto;">
-                </a>
-            </div>
-        </nav>
     </header>
 
     <main>
@@ -461,6 +460,7 @@
     <script src="/src/core/Equities.js"></script>
     <script src="/src/core/RealEstate.js"></script>
     <script src="/src/core/Utils.js"></script>
+    <script src="/src/core/TaxBreakdownRecorder.js"></script>
     <script src="/src/core/Simulator.js"></script>
     
     <script>
@@ -839,7 +839,7 @@
           .header-center { margin: 0 auto !important; gap: 1rem !important; justify-content: center !important; display: flex !important; }
           .button-group-primary { display: flex !important; gap: 0.5rem !important; justify-content: center !important; }
           .button-group-secondary { display: flex !important; gap: 0.5rem !important; justify-content: center !important; }
-          .header-right { display: none !important; }
+          .header-right { display: flex !important; }
           .mobile-menu-toggle { flex: 0 0 auto !important; min-width: 40px !important; }
           .mobile-menu { display: block; }
         }
@@ -855,7 +855,7 @@
           .header-center { margin: 0 auto !important; gap: 0 !important; justify-content: center !important; display: flex !important; }
           .button-group-primary { display: flex !important; gap: 0.5rem !important; justify-content: center !important; }
           .button-group-secondary { display: none !important; }
-          .header-right { display: none !important; }
+          .header-right { display: flex !important; }
           .mobile-menu-toggle { flex: 0 0 auto !important; min-width: 40px !important; }
           .mobile-menu { display: block; }
           #runSimulation::before { content: "Run"; }

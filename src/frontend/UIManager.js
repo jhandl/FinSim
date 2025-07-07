@@ -8,6 +8,8 @@ STATUS_COLORS = {
   WHITE: "#FFFFFF"
 };
 
+const ENABLE_TAX_BREAKDOWN = true; // Set to false to disable tax breakdown feature
+
 class UIManager {
 
   // Constants
@@ -134,7 +136,19 @@ class UIManager {
       PRSI: dataSheet[row].prsi / scale,
       USC: dataSheet[row].usc / scale,
       CGT: dataSheet[row].cgt / scale,
-      Worth: dataSheet[row].worth / scale
+      Worth: dataSheet[row].worth / scale,
+      taxBreakdown: (() => {
+        const tb = dataSheet[row].taxBreakdown;
+        if (!tb) return undefined;
+        const scaled = { it:{}, prsi:{}, usc:{}, cgt:{} };
+        ['it','prsi','usc','cgt'].forEach(tax => {
+          if (!tb[tax]) return;
+          for (const [k,v] of Object.entries(tb[tax])) {
+            scaled[tax][k] = v / scale;
+          }
+        });
+        return scaled;
+      })()
     };
 
     this.ui.setDataRow(row, data);
@@ -188,7 +202,8 @@ class UIManager {
       initialPensionP2: this.ui.getValue("InitialPensionP2"),
       pensionPercentageP2: this.ui.getValue("PensionContributionPercentageP2"),
       simulation_mode: this.ui.getValue("simulation_mode"),
-      economyMode: this.ui.getValue("economy_mode")
+      economyMode: this.ui.getValue("economy_mode"),
+      enableTaxBreakdown: ENABLE_TAX_BREAKDOWN
     };
 
     // In deterministic mode, override volatility parameters to 0 to ensure fixed growth rates

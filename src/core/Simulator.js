@@ -12,6 +12,7 @@ var person1, person2;
 var perRunResults, currentRun;
 // Variables for earned net income tracking
 var earnedNetIncome, householdPhase;
+var taxRecorder; // Tax breakdown helper
 
 const Phases = {
   growth: 'growth',
@@ -146,6 +147,13 @@ function initializeSimulationVariables() {
   cash = params.initialSavings;
   failedAt = 0;
   row = 0;
+
+  // Instantiate tax breakdown recorder if requested
+  if (params.enableTaxBreakdown) {
+    taxRecorder = new TaxBreakdownRecorder();
+  } else {
+    taxRecorder = null;
+  }
 }
 
 function resetYearlyVariables() {
@@ -179,7 +187,12 @@ function resetYearlyVariables() {
   // Pass Person objects to revenue reset (now using updated ages and year)
   revenue.reset(person1, person2);
   
-  // Add year to global investment objects
+  // Reset tax breakdown maps for the new year BEFORE any income/gains are recorded
+  if (taxRecorder) {
+    taxRecorder.reset();
+  }
+
+  // Add year to global investment objects (may record deemed-disposal CGT, etc.)
   indexFunds.addYear();
   shares.addYear();
   realEstate.addYear();
@@ -210,9 +223,18 @@ function calculatePensionIncome() {
   if (p1CalcResults.lumpSumAmount > 0) {
     cash += p1CalcResults.lumpSumAmount;
     revenue.declarePrivatePensionLumpSum(p1CalcResults.lumpSumAmount);
+    if (taxRecorder && p1CalcResults.lumpSumAmount > 0) {
+      taxRecorder.recordIncome('PensionLumpSum:P1', p1CalcResults.lumpSumAmount, Revenue.getTaxProfile('PensionLumpSum'));
+    }
   }
   incomePrivatePension += person1.yearlyIncomePrivatePension;
+  if (taxRecorder && person1.yearlyIncomePrivatePension > 0) {
+    taxRecorder.recordIncome('PensionIncome:P1', person1.yearlyIncomePrivatePension, Revenue.getTaxProfile('PensionIncome'));
+  }
   incomeStatePension += person1.yearlyIncomeStatePension;
+  if (taxRecorder && person1.yearlyIncomeStatePension > 0) {
+    taxRecorder.recordIncome('StatePension:P1', person1.yearlyIncomeStatePension, Revenue.getTaxProfile('StatePension'));
+  }
 
   // Calculate pension income for Person 2 (if exists)
   if (person2) {
@@ -220,9 +242,18 @@ function calculatePensionIncome() {
     if (p2CalcResults.lumpSumAmount > 0) {
       cash += p2CalcResults.lumpSumAmount;
       revenue.declarePrivatePensionLumpSum(p2CalcResults.lumpSumAmount);
+      if (taxRecorder && p2CalcResults.lumpSumAmount > 0) {
+        taxRecorder.recordIncome('PensionLumpSum:P2', p2CalcResults.lumpSumAmount, Revenue.getTaxProfile('PensionLumpSum'));
+      }
     }
     incomePrivatePension += person2.yearlyIncomePrivatePension;
+    if (taxRecorder && person2.yearlyIncomePrivatePension > 0) {
+      taxRecorder.recordIncome('PensionIncome:P2', person2.yearlyIncomePrivatePension, Revenue.getTaxProfile('PensionIncome'));
+    }
     incomeStatePension += person2.yearlyIncomeStatePension;
+    if (taxRecorder && person2.yearlyIncomeStatePension > 0) {
+      taxRecorder.recordIncome('StatePension:P2', person2.yearlyIncomeStatePension, Revenue.getTaxProfile('StatePension'));
+    }
   }
 
   // Declare total state pension to revenue
@@ -273,6 +304,11 @@ function processEvents() {
           pensionContribution += p1TotalContrib;
           person1.pension.buy(p1TotalContrib);
           revenue.declareSalaryIncome(amount, p1ContribRate, person1); // Pass P1's personal contrib rate
+
+          if (taxRecorder) {
+            const sourceKey = `Salary:${event.id}`;
+            taxRecorder.recordIncome(sourceKey, amount, Revenue.getTaxProfile('Salary'));
+          }
         }
         break;
 
@@ -280,6 +316,11 @@ function processEvents() {
         if (inScope) {
           incomeSalaries += amount;
           revenue.declareSalaryIncome(amount, 0, person1); // No pension contribution for P1
+
+          if (taxRecorder) {
+            const sourceKey = `SalaryNP:${event.id}`;
+            taxRecorder.recordIncome(sourceKey, amount, Revenue.getTaxProfile('SalaryNP'));
+          }
         }
         break;
 
@@ -304,6 +345,11 @@ function processEvents() {
           pensionContribution += p2TotalContrib;
           person2.pension.buy(p2TotalContrib);
           revenue.declareSalaryIncome(amount, p2ContribRate, person2); // Pass P2's personal contrib rate
+
+          if (taxRecorder) {
+            const sourceKey = `Salary:${event.id}`;
+            taxRecorder.recordIncome(sourceKey, amount, Revenue.getTaxProfile('Salary'));
+          }
         } else if (inScope && !person2) {
           // Fallback: SI2 event but no Person 2 defined. Treat as P1 non-pensionable salary.
           incomeSalaries += amount;
@@ -316,6 +362,11 @@ function processEvents() {
         if (inScope && person2) {
           incomeSalaries += amount;
           revenue.declareSalaryIncome(amount, 0, person2); // No pension contribution for P2
+
+          if (taxRecorder) {
+            const sourceKey = `SalaryNP:${event.id}`;
+            taxRecorder.recordIncome(sourceKey, amount, Revenue.getTaxProfile('SalaryNP'));
+          }
         }
         break;
 
@@ -323,6 +374,11 @@ function processEvents() {
         if (inScope) {
           incomeShares += amount;
           revenue.declareNonEuSharesIncome(amount);
+
+          if (taxRecorder) {
+            const sourceKey = `RSU:${event.id}`;
+            taxRecorder.recordIncome(sourceKey, amount, Revenue.getTaxProfile('RSU'));
+          }
         }
         break;
 
@@ -330,6 +386,11 @@ function processEvents() {
         if (inScope) {
           incomeRentals += amount;
           revenue.declareOtherIncome(amount);
+
+          if (taxRecorder) {
+            const sourceKey = `RentalIncome:${event.id}`;
+            taxRecorder.recordIncome(sourceKey, amount, Revenue.getTaxProfile('RentalIncome'));
+          }
         }
         break;
 
@@ -337,6 +398,11 @@ function processEvents() {
         if (inScope) {
           incomeDefinedBenefit += amount;
           revenue.declareSalaryIncome(amount, 0, person1);
+
+          if (taxRecorder) {
+            const sourceKey = `PensionIncome:${event.id}`;
+            taxRecorder.recordIncome(sourceKey, amount, Revenue.getTaxProfile('PensionIncome'));
+          }
         }
         break;
 
@@ -649,6 +715,30 @@ function updateYearlyData() {
   dataSheet[row].usc += revenue.usc;
   dataSheet[row].cgt += revenue.cgt;
   dataSheet[row].worth += realEstate.getTotalValue() + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFunds.capital() + shares.capital() + cash;
+
+  if (taxRecorder) {
+    const yearlyBreakdown = (taxRecorder.paid && Object.keys(taxRecorder.paid).length)
+          ? taxRecorder.paid
+          : taxRecorder.allocateTaxes({ it: revenue.it, prsi: revenue.prsi, usc: revenue.usc, cgt: revenue.cgt });
+    if (!dataSheet[row].taxBreakdown) {
+      dataSheet[row].taxBreakdown = { it: {}, prsi: {}, usc: {}, cgt: {} };
+    }
+    ['it','prsi','usc','cgt'].forEach(tax => {
+      for (const [key, value] of Object.entries(yearlyBreakdown[tax])) {
+        if (!dataSheet[row].taxBreakdown[tax][key]) {
+          dataSheet[row].taxBreakdown[tax][key] = 0;
+        }
+        dataSheet[row].taxBreakdown[tax][key] += value;
+      }
+    });
+
+    if (revenue.cgt > 0) {
+      const taxableCGTTotal = Object.values(taxRecorder.taxable.cgt || {}).reduce((s,v)=>s+v,0);
+      if (taxableCGTTotal === 0) {
+        console.warn('[TaxDebug] CGT tax', revenue.cgt.toFixed(2), 'at age', person1.age, 'year', year, 'but no taxable CGT sources recorded.');
+      }
+    }
+  }
 
   if (!montecarlo) {
     uiManager.updateDataRow(row, (person1.age-params.startingAge) / (100-params.startingAge));
