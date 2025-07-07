@@ -5,6 +5,7 @@
 ### Improvements
 - Add tooltips to the data table cells showing the origin of the numbers.
 - Allow three options for retirement lump sum: not take it, limit to tax-free allowance, take it all.
+- Add an option to the pension contribution: Only contribute once hitting the high income tax bracket (this allows for downpayment saving while young; check with users if this makes sense though).
 - Auto save of changes to a scenario? A toggle maybe?
 - Forms-like data input. While highlighting the relevant section in the background, ask questions and populate fields, with a nice animation showing the entered data moving to the corresponding sections. Auto saving along the way so if you go back it goes to step 2 etc. The personal tax credit must ask about all possible personal circumstances, like PWC's calculator.
 - New events: 
