@@ -112,7 +112,9 @@ async function loadPage(routeConfig) {
         container.appendChild(newFrame);
         
         // Build iframe source (cache-busted)
-        newFrame.src = routeConfig.contentPath + '?v=' + new Date().getTime();
+        // XXX
+        //newFrame.src = routeConfig.contentPath + '?v=' + new Date().getTime();
+        newFrame.src = routeConfig.contentPath;
         
     } catch (error) {
         document.getElementById('app-container').innerHTML = `
