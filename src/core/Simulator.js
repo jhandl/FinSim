@@ -551,9 +551,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
           if (indexFundsCapital > 0.5) {
             let withdraw = Math.min(indexFundsCapital, needed);
             totalWithdraw += withdraw;
-            const soldAmount = indexFunds.sell(withdraw);
-            incomeFundsRent += soldAmount;
-            attributionManager.record('incomefundsrent', 'Index Funds Sale', soldAmount);
+            incomeFundsRent += indexFunds.sell(withdraw);
             keepTrying = true;
           }
           break;
@@ -561,9 +559,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
           if (sharesCapital > 0.5) {
             let withdraw = Math.min(sharesCapital, needed);
             totalWithdraw += withdraw;
-            const soldAmount = shares.sell(withdraw);
-            incomeSharesRent += soldAmount;
-            attributionManager.record('incomesharesrent', 'Shares Sale', soldAmount);
+            incomeSharesRent += shares.sell(withdraw);
             keepTrying = true;
           }
           break;
@@ -580,7 +576,6 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
 function liquidateAll() {
   cashWithdraw = cash;
   cash = 0;
-  attributionManager.record('incomecash', 'Cash Withdrawal', cashWithdraw);
   
   if (person1.pension.capital() > 0) {
     const soldAmount = person1.pension.sell(person1.pension.capital());
@@ -593,14 +588,10 @@ function liquidateAll() {
     attributionManager.record('incomeprivatepension', 'Pension Withdrawal P2', soldAmount);
   }
   if (indexFunds.capital() > 0) {
-    const soldAmount = indexFunds.sell(indexFunds.capital());
-    incomeFundsRent += soldAmount;
-    attributionManager.record('incomefundsrent', 'Index Funds Withdrawal', soldAmount);
+    incomeFundsRent += indexFunds.sell(indexFunds.capital());
   }
   if (shares.capital() > 0) {
-    const soldAmount = shares.sell(shares.capital());
-    incomeSharesRent += soldAmount;
-    attributionManager.record('incomesharesrent', 'Shares Withdrawal', soldAmount);
+    incomeSharesRent += shares.sell(shares.capital());
   }
   netIncome = cashWithdraw + revenue.netIncome();
 }
