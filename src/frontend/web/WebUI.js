@@ -375,7 +375,7 @@ class WebUI extends AbstractUI {
         try {
           run();
         } catch (error) {
-          this.setError('Simulation failed: ' + error.message);
+          this.setError(error);
           // Re-enable button on error
           this.isSimulationRunning = false;
           runButton.disabled = false;
@@ -1065,7 +1065,6 @@ class WebUI extends AbstractUI {
         // Forward to existing handler
         this.onVisualizationPresetChange(val);
       },
-      tooltipFormatter: (txt) => (typeof marked !== 'undefined' ? marked.parse(txt) : txt),
     });
 
     // Set initial preset

@@ -58,7 +58,7 @@ const TestPensionContributionValidation = {
       target: "age",
       age: 30,
       field: "pensionContribution",
-      expected: 7200,  // 6% personal (3600) + 6% employer (3600) = 7200 total
+      expected: 3600,  // 6% personal contribution only (not including employer match)
       tolerance: 1
     },
     {
@@ -74,7 +74,7 @@ const TestPensionContributionValidation = {
       target: "age",
       age: 30,
       field: "pensionFund",
-      expected: 7200, // Total contribution in first year
+      expected: 7200, // Total contribution in first year (personal + employer)
       tolerance: 1
     },
     {
@@ -98,7 +98,7 @@ const TestPensionContributionValidation = {
       target: "age",
       age: 34,
       field: "pensionContribution",
-      expected: 7200,  // Should be consistent each year
+      expected: 3600,  // Should be consistent each year (personal contribution only)
       tolerance: 1
     },
     {

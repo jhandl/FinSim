@@ -19,6 +19,36 @@ class UIManager {
 
   // Constants
   updateDataSheet(runs, perRunResults) {
+    // Average the attributions over all runs
+    for (let i = 1; i <= row; i++) {
+        const totalAttributions = {};
+        for (let j = 0; j < runs; j++) {
+            if (perRunResults[j] && perRunResults[j][i-1]) {
+                const runAttributions = perRunResults[j][i-1].attributions;
+                for (const metric in runAttributions) {
+                    if (!totalAttributions[metric]) {
+                        totalAttributions[metric] = {};
+                    }
+                    const breakdown = runAttributions[metric].slices;
+                    for (const source in breakdown) {
+                        if (!totalAttributions[metric][source]) {
+                            totalAttributions[metric][source] = 0;
+                        }
+                        totalAttributions[metric][source] += breakdown[source];
+                    }
+                }
+            }
+        }
+
+        // Divide by number of runs to get the average
+        for (const metric in totalAttributions) {
+            for (const source in totalAttributions[metric]) {
+                totalAttributions[metric][source] /= runs;
+            }
+        }
+        dataSheet[i].attributions = totalAttributions;
+    }
+
     let rowColors = {};
     
     // Store simulation results for later visualization changes (web UI only)
@@ -134,7 +164,8 @@ class UIManager {
       PRSI: dataSheet[row].prsi / scale,
       USC: dataSheet[row].usc / scale,
       CGT: dataSheet[row].cgt / scale,
-      Worth: dataSheet[row].worth / scale
+      Worth: dataSheet[row].worth / scale,
+      Attributions: dataSheet[row].attributions
     };
 
     this.ui.setDataRow(row, data);

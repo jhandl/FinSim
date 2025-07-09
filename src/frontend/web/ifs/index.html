@@ -412,11 +412,11 @@
                             <th data-key="PRSI" title="Pay Related Social Insurance contributions">PRSI</th>
                             <th data-key="USC" title="Universal Social Charge paid">USC</th>
                             <th data-key="CGT" title="Capital Gains Tax (and Exit Tax) paid on investment gains.">CGT</th>
-                            <th data-key="PensionContribution" title="Amount contributed to private pensions (including employer match)">P. Contrib</th>
-                            <th data-key="NetIncome" title="Total income after all taxes and deductions (except employer pension match)">Inflows</th>
-                            <th data-key="Expenses" title="Your annual total expenses">Outflows</th>
+                            <th data-key="PensionContribution" title="Amount contributed to private pensions (excluding employer match)">P. Contrib</th>
+                            <th data-key="NetIncome" title="Total income after all taxes and deductions">Inflows</th>
+                            <th data-key="Expenses" title="Total annual expenses">Outflows</th>
                             <th data-key="PensionFund" title="Total value of private pension funds">P.Fund</th>
-                            <th data-key="Cash" title="Total cash savings balance">Cash</th>
+                            <th data-key="Cash" title="Total cash savings">Cash</th>
                             <th data-key="RealEstateCapital" title="Total value of your owned real estate">R.Estate</th>
                             <th data-key="FundsCapital" title="Total value of your index fund investments">Index Funds</th>
                             <th data-key="SharesCapital" title="Total value of your Investment Trusts or individual share investments">Shares</th>
@@ -461,6 +461,8 @@
     <script src="/src/core/Equities.js"></script>
     <script src="/src/core/RealEstate.js"></script>
     <script src="/src/core/Utils.js"></script>
+    <script src="/src/core/Attribution.js"></script>
+    <script src="/src/core/AttributionManager.js"></script>
     <script src="/src/core/Simulator.js"></script>
     
     <script>
@@ -1417,5 +1419,14 @@
             </div>
         </div>
     </div>
+
+    <script>
+    window.addEventListener('error', function(event) {
+      console.error('Global error handler:', event.error ? event.error.stack : event.message);
+    });
+    window.addEventListener('unhandledrejection', function(event) {
+      console.error('Global unhandledrejection:', event.reason ? event.reason.stack : event.reason);
+    });
+    </script>
 </body>
 </html> 

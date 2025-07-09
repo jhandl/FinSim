@@ -60,7 +60,7 @@ const TestPensionMatchContribution = {
             target: 'age',
             age: 30,
             field: 'pensionContribution',
-            expected: 4800,              // 4% personal + 4% employer = 8% total = €4,800 per year
+            expected: 2400,              // 4% personal only (employer match not included)
             tolerance: 10
         },
         {

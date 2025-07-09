@@ -113,6 +113,109 @@ class TableManager {
         } else {
           td.textContent = value.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
         }
+        
+        // Add tooltip for attributable values
+        if (data.Attributions) {
+            // Convert table column key to lowercase to match attribution keys
+            let attributionKey = key.toLowerCase();
+            
+            // Handle combined columns that have multiple attribution sources
+            let breakdown = null;
+            if (key === 'incomePrivatePension') {
+                // Combine private pension and defined benefit attributions
+                const privatePensionBreakdown = data.Attributions['incomeprivatepension'] || {};
+                const definedBenefitBreakdown = data.Attributions['incomedefinedbenefit'] || {};
+                breakdown = { ...privatePensionBreakdown, ...definedBenefitBreakdown };
+            } else if (key === 'incomeCash') {
+                // Combine cash withdrawal and tax-free income attributions
+                const cashBreakdown = data.Attributions['incomecash'] || {};
+                const taxFreeBreakdown = data.Attributions['incometaxfree'] || {};
+                breakdown = { ...cashBreakdown, ...taxFreeBreakdown };
+            } else if (key === 'FundsCapital') {
+                // Use index funds capital attribution
+                breakdown = data.Attributions['indexfundscapital'] || {};
+            } else if (key === 'SharesCapital') {
+                // Use shares capital attribution
+                breakdown = data.Attributions['sharescapital'] || {};
+            } else {
+                // Check for specific attribution first, then fall back to general 'income' for income columns
+                breakdown = data.Attributions[attributionKey];
+                if (!breakdown && key.startsWith('income') && data.Attributions.income) {
+                    breakdown = data.Attributions.income;
+                }
+            }
+            
+            if (breakdown) {
+                let tooltipText = '';
+                
+                // Special handling for asset columns (FundsCapital and SharesCapital)
+                if (key === 'FundsCapital' || key === 'SharesCapital') {
+                    const orderedKeys = ['Bought', 'Sold', 'Principal', 'P/L'];
+                    
+                    // Pre-format all amounts and calculate max width
+                    const formattedAmounts = orderedKeys.map(source => {
+                        const amount = breakdown[source] || 0;
+                        if (amount === 0) return null;
+                        
+                        // Special handling for P/L
+                        let displaySource = source;
+                        if (source === 'P/L') {
+                            displaySource = amount > 0 ? 'Accum. Gains' : 'Accum. Losses';
+                        }
+                        
+                        return {
+                            source: displaySource,
+                            formatted: Math.abs(amount).toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})
+                        };
+                    }).filter(item => item !== null);
+                    
+                    // Only proceed if we have formatted amounts to display
+                    if (formattedAmounts.length > 0) {
+                        // Find the longest display source name for alignment (after P/L transformation)
+                        const maxSourceLength = Math.max(...formattedAmounts.map(item => item.source.length));
+                        const maxAmountWidth = Math.max(...formattedAmounts.map(item => item.formatted.length));
+                        
+                        for (const {source, formatted} of formattedAmounts) {
+                            const sourcePadding = '&nbsp;'.repeat(Math.max(0, maxSourceLength - source.length + 1));
+                            const amountPadding = '&nbsp;'.repeat(Math.max(0, maxAmountWidth - formatted.length));
+                            tooltipText += `\n\n<code>${source}${sourcePadding}  ${amountPadding}${formatted}</code>`;
+                        }
+                    } 
+                } else {
+                    // Original logic for other columns
+                    const breakdownEntries = Object.entries(breakdown);
+                    
+                    // Find the longest source name for alignment
+                    const maxSourceLength = Math.max(...breakdownEntries.map(([source]) => source.length));
+                    
+                    // Pre-format all amounts and calculate max width
+                    const formattedAmounts = breakdownEntries.map(([source, amount]) => ({
+                        source,
+                        amount,
+                        formatted: amount.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})
+                    }));
+                    
+                    // Calculate max width including potential tax amount
+                    const potentialTax = (data.IT || 0) + (data.USC || 0) + (data.PRSI || 0) + (data.CGT || 0);
+                    const formattedTax = potentialTax.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
+                    const maxAmountWidth = Math.max(
+                        ...formattedAmounts.map(item => item.formatted.length),
+                        formattedTax.length
+                    );
+                    
+                    for (const {source, amount, formatted} of formattedAmounts) {
+                        if (amount !== 0) {
+                            const sourcePadding = '&nbsp;'.repeat(maxSourceLength - source.length + 1);
+                            const amountPadding = '&nbsp;'.repeat(maxAmountWidth - formatted.length);
+                            tooltipText += `\n\n<code>${source}${sourcePadding}  ${amountPadding}${formatted}</code>`;
+                        }
+                    }
+                }
+                
+                TooltipUtils.attachTooltip(td, tooltipText);
+            }
+        }
+
         row.appendChild(td);
       }
     });
@@ -130,7 +233,6 @@ class TableManager {
     const headers = Array.from(headerRow.cells);
     const ageColumnIndex = headers.findIndex(header => header.getAttribute('data-key') === 'Age');
     if (ageColumnIndex === -1) {
-      console.error("Age column not found");
       return;
     }
     const dataRows = document.querySelectorAll('#Data tbody tr');

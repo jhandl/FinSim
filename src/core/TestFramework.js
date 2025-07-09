@@ -142,6 +142,8 @@ class TestFramework {
         'Events.js',
         'Utils.js',
         'Config.js',
+        'Attribution.js',
+        'AttributionManager.js',
         'Revenue.js',
         'Equities.js', 
         'RealEstate.js',

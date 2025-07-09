@@ -12,7 +12,6 @@ class DropdownUtils {
    *                                            Each: { value, label, description, selected }
    * @param {string}        [cfg.selectedValue]– Initially selected value.
    * @param {Function}      [cfg.onSelect]     – Callback(value, label) when user selects.
-   * @param {Function}      [cfg.tooltipFormatter] – fn(text) → html/string for tooltips.
    * @param {string}        [cfg.width]        – Optional width for the dropdown.
    * @param {string}        [cfg.header]       – Optional header text for the dropdown.
    * @returns {Object} { open, close, getSelected, setOptions }
@@ -24,7 +23,6 @@ class DropdownUtils {
       options,
       selectedValue,
       onSelect,
-      tooltipFormatter,
       width,
       header,
     } = cfg;
@@ -64,10 +62,8 @@ class DropdownUtils {
 
     // --- Internal state ---------------------------------------------------
     let selected = selectedValue;
-    const format = tooltipFormatter || ((txt) => txt);
     let tooltipEl = null;
     let tooltipTimer = null;
-    const originalParent = dropdownEl.parentNode;
 
     // ---------------------------------------------------------------------
     // DOM helpers
@@ -107,44 +103,9 @@ class DropdownUtils {
         tooltipTimer = null;
       }
       if (tooltipEl) {
-        tooltipEl.remove();
+        TooltipUtils.hideTooltip(tooltipEl);
         tooltipEl = null;
       }
-    };
-
-    const createTooltip = (html) => {
-      const t = document.createElement('div');
-      t.className = 'visualization-tooltip';
-      if (/<[a-z][\s\S]*>/i.test(html)) {
-        t.innerHTML = html;
-      } else {
-        t.textContent = html;
-      }
-      document.body.appendChild(t);
-      return t;
-    };
-
-    const positionTooltip = (tt, targetRect) => {
-      const isMobile = window.innerWidth <= 768;
-      const vpH = window.innerHeight;
-      const vpW = window.innerWidth;
-      const margin = isMobile ? 20 : 10;
-      const spacing = isMobile ? 15 : 10;
-
-      const ttRect = tt.getBoundingClientRect();
-      let left = targetRect.left + (targetRect.width - ttRect.width) / 2;
-      let top = targetRect.top - ttRect.height - spacing;
-
-      if (top < margin) top = targetRect.bottom + spacing;
-      if (top + ttRect.height > vpH - margin) top = Math.max(margin, vpH - ttRect.height - margin);
-
-      if (left < margin) left = margin;
-      if (left + ttRect.width > vpW - margin) left = vpW - ttRect.width - margin;
-
-      tt.style.position = 'fixed';
-      tt.style.left = `${left}px`;
-      tt.style.top = `${top}px`;
-      tt.style.transform = 'none';
     };
 
     const showTooltipDelayed = (text, rect) => {
@@ -152,11 +113,7 @@ class DropdownUtils {
       if (tooltipTimer) clearTimeout(tooltipTimer);
       removeTooltip();
       tooltipTimer = setTimeout(() => {
-        tooltipEl = createTooltip(format(text));
-        requestAnimationFrame(() => {
-          positionTooltip(tooltipEl, rect);
-          tooltipEl.classList.add('visible');
-        });
+        tooltipEl = TooltipUtils.showTooltip(text, rect);
         tooltipTimer = null;
       }, 600);
     };
@@ -303,11 +260,7 @@ class DropdownUtils {
         longPressTimer = setTimeout(() => {
           const desc = tgt.getAttribute('data-description');
           if (desc) {
-            tooltipEl = createTooltip(format(desc));
-            requestAnimationFrame(() => {
-              positionTooltip(tooltipEl, tgt.getBoundingClientRect());
-              tooltipEl.classList.add('visible');
-            });
+            tooltipEl = TooltipUtils.showTooltip(desc, tgt);
           }
         }, 500);
       },
@@ -351,11 +304,7 @@ class DropdownUtils {
           if (!sel) return;
           const desc = sel.getAttribute('data-description');
           if (!desc) return;
-          tooltipEl = createTooltip(format(desc));
-          requestAnimationFrame(() => {
-            positionTooltip(tooltipEl, controlContainer.getBoundingClientRect());
-            tooltipEl.classList.add('visible');
-          });
+          tooltipEl = TooltipUtils.showTooltip(desc, controlContainer);
         }, 500);
       },
       { passive: true },

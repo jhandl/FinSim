@@ -2,8 +2,9 @@
 
 class Revenue {
 
-  declareSalaryIncome(amount, contribRate, person) {
+  declareSalaryIncome(amount, contribRate, person, description) {
     this.income += amount; // Total gross income
+    this.attributionManager.record('income', description, amount);
 
     const contribution = contribRate * amount;
     const relief = contribRate * Math.min(amount, adjust(config.pensionContribEarningLimit));
@@ -11,35 +12,41 @@ class Revenue {
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
       this.pensionContribAmountP1 += contribution;
       this.pensionContribReliefP1 += relief;
-      this.salariesP1.push({amount: amount, contribRate: contribRate});
+      this.salariesP1.push({amount: amount, contribRate: contribRate, description: description});
       this.salariesP1.sort((a,b) => a.amount - b.amount);
     } else if (person && this.person2Ref && person.id === this.person2Ref.id) {
       this.pensionContribAmountP2 += contribution;
       this.pensionContribReliefP2 += relief;
-      this.salariesP2.push({amount: amount, contribRate: contribRate});
+      this.salariesP2.push({amount: amount, contribRate: contribRate, description: description});
       this.salariesP2.sort((a,b) => a.amount - b.amount);
    }
   };
   
-  declareNonEuSharesIncome(amount) {
+  declareNonEuSharesIncome(amount, description) {
     this.nonEuShares += amount;
+    this.attributionManager.record('nonEuShares', description, amount);
   };
   
-  declarePrivatePensionIncome(amount, person) {
+  declarePrivatePensionIncome(amount, person, description) {
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
       this.privatePensionP1 += amount;
+      this.attributionManager.record('privatepensionp1', description, amount);
     } else if (person && this.person2Ref && person.id === this.person2Ref.id) {
       this.privatePensionP2 += amount;
+      this.attributionManager.record('privatepensionp2', description, amount);
     }
   };
   
   declarePrivatePensionLumpSum(amount, person) {
+    const description = `Pension Lump Sum P${person.id}`;
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
       this.privatePensionLumpSumP1 += amount;
       this.privatePensionLumpSumCountP1++;
+      this.attributionManager.record('privatepensionlumpsum', description, amount);
     } else if (person && this.person2Ref && person.id === this.person2Ref.id) {
       this.privatePensionLumpSumP2 += amount;
       this.privatePensionLumpSumCountP2++;
+      this.attributionManager.record('privatepensionlumpsum', description, amount);
     } else {
       // Fallback if person is not identifiable, though this should ideally not happen
       // For safety, and to maintain existing behavior if called without person, assign to P1
@@ -48,28 +55,36 @@ class Revenue {
       if (this.person1Ref) { // Default to P1 if no specific person provided for some reason
           this.privatePensionLumpSumP1 += amount;
           this.privatePensionLumpSumCountP1++;
-      } 
+          this.attributionManager.record('privatepensionlumpsum', 'Pension Lump Sum P1', amount);
+      }
       // console.warn("declarePrivatePensionLumpSum called without a clearly identifiable person.");
     }
   };
   
   declareStatePensionIncome(amount) {
     this.statePension += amount;
+    // Attribution for state pension is handled in Simulator.js
   };
   
-  declareInvestmentIncome(amount) {
+  declareInvestmentIncome(amount, description) {
     this.investmentIncome += amount;
+    this.attributionManager.record('investmentincome', description, amount);
   };
   
-  declareOtherIncome(amount) {
+  declareOtherIncome(amount, description) {
     this.income += amount;
+    this.attributionManager.record('income', description, amount);
   };
     
-  declareInvestmentGains(amount, taxRate) {
+  declareInvestmentGains(amount, taxRate, description) {
     if (!this.gains.hasOwnProperty(taxRate)) {
-      this.gains[taxRate] = 0;
+      this.gains[taxRate] = { amount: 0, sources: {} };
     }
-    this.gains[taxRate] += amount;
+    this.gains[taxRate].amount += amount;
+    if (!this.gains[taxRate].sources[description]) {
+      this.gains[taxRate].sources[description] = 0;
+    }
+    this.gains[taxRate].sources[description] += amount;
   };
     
   computeTaxes() {
@@ -89,8 +104,9 @@ class Revenue {
     return gross - tax;
   };
   
-  reset(person1, person2_optional) {
-    this.gains = [];
+  reset(person1, person2_optional, attributionManager) {
+    this.attributionManager = attributionManager;
+    this.gains = {};
     this.income = 0;
     this.nonEuShares = 0;
     this.statePension = 0;
@@ -130,37 +146,73 @@ class Revenue {
     }
   };
 
-  computeProgressiveTax(bands, income, multiplier=1, limitShift=0) {
-    // bands is a map in the form {"limit1": rate1, "limit2": rate2, "limit3": rate3, ...}
-    // where anything between limit1 and limit2 is taxed at rate1, 
-    //       anything between limit2 and limit3 is taxed at rate2,
-    //       and anything above the last limit is taxed at the lat rate. 
-    // The limits have to be in ascending order.
-    // The limits are shifted by "limitShift" and multiplied by "multiplier", if defined, in that order.
+  computeProgressiveTax(bands, incomeAttribution, taxType, multiplier = 1, limitShift = 0) {
+    // bands is a map in the form {"limit1": rate1, "limit2": rate2, ...}
+    // The limits are shifted by "limitShift" and multiplied by "multiplier".
+    const income = incomeAttribution.getTotal();
+    if (income <= 0) {
+      return 0;
+    }
+
     const adjustedBands = Object.fromEntries(Object.entries(bands)
-                            .map(([limit, rate]) => {
-                                let newLimit = parseInt(limit);
-                                if (newLimit > 0) {
-                                    newLimit += limitShift;
-                                }
-                                newLimit = adjust(newLimit) * multiplier;
-                                return [String(newLimit), rate];
-                            }));
-    return Object.keys(adjustedBands)
+      .map(([limit, rate]) => {
+        let newLimit = parseInt(limit);
+        if (newLimit > 0) {
+          newLimit += limitShift;
+        }
+        newLimit = adjust(newLimit) * multiplier;
+        return [String(newLimit), rate];
+      }));
+
+    const totalTax = Object.keys(adjustedBands)
       .map((lowerLimit, index, arr) => {
-          const upperLimit = arr[index + 1] || Infinity;
-          const rate = adjustedBands[lowerLimit];
-          const taxable = Math.min(income, upperLimit) - lowerLimit;
-          return Math.max(taxable, 0) * rate;
+        const upperLimit = arr[index + 1] || Infinity;
+        const rate = adjustedBands[lowerLimit];
+        const taxable = Math.min(income, upperLimit) - lowerLimit;
+        return Math.max(taxable, 0) * rate;
       })
       .reduce((sum, amount) => sum + amount, 0);
+
+    // Attribute the tax proportionally to the income sources
+    const incomeSources = incomeAttribution.getBreakdown();
+    for (const source in incomeSources) {
+      const proportion = incomeSources[source] / income;
+      this.attributionManager.record(taxType, source, totalTax * proportion);
+    }
+
+    return totalTax;
   };
   
   computeIT() {
-    // standard income
-    let taxable = this.income + (this.privatePensionP1 + this.privatePensionP2) + 
-                  this.nonEuShares - (this.pensionContribReliefP1 + this.pensionContribReliefP2);
+    // Create an attribution object for taxable income
+    const taxableIncomeAttribution = new Attribution('taxableIncome');
     
+    // Add income sources
+    const incomeAttribution = this.attributionManager.getAttribution('income');
+    if (incomeAttribution) {
+        const incomeBreakdown = incomeAttribution.getBreakdown();
+        for (const source in incomeBreakdown) {
+            taxableIncomeAttribution.add(source, incomeBreakdown[source]);
+        }
+    }
+
+    // Add private pension income
+    if (this.privatePensionP1 > 0) taxableIncomeAttribution.add('Private Pension P1', this.privatePensionP1);
+    if (this.privatePensionP2 > 0) taxableIncomeAttribution.add('Private Pension P2', this.privatePensionP2);
+
+    // Add non-EU shares income
+    const nonEuSharesAttribution = this.attributionManager.getAttribution('nonEuShares');
+    if (nonEuSharesAttribution) {
+        const nonEuSharesBreakdown = nonEuSharesAttribution.getBreakdown();
+        for (const source in nonEuSharesBreakdown) {
+            taxableIncomeAttribution.add(source, nonEuSharesBreakdown[source]);
+        }
+    }
+
+    // Subtract pension contribution relief
+    taxableIncomeAttribution.add('Your Pension Relief', -this.pensionContribReliefP1);
+    taxableIncomeAttribution.add('Their Pension Relief', -this.pensionContribReliefP2);
+
     let itBands = config.itSingleNoChildrenBands;
     let marriedBandIncrease = 0;
     if (this.married) {
@@ -178,11 +230,18 @@ class Revenue {
     } else if (this.dependentChildren) {
       itBands = config.itSingleDependentChildrenBands;
     }
-    let tax = this.computeProgressiveTax(itBands, taxable, 1, marriedBandIncrease);
+    
+    let tax = this.computeProgressiveTax(itBands, taxableIncomeAttribution, 'it', 1, marriedBandIncrease);
 
-    if (this.privatePensionLumpSumCountP1 > 0 || this.privatePensionLumpSumCountP2 > 0) {
-      tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, this.privatePensionLumpSumP1, this.privatePensionLumpSumCountP1) +
-             this.computeProgressiveTax(config.pensionLumpSumTaxBands, this.privatePensionLumpSumP2, this.privatePensionLumpSumCountP2);
+    if (this.privatePensionLumpSumCountP1 > 0) {
+        const lumpSumAttribution = new Attribution('pensionLumpSum');
+        lumpSumAttribution.add('Pension Lump Sum P1', this.privatePensionLumpSumP1);
+        tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, lumpSumAttribution, 'it', this.privatePensionLumpSumCountP1);
+    }
+    if (this.privatePensionLumpSumCountP2 > 0) {
+        const lumpSumAttribution = new Attribution('pensionLumpSum');
+        lumpSumAttribution.add('Pension Lump Sum P2', this.privatePensionLumpSumP2);
+        tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, lumpSumAttribution, 'it', this.privatePensionLumpSumCountP2);
     }
     
     let numSalaryEarners = (this.salariesP1.length > 0 ? 1 : 0) + (this.salariesP2.length > 0 ? 1 : 0);
@@ -200,130 +259,206 @@ class Revenue {
     let p2AgeEligible = (this.married && this.person2Ref && this.person2Ref.age >= config.itExemptionAge);
     let isEligibleForAgeExemption = p1AgeEligible || p2AgeEligible;
     
-    if (isEligibleForAgeExemption && taxable <= adjust(exemption) && (this.privatePensionLumpSumCountP1 === 0 && this.privatePensionLumpSumCountP2 === 0)) {
+    const taxableAmount = taxableIncomeAttribution.getTotal();
+    if (isEligibleForAgeExemption && taxableAmount <= adjust(exemption) && (this.privatePensionLumpSumCountP1 === 0 && this.privatePensionLumpSumCountP2 === 0)) {
       this.it = 0;
     } else {
       this.it = Math.max(tax - credit, 0);
     }
+    this.attributionManager.record('it', 'Tax Credit', -Math.min(tax, credit));
   };
   
   computePRSI() {
     this.prsi = 0;
-    let p1TotalSalaryIncome = 0;
-    let p2TotalSalaryIncome = 0;
 
-    // Calculate PRSI for P1's PAYE income (salaries)
-    p1TotalSalaryIncome = this.salariesP1.reduce((sum, s) => sum + s.amount, 0);
+    // PRSI for P1's PAYE income
     if (this.person1Ref && this.person1Ref.age < config.prsiExcemptAge) {
-      this.prsi += p1TotalSalaryIncome * config.prsiRate;
+        this.salariesP1.forEach(s => {
+            const prsi = s.amount * config.prsiRate;
+            this.prsi += prsi;
+            this.attributionManager.record('prsi', s.description, prsi);
+        });
     }
 
-    // Calculate PRSI for P2's PAYE income (salaries)
-    if (this.person2Ref) {
-      p2TotalSalaryIncome = this.salariesP2.reduce((sum, s) => sum + s.amount, 0);
-      if (this.person2Ref.age < config.prsiExcemptAge) {
-        this.prsi += p2TotalSalaryIncome * config.prsiRate;
-      }
-    }
-    
-    // Calculate PRSI for non-PAYE income
-    const totalSalaryIncome = p1TotalSalaryIncome + p2TotalSalaryIncome;
-    const nonSalaryGeneralIncome = this.income - totalSalaryIncome; // Income from declareOtherIncome() or unassigned
-    
-    let nonPAYEIncomeP1 = 0;
-    let nonPAYEIncomeP2 = 0;
-
-    if (this.person2Ref) { // Two people
-      // Split non-salary general income and non-EU shares 50/50 for PRSI purposes
-      // This is a simplification; ideally, these income sources would also be person-specific
-      nonPAYEIncomeP1 = (nonSalaryGeneralIncome / 2) + (this.nonEuShares / 2);
-      nonPAYEIncomeP2 = (nonSalaryGeneralIncome / 2) + (this.nonEuShares / 2);
-    } else { // One person
-      nonPAYEIncomeP1 = nonSalaryGeneralIncome + this.nonEuShares;
-    }
-
-    if (this.person1Ref && this.person1Ref.age < config.prsiExcemptAge) {
-      this.prsi += nonPAYEIncomeP1 * config.prsiRate;
-    }
+    // PRSI for P2's PAYE income
     if (this.person2Ref && this.person2Ref.age < config.prsiExcemptAge) {
-      this.prsi += nonPAYEIncomeP2 * config.prsiRate;
+        this.salariesP2.forEach(s => {
+            const prsi = s.amount * config.prsiRate;
+            this.prsi += prsi;
+            this.attributionManager.record('prsi', s.description, prsi);
+        });
+    }
+
+    // PRSI for non-PAYE income
+    const nonPayeIncomeAttribution = new Attribution('nonPayeIncome');
+    const incomeAttribution = this.attributionManager.getAttribution('income');
+    const nonEuSharesAttribution = this.attributionManager.getAttribution('nonEuShares');
+
+    // Add non-PAYE income sources
+    if (incomeAttribution) {
+        const incomeBreakdown = incomeAttribution.getBreakdown();
+        for (const source in incomeBreakdown) {
+            if (!this.salariesP1.some(s => s.description === source) && !this.salariesP2.some(s => s.description === source)) {
+                nonPayeIncomeAttribution.add(source, incomeBreakdown[source]);
+            }
+        }
+    }
+    
+    // Add non-EU shares income
+    if (nonEuSharesAttribution) {
+        const nonEuSharesBreakdown = nonEuSharesAttribution.getBreakdown();
+        for (const source in nonEuSharesBreakdown) {
+            nonPayeIncomeAttribution.add(source, nonEuSharesBreakdown[source]);
+        }
+    }
+
+    // Calculate PRSI on non-PAYE income
+    const nonPayeBreakdown = nonPayeIncomeAttribution.getBreakdown();
+    for (const source in nonPayeBreakdown) {
+        const income = nonPayeBreakdown[source];
+        if (this.person2Ref) { // Two people, split 50/50
+            if (this.person1Ref && this.person1Ref.age < config.prsiExcemptAge) {
+                const prsi = (income / 2) * config.prsiRate;
+                this.prsi += prsi;
+                this.attributionManager.record('prsi', `${source} (P1)`, prsi);
+            }
+            if (this.person2Ref.age < config.prsiExcemptAge) {
+                const prsi = (income / 2) * config.prsiRate;
+                this.prsi += prsi;
+                this.attributionManager.record('prsi', `${source} (P2)`, prsi);
+            }
+        } else { // One person
+            if (this.person1Ref && this.person1Ref.age < config.prsiExcemptAge) {
+                const prsi = income * config.prsiRate;
+                this.prsi += prsi;
+                this.attributionManager.record('prsi', source, prsi);
+            }
+        }
     }
   };
   
   computeUSC() {
     this.usc = 0;
     const uscExemptAmount = adjust(config.uscExemptAmount);
-    const uscReducedRateAge = config.uscReducedRateAge; // Assuming this is defined in config
+    const uscReducedRateAge = config.uscReducedRateAge;
     const uscReducedRateMaxIncome = adjust(config.uscReducedRateMaxIncome);
 
-    // Helper function to calculate USC for a single person's income slice
-    const calculateUscForPerson = (totalPersonUscLiableIncome, personAge) => {
-      let personUsc = 0;
-      if (totalPersonUscLiableIncome > uscExemptAmount) {
-        if ((personAge !== undefined && personAge >= uscReducedRateAge) && 
-            (totalPersonUscLiableIncome <= uscReducedRateMaxIncome)) {
-          personUsc = this.computeProgressiveTax(config.uscReducedTaxBands, totalPersonUscLiableIncome);
-        } else {
-          personUsc = this.computeProgressiveTax(config.uscTaxBands, totalPersonUscLiableIncome);
+    const calculateUscForPerson = (person, personUscLiableIncomeAttribution) => {
+        const totalPersonUscLiableIncome = personUscLiableIncomeAttribution.getTotal();
+        if (totalPersonUscLiableIncome <= uscExemptAmount) {
+            return 0;
         }
-      }
-      return personUsc;
+
+        const personAge = person ? person.age : undefined;
+        let bands = config.uscTaxBands;
+        if ((personAge !== undefined && personAge >= uscReducedRateAge) &&
+            (totalPersonUscLiableIncome <= uscReducedRateMaxIncome)) {
+            bands = config.uscReducedTaxBands;
+        }
+        
+        return this.computeProgressiveTax(bands, personUscLiableIncomeAttribution, 'usc');
     };
 
     // Person 1 Analysis
     if (this.person1Ref) {
-      let p1TotalSalaryIncome = this.salariesP1.reduce((sum, s) => sum + s.amount, 0);
-      let p1TotalUscLiableIncome = p1TotalSalaryIncome + this.privatePensionP1;
-      
-      if (!this.person2Ref) { // Person 1 is single for tax purposes here (or P2 not present)
-        // If single, P1 gets all nonEuShares for USC calculation.
-        p1TotalUscLiableIncome += this.nonEuShares; 
-        this.usc += calculateUscForPerson(p1TotalUscLiableIncome, (this.person1Ref ? this.person1Ref.age : undefined));
-      } else {
-        // If two people, P1 gets half of nonEuShares for USC calculation.
-        p1TotalUscLiableIncome += (this.nonEuShares / 2);
-        this.usc += calculateUscForPerson(p1TotalUscLiableIncome, (this.person1Ref ? this.person1Ref.age : undefined));
-      }
+        const p1UscAttribution = new Attribution('p1UscIncome');
+        this.salariesP1.forEach(s => p1UscAttribution.add(s.description, s.amount));
+        if (this.privatePensionP1 > 0) p1UscAttribution.add('Private Pension P1', this.privatePensionP1);
+
+        if (!this.person2Ref) { // Single person
+            const nonEuSharesAttribution = this.attributionManager.getAttribution('nonEuShares');
+            if (nonEuSharesAttribution) {
+                const nonEuSharesBreakdown = nonEuSharesAttribution.getBreakdown();
+                for (const source in nonEuSharesBreakdown) {
+                    p1UscAttribution.add(source, nonEuSharesBreakdown[source]);
+                }
+            }
+        } else { // Two people, split non-EU shares
+            const nonEuSharesAttribution = this.attributionManager.getAttribution('nonEuShares');
+            if (nonEuSharesAttribution) {
+                const nonEuSharesBreakdown = nonEuSharesAttribution.getBreakdown();
+                for (const source in nonEuSharesBreakdown) {
+                    p1UscAttribution.add(source, nonEuSharesBreakdown[source] / 2);
+                }
+            }
+        }
+        this.usc += calculateUscForPerson(this.person1Ref, p1UscAttribution);
     }
 
     // Person 2 Analysis
     if (this.person2Ref) {
-      let p2TotalSalaryIncome = this.salariesP2.reduce((sum, s) => sum + s.amount, 0);
-      let p2TotalUscLiableIncome = p2TotalSalaryIncome + this.privatePensionP2;
-      p2TotalUscLiableIncome += (this.nonEuShares / 2); // Person 2 gets their half of non-EU shares for USC
-
-      this.usc += calculateUscForPerson(p2TotalUscLiableIncome, (this.person2Ref ? this.person2Ref.age : undefined));
+        const p2UscAttribution = new Attribution('p2UscIncome');
+        this.salariesP2.forEach(s => p2UscAttribution.add(s.description, s.amount));
+        if (this.privatePensionP2 > 0) p2UscAttribution.add('Private Pension P2', this.privatePensionP2);
+        
+        const nonEuSharesAttribution = this.attributionManager.getAttribution('nonEuShares');
+        if (nonEuSharesAttribution) {
+            const nonEuSharesBreakdown = nonEuSharesAttribution.getBreakdown();
+            for (const source in nonEuSharesBreakdown) {
+                p2UscAttribution.add(source, nonEuSharesBreakdown[source] / 2);
+            }
+        }
+        this.usc += calculateUscForPerson(this.person2Ref, p2UscAttribution);
     }
   };
 
-computeCGT() {
+  computeCGT() {
+    if (this.attributionManager && this.attributionManager.yearlyAttributions && this.attributionManager.yearlyAttributions['cgt']) {
+      // Reset CGT attribution for this calculation
+      this.attributionManager.yearlyAttributions['cgt'] = new Attribution('cgt');
+    }
     let tax = 0;
     let remainingRelief = adjust(config.cgtTaxRelief);
     let totalLosses = 0;
-    for (let [_, gains] of Object.entries(this.gains)) {
-      if (gains < 0) {
-        totalLosses -= gains;
-      }
+
+    // Calculate total losses first
+    for (const taxRate in this.gains) {
+        if (this.gains[taxRate].amount < 0) {
+            totalLosses -= this.gains[taxRate].amount;
+        }
     }
-    for (let [taxRate, gains] of Object.entries(this.gains).sort((a,b) => b[0].localeCompare(a[0]))) {
-      if (gains > 0) {
-        let gainAfterLosses = Math.max(gains - totalLosses, 0);
-        totalLosses = Math.max(totalLosses - gains, 0);
-        let taxableGains = Math.max(gainAfterLosses - remainingRelief, 0);
-        remainingRelief = Math.max(remainingRelief - gainAfterLosses, 0);
-        tax += taxableGains * taxRate;
-      }
+
+    // Process gains, sorted by tax rate descending
+    const sortedGains = Object.entries(this.gains).sort((a, b) => parseFloat(b[0]) - parseFloat(a[0]));
+
+    for (const [taxRate, gainData] of sortedGains) {
+        if (gainData.amount > 0) {
+            let gainAfterLosses = Math.max(gainData.amount - totalLosses, 0);
+            totalLosses = Math.max(totalLosses - gainData.amount, 0);
+            
+            let taxableGains = Math.max(gainAfterLosses - remainingRelief, 0);
+            let usedRelief = Math.min(remainingRelief, gainAfterLosses);
+            remainingRelief = Math.max(remainingRelief - gainAfterLosses, 0);
+            
+            const taxOnThisGain = taxableGains * parseFloat(taxRate);
+            tax += taxOnThisGain;
+
+            // Attribute the tax proportionally to the sources of this gain
+            const totalGainAmount = gainData.amount;
+            for (const source in gainData.sources) {
+                const proportion = gainData.sources[source] / totalGainAmount;
+                const attributedTax = taxOnThisGain * proportion;
+                this.attributionManager.record('cgt', source, attributedTax);
+            }
+        }
     }
     this.cgt = tax;
+    if (remainingRelief > 0 && tax > 0) {
+        this.attributionManager.record('cgt', 'CGT Relief', -Math.min(tax, adjust(config.cgtTaxRelief)));
+    }
   };
-
+  
   // Create a new Revenue instance with a deep copy of this one's state
   clone() {
     const copy = new Revenue();
-    // Clone gains (might be an array with string keys)
+    // Deep clone gains (including nested sources objects)
     copy.gains = {};
     for (let key of Object.keys(this.gains)) {
-      copy.gains[key] = this.gains[key];
+      const gainData = this.gains[key];
+      copy.gains[key] = {
+        amount: gainData.amount,
+        sources: {}
+      };
     }
     // Clone primitive fields
     copy.income = this.income;
@@ -359,6 +494,14 @@ computeCGT() {
     // Clone marital/dependent flags
     copy.married = this.married;
     copy.dependentChildren = this.dependentChildren;
+    
+    // Create a dummy AttributionManager that does nothing to prevent attribution pollution
+    copy.attributionManager = {
+      record: function() {}, // No-op function
+      getAttribution: function() { return null; }, // Always return null
+      yearlyAttributions: {} // Empty object
+    };
+    
     return copy;
   };
 }

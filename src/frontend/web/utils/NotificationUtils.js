@@ -19,13 +19,21 @@ class NotificationUtils {
     this.statusElement.classList.remove('error');
   }
 
-  setError(message) {
-    // This method is for actual errors that should trigger the modal
+  setError(error) {
+    // Log error and stack trace for debugging
+    console.error('NotificationUtils.setError:', error, error.stack || '');
+    let message = "Unknown error";
+    if (error instanceof String) {
+      message = `${error}`;
+    } else if (error instanceof Error) {
+      message = `${error.message}`;
+    } else if (typeof error === 'object' && error !== null && error.stack) {
+      message = `${error.message || 'Unknown error'}`;
+    }
     if (this.errorModalUtils) {
-      this.errorModalUtils.setError(message);
+      this.errorModalUtils.setError("Simulation failed: " + message);
     } else {
-      // Fallback if error modal utils not available
-      this.setStatus(message, STATUS_COLORS.ERROR);
+      this.setStatus("Error", STATUS_COLORS.ERROR);
     }
   }
 

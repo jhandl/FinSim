@@ -8,16 +8,21 @@ class Equity {
     this.stdev = stdev;
     this.portfolio = [];
     this.canOffsetLosses = true;
+    // Track yearly statistics for attribution
+    this.yearlyBought = 0;
+    this.yearlySold = 0;
+    this.yearlyGrowth = 0;
   }
 
   buy(amountToBuy) {
     this.portfolio.push({amount: amountToBuy, interest: 0, age: 0});
+    this.yearlyBought += amountToBuy;
   }
   
   declareRevenue(income, gains) {
     revenue.declareInvestmentIncome(income);
     if (gains > 0 || this.canOffsetLosses) {
-      revenue.declareInvestmentGains(gains, this.taxRate);
+      revenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name + " Sale");
     }
   }
   
@@ -44,6 +49,7 @@ class Equity {
       }
       amountToSell -= sale;
     }
+    this.yearlySold += sold;
     this.declareRevenue(sold, gains);
     return sold;
   }
@@ -55,12 +61,47 @@ class Equity {
     }
     return sum;
   }
+
+  // Get portfolio statistics for attribution
+  getPortfolioStats() {
+    let principal = 0;
+    let totalGain = 0;
+    
+    for (let holding of this.portfolio) {
+      principal += holding.amount;
+      totalGain += holding.interest;
+    }
+    
+    return {
+      principal: principal,
+      totalGain: totalGain,
+      yearlyBought: this.yearlyBought,
+      yearlySold: this.yearlySold,
+      yearlyGrowth: this.yearlyGrowth
+    };
+  }
+
+  // Reset yearly statistics
+  resetYearlyStats() {
+    this.yearlyBought = 0;
+    this.yearlySold = 0;
+    this.yearlyGrowth = 0;
+  }
     
   addYear() {
     // Accumulate interests
     for (let i = 0; i < this.portfolio.length; i++) {
-      this.portfolio[i].interest += (this.portfolio[i].amount + this.portfolio[i].interest) * gaussian(this.growth,this.stdev);
-      this.portfolio[i].age++;
+      const holding = this.portfolio[i];
+      const gaussianValue = gaussian(this.growth, this.stdev);
+      const growthAmount = (holding.amount + holding.interest) * gaussianValue;
+      holding.interest += growthAmount;
+      this.yearlyGrowth += growthAmount;
+      holding.age++;
+      // Floor holding at zero if it goes negative
+      if (holding.amount + holding.interest < 0) {
+        holding.amount = 0;
+        holding.interest = 0;
+      }
     }
   }
 
@@ -81,7 +122,7 @@ class Equity {
   simulateDeclareRevenue(income, gains, testRevenue) {
     testRevenue.declareInvestmentIncome(income);
     if (gains > 0 || this.canOffsetLosses) {
-      testRevenue.declareInvestmentGains(gains, this.taxRate);
+      testRevenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name+" Sim");
     }
   }
 
@@ -105,7 +146,7 @@ class IndexFunds extends Equity {
         this.portfolio[i].interest = 0;
         this.portfolio[i].age = 0;
         if (gains > 0 || this.canOffsetLosses) {
-          revenue.declareInvestmentGains(gains, this.taxRate);
+          revenue.declareInvestmentGains(gains, this.taxRate, 'Deemed Disposal');
         }
       }
     }
