@@ -1,13 +1,13 @@
 module.exports = {
-    name: 'TestPropertyPurchaseAttribution',
-    description: 'Test that property purchase attribution shows the full purchase amount with proper breakdown of cash vs expense',
+    name: 'TestPropertySalePurchaseAttribution',
+    description: 'Test that property sales and purchases are correctly recorded in attribution with proper tooltips',
     category: 'attribution',
     scenario: {
         parameters: {
             startingAge: 30,
             targetAge: 35,
             retirementAge: 65,
-            initialSavings: 20000, // Start with 20k cash (less than property cost)
+            initialSavings: 100000, // Start with 100k cash
             initialPension: 0,
             initialFunds: 0,
             initialShares: 0,
@@ -39,19 +39,27 @@ module.exports = {
         },
         events: [
             {
-                type: 'SI', // Salary income to provide funds
+                type: 'SI', // Salary income
                 id: 'Salary',
-                amount: 100000, // 100k salary
+                amount: 80000,
                 fromAge: 30,
                 toAge: 34,
                 rate: 0,
                 match: 0
             },
             {
-                type: 'R', // Real estate purchase
-                id: 'Test Property',
-                amount: 50000, // 50k downpayment
+                type: 'R', // Buy first property
+                id: 'First Property',
+                amount: 200000,
                 fromAge: 30,
+                toAge: 32, // Sell at age 32
+                rate: 0.03
+            },
+            {
+                type: 'R', // Buy second property
+                id: 'Second Property',
+                amount: 150000,
+                fromAge: 32,
                 toAge: 34,
                 rate: 0.03
             }
@@ -63,16 +71,26 @@ module.exports = {
             target: 'age',
             age: 30,
             field: 'expenses',
-            expected: 30000, // Should show only unfunded portion (50k - 20k cash)
+            expected: 100000, // Should show unfunded portion (200k - 100k cash)
             tolerance: 1
         },
         {
             type: 'exact_value',
             target: 'age',
-            age: 30,
-            field: 'cash',
-            expected: 0, // Should have 0 cash remaining (all cash used for property purchase)
+            age: 32,
+            field: 'expenses',
+            expected: 0, // Should show 0 (sale proceeds cover purchase)
             tolerance: 1
+        },
+        {
+            type: 'comparison',
+            target: 'age',
+            age: 32,
+            field: 'cash',
+            expected: {
+                operator: '>',
+                value: 0 // Should have positive cash after sale
+            }
         }
     ]
 }; 

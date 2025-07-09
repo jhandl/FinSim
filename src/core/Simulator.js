@@ -258,7 +258,9 @@ function processEvents() {
     let event = events[i];
     if (event.type === 'R' && event.toAge && person1.age === event.toAge) {
       // console.log("Sell property ["+event.id+"] for "+Math.round(realEstate.getValue(event.id)));            
-      cash += realEstate.sell(event.id);
+      let saleProceeds = realEstate.sell(event.id);
+      cash += saleProceeds;
+      attributionManager.record('realestatecapital', `Sale (${event.id})`, -saleProceeds);
     }
   }
   
@@ -395,7 +397,7 @@ function processEvents() {
         if (inScope) {
           const payment = realEstate.getPayment(event.id);
           expenses += payment; // not adjusted once mortgage starts, assuming fixed rate
-          attributionManager.record('expenses', `Mortgage ${event.id}`, payment);
+          attributionManager.record('expenses', `Mortgage (${event.id})`, payment);
           //            console.log("Mortgage payment "+realEstate.getPayment(event.id)+" for property ["+event.id+"] ("+(realEstate.properties[event.id].paymentsMade)+" of "+realEstate.properties[event.id].terms+")");
         }
         break;
@@ -408,8 +410,11 @@ function processEvents() {
           let cashUsed = Math.min(cash, amount);
           cash -= cashUsed;
           expenses += amount - cashUsed;
-          attributionManager.record('expenses', `Purchase ${event.id}`, amount);
-          //            console.log("Buy property ["+event.id+"] with "+Math.round(amount)+" downpayment (used "+Math.round(cashUsed)+" cash, "+Math.round(remainingExpense)+" added to expenses) (valued "+Math.round(realEstate.getValue(event.id))+")");
+          if (amount - cashUsed > 0) {
+            attributionManager.record('expenses', `Downpayment shortfall (${event.id})`, amount - cashUsed);
+          }
+          attributionManager.record('realestatecapital', `Purchase (${event.id})`, amount);
+          //            console.log("Buy property ["+event.id+"] with "+Math.round(amount)+" downpayment (used "+Math.round(cashUsed)+" cash, "+Math.round(amount - cashUsed)+" added to expenses) (valued "+Math.round(realEstate.getValue(event.id))+")");
         }
         // Note: sales are now handled in the first pass above to ensure sale proceeds are available before purchases
         break;
