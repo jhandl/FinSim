@@ -106,15 +106,22 @@ class TableManager {
 
       if (value !== undefined) {
         const td = document.createElement('td');
+        
+        // Create a container for the cell content
+        const contentContainer = document.createElement('div');
+        contentContainer.className = 'cell-content';
+        
+        // Add the formatted value
         if (key === 'Age' || key === 'Year') {
-          td.textContent = value.toString();
+          contentContainer.textContent = value.toString();
         } else if (key === 'WithdrawalRate') {
-          td.textContent = value.toLocaleString("en-IE", {style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2});
+          contentContainer.textContent = value.toLocaleString("en-IE", {style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2});
         } else {
-          td.textContent = value.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
+          contentContainer.textContent = value.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
         }
         
         // Add tooltip for attributable values
+        let hasTooltip = false;
         if (data.Attributions) {
             // Convert table column key to lowercase to match attribution keys
             let attributionKey = key.toLowerCase();
@@ -213,7 +220,19 @@ class TableManager {
                 }
                 
                 TooltipUtils.attachTooltip(td, tooltipText);
+                hasTooltip = true;
             }
+        }
+
+        // Add the content container to the cell
+        td.appendChild(contentContainer);
+        
+        // Add 'i' icon if the cell has a tooltip
+        if (hasTooltip) {
+            const infoIcon = document.createElement('span');
+            infoIcon.className = 'cell-info-icon';
+            infoIcon.textContent = 'i';
+            contentContainer.appendChild(infoIcon);
         }
 
         row.appendChild(td);

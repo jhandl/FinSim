@@ -1994,6 +1994,31 @@ footer {
     max-width: 70px;
 }
 
+/* Cell content container for tooltip icons */
+#Data tbody td .cell-content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* Info icon styling - simple 'i' character */
+#Data tbody td .cell-info-icon {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    font-size: 10px;
+    font-family: 'Times New Roman', 'Georgia', serif;
+    color: var(--primary-color);
+    font-weight: bold;
+    font-style: italic;
+    pointer-events: none;
+    z-index: 1;
+    line-height: 1;
+}
+
 /* Ensure proper background colors for sticky elements */
 #Data tbody tr:nth-child(even) td:nth-child(1),
 #Data tbody tr:nth-child(even) td:nth-child(2) {
