@@ -411,7 +411,7 @@ function processEvents() {
           cash -= cashUsed;
           expenses += amount - cashUsed;
           if (amount - cashUsed > 0) {
-            attributionManager.record('expenses', `Downpayment shortfall (${event.id})`, amount - cashUsed);
+            attributionManager.record('expenses', `Purchase shortfall (${event.id})`, amount - cashUsed);
           }
           attributionManager.record('realestatecapital', `Purchase (${event.id})`, amount);
           //            console.log("Buy property ["+event.id+"] with "+Math.round(amount)+" downpayment (used "+Math.round(cashUsed)+" cash, "+Math.round(amount - cashUsed)+" added to expenses) (valued "+Math.round(realEstate.getValue(event.id))+")");
@@ -451,7 +451,7 @@ function handleInvestments() {
   if (cash < targetCash) {
     cashDeficit = targetCash - cash;
   }
-  let capitalPreWithdrawal = indexFunds.capital() + shares.capital();
+  let capitalPreWithdrawal = indexFunds.capital() + shares.capital() + person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
   if (expenses > netIncome) {
     switch (person1.phase) {
       case Phases.growth:
@@ -463,7 +463,7 @@ function handleInvestments() {
     }
   }
   if (capitalPreWithdrawal > 0) {
-    withdrawalRate = (incomeFundsRent + incomeSharesRent) / capitalPreWithdrawal;
+    withdrawalRate = (incomeFundsRent + incomeSharesRent + incomePrivatePension) / capitalPreWithdrawal;
   } else {
     withdrawalRate = 0;
   }
