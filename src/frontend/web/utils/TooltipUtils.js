@@ -25,6 +25,11 @@ class TooltipUtils {
     const showTooltip = () => {
       if (tooltipEl) return;
       tooltipEl = TooltipUtils.showTooltip(text, element);
+      
+      // Add highlight effect for TD elements
+      if (element.tagName === 'TD') {
+        element.classList.add('tooltip-highlighted');
+      }
     };
 
     const hideTooltip = () => {
@@ -39,6 +44,11 @@ class TooltipUtils {
       if (tooltipEl) {
         TooltipUtils.hideTooltip(tooltipEl);
         tooltipEl = null;
+      }
+      
+      // Remove highlight effect for TD elements
+      if (element.tagName === 'TD') {
+        element.classList.remove('tooltip-highlighted');
       }
     };
 

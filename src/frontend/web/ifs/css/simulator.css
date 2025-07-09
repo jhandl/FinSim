@@ -2088,6 +2088,17 @@ footer {
     margin-bottom: 0 !important;
 }
 
+/* Table cell tooltip highlight effect */
+#Data tbody td.tooltip-highlighted {
+    background-color: white !important;
+    border: none !important;
+    border-radius: 6px;
+    box-shadow: 0 0 10px 4px rgba(255, 255, 255, 0.75), 0 0 13px 6px rgba(173, 173, 255, 0.5);
+    transition: all 0.15s ease;
+    position: relative;
+    z-index: 2;
+}
+
 .events-section.card {
     max-width: 810px; /* Override .card's 306px to allow full-width events table */
 }
