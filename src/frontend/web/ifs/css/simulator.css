@@ -2182,3 +2182,20 @@ footer {
   display: none;
 }
 
+/* Subtle colored border for Event Type indicating inflow / outflow */
+#Events .pseudo-select.inflow {
+    box-shadow: inset 0 0 6px 1px rgba(76, 175, 80, 0.4); /* soft green */
+}
+
+#Events .pseudo-select.outflow {
+    box-shadow: inset 0 0 6px 1px rgba(239, 83, 80, 0.4); /* soft red */
+}
+
+#Events .pseudo-select.real-estate {
+    box-shadow: inset 0 0 6px 1px rgba(66, 165, 245, 0.4); /* soft blue */
+}
+
+#Events .pseudo-select.stock-market {
+    box-shadow: inset 0 0 6px 1px rgba(251, 192, 45, 0.4); /* soft yellow */
+}
+

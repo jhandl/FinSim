@@ -241,6 +241,41 @@ class EventsTableManager {
       return `row_${++this.eventRowCounter}`;
   }
 
+  /* ------------------------------------------------------------
+     Inflow / Outflow visual helpers
+  ------------------------------------------------------------ */
+  isInflow(eventType) {
+      return ['SI', 'SInp', 'SI2', 'SI2np', 'UI', 'RI', 'DBI', 'FI'].includes(eventType);
+  }
+
+  isOutflow(eventType) {
+      return ['E'].includes(eventType); // SM handled separately
+  }
+
+  isStockMarket(eventType) {
+      return ['SM'].includes(eventType);
+  }
+
+  isRealEstate(eventType) {
+      return ['R', 'M'].includes(eventType);
+  }
+
+  applyTypeColouring(row) {
+      const typeVal = row.querySelector('.event-type')?.value;
+      const toggle  = row.querySelector('.dd-toggle');
+      if (!toggle) return;
+      toggle.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market');
+      if (this.isStockMarket(typeVal)) {
+          toggle.classList.add('stock-market');
+      } else if (this.isRealEstate(typeVal)) {
+          toggle.classList.add('real-estate');
+      } else if (this.isInflow(typeVal)) {
+          toggle.classList.add('inflow');
+      } else if (this.isOutflow(typeVal)) {
+          toggle.classList.add('outflow');
+      }
+  }
+
   createEventRow(type = '', name = '', amount = '', fromAge = '', toAge = '', rate = '', match = '') {
     const rowId = this.generateEventRowId();
     const row = document.createElement('tr');
@@ -290,6 +325,7 @@ class EventsTableManager {
         toggleEl.textContent = label;
         row.dataset.originalEventType = val;
         this.updateFieldVisibility(typeInput);
+        this.applyTypeColouring(row);
         typeInput.dispatchEvent(new Event('change', { bubbles: true }));
       },
     });
@@ -298,6 +334,7 @@ class EventsTableManager {
 
     // Initial visibility update
     this.updateFieldVisibility(typeInput);
+    this.applyTypeColouring(row);
 
     return row;
   }
