@@ -77,12 +77,13 @@ class Revenue {
   };
     
   computeTaxes() {
+    this.resetTaxAttributions();
     this.computeIT();
     this.computePRSI();
     this.computeUSC();
     this.computeCGT();
   };
-   
+
   netIncome() {
     this.computeTaxes();
     let gross = this.income - (this.pensionContribAmountP1 + this.pensionContribAmountP2) + 
@@ -126,6 +127,7 @@ class Revenue {
     this.people = this.person1Ref ? (this.person2Ref ? 2 : 1) : 0;
 
     this.married = ((typeof params.marriageYear === 'number') && (params.marriageYear > 0) && (year >= params.marriageYear));
+    
     if ((typeof params.oldestChildBorn === 'number') || (typeof params.youngestChildBorn === 'number')) {
       let dependentStartYear = (typeof params.oldestChildBorn === 'number' ? params.oldestChildBorn : params.youngestChildBorn);
       let dependentEndYear = (typeof params.youngestChildBorn === 'number' ? params.youngestChildBorn : params.oldestChildBorn) + 18;
@@ -134,6 +136,19 @@ class Revenue {
       this.dependentChildren = false;
     }
   };
+
+  resetTaxAttributions() {
+    // Reset tax attributions to prevent double-counting when taxes are recomputed multiple times in the same year
+    const taxMetrics = ['it', 'prsi', 'usc', 'cgt'];
+    if (this.attributionManager && this.attributionManager.yearlyAttributions) {
+      for (const metric of taxMetrics) {
+        if (this.attributionManager.yearlyAttributions[metric]) {
+          this.attributionManager.yearlyAttributions[metric] = new Attribution(metric);
+        }
+      }
+    }
+  };
+
 
   computeProgressiveTax(bands, incomeAttribution, taxType, multiplier = 1, limitShift = 0) {
     // bands is a map in the form {"limit1": rate1, "limit2": rate2, ...}
@@ -175,7 +190,7 @@ class Revenue {
   computeIT() {
     // Create an attribution object for taxable income
     const taxableIncomeAttribution = new Attribution('taxableIncome');
-    
+      
     // Add income sources
     const incomeAttribution = this.attributionManager.getAttribution('income');
     if (incomeAttribution) {
@@ -328,6 +343,7 @@ class Revenue {
   
   computeUSC() {
     this.usc = 0;
+
     const uscExemptAmount = adjust(config.uscExemptAmount);
     const uscReducedRateAge = config.uscReducedRateAge;
     const uscReducedRateMaxIncome = adjust(config.uscReducedRateMaxIncome);
@@ -392,10 +408,6 @@ class Revenue {
   };
 
   computeCGT() {
-    if (this.attributionManager && this.attributionManager.yearlyAttributions && this.attributionManager.yearlyAttributions['cgt']) {
-      // Reset CGT attribution for this calculation
-      this.attributionManager.yearlyAttributions['cgt'] = new Attribution('cgt');
-    }
     let tax = 0;
     let remainingRelief = adjust(config.cgtTaxRelief);
     let totalLosses = 0;
