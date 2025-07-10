@@ -1220,6 +1220,14 @@ class WebUI extends AbstractUI {
 
       if (!isTextInput) return;
 
+      // Only apply on mobile and tablet devices, skip desktop
+      const hasTouchSupport = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      const isSmallScreen = window.innerWidth <= 1024; // common breakpoint for tablets
+      const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isMobileOrTablet = isMobileUserAgent || (hasTouchSupport && (isSmallScreen || isCoarsePointer));
+      if (!isMobileOrTablet) return;
+
       // Defer to allow other focus handlers (e.g. FormatUtils) to adjust value first
       setTimeout(() => {
         try {
