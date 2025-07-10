@@ -583,9 +583,14 @@ class Wizard {
   }
 
   handleClick(event) {
-    // Clear field tracking when clicking on non-input elements
+    // Skip focus reset if the click originates from the mobile burger menu or its toggle
+    const isBurgerMenuClick = event.target.closest('#mobileMenuToggle, #mobileMenu');
+
+    // Clear field tracking when clicking on non-input elements that are not part of the burger menu
     // This ensures clicks on non-focusable elements reset last focused state
-    if (!event.target.matches('input, textarea, select') && !event.target.classList.contains('visualization-control')) {
+    if (!isBurgerMenuClick &&
+        !event.target.matches('input, textarea, select') &&
+        !event.target.classList.contains('visualization-control')) {
       this.lastFocusedField = null;
       this.lastFocusedWasInput = false;
     }
