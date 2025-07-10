@@ -263,20 +263,17 @@
 
             // Decide which rectangle we want to keep in view (card if possible, otherwise target)
             let desiredRect = rect;
-            let fitsVertically = false, topVisible = false, bottomVisible = false;
             if (cardRect) {
-                fitsVertically = cardRect.height <= (window.innerHeight - hdrH - 2 * margin);
-                topVisible = cardRect.top >= hdrH + margin;
-                bottomVisible = cardRect.bottom <= window.innerHeight - margin;
+                // Always align section header directly below fixed header so the
+                // highlighted field sits at a predictable position and the
+                // popover doesn’t jump around depending on its size.
+                desiredRect = cardRect;
 
-                // If the entire card already fits and is fully visible, no scrolling needed
-                if (fitsVertically && topVisible && bottomVisible) {
-                    return; // early exit, skip any vertical scrolling
-                }
-
-                // Otherwise, scroll to reveal full card when it fits
-                if (fitsVertically) {
-                    desiredRect = cardRect;
+                // If the header is already within a small tolerance of its
+                // target position, no scrolling is needed.
+                const curOffset = cardRect.top - (hdrH + margin);
+                if (Math.abs(curOffset) < 4) {
+                    return; // already aligned; skip further work
                 }
             }
 
