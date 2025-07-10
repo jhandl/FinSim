@@ -218,7 +218,7 @@ function calculatePensionIncome() {
   const p1CalcResults = person1.calculateYearlyPensionIncome(config);
   if (p1CalcResults.lumpSumAmount > 0) {
     cash += p1CalcResults.lumpSumAmount;
-    revenue.declarePrivatePensionLumpSum(p1CalcResults.lumpSumAmount, person1);
+    // Note: Lump sum tax is already declared in Pension.declareRevenue() when getLumpsum() calls sell()
   }
   if (person1.yearlyIncomePrivatePension > 0) {
             attributionManager.record('incomeprivatepension', 'Your Private Pension', person1.yearlyIncomePrivatePension);
@@ -234,7 +234,7 @@ function calculatePensionIncome() {
     const p2CalcResults = person2.calculateYearlyPensionIncome(config);
     if (p2CalcResults.lumpSumAmount > 0) {
       cash += p2CalcResults.lumpSumAmount;
-      revenue.declarePrivatePensionLumpSum(p2CalcResults.lumpSumAmount, person2);
+      // Note: Lump sum tax is already declared in Pension.declareRevenue() when getLumpsum() calls sell()
     }
     if (person2.yearlyIncomePrivatePension > 0) {
               attributionManager.record('incomeprivatepension', 'Their Private Pension', person2.yearlyIncomePrivatePension);

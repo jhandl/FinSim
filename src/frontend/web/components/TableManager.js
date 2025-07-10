@@ -219,8 +219,11 @@ class TableManager {
                     }
                 }
                 
-                TooltipUtils.attachTooltip(td, tooltipText);
-                hasTooltip = true;
+                // Only attach tooltip and show 'i' icon if there's meaningful content to display
+                if (tooltipText.trim() !== '' && value >= 1) {
+                    TooltipUtils.attachTooltip(td, tooltipText);
+                    hasTooltip = true;
+                }
             }
         }
 

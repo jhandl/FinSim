@@ -47,17 +47,6 @@ class Revenue {
       this.privatePensionLumpSumP2 += amount;
       this.privatePensionLumpSumCountP2++;
       this.attributionManager.record('privatepensionlumpsum', description, amount);
-    } else {
-      // Fallback if person is not identifiable, though this should ideally not happen
-      // For safety, and to maintain existing behavior if called without person, assign to P1
-      // However, calls from Pension.declareRevenue should always include a person.
-      // Consider logging a warning if person is null/undefined here.
-      if (this.person1Ref) { // Default to P1 if no specific person provided for some reason
-          this.privatePensionLumpSumP1 += amount;
-          this.privatePensionLumpSumCountP1++;
-          this.attributionManager.record('privatepensionlumpsum', 'Pension Lump Sum P1', amount);
-      }
-      // console.warn("declarePrivatePensionLumpSum called without a clearly identifiable person.");
     }
   };
   
@@ -236,12 +225,12 @@ class Revenue {
     if (this.privatePensionLumpSumCountP1 > 0) {
         const lumpSumAttribution = new Attribution('pensionLumpSum');
         lumpSumAttribution.add('Pension Lump Sum P1', this.privatePensionLumpSumP1);
-        tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, lumpSumAttribution, 'it', this.privatePensionLumpSumCountP1);
+        tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, lumpSumAttribution, 'it');
     }
     if (this.privatePensionLumpSumCountP2 > 0) {
         const lumpSumAttribution = new Attribution('pensionLumpSum');
         lumpSumAttribution.add('Pension Lump Sum P2', this.privatePensionLumpSumP2);
-        tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, lumpSumAttribution, 'it', this.privatePensionLumpSumCountP2);
+        tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, lumpSumAttribution, 'it');
     }
     
     let numSalaryEarners = (this.salariesP1.length > 0 ? 1 : 0) + (this.salariesP2.length > 0 ? 1 : 0);
