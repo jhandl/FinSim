@@ -354,7 +354,7 @@ header.header-hidden {
     justify-content: center;
     margin-left: 0.5rem;
     font-size: 10px;
-    font-family: 'Times New Roman', 'Georgia', serif;
+    font-family: 'Georgia', 'Times New Roman', serif;
     color: var(--primary-color);
     cursor: pointer;
     background: white;
@@ -2007,15 +2007,15 @@ footer {
 /* Info icon styling - simple 'i' character */
 #Data tbody td .cell-info-icon {
     position: absolute;
-    top: -5px;
-    right: -5px;
+    bottom: -7px;
+    right: -6px;
     font-size: 10px;
-    font-family: 'Times New Roman', 'Georgia', serif;
+    font-family: 'Georgia', 'Times New Roman', serif;
     color: var(--primary-color);
     font-weight: bold;
     font-style: italic;
     pointer-events: none;
-    z-index: 1;
+    z-index: 0;
     line-height: 1;
 }
 
