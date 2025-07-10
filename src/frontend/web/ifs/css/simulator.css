@@ -1210,6 +1210,13 @@ th {
     text-align: right;
     border: 1px solid var(--border-color);
     white-space: nowrap;
+    /* Prevent text selection & system copy/callout menu on mobile long-press so tooltips still trigger */
+    -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none;   /* Safari */
+    -khtml-user-select: none;    /* Konqueror HTML */
+    -moz-user-select: none;      /* Firefox */
+    -ms-user-select: none;       /* Internet Explorer/Edge */
+    user-select: none;           /* Standard */
 }
 
 #Data th {

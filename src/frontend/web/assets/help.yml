@@ -1387,7 +1387,7 @@ WizardSteps:
     tours: [quick, full, mini]
     card: data
     popover:
-      description: "<p>The actual year-by-year numbers as they are computed by the simulator, from your current age to the final age.</p><p>On smaller screens the table is hidden but you can tap 'Show anyway' to see it.</p>"
+      description: "<p>The actual year-by-year numbers as they are computed by the simulator, from your current age to the final age.</p><p>On smaller screens the table is hidden but you can tap 'Show anyway' to see it.</p><p>You can hover or long-press any cell with a small i to get a tooltip with more detailed information.</p>"
       side: "top"
       align: "left"
 
