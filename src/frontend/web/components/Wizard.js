@@ -571,7 +571,7 @@ class Wizard {
   followFocus(event) {
     if (!event.target.matches('#startWizard') && 
         !event.target.closest('#mobileMenuToggle, #mobileMenu')) {
-      if (event.target.matches('input, textarea, select')) {
+      if (event.target.matches('input, textarea, select') || event.target.classList.contains('visualization-control')) {
         this.lastFocusedField = event.target;
         this.lastFocusedWasInput = true;
       } else {
@@ -585,7 +585,7 @@ class Wizard {
   handleClick(event) {
     // Clear field tracking when clicking on non-input elements
     // This ensures clicks on non-focusable elements reset last focused state
-    if (!event.target.matches('input, textarea, select')) {
+    if (!event.target.matches('input, textarea, select') && !event.target.classList.contains('visualization-control')) {
       this.lastFocusedField = null;
       this.lastFocusedWasInput = false;
     }
@@ -786,7 +786,7 @@ class Wizard {
   }
 
   handleVerticalNavigation(direction) {
-    if (this.lastFocusedField && this.lastFocusedField.matches('input, select')) {
+    if (this.lastFocusedField && (this.lastFocusedField.matches('input, select') || this.lastFocusedField.classList.contains('visualization-control'))) {
       const currentState = this.getEventTableState();
       if (!currentState.isEmpty && currentState.focusedRow) {
         const tbody = document.querySelector('#Events tbody');

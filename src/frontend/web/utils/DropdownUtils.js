@@ -77,6 +77,7 @@ class DropdownUtils {
         if (!opt) return;
         const div = document.createElement('div');
         div.setAttribute('data-value', opt.value);
+        div.setAttribute('role', 'option');
         div.textContent = opt.label;
         if (opt.description) div.setAttribute('data-description', opt.description);
         if (opt.selected || opt.value === selected) div.classList.add('selected');
@@ -153,6 +154,7 @@ class DropdownUtils {
       dropdownEl.style.transform = 'none';
 
       dropdownEl.style.visibility = 'visible';
+      controlContainer.setAttribute('aria-expanded', 'true');
 
       const sel = dropdownEl.querySelector('.selected');
       dropdownEl.querySelectorAll('.highlighted').forEach((n) => n.classList.remove('highlighted'));
@@ -170,12 +172,42 @@ class DropdownUtils {
       dropdownEl.style.display = 'none';
       dropdownEl.querySelectorAll('.highlighted').forEach((n) => n.classList.remove('highlighted'));
       window.__openDropdowns.delete(close);
+      controlContainer.setAttribute('aria-expanded', 'false');
     };
 
     // ---------------------------------------------------------------------
     // Event listeners
     // ---------------------------------------------------------------------
     const controlContainer = toggleEl.closest('.visualization-control') || toggleEl;
+    // Ensure focusability and ARIA compliance
+    if (!controlContainer.hasAttribute('tabindex')) {
+      controlContainer.setAttribute('tabindex', '0');
+    }
+    controlContainer.setAttribute('role', 'button');
+    controlContainer.setAttribute('aria-haspopup', 'listbox');
+    controlContainer.setAttribute('aria-expanded', 'false');
+    dropdownEl.setAttribute('role', 'listbox');
+
+    /* ---------------------------------------------------------------
+       Keyboard accessibility helpers
+    ----------------------------------------------------------------*/
+    const getOptionsList = () => Array.from(dropdownEl.querySelectorAll('[data-value]'));
+    const moveHighlight = (dir) => {
+      const opts = getOptionsList();
+      if (opts.length === 0) return;
+      let idx = opts.findIndex((el) => el.classList.contains('highlighted'));
+      if (idx === -1) idx = opts.findIndex((el) => el.classList.contains('selected'));
+      let newIdx = idx + dir;
+      if (newIdx < 0) newIdx = opts.length - 1;
+      if (newIdx >= opts.length) newIdx = 0;
+      opts.forEach((el) => el.classList.remove('highlighted'));
+      opts[newIdx].classList.add('highlighted');
+      opts[newIdx].scrollIntoView({ block: 'nearest' });
+    };
+    const selectHighlighted = () => {
+      const hl = dropdownEl.querySelector('.highlighted') || dropdownEl.querySelector('.selected');
+      if (hl) hl.click();
+    };
 
     // Toggle click
     controlContainer.addEventListener('click', (e) => {
@@ -312,6 +344,50 @@ class DropdownUtils {
     controlContainer.addEventListener('touchend', cancelCtrlLongPress, { passive: true });
     controlContainer.addEventListener('touchmove', cancelCtrlLongPress, { passive: true });
     controlContainer.addEventListener('touchcancel', cancelCtrlLongPress, { passive: true });
+
+    // Keyboard interactions
+    const handleKeyDown = (e) => {
+      const key = e.key;
+      const isOpen = dropdownEl.style.display !== 'none' && dropdownEl.style.display !== '';
+      if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+        if (!isOpen) {
+          open();
+        } else {
+          selectHighlighted();
+        }
+        e.preventDefault();
+      } else if (key === 'ArrowDown') {
+        if (document.querySelector('.driver-popover')) {
+          // Ignore arrow keys when help popover is visible
+          e.preventDefault();
+          return;
+        }
+        if (!isOpen) {
+          open();
+        } else {
+          moveHighlight(1);
+        }
+        e.preventDefault();
+      } else if (key === 'ArrowUp') {
+        if (document.querySelector('.driver-popover')) {
+          e.preventDefault();
+          return;
+        }
+        if (!isOpen) {
+          open();
+        } else {
+          moveHighlight(-1);
+        }
+        e.preventDefault();
+      } else if (key === 'Escape') {
+        if (isOpen) {
+          close();
+          controlContainer.focus();
+        }
+      }
+    };
+    controlContainer.addEventListener('keydown', handleKeyDown);
+    dropdownEl.addEventListener('keydown', handleKeyDown);
 
     // Public API
     return {

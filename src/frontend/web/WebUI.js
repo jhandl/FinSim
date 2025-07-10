@@ -484,6 +484,12 @@ class WebUI extends AbstractUI {
       helpButton.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        // Close any open dropdowns before launching the wizard (helps when invoking on dropdown fields)
+        if (window.__openDropdowns) {
+          window.__openDropdowns.forEach((closer) => {
+            try { if (typeof closer === 'function') closer(); } catch (_) {}
+          });
+        }
         // Use wizard's built-in logic only if there was a recently focused input field
         if (wizard.lastFocusedWasInput && wizard.lastFocusedField) {
           wizard.start();
@@ -497,12 +503,20 @@ class WebUI extends AbstractUI {
       userManualButton.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        // Close any open dropdowns before launching the wizard
+        if (window.__openDropdowns) {
+          window.__openDropdowns.forEach((closer) => { try { if (typeof closer === 'function') closer(); } catch (_) {} });
+        }
         wizard.start(0);
       });
     }
     document.addEventListener('keydown', (event) => {
       if (event.key === '?') {
         event.preventDefault();
+        // Close any open dropdowns before launching the wizard
+        if (window.__openDropdowns) {
+          window.__openDropdowns.forEach((closer) => { try { if (typeof closer === 'function') closer(); } catch (_) {} });
+        }
         // For keyboard shortcut, use same logic as Help button
         if (wizard.lastFocusedWasInput && wizard.lastFocusedField) {
           wizard.start();
