@@ -36,6 +36,57 @@ WelcomeTabs:
         - title: "Pinch Point Visualisation"
           description: "Use the color scheme dropdown ({icon:palette}) in the data table to highlight critical periods in your plan."
 
+  - id: faq
+    title: F.A.Q.
+    excludeFromHeightCalculation: true
+    contentType: accordion
+    content:
+      items:
+        - question: "Why are the numbers much larger than I expected?"
+          answer:
+            - "Unless you specify 0 inflation, the numbers will grow year after year at the rate of inflation."
+            - "The values you enter into the different fields have to be in terms of present value. For example, for a property that you expect to purchase 10 years from now, you have to enter the present value of the property, not the value you expect it to be worth in 10 years time."
+        - question: "Why are Revenue's tax credits also inflation adjusted?"
+          answer:
+            - "Even though some of the budget numbers don't change every year (ahem, cgt credit, ahem), many generally do, for example the income tax brackets."
+            - "I have to assume some periodic adjustment, and inflation is the best proxy I can think of. I'm open to suggestions on how to do this better."
+        - question: "Why do I see this unexpected number in the simulation data table?"
+          answer:
+            - "Many of the table cells have a little 'i' on the lower right corner. That means that the cell has a tooltip attached to it." 
+            - "You can hover over the number to see where the number comes from."
+        - question: "How do I use the Events table?"
+          answer:
+            - "Things that have a start date and an end date, like your income, your expenses or buying a property, go into the events table."
+            - "Click \"Add Event\" and choose the type. You can hover (or long-press) on any type in the menu to see a description of what it does."
+            - "You can set events by age or calendar year, and they'll be applied in your projections."
+        - question: "How do I model property purchases?"
+          answer:
+            - "Use the \"Real Estate\" event type. Enter a name for the property, the down payment, purchase date (which can be in the past) and expected sale date, and the expected appreciation rate."
+            - "Then create a \"Mortgage\" event with the same name, and enter the yearly mortgage repayment (12 x the monthly payment), and the interest rate."
+            - "You can add multiple properties to your plan."
+        - question: "What if I want to buy a property in cash?"
+          answer:
+            - "You can enter the full purchase price and not add a mortgage event for that property."
+        - question: "Can couples use this together?"
+          answer:
+            - "Yes! Toggle to \"Two-Person Mode\" using the {icon:user-friends} icon. This allows separate incomes, pensions, and retirement ages."
+            - "The simulator will optimize tax efficiency between partners and model joint financial planning."
+        - question: "What is Monte Carlo simulation?"
+          answer:
+            - "When in Variable Growth mode, your scenario runs thousands of times with random variations in investment returns."
+            - "The simulator then counts what percentage of those runs were successful (i.e. reached your target age without running out of money)."
+            - "The result shows the probability of success of your scenario and gives you an idea of the range of possible outcomes."
+        - question: "How do find the critical points in my plan?"
+          answer:
+            - "Use the color schemes ({icon:palette}) in the simulation data table to understand where your plan tends to fail." 
+        - question: "How accurate are the projections?"
+          answer:
+            - "The projections are estimates based on your inputs and assumptions about future economic conditions. Not a prediction of the future."
+        - question: "Is my financial data secure?"
+          answer:
+            - "Yes, all your financial data stays on your computer. It's not sent to any server or stored online."
+            - "If you don't save it before closing this browser tab, it will be lost."
+
   - id: notes
     title: Notes
     contentType: list
@@ -47,53 +98,6 @@ WelcomeTabs:
           description: "I don't collect any data from you. The information you enter stays in your computer."
         - title: "Complementary tools"
           description: "Consider also using Irish Tax Hub's [tax calculators](https://www.irishtaxhub.ie/tools){tax calculators,suite,net income,free,pension,try calculator} and PWC's [income tax calculator](https://download.pwc.com/ie/budget-2025/income-tax-calculator.html){income tax calculator,your status,are you entitled}."
-
-  - id: faq
-    title: F.A.Q.
-    excludeFromHeightCalculation: true
-    contentType: accordion
-    content:
-      items:
-        - question: "How do I get started with the simulator?"
-          answer:
-            - "Start by filling in your basic information in the parameters section (age, income, assets, etc.). Then add any planned financial events in the Events table. Finally, click Run to see your projections."
-            - "For a quick introduction, try the Demo button to load a sample scenario."
-        - question: "How accurate are the projections?"
-          answer:
-            - "The simulator uses standard financial modeling techniques, but projections are estimates based on your inputs and assumptions about future economic conditions."
-            - "Use the Monte Carlo mode to see a range of possible outcomes and stress-test your plan with different scenarios."
-        - question: "Is my financial data secure?"
-          answer:
-            - "Yes, all your data stays on your computer. Nothing is sent to any server or stored online."
-            - "You can save scenarios to files on your computer and load them later, but the data never leaves your device."
-        - question: "What is Monte Carlo simulation?"
-          answer:
-            - "Monte Carlo simulation runs thousands of scenarios with random variations in investment returns, inflation, and other factors."
-            - "This shows you the probability of success and helps you understand the range of possible outcomes, not just a single projection."
-        - question: "How do I use the Events table?"
-          answer:
-            - "The Events table lets you add time-bound financial events like salary changes, property purchases, or retirement."
-            - "Click \"Add Event\" and choose the type. You can set events by age or calendar year, and they'll be applied in your projections."
-        - question: "Can I plan for retirement?"
-          answer:
-            - "Yes! Set your retirement age and target income. Add pension contributions and state pension expectations."
-            - "The simulator will show if your savings are on track and how long your money might last in retirement."
-        - question: "How do I model property purchases?"
-          answer:
-            - "Use the \"Buy Property\" event type. Enter the purchase price, down payment, and mortgage details."
-            - "The simulator will account for mortgage payments, property appreciation, and the impact on your cash flow and net worth."
-        - question: "Does it include Irish taxes?"
-          answer:
-            - "Yes, the simulator includes Irish income tax, USC, PRSI, and capital gains tax calculations."
-            - "It also models pension tax relief and other Irish-specific tax considerations for accurate projections."
-        - question: "Can couples use this together?"
-          answer:
-            - "Yes! Toggle to \"Two-Person Mode\" using the user icons. This allows separate incomes, pensions, and retirement ages."
-            - "The simulator will optimize tax efficiency between partners and model joint financial planning."
-        - question: "How do I save my scenarios?"
-          answer:
-            - "Click the Save button to download your scenario as a file. You can load it later using the Load button."
-            - "This lets you compare different strategies or return to your planning later."
 
 
 ###########################################################

@@ -519,7 +519,7 @@ header.header-hidden {
 
 
 .welcome-tab-content {
-    padding: 20px;
+    padding: 8px 20px;
     position: absolute;
     top: 38px;
     left: 0;
@@ -583,7 +583,7 @@ header.header-hidden {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.8rem 1rem;
+    padding: 0.5rem 1rem;
     background: #f8f9fa;
     cursor: pointer;
     font-weight: 600;
@@ -623,14 +623,20 @@ header.header-hidden {
 }
 
 .faq-answer p {
-    padding: 0.8rem 1rem;
+    padding: 0.6rem 1rem;
     margin: 0;
     line-height: 1.5;
     color: var(--text-color);
 }
 
 .faq-answer p:not(:last-child) {
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: none;
+    padding-bottom: 0.3rem; /* reduce bottom padding between paragraphs */
+}
+
+/* Reduce top padding for paragraphs except the first to tighten spacing */
+.faq-answer p:not(:first-child) {
+    padding-top: 0.3rem;
 }
 
 /* Welcome Tab Content Styling - Unified Design */
@@ -806,7 +812,7 @@ body.modal-open {
     }
 
     .welcome-tab-content {
-        padding: 15px;
+        padding: 12px;
         top: 34px;
     }
 
@@ -884,6 +890,15 @@ body.modal-open {
     .faq-answer p {
         padding: 0.6rem 0.8rem;
         font-size: 0.9rem;
+    }
+
+    /* Mobile: tighten spacing between answer paragraphs */
+    .faq-answer p:not(:last-child) {
+        padding-bottom: 0.3rem;
+    }
+
+    .faq-answer p:not(:first-child) {
+        padding-top: 0.3rem;
     }
 
     .faq-icon {
