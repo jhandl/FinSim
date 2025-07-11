@@ -529,8 +529,15 @@ class WebUI extends AbstractUI {
 
   setupNavigation() {
     document.querySelectorAll('a[href^="/"]').forEach(link => {
-      link.addEventListener('click', (e) => {
+      link.addEventListener('click', async (e) => {
         e.preventDefault();
+        // If there are unsaved changes, confirm with the user before navigating away
+        if (this.fileManager && this.fileManager.hasUnsavedChanges()) {
+          const proceed = await this.showAlert("You have unsaved changes. Are you sure you want to navigate away and lose them?", "Unsaved Changes", true);
+          if (!proceed) {
+            return; // User chose to stay on the page
+          }
+        }
         window.parent.postMessage({ type: 'navigate', href: link.getAttribute('href') }, '*');
       });
     });
