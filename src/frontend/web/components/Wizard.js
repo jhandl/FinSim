@@ -57,11 +57,21 @@ class Wizard {
       // Store original config with variables processed but placeholders intact
       this.originalConfig = FormatUtils.processVariablesInObject(rawConfig);
 
-      // Process markdown links but keep age/year placeholders for later processing
+      // Process content: use ContentRenderer for structured content, markdown links for legacy HTML
       if (this.originalConfig.steps) {
         this.originalConfig.steps = this.originalConfig.steps.map(step => {
-          if (step.popover && step.popover.description) {
-            step.popover.description = FormatUtils.processMarkdownLinks(step.popover.description);
+          if (step.popover) {
+            if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
+              // Use ContentRenderer for structured content
+              step.popover.description = ContentRenderer.render(
+                step.popover.contentType,
+                step.popover.content,
+                { context: 'wizard', compact: true }
+              );
+            } else if (step.popover.description) {
+              // Backward compatibility: process as HTML string
+              step.popover.description = FormatUtils.processMarkdownLinks(step.popover.description);
+            }
           }
           return step;
         });
@@ -71,8 +81,18 @@ class Wizard {
       this.config = JSON.parse(JSON.stringify(this.originalConfig));
       if (this.config.steps) {
         this.config.steps = this.config.steps.map(step => {
-          if (step.popover && step.popover.description) {
-            step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
+          if (step.popover) {
+            if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
+              // Re-render with ContentRenderer to process age/year placeholders
+              step.popover.description = ContentRenderer.render(
+                step.popover.contentType,
+                this.processAgeYearInContent(step.popover.content),
+                { context: 'wizard', compact: true }
+              );
+            } else if (step.popover.description) {
+              // Process age/year placeholders in legacy HTML descriptions
+              step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
+            }
           }
           return step;
         });
@@ -80,6 +100,28 @@ class Wizard {
     } catch (error) {
       console.error('Failed to load wizard configuration:', error);
     }
+  }
+
+  /**
+   * Recursively processes age/year placeholders in structured content
+   * @param {Object|Array|string} content - Content to process
+   * @returns {Object|Array|string} Content with placeholders replaced
+   */
+  processAgeYearInContent(content) {
+    if (typeof content === 'string') {
+      return FormatUtils.replaceAgeYearPlaceholders(content);
+    }
+    if (Array.isArray(content)) {
+      return content.map(item => this.processAgeYearInContent(item));
+    }
+    if (content && typeof content === 'object') {
+      const processed = {};
+      for (const [key, value] of Object.entries(content)) {
+        processed[key] = this.processAgeYearInContent(value);
+      }
+      return processed;
+    }
+    return content;
   }
 
   getEventTableState() {
@@ -276,8 +318,18 @@ class Wizard {
       this.config = JSON.parse(JSON.stringify(this.originalConfig));
       if (this.config.steps) {
         this.config.steps = this.config.steps.map(step => {
-          if (step.popover && step.popover.description) {
-            step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
+          if (step.popover) {
+            if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
+              // Re-render with ContentRenderer to process age/year placeholders
+              step.popover.description = ContentRenderer.render(
+                step.popover.contentType,
+                this.processAgeYearInContent(step.popover.content),
+                { context: 'wizard', compact: true }
+              );
+            } else if (step.popover.description) {
+              // Process age/year placeholders in legacy HTML descriptions
+              step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
+            }
           }
           return step;
         });
@@ -1135,10 +1187,20 @@ class Wizard {
       return true;
     });
 
-    // Replace age/year placeholders now so UI displays correct text
+    // Process content with age/year placeholders for UI display
     filtered.forEach(step => {
-      if (step.popover && step.popover.description) {
-        step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
+      if (step.popover) {
+        if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
+          // Re-render with ContentRenderer to process age/year placeholders
+          step.popover.description = ContentRenderer.render(
+            step.popover.contentType,
+            this.processAgeYearInContent(step.popover.content),
+            { context: 'wizard', compact: true }
+          );
+        } else if (step.popover.description) {
+          // Process age/year placeholders in legacy HTML descriptions
+          step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
+        }
       }
     });
 

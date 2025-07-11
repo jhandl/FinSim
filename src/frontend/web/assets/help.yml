@@ -103,7 +103,21 @@ WizardSteps:
   - element: "header"
     tours: [quick, full]
     popover:
-      description: "<p>Main action buttons:</p><ul><li><strong>Run</strong> – calculate projections</li><li><strong>Save</strong> – store your scenario to a file</li><li><strong>Load</strong> – reopen a saved scenario</li><li><strong>Help</strong> – get a tour or assistance for a field</li><li><strong>Demo</strong> – load and run a demo scenario</li></ul><p>On small screens some of these move into the ☰ menu.</p>"
+      contentType: bullets
+      content:
+        description: "Main action buttons:"
+        items:
+          - title: "Run"
+            description: "calculate projections"
+          - title: "Save"
+            description: "store your scenario to a file"
+          - title: "Load"
+            description: "reopen a saved scenario"
+          - title: "Help"
+            description: "get a tour or assistance for a field"
+          - title: "Demo"
+            description: "load and run a demo scenario"
+        footnote: "On small screens some of these move into the ☰ menu."
       showButtons: ["next", "close"]
       side: "bottom"
       align: "center"
@@ -111,21 +125,37 @@ WizardSteps:
   - element: "#progress"
     tours: [full]
     popover:
-      description: "<p>The outcome of the simulation will be shown here.</p><ul><li>If you specified linear growth rates, this will show either 'Success' or the age at which you ran out of money.</li><li>If you specified some volatility, it will show the probability of success of your scenario.</li></ul></p>"
+      contentType: bullets
+      content:
+        description: "The outcome of the simulation will be shown here."
+        items:
+          - title: "Linear Growth"
+            description: "if you specified linear growth rates, this will show either 'Success' or the age at which you ran out of money"
+          - title: "With Volatility"
+            description: "if you specified some volatility, it will show the probability of success of your scenario"
       side: "bottom"
       align: "center"
 
   - element: ".parameters-section"
     tours: [full, quick]
     popover:
-      description: "<p>Parameter panels:</p><ul><li>Enter your current situation, targets, investment allocations, and economic assumptions.</li><li>Click the info icons for detailed help on any panel or field.</li></ul>"
+      contentType: bullets
+      content:
+        description: "Parameter panels:"
+        items:
+          - title: "Enter Information"
+            description: "enter your current situation, targets, investment allocations, and economic assumptions"
+          - title: "Get Help"
+            description: "click the info icons ({icon:info}) for detailed help on any panel or field"
       side: "right"
       align: "start"
 
   - element: "#startingPosition"
     tours: [full, mini]
     popover:
-      description: "<p>This is where you describe your current financial situation.</p><p>It's the starting point for the simulation.</p>"
+      contentType: text
+      content:
+        text: "This is where you describe your current financial situation. It's the starting point for the simulation."
       side: "right"
       align: "start"
     card: startingPosition

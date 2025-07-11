@@ -11,6 +11,8 @@ class ContentRenderer {
    * @param {string} contentType - Type of content (workflow, list, accordion, etc.)
    * @param {Object} content - Content data structure
    * @param {Object} options - Additional rendering options
+   * @param {string} options.context - Rendering context ('wizard', 'modal', etc.)
+   * @param {boolean} options.compact - Whether to use compact rendering for space-constrained environments
    * @returns {string} Generated HTML string
    */
   static render(contentType, content, options = {}) {
@@ -18,25 +20,58 @@ class ContentRenderer {
       return this.renderError('Missing content type or content data');
     }
 
+    // Apply wizard-specific rendering adjustments
+    const processedOptions = this.processRenderingOptions(options);
+
     try {
       switch (contentType) {
         case 'workflow':
-          return this.renderWorkflow(content, options);
+          return this.renderWorkflow(content, processedOptions);
         case 'list':
-          return this.renderList(content, options);
+          return this.renderList(content, processedOptions);
+        case 'bullets':
+          return this.renderBullets(content, processedOptions);
         case 'accordion':
-          return this.renderAccordion(content, options);
+          return this.renderAccordion(content, processedOptions);
+        case 'text':
+          return this.renderText(content, processedOptions);
         case 'html':
           // Backward compatibility: direct HTML content
           return typeof content === 'string' ? content : content.html || '';
         default:
           console.warn(`Unknown content type: ${contentType}, falling back to plain text`);
-          return this.renderPlainText(content, options);
+          return this.renderPlainText(content, processedOptions);
       }
     } catch (error) {
       console.error('ContentRenderer error:', error);
       return this.renderError(`Failed to render ${contentType} content`);
     }
+  }
+
+  /**
+   * Processes rendering options and applies context-specific defaults
+   * @param {Object} options - Raw rendering options
+   * @returns {Object} Processed options with context-specific defaults
+   */
+  static processRenderingOptions(options = {}) {
+    const processed = { ...options };
+    const isWizard = options.context === 'wizard';
+    const compact = options.compact || false;
+
+    if (isWizard) {
+      // Wizard-specific defaults
+      processed.showTitles = processed.showTitles !== false; // Default true for wizard
+      processed.compactSpacing = compact;
+      processed.cssPrefix = 'wizard';
+      processed.includeDescription = processed.includeDescription !== false; // Default true
+    } else {
+      // Modal/welcome defaults
+      processed.cssPrefix = 'welcome';
+      processed.showTitles = processed.showTitles !== false;
+      processed.compactSpacing = false;
+    }
+
+    return processed;
   }
 
   /**
@@ -50,13 +85,17 @@ class ContentRenderer {
       return this.renderError('Workflow content must have a steps array');
     }
 
+    const cssPrefix = options.cssPrefix || 'welcome';
+    const compactSpacing = options.compactSpacing || false;
+    const spacingClass = compactSpacing ? ' compact' : '';
+
     const stepsHtml = content.steps.map((step, index) => {
       const stepNumber = index + 1;
       const title = this.escapeHtml(step.title || '');
-      const description = this.escapeHtml(step.description || '');
-      
+      const description = this.processText(step.description || '');
+
       return `
-        <div class="workflow-step">
+        <div class="workflow-step${spacingClass}">
           <div class="step-number">${stepNumber}</div>
           <div class="step-content">
             <strong>${title}</strong>
@@ -67,10 +106,52 @@ class ContentRenderer {
     }).join('');
 
     return `
-      <div class="welcome-workflow">
+      <div class="${cssPrefix}-workflow">
         <div class="workflow-steps">
           ${stepsHtml}
         </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Renders bullet-style content for wizard popovers (traditional bullet points)
+   * @param {Object} content - Content with items array
+   * @param {Object} options - Rendering options
+   * @returns {string} HTML for bullet content
+   */
+  static renderBullets(content, options = {}) {
+    if (!content.items || !Array.isArray(content.items)) {
+      return this.renderError('Bullets content must have an items array');
+    }
+
+    const cssPrefix = options.cssPrefix || 'welcome';
+
+    // Add optional description before the list
+    const descriptionHtml = content.description ? `
+      <p>${this.processText(content.description)}</p>
+    ` : '';
+
+    const itemsHtml = content.items.map(item => {
+      const title = this.escapeHtml(item.title || '');
+      const description = this.processText(item.description || '');
+
+      // Format as "Title – description" on same line with bullet point
+      return `<li><strong>${title}</strong> – ${description}</li>`;
+    }).join('');
+
+    // Add footnote if present
+    const footnoteHtml = content.footnote ? `
+      <p>${this.processText(content.footnote)}</p>
+    ` : '';
+
+    return `
+      <div class="${cssPrefix}-bullets">
+        ${descriptionHtml}
+        <ul>
+          ${itemsHtml}
+        </ul>
+        ${footnoteHtml}
       </div>
     `;
   }
@@ -86,27 +167,38 @@ class ContentRenderer {
       return this.renderError('List content must have an items array');
     }
 
+    const cssPrefix = options.cssPrefix || 'welcome';
+    const compactSpacing = options.compactSpacing || false;
+    const spacingClass = compactSpacing ? ' compact' : '';
+    const includeDescription = options.includeDescription !== false;
+
+    // Add optional description before the list
+    const descriptionHtml = content.description ? `
+      <p class="list-description">${this.processText(content.description)}</p>
+    ` : '';
+
     const itemsHtml = content.items.map(item => {
       const title = this.escapeHtml(item.title || '');
-      const description = this.processText(item.description || '');
+      const description = includeDescription ? this.processText(item.description || '') : '';
 
       return `
-        <div class="list-item">
+        <div class="list-item${spacingClass}">
           <strong>${title}</strong>
-          <p>${description}</p>
+          ${description ? `<p>${description}</p>` : ''}
         </div>
       `;
     }).join('');
 
     // Add footnote if present
     const footnoteHtml = content.footnote ? `
-      <div class="footnote-item">
+      <div class="footnote-item${spacingClass}">
         ${this.processText(content.footnote)}
       </div>
     ` : '';
 
     return `
-      <div class="welcome-list">
+      <div class="${cssPrefix}-list">
+        ${descriptionHtml}
         ${itemsHtml}
         ${footnoteHtml}
       </div>
@@ -124,6 +216,10 @@ class ContentRenderer {
       return this.renderError('Accordion content must have an items array');
     }
 
+    const cssPrefix = options.cssPrefix || 'welcome';
+    const compactSpacing = options.compactSpacing || false;
+    const spacingClass = compactSpacing ? ' compact' : '';
+
     const itemsHtml = content.items.map((item, index) => {
       const question = this.escapeHtml(item.question || '');
       const answerId = `faq-${index}`;
@@ -139,7 +235,7 @@ class ContentRenderer {
       }
 
       return `
-        <div class="faq-item">
+        <div class="faq-item${spacingClass}">
           <div class="faq-question" data-faq="${answerId}">
             <span>${question}</span>
             <i class="faq-icon">+</i>
@@ -152,10 +248,27 @@ class ContentRenderer {
     }).join('');
 
     return `
-      <div class="faq-container">
+      <div class="${cssPrefix}-faq-container">
         ${itemsHtml}
       </div>
     `;
+  }
+
+  /**
+   * Renders simple text content
+   * @param {Object} content - Content with text field
+   * @param {Object} options - Rendering options
+   * @returns {string} HTML for text content
+   */
+  static renderText(content, options = {}) {
+    const cssPrefix = options.cssPrefix || 'welcome';
+    const text = content.text || content.description || '';
+
+    if (!text) {
+      return this.renderError('Text content must have a text or description field');
+    }
+
+    return `<div class="${cssPrefix}-text"><p>${this.processText(text)}</p></div>`;
   }
 
   /**
@@ -165,11 +278,12 @@ class ContentRenderer {
    * @returns {string} HTML for plain text content
    */
   static renderPlainText(content, options = {}) {
-    const text = typeof content === 'string' ? content : 
-                 content.text || content.description || 
+    const cssPrefix = options.cssPrefix || 'welcome';
+    const text = typeof content === 'string' ? content :
+                 content.text || content.description ||
                  JSON.stringify(content);
-    
-    return `<div class="welcome-text"><p>${this.escapeHtml(text)}</p></div>`;
+
+    return `<div class="${cssPrefix}-text"><p>${this.escapeHtml(text)}</p></div>`;
   }
 
   /**
@@ -189,20 +303,23 @@ class ContentRenderer {
    * @returns {string} HTML for icon
    */
   static renderIcon(iconType) {
-    // Import IconRenderer if available, otherwise use inline icons
-    if (typeof IconRenderer !== 'undefined') {
-      return IconRenderer.render(iconType);
-    }
-    
-    // Fallback inline icons for common types
+    // Inline icons for all types
     const iconMap = {
       'user-toggle': '<i class="fas fa-user"></i> / <i class="fas fa-user-friends"></i>',
       'chart-line': '<svg width="18" height="14" viewBox="0 0 20 16" style="vertical-align: middle;"><line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1"/><line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1"/><line x1="3" y1="12" x2="19" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       'chart-variable': '<svg width="18" height="14" viewBox="0 0 20 16" style="vertical-align: middle;"><line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1"/><line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1"/><path d="M3 12 L6 9 L9 11 L12 7 L15 10 L19 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
-      'palette': '<i class="fas fa-palette" style="background: linear-gradient(45deg,#fe0000 0%,#f34201 20%,#eda600 40%,#e0cd00 60%,#94ac29 80%,#00e000 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;"></i>'
+      'palette': '<i class="fas fa-palette" style="background: linear-gradient(45deg,#fe0000 0%,#f34201 20%,#eda600 40%,#e0cd00 60%,#94ac29 80%,#00e000 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;"></i>',
+      'user': '<i class="fas fa-user"></i>',
+      'user-friends': '<i class="fas fa-user-friends"></i>',
+      'demo': '<i class="fas fa-play-circle"></i>',
+      'save': '<i class="fas fa-save"></i>',
+      'load': '<i class="fas fa-folder-open"></i>',
+      'help': '<span style="display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-family: \'Georgia\', \'Times New Roman\', serif; color: #0077cc; background: white; border: 1px solid #0077cc; border-radius: 50%; width: 16px; height: 16px; font-weight: bold; font-style: italic; vertical-align: middle; margin: 0 2px;">i</span>',
+      'info': '<span style="display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-family: \'Georgia\', \'Times New Roman\', serif; color: #0077cc; background: white; border: 1px solid #0077cc; border-radius: 50%; width: 16px; height: 16px; font-weight: bold; font-style: italic; vertical-align: middle; margin: 0 2px;">i</span>',
+      'run': '<i class="fas fa-calculator"></i>'
     };
-    
-    return iconMap[iconType] || '';
+
+    return iconMap[iconType] || '<i class="fas fa-circle"></i>';
   }
 
   /**
@@ -240,7 +357,7 @@ class ContentRenderer {
     if (!text || typeof text !== 'string') return text;
 
     // Replace {icon:icon-type} with rendered icon HTML
-    return text.replace(/\{icon:([^}]+)\}/g, (match, iconType) => {
+    return text.replace(/\{icon:([^}]+)\}/g, (_, iconType) => {
       return this.renderIcon(iconType.trim());
     });
   }
