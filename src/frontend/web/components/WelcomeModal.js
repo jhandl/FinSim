@@ -25,9 +25,9 @@ class WelcomeModal {
       // Extract WelcomeTabs (fallback to legacy tabs if needed)
       const tabsArray = (processed && processed.WelcomeTabs) ? processed.WelcomeTabs : (processed.tabs || []);
 
-      // Convert markdown links inside tab content
+      // Convert markdown links inside tab content (only for legacy string content)
       tabsArray.forEach(tab => {
-        if (tab.content) {
+        if (tab.content && typeof tab.content === 'string') {
           tab.content = FormatUtils.processMarkdownLinks(tab.content);
         }
       });
@@ -126,13 +126,33 @@ class WelcomeModal {
   createTabContent() {
     if (!this.contentData.tabs) return '';
 
-    return this.contentData.tabs.map((tab, index) => `
-      <div class="welcome-tab-content ${index === 0 ? 'active' : ''}"
-           data-tab="${tab.id}"
-           role="tabpanel">
-        ${tab.content}
-      </div>
-    `).join('');
+    return this.contentData.tabs.map((tab, index) => {
+      const scrollableClass = tab.excludeFromHeightCalculation ? ' scrollable-tab' : '';
+      const renderedContent = this.renderTabContent(tab);
+
+      return `
+        <div class="welcome-tab-content${scrollableClass} ${index === 0 ? 'active' : ''}"
+             data-tab="${tab.id}"
+             role="tabpanel">
+          ${renderedContent}
+        </div>
+      `;
+    }).join('');
+  }
+
+  renderTabContent(tab) {
+    // Check if tab has contentType (new meta-description format)
+    if (tab.contentType && typeof ContentRenderer !== 'undefined') {
+      try {
+        return ContentRenderer.render(tab.contentType, tab.content);
+      } catch (error) {
+        console.error('Error rendering tab content with ContentRenderer:', error);
+        // Fall back to direct content rendering
+      }
+    }
+
+    // Backward compatibility: use direct content (HTML string)
+    return tab.content || '';
   }
 
   setupEventListeners() {
@@ -187,6 +207,9 @@ class WelcomeModal {
     // Keyboard navigation
     this.keydownHandler = this.handleKeydown.bind(this);
     document.addEventListener('keydown', this.keydownHandler);
+
+    // FAQ accordion functionality
+    this.setupFAQAccordion();
   }
 
   switchTab(tabId) {
@@ -203,6 +226,44 @@ class WelcomeModal {
     panels.forEach(panel => {
       const isActive = panel.getAttribute('data-tab') === tabId;
       panel.classList.toggle('active', isActive);
+    });
+
+    // Re-setup FAQ accordion if switching to FAQ tab
+    if (tabId === 'faq') {
+      setTimeout(() => this.setupFAQAccordion(), 50);
+    }
+  }
+
+  setupFAQAccordion() {
+    const faqQuestions = this.modal.querySelectorAll('.faq-question');
+
+    faqQuestions.forEach(question => {
+      // Remove existing listeners to prevent duplicates
+      const newQuestion = question.cloneNode(true);
+      question.parentNode.replaceChild(newQuestion, question);
+
+      newQuestion.addEventListener('click', () => {
+        const faqItem = newQuestion.closest('.faq-item');
+        const answer = faqItem.querySelector('.faq-answer');
+
+        const isOpen = faqItem.classList.contains('open');
+
+        if (isOpen) {
+          // Close this item
+          faqItem.classList.remove('open');
+          answer.style.maxHeight = '0';
+        } else {
+          // Close all other items first
+          this.modal.querySelectorAll('.faq-item.open').forEach(openItem => {
+            openItem.classList.remove('open');
+            openItem.querySelector('.faq-answer').style.maxHeight = '0';
+          });
+
+          // Open this item
+          faqItem.classList.add('open');
+          answer.style.maxHeight = answer.scrollHeight + 'px';
+        }
+      });
     });
   }
 
@@ -239,6 +300,12 @@ class WelcomeModal {
     const actualWidth = modalContent ? modalContent.offsetWidth : 600;
 
     this.contentData.tabs.forEach(tab => {
+      // Skip tabs that are excluded from height calculation
+      if (tab.excludeFromHeightCalculation) {
+        heights.push({ id: tab.id, height: 0, excluded: true });
+        return;
+      }
+
       // Create a test container that mimics the modal structure
       const testContainer = document.createElement('div');
       testContainer.style.position = 'absolute';
@@ -253,7 +320,7 @@ class WelcomeModal {
       testContent.style.position = 'relative'; // Use relative instead of absolute for measurement
       testContent.style.width = '100%';
       testContent.style.boxSizing = 'border-box';
-      testContent.innerHTML = tab.content;
+      testContent.innerHTML = this.renderTabContent(tab);
 
       testContainer.appendChild(testContent);
       document.body.appendChild(testContainer);
@@ -282,9 +349,10 @@ class WelcomeModal {
     const footerHeight = footer ? footer.offsetHeight : 0;
     const tabsHeight = tabs ? tabs.offsetHeight : 0;
 
-    // Find the tallest tab content
+    // Find the tallest tab content, excluding tabs marked for exclusion
     const tabHeights = this.measureAllTabHeights();
-    const maxContentHeight = Math.max(...tabHeights.map(t => t.height), 0);
+    const includedHeights = tabHeights.filter(t => !t.excluded).map(t => t.height);
+    const maxContentHeight = Math.max(...includedHeights, 0);
 
     // The measured content height already includes padding (20px), so we don't need to add extra
     // Just add a minimal buffer for any spacing between tabs and content

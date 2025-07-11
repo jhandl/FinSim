@@ -2,86 +2,98 @@ WelcomeTabs:
 
   - id: getting-started
     title: Start
-    content: |
-      <div class="welcome-workflow">
-        <div class="workflow-steps">
-          <div class="workflow-step">
-            <div class="step-number">1</div>
-            <div class="step-content">
-              <strong>Setup Your Situation</strong>
-              <p>Fill in your current financial position, personal circumstances, and targets in the input panels.</p>
-            </div>
-          </div>
-          <div class="workflow-step">
-            <div class="step-number">2</div>
-            <div class="step-content">
-              <strong>Add Your Plans</strong>
-              <p>Use the Events table to add any time-bound financial events, such as your income, expenses, buying or selling a property, etc.</p>
-            </div>
-          </div>
-          <div class="workflow-step">
-            <div class="step-number">3</div>
-            <div class="step-content">
-              <strong>Run & Analyze</strong>
-              <p>Run the simulator to see how your plan unfolds. You'll see graphs showing your cashflow and asset growth, plus a detailed year-by-year breakdown.</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    contentType: workflow
+    content:
+      steps:
+        - title: "Setup Your Situation"
+          description: "Fill in your current financial position, personal circumstances, and targets in the input panels."
+        - title: "Add Your Plans"
+          description: "Use the Events table to add any time-bound financial events, such as your income, expenses, buying or selling a property, etc."
+        - title: "Run & Analyze"
+          description: "Run the simulator to see how your plan unfolds. You'll see graphs showing your cashflow and asset growth, plus a detailed year-by-year breakdown."
 
   - id: key-concepts
     title: Modes
-    content: |
-      <div class="welcome-list">
-        <div class="list-item">
-          <strong>Single vs Two-Person Mode</strong>
-          <p>Use the toggle icons to switch between individual planning (<i class="fas fa-user"></i>) and couples/partnerships (<i class="fas fa-user-friends"></i>) with separate pensions and retirement ages.</p>
-        </div>
-        <div class="list-item">
-          <strong>Fixed vs Variable Growth</strong>
-          <p>Toggle between a fixed growth rate (<svg width="18" height="14" viewBox="0 0 20 16" style="vertical-align: middle;"><line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1"/><line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1"/><line x1="3" y1="12" x2="19" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>) and a variable growth rate (<svg width="18" height="14" viewBox="0 0 20 16" style="vertical-align: middle;"><line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1"/><line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1"/><path d="M3 12 L6 9 L9 11 L12 7 L15 10 L19 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>) to simulate different market conditions and understand the probability of success.</p>
-        </div>
-        <div class="list-item">
-          <strong>Age vs Year Mode</strong>
-          <p>Toggle between age-based and year-based planning in the Events table to better understand your timeline.</p>
-        </div>
-      </div>
+    contentType: list
+    content:
+      items:
+        - title: "Single vs Two-Person Mode"
+          description: "Use the toggle icons to switch between individual planning ({icon:user}) and couples/partnerships ({icon:user-friends}) with separate pensions and retirement ages."
+        - title: "Fixed vs Variable Growth"
+          description: "Toggle between a fixed growth rate ({icon:chart-line}) and a variable growth rate ({icon:chart-variable}) to simulate different market conditions and understand the probability of success."
+        - title: "Age vs Year Mode"
+          description: "Toggle between age-based and year-based planning in the Events table to better understand your timeline."
 
   - id: tips-tricks
     title: Tips
-    content: |
-      <div class="welcome-list">
-        <div class="list-item">
-          <strong>Demo Scenario</strong>
-          <p>The best way to get familiar with the simulator is to try the demo scenario. Hit the Demo button to load and run it.</p>
-        </div>
-        <div class="list-item">
-          <strong>Stress Testing</strong>
-          <p>Try different economic scenarios such as higher inflation, lower investment returns and market crashes to see how robust your plan is.</p>
-        </div>
-        <div class="list-item">
-          <strong>Pinch Point Visualisation</strong>
-          <p>Use the color scheme dropdown (<i class="fas fa-palette" style="background: linear-gradient(45deg,#fe0000 0%,#f34201 20%,#eda600 40%,#e0cd00 60%,#94ac29 80%,#00e000 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;"></i>) in the data table to highlight critical periods in your plan.</p>
-        </div>
-      </div>
+    contentType: list
+    content:
+      items:
+        - title: "Demo Scenario"
+          description: "The best way to get familiar with the simulator is to try the demo scenario. Hit the Demo button to load and run it."
+        - title: "Stress Testing"
+          description: "Try different economic scenarios such as higher inflation, lower investment returns and market crashes to see how robust your plan is."
+        - title: "Pinch Point Visualisation"
+          description: "Use the color scheme dropdown ({icon:palette}) in the data table to highlight critical periods in your plan."
 
   - id: notes
     title: Notes
-    content: |
-      <div class="welcome-list">
-        <div class="list-item">
-          <strong>Disclaimer</strong>
-          <p>This is not financial advice. It's a tool to help you understand how different decisions and scenarios can affect your long term financial future. Don't make serious financial decisions without talking to a financial advisor.</p>
-        </div>
-        <div class="list-item">
-          <strong>Privacy notice</strong>
-          <p>I don't collect any data from you. The information you enter stays in your computer.</p>
-        </div>
-        <div class="list-item">
-          <strong>Complementary tools</strong>
-          <p>Consider also using Irish Tax Hub's [tax calculators](https://www.irishtaxhub.ie/tools){tax calculators,suite,net income,free,pension,try calculator} and PWC's [income tax calculator](https://download.pwc.com/ie/budget-2025/income-tax-calculator.html){income tax calculator,your status,are you entitled}.</p>
-        </div>
-      </div>
+    contentType: list
+    content:
+      items:
+        - title: "Disclaimer"
+          description: "This is not financial advice. It's a tool to help you understand how different decisions and scenarios can affect your long term financial future. Don't make serious financial decisions without talking to a financial advisor."
+        - title: "Privacy notice"
+          description: "I don't collect any data from you. The information you enter stays in your computer."
+        - title: "Complementary tools"
+          description: "Consider also using Irish Tax Hub's [tax calculators](https://www.irishtaxhub.ie/tools){tax calculators,suite,net income,free,pension,try calculator} and PWC's [income tax calculator](https://download.pwc.com/ie/budget-2025/income-tax-calculator.html){income tax calculator,your status,are you entitled}."
+
+  - id: faq
+    title: F.A.Q.
+    excludeFromHeightCalculation: true
+    contentType: accordion
+    content:
+      items:
+        - question: "How do I get started with the simulator?"
+          answer:
+            - "Start by filling in your basic information in the parameters section (age, income, assets, etc.). Then add any planned financial events in the Events table. Finally, click Run to see your projections."
+            - "For a quick introduction, try the Demo button to load a sample scenario."
+        - question: "How accurate are the projections?"
+          answer:
+            - "The simulator uses standard financial modeling techniques, but projections are estimates based on your inputs and assumptions about future economic conditions."
+            - "Use the Monte Carlo mode to see a range of possible outcomes and stress-test your plan with different scenarios."
+        - question: "Is my financial data secure?"
+          answer:
+            - "Yes, all your data stays on your computer. Nothing is sent to any server or stored online."
+            - "You can save scenarios to files on your computer and load them later, but the data never leaves your device."
+        - question: "What is Monte Carlo simulation?"
+          answer:
+            - "Monte Carlo simulation runs thousands of scenarios with random variations in investment returns, inflation, and other factors."
+            - "This shows you the probability of success and helps you understand the range of possible outcomes, not just a single projection."
+        - question: "How do I use the Events table?"
+          answer:
+            - "The Events table lets you add time-bound financial events like salary changes, property purchases, or retirement."
+            - "Click \"Add Event\" and choose the type. You can set events by age or calendar year, and they'll be applied in your projections."
+        - question: "Can I plan for retirement?"
+          answer:
+            - "Yes! Set your retirement age and target income. Add pension contributions and state pension expectations."
+            - "The simulator will show if your savings are on track and how long your money might last in retirement."
+        - question: "How do I model property purchases?"
+          answer:
+            - "Use the \"Buy Property\" event type. Enter the purchase price, down payment, and mortgage details."
+            - "The simulator will account for mortgage payments, property appreciation, and the impact on your cash flow and net worth."
+        - question: "Does it include Irish taxes?"
+          answer:
+            - "Yes, the simulator includes Irish income tax, USC, PRSI, and capital gains tax calculations."
+            - "It also models pension tax relief and other Irish-specific tax considerations for accurate projections."
+        - question: "Can couples use this together?"
+          answer:
+            - "Yes! Toggle to \"Two-Person Mode\" using the user icons. This allows separate incomes, pensions, and retirement ages."
+            - "The simulator will optimize tax efficiency between partners and model joint financial planning."
+        - question: "How do I save my scenarios?"
+          answer:
+            - "Click the Save button to download your scenario as a file. You can load it later using the Load button."
+            - "This lets you compare different strategies or return to your planning later."
 
 
 ###########################################################

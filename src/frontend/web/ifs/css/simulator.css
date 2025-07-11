@@ -537,6 +537,102 @@ header.header-hidden {
     visibility: visible;
 }
 
+/* Scrollable tab content for FAQ */
+.welcome-tab-content.scrollable-tab {
+    overflow-y: auto;
+    padding-right: 15px; /* Account for scrollbar */
+}
+
+.welcome-tab-content.scrollable-tab::-webkit-scrollbar {
+    width: 5px;
+}
+
+.welcome-tab-content.scrollable-tab::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.welcome-tab-content.scrollable-tab::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.welcome-tab-content.scrollable-tab::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* FAQ Accordion Styles */
+.faq-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.faq-item {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+}
+
+.faq-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.faq-question {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1rem;
+    background: #f8f9fa;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-color);
+    transition: background-color 0.2s ease;
+    user-select: none;
+}
+
+.faq-question:hover {
+    background: #e9ecef;
+}
+
+.faq-item.open .faq-question {
+    background: var(--primary-color);
+    color: white;
+}
+
+.faq-icon {
+    font-size: 1rem;
+    transition: transform 0.3s ease;
+    font-style: normal;
+    font-weight: bold;
+    display: inline-block;
+    width: 1rem;
+    text-align: center;
+}
+
+.faq-item.open .faq-icon {
+    transform: rotate(45deg);
+}
+
+.faq-answer {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background: white;
+}
+
+.faq-answer p {
+    padding: 0.8rem 1rem;
+    margin: 0;
+    line-height: 1.5;
+    color: var(--text-color);
+}
+
+.faq-answer p:not(:last-child) {
+    border-bottom: 1px solid #f0f0f0;
+}
+
 /* Welcome Tab Content Styling - Unified Design */
 .welcome-workflow h3 {
     font-size: 1.1rem;
@@ -777,6 +873,21 @@ body.modal-open {
         width: 0.35rem;
         height: 0.35rem;
         top: 0.45rem;
+    }
+
+    /* Mobile FAQ styles */
+    .faq-question {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.9rem;
+    }
+
+    .faq-answer p {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.9rem;
+    }
+
+    .faq-icon {
+        font-size: 0.9rem;
     }
 
     .step-content strong,
