@@ -211,6 +211,26 @@ class DropdownUtils {
 
     // Toggle click
     controlContainer.addEventListener('click', (e) => {
+      // If the interactive onboarding wizard is active, close it before we proceed.
+      // Wizard.js creates a singleton instance accessible via Wizard.getInstance().
+      // However, depending on the bundler/load order, the instance may also be
+      // available as a global variable (wizard_instance). We account for both.
+
+      const activeWizard = (() => {
+        if (typeof Wizard !== 'undefined' && typeof Wizard.getInstance === 'function') {
+          const w = Wizard.getInstance();
+          return w && w.wizardActive ? w : null;
+        }
+        if (typeof window !== 'undefined' && window.wizard_instance && window.wizard_instance.wizardActive) {
+          return window.wizard_instance;
+        }
+        return null;
+      })();
+
+      if (activeWizard) {
+        try { activeWizard.finishTour(); } catch (_) { /* safeguard – ignore */ }
+      }
+
       e.stopPropagation();
       const isVisible = dropdownEl.style.display !== 'none' && dropdownEl.style.display !== '';
       if (isVisible) {
