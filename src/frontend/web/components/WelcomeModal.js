@@ -127,7 +127,8 @@ class WelcomeModal {
     if (!this.contentData.tabs) return '';
 
     return this.contentData.tabs.map((tab, index) => {
-      const scrollableClass = tab.excludeFromHeightCalculation ? ' scrollable-tab' : '';
+      const isFAQ = tab.id === 'faq';
+      const scrollableClass = (tab.excludeFromHeightCalculation || isFAQ) ? ' scrollable-tab' : '';
       const renderedContent = this.renderTabContent(tab);
 
       return `
@@ -301,7 +302,7 @@ class WelcomeModal {
 
     this.contentData.tabs.forEach(tab => {
       // Skip tabs that are excluded from height calculation
-      if (tab.excludeFromHeightCalculation) {
+      if (tab.excludeFromHeightCalculation || tab.id === 'faq') {
         heights.push({ id: tab.id, height: 0, excluded: true });
         return;
       }
@@ -316,7 +317,7 @@ class WelcomeModal {
 
       // Create the content div with the same structure as the real tab content
       const testContent = document.createElement('div');
-      testContent.style.padding = '20px';
+      testContent.style.padding = '8px 20px'; // Match real tab padding for accurate measurement
       testContent.style.position = 'relative'; // Use relative instead of absolute for measurement
       testContent.style.width = '100%';
       testContent.style.boxSizing = 'border-box';
@@ -387,6 +388,15 @@ class WelcomeModal {
 
       modalBody.style.height = `${bodyHeight}px`;
       modalBody.style.minHeight = 'auto'; // Override the CSS min-height constraint
+
+      // Ensure tab content containers align with real tabs height instead of hard-coded 38px
+      const tabsElement = this.modal.querySelector('.welcome-tabs');
+      const tabsHeightActual = tabsElement ? tabsElement.offsetHeight : 0;
+      const tabContents = this.modal.querySelectorAll('.welcome-tab-content');
+      tabContents.forEach(tc => {
+        tc.style.top = `${tabsHeightActual}px`;
+        tc.style.bottom = 'auto'; // Allow natural height – prevents forced stretching
+      });
 
       // If content is taller than max height, enable scrolling
       if (optimalHeight > maxHeight) {
