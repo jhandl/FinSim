@@ -472,7 +472,7 @@ header.header-hidden {
     display: flex;
     flex-direction: column;
     position: relative;
-    min-height: 350px;
+    min-height: 0px;
 }
 
 .welcome-tabs {

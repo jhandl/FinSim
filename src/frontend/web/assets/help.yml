@@ -18,7 +18,7 @@ WelcomeTabs:
     content:
       items:
         - title: "Single vs Two-Person Mode"
-          description: "Use the toggle icons to switch between individual planning ({icon:user}) and couples/partnerships ({icon:user-friends}) with separate pensions and retirement ages."
+          description: "Use the toggle icons to switch between individual ({icon:user}) and couples/partnerships ({icon:user-friends}) with separate pensions and retirement ages."
         - title: "Fixed vs Variable Growth"
           description: "Toggle between a fixed growth rate ({icon:chart-line}) and a variable growth rate ({icon:chart-variable}) to simulate different market conditions and understand the probability of success."
         - title: "Age vs Year Mode"

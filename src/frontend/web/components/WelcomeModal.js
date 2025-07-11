@@ -102,8 +102,21 @@ class WelcomeModal {
 
     document.body.appendChild(this.modal);
 
+    // Temporarily hide FAQ content so it doesn't influence initial rendering / measurement
+    const faqPanel = this.modal.querySelector('.welcome-tab-content[data-tab="faq"]');
+    if (faqPanel) {
+      faqPanel.dataset.originalDisplay = faqPanel.style.display || '';
+      faqPanel.style.display = 'none';
+    }
+
     // Measure and apply dynamic height while invisible
     this.applyDynamicHeight();
+
+    // Restore FAQ visibility (kept scrollable, will not affect height)
+    if (faqPanel) {
+      faqPanel.style.display = faqPanel.dataset.originalDisplay;
+      delete faqPanel.dataset.originalDisplay;
+    }
 
     // Now make it ready for the show animation
     this.modal.style.visibility = '';  // Clear the visibility override
@@ -292,47 +305,45 @@ class WelcomeModal {
   }
 
   measureAllTabHeights() {
-    if (!this.contentData.tabs) return [];
+    const panels = Array.from(this.modal.querySelectorAll('.welcome-tab-content'));
 
     const heights = [];
 
-    // Get the actual modal content width to match the real tab content area
-    const modalContent = this.modal.querySelector('.welcome-modal-content');
-    const actualWidth = modalContent ? modalContent.offsetWidth : 600;
+    panels.forEach(panel => {
+      const tabId = panel.getAttribute('data-tab');
 
-    this.contentData.tabs.forEach(tab => {
-      // Skip tabs that are excluded from height calculation
-      if (tab.excludeFromHeightCalculation || tab.id === 'faq') {
-        heights.push({ id: tab.id, height: 0, excluded: true });
+      // Ignore FAQ or any tab explicitly marked for exclusion via YAML
+      const isExcluded = tabId === 'faq' || panel.classList.contains('scrollable-tab');
+      if (isExcluded) {
+        heights.push({ id: tabId, height: 0, excluded: true });
         return;
       }
 
-      // Create a test container that mimics the modal structure
-      const testContainer = document.createElement('div');
-      testContainer.style.position = 'absolute';
-      testContainer.style.top = '-9999px';
-      testContainer.style.left = '0';
-      testContainer.style.width = `${actualWidth}px`;
-      testContainer.style.visibility = 'hidden';
+      // Preserve original inline styles so we can restore them after measurement
+      const originalStyles = {
+        position: panel.style.position,
+        visibility: panel.style.visibility,
+        display: panel.style.display,
+        top: panel.style.top,
+        bottom: panel.style.bottom,
+        left: panel.style.left,
+        right: panel.style.right
+      };
 
-      // Create the content div with the same structure as the real tab content
-      const testContent = document.createElement('div');
-      testContent.style.padding = '8px 20px'; // Match real tab padding for accurate measurement
-      testContent.style.position = 'relative'; // Use relative instead of absolute for measurement
-      testContent.style.width = '100%';
-      testContent.style.boxSizing = 'border-box';
-      testContent.innerHTML = this.renderTabContent(tab);
+      // Temporarily show the panel in normal flow for accurate measurement
+      panel.style.position = 'relative';
+      panel.style.visibility = 'hidden';
+      panel.style.display = 'block';
+      panel.style.top = panel.style.bottom = panel.style.left = panel.style.right = 'auto';
 
-      testContainer.appendChild(testContent);
-      document.body.appendChild(testContainer);
+      const height = panel.scrollHeight;
 
-      // Force layout and measure
-      testContainer.offsetHeight;
-      const testHeight = testContent.scrollHeight;
+      // Restore original styles
+      Object.keys(originalStyles).forEach(key => {
+        panel.style[key] = originalStyles[key] || '';
+      });
 
-      document.body.removeChild(testContainer);
-
-      heights.push({ id: tab.id, height: testHeight });
+      heights.push({ id: tabId, height });
     });
 
     return heights;
@@ -356,10 +367,7 @@ class WelcomeModal {
     const maxContentHeight = Math.max(...includedHeights, 0);
 
     // The measured content height already includes padding (20px), so we don't need to add extra
-    // Just add a minimal buffer for any spacing between tabs and content
-    const buffer = 5;
-
-    return headerHeight + footerHeight + tabsHeight + maxContentHeight + buffer;
+    return headerHeight + footerHeight + tabsHeight + maxContentHeight;
   }
 
   applyDynamicHeight() {
@@ -387,7 +395,8 @@ class WelcomeModal {
       const bodyHeight = finalHeight - headerHeight - footerHeight;
 
       modalBody.style.height = `${bodyHeight}px`;
-      modalBody.style.minHeight = 'auto'; // Override the CSS min-height constraint
+      modalBody.style.minHeight = '0'; // Remove CSS min-height that caused blank space
+      modalBody.style.flex = '0 0 auto'; // Prevent flex:1 from forcing extra space
 
       // Ensure tab content containers align with real tabs height instead of hard-coded 38px
       const tabsElement = this.modal.querySelector('.welcome-tabs');
@@ -396,12 +405,15 @@ class WelcomeModal {
       tabContents.forEach(tc => {
         tc.style.top = `${tabsHeightActual}px`;
         tc.style.bottom = 'auto'; // Allow natural height – prevents forced stretching
+        tc.style.height = 'auto';
       });
 
       // If content is taller than max height, enable scrolling
       if (optimalHeight > maxHeight) {
         modalBody.style.overflowY = 'auto';
       }
+
+      // No additional adjustments needed; min-height override should eliminate surplus space
     }
   }
 
