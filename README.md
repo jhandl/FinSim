@@ -3,7 +3,9 @@
 # Roadmap
 
 ### Improvements
-- Add tooltips to the data table cells showing the origin of the numbers.
+- Auto-save scenarios
+   - Save the current scenario to the local storage when it gets dirty. When opening the page, check if there's a saved scenario. If there is, load it. If not => welcome modal.
+   - Add a clear scenario button somewhere. When clearing the scenario, clean the storage as well.
 - Implement analytics to replace cloudfront
 - Allow three options for retirement lump sum: not take it, limit to tax-free allowance, take it all.
 - Add an option to the pension contribution: Only contribute once hitting the high income tax bracket (this allows for downpayment saving while young; check with users if this makes sense though).

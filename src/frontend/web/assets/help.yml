@@ -45,24 +45,23 @@ WelcomeTabs:
         - question: "Why are the numbers much larger than I expected?"
           answer:
             - "Unless you specify 0 inflation, the numbers will grow year after year at the rate of inflation."
-            - "The values you enter into the different fields have to be in terms of present value. For example, for a property that you expect to purchase 10 years from now, you have to enter the present value of the property, not the value you expect it to be worth in 10 years time."
-        - question: "Why are Revenue's tax credits also inflation adjusted?"
+            - "The values you enter into the different fields have to be in terms of present value though. For example, for a property that you expect to purchase 10 years from now, you should enter the current value of the property, not the value you expect it to be worth in 10 years time."
+        - question: "Why are tax credits and limits also inflation adjusted?"
           answer:
-            - "Even though some of the budget numbers don't change every year (ahem, cgt credit, ahem), many generally do, for example the income tax brackets."
+            - "Even though some of the budget numbers don't change every year (cough, cgt credit, cough), many generally do, for example the income tax brackets."
             - "I have to assume some periodic adjustment, and inflation is the best proxy I can think of. I'm open to suggestions on how to do this better."
         - question: "Why do I see this unexpected number in the simulation data table?"
           answer:
             - "Many of the table cells have a little 'i' on the lower right corner. That means that the cell has a tooltip attached to it." 
-            - "You can hover over the number to see where the number comes from."
+            - "You can hover (or long-press) over the number to see where the number comes from."
         - question: "How do I use the Events table?"
           answer:
             - "Things that have a start date and an end date, like your income, your expenses or buying a property, go into the events table."
             - "Click \"Add Event\" and choose the type. You can hover (or long-press) on any type in the menu to see a description of what it does."
-            - "You can set events by age or calendar year, and they'll be applied in your projections."
         - question: "How do I model property purchases?"
           answer:
-            - "Use the \"Real Estate\" event type. Enter a name for the property, the down payment, purchase date (which can be in the past) and expected sale date, and the expected appreciation rate."
-            - "Then create a \"Mortgage\" event with the same name, and enter the yearly mortgage repayment (12 x the monthly payment), and the interest rate."
+            - "Use the \"Real Estate\" event type. Enter a name for the property, the down payment, purchase date (which can be in the past), expected sale date (leave it blank if you won't sell it), and the expected appreciation rate."
+            - "Then create a \"Mortgage\" event with the same name and start date, then enter the yearly mortgage repayment, end date and the interest rate."
             - "You can add multiple properties to your plan."
         - question: "What if I want to buy a property in cash?"
           answer:
