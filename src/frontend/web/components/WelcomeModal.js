@@ -391,12 +391,12 @@ class WelcomeModal {
       // Set the total modal height
       modalContent.style.height = `${finalHeight}px`;
 
-      // Calculate the body height by subtracting header and footer
+      // Calculate exact body height (space between header and footer)
       const bodyHeight = finalHeight - headerHeight - footerHeight;
 
       modalBody.style.height = `${bodyHeight}px`;
-      modalBody.style.minHeight = '0'; // Remove CSS min-height that caused blank space
-      modalBody.style.flex = '0 0 auto'; // Prevent flex:1 from forcing extra space
+      modalBody.style.minHeight = 'auto'; // override CSS min-height
+      modalBody.style.flex = '0 0 auto'; // prevent unwanted stretching
 
       // Ensure tab content containers align with real tabs height instead of hard-coded 38px
       const tabsElement = this.modal.querySelector('.welcome-tabs');
@@ -404,7 +404,13 @@ class WelcomeModal {
       const tabContents = this.modal.querySelectorAll('.welcome-tab-content');
       tabContents.forEach(tc => {
         tc.style.top = `${tabsHeightActual}px`;
-        tc.style.bottom = 'auto'; // Allow natural height – prevents forced stretching
+        if (tc.classList.contains('scrollable-tab')) {
+          // For FAQ/scrollable tabs keep bottom 0 so it fills the remaining space and becomes scrollable
+          tc.style.bottom = '0';
+          tc.style.overflowY = 'auto';
+        } else {
+          tc.style.bottom = 'auto'; // natural height for non-scrollable tabs
+        }
         tc.style.height = 'auto';
       });
 
@@ -413,7 +419,8 @@ class WelcomeModal {
         modalBody.style.overflowY = 'auto';
       }
 
-      // No additional adjustments needed; min-height override should eliminate surplus space
+      // Final sanity check: if our computed body height still leaves blank space, trim it
+      // No further adjustment needed; modal body now sizes naturally
     }
   }
 
