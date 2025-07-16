@@ -38,19 +38,7 @@ th.sorted-secondary .sort-caret {
   color: #555;
 }
 
-/* Flash highlight for moved rows */
-@keyframes flash-bg {
-  from {
-    background-color: #ffffd8;
-  }
-  to {
-    background-color: inherit;
-  }
-}
 
-tr.flash {
-  animation: flash-bg 1s ease-out;
-}
 
 /* Smooth translate transition for FLIP */
 #Events tbody tr {

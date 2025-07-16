@@ -714,7 +714,7 @@ class EventsTableManager {
     }, true);
   }
 
-  applySort(flashRows = false) {
+  applySort() {
     const tbody = document.querySelector('#Events tbody');
     if (!tbody) return;
 
@@ -731,7 +731,7 @@ class EventsTableManager {
     }
 
     if (window.RowSorter) {
-      RowSorter.sortRows(tbody, this.sortKeys, { flash: flashRows });
+      RowSorter.sortRows(tbody, this.sortKeys);
     }
 
     this.updateHeaderIndicators();
@@ -924,7 +924,15 @@ class EventsTableManager {
     if (wizardManager) {
       // Pass callback to create event when wizard completes
       wizardManager.startWizard(eventType, {
-        onComplete: (eventData) => this.createEventFromWizard(eventData)
+        onComplete: (eventData) => {
+          if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+            // In accordion mode, let accordion manager handle creation and animation
+            this.webUI.eventAccordionManager.addEventFromWizard(eventData);
+          } else {
+            // In table mode, handle creation and sorting here
+            this.addEventFromWizardWithSorting(eventData);
+          }
+        }
       });
     }
   }
@@ -932,8 +940,12 @@ class EventsTableManager {
   /**
    * Create event from wizard data
    * @param {Object} eventData - Data collected from wizard
+   * @returns {HTMLElement} The created table row
    */
   createEventFromWizard(eventData) {
+    // Generate unique ID for this event
+    const id = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Create a new event row with the wizard data
     const row = this.createEventRow(
       eventData.eventType || '',
@@ -945,8 +957,8 @@ class EventsTableManager {
       eventData.match || ''
     );
 
-    // Mark as just created for animation targeting
-    row.classList.add('just-created');
+    // Store the unique ID on the row
+    row.dataset.eventId = id;
 
     // Add to table
     const tbody = document.querySelector('#Events tbody');
@@ -956,23 +968,44 @@ class EventsTableManager {
       // Setup formatting for new inputs
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();
+    }
 
-      // Apply sort if needed - this will also notify accordion
-      if (this.sortKeys.length > 0) {
-        this.applySort();
-      } else {
-        // Even if no sort is active, notify accordion to refresh
-        this.notifyAccordionOfSortChange();
-      }
+    return { row, id };
+  }
 
-      // Add animation for new event based on current view mode
-      if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
-        this.webUI.eventAccordionManager.refreshWithNewEventAnimation(eventData);
-      } else if (this.viewMode === 'table') {
-        // Animate the newly created row in table view
-        this.animateNewTableRow(eventData);
+  /**
+   * Add event from wizard data with sorting and animation for table view
+   * @param {Object} eventData - Data collected from wizard
+   */
+  addEventFromWizardWithSorting(eventData) {
+    // Create the event
+    const result = this.createEventFromWizard(eventData);
+    const row = result.row;
+
+    // Apply sorting and animation for table view
+    if (this.sortKeys.length > 0) {
+      this.applySort(); // Apply FLIP animation for moved rows
+
+      // Apply HIGHLIGHT animation to the new row after FLIP animation
+      setTimeout(() => {
+        if (row) {
+          row.classList.add('new-event-highlight');
+          setTimeout(() => {
+            row.classList.remove('new-event-highlight');
+          }, 800); // Match animation duration
+        }
+      }, 400); // After FLIP animation completes
+    } else {
+      // No sorting active, just highlight the new row
+      if (row) {
+        row.classList.add('new-event-highlight');
+        setTimeout(() => {
+          row.classList.remove('new-event-highlight');
+        }, 800); // Match animation duration
       }
     }
+
+    return result;
   }
 
   /**

@@ -70,17 +70,11 @@ class EventSummaryRenderer {
    */
   formatCurrency(amount) {
     if (!amount || amount === '0') return '';
-    
-    const num = parseFloat(amount.toString().replace(/[,$]/g, ''));
+
+    const num = parseFloat(amount.toString().replace(/[€,$]/g, ''));
     if (isNaN(num)) return amount;
-    
-    if (num >= 1000000) {
-      return `$${(num / 1000000).toFixed(1)}M`;
-    } else if (num >= 1000) {
-      return `$${(num / 1000).toFixed(0)}K`;
-    } else {
-      return `$${num.toLocaleString()}`;
-    }
+
+    return FormatUtils.formatCurrency(num);
   }
 
   /**
@@ -278,7 +272,7 @@ class EventSummaryRenderer {
       <div class="detail-row">
         <label>Event Type:</label>
         <div class="editable-field">
-          <input type="hidden" class="accordion-edit-type" value="${event.type}" data-accordion-id="${event.accordionId}" data-original-type="${event.type}">
+          <input type="hidden" class="accordion-edit-type" value="${event.type}" data-accordion-id="${event.accordionId}" data-original-type="${event.type}" data-sort-key="event-type">
           <div class="event-type-dd visualization-control" id="AccordionEventType_${event.accordionId}">
             <span id="AccordionEventTypeToggle_${event.accordionId}" class="dd-toggle pseudo-select">${currentEventTypeInfo.label}</span>
             <div id="AccordionEventTypeOptions_${event.accordionId}" class="visualization-dropdown" style="display:none;"></div>
@@ -292,7 +286,7 @@ class EventSummaryRenderer {
       <div class="detail-row">
         <label>Name:</label>
         <div class="editable-field">
-          <input type="text" class="accordion-edit-name" value="${this.escapeHtml(event.name || '')}" data-accordion-id="${event.accordionId}">
+          <input type="text" class="accordion-edit-name" value="${this.escapeHtml(event.name || '')}" data-accordion-id="${event.accordionId}" data-sort-key="event-name">
         </div>
       </div>
     `);
@@ -302,7 +296,7 @@ class EventSummaryRenderer {
       <div class="detail-row">
         <label>Amount:</label>
         <div class="editable-field">
-          <input type="text" class="accordion-edit-amount currency" inputmode="numeric" pattern="[0-9]*" value="${event.amount || ''}" data-accordion-id="${event.accordionId}">
+          <input type="text" class="accordion-edit-amount currency" inputmode="numeric" pattern="[0-9]*" value="${event.amount || ''}" data-accordion-id="${event.accordionId}" data-sort-key="event-amount">
         </div>
       </div>
     `);
@@ -312,7 +306,7 @@ class EventSummaryRenderer {
       <div class="detail-row">
         <label>From Age:</label>
         <div class="editable-field">
-          <input type="text" class="accordion-edit-fromage" inputmode="numeric" pattern="[0-9]*" value="${event.fromAge || ''}" data-accordion-id="${event.accordionId}">
+          <input type="text" class="accordion-edit-fromage" inputmode="numeric" pattern="[0-9]*" value="${event.fromAge || ''}" data-accordion-id="${event.accordionId}" data-sort-key="from-age">
         </div>
       </div>
     `);
@@ -323,7 +317,7 @@ class EventSummaryRenderer {
       <div class="detail-row" style="display: ${showToAge ? '' : 'none'}">
         <label>To Age:</label>
         <div class="editable-field">
-          <input type="text" class="accordion-edit-toage" inputmode="numeric" pattern="[0-9]*" value="${event.toAge || ''}" data-accordion-id="${event.accordionId}">
+          <input type="text" class="accordion-edit-toage" inputmode="numeric" pattern="[0-9]*" value="${event.toAge || ''}" data-accordion-id="${event.accordionId}" data-sort-key="to-age">
         </div>
       </div>
     `);
@@ -350,7 +344,7 @@ class EventSummaryRenderer {
       <div class="detail-row" style="display: ${showGrowthRate ? '' : 'none'}">
         <label>${rateLabel}</label>
         <div class="editable-field percentage-container">
-          <input type="text" class="accordion-edit-rate percentage" inputmode="numeric" pattern="[0-9]*" placeholder="${placeholder}" value="${event.rate || ''}" data-accordion-id="${event.accordionId}">
+          <input type="text" class="accordion-edit-rate percentage" inputmode="numeric" pattern="[0-9]*" placeholder="${placeholder}" value="${event.rate || ''}" data-accordion-id="${event.accordionId}" data-sort-key="event-rate">
         </div>
       </div>
     `);
@@ -361,7 +355,7 @@ class EventSummaryRenderer {
       <div class="detail-row" style="display: ${showEmployerMatch ? '' : 'none'}">
         <label>Employer Match:</label>
         <div class="editable-field percentage-container">
-          <input type="text" class="accordion-edit-match percentage" inputmode="numeric" pattern="[0-9]*" value="${event.match || ''}" data-accordion-id="${event.accordionId}">
+          <input type="text" class="accordion-edit-match percentage" inputmode="numeric" pattern="[0-9]*" value="${event.match || ''}" data-accordion-id="${event.accordionId}" data-sort-key="event-match">
         </div>
       </div>
     `);

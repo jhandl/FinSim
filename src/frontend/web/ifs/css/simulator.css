@@ -3223,8 +3223,8 @@ footer {
 }
 
 /* Ensure table container allows overflow during animation */
-#Events.table-container {
-    overflow: visible;
+.table-container:has(#Events tbody tr.new-event-highlight) {
+    overflow: visible !important;
 }
 
 /* Temporarily allow overflow on table during animation */

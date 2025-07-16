@@ -9,8 +9,10 @@ class EventAccordionManager {
     this.accordionContainer = null;
     this.events = []; // Store event data for accordion items
     this.expandedItems = new Set(); // Track which items are expanded
+    this._newEventId = null;
     this.setupAccordionContainer();
     this.setupResizeListener();
+    this.setupAutoSortOnBlur();
   }
 
   /**
@@ -92,89 +94,11 @@ class EventAccordionManager {
       const event = this.extractEventFromRow(row);
       if (event) {
         event.accordionId = `accordion-item-${index}`;
-        // CRITICAL FIX: Store table row reference for reliable lookup
         event.tableRowIndex = index;
+        event.id = row.dataset.eventId; // Get unique ID from table row
         this.events.push(event);
       }
     });
-
-    // Apply sorting if table has active sort
-    this.applySortingToAccordion();
-  }
-
-  /**
-   * Get current sort state from table manager and apply to accordion
-   */
-  applySortingToAccordion() {
-    const tableManager = this.webUI.eventsTableManager;
-    if (!tableManager || !tableManager.sortKeys || tableManager.sortKeys.length === 0) {
-      return; // No sorting active
-    }
-
-    // Use the same sorting logic as the table
-    this.events.sort((a, b) => {
-      for (const { col, dir } of tableManager.sortKeys) {
-        const cmp = this.compareEventValues(a, b, col, dir);
-        if (cmp !== 0) return dir === 'desc' ? -cmp : cmp;
-      }
-      return 0;
-    });
-  }
-
-  /**
-   * Compare two events for sorting (reuses table sorting logic)
-   */
-  compareEventValues(eventA, eventB, col, dir) {
-    const aVal = this.getEventValueForColumn(eventA, col);
-    const bVal = this.getEventValueForColumn(eventB, col);
-
-    // Use the same comparison logic as RowSorter
-    const aNum = parseFloat(aVal);
-    const bNum = parseFloat(bVal);
-    const aIsNum = !isNaN(aNum);
-    const bIsNum = !isNaN(bNum);
-
-    // If sorting ascending, treat empty/zero as high values to sink them
-    if (dir === 'asc') {
-      if (aIsNum && aNum === 0 && bIsNum && bNum !== 0) return 1;
-      if (bIsNum && bNum === 0 && aIsNum && aNum !== 0) return -1;
-      if (!aVal && bVal) return 1;
-      if (aVal && !bVal) return -1;
-    }
-
-    if (aIsNum && bIsNum) {
-      if (aNum < bNum) return -1;
-      if (aNum > bNum) return 1;
-      return 0;
-    }
-    // Fallback to locale-aware string compare
-    return aVal.toString().localeCompare(bVal.toString(), undefined, { sensitivity: 'accent' });
-  }
-
-  /**
-   * Get event value for a specific column (maps to table column selectors)
-   */
-  getEventValueForColumn(event, col) {
-    switch (col) {
-      case 'event-type':
-        return event.type || '';
-      case 'event-name':
-        return event.name || '';
-      case 'event-amount':
-        // Clean amount like table does
-        const amount = event.amount || '';
-        return amount.replace(/[^0-9\.]/g, '');
-      case 'from-age':
-        return event.fromAge || '';
-      case 'to-age':
-        return event.toAge || '';
-      case 'event-rate':
-        return event.rate || '';
-      case 'event-match':
-        return event.match || '';
-      default:
-        return '';
-    }
   }
 
   /**
@@ -399,6 +323,7 @@ class EventAccordionManager {
    */
   refresh() {
     this.renderAccordion();
+    this.applySortingWithAnimation();
     // Check for wrapping after rendering
     setTimeout(() => this.checkAndApplyWrapping(), 50);
   }
@@ -406,76 +331,116 @@ class EventAccordionManager {
   /**
    * Refresh the accordion with animation for newly created event
    */
-  refreshWithNewEventAnimation(eventData) {
-    // Don't refresh if we already refreshed recently (to avoid double refresh)
-    if (this._recentlyRefreshed) {
-      // Just animate the existing items
-      setTimeout(() => {
-        this.animateNewEventWithSorting(eventData);
-      }, 100);
+  refreshWithNewEventAnimation(eventData, id) {
+    // Store reference to identify new item by unique ID
+    this._newEventId = id;
+
+    // First refresh the accordion to get the new event (unsorted)
+    this.renderAccordion();
+
+    // Then apply sorting with animation and highlight the new item
+    setTimeout(() => {
+      this.applySortingWithAnimation(true); // true = highlight new item
+    }, 50);
+  }
+
+  /**
+   * Apply sorting with FLIP animation using AccordionSorter
+   */
+  applySortingWithAnimation(highlightNew = false) {
+    const tableManager = this.webUI.eventsTableManager;
+    if (!tableManager || !tableManager.sortKeys || tableManager.sortKeys.length === 0) {
+      // No sorting active, just highlight if needed
+      if (highlightNew && this._newEventId) {
+        this.highlightNewEvent();
+      }
       return;
     }
 
-    // Mark as recently refreshed
-    this._recentlyRefreshed = true;
-    setTimeout(() => { this._recentlyRefreshed = false; }, 200);
+    const container = this.accordionContainer.querySelector('.events-accordion-items');
+    if (!container || !window.AccordionSorter) return;
 
-    // First refresh the accordion to get the new event
-    this.renderAccordion();
+    // Apply sorting with animation to accordion
+    window.AccordionSorter.sortAccordionItems(container, tableManager.sortKeys, this);
 
-    // Then find and animate the newly created event
-    setTimeout(() => {
-      this.animateNewEventWithSorting(eventData);
-    }, 100);
-  }
-
-  /**
-   * Animate the newly created event, accounting for its sorted position
-   */
-  animateNewEventWithSorting(eventData) {
-    // Find the accordion item that corresponds to the new event
-    // Since sorting may have moved it, we need to find it by matching data
-    const accordionItems = document.querySelectorAll('.events-accordion-item');
-    let targetItem = null;
-
-    // Look for the item that matches our event data
-    for (const item of accordionItems) {
-      const accordionId = item.dataset.accordionId;
-      const event = this.events.find(e => e.accordionId === accordionId);
-
-      if (event && this.isNewlyCreatedEvent(event, eventData)) {
-        targetItem = item;
-        break;
-      }
+    // Also sort the table (without notification to avoid recursion)
+    const tbody = document.querySelector('#Events tbody');
+    if (tbody && window.RowSorter) {
+      window.RowSorter.sortRows(tbody, tableManager.sortKeys);
     }
 
-    if (targetItem) {
-      // Add highlight animation class
-      targetItem.classList.add('new-event-highlight');
-
-      // Scroll the new event into view
-      targetItem.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
-
-      // Remove highlight after animation completes
+    // Highlight the new event after sorting animation
+    if (highlightNew && this._newEventId) {
       setTimeout(() => {
-        targetItem.classList.remove('new-event-highlight');
-      }, 800);
+        this.highlightNewEvent();
+      }, 400); // After animation completes
+    }
+
+    // Clear the new event reference
+    if (highlightNew) {
+      setTimeout(() => {
+        this._newEventId = null;
+      }, 1000);
     }
   }
 
   /**
-   * Check if an event matches newly created event data
+   * Highlight the newly created event
    */
-  isNewlyCreatedEvent(event, eventData) {
-    return event.type === eventData.eventType &&
-           event.name === eventData.name &&
-           event.amount === eventData.amount &&
-           event.fromAge === eventData.fromAge &&
-           event.toAge === eventData.toAge;
+  highlightNewEvent() {
+    if (!this._newEventId) return;
+
+    const container = this.accordionContainer.querySelector('.events-accordion-items');
+    if (!container || !window.AccordionSorter) return;
+
+    // Use AccordionSorter to find and highlight the new item
+    window.AccordionSorter.highlightNewItem(container, (item) => {
+      return this.isNewlyCreatedAccordionItem(item, this._newEventId);
+    });
   }
+
+  /**
+   * Check if an accordion item corresponds to newly created event by unique ID
+   */
+  isNewlyCreatedAccordionItem(item, id) {
+    const accordionId = item.dataset.accordionId;
+    const event = this.events.find(e => e.accordionId === accordionId);
+
+    if (!event || !id) return false;
+
+    // Match on unique ID - simple and reliable
+    return event.id === id;
+  }
+
+  /**
+   * Setup auto-sort on blur for accordion input fields
+   */
+  setupAutoSortOnBlur() {
+    if (!this.accordionContainer) return;
+
+    this.accordionContainer.addEventListener('blur', (e) => {
+      // Check if the blurred element is an input field in an accordion item
+      if (e.target.matches('input') && e.target.closest('.events-accordion-item')) {
+        const tableManager = this.webUI.eventsTableManager;
+
+        if (tableManager && tableManager.sortKeys && tableManager.sortKeys.length > 0) {
+          // Only trigger auto-sort if the blurred field matches the current sort column
+          const fieldSortKey = e.target.dataset.sortKey;
+          const currentSortKey = tableManager.sortKeys[0].col;
+
+          if (fieldSortKey === currentSortKey) {
+            // Sync accordion data from table first to get the updated values
+            this.syncEventsFromTable();
+            this.applySortingWithAnimation(false); // false = no highlight, just sort
+          }
+        }
+      }
+    }, true);
+  }
+
+
+
+
 
   /**
    * Animate the newly created event to draw attention
@@ -966,12 +931,16 @@ class EventAccordionManager {
    * Add event from wizard data
    */
   addEventFromWizard(eventData) {
-    // First add to table (maintains data consistency)
+    // Create the event in the table (just creates, no sorting/refreshing)
+    let id = null;
     if (this.webUI.eventsTableManager) {
-      this.webUI.eventsTableManager.createEventFromWizard(eventData);
+      const result = this.webUI.eventsTableManager.createEventFromWizard(eventData);
+      id = result.id;
     }
 
-    // Animation is handled by the table manager based on current view mode
+    // Handle sorting and animation for accordion view
+    // This will also sort the table when it applies accordion sorting
+    this.refreshWithNewEventAnimation(eventData, id);
   }
 
   /**
