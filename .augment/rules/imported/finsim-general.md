@@ -1,0 +1,7 @@
+---
+type: "always_apply"
+---
+
+## GENERAL ADVICE ##
+
+Always read [AGENTS.md](mdc:AGENTS.md) to understand the project. Never assume how the code works, always read the relevant source code files to understand the code. 

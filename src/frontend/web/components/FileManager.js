@@ -150,13 +150,13 @@ class FileManager {
     this.webUI.tableManager.clearExtraDataRows(0);
     this.webUI.chartManager.clearExtraChartRows(0);
     this.setScenarioName(name);
-    
+
     // Reset age/year toggle to 'age' mode when loading a scenario
     // This ensures loaded scenarios display age values as they are stored in the file
     if (this.webUI.eventsTableManager) {
       this.webUI.eventsTableManager.handleAgeYearToggle('age');
     }
-    
+
     const eventData = deserializeSimulation(content, this.webUI);
 
     // Note: Simulation mode is already set by deserializeSimulation based on file version and P2 data
@@ -196,6 +196,11 @@ class FileManager {
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();
       this.webUI.eventsTableManager.updateEventRowsVisibilityAndTypes();
+
+      // CRITICAL FIX: Refresh accordion AFTER table is fully populated
+      if (this.webUI.eventAccordionManager) {
+        this.webUI.eventAccordionManager.refresh();
+      }
     }
     this.webUI.setStatus("Ready");
   }

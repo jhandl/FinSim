@@ -237,8 +237,8 @@ class ContentRenderer {
       return `
         <div class="faq-item${spacingClass}">
           <div class="faq-question" data-faq="${answerId}">
-            <span>${question}</span>
             <i class="faq-icon">+</i>
+            <span>${question}</span>
           </div>
           <div class="faq-answer">
             ${answerHtml}

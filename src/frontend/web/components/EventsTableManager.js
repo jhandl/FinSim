@@ -6,12 +6,15 @@ class EventsTableManager {
     this.webUI = webUI;
     this.eventRowCounter = 0;
     this.ageYearMode = 'age'; // Track current toggle mode
+    this.viewMode = 'table'; // Track current view mode (table/accordion)
     this.tooltipElement = null; // Reference to current tooltip
     this.tooltipTimeout = null; // Reference to tooltip delay timeout
     this.setupAddEventButton();
+    this.setupWizardButton();
     this.setupEventTableRowDelete();
     this.setupEventTypeChangeHandler();
     this.setupSimulationModeChangeHandler();
+    this.setupViewToggle();
     this.setupAgeYearToggle();
     this.setupTooltipHandlers();
     this.sortColumn = null;
@@ -34,13 +37,29 @@ class EventsTableManager {
     }
   }
 
+  setupWizardButton() {
+    const wizardButton = document.getElementById('addEventWizard');
+    if (wizardButton) {
+      wizardButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.showWizardSelection();
+      });
+    }
+  }
+
   setupEventTableRowDelete() {
     const eventsTable = document.getElementById('Events');
     if (eventsTable) {
       eventsTable.addEventListener('click', (e) => {
         if (e.target.classList.contains('delete-event')) {
           const row = e.target.closest('tr');
-          if (row) row.remove();
+          if (row) {
+            row.remove();
+            // Refresh accordion if it's active
+            if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+              this.webUI.eventAccordionManager.refresh();
+            }
+          }
         }
       });
     }
@@ -72,17 +91,36 @@ class EventsTableManager {
     }
   }
 
+  setupViewToggle() {
+    const tableToggle = document.getElementById('viewModeTable');
+    const accordionToggle = document.getElementById('viewModeAccordion');
+
+    if (tableToggle) {
+      tableToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.handleViewToggle('table');
+      });
+    }
+
+    if (accordionToggle) {
+      accordionToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.handleViewToggle('accordion');
+      });
+    }
+  }
+
   setupAgeYearToggle() {
     const ageToggle = document.getElementById('ageYearModeAge');
     const yearToggle = document.getElementById('ageYearModeYear');
-    
+
     if (ageToggle) {
       ageToggle.addEventListener('click', (e) => {
         e.preventDefault();
         this.handleAgeYearToggle('age');
       });
     }
-    
+
     if (yearToggle) {
       yearToggle.addEventListener('click', (e) => {
         e.preventDefault();
@@ -91,22 +129,66 @@ class EventsTableManager {
     }
   }
 
+  handleViewToggle(newMode) {
+    // Don't do anything if already in the requested mode
+    if (this.viewMode === newMode) {
+      return;
+    }
+
+    // CRITICAL FIX: Force blur on any active accordion input before switching
+    if (this.viewMode === 'accordion' && newMode === 'table') {
+      const activeElement = document.activeElement;
+      if (activeElement && activeElement.matches('.accordion-edit-name, .accordion-edit-amount, .accordion-edit-fromage, .accordion-edit-toage, .accordion-edit-rate, .accordion-edit-match')) {
+        activeElement.blur();
+        // Give a small delay to allow the blur event and sync to complete
+        setTimeout(() => {
+          this.completeViewToggle(newMode);
+        }, 50);
+        return;
+      }
+    }
+
+    this.completeViewToggle(newMode);
+  }
+
+  completeViewToggle(newMode) {
+    // Update the mode
+    this.viewMode = newMode;
+
+    // Update visual state of toggle buttons
+    const tableToggle = document.getElementById('viewModeTable');
+    const accordionToggle = document.getElementById('viewModeAccordion');
+
+    if (tableToggle && accordionToggle) {
+      if (newMode === 'table') {
+        tableToggle.classList.add('mode-toggle-active');
+        accordionToggle.classList.remove('mode-toggle-active');
+      } else {
+        accordionToggle.classList.add('mode-toggle-active');
+        tableToggle.classList.remove('mode-toggle-active');
+      }
+    }
+
+    // Switch between table and accordion views
+    this.switchView(newMode);
+  }
+
   handleAgeYearToggle(newMode) {
     // Don't do anything if already in the requested mode
     if (this.ageYearMode === newMode) {
       return;
     }
-    
+
     // Convert existing input values before changing the mode
     this.convertExistingInputValues(this.ageYearMode, newMode);
-    
+
     // Update the mode
     this.ageYearMode = newMode;
-    
+
     // Update visual state of toggle buttons
     const ageToggle = document.getElementById('ageYearModeAge');
     const yearToggle = document.getElementById('ageYearModeYear');
-    
+
     if (ageToggle && yearToggle) {
       if (newMode === 'age') {
         ageToggle.classList.add('mode-toggle-active');
@@ -116,11 +198,16 @@ class EventsTableManager {
         ageToggle.classList.remove('mode-toggle-active');
       }
     }
-    
+
     // Update table headers
     this.updateTableHeaders();
-    
-    // Clear warnings and revalidate events to ensure warning messages 
+
+    // Update accordion age/year mode if it exists
+    if (this.webUI.eventAccordionManager) {
+      this.webUI.eventAccordionManager.updateAgeYearMode(newMode);
+    }
+
+    // Clear warnings and revalidate events to ensure warning messages
     // use the correct terminology (age vs year) for the new mode
     this.webUI.clearAllWarnings();
     this.webUI.validateEvents();
@@ -129,7 +216,7 @@ class EventsTableManager {
   updateTableHeaders() {
     const fromHeader = document.getElementById('fromAgeHeader');
     const toHeader = document.getElementById('toAgeHeader');
-    
+
     if (fromHeader && toHeader) {
       const setText=(el,txt)=>{const span=el.querySelector('.header-text'); if(span){span.textContent=txt;} else {el.childNodes[0].textContent=txt;}};
       if (this.ageYearMode === 'age') {
@@ -142,6 +229,49 @@ class EventsTableManager {
         setText(toHeader,'To Year');
         fromHeader.classList.add('year-mode');
         toHeader.classList.add('year-mode');
+      }
+    }
+  }
+
+  switchView(viewMode) {
+    const tableContainer = document.querySelector('.events-section .table-container');
+    const addEventContainer = document.querySelector('.events-section div[style*="text-align: right"]');
+
+    if (viewMode === 'table') {
+      // Show table view
+      if (tableContainer) {
+        tableContainer.style.display = 'block';
+      }
+      if (addEventContainer) {
+        addEventContainer.style.display = 'block';
+      }
+      // Hide accordion view
+      const accordionContainer = document.querySelector('.events-accordion-container');
+      if (accordionContainer) {
+        accordionContainer.style.display = 'none';
+      }
+    } else {
+      // Hide table view
+      if (tableContainer) {
+        tableContainer.style.display = 'none';
+      }
+      if (addEventContainer) {
+        addEventContainer.style.display = 'none';
+      }
+      // Show accordion view
+      this.showAccordionView();
+    }
+  }
+
+  showAccordionView() {
+    // Show accordion view using the accordion manager
+    const accordionContainer = document.querySelector('.events-accordion-container');
+    if (accordionContainer) {
+      accordionContainer.style.display = 'block';
+
+      // Refresh accordion to sync with current table data
+      if (this.webUI.eventAccordionManager) {
+        this.webUI.eventAccordionManager.refresh();
       }
     }
   }
@@ -345,13 +475,18 @@ class EventsTableManager {
 
     // Store the current scroll position to prevent page jumping
     const currentScrollY = window.scrollY;
-    
+
     const row = this.createEventRow();
     tbody.appendChild(row);
 
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
-    
+
+    // Refresh accordion if it's active
+    if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+      this.webUI.eventAccordionManager.refresh();
+    }
+
     // Prevent any automatic focus that might cause scrolling
     // Use setTimeout to ensure this runs after any potential focus events
     setTimeout(() => {
@@ -590,6 +725,8 @@ class EventsTableManager {
 
     if (this.sortKeys.length === 0) {
       this.updateHeaderIndicators();
+      // Notify accordion that sorting was cleared
+      this.notifyAccordionOfSortChange();
       return;
     }
 
@@ -598,6 +735,19 @@ class EventsTableManager {
     }
 
     this.updateHeaderIndicators();
+
+    // Notify accordion of sort change
+    this.notifyAccordionOfSortChange();
+  }
+
+  /**
+   * Notify accordion manager of sorting changes
+   */
+  notifyAccordionOfSortChange() {
+    if (this.webUI.eventAccordionManager && this.viewMode === 'accordion') {
+      // Only refresh if accordion is currently visible
+      this.webUI.eventAccordionManager.refresh();
+    }
   }
 
   updateHeaderIndicators() {
@@ -639,4 +789,300 @@ class EventsTableManager {
     });
   }
 
-} 
+  /**
+   * Show wizard selection modal for event types
+   */
+  showWizardSelection() {
+    // Get available wizards from the wizard manager
+    const wizardManager = this.webUI.eventWizardManager;
+    if (!wizardManager || !wizardManager.wizardData) {
+      console.error('Wizard manager not available');
+      return;
+    }
+
+    const wizards = wizardManager.wizardData.EventWizards;
+    if (!wizards || wizards.length === 0) {
+      console.error('No wizards available');
+      return;
+    }
+
+    // Create selection modal
+    this.createWizardSelectionModal(wizards);
+  }
+
+  /**
+   * Create and display wizard selection modal
+   * @param {Array} wizards - Available wizard configurations
+   */
+  createWizardSelectionModal(wizards) {
+    // Remove any existing modal
+    const existingModal = document.getElementById('wizardSelectionOverlay');
+    if (existingModal) {
+      existingModal.remove();
+    }
+
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'wizard-overlay';
+    overlay.id = 'wizardSelectionOverlay';
+
+    // Create modal container
+    const modal = document.createElement('div');
+    modal.className = 'event-wizard-modal event-wizard-selection-modal';
+
+    // Modal header
+    const header = document.createElement('div');
+    header.className = 'event-wizard-step-header';
+
+    const title = document.createElement('h3');
+    title.textContent = 'Choose Event Type';
+    header.appendChild(title);
+
+    const subtitle = document.createElement('p');
+    subtitle.textContent = 'Select the type of event you want to create:';
+    subtitle.className = 'event-wizard-selection-subtitle';
+    header.appendChild(subtitle);
+
+    modal.appendChild(header);
+
+    // Modal body with wizard options
+    const body = document.createElement('div');
+    body.className = 'event-wizard-step-body';
+
+    const wizardGrid = document.createElement('div');
+    wizardGrid.className = 'wizard-selection-grid';
+
+    wizards.forEach(wizard => {
+      const option = document.createElement('div');
+      option.className = 'wizard-selection-option';
+      option.dataset.eventType = wizard.eventType;
+
+      // Get category color
+      const wizardManager = this.webUI.eventWizardManager;
+      const categoryConfig = wizardManager.wizardData.WizardConfig?.categories?.[wizard.category];
+      const categoryColor = categoryConfig?.color || '#007bff';
+
+      option.innerHTML = `
+        <div class="wizard-option-icon" style="background-color: ${categoryColor}">
+          <i class="fas fa-${this.getCategoryIcon(wizard.category)}"></i>
+        </div>
+        <div class="wizard-option-content">
+          <h4>${wizard.name}</h4>
+        </div>
+      `;
+
+      // Add click handler
+      option.addEventListener('click', () => {
+        this.startWizardForEventType(wizard.eventType);
+        overlay.remove();
+      });
+
+      wizardGrid.appendChild(option);
+    });
+
+    body.appendChild(wizardGrid);
+    modal.appendChild(body);
+
+    // Modal footer
+    const footer = document.createElement('div');
+    footer.className = 'event-wizard-step-footer';
+
+    const cancelButton = document.createElement('button');
+    cancelButton.className = 'event-wizard-button';
+    cancelButton.textContent = 'Cancel';
+    cancelButton.addEventListener('click', () => overlay.remove());
+
+    footer.appendChild(cancelButton);
+    modal.appendChild(footer);
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.remove();
+      }
+    });
+
+    // ESC key to close
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        overlay.remove();
+        document.removeEventListener('keydown', handleKeyDown);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+  }
+
+  /**
+   * Start wizard for specific event type
+   * @param {string} eventType - The event type code
+   */
+  startWizardForEventType(eventType) {
+    const wizardManager = this.webUI.eventWizardManager;
+    if (wizardManager) {
+      // Pass callback to create event when wizard completes
+      wizardManager.startWizard(eventType, {
+        onComplete: (eventData) => this.createEventFromWizard(eventData)
+      });
+    }
+  }
+
+  /**
+   * Create event from wizard data
+   * @param {Object} eventData - Data collected from wizard
+   */
+  createEventFromWizard(eventData) {
+    // Create a new event row with the wizard data
+    const row = this.createEventRow(
+      eventData.eventType || '',
+      eventData.name || '',
+      eventData.amount || '',
+      eventData.fromAge || '',
+      eventData.toAge || '',
+      eventData.rate || '',
+      eventData.match || ''
+    );
+
+    // Mark as just created for animation targeting
+    row.classList.add('just-created');
+
+    // Add to table
+    const tbody = document.querySelector('#Events tbody');
+    if (tbody) {
+      tbody.appendChild(row);
+
+      // Setup formatting for new inputs
+      this.webUI.formatUtils.setupCurrencyInputs();
+      this.webUI.formatUtils.setupPercentageInputs();
+
+      // Apply sort if needed - this will also notify accordion
+      if (this.sortKeys.length > 0) {
+        this.applySort();
+      } else {
+        // Even if no sort is active, notify accordion to refresh
+        this.notifyAccordionOfSortChange();
+      }
+
+      // Add animation for new event based on current view mode
+      if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+        this.webUI.eventAccordionManager.refreshWithNewEventAnimation(eventData);
+      } else if (this.viewMode === 'table') {
+        // Animate the newly created row in table view
+        this.animateNewTableRow(eventData);
+      }
+    }
+  }
+
+  /**
+   * Get icon for category
+   * @param {string} category - Category name
+   * @returns {string} Font Awesome icon name
+   */
+  getCategoryIcon(category) {
+    const icons = {
+      'income': 'plus-circle',
+      'expense': 'minus-circle',
+      'property': 'home',
+      'investment': 'chart-line'
+    };
+    return icons[category] || 'circle';
+  }
+
+  /**
+   * Format category name for display
+   * @param {string} category - Category name
+   * @returns {string} Formatted category
+   */
+  formatCategory(category) {
+    return category.charAt(0).toUpperCase() + category.slice(1);
+  }
+
+  /**
+   * Animate the newly created table row
+   */
+  animateNewTableRow(eventData) {
+    // The new row is always the one that was just added to the DOM
+    // After sorting, we need to find it by marking it during creation
+    const tableRows = document.querySelectorAll('#Events tbody tr');
+    let targetRow = null;
+
+    // Look for the row that was just created (should have a temporary marker)
+    targetRow = document.querySelector('#Events tbody tr.just-created');
+
+    // If no marker found, fall back to finding by data
+    if (!targetRow) {
+      for (const row of tableRows) {
+        if (this.isRowMatchingEventData(row, eventData)) {
+          targetRow = row;
+          break;
+        }
+      }
+    }
+
+    // Final fallback to last row
+    if (!targetRow && tableRows.length > 0) {
+      targetRow = tableRows[tableRows.length - 1];
+    }
+
+    if (targetRow) {
+      // Find the table container to temporarily allow overflow
+      const tableContainer = targetRow.closest('.table-container');
+      const eventsTable = document.getElementById('Events');
+
+      // Temporarily allow overflow to prevent clipping
+      if (tableContainer) {
+        tableContainer.style.overflow = 'visible';
+      }
+      if (eventsTable) {
+        eventsTable.style.overflow = 'visible';
+      }
+
+      // Add pulse animation class
+      targetRow.classList.add('new-event-highlight');
+
+      // Scroll the new row into view
+      targetRow.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+
+      // Remove highlight and restore overflow after animation completes
+      setTimeout(() => {
+        targetRow.classList.remove('new-event-highlight');
+        targetRow.classList.remove('just-created'); // Remove the marker
+
+        // Restore original overflow settings
+        if (tableContainer) {
+          tableContainer.style.overflow = '';
+        }
+        if (eventsTable) {
+          eventsTable.style.overflow = '';
+        }
+      }, 800);
+    }
+  }
+
+  /**
+   * Check if a table row matches the given event data
+   */
+  isRowMatchingEventData(row, eventData) {
+    const typeInput = row.querySelector('.event-type');
+    const nameInput = row.querySelector('.event-name');
+    const amountInput = row.querySelector('.event-amount');
+    const fromAgeInput = row.querySelector('.event-from-age');
+    const toAgeInput = row.querySelector('.event-to-age');
+
+    // Clean the amount from the table (remove currency formatting)
+    const cleanRowAmount = amountInput?.value ? amountInput.value.replace(/[^0-9\.]/g, '') : '';
+    const cleanEventAmount = eventData.amount ? eventData.amount.toString() : '';
+
+    return typeInput && typeInput.value === eventData.eventType &&
+           nameInput && nameInput.value === eventData.name &&
+           cleanRowAmount === cleanEventAmount &&
+           fromAgeInput && fromAgeInput.value === eventData.fromAge &&
+           toAgeInput && toAgeInput.value === eventData.toAge;
+  }
+
+}

@@ -581,9 +581,10 @@ header.header-hidden {
 
 .faq-question {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 0;
     align-items: center;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 0.5rem;
     background: #f8f9fa;
     cursor: pointer;
     font-weight: 600;
@@ -608,7 +609,8 @@ header.header-hidden {
     font-weight: bold;
     display: inline-block;
     width: 1rem;
-    text-align: center;
+    text-align: left;
+    margin-right: 0.25rem;
 }
 
 .faq-item.open .faq-icon {
@@ -883,7 +885,7 @@ body.modal-open {
 
     /* Mobile FAQ styles */
     .faq-question {
-        padding: 0.6rem 0.8rem;
+        padding: 0.6rem 0.6rem;
         font-size: 0.9rem;
     }
 
@@ -1320,6 +1322,7 @@ th {
 
 .percentage {
     width: 100% !important;
+    padding-right: 1rem !important;
 }
 
 
@@ -1786,13 +1789,56 @@ footer {
     padding-top: 0.1rem;
 }
 
+/* Events Header Controls - container for view toggle and age/year toggle */
+.events-header-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    margin-left: auto;
+}
+
+/* View Toggle - matches simulation-mode-toggle styling */
+.view-toggle {
+    display: flex;
+    align-items: flex-end;
+    border-bottom: none;
+    position: relative;
+    white-space: normal;
+    margin-bottom: 0;
+}
+
+.view-toggle span {
+    cursor: pointer;
+    padding: 0.1rem 0.8rem;
+    margin-left: 0rem;
+    border-radius: 4px 4px 0 0;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+    border: var(--card-header-border-width) solid transparent;
+    border-bottom: none;
+    background-color: transparent;
+    position: relative;
+    top: var(--card-header-border-width);
+    font-size: 1rem;
+}
+
+.view-toggle span:first-child {
+    margin-left: 0;
+}
+
+.view-toggle span.mode-toggle-active {
+    background-color: var(--card-bg-color, white);
+    border-top: var(--card-header-border-width) solid var(--primary-color);
+    border-left: var(--card-header-border-width) solid var(--primary-color);
+    border-right: var(--card-header-border-width) solid var(--primary-color);
+    z-index: 1;
+}
+
 /* Age/Year Toggle - matches simulation-mode-toggle styling */
 .age-year-toggle {
     display: flex;
     align-items: flex-end;
     border-bottom: none;
     position: relative;
-    margin-left: auto;
     white-space: normal;
     margin-bottom: 0;
 }
@@ -2330,5 +2376,1021 @@ footer {
 
 #Events .pseudo-select.stock-market {
     box-shadow: inset 0 0 6px 1px rgba(251, 192, 45, 0.4); /* soft yellow */
+}
+
+/* Events Table Actions */
+.events-table-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.events-table-actions button {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid;
+}
+
+.primary-button {
+    background: var(--primary-color, #007bff);
+    color: white;
+    border-color: var(--primary-color, #007bff);
+}
+
+.primary-button:hover {
+    background: #0056b3;
+    border-color: #0056b3;
+}
+
+.secondary-button {
+    background: white;
+    color: #333;
+    border-color: #ddd;
+}
+
+.secondary-button:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+/* Event Wizard Modal Styles */
+.wizard-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.event-wizard-modal {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.event-wizard-step-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.event-wizard-step-header {
+    padding: 1.5rem 1.5rem 1rem;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+}
+
+.event-wizard-step-header h3 {
+    margin: 0 0 0.5rem 0;
+    color: #333;
+    font-size: 1.25rem;
+}
+
+.event-wizard-progress {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.event-wizard-step-body {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+    background: white;
+}
+
+.event-wizard-step-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e9ecef;
+    background: #f8f9fa;
+}
+
+.event-wizard-buttons {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.event-wizard-button {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    color: #333;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+}
+
+.event-wizard-button:hover:not(:disabled) {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.event-wizard-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.event-wizard-button-primary {
+    background: var(--primary-color, #007bff);
+    color: white;
+    border-color: var(--primary-color, #007bff);
+}
+
+.event-wizard-button-primary:hover:not(:disabled) {
+    background: #0056b3;
+    border-color: #0056b3;
+}
+
+/* Event Wizard Content Styles */
+.event-wizard-intro {
+    text-align: center;
+}
+
+.event-wizard-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.event-wizard-icon-salary {
+    background: #28a745;
+}
+
+.event-wizard-icon-expense {
+    background: #dc3545;
+}
+
+.event-wizard-icon-property {
+    background: #6f42c1;
+}
+
+.event-wizard-input-group {
+    margin: 1rem 0;
+}
+
+.event-wizard-input-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.event-wizard-input-group input:focus {
+    outline: none;
+    border-color: var(--primary-color, #007bff);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.event-wizard-help {
+    font-size: 0.875rem;
+    color: #666;
+    margin-top: 0.5rem;
+}
+
+.event-wizard-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 1rem 0;
+}
+
+.event-wizard-choice-option {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.event-wizard-choice-option:hover {
+    border-color: var(--primary-color, #007bff);
+    background: #f8f9fa;
+}
+
+.event-wizard-choice-option.selected {
+    border-color: var(--primary-color, #007bff);
+    background: rgba(0, 123, 255, 0.1);
+}
+
+.event-wizard-choice-option input[type="radio"] {
+    display: none;
+}
+
+.event-wizard-choice-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: #333;
+}
+
+.event-wizard-choice-description {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+/* Event Wizard Period Content Styles */
+.event-wizard-period-inputs {
+    display: flex;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.event-wizard-period-from,
+.event-wizard-period-to {
+    flex: 1;
+}
+
+/* Event Wizard Summary Content Styles */
+.event-wizard-summary-details {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.event-wizard-summary-text {
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Event Wizard Mortgage Content Styles */
+.event-wizard-mortgage-details {
+    margin: 1rem 0;
+}
+
+.event-wizard-mortgage-calculation {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.calculation-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.calculation-row:last-child {
+    margin-bottom: 0;
+    font-weight: 600;
+    border-top: 1px solid #dee2e6;
+    padding-top: 0.5rem;
+}
+
+/* Period Input Styles */
+.wizard-period-inputs {
+    display: flex;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.wizard-period-from,
+.wizard-period-to {
+    flex: 1;
+}
+
+.wizard-period-inputs label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.wizard-period-inputs input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.wizard-period-inputs input:focus {
+    outline: none;
+    border-color: var(--primary-color, #007bff);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Summary Styles */
+.wizard-summary-details {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.wizard-summary-text {
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+/* Mortgage Styles */
+.wizard-mortgage-details {
+    margin: 1rem 0;
+}
+
+.wizard-mortgage-calculation {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.calculation-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.calculation-row:last-child {
+    border-bottom: none;
+}
+
+.calculation-total {
+    font-weight: 600;
+    border-top: 2px solid #dee2e6;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.calculation-payment {
+    color: var(--primary-color, #007bff);
+    font-weight: 600;
+}
+
+/* Event Wizard Selection Modal */
+.event-wizard-selection-modal {
+    max-width: 500px;
+}
+
+.event-wizard-selection-subtitle {
+    margin: 0.5rem 0 0 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.wizard-selection-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.wizard-selection-option {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.wizard-selection-option:hover {
+    border-color: var(--primary-color, #007bff);
+    background: #f8f9fa;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.wizard-option-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+    color: white;
+    font-size: 1.25rem;
+}
+
+.wizard-option-content h4 {
+    margin: 0 0 0.25rem 0;
+    color: #333;
+    font-size: 1rem;
+}
+
+.wizard-option-category {
+    margin: 0;
+    color: #666;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Events Accordion Styles */
+.events-accordion-container {
+    display: none; /* Hidden by default, shown when accordion view is active */
+    background: var(--card-background);
+    border-radius: var(--border-radius-large);
+    box-shadow: var(--box-shadow);
+    margin-top: 1rem;
+}
+
+
+
+.accordion-header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.accordion-header-content h3 {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 1.25rem;
+}
+
+.events-accordion-items {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.events-accordion-item {
+    transition: background-color 0.2s ease;
+    border-radius: var(--border-radius);
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.events-accordion-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* Color coding for accordion items (same as table event type selector) */
+.events-accordion-item.inflow {
+    box-shadow: inset 0 0 6px 1px rgba(76, 175, 80, 0.4);
+}
+
+.events-accordion-item.outflow {
+    box-shadow: inset 0 0 6px 1px rgba(239, 83, 80, 0.4);
+}
+
+.events-accordion-item.real-estate {
+    box-shadow: inset 0 0 6px 1px rgba(66, 165, 245, 0.4);
+}
+
+.events-accordion-item.stock-market {
+    box-shadow: inset 0 0 6px 1px rgba(255, 193, 7, 0.4);
+}
+
+.accordion-item-header {
+    padding: 0rem 0.4rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    user-select: none;
+    gap: 0.75rem;
+}
+
+.accordion-item-controls-left {
+    flex-shrink: 0;
+}
+
+.accordion-item-summary {
+    flex: 1;
+    min-width: 0;
+}
+
+.accordion-item-controls-right {
+    flex-shrink: 0;
+}
+
+.accordion-expand-btn {
+    background: none;
+    border: none;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #6c757d;
+    font-size: 1rem;
+    font-style: normal;
+    font-weight: bold;
+}
+
+.accordion-expand-btn:hover {
+    color: #495057;
+}
+
+.accordion-expand-btn.expanded {
+    transform: rotate(45deg);
+}
+
+.accordion-delete-btn {
+    background: none;
+    border: none;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.accordion-delete-btn:hover {
+    color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.1);
+    border-radius: 50%;
+}
+
+.accordion-item-content {
+    border-top: 1px solid #e9ecef;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+    opacity: 0;
+    padding: 0;
+}
+
+.accordion-item-content.expanded {
+    max-height: 1000px; /* Large enough to accommodate content */
+    opacity: 1;
+    transition: max-height 0.3s ease-in, opacity 0.2s ease-in;
+    padding: 0.4rem 0.8rem;
+}
+
+/* Event Summary Styles */
+.event-summary {
+    width: 100%;
+}
+
+.event-summary-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.event-summary-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.event-summary-icon.income {
+    background-color: #28a745;
+}
+
+.event-summary-icon.expense {
+    background-color: #dc3545;
+}
+
+.event-summary-icon.property {
+    background-color: #6f42c1;
+}
+
+.event-summary-icon.investment {
+    background-color: #007bff;
+}
+
+.event-summary-icon.other {
+    background-color: #6c757d;
+}
+
+.event-summary-main {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 1fr 140px 100px 120px;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Grid item styles for column alignment */
+.event-summary-name {
+    justify-self: start;
+}
+
+.event-summary-badge {
+    justify-self: start;
+    text-align: left;
+}
+
+.event-summary-amount {
+    justify-self: end;
+    text-align: right;
+}
+
+.event-summary-period {
+    justify-self: start;
+    text-align: left;
+}
+
+/* When wrapping is needed, revert to old behavior with title and details rows */
+.events-accordion-container.force-wrap .event-summary-main {
+    display: block;
+}
+
+.events-accordion-container.force-wrap .event-summary-name,
+.events-accordion-container.force-wrap .event-summary-badge,
+.events-accordion-container.force-wrap .event-summary-amount,
+.events-accordion-container.force-wrap .event-summary-period {
+    display: inline;
+    text-align: left;
+    justify-self: auto;
+}
+
+/* Create title row with name and badge */
+.events-accordion-container.force-wrap .event-summary-name::after {
+    content: " ";
+}
+
+.events-accordion-container.force-wrap .event-summary-badge::after {
+    content: "\A";
+    white-space: pre;
+}
+
+/* Create details row with amount and period */
+.events-accordion-container.force-wrap .event-summary-amount::after {
+    content: " • ";
+}
+
+.events-accordion-container.force-wrap .event-summary-period {
+    color: #6c757d;
+}
+
+.event-summary-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.event-name {
+    font-weight: 600;
+    color: var(--text-color);
+    font-size: 1rem;
+}
+
+.event-type-badge {
+    background-color: #e9ecef;
+    color: #495057;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.event-summary-details {
+    color: #6c757d;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.detail-amount {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.detail-period,
+.detail-rate,
+.detail-match {
+    color: #6c757d;
+}
+
+.detail-empty {
+    font-style: italic;
+    color: #adb5bd;
+}
+
+
+
+.detail-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0.1rem 0;
+    gap: 1rem;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-row label {
+    font-weight: 500;
+    color: #495057;
+    margin: 0;
+}
+
+.detail-row span {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+/* Override bold styling for pseudo-select dropdown in accordion */
+.detail-row .pseudo-select {
+    font-weight: normal;
+    text-align: right;
+}
+
+/* Editable Fields in Accordion */
+.editable-field {
+    flex: 0 0 190px;
+    width: 190px;
+}
+
+.editable-field input,
+.editable-field select {
+    width: 100%;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: #495057;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.editable-field input:focus,
+.editable-field select:focus {
+    color: #495057;
+    background-color: #fff;
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.editable-field .percentage-container {
+    position: relative;
+    width: 100%;
+}
+
+.editable-field .percentage-container input {
+    padding-right: 2rem;
+}
+
+.editable-field .percentage-container::after {
+    content: "%";
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d;
+}
+
+/* Validation styles for accordion fields */
+.editable-field input.validation-error,
+.editable-field select.validation-error {
+    border-color: var(--error-color);
+    box-shadow: 0 0 0 0.2rem rgba(255, 128, 128, 0.25);
+}
+
+.editable-field input.validation-warning,
+.editable-field select.validation-warning {
+    border-color: var(--warning-color);
+    box-shadow: 0 0 0 0.2rem rgba(255, 224, 102, 0.25);
+}
+
+.validation-message {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    display: block;
+}
+
+.validation-message.error {
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
+.validation-message.warning {
+    color: #856404;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+}
+
+/* New event single pulse animation */
+.events-accordion-item.new-event-highlight,
+#Events tbody tr.new-event-highlight {
+    animation: singlePulse 0.8s ease-out;
+    transform-origin: center;
+}
+
+/* Ensure table rows don't get clipped during animation */
+#Events tbody tr.new-event-highlight {
+    position: relative;
+    z-index: 1000;
+    overflow: visible;
+}
+
+/* Ensure table container allows overflow during animation */
+#Events.table-container {
+    overflow: visible;
+}
+
+/* Temporarily allow overflow on table during animation */
+#Events tbody tr.new-event-highlight td {
+    overflow: visible;
+}
+
+@keyframes singlePulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Wizard validation styles */
+.wizard-validation-message {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    display: block;
+}
+
+.wizard-validation-message.error {
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
+.wizard-validation-message.warning {
+    color: #856404;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+}
+
+.event-wizard-modal input.validation-error {
+    border-color: var(--error-color);
+    box-shadow: 0 0 0 0.2rem rgba(255, 128, 128, 0.25);
+}
+
+.event-wizard-modal input.validation-warning {
+    border-color: var(--warning-color);
+    box-shadow: 0 0 0 0.2rem rgba(255, 224, 102, 0.25);
+}
+
+/* Mobile styles for editable fields */
+@media (max-width: 768px) {
+    .editable-field {
+        max-width: 100%;
+    }
+}
+
+/* Accordion Action Buttons */
+.accordion-item-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.accordion-action-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    background: white;
+    color: #495057;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.accordion-action-btn:hover {
+    background-color: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.accordion-edit-btn:hover {
+    background-color: #e3f2fd;
+    border-color: #2196f3;
+    color: #1976d2;
+}
+
+.accordion-delete-btn:hover {
+    background-color: #ffebee;
+    border-color: #f44336;
+    color: #d32f2f;
+}
+
+/* Accordion Empty State */
+.accordion-empty-state {
+    padding: 3rem 1.5rem;
+    text-align: center;
+    color: #6c757d;
+}
+
+.accordion-empty-state p {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .event-wizard-modal {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .event-wizard-step-header,
+    .event-wizard-step-body,
+    .event-wizard-step-footer {
+        padding: 1rem;
+    }
+
+    .event-wizard-buttons {
+        flex-direction: column;
+    }
+
+    .event-wizard-button {
+        width: 100%;
+    }
+
+    .wizard-period-inputs {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    /* Accordion mobile styles */
+
+    .accordion-item-header {
+        padding: 0.4rem 0.6rem;
+    }
+
+    .event-summary-header {
+        gap: 0.5rem;
+    }
+
+    .event-summary-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 0.85rem;
+    }
+
+
+
+    .accordion-item-details {
+        padding: 0.4rem 0.6rem;
+    }
+
+    .events-table-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .events-table-actions button {
+        width: 100%;
+    }
 }
 

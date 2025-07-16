@@ -32,6 +32,8 @@ class WebUI extends AbstractUI {
       this.tableManager = new TableManager(this);
       this.fileManager = new FileManager(this);
       this.eventsTableManager = new EventsTableManager(this);
+      this.eventAccordionManager = new EventAccordionManager(this);
+      this.eventWizardManager = new EventWizardManager(this);
       this.dragAndDrop = new DragAndDrop();
 
       // Initialize WelcomeModal with error checking

@@ -1,0 +1,350 @@
+# Events Wizard Configuration
+# This file defines wizard flows for guided event creation
+# Similar to help.yml but focused on step-by-step event creation
+
+EventWizards:
+
+  # Income Wizard (Comprehensive Flow)
+  - eventType: "SI"
+    name: "Income"
+    category: "income"
+    steps:
+      - stepId: "incomeType"
+        title: "Income Type"
+        contentType: "choice"
+        content:
+          text: "What type of income is this?"
+          choices:
+            - value: "salary"
+              title: "Salary"
+              description: "Regular employment income"
+            - value: "rsu"
+              title: "RSU"
+              description: "Restricted Stock Units"
+            - value: "rental"
+              title: "Rental"
+              description: "Rental property income"
+            - value: "defined_benefit"
+              title: "Defined Benefit"
+              description: "Pension or defined benefit plan"
+            - value: "tax_free"
+              title: "Tax-free income"
+              description: "Income not subject to taxation"
+        showButtons: ["back", "next"]
+
+      - stepId: "person"
+        title: "For Whom?"
+        contentType: "choice"
+        content:
+          text: "Who will receive this salary income?"
+          choices:
+            - value: "person1"
+              title: "You"
+              description: "Your salary income"
+            - value: "person2"
+              title: "Your partner"
+              description: "Your partner's salary income"
+        showButtons: ["back", "next"]
+        condition: "incomeType === 'salary' && simulationMode === 'couple'"
+
+      - stepId: "name"
+        title: "Name Your Income"
+        contentType: "input"
+        field: "name"
+        content:
+          text: "Give this income a descriptive name."
+          validation: "required"
+        showButtons: ["back", "next"]
+
+      - stepId: "amount"
+        title: "Annual Amount"
+        contentType: "input"
+        field: "amount"
+        content:
+          text: "Enter the annual amount for this income."
+          inputType: "currency"
+          validation: "required|positive"
+          help: "Enter the gross annual amount before taxes and deductions."
+        showButtons: ["back", "next"]
+
+      - stepId: "period"
+        title: "Income Period"
+        contentType: "period"
+        fields: ["fromAge", "toAge"]
+        content:
+          text: "When will you receive this income?"
+          help: "Enter the age range during which you'll receive this income."
+        showButtons: ["back", "next"]
+
+      - stepId: "growth"
+        title: "Growth Rate"
+        contentType: "input"
+        field: "rate"
+        content:
+          text: "What annual growth rate do you expect?"
+          inputType: "percentage"
+          validation: "optional"
+          help: "Leave blank to use inflation rate. Typical growth is 2-5% annually."
+          defaultValue: "inflation"
+        showButtons: ["back", "next"]
+        condition: "incomeType !== 'defined_benefit'"
+
+      - stepId: "pensionContribution"
+        title: "Pension Contribution"
+        contentType: "choice"
+        content:
+          text: "Does this salary contribute to a pension?"
+          choices:
+            - value: "yes"
+              title: "Yes"
+              description: "This salary contributes to pension"
+            - value: "no"
+              title: "No"
+              description: "This salary does not contribute to pension"
+        showButtons: ["back", "next"]
+        condition: "incomeType === 'salary'"
+
+      - stepId: "match"
+        title: "Employer Pension Match"
+        contentType: "input"
+        field: "match"
+        content:
+          text: "Does your employer match pension contributions? If so, up to what percentage?"
+          inputType: "percentage"
+          validation: "optional"
+          help: "Many employers match contributions up to 3-6% of salary. Enter 0 if no match."
+        showButtons: ["back", "next"]
+        condition: "incomeType === 'salary' && pensionContribution === 'yes'"
+
+      - stepId: "summary"
+        title: "Review & Create"
+        contentType: "summary"
+        content:
+          text: "Review your income details:"
+          template: "**{name}**: {amount} annually from age {fromAge} to {toAge}"
+        showButtons: ["back", "create"]
+
+  # Expense Wizard (Simple Flow)
+  - eventType: "E"
+    name: "Expense"
+    category: "expense"
+    description: "Add a regular or one-time expense"
+    difficulty: "simple"
+    steps:
+      - stepId: "type"
+        title: "Expense Type"
+        contentType: "choice"
+        content:
+          text: "What type of expense is this?"
+          choices:
+            - value: "oneoff"
+              title: "One-off"
+              description: "A single expense that occurs once"
+            - value: "ongoing"
+              title: "Spanning multiple years"
+              description: "Regular ongoing expenses over multiple years"
+        showButtons: ["back", "next"]
+        
+      - stepId: "name"
+        title: "Name Your Expense"
+        contentType: "input"
+        field: "name"
+        content:
+          text: "Give this expense a descriptive name."
+          validation: "required"
+        showButtons: ["back", "next"]
+        
+      - stepId: "amount"
+        title: "Annual Cost"
+        contentType: "input"
+        field: "amount"
+        content:
+          text: "What's the annual cost of this expense?"
+          inputType: "currency"
+          validation: "required|positive"
+          help: "For one-time expenses, enter the total cost. For ongoing expenses, enter the yearly amount."
+        showButtons: ["back", "next"]
+        
+      - stepId: "period"
+        title: "Expense Period"
+        contentType: "period"
+        fields: ["fromAge", "toAge"]
+        content:
+          text: "During what period will you have this expense?"
+          help: "Enter the age range during which you'll have this expense."
+        showButtons: ["back", "next"]
+        condition: "type !== 'oneoff'"
+
+      - stepId: "timing"
+        title: "When will this expense occur?"
+        contentType: "input"
+        field: "fromAge"
+        content:
+          text: "At what age will you have this one-time expense?"
+          inputType: "age"
+          validation: "required|positive"
+          help: "Enter the age when this expense will occur."
+        showButtons: ["back", "next"]
+        condition: "type === 'oneoff'"
+
+      - stepId: "growth"
+        title: "Cost Growth"
+        contentType: "input"
+        field: "rate"
+        content:
+          text: "How much do you expect this expense to grow annually?"
+          inputType: "percentage"
+          validation: "optional"
+          help: "Leave blank to use inflation rate. Living expenses typically grow with inflation."
+          defaultValue: "inflation"
+        showButtons: ["back", "next"]
+        condition: "type !== 'oneoff'"
+        
+      - stepId: "summary"
+        title: "Review & Create"
+        contentType: "summary"
+        content:
+          text: "Review your expense details:"
+          template: "**{name}**: {amount} annually from age {fromAge} to {toAge}"
+        showButtons: ["back", "create"]
+
+  # Property Purchase Wizard (Complex Flow)
+  - eventType: "R"
+    name: "Property Purchase"
+    category: "property"
+    steps:
+      - stepId: "financing"
+        title: "How will you finance this property?"
+        contentType: "choice"
+        content:
+          text: "Choose your financing method:"
+          choices:
+            - value: "cash"
+              title: "Cash Purchase"
+              description: "Buy the property outright without a mortgage"
+            - value: "mortgage"
+              title: "With Mortgage"
+              description: "Buy with a down payment and mortgage financing"
+        showButtons: ["back", "next"]
+
+      - stepId: "name"
+        title: "Property Name"
+        contentType: "input"
+        field: "name"
+        content:
+          text: "Give this property a name for your reference."
+          validation: "required"
+          help: "If using a mortgage, the mortgage event will use the same name."
+        showButtons: ["back", "next"]
+        
+      - stepId: "name"
+        title: "Property Name"
+        contentType: "input"
+        field: "name"
+        content:
+          text: "Give this property a name for your reference."
+          validation: "required"
+          help: "If using a mortgage, the mortgage event will use the same name."
+        showButtons: ["back", "next"]
+        
+      - stepId: "cash_purchase_price"
+        title: "Property Purchase Price"
+        contentType: "input"
+        field: "amount"
+        content:
+          text: "What's the total purchase price of the property?"
+          inputType: "currency"
+          validation: "required|positive"
+          help: "This is the full amount you'll pay for the property."
+        showButtons: ["back", "next"]
+        condition: "financing === 'cash'"
+
+      - stepId: "mortgage_property_price"
+        title: "Property Value"
+        contentType: "input"
+        field: "propertyValue"
+        content:
+          text: "What's the total purchase price of the property?"
+          inputType: "currency"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+        condition: "financing === 'mortgage'"
+
+      - stepId: "down_payment"
+        title: "Down Payment"
+        contentType: "input"
+        field: "amount"
+        content:
+          text: "How much will you pay as a down payment?"
+          inputType: "currency"
+          validation: "required|positive"
+          help: "This is the initial payment you'll make when purchasing the property."
+        showButtons: ["back", "next"]
+        condition: "financing === 'mortgage'"
+        
+      - stepId: "timing"
+        title: "Purchase & Sale Timing"
+        contentType: "period"
+        fields: ["fromAge", "toAge"]
+        content:
+          text: "When will you buy and sell this property?"
+          help: "Purchase age is when you buy it. Sale age is when you sell it (leave blank if you plan to keep it)."
+        showButtons: ["back", "next"]
+        
+      - stepId: "appreciation"
+        title: "Property Appreciation"
+        contentType: "input"
+        field: "rate"
+        content:
+          text: "What annual appreciation rate do you expect?"
+          inputType: "percentage"
+          validation: "optional"
+          help: "Historical property appreciation is typically 2-4% annually."
+          defaultValue: "3"
+        showButtons: ["back", "next"]
+        
+      - stepId: "mortgage_setup"
+        title: "Mortgage Details"
+        contentType: "mortgage"
+        content:
+          text: "Now let's set up the mortgage for this property."
+          help: "We'll create a separate mortgage event linked to this property."
+        showButtons: ["back", "next"]
+        condition: "financing === 'mortgage'"
+        
+      - stepId: "summary"
+        title: "Review & Create"
+        contentType: "summary"
+        content:
+          text: "Review your property purchase:"
+          template: "**{name}**: Purchase for {propertyValue}, down payment {amount}, from age {fromAge} to {toAge}"
+        showButtons: ["back", "create"]
+
+# Wizard UI Configuration
+WizardConfig:
+  modal:
+    width: "600px"
+    maxHeight: "80vh"
+    overlay: true
+    
+  animation:
+    duration: 300
+    easing: "ease-in-out"
+    
+  validation:
+    showErrors: true
+    validateOnBlur: true
+    
+  categories:
+    income:
+      color: "#28a745"
+      icon: "plus-circle"
+    expense:
+      color: "#dc3545" 
+      icon: "minus-circle"
+    property:
+      color: "#6f42c1"
+      icon: "home"
+    investment:
+      color: "#007bff"
+      icon: "chart-line"
