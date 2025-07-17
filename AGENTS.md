@@ -1,159 +1,124 @@
-# FinSim Project Guidelines
+# FinSim Agent Onboarding Guide
 
-## Project Information
-- Browser-based financial simulator that works both on web and Google Sheets
-- Single Page Application (SPA) with component-based architecture
-- Runs entirely in browser (no server-side code)
+## 1. Project Overview
 
-## Project Structure & Architecture
-- **Core simulation logic**: `src/core/` - Simulator, Config, Revenue, Equities, RealEstate, Events (compatible with both web and Google Sheets)
-- **Frontend UI**: `src/frontend/`
-  - `gas/` - Google Apps Script version
-  - `web/` - Website version with SPA router, modular components, utils, and landing page
-- **Tests**: `src/tests/` - Comprehensive test suite covering simulation scenarios
-- **Entry point**: `index.html` - Main application with SPA routing between landing page and simulator
-- **Initialized globals**: `params`, `config`, `events`, `revenue`, `uiManager`
+FinSim is a sophisticated personal finance simulator, originating as a tool on Google Sheets and evolving into its current web-based form. It is designed as an educational "sandbox" that empowers users, particularly those familiar with the Irish tax system, to model their financial future by running "what-if" scenarios.
 
-## Core Simulation Mechanics
+The core philosophy is to provide a private, powerful, and transparent tool for financial planning. Due to its origins, the core logic must maintain compatibility with the Google Apps Script JavaScript environment.
 
-### Person/Variable Naming Conventions  
-- **SI** and **SInp**: Always refer to the 1st person
-- **S2** and **S2np**: Always refer to the 2nd person  
-- **'np' postfix**: In SInp and S2np, 'np' always means "no pension contribution"
-- These conventions apply regardless of whether Monte Carlo mode is used or not
+## 2. Key Features
 
-### Monte Carlo Simulation Method
-The simulator uses an accumulation-then-average approach for Monte Carlo runs:
-1. **Accumulation Phase**: For each simulation run, all yearly outcomes (salaries, taxes, assets, etc.) are accumulated into running totals
-2. **Averaging Phase**: After all runs complete, the accumulated sums are divided by the number of runs to produce average values
-3. **Result**: The final data sheet contains averaged values across all Monte Carlo iterations, not individual run results
+*   **Detailed Financial Simulation:** Models income, expenses, investments, and taxes over a lifetime.
+*   **Irish Tax System Focus:** Accurately calculates Irish PAYE (IT, PRSI, USC) and Capital Gains Tax (CGT), including deemed disposal on ETFs.
+*   **Scenario Planning:** Users can define custom life events (e.g., salary changes, property purchases, market crashes) to see their impact.
+*   **Multiple Event Views:** Events can be viewed and managed in a traditional table, a collapsible accordion, or created via a step-by-step wizard.
+*   **Monte Carlo Analysis:** In addition to deterministic projections, the simulator can run thousands of simulations with market volatility to assess the probability of success.
+*   **Data Persistence:** Scenarios can be saved to and loaded from local CSV files.
 
-## Testing
-- All tests are in `./src/tests/`
-- Run all tests: `./src/run-tests.sh` from project root
-- An individual test can be run by passing its name (without the extension) to the script.
+## 3. Project Architecture
 
-### Test File Structure
-The project uses two main test patterns:
+### 3.1. General Design
 
-#### Standard Simulation Tests
-Most tests use this structure for testing simulation scenarios:
-```javascript
-module.exports = {
-    name: 'TestName',                    // String: Descriptive test name
-    description: 'Test description',     // String: What the test validates
-    category: 'optional-category',       // String: Test category (optional)
-    scenario: {
-        parameters: {                    // Object: Simulation parameters
-            startingAge: 30,             // Required: Starting age
-            targetAge: 35,               // Required: End age
-            retirementAge: 65,           // Required: Retirement age
-            initialSavings: 0,           // Required: Starting cash
-            initialPension: 0,           // Required: Starting pension
-            initialFunds: 0,             // Required: Starting index funds
-            initialShares: 0,            // Required: Starting shares
-            // ... include all other required parameters
-            // See existing tests for complete parameter lists
-        },
-        events: [                        // Array: Simulation events
-            {
-                type: 'EventType',       // String: Event type (see Event Types below)
-                id: 'unique-id',         // String: Unique identifier
-                amount: 50000,           // Number: Event amount
-                fromAge: 30,             // Number: Start age
-                toAge: 34,               // Number: End age
-                rate: 0,                 // Number: Rate/percentage (context dependent)
-                match: 0                 // Number: Match amount (context dependent)
-            }
-            // Add multiple events as needed
-        ]
-    },
-    assertions: [                        // Array: Test assertions
-        {
-            type: 'assertion_type',      // String: Assertion type (see below)
-            target: 'target_type',       // String: Target type (age/final/year)
-            age: 31,                     // Number: Specific age (for target: 'age')
-            field: 'field_name',         // String: Field to check
-            expected: 12345,             // Number/Object: Expected value
-            tolerance: 50                // Number: Optional tolerance for rounding
-        }
-        // Add multiple assertions as needed
-    ]
-};
+FinSim employs a modular architecture that separates the core simulation logic from the user interface. This is a critical design feature, as the core engine must run in different environments: the modern web browser and the legacy Google Apps Script environment.
+
+The simulation is event-driven and proceeds chronologically, year by year. At the start of each year, the simulator processes all relevant financial events, calculates income and taxes, and updates the state of all financial assets.
+
+```mermaid
+graph TD
+    subgraph "UI Environments"
+        direction LR
+        A[WebUI]
+        B[Google Apps Script UI (Legacy)]
+    end
+
+    subgraph "Frontend Abstraction"
+        C[UIManager.js]
+    end
+
+    subgraph "Core Engine (GAS Compatible)"
+        direction TB
+        D[Simulator.js] --> E{Core Components};
+        E --> F[Revenue.js];
+        E --> G[Person.js];
+        E --> H[Equities.js];
+        E --> I[RealEstate.js];
+        E --> J[Config.js];
+        D -- Populates --> K[Data Sheet];
+    end
+    
+    subgraph "Web Frontend Components"
+        L[EventsTableManager.js]
+        M[EventAccordionManager.js]
+        N[EventWizardManager.js]
+        O[ChartManager.js]
+    end
+
+    A --> C;
+    B --> C;
+    C --> D;
+    K --> O;
+    A --> L;
+    A --> M;
+    A --> N;
 ```
 
-#### Custom Tests
-For complex testing scenarios (singletons, UI interactions, error conditions, etc.):
-```javascript
-module.exports = {
-    name: 'TestName',
-    description: 'Test description',
-    isCustomTest: true,                  // Boolean: Marks as custom test
-    runCustomTest: async function() {    // Function: Custom test implementation
-        // Custom test logic here
-        // Access TestFramework, mock objects, etc.
-        // Must return: { success: boolean, errors: string[] }
-        return { success: true, errors: [] };
-    }
-};
-```
+### 3.2. Components
 
-### Event Types
-Common event types used in simulation scenarios:
-- `SI`: Salary Income
-- `E`: Expense  
-- `R`: Real Estate transaction
-- `SM`: Stock Market override
-- `RI`: Rental Income
-- `UI`: RSU/Share Income
-- `SInp`: Salary Income with pension contribution
-- And others - see existing tests for more examples
+#### Core
 
-### Test Assertion Types
-- `exact_value`: Check field equals expected value (with optional tolerance)
-- `range`: Check field is within min/max bounds (`expected: {min: 1000, max: 2000}`)
-- `comparison`: Check field with operators (`expected: {operator: '>=', value: 1000}`)
+*   **[`Simulator.js`](src/core/Simulator.js:1):** The main orchestrator of the simulation.
+*   **[`Person.js`](src/core/Person.js:1):** Represents an individual in the simulation.
+*   **[`Config.js`](src/core/Config.js:1):** Loads and holds all configuration parameters.
+*   **[`Events.js`](src/core/Events.js:1):** Defines the `SimEvent` class.
+*   **[`Revenue.js`](src/core/Revenue.js:1):** Responsible for all tax calculations.
+*   **[`Equities.js`](src/core/Equities.js:1):** The base class for all investment assets (`IndexFunds`, `Shares`, `Pension`).
+*   **[`RealEstate.js`](src/core/RealEstate.js:1):** Manages real estate properties and mortgages.
 
-### Target Types
-- `age`: Test at specific age (`age: 31`)
-- `final`: Test at end of simulation
-- `year`: Test at specific year
+#### Frontend
 
-### Common Fields to Test
-- Financial: `cash`, `worth`, `netIncome`, `pensionFund`, `indexFundsCapital`, `sharesCapital`
-- Tax: `it` (income tax), `prsi`, `usc`, `cgt` (capital gains tax)
-- Income: `incomeSalaries`, `incomeRentals`, `incomeRSUs`
-- Other: `age`, `expenses`
+*   **[`UIManager.js`](src/frontend/UIManager.js:1):** An abstraction layer that sits between the core simulator and the UI, allowing the core to remain UI-agnostic.
+*   **[`WebUI.js`](src/frontend/web/WebUI.js:1):** The web-based implementation of the UI. It manages all the DOM elements and orchestrates the various frontend components.
+*   **Event Management:** The web UI provides three ways to interact with events, all of which must remain synchronized.
+    *   **[`EventsTableManager.js`](src/frontend/web/components/EventsTableManager.js:1):** Manages the traditional table view for events. This is the primary data source for the other views.
+    *   **[`EventAccordionManager.js`](src/frontend/web/components/EventAccordionManager.js:1):** Provides a collapsible accordion view of the events, which is more mobile-friendly. It reads from and syncs with the main event table.
+    *   **[`EventWizardManager.js`](src/frontend/web/components/EventWizardManager.js:1):** Manages a step-by-step wizard for creating new events. When the wizard completes, it adds a new row to the main event table.
 
-### Important Notes
-- Always include complete parameter sets - copy from existing working tests
-- Use meaningful event IDs for debugging
-- When adding a new feature create failing tests first (TDD) 
-- Run tests frequently during development to catch issues early
+#### Utils & Help Systems
 
-## UI/UX Features
+*   **[`src/core/Utils.js`](src/core/Utils.js:1):** Core utility functions, including `serializeSimulation()` and `deserializeSimulation()`.
+*   **[`src/frontend/web/utils/`](src/frontend/web/utils/):** Various utility classes for the web UI.
+*   **[`Wizard.js`](src/frontend/web/components/Wizard.js:1):** Provides a guided tour of the application's features.
 
-### Progressive Header Design
-The web interface uses a progressive responsive header that adapts to different screen sizes to prevent button wrapping:
-- **Desktop**: Full app name + all buttons visible in header
-- **Large Tablet**: Full app name + Run + Status + Save + Load + burger menu
-- **Small Tablet**: App name (smaller font) + Run + Status + Save + Load + burger menu  
-- **Large Mobile**: App icon + Run + Status + Save + Load + burger menu
-- **Small Mobile**: App icon + Run + Status + burger menu (Save + Load move to menu)
+### 3.3. Data Management and Persistence
 
-### Mobile Burger Menu
-- Slide-in navigation menu for mobile/tablet devices
-- Breakpoint values centralized in CSS custom properties (breakpoint-large-tablet, breakpoint-small-tablet, breakpoint-large-mobile, --breakpoint-small-mobile: 480px)
-- JavaScript `MobileBurgerMenu` class handles menu behavior and synchronization
-- Dynamic CSS generation from centralized breakpoint values for maintainability
-- Action buttons are centered in header across all breakpoints
+User scenarios are persisted as CSV files, handled by the `serializeSimulation()` and `deserializeSimulation()` functions in [`src/core/Utils.js`](src/core/Utils.js:1) and managed on the frontend by [`FileManager.js`](src/frontend/web/components/FileManager.js:1).
 
-## Important Guidelines
-- **File headers**: Check compatibility notes in file headers before making changes
-- **Core compatibility**: All changes to `src/core/` must maintain compatibility between web and Google Sheets versions
-- **Functions**: Keep mathematical functions pure and portable
-- **Naming**: Use camelCase for variables/functions, PascalCase for classes
-- **Error Handling**: Use early returns and validation before simulation runs
-- **Formatting**: Use FormatUtils for currency and percentage values
-- **Patterns**: Follow existing color coding, status patterns, and project structure
-- **Testing**: Developer has a running local server available for testing
+## 4. Test Framework
+
+The project uses a custom testing framework in Node.js to validate the core simulation logic.
+
+### 4.1. Kinds of Tests
+
+1.  **Regression Tests:** Define a scenario and assert that the output matches a "golden standard." (e.g., [`TestRegression.js`](src/tests/TestRegression.js:1)).
+2.  **Custom Tests:** Allow for more complex validation logic (e.g., [`TestValidation.js`](src/tests/TestValidation.js:1)).
+
+### 4.2. How to Add a Test
+
+All tests are run using the [`run-tests.sh`](src/run-tests.sh:1) script.
+1.  Create a new test file in [`src/tests/`](src/tests/).
+2.  Use `TestRegression.js` or `TestValidation.js` as a template.
+3.  Run a specific test with `./run-tests.sh <TestName>`.
+
+### 4.3. UI Testing
+
+The automated tests **only cover the core logic**. All UI-related changes must be tested manually by the user. The application is always running and available for testing in the user's browser.
+
+**Do not** attempt to start a server, open a browser, or interact with the UI programmatically. When a UI change is ready, you should ask the user to test it.
+
+## 5. Important Guidelines
+
+*   **JavaScript Compatibility:** Core files (in [`src/core/`](src/core/)) **must** remain compatible with the Google Apps Script JavaScript environment. This means **no modern JS features like `import`/`export` modules or classes in some contexts**. All core code should be written in a way that can be copy-pasted into a `.gs` file and run.
+*   **Event View Compatibility:** Any changes to the event structure or how events are handled must be tested against all three event views: the table, the accordion, and the wizard.
+*   **Configuration over Hardcoding:** Any constants, especially those related to tax rules, should be placed in the `finance-simulation-config-X.XX.json` file.
+*   **Write Tests:** Any new feature or bug fix for the core logic should be accompanied by a corresponding test. 
+*   **UI Testin:** Rely on the user for all UI testing and validation. The user is always running a local server. Don't start a new server and don't open browser windows.
