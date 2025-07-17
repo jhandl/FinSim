@@ -106,18 +106,30 @@ class EventSummaryRenderer {
    */
   formatPeriod(fromAge, toAge) {
     if (!fromAge) return '';
-    
+
     const from = parseInt(fromAge);
     const to = parseInt(toAge);
-    
+
     if (isNaN(from)) return '';
-    
+
+    // Get current age/year mode
+    let timeUnit = 'age';
+    try {
+      if (this.webUI && this.webUI.eventsTableManager && this.webUI.eventsTableManager.ageYearMode) {
+        timeUnit = this.webUI.eventsTableManager.ageYearMode;
+      }
+    } catch (err) {
+      // Silently ignore errors and keep default
+    }
+
+    const timeUnitPlural = timeUnit === 'age' ? 'ages' : 'years';
+
     if (isNaN(to) || to === 999) {
-      return `from age ${from}`;
+      return `from ${timeUnit} ${from}`;
     } else if (from === to) {
-      return `at age ${from}`;
+      return `at ${timeUnit} ${from}`;
     } else {
-      return `ages ${from}-${to}`;
+      return `${timeUnitPlural} ${from}-${to}`;
     }
   }
 

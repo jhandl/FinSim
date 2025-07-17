@@ -181,6 +181,20 @@ class FormatUtils {
     return text.replace(/\${([^}]+)}/g, (match, variable) => {
       let [varToken, format] = variable.split(',').map(s => s.trim());
 
+      // Handle special timeUnit variable for age/year mode
+      if (varToken === 'timeUnit') {
+        let currentMode = 'age';
+        try {
+          const webUI = (typeof WebUI !== 'undefined') ? WebUI.getInstance() : null;
+          if (webUI && webUI.eventsTableManager && webUI.eventsTableManager.ageYearMode) {
+            currentMode = webUI.eventsTableManager.ageYearMode;
+          }
+        } catch (err) {
+          // Silently ignore errors and keep default
+        }
+        return currentMode;
+      }
+
       // Support nested paths like pensionContributionRateBands.min
       if (varToken.includes('.')) {
         const tokens = varToken.split('.');

@@ -2994,29 +2994,41 @@ footer {
     flex: 1;
     min-width: 0;
     display: grid;
-    grid-template-columns: 1fr 140px 100px 120px;
+    grid-template-columns: var(--event-type-width, 140px) 120px 90px 100px;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
+}
+
+/* Adjust grid columns for year mode to accommodate longer text */
+.events-accordion-container.year-mode .event-summary-main {
+    grid-template-columns: var(--event-type-width, 140px) 120px 90px 120px; /* Increase period column width */
 }
 
 /* Grid item styles for column alignment */
 .event-summary-name {
     justify-self: start;
+    white-space: nowrap;
 }
 
 .event-summary-badge {
     justify-self: start;
     text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px; /* Match the grid column width */
 }
 
 .event-summary-amount {
     justify-self: end;
     text-align: right;
+    white-space: nowrap;
 }
 
 .event-summary-period {
     justify-self: start;
     text-align: left;
+    white-space: nowrap;
 }
 
 /* When wrapping is needed, revert to old behavior with title and details rows */
@@ -3031,6 +3043,19 @@ footer {
     display: inline;
     text-align: left;
     justify-self: auto;
+}
+
+/* Ensure badge truncation works in force-wrap mode */
+.events-accordion-container.force-wrap .event-summary-badge {
+    max-width: 200px; /* Allow more space in wrap mode but still limit */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Override display property for badge in force-wrap mode to maintain layout */
+.events-accordion-container.force-wrap .event-type-badge {
+    display: inline; /* Override inline-block to maintain proper line breaking */
 }
 
 /* Create title row with name and badge */
@@ -3073,6 +3098,11 @@ footer {
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%; /* Take full width of parent container */
+    display: inline-block; /* Required for text-overflow to work */
 }
 
 .event-summary-details {
@@ -3365,7 +3395,7 @@ footer {
     /* Accordion mobile styles */
 
     .accordion-item-header {
-        padding: 0.4rem 0.6rem;
+        padding: 0rem 0.4rem;
     }
 
     .event-summary-header {

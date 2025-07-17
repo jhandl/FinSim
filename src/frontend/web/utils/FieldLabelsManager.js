@@ -29,7 +29,6 @@ class FieldLabelsManager {
       const yamlText = await response.text();
       this.labels = jsyaml.load(yamlText);
       
-      console.log('Field labels loaded successfully');
       return this.labels;
     } catch (error) {
       console.error('Error loading field labels:', error);
@@ -48,14 +47,23 @@ class FieldLabelsManager {
       return this._getHardcodedLabel(eventType, fieldName);
     }
 
+    let label;
+
     // Check for event-specific override
     const eventConfig = this.labels.eventTypes?.[eventType];
     if (eventConfig && eventConfig[fieldName]) {
-      return eventConfig[fieldName];
+      label = eventConfig[fieldName];
+    } else {
+      // Fall back to default
+      label = this.labels.defaults?.[fieldName] || this._getHardcodedLabel(eventType, fieldName);
     }
 
-    // Fall back to default
-    return this.labels.defaults?.[fieldName] || this._getHardcodedLabel(eventType, fieldName);
+    // Process variable substitution using FormatUtils
+    if (typeof FormatUtils !== 'undefined' && FormatUtils.processVariables) {
+      label = FormatUtils.processVariables(label);
+    }
+
+    return label;
   }
 
   /**

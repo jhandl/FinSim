@@ -6,8 +6,8 @@ defaults:
   eventType: "Event Type"
   name: "Event Name"
   amount: "Amount"
-  fromAge: "From Age"
-  toAge: "To Age"
+  fromAge: "From ${timeUnit}"
+  toAge: "To ${timeUnit}"
   rate: "Growth Rate"
   match: "Employer Match"
   placeholders:
@@ -56,8 +56,8 @@ eventTypes:
 
   DBI: # Defined Benefit Income
     amount: "Annual Pension"
-    fromAge: "Pension Start Age"
-    toAge: "End Age"
+    fromAge: "Pension Start ${timeUnit}"
+    toAge: "End ${timeUnit}"
     rate: "Pension Growth"
     placeholders:
       rate: "inflation"
@@ -76,30 +76,30 @@ eventTypes:
 
   E1: # One-off Expense
     amount: "Total Cost"
-    fromAge: "At Age"
+    fromAge: "At ${timeUnit}"
     rate: "Cost Growth"
     placeholders:
       rate: "inflation"
 
   R: # Real Estate
     amount: "Purchase Price"
-    fromAge: "Purchase Age"
-    toAge: "Sale Age"
+    fromAge: "Purchase ${timeUnit}"
+    toAge: "Sale ${timeUnit}"
     rate: "Appreciation Rate"
     placeholders:
       rate: "inflation"
 
   M: # Mortgage
     amount: "Yearly Repayment"
-    fromAge: "Mortgage Start Age"
-    toAge: "Mortgage End Age"
+    fromAge: "Mortgage Start ${timeUnit}"
+    toAge: "Mortgage End ${timeUnit}"
     rate: "Interest Rate"
     placeholders:
       rate: ""
 
   SM: # Stock Market
-    fromAge: "Start Age"
-    toAge: "End Age"
+    fromAge: "Start ${timeUnit}"
+    toAge: "End ${timeUnit}"
     rate: "Market Change"
     placeholders:
       rate: ""

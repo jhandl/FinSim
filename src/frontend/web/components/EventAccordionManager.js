@@ -40,6 +40,12 @@ class EventAccordionManager {
     }
 
     this.accordionContainer = container;
+
+    // Apply initial year-mode class if needed
+    if (this.ageYearMode === 'year') {
+      container.classList.add('year-mode');
+    }
+
     this.renderAccordion();
   }
 
@@ -325,8 +331,11 @@ class EventAccordionManager {
   refresh() {
     this.renderAccordion();
     this.applySortingWithAnimation();
-    // Check for wrapping after rendering
-    setTimeout(() => this.checkAndApplyWrapping(), 50);
+    // Update grid columns and check for wrapping after rendering
+    setTimeout(() => {
+      this.updateGridColumns();
+      this.checkAndApplyWrapping();
+    }, 50);
   }
 
   /**
@@ -966,8 +975,62 @@ class EventAccordionManager {
    */
   updateAgeYearMode(mode) {
     this.ageYearMode = mode;
+
+    // Update CSS class on accordion container for year mode styling
+    const accordionContainer = document.querySelector('.events-accordion-container');
+    if (accordionContainer) {
+      if (mode === 'year') {
+        accordionContainer.classList.add('year-mode');
+      } else {
+        accordionContainer.classList.remove('year-mode');
+      }
+    }
+
     // Refresh to update any age/year displays
     this.refresh();
+  }
+
+  /**
+   * Calculate optimal width for event type name column
+   */
+  calculateOptimalEventTypeWidth() {
+    // Get all possible event type labels
+    const eventTypeOptions = this.webUI.eventsTableManager?.getEventTypeOptionObjects() || [];
+
+    // Create a temporary element to measure text width
+    const testElement = document.createElement('span');
+    testElement.style.position = 'absolute';
+    testElement.style.visibility = 'hidden';
+    testElement.style.whiteSpace = 'nowrap';
+    testElement.style.fontSize = 'inherit';
+    testElement.style.fontFamily = 'inherit';
+    testElement.style.fontWeight = 'inherit';
+    document.body.appendChild(testElement);
+
+    let maxWidth = 0;
+
+    // Measure each event type label
+    eventTypeOptions.forEach(option => {
+      testElement.textContent = option.label;
+      const width = testElement.getBoundingClientRect().width;
+      maxWidth = Math.max(maxWidth, width);
+    });
+
+    // Clean up
+    document.body.removeChild(testElement);
+
+    // Add some margin (20px) so badge doesn't touch the type name
+    return Math.ceil(maxWidth) + 20;
+  }
+
+  /**
+   * Update CSS grid columns with calculated optimal width
+   */
+  updateGridColumns() {
+    const optimalWidth = this.calculateOptimalEventTypeWidth();
+
+    // Update CSS custom property for the event type column width
+    this.accordionContainer.style.setProperty('--event-type-width', `${optimalWidth}px`);
   }
 
   /**
@@ -978,6 +1041,9 @@ class EventAccordionManager {
 
     const accordionItems = this.accordionContainer.querySelectorAll('.events-accordion-item');
     let needsWrapping = false;
+
+    // Store the current state before testing
+    const wasWrapped = this.accordionContainer.classList.contains('force-wrap');
 
     // First, ensure we're in no-wrap mode to test
     this.accordionContainer.classList.remove('force-wrap');
@@ -994,7 +1060,8 @@ class EventAccordionManager {
 
     accordionItems.forEach(item => {
       const summaryMain = item.querySelector('.event-summary-main');
-      if (!summaryMain) return;
+      const accordionSummary = item.querySelector('.accordion-item-summary');
+      if (!summaryMain || !accordionSummary) return;
 
       const name = summaryMain.querySelector('.event-summary-name');
       const badge = summaryMain.querySelector('.event-summary-badge');
@@ -1019,15 +1086,22 @@ class EventAccordionManager {
       testContainer.appendChild(amountClone);
       testContainer.appendChild(periodClone);
 
-      // Get natural width requirement
-      const naturalWidth = testContainer.getBoundingClientRect().width;
+      // Calculate the total grid width based on current CSS
+      const eventTypeWidth = parseInt(this.accordionContainer.style.getPropertyValue('--event-type-width')) || 140;
+      const isYearMode = this.accordionContainer.classList.contains('year-mode');
+      const badgeWidth = 120;
+      const amountWidth = 90;
+      const periodWidth = isYearMode ? 120 : 100;
+      const gapWidth = 0.5 * 16 * 3; // 0.5rem * 3 gaps in px
 
-      // Get available width for this item
-      const summaryMainRect = summaryMain.getBoundingClientRect();
-      const availableWidth = summaryMainRect.width;
+      const totalGridWidth = eventTypeWidth + badgeWidth + amountWidth + periodWidth + gapWidth;
 
-      // If natural width exceeds available width, we need wrapping
-      if (naturalWidth > availableWidth + 5) { // 5px tolerance
+      // Get available width by measuring the actual accordion-item-summary container
+      const accordionSummaryRect = accordionSummary.getBoundingClientRect();
+      const availableWidth = accordionSummaryRect.width;
+
+      // If total grid width exceeds available width, we need wrapping
+      if (totalGridWidth > availableWidth - 10) { // 10px tolerance for safety
         needsWrapping = true;
       }
     });
@@ -1036,6 +1110,12 @@ class EventAccordionManager {
     document.body.removeChild(testContainer);
 
     // Apply the appropriate class
+    if (needsWrapping !== wasWrapped) {
+      if (needsWrapping) {
+        this.accordionContainer.classList.add('force-wrap');
+      }
+    }
+
     if (needsWrapping) {
       this.accordionContainer.classList.add('force-wrap');
     }
