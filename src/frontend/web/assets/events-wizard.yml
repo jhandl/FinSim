@@ -208,6 +208,51 @@ EventWizards:
           template: "**{name}**: {amount} annually from age {fromAge} to {toAge}"
         showButtons: ["back", "create"]
 
+  # One-off Expense Wizard (Simple Flow)
+  - eventType: "E1"
+    name: "One-off Expense"
+    category: "expense"
+    description: "Add a single, non-recurring expense"
+    difficulty: "simple"
+    steps:
+      - stepId: "name"
+        title: "Name Your Expense"
+        contentType: "input"
+        field: "name"
+        content:
+          text: "Give this one-off expense a descriptive name."
+          validation: "required"
+        showButtons: ["back", "next"]
+
+      - stepId: "amount"
+        title: "Expense Amount"
+        contentType: "input"
+        field: "amount"
+        content:
+          text: "What's the total cost of this one-off expense?"
+          inputType: "currency"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+
+      - stepId: "timing"
+        title: "When will this expense occur?"
+        contentType: "input"
+        field: "fromAge"
+        content:
+          text: "At what age will you have this expense?"
+          inputType: "age"
+          validation: "required|positive"
+          help: "Enter the age when this expense will occur."
+        showButtons: ["back", "next"]
+
+      - stepId: "summary"
+        title: "Review & Create"
+        contentType: "summary"
+        content:
+          text: "Review your one-off expense details:"
+          template: "**{name}**: {amount} at age {fromAge}"
+        showButtons: ["back", "create"]
+
   # Property Purchase Wizard (Complex Flow)
   - eventType: "R"
     name: "Property Purchase"

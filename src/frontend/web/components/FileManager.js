@@ -189,6 +189,9 @@ class FileManager {
         if (type) {
           const displayRate = (rate !== undefined && rate !== '') ? String(parseFloat((Number(rate) * 100).toFixed(2))) : '';
           const displayMatch = (match !== undefined && match !== '') ? String(parseFloat((Number(match) * 100).toFixed(2))) : '';
+          if (type === 'E' && fromAge !== "" && toAge !== "" && parseInt(fromAge) === parseInt(toAge)) {
+            type = 'E1';
+          }
           const row = this.webUI.eventsTableManager.createEventRow(type, name, amount, fromAge || '', toAge || '', displayRate, displayMatch);
           tbody.appendChild(row);
         }
@@ -197,7 +200,7 @@ class FileManager {
       this.webUI.formatUtils.setupPercentageInputs();
       this.webUI.eventsTableManager.updateEventRowsVisibilityAndTypes();
 
-      // CRITICAL FIX: Refresh accordion AFTER table is fully populated
+      // TODO: This is the wrong place for this. It belongs in the UI side of things.
       if (this.webUI.eventAccordionManager) {
         this.webUI.eventAccordionManager.refresh();
       }

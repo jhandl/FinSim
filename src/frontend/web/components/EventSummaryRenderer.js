@@ -124,6 +124,7 @@ class EventSummaryRenderer {
       'DBI': 'Defined Benefit Income',
       'FI': 'Tax-free Income',
       'E': 'Expense',
+      'E1': 'One-off Expense',
       'R': 'Real Estate',
       'M': 'Mortgage',
       'SM': 'Stock Market',
@@ -174,7 +175,7 @@ class EventSummaryRenderer {
   }
 
   isOutflow(eventType) {
-    return ['E'].includes(eventType);
+    return ['E', 'E1'].includes(eventType);
   }
 
   isStockMarket(eventType) {
@@ -204,13 +205,12 @@ class EventSummaryRenderer {
    * Based on actual simulation behavior and event type meanings
    */
   showsToAgeField(eventType, event = null) {
-    // Expenses (E): Check if it's a one-off expense
-    if (eventType === 'E' && event) {
-      // If toAge equals fromAge, it's a one-off expense - don't show To Age field
-      return event.toAge !== event.fromAge;
+    // E1 (One-off Expense): Never show To Age field since it's automatically set to fromAge
+    if (eventType === 'E1') {
+      return false;
     }
 
-    // All event types show To Age field (including Property for sale date)
+    // All other event types show To Age field (including E, R for sale date, etc.)
     return true;
   }
 
@@ -219,6 +219,11 @@ class EventSummaryRenderer {
    * Based on what the rate field means for each event type
    */
   showsGrowthRateField(eventType, event = null) {
+    // E1 (One-off Expense): Never show Growth Rate field since it occurs only once
+    if (eventType === 'E1') {
+      return false;
+    }
+
     // Mortgages (M): Rate is interest rate, not growth rate - don't show
     if (eventType === 'M') {
       return false;
@@ -234,10 +239,9 @@ class EventSummaryRenderer {
       return true;
     }
 
-    // Expenses (E): Check if it's a one-off expense
-    if (eventType === 'E' && event) {
-      // One-off expenses don't have growth rates
-      return event.toAge !== event.fromAge;
+    // Expenses (E): Always show growth rate field for recurring expenses
+    if (eventType === 'E') {
+      return true;
     }
 
     // All income types (SI, UI, RI, etc.) show growth rate

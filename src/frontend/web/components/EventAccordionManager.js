@@ -207,7 +207,7 @@ class EventAccordionManager {
   }
 
   isOutflow(eventType) {
-    return ['E'].includes(eventType);
+    return ['E', 'E1'].includes(eventType);
   }
 
   isStockMarket(eventType) {
@@ -647,6 +647,23 @@ class EventAccordionManager {
         switch (value) {
           case 'E': // Expense
             // Default to one-off: set toAge = fromAge and rate = '' (inflation)
+            if (fromAgeInput && toAgeInput && fromAgeInput.value) {
+              toAgeInput.value = fromAgeInput.value; // One-off expense
+
+              // Force a change event on toAge to ensure it's recognized as a one-off expense
+              const changeEvent = new Event('change', { bubbles: true });
+              toAgeInput.dispatchEvent(changeEvent);
+            }
+            if (rateInput) {
+              rateInput.value = ''; // Use inflation rate by default
+            }
+            if (matchInput) {
+              matchInput.value = ''; // No match for expenses
+            }
+            break;
+
+          case 'E1': // One-off Expense
+            // Set toAge = fromAge and rate = '' (inflation)
             if (fromAgeInput && toAgeInput && fromAgeInput.value) {
               toAgeInput.value = fromAgeInput.value; // One-off expense
 

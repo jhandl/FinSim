@@ -593,10 +593,10 @@ class EventWizardManager {
       return;
     }
 
-    // Handle special cases before creating event
+    // Handle special cases before creating event (may modify eventType)
     this.handleSpecialCases();
 
-    // Prepare event data
+    // Prepare event data (use potentially modified eventType)
     const eventData = {
       eventType: this.wizardState.eventType,
       ...this.wizardState.data
@@ -668,11 +668,21 @@ class EventWizardManager {
   handleSpecialCases() {
     const data = this.wizardState.data;
 
-    // For one-time expenses, set toAge equal to fromAge and growth rate to blank (uses inflation)
+    // For one-time expenses, change event type to E1 and set appropriate fields
     if (this.wizardState.eventType === 'E' && data.type === 'oneoff') {
+      // Change event type to E1 for one-off expenses
+      this.wizardState.eventType = 'E1';
       // Set toAge equal to fromAge for one-time expenses
       data.toAge = data.fromAge;
       // Set growth rate to blank for one-time expenses (uses inflation rate)
+      data.rate = '';
+    }
+
+    // For E1 (one-off expense) events, set toAge equal to fromAge and growth rate to blank
+    if (this.wizardState.eventType === 'E1') {
+      // Set toAge equal to fromAge for one-off expenses
+      data.toAge = data.fromAge;
+      // Set growth rate to blank for one-off expenses (uses inflation rate)
       data.rate = '';
     }
 

@@ -371,6 +371,7 @@ class UIManager {
           "DBI": "Defined Benefit Pension Income",
           "FI": "Tax-free Income",
           "E": "Expense",
+          "E1": "One-off Expense",
           "R": "Real Estate",
           "M": "Mortgage",
           "SM": "Stock Market"
@@ -410,9 +411,14 @@ class UIManager {
           processedToAge = this.convertEventYearToAge(parseInt(toAge), birthYear);
         }
       }
-      
+
+      // For E1 events, set toAge equal to fromAge (one-off expenses occur only once)
+      if (type === 'E1') {
+        processedToAge = processedFromAge;
+      }
+
       events.push(new SimEvent(
-        type, id, amount, processedFromAge, 
+        type, id, amount, processedFromAge,
         (processedToAge === "" && (type === "R" || type === "DBI")) ? 999 : processedToAge,
         (rate === "") ? undefined : rate,
         (match === "") ? undefined : match
@@ -515,6 +521,17 @@ class UIManager {
           errors = true;
         }
       });
+
+      // Special validation for E1 (one-off expense) events
+      if (event.type === 'E1') {
+        // Ensure toAge equals fromAge for one-off expenses
+        if (event.fromAge !== undefined && event.toAge !== undefined &&
+            event.fromAge !== '' && event.toAge !== '' &&
+            parseInt(event.fromAge) !== parseInt(event.toAge)) {
+          this.ui.setWarning(`Events[${i + 1},${UIManager.getIndexForField('toAge')}]`, "One-off expenses must have the same start and end age");
+          errors = true;
+        }
+      }
     }
   }
 
@@ -690,6 +707,7 @@ class UIManager {
       'DBI': 'rrroo-',
       'FI':  'rrrro-',
       'E':   'rrrro-',
+      'E1':  'rrr---',    // One-off Expense: name, amount, fromAge, toAge (hidden), rate (hidden), match (hidden)
       'R':   'rrroo-',
       'M':   'rrrrr-',
       'SM':  'r-rrr-'

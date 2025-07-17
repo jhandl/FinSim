@@ -379,7 +379,7 @@ class EventsTableManager {
   }
 
   isOutflow(eventType) {
-      return ['E'].includes(eventType); // SM handled separately
+      return ['E', 'E1'].includes(eventType); // SM handled separately
   }
 
   isStockMarket(eventType) {
@@ -529,6 +529,7 @@ class EventsTableManager {
         { value: 'DBI', label: 'Defined Benefit Income' },
         { value: 'FI', label: 'Tax-free Income' },
         { value: 'E', label: 'Expense' },
+        { value: 'E1', label: 'One-off Expense' },
         { value: 'R', label: 'Real Estate' },
         { value: 'M', label: 'Mortgage' },
         { value: 'SM', label: 'Stock Market' },

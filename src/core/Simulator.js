@@ -383,6 +383,7 @@ function processEvents() {
         break;
 
       case 'E': // Expenses
+      case 'E1': // One-off Expenses
         if (inScope) {
           expenses += amount;
           attributionManager.record('expenses', event.id, amount);
