@@ -1,0 +1,108 @@
+# Field Label Configuration
+# Defines custom field labels and placeholders for different event types
+
+# Default labels used when no event-specific override is defined
+defaults:
+  eventType: "Event Type"
+  name: "Event Name"
+  amount: "Amount"
+  fromAge: "From Age"
+  toAge: "To Age"
+  rate: "Growth Rate"
+  match: "Employer Match"
+  placeholders:
+    rate: "inflation"
+    match: ""
+
+# Event-specific field label overrides
+eventTypes:
+  SI: # Salary Income
+    amount: "Annual Salary"
+    rate: "Salary Growth"
+    placeholders:
+      rate: "inflation"
+      match: ""
+
+  SInp: # Salary Income (no pension)
+    amount: "Annual Salary"
+    rate: "Salary Growth"
+    placeholders:
+      rate: "inflation"
+
+  SI2: # Their Salary
+    amount: "Annual Salary"
+    rate: "Salary Growth"
+    placeholders:
+      rate: "inflation"
+      match: ""
+
+  SI2np: # Their Salary (no pension)
+    amount: "Annual Salary"
+    rate: "Salary Growth"
+    placeholders:
+      rate: "inflation"
+
+  UI: # RSU Income
+    amount: "Annual RSU Value"
+    rate: "RSU Growth"
+    placeholders:
+      rate: "inflation"
+
+  RI: # Rental Income
+    amount: "Annual Rental Income"
+    rate: "Rent Growth"
+    placeholders:
+      rate: "inflation"
+
+  DBI: # Defined Benefit Income
+    amount: "Annual Pension"
+    fromAge: "Pension Start Age"
+    toAge: "End Age"
+    rate: "Pension Growth"
+    placeholders:
+      rate: "inflation"
+
+  FI: # Tax-free Income
+    amount: "Annual Income"
+    rate: "Income Growth"
+    placeholders:
+      rate: "inflation"
+
+  E: # Expense
+    amount: "Annual Cost"
+    rate: "Cost Growth"
+    placeholders:
+      rate: "inflation"
+
+  E1: # One-off Expense
+    amount: "Total Cost"
+    fromAge: "At Age"
+    rate: "Cost Growth"
+    placeholders:
+      rate: "inflation"
+
+  R: # Real Estate
+    amount: "Purchase Price"
+    fromAge: "Purchase Age"
+    toAge: "Sale Age"
+    rate: "Appreciation Rate"
+    placeholders:
+      rate: "inflation"
+
+  M: # Mortgage
+    amount: "Yearly Repayment"
+    fromAge: "Mortgage Start Age"
+    toAge: "Mortgage End Age"
+    rate: "Interest Rate"
+    placeholders:
+      rate: ""
+
+  SM: # Stock Market
+    fromAge: "Start Age"
+    toAge: "End Age"
+    rate: "Market Change"
+    placeholders:
+      rate: ""
+
+  NOP: # No Operation
+    # Uses defaults

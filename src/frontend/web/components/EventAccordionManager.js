@@ -10,6 +10,7 @@ class EventAccordionManager {
     this.events = []; // Store event data for accordion items
     this.expandedItems = new Set(); // Track which items are expanded
     this._newEventId = null;
+    this.fieldLabelsManager = FieldLabelsManager.getInstance();
     this.setupAccordionContainer();
     this.setupResizeListener();
     this.setupAutoSortOnBlur();
@@ -1293,6 +1294,7 @@ class EventAccordionManager {
 
     // Update field visibility based on event type
     const fields = [
+      { selector: '.accordion-edit-amount', key: 'amount', showMethod: 'showsAmountField' },
       { selector: '.accordion-edit-toage', key: 'toAge', showMethod: 'showsToAgeField' },
       { selector: '.accordion-edit-rate', key: 'rate', showMethod: 'showsGrowthRateField' },
       { selector: '.accordion-edit-match', key: 'match', showMethod: 'showsEmployerMatchField' }
@@ -1322,10 +1324,9 @@ class EventAccordionManager {
       }
     });
 
-    // Always show name, amount, and fromAge fields and restore their values
+    // Always show name and fromAge fields and restore their values
     const alwaysVisibleFields = [
       { selector: '.accordion-edit-name', key: 'name' },
-      { selector: '.accordion-edit-amount', key: 'amount' },
       { selector: '.accordion-edit-fromage', key: 'fromAge' }
     ];
 
@@ -1349,17 +1350,8 @@ class EventAccordionManager {
   updateRateFieldLabel(row, eventType) {
     const label = row.querySelector('label');
     if (label) {
-      let rateLabel = "Growth Rate:";
-
-      if (eventType === 'R') {
-        rateLabel = "Appreciation Rate:";
-      } else if (eventType === 'SM') {
-        rateLabel = "Market Growth:";
-      } else if (eventType === 'M') {
-        rateLabel = "Interest Rate:";
-      }
-
-      label.textContent = rateLabel;
+      const rateLabel = this.fieldLabelsManager.getFieldLabel(eventType, 'rate');
+      label.textContent = `${rateLabel}:`;
     }
   }
 

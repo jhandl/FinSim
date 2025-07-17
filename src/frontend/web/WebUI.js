@@ -28,6 +28,7 @@ class WebUI extends AbstractUI {
       this.formatUtils = new FormatUtils();
       this.notificationUtils = new NotificationUtils();
       this.errorModalUtils = new ErrorModalUtils();
+      this.fieldLabelsManager = FieldLabelsManager.getInstance();
       this.chartManager = new ChartManager();
       this.tableManager = new TableManager(this);
       this.fileManager = new FileManager(this);
@@ -1275,6 +1276,9 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
   try {
     const webUi = WebUI.getInstance(); // Get WebUI instance
     await Config.initialize(webUi);   // Initialize Config and wait for it
+
+    // Load field labels configuration
+    await webUi.fieldLabelsManager.loadLabels();
 
     // Show welcome modal instead of automatically starting wizard
     webUi.showWelcomeModal();

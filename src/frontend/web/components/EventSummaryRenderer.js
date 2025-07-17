@@ -4,6 +4,7 @@ class EventSummaryRenderer {
 
   constructor(webUI) {
     this.webUI = webUI;
+    this.fieldLabelsManager = FieldLabelsManager.getInstance();
   }
 
   /**
@@ -18,9 +19,15 @@ class EventSummaryRenderer {
 
     const eventTypeInfo = this.getEventTypeInfo(event.type);
     const category = this.getEventCategory(event.type);
-    
+
     // Extract individual components for grid layout
-    const amount = this.formatCurrency(event.amount);
+    // For stock market events, show rate instead of amount
+    let displayValue;
+    if (this.isStockMarket(event.type)) {
+      displayValue = this.formatRate(event.rate);
+    } else {
+      displayValue = this.formatCurrency(event.amount);
+    }
     const period = this.formatPeriod(event.fromAge, event.toAge);
 
     return `
@@ -34,7 +41,7 @@ class EventSummaryRenderer {
               <span class="event-type-badge">${this.escapeHtml(event.name || 'Unnamed Event')}</span>
             </div>
             <div class="event-summary-amount">
-              ${amount ? `<span class="detail-amount">${amount}</span>` : '<span class="detail-empty">—</span>'}
+              ${displayValue ? `<span class="detail-amount">${displayValue}</span>` : '<span class="detail-empty">—</span>'}
             </div>
             <div class="event-summary-period">
               ${period ? `<span class="detail-period">${period}</span>` : '<span class="detail-empty">—</span>'}
@@ -75,6 +82,23 @@ class EventSummaryRenderer {
     if (isNaN(num)) return amount;
 
     return FormatUtils.formatCurrency(num);
+  }
+
+  /**
+   * Format rate as percentage
+   */
+  formatRate(rate) {
+    if (!rate || rate === '0' || rate === '') return '';
+
+    const num = parseFloat(rate.toString().replace(/[%]/g, ''));
+    if (isNaN(num)) return rate;
+
+    // Convert to decimal format for FormatUtils.formatPercentage
+    // If the value is > 1, assume it's already in percentage form (like 20 for 20%)
+    // If the value is <= 1, assume it's in decimal form (like 0.2 for 20%)
+    const decimalValue = Math.abs(num) > 1 ? num / 100 : num;
+
+    return FormatUtils.formatPercentage(decimalValue);
   }
 
   /**
@@ -249,6 +273,20 @@ class EventSummaryRenderer {
   }
 
   /**
+   * Check if event should show Amount field in UI
+   * Stock market events don't use the amount field
+   */
+  showsAmountField(eventType, event = null) {
+    // Stock Market events (SM): Don't show amount field - they use rate instead
+    if (eventType === 'SM') {
+      return false;
+    }
+
+    // All other event types show amount field
+    return true;
+  }
+
+  /**
    * Escape HTML to prevent XSS
    */
   escapeHtml(text) {
@@ -286,19 +324,22 @@ class EventSummaryRenderer {
     `);
 
     // Event name (editable text input)
+    const nameLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'name');
     details.push(`
       <div class="detail-row">
-        <label>Name:</label>
+        <label>${nameLabel}:</label>
         <div class="editable-field">
           <input type="text" class="accordion-edit-name" value="${this.escapeHtml(event.name || '')}" data-accordion-id="${event.accordionId}" data-sort-key="event-name">
         </div>
       </div>
     `);
 
-    // Amount (editable currency input) - shown for all event types
+    // Amount (editable currency input) - always generate but hide if not needed
+    const showAmount = this.showsAmountField(event.type, event);
+    const amountLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'amount');
     details.push(`
-      <div class="detail-row">
-        <label>Amount:</label>
+      <div class="detail-row" style="display: ${showAmount ? '' : 'none'}">
+        <label>${amountLabel}:</label>
         <div class="editable-field">
           <input type="text" class="accordion-edit-amount currency" inputmode="numeric" pattern="[0-9]*" value="${event.amount || ''}" data-accordion-id="${event.accordionId}" data-sort-key="event-amount">
         </div>
@@ -306,9 +347,10 @@ class EventSummaryRenderer {
     `);
 
     // From Age (editable numeric input) - shown for all event types
+    const fromAgeLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'fromAge');
     details.push(`
       <div class="detail-row">
-        <label>From Age:</label>
+        <label>${fromAgeLabel}:</label>
         <div class="editable-field">
           <input type="text" class="accordion-edit-fromage" inputmode="numeric" pattern="[0-9]*" value="${event.fromAge || ''}" data-accordion-id="${event.accordionId}" data-sort-key="from-age">
         </div>
@@ -317,9 +359,10 @@ class EventSummaryRenderer {
 
     // To Age (editable numeric input) - always generate but hide if not needed
     const showToAge = this.showsToAgeField(event.type, event);
+    const toAgeLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'toAge');
     details.push(`
       <div class="detail-row" style="display: ${showToAge ? '' : 'none'}">
-        <label>To Age:</label>
+        <label>${toAgeLabel}:</label>
         <div class="editable-field">
           <input type="text" class="accordion-edit-toage" inputmode="numeric" pattern="[0-9]*" value="${event.toAge || ''}" data-accordion-id="${event.accordionId}" data-sort-key="to-age">
         </div>
@@ -328,38 +371,27 @@ class EventSummaryRenderer {
 
     // Growth Rate (editable percentage input) - always generate but hide if not needed
     const showGrowthRate = this.showsGrowthRateField(event.type, event);
-
-    // Customize label based on event type
-    let rateLabel = "Growth Rate:";
-    let placeholder = "inflation";
-
-    if (event.type === 'R') {
-      rateLabel = "Appreciation Rate:";
-      placeholder = "inflation";
-    } else if (event.type === 'SM') {
-      rateLabel = "Market Growth:";
-      placeholder = "";
-    } else if (event.type === 'M') {
-      rateLabel = "Interest Rate:";
-      placeholder = "";
-    }
+    const rateLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'rate');
+    const ratePlaceholder = this.fieldLabelsManager.getFieldPlaceholder(event.type, 'rate');
 
     details.push(`
       <div class="detail-row" style="display: ${showGrowthRate ? '' : 'none'}">
-        <label>${rateLabel}</label>
+        <label>${rateLabel}:</label>
         <div class="editable-field percentage-container">
-          <input type="text" class="accordion-edit-rate percentage" inputmode="numeric" pattern="[0-9]*" placeholder="${placeholder}" value="${event.rate || ''}" data-accordion-id="${event.accordionId}" data-sort-key="event-rate">
+          <input type="text" class="accordion-edit-rate percentage" inputmode="numeric" pattern="[0-9]*" placeholder="${ratePlaceholder}" value="${event.rate || ''}" data-accordion-id="${event.accordionId}" data-sort-key="event-rate">
         </div>
       </div>
     `);
 
     // Employer Match (always generate but hide if not needed)
     const showEmployerMatch = this.showsEmployerMatchField(event.type);
+    const matchLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'match');
+    const matchPlaceholder = this.fieldLabelsManager.getFieldPlaceholder(event.type, 'match');
     details.push(`
       <div class="detail-row" style="display: ${showEmployerMatch ? '' : 'none'}">
-        <label>Employer Match:</label>
+        <label>${matchLabel}:</label>
         <div class="editable-field percentage-container">
-          <input type="text" class="accordion-edit-match percentage" inputmode="numeric" pattern="[0-9]*" value="${event.match || ''}" data-accordion-id="${event.accordionId}" data-sort-key="event-match">
+          <input type="text" class="accordion-edit-match percentage" inputmode="numeric" pattern="[0-9]*" placeholder="${matchPlaceholder}" value="${event.match || ''}" data-accordion-id="${event.accordionId}" data-sort-key="event-match">
         </div>
       </div>
     `);
