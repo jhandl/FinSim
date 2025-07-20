@@ -265,11 +265,6 @@ class WebUI extends AbstractUI {
     document.addEventListener('change', (event) => {
       const element = event.target;
 
-      // If P2StartingAge changes, update the state of other P2 fields
-      if (element.id === 'P2StartingAge') {
-        // this.updatePerson2FieldsState(); // REMOVED by user request
-      }
-
       this.editCallbacks.forEach(callback => {
         callback({
           element: element,
@@ -351,13 +346,6 @@ class WebUI extends AbstractUI {
       // Clear all warnings at the start of each simulation attempt
       this.clearAllWarnings();
 
-      // Always validate fields first to show mandatory field warnings
-      this._validateRequiredFields();
-
-      if (this._isScenarioDataMissing()) {
-        return; // Don't run simulation if data is missing
-      }
-
       this.isSimulationRunning = true;
       runButton.disabled = true;
       runButton.classList.add('disabled');
@@ -397,87 +385,6 @@ class WebUI extends AbstractUI {
     };
 
     runButton.addEventListener('click', this.handleRunSimulation);
-  }
-
-  _isScenarioDataMissing() {
-    const startingAge = this.getValue('StartingAge');
-    const retirementAge = this.getValue('RetirementAge');
-    const targetAge = this.getValue('TargetAge');
-
-    if (!startingAge || !retirementAge || !targetAge) {
-      return true;
-    }
-
-    const eventsTable = document.getElementById('Events');
-    const rows = eventsTable.getElementsByTagName('tr');
-    let validEventFound = false;
-
-    for (let i = 1; i < rows.length; i++) { // Start from 1 to skip header row
-      const row = rows[i];
-      if (row.style.display === 'none') {
-        continue;
-      }
-
-      const eventType = row.querySelector('.event-type').value;
-      if (eventType !== 'NOP') {
-        validEventFound = true;
-        break;
-      }
-    }
-
-    return !validEventFound;
-  }
-
-  _validateRequiredFields() {
-    // Check mandatory parameters
-    const startingAge = this.getValue('StartingAge');
-    const retirementAge = this.getValue('RetirementAge');
-    const targetAge = this.getValue('TargetAge');
-    const message = "Required field";
-
-    if (!startingAge || startingAge === '' || startingAge === '0') {
-      this.setWarning('StartingAge', message);
-    }
-
-    if (!retirementAge || retirementAge === '' || retirementAge === '0') {
-      this.setWarning('RetirementAge', message);
-    }
-
-    if (!targetAge || targetAge === '' || targetAge === '0') {
-      this.setWarning('TargetAge', message);
-    }
-
-    // Check mandatory events
-    const eventsTable = document.getElementById('Events');
-    const rows = eventsTable.getElementsByTagName('tr');
-    let validEventFound = false;
-
-    for (let i = 1; i < rows.length; i++) { // Start from 1 to skip header row
-      const row = rows[i];
-      if (row.style.display === 'none') {
-        continue;
-      }
-
-      const eventType = row.querySelector('.event-type').value;
-      if (eventType !== 'NOP' && eventType !== '') {
-        validEventFound = true;
-        break;
-      }
-    }
-
-    if (!validEventFound) {
-      // Try to find the first visible event row to show the warning
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (row.style.display !== 'none') {
-          const eventTypeInput = row.querySelector('.event-type');
-          if (eventTypeInput) {
-            this.setWarning(eventTypeInput.id || `Events[${i},1]`, 'At least one event is required (e.g., salary income or expenses)');
-            break;
-          }
-        }
-      }
-    }
   }
 
   setupWizardInvocation() {

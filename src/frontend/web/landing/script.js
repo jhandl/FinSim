@@ -144,8 +144,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Responsive menu toggle removed as requested
-
   // Fix iOS Safari zoom on orientation change
   function preventZoomOnOrientationChange() {
     const viewport = document.querySelector('meta[name="viewport"]');

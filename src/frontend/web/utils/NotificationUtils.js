@@ -106,11 +106,30 @@ class NotificationUtils {
       if (!element) throw new Error(`Element not found: ${elementId}`);
     }
     
-    element.style.backgroundColor = STATUS_COLORS.WARNING;
-    element.setAttribute('data-tooltip', message);
-    
-    // Remove existing event listeners to prevent duplicates
-    this.clearElementWarningListeners(element);
+    // Check if this is a dropdown element with a wrapper reference
+    if (element._dropdownWrapper) {
+      // Apply warning class to the wrapper instead of changing background color
+      element._dropdownWrapper.classList.add('warning');
+      element._dropdownWrapper.setAttribute('data-tooltip', message);
+      this.clearElementWarningListeners(element._dropdownWrapper);
+      
+      // Set up tooltip event listeners on the wrapper
+      this.setupElementWarningListeners(element._dropdownWrapper);
+    } else {
+      // Apply warning directly to the element (for non-dropdown elements)
+      element.style.backgroundColor = STATUS_COLORS.WARNING;
+      element.setAttribute('data-tooltip', message);
+      
+      // Remove existing event listeners to prevent duplicates
+      this.clearElementWarningListeners(element);
+      
+      // Set up tooltip event listeners
+      this.setupElementWarningListeners(element);
+    }
+  }
+
+  setupElementWarningListeners(element) {
+    const message = element.getAttribute('data-tooltip');
     
     const showTooltip = () => {
       // Remove any existing tooltip first
@@ -188,18 +207,41 @@ class NotificationUtils {
   }
 
   clearElementWarning(element) {
-    element.style.backgroundColor = STATUS_COLORS.WHITE;
-    element.removeAttribute('data-tooltip');
-    this.clearElementWarningListeners(element);
+    // Check if this is a dropdown element with a wrapper reference
+    if (element._dropdownWrapper) {
+      element._dropdownWrapper.classList.remove('warning');
+      element._dropdownWrapper.removeAttribute('data-tooltip');
+      this.clearElementWarningListeners(element._dropdownWrapper);
+    } else {
+      element.style.backgroundColor = STATUS_COLORS.WHITE;
+      element.removeAttribute('data-tooltip');
+      this.clearElementWarningListeners(element);
+    }
   }
 
   clearAllWarnings() {
     const warningRGB = `rgb(${parseInt(STATUS_COLORS.WARNING.slice(1,3), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(3,5), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(5,7), 16)})`;
-    const elements = document.querySelectorAll('input[style]');
+    
+    // Find all input elements with warning background color
+    const elements = document.querySelectorAll('input[style], h2[style]');
     const warningElements = Array.from(elements).filter(element => {
       const bgColor = element.style.backgroundColor;
       return bgColor === warningRGB;
     });
+    
+    // Find all elements with _dropdownWrapper that have warning class
+    const hiddenInputs = document.querySelectorAll('input[type="hidden"]');
+    hiddenInputs.forEach(input => {
+      if (input._dropdownWrapper && input._dropdownWrapper.classList.contains('warning')) {
+        warningElements.push(input);
+      }
+    });
+    
+    // Check for EventsTitle specifically
+    const eventsTitle = document.getElementById('EventsTitle');
+    if (eventsTitle && eventsTitle.style.backgroundColor === warningRGB) {
+      warningElements.push(eventsTitle);
+    }
     
     warningElements.forEach(element => {
       this.clearElementWarning(element);

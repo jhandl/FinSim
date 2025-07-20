@@ -726,66 +726,63 @@ class EventWizardManager {
    */
   validateWizardData() {
     const data = this.wizardState.data;
-    const eventType = this.wizardState.eventType;
 
-    // Validate name
-    if (!data.name || data.name.trim() === '') {
-      alert('Please enter a name for the event.');
+    // Validate required fields
+    const nameValidation = ValidationUtils.validateRequired(data.name, 'Event name');
+    if (!nameValidation.isValid) {
+      alert(nameValidation.message);
       return false;
     }
 
-    // Validate amount - check for NaN properly
-    if (!data.amount || data.amount.trim() === '') {
-      alert('Please enter an amount.');
+    const amountValidation = ValidationUtils.validateRequired(data.amount, 'Amount');
+    if (!amountValidation.isValid) {
+      alert(amountValidation.message);
       return false;
     }
 
-    const amountValue = parseFloat(data.amount.replace(/[€,$]/g, ''));
-    if (isNaN(amountValue) || amountValue <= 0) {
-      alert('Please enter a valid amount (numbers only).');
+    const fromAgeValidation = ValidationUtils.validateRequired(data.fromAge, 'Starting age/year');
+    if (!fromAgeValidation.isValid) {
+      alert(fromAgeValidation.message);
       return false;
     }
 
-    // Validate fromAge - check for NaN properly
-    if (!data.fromAge || data.fromAge.trim() === '') {
-      alert('Please enter a starting age/year.');
+    // Validate numeric values
+    if (ValidationUtils.validateValue('money', data.amount) === null) {
+      alert('Please enter a valid amount');
       return false;
     }
 
-    const fromAgeValue = parseInt(data.fromAge);
-    if (isNaN(fromAgeValue) || fromAgeValue < 0) {
-      alert('Please enter a valid starting age/year (numbers only).');
+    if (ValidationUtils.validateValue('age', data.fromAge) === null) {
+      alert('Please enter a valid starting age/year');
       return false;
     }
 
-    // Validate toAge if present - check for NaN properly
+    // Validate toAge if present
     if (data.toAge && data.toAge.trim() !== '') {
-      const toAgeValue = parseInt(data.toAge);
-      if (isNaN(toAgeValue) || toAgeValue < 0) {
-        alert('Please enter a valid ending age/year (numbers only).');
+      if (ValidationUtils.validateValue('age', data.toAge) === null) {
+        alert('Please enter a valid ending age/year');
         return false;
       }
 
-      if (toAgeValue < fromAgeValue) {
-        alert('Ending age/year cannot be before starting age/year.');
+      const relationship = ValidationUtils.validateAgeRelationship(data.fromAge, data.toAge);
+      if (!relationship.isValid) {
+        alert(relationship.message);
         return false;
       }
     }
 
-    // Validate rate if present - check for NaN properly
+    // Validate rate if present
     if (data.rate && data.rate.trim() !== '') {
-      const rateValue = parseFloat(data.rate.replace('%', ''));
-      if (isNaN(rateValue)) {
-        alert('Please enter a valid rate (numbers only).');
+      if (ValidationUtils.validateValue('percentage', data.rate) === null) {
+        alert('Please enter a valid rate');
         return false;
       }
     }
 
-    // Validate match if present - check for NaN properly
+    // Validate match if present
     if (data.match && data.match.trim() !== '') {
-      const matchValue = parseFloat(data.match.replace('%', ''));
-      if (isNaN(matchValue)) {
-        alert('Please enter a valid match percentage (numbers only).');
+      if (ValidationUtils.validateValue('percentage', data.match) === null) {
+        alert('Please enter a valid match percentage');
         return false;
       }
     }
@@ -803,92 +800,32 @@ class EventWizardManager {
     // Clear any existing validation styling
     this.clearWizardFieldValidation(input);
 
-    // Skip validation for empty values (will be caught by final validation if required)
-    if (!value || value.trim() === '') {
-      return;
-    }
+    if (!value || value.trim() === '') return; // empty allowed, handled on final submit
 
-    // Validate based on field type
+    // Map field types to ValidationUtils
     switch (fieldType) {
       case 'currency':
-        validation = this.validateWizardCurrency(value);
+        if (ValidationUtils.validateValue('money', value) === null) {
+          validation = { isValid: false, message: 'Please enter a valid amount' };
+        }
         break;
       case 'percentage':
-        validation = this.validateWizardPercentage(value);
+        if (ValidationUtils.validateValue('percentage', value) === null) {
+          validation = { isValid: false, message: 'Please enter a valid percentage' };
+        }
         break;
       default:
-        // For age fields and other numeric fields
         if (fieldName === 'fromAge' || fieldName === 'toAge') {
-          validation = this.validateWizardAge(value);
+          if (ValidationUtils.validateValue('age', value) === null) {
+            validation = { isValid: false, message: 'Please enter a valid age' };
+          }
         }
         break;
     }
 
-    // Show validation result
     if (!validation.isValid) {
-      this.showWizardFieldValidation(input, validation.message, validation.isWarningOnly);
+      this.showWizardFieldValidation(input, validation.message);
     }
-  }
-
-  /**
-   * Validate currency field in wizard
-   */
-  validateWizardCurrency(value) {
-    const cleanValue = value.replace(/[€,$]/g, '');
-    const numValue = parseFloat(cleanValue);
-
-    if (isNaN(numValue)) {
-      return { isValid: false, message: 'Please enter a valid amount (numbers only)' };
-    }
-
-    if (numValue <= 0) {
-      return { isValid: false, message: 'Amount must be greater than zero' };
-    }
-
-    if (numValue > 10000000) {
-      return { isValid: false, message: 'Amount seems unreasonably high', isWarningOnly: true };
-    }
-
-    return { isValid: true };
-  }
-
-  /**
-   * Validate age field in wizard
-   */
-  validateWizardAge(value) {
-    const numValue = parseInt(value);
-
-    if (isNaN(numValue)) {
-      return { isValid: false, message: 'Please enter a valid age (numbers only)' };
-    }
-
-    if (numValue < 0) {
-      return { isValid: false, message: 'Age cannot be negative' };
-    }
-
-    if (numValue > 120) {
-      return { isValid: false, message: 'Age seems unreasonably high', isWarningOnly: true };
-    }
-
-    return { isValid: true };
-  }
-
-  /**
-   * Validate percentage field in wizard
-   */
-  validateWizardPercentage(value) {
-    const cleanValue = value.replace('%', '');
-    const numValue = parseFloat(cleanValue);
-
-    if (isNaN(numValue)) {
-      return { isValid: false, message: 'Please enter a valid percentage (numbers only)' };
-    }
-
-    if (Math.abs(numValue) > 100) {
-      return { isValid: false, message: 'Percentage seems very high', isWarningOnly: true };
-    }
-
-    return { isValid: true };
   }
 
   /**

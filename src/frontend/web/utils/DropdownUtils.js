@@ -14,7 +14,7 @@ class DropdownUtils {
    * @param {Function}      [cfg.onSelect]     – Callback(value, label) when user selects.
    * @param {string}        [cfg.width]        – Optional width for the dropdown.
    * @param {string}        [cfg.header]       – Optional header text for the dropdown.
-   * @returns {Object} { open, close, getSelected, setOptions }
+   * @returns {Object} { open, close, getSelected, setOptions, wrapper }
    */
   static create(cfg = {}) {
     const {
@@ -34,6 +34,40 @@ class DropdownUtils {
       console.error('DropdownUtils: toggleEl and dropdownEl are required');
       return null;
     }
+
+    // Create a wrapper around the toggle element to make it compatible with validation
+    const wrapper = document.createElement('div');
+    wrapper.className = 'dropdown-wrapper';
+    
+    // Insert the wrapper in the DOM
+    if (toggleEl.parentNode) {
+      toggleEl.parentNode.insertBefore(wrapper, toggleEl);
+      wrapper.appendChild(toggleEl);
+    }
+
+    // Forward properties and methods to make the wrapper compatible with validation system
+    wrapper.style = toggleEl.style;
+    wrapper.setAttribute = function(name, value) {
+      if (name === 'data-tooltip') {
+        toggleEl.setAttribute(name, value);
+      }
+      return HTMLElement.prototype.setAttribute.call(this, name, value);
+    };
+    wrapper.removeAttribute = function(name) {
+      if (name === 'data-tooltip') {
+        toggleEl.removeAttribute(name);
+      }
+      return HTMLElement.prototype.removeAttribute.call(this, name);
+    };
+
+    // Forward relevant events from wrapper to toggle element
+    const forwardEvents = ['mouseenter', 'mouseleave', 'focus', 'blur'];
+    forwardEvents.forEach(eventName => {
+      wrapper.addEventListener(eventName, (e) => {
+        const newEvent = new Event(eventName, { bubbles: true });
+        toggleEl.dispatchEvent(newEvent);
+      });
+    });
 
     // Apply custom width if provided
     if (width) {
@@ -166,7 +200,7 @@ class DropdownUtils {
       if (dropdownEl.parentNode !== document.body) {
         document.body.appendChild(dropdownEl);
       }
-    };
+    }
 
     const close = () => {
       dropdownEl.style.display = 'none';
@@ -271,6 +305,9 @@ class DropdownUtils {
 
     // Control container hover tooltip (selected option)
     controlContainer.addEventListener('mouseover', () => {
+      // Don't show tooltip if the wrapper has a warning class
+      if (wrapper.classList.contains('warning')) return;
+      
       if (window.innerWidth <= 768) return;
       const sel = dropdownEl.querySelector('.selected');
       if (sel) {
@@ -350,6 +387,9 @@ class DropdownUtils {
 
         // Don't trigger when dropdown is open – options handler covers that
         if (dropdownEl.style.display !== 'none') return;
+        
+        // Don't show tooltip if the wrapper has a warning class
+        if (wrapper.classList.contains('warning')) return;
 
         ctrlLongPressTimer = setTimeout(() => {
           const sel = dropdownEl.querySelector('.selected');
@@ -415,6 +455,7 @@ class DropdownUtils {
       close,
       getSelected: () => selected,
       setOptions: rebuildOptions,
+      wrapper // Expose wrapper for reference
     };
   }
 } 

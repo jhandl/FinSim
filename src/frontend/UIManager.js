@@ -578,29 +578,23 @@ class UIManager {
   }
 
   validateAgeValue(value, eventType, startingAge, p2StartingAge, currentMode) {
-    const numValue = parseInt(value);
+    const parsed = ValidationUtils.validateValue('age', value);
+    if (parsed === null) {
+      return { isValid: false, message: "Please enter a valid non-negative number" };
+    }
+
+    // Additional sanity check relative to starting age if parameters supplied
+    const numValue = parsed;
     const modeWord = currentMode || 'age';
     const capModeWord = modeWord.charAt(0).toUpperCase() + modeWord.slice(1);
-    
-    if (isNaN(numValue)) {
-      return { isValid: false, message: "Please enter a valid number" };
-    }
-    
-    // Validate age values (events always contain ages after conversion)
-    if (numValue < 0) {
-      return { isValid: false, message: `${capModeWord} cannot be negative` };
-    }
-    if (numValue > 120) {
-      return { isValid: false, message: `${capModeWord} seems unreasonably high` };
-    }
-    
-    // Check if age makes sense relative to starting age
+
     const relevantStartingAge = this.getRelevantStartingAge(eventType, startingAge, p2StartingAge);
     if (relevantStartingAge > 0) {
-      if (numValue > relevantStartingAge + 70) {
-        return { isValid: false, message: `${capModeWord} seems very far in the future (${numValue - relevantStartingAge} years from now)` }; 
+      // We use an extremely wide ±1000 year window just to catch obvious mistakes without judging typical values
+      if (numValue > relevantStartingAge + 1000) {
+        return { isValid: false, message: `${capModeWord} seems very far in the future (${numValue - relevantStartingAge} years from now)` };
       }
-      if (numValue < relevantStartingAge - 70) {
+      if (numValue < relevantStartingAge - 1000) {
         return { isValid: false, message: `${capModeWord} seems very far in the past (${relevantStartingAge - numValue} years ago)` };
       }
     }
@@ -632,12 +626,12 @@ class UIManager {
       field.person === 'P1' || field.person === 'shared' || shouldValidateP2
     );
 
-    // Validate individual age fields
+    // Validate individual age fields (numeric only)
     fieldsToValidate.forEach(field => {
       if (this.hasValue(field.value)) {
-        const validation = this.validateParameterAgeValue(field.value, field.name);
-        if (!validation.isValid) {
-          this.ui.setWarning(field.fieldId, validation.message);
+        const parsed = ValidationUtils.validateValue('age', field.value);
+        if (parsed === null) {
+          this.ui.setWarning(field.fieldId, "Please enter a valid non-negative number");
           errors = true;
         }
       }
@@ -655,20 +649,6 @@ class UIManager {
 
   hasValue(value) {
     return value !== undefined && value !== '' && value !== 0;
-  }
-
-  validateParameterAgeValue(value, fieldName) {
-    const numValue = parseInt(value);
-    if (isNaN(numValue)) {
-      return { isValid: false, message: "Please enter a valid number" };
-    }
-    if (numValue < 0) {
-      return { isValid: false, message: "Age cannot be negative" };
-    }
-    if (numValue > 120) {
-      return { isValid: false, message: "Age seems unreasonably high" };
-    }
-    return { isValid: true };
   }
 
   saveToFile() {
@@ -782,45 +762,52 @@ class UIManager {
   }
 
   validatePercentageValue(value, fieldName, min, max, unit, allowExceedMax = false, exceedMaxMessage = null) {
-    const numValue = parseFloat(value);
-    
-    if (isNaN(numValue)) {
+    const parsed = ValidationUtils.validateValue('percentage', value);
+    if (parsed === null) {
       return { isValid: false, message: "Please enter a valid number", isWarningOnly: false };
     }
-    
-    if (numValue < min) {
+
+    // Apply min/max rules if provided (parsed is decimal eg 0.1)
+    if (min !== undefined && parsed < min) {
       return { isValid: false, message: `${fieldName} cannot be less than ${min * 100}${unit}`, isWarningOnly: false };
     }
-    
-    if (numValue > max) {
+    if (max !== undefined && parsed > max) {
       if (allowExceedMax && exceedMaxMessage) {
-        // Show warning but don't block simulation
         return { isValid: false, message: exceedMaxMessage, isWarningOnly: true };
-      } else {
-        // Standard error that blocks simulation
-        return { isValid: false, message: `${fieldName} cannot be greater than ${max * 100}${unit}`, isWarningOnly: false };
       }
+      return { isValid: false, message: `${fieldName} cannot be greater than ${max * 100}${unit}`, isWarningOnly: false };
     }
-    
-    // Additional reasonableness checks for specific types (using decimal values)
-    if (fieldName.toLowerCase().includes('growth') && Math.abs(numValue) > 0.3) {
-      return { isValid: false, message: `${fieldName} of ${numValue * 100}${unit} seems unrealistic`, isWarningOnly: false };
-    }
-    
-    if (fieldName.toLowerCase().includes('inflation') && Math.abs(numValue) > 0.1) {
-      return { isValid: false, message: `${fieldName} of ${numValue * 100}${unit} seems very high`, isWarningOnly: false };
-    }
-    
+
     return { isValid: true };
   }
 
   validateRequiredEvents(events) {
-    // Check that at least one valid (non-NOP) event exists
+    const message = "At least one event is required (e.g., salary income or expenses)";
+
+    if (!events || events.length === 0) {
+      // No rows at all – highlight section title
+      this.ui.setWarning("EventsTitle", message);
+      errors = true;
+      return;
+    }
+
+    // Check for any non-NOP events
     const validEvents = events.filter(event => event.type !== 'NOP');
-    
-    if (validEvents.length === -1) {
-      // Set warning on first row of events table if no valid events exist
-      this.ui.setWarning("Events[1,1]", "Hola At least one event is required (e.g., salary income or expenses)");
+
+    if (validEvents.length === 0) {
+      // All rows are NOP – highlight first NOP event type cell if available, otherwise title
+      const firstNopIndex = events.findIndex(e => e.type === 'NOP');
+      if (firstNopIndex >= 0) {
+        // Clear any previous title warning
+        const titleEl = document.getElementById('EventsTitle');
+        if (titleEl) this.ui.clearElementWarning(titleEl);
+
+        // Highlight the event type field (column 0)
+        this.ui.setWarning(`Events[${firstNopIndex + 1},0]`, message);
+      } else {
+        // Fallback (shouldn't happen)
+        this.ui.setWarning("EventsTitle", message);
+      }
       errors = true;
     }
   }

@@ -51,18 +51,89 @@ class EventsTableManager {
     const eventsTable = document.getElementById('Events');
     if (eventsTable) {
       eventsTable.addEventListener('click', (e) => {
-        if (e.target.classList.contains('delete-event')) {
-          const row = e.target.closest('tr');
+        // Check if the clicked element or its parent is the delete button
+        const deleteButton = e.target.closest('.delete-event');
+        if (deleteButton) {
+          const row = deleteButton.closest('tr');
           if (row) {
-            row.remove();
-            // Refresh accordion if it's active
-            if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
-              this.webUI.eventAccordionManager.refresh();
-            }
+            this.deleteTableRowWithAnimation(row);
           }
         }
       });
     }
+  }
+
+  /**
+   * Delete table row with smooth animation
+   */
+  deleteTableRowWithAnimation(row) {
+    // Check if this is the only row
+    const allRows = document.querySelectorAll('#Events tbody tr');
+    const isLastRow = allRows.length === 1;
+
+    if (isLastRow) {
+      // Simple fade for last row
+      row.classList.add('deleting-last');
+      setTimeout(() => {
+        row.remove();
+        // Refresh accordion if it's active
+        if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+          this.webUI.eventAccordionManager.refresh();
+        }
+      }, 400);
+    } else {
+      // Complex animation with slide-up for multiple rows
+      this.deleteRowWithSlideUp(row);
+    }
+  }
+
+  /**
+   * Delete row with slide-up animation for remaining rows
+   */
+  deleteRowWithSlideUp(rowToDelete) {
+    const allRows = Array.from(document.querySelectorAll('#Events tbody tr'));
+    const deleteIndex = allRows.indexOf(rowToDelete);
+    const rowsBelow = allRows.slice(deleteIndex + 1);
+
+    // Get the height of the row being deleted (including borders/padding)
+    const deletedRowHeight = rowToDelete.offsetHeight;
+
+    // Phase 1: Fade out the row being deleted
+    rowToDelete.classList.add('deleting-fade');
+
+    setTimeout(() => {
+      // Phase 2: Remove the row first, then slide up the rows below
+      rowToDelete.remove();
+
+      // Now animate the rows below sliding up
+      rowsBelow.forEach(row => {
+        // Start them displaced down by the deleted row height
+        row.style.transform = `translateY(${deletedRowHeight}px)`;
+        row.style.transition = 'none'; // No transition for initial position
+      });
+
+      // Force a reflow to ensure the initial position is applied
+      rowsBelow[0]?.offsetHeight;
+
+      // Now animate them back to their natural position
+      rowsBelow.forEach(row => {
+        row.style.transition = 'transform 0.3s ease-out';
+        row.style.transform = 'translateY(0)';
+      });
+
+      // Clean up after animation completes
+      setTimeout(() => {
+        rowsBelow.forEach(row => {
+          row.style.transform = '';
+          row.style.transition = '';
+        });
+
+        // Refresh accordion if it's active
+        if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+          this.webUI.eventAccordionManager.refresh();
+        }
+      }, 300); // Wait for slide animation to complete
+    }, 200); // Wait for fade to complete
   }
 
   setupEventTypeChangeHandler() {
@@ -432,7 +503,9 @@ class EventsTableManager {
       <td><div class="percentage-container"><input type="text" id="EventRate_${rowId}" class="event-rate percentage" inputmode="numeric" pattern="[0-9]*" placeholder="inflation" value="${rate}"></div></td>
       <td><div class="percentage-container"><input type="text" id="EventMatch_${rowId}" class="event-match percentage" inputmode="numeric" pattern="[0-9]*" value="${match}"></div></td>
       <td>
-          <button class="delete-event" title="Delete event">×</button>
+          <button class="delete-event" title="Delete event">
+            <i class="fas fa-trash"></i>
+          </button>
       </td>
     `;
 
@@ -461,6 +534,12 @@ class EventsTableManager {
     });
     // Keep reference for later refreshes
     row._eventTypeDropdown = dropdown;
+    
+    // Store reference to the dropdown wrapper on the hidden input element
+    // This allows the validation system to find the visible element to style
+    if (dropdown.wrapper) {
+      typeInput._dropdownWrapper = dropdown.wrapper;
+    }
 
     // Initial visibility update
     this.updateFieldVisibility(typeInput);

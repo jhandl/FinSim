@@ -325,7 +325,7 @@
 
         <div class="events-section card">
             <div class="card-header-flex">
-                <h2>Events</h2>
+                <h2 id="EventsTitle">Events</h2>
                 <div class="events-header-controls">
                     <div class="view-toggle">
                         <span id="viewModeTable" class="mode-toggle-option mode-toggle-active">Table</span>
@@ -455,6 +455,7 @@
     <script src="/src/frontend/web/utils/NotificationUtils.js"></script>
     <script src="/src/frontend/web/utils/ErrorModalUtils.js"></script>
     <script src="/src/frontend/web/utils/FieldLabelsManager.js"></script>
+    <script src="/src/frontend/web/utils/ValidationUtils.js"></script>
     <script src="/src/frontend/web/components/TableManager.js"></script>
     <script src="/src/frontend/web/components/EventsTableManager.js"></script>
     <script src="/src/frontend/web/components/EventSummaryRenderer.js"></script>
@@ -1444,5 +1445,7 @@
       console.error('Global unhandledrejection:', event.reason ? event.reason.stack : event.reason);
     });
     </script>
+    
+
 </body>
 </html> 

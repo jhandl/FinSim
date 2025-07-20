@@ -77,7 +77,7 @@ class EventAccordionManager {
     if (this.events.length === 0) {
       container.innerHTML = `
         <div class="accordion-empty-state">
-          <p>No events yet. Use the table view to add events.</p>
+          <p>No events yet. Add events with the wizard or in the table view.</p>
         </div>
       `;
     } else {
@@ -934,23 +934,55 @@ class EventAccordionManager {
   }
 
   /**
-   * Delete event
+   * Delete event with smooth animation
    */
   deleteEvent(event) {
-    if (!confirm(`Are you sure you want to delete "${event.name}"?`)) {
-      return;
-    }
+    // Find the accordion item element
+    const accordionItem = document.querySelector(`[data-accordion-id="${event.accordionId}"]`)?.closest('.events-accordion-item');
 
-    // Find and remove the corresponding table row
-    const tableRows = document.querySelectorAll('#Events tbody tr');
-    const matchingRow = Array.from(tableRows).find(row => {
-      const rowEvent = this.extractEventFromRow(row);
-      return rowEvent && rowEvent.name === event.name && rowEvent.type === event.type;
-    });
+    if (accordionItem) {
+      // Check if this is the last event in the list (nothing below to slide up)
+      const allAccordionItems = document.querySelectorAll('.events-accordion-item');
+      const currentIndex = Array.from(allAccordionItems).indexOf(accordionItem);
+      const isLastInList = currentIndex === allAccordionItems.length - 1;
 
-    if (matchingRow) {
-      matchingRow.remove();
-      this.refresh(); // Refresh accordion after deletion
+      // Store the current height for the animation
+      const currentHeight = accordionItem.offsetHeight;
+      accordionItem.style.setProperty('--item-height', `${currentHeight}px`);
+
+      // Add the appropriate deleting class
+      if (isLastInList) {
+        accordionItem.classList.add('deleting-last');
+      } else {
+        accordionItem.classList.add('deleting');
+      }
+
+      // Wait for animation to complete before removing from table
+      setTimeout(() => {
+        // Find and remove the corresponding table row
+        const tableRows = document.querySelectorAll('#Events tbody tr');
+        const matchingRow = Array.from(tableRows).find(row => {
+          const rowEvent = this.extractEventFromRow(row);
+          return rowEvent && rowEvent.name === event.name && rowEvent.type === event.type;
+        });
+
+        if (matchingRow) {
+          matchingRow.remove();
+          this.refresh(); // Refresh accordion after deletion
+        }
+      }, 400); // Match the animation duration
+    } else {
+      // Fallback: if accordion item not found, delete immediately
+      const tableRows = document.querySelectorAll('#Events tbody tr');
+      const matchingRow = Array.from(tableRows).find(row => {
+        const rowEvent = this.extractEventFromRow(row);
+        return rowEvent && rowEvent.name === event.name && rowEvent.type === event.type;
+      });
+
+      if (matchingRow) {
+        matchingRow.remove();
+        this.refresh();
+      }
     }
   }
 
@@ -1122,126 +1154,47 @@ class EventAccordionManager {
   }
 
   /**
-   * Validate a field value based on its type
+   * Validate a field value using ValidationUtils
    */
   validateField(value, fieldType, event) {
-    // Empty values are generally allowed (will be handled by required field validation)
+    // Allow blank values – required-field logic is handled elsewhere
     if (!value || value.trim() === '') {
       return { isValid: true };
     }
 
     switch (fieldType) {
       case 'text':
-        return this.validateTextField(value);
-      case 'currency':
-        return this.validateCurrencyField(value);
-      case 'age':
-        return this.validateAgeField(value, event);
-      case 'percentage':
-        return this.validatePercentageField(value, event);
+        return { isValid: true }; // No length restrictions
+
+      case 'currency': {
+        const parsed = ValidationUtils.validateValue('money', value);
+        return parsed === null ? { isValid: false, message: 'Please enter a valid amount' } : { isValid: true };
+      }
+
+      case 'age': {
+        const parsed = ValidationUtils.validateValue('age', value);
+        if (parsed === null) {
+          return { isValid: false, message: 'Please enter a valid age' };
+        }
+
+        // Check age relationship if both ages present
+        if (event && event.fromAge && event.toAge) {
+          const relationship = ValidationUtils.validateAgeRelationship(event.fromAge, event.toAge);
+          if (!relationship.isValid) {
+            return relationship;
+          }
+        }
+        return { isValid: true };
+      }
+
+      case 'percentage': {
+        const parsed = ValidationUtils.validateValue('percentage', value);
+        return parsed === null ? { isValid: false, message: 'Please enter a valid percentage' } : { isValid: true };
+      }
+
       default:
         return { isValid: true };
     }
-  }
-
-  /**
-   * Validate text field (name)
-   */
-  validateTextField(value) {
-    if (value.length > 100) {
-      return { isValid: false, message: 'Name is too long (max 100 characters)' };
-    }
-    return { isValid: true };
-  }
-
-  /**
-   * Validate currency field (amount)
-   */
-  validateCurrencyField(value) {
-    // Remove currency symbols and commas for validation
-    const cleanValue = value.replace(/[€,$]/g, '');
-    const numValue = parseFloat(cleanValue);
-
-    if (isNaN(numValue)) {
-      return { isValid: false, message: 'Please enter a valid amount' };
-    }
-
-    if (numValue < 0) {
-      return { isValid: false, message: 'Amount cannot be negative' };
-    }
-
-    if (numValue > 10000000) {
-      return { isValid: false, message: 'Amount seems unreasonably high', isWarningOnly: true };
-    }
-
-    return { isValid: true };
-  }
-
-  /**
-   * Validate age field (fromAge, toAge)
-   */
-  validateAgeField(value, event) {
-    const numValue = parseInt(value);
-
-    if (isNaN(numValue)) {
-      return { isValid: false, message: 'Please enter a valid age' };
-    }
-
-    if (numValue < 0) {
-      return { isValid: false, message: 'Age cannot be negative' };
-    }
-
-    if (numValue > 120) {
-      return { isValid: false, message: 'Age seems unreasonably high', isWarningOnly: true };
-    }
-
-    // Additional validation for toAge vs fromAge
-    if (event && event.fromAge && event.toAge) {
-      const fromAge = parseInt(event.fromAge);
-      const toAge = parseInt(event.toAge);
-
-      if (!isNaN(fromAge) && !isNaN(toAge) && toAge < fromAge) {
-        return { isValid: false, message: 'End age cannot be before start age' };
-      }
-    }
-
-    return { isValid: true };
-  }
-
-  /**
-   * Validate percentage field (rate, match)
-   */
-  validatePercentageField(value, event) {
-    // Remove percentage symbol for validation
-    const cleanValue = value.replace('%', '');
-    const numValue = parseFloat(cleanValue);
-
-    if (isNaN(numValue)) {
-      return { isValid: false, message: 'Please enter a valid percentage' };
-    }
-
-    // Convert to decimal for validation (assuming input is in percentage form)
-    const decimalValue = numValue / 100;
-
-    // General percentage validation
-    if (Math.abs(decimalValue) > 1) {
-      return { isValid: false, message: 'Percentage seems very high', isWarningOnly: true };
-    }
-
-    // Specific validation based on field context
-    if (event && event.type) {
-      // Growth rate validation
-      if (Math.abs(decimalValue) > 0.3) {
-        return { isValid: false, message: 'Growth rate seems unrealistic', isWarningOnly: true };
-      }
-
-      // Match percentage should be reasonable
-      if (decimalValue > 0.2) {
-        return { isValid: false, message: 'Match percentage seems very high', isWarningOnly: true };
-      }
-    }
-
-    return { isValid: true };
   }
 
   /**

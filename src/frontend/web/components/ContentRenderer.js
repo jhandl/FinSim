@@ -384,12 +384,18 @@ class ContentRenderer {
   static validateContent(contentType, content) {
     const errors = [];
     
-    if (!contentType) {
-      errors.push('Content type is required');
+    const contentTypeValidation = ValidationUtils.validateRequired(contentType, 'Content type');
+    if (!contentTypeValidation.isValid) {
+      errors.push(contentTypeValidation.message);
     }
     
-    if (!content) {
-      errors.push('Content data is required');
+    const contentValidation = ValidationUtils.validateRequired(content, 'Content data');
+    if (!contentValidation.isValid) {
+      errors.push(contentValidation.message);
+    }
+    
+    if (errors.length > 0) {
+      return { isValid: false, errors: errors };
     }
     
     switch (contentType) {

@@ -1135,33 +1135,41 @@ th {
 }
 
 .delete-event {
-    background-color: transparent;
+    background: none;
     border: none;
-    color: #ff4444;
-    font-size: 1.35rem;
-    font-weight: bold;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    padding: 0.225rem 0.45rem;
-    border-radius: 3.6px;
-    transition: var(--transition-default);
+    transition: all 0.2s ease;
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-left: -8px;
 }
 
 .delete-event:hover {
-    background-color: rgba(255, 68, 68, 0.1);
+    color: #dc3545;
+    background-color: rgba(220, 53, 69, 0.1);
+    border-radius: 50%;
 }
 
 #Events {
-    width: 100%;
+    width: 774px; /* Fixed width 774px instead of 100% */
     border-collapse: collapse;
     margin-bottom: 1rem;
+    table-layout: flex; /* Keep fixed layout */
+    min-width: 774px; /* Same as width to prevent resizing */
+    max-width: 774px; /* Same as width to prevent resizing */
 }
 
 #Events th,
 #Events td {
-    padding: 0.225rem;
-    text-align: left;
+    padding: 0.225rem 0.18rem; /* Consistent padding */
     border-bottom: var(--events-line-divider) solid var(--border-color);
     vertical-align: middle;
+    box-sizing: border-box; /* Ensure padding is included in width calculations */
 }
 
 #Events th {
@@ -1209,9 +1217,22 @@ th {
     max-width: 72px;
 }
 
+#Events td:nth-child(7) {
+    width: 52px; /* Set a fixed width for the Match column cell */
+    max-width: 52px;
+}
+
+#Events td:nth-child(7) .percentage-container {
+    background-color: transparent;
+    outline: none;
+}
+
 #Events td:nth-child(7) input {
     min-width: 52px;
     max-width: 52px;
+    /* Remove any diagnostic background colors or outlines */
+    background-color: transparent;
+    outline: none;
 }
 
 #Events td:last-child {
@@ -1296,14 +1317,23 @@ th {
 .percentage-container {
     position: relative;
     display: inline-block;
+    width: auto; /* Allow container to size to its content */
 }
 
+/* Specific width for growth rates table */
 .growth-rates-table .percentage-container {
     width: 72px;
 }
 
+/* Specific width for input wrapper */
 .input-wrapper .percentage-container {
     width: 75px;
+}
+
+/* Specific width for Match column */
+#Events td:nth-child(7) .percentage-container {
+    width: 52px;
+    display: inline-block; /* Ensure the container takes only the width it needs */
 }
 
 .percentage-container::after {
@@ -2280,6 +2310,7 @@ footer {
 
 .events-section.card {
     max-width: 810px; /* Override .card's 306px to allow full-width events table */
+    overflow: hidden; /* Ensure the container doesn't grow with the table */
 }
 
 /* Center-align dropdown header and items so they look identical regardless of parent alignment */
@@ -2844,6 +2875,64 @@ footer {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* Delete animation for accordion items */
+.events-accordion-item.deleting {
+    animation: accordionDeleteFade 0.4s ease-out forwards;
+    pointer-events: none; /* Prevent interaction during deletion */
+    /* Override the flex gap by using margin instead */
+    margin-bottom: 0.5rem;
+}
+
+/* Delete animation for the last accordion item in the list (fade only, no height collapse) */
+.events-accordion-item.deleting-last {
+    animation: accordionDeleteFadeOnly 0.4s ease-out forwards;
+    pointer-events: none; /* Prevent interaction during deletion */
+}
+
+/* Temporarily disable gap on container when an item is being deleted */
+.events-accordion-items:has(.events-accordion-item.deleting) {
+    gap: 0;
+}
+
+/* Add margin to all items when gap is disabled */
+.events-accordion-items:has(.events-accordion-item.deleting) .events-accordion-item:not(.deleting) {
+    margin-bottom: 0.5rem;
+}
+
+/* Remove margin from last item to prevent extra space */
+.events-accordion-items:has(.events-accordion-item.deleting) .events-accordion-item:not(.deleting):last-child {
+    margin-bottom: 0;
+}
+
+@keyframes accordionDeleteFade {
+    0% {
+        opacity: 1;
+        max-height: var(--item-height, 60px);
+        margin-bottom: 0.5rem;
+    }
+    50% {
+        opacity: 0;
+        max-height: var(--item-height, 60px);
+        margin-bottom: 0.5rem;
+    }
+    100% {
+        opacity: 0;
+        max-height: 0;
+        margin-bottom: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+}
+
+@keyframes accordionDeleteFadeOnly {
+    0% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
 .events-accordion-item:hover {
     background-color: #f8f9fa;
 }
@@ -3252,6 +3341,24 @@ footer {
     overflow: visible;
 }
 
+/* Delete animation for table rows */
+#Events tbody tr.deleting {
+    animation: tableRowDeleteFade 0.4s ease-out forwards;
+    pointer-events: none; /* Prevent interaction during deletion */
+}
+
+/* Delete animation for the last/only table row (fade only, no height collapse) */
+#Events tbody tr.deleting-last {
+    animation: tableRowDeleteFadeOnly 0.4s ease-out forwards;
+    pointer-events: none; /* Prevent interaction during deletion */
+}
+
+/* Fade animation for row being deleted in slide-up sequence */
+#Events tbody tr.deleting-fade {
+    animation: tableRowDeleteFadeOnly 0.2s ease-out forwards;
+    pointer-events: none; /* Prevent interaction during deletion */
+}
+
 /* Ensure table container allows overflow during animation */
 .table-container:has(#Events tbody tr.new-event-highlight) {
     overflow: visible !important;
@@ -3271,6 +3378,33 @@ footer {
     }
     100% {
         transform: scale(1);
+    }
+}
+
+@keyframes tableRowDeleteFade {
+    0% {
+        opacity: 1;
+        height: var(--row-height, auto);
+    }
+    50% {
+        opacity: 0;
+        height: var(--row-height, auto);
+    }
+    100% {
+        opacity: 0;
+        height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-bottom-width: 0;
+    }
+}
+
+@keyframes tableRowDeleteFadeOnly {
+    0% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
     }
 }
 
@@ -3303,6 +3437,16 @@ footer {
 .event-wizard-modal input.validation-warning {
     border-color: var(--warning-color);
     box-shadow: 0 0 0 0.2rem rgba(255, 224, 102, 0.25);
+}
+
+/* Dropdown wrapper for validation compatibility */
+.dropdown-wrapper {
+    display: inline-block;
+}
+
+/* Styling for dropdown toggle when it has a warning */
+.dropdown-wrapper.warning .dd-toggle {
+    background-color: var(--warning-color);
 }
 
 /* Mobile styles for editable fields */
@@ -3423,4 +3567,26 @@ footer {
         width: 100%;
     }
 }
+
+/* Validation styles for accordion fields */
+.editable-field input.validation-error,
+.editable-field select.validation-error {
+    border-color: var(--error-color);
+    box-shadow: 0 0 0 0.2rem rgba(255, 128, 128, 0.25);
+}
+
+.editable-field input.validation-warning,
+.editable-field select.validation-warning {
+    border-color: var(--warning-color);
+    box-shadow: 0 0 0 0.2rem rgba(255, 224, 102, 0.25);
+}
+
+#Events th:nth-child(1) { width: 179px; } /* Event Type */
+#Events th:nth-child(2) { width: 121px; } /* Name */
+#Events th:nth-child(3) { width: 89px; } /* Amount */
+#Events th:nth-child(4) { width: 80px; } /* From Age */
+#Events th:nth-child(5) { width: 72px; } /* To Age */
+#Events th:nth-child(6) { width: 72px; } /* Rate */
+#Events th:nth-child(7) { width: 52px; } /* Match */
+#Events th:nth-child(8) { width: 36px; } /* Delete button */
 

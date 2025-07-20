@@ -60,8 +60,8 @@ function initializeUI() {
 function readScenario(validate) {
   errors = false;
   uiManager.clearWarnings();
-  params = uiManager.readParameters(validate); // 6918 ms
-  events = uiManager.readEvents(validate); // 534 ms
+  params = uiManager.readParameters(validate);
+  events = uiManager.readEvents(validate);
   if (errors) {
     uiManager.setStatus("Check errors", STATUS_COLORS.WARNING);
   }
