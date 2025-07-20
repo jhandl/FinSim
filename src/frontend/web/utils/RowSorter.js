@@ -11,6 +11,11 @@
   };
 
   function getCellValue(row, col) {
+    // Handle creation-index as a special case
+    if (col === 'creation-index') {
+      return row.dataset.creationIndex || '0';
+    }
+
     const selector = COL_SELECTORS[col];
     if (!selector) return '';
     const el = row.querySelector(selector);

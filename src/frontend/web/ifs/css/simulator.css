@@ -2841,9 +2841,6 @@ footer {
 /* Events Accordion Styles */
 .events-accordion-container {
     display: none; /* Hidden by default, shown when accordion view is active */
-    background: var(--card-background);
-    border-radius: var(--border-radius-large);
-    box-shadow: var(--box-shadow);
     margin-top: 1rem;
 }
 
@@ -3024,16 +3021,22 @@ footer {
     border-top: 1px solid #e9ecef;
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+    transition: max-height 0.3s ease-out, opacity 0.2s ease-out, padding 0.3s ease-out;
     opacity: 0;
-    padding: 0;
+    padding: 0 0.8rem;
+    position: relative;
 }
 
 .accordion-item-content.expanded {
     max-height: 1000px; /* Large enough to accommodate content */
     opacity: 1;
-    transition: max-height 0.3s ease-in, opacity 0.2s ease-in;
+    transition: max-height 0.3s ease-in, opacity 0.2s ease-in, padding 0.3s ease-in;
     padding: 0.4rem 0.8rem;
+}
+
+.accordion-item-content-wrapper {
+    position: relative;
+    width: 100%;
 }
 
 /* Event Summary Styles */
@@ -3498,13 +3501,15 @@ footer {
 }
 
 /* Accordion Empty State */
-.accordion-empty-state {
+.accordion-empty-state,
+.table-empty-state {
     padding: 3rem 1.5rem;
     text-align: center;
     color: #6c757d;
 }
 
-.accordion-empty-state p {
+.accordion-empty-state p,
+.table-empty-state p {
     margin: 0;
     font-size: 1rem;
     line-height: 1.5;

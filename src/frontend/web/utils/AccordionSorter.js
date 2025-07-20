@@ -66,12 +66,16 @@
 
   /**
    * Find and highlight newly created accordion item
+   * @returns {HTMLElement|null} The found item or null if not found
    */
   function highlightNewItem(container, isNewItemFn) {
     const items = Array.from(container.querySelectorAll('.events-accordion-item'));
+    let foundItem = null;
     
     for (const item of items) {
       if (isNewItemFn && isNewItemFn(item)) {
+        foundItem = item;
+        
         // Add highlight animation class
         item.classList.add('new-event-highlight');
 
@@ -89,6 +93,8 @@
         break;
       }
     }
+    
+    return foundItem;
   }
 
   // Export utilities

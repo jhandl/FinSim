@@ -75,19 +75,20 @@ class EventAccordionManager {
     this.syncEventsFromTable();
     
     if (this.events.length === 0) {
-      container.innerHTML = `
-        <div class="accordion-empty-state">
-          <p>No events yet. Add events with the wizard or in the table view.</p>
-        </div>
-      `;
+      // Create empty state message directly without the box
+      const emptyState = document.createElement('div');
+      emptyState.className = 'accordion-empty-state';
+      emptyState.innerHTML = '<p>No events yet. Add events with the wizard or using the Add Event button.</p>';
+      
+      return emptyState; // Return the empty state directly instead of the container
     } else {
       this.events.forEach((event, index) => {
         const item = this.createAccordionItem(event, index);
         container.appendChild(item);
       });
+      
+      return container;
     }
-    
-    return container;
   }
 
   /**
@@ -96,13 +97,20 @@ class EventAccordionManager {
   syncEventsFromTable() {
     this.events = [];
     const tableRows = document.querySelectorAll('#Events tbody tr');
-
+    
     tableRows.forEach((row, index) => {
       const event = this.extractEventFromRow(row);
       if (event) {
         event.accordionId = `accordion-item-${index}`;
         event.tableRowIndex = index;
-        event.id = row.dataset.eventId; // Get unique ID from table row
+        
+        // Generate a unique ID if one doesn't exist on the row
+        if (!row.dataset.eventId) {
+          row.dataset.eventId = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`;
+        }
+        
+        event.id = row.dataset.eventId;
+        
         this.events.push(event);
       }
     });
@@ -274,10 +282,14 @@ class EventAccordionManager {
     const isExpanded = this.expandedItems.has(accordionId);
 
     if (isExpanded) {
-      // Collapse with animation
-      content.classList.remove('expanded');
+      // Collapse with animation - first update the button state
       expandBtn.classList.remove('expanded');
       expandBtn.title = 'Expand';
+      
+      // Then start the collapse animation
+      content.classList.remove('expanded');
+      
+      // Update tracking state
       this.expandedItems.delete(accordionId);
     } else {
       // First render details if not already rendered
@@ -299,10 +311,12 @@ class EventAccordionManager {
       }
 
       // Then expand with animation
-      content.classList.add('expanded');
-      expandBtn.classList.add('expanded');
-      expandBtn.title = 'Collapse';
-      this.expandedItems.add(accordionId);
+      requestAnimationFrame(() => {
+        content.classList.add('expanded');
+        expandBtn.classList.add('expanded');
+        expandBtn.title = 'Collapse';
+        this.expandedItems.add(accordionId);
+      });
     }
   }
 
@@ -317,7 +331,8 @@ class EventAccordionManager {
     const summaryRenderer = new EventSummaryRenderer(this.webUI);
     const detailedSummary = summaryRenderer.generateDetailedSummary(event);
 
-    contentContainer.innerHTML = detailedSummary;
+    // Wrap the content in a container to maintain position during transitions
+    contentContainer.innerHTML = `<div class="accordion-item-content-wrapper">${detailedSummary}</div>`;
 
     // Setup editable field handlers for direct editing
     this.setupEditableFieldHandlers(contentContainer, event);
@@ -326,16 +341,26 @@ class EventAccordionManager {
 
 
   /**
-   * Refresh the accordion display
+   * Refresh the accordion view with current table data
    */
   refresh() {
+    // Re-render the accordion
     this.renderAccordion();
     this.applySortingWithAnimation();
+    
     // Update grid columns and check for wrapping after rendering
     setTimeout(() => {
       this.updateGridColumns();
       this.checkAndApplyWrapping();
     }, 50);
+    
+    // Restore expanded state
+    [...this.expandedItems].forEach(id => {
+      const item = document.querySelector(`.events-accordion-item[data-accordion-id="${id}"]`);
+      if (item) {
+        this.toggleAccordionItem(id, true);
+      }
+    });
   }
 
   /**
@@ -404,9 +429,25 @@ class EventAccordionManager {
     if (!container || !window.AccordionSorter) return;
 
     // Use AccordionSorter to find and highlight the new item
-    window.AccordionSorter.highlightNewItem(container, (item) => {
+    const foundItem = window.AccordionSorter.highlightNewItem(container, (item) => {
       return this.isNewlyCreatedAccordionItem(item, this._newEventId);
     });
+    
+    // If we found the item, expand it
+    if (foundItem) {
+      const accordionId = foundItem.dataset.accordionId;
+      if (accordionId) {
+        console.debug('Expanding highlighted new event with ID:', this._newEventId, 'and accordionId:', accordionId);
+        
+        // Expand the item after a short delay to allow the highlight animation to start
+        setTimeout(() => {
+          // Only expand if not already expanded
+          if (!this.expandedItems.has(accordionId)) {
+            this.toggleAccordionItem(accordionId);
+          }
+        }, 100);
+      }
+    }
   }
 
   /**
@@ -484,7 +525,7 @@ class EventAccordionManager {
 
 
   /**
-   * Setup handlers for editable fields in accordion item
+   * Setup handlers for editable fields in the accordion
    */
   setupEditableFieldHandlers(container, event) {
     // Handle event type custom dropdown (same as table view)
@@ -514,7 +555,7 @@ class EventAccordionManager {
 
             // Clear any validation errors for the dropdown
             this.clearFieldValidation(typeInput);
-
+            
             // Preserve current field values before updating table
             const currentValues = this.preserveCurrentFieldValues(container);
 
@@ -534,7 +575,7 @@ class EventAccordionManager {
       container._eventTypeDropdown = dropdown;
     }
 
-    // Handle direct field editing with validation
+    // Define editable fields and their validation types
     const editableFields = [
       { selector: '.accordion-edit-name', tableClass: '.event-name', type: 'text' },
       { selector: '.accordion-edit-amount', tableClass: '.event-amount', type: 'currency' },
@@ -544,6 +585,7 @@ class EventAccordionManager {
       { selector: '.accordion-edit-match', tableClass: '.event-match', type: 'percentage' }
     ];
 
+    // Setup handlers for each editable field
     editableFields.forEach(field => {
       const input = container.querySelector(field.selector);
       if (input) {
@@ -551,7 +593,7 @@ class EventAccordionManager {
         input.addEventListener('input', (e) => {
           const value = e.target.value;
           const validation = this.validateField(value, field.type, event);
-
+          
           if (validation.isValid) {
             this.clearFieldValidation(input);
             this.syncFieldToTable(event, field.tableClass, value);
@@ -563,10 +605,11 @@ class EventAccordionManager {
             }
           }
         });
-
+        
         // Final validation and summary refresh on blur
         input.addEventListener('blur', (e) => {
           const value = e.target.value;
+          
           const validation = this.validateField(value, field.type, event);
 
           if (validation.isValid) {
@@ -762,7 +805,24 @@ class EventAccordionManager {
 
     const tableInput = tableRow.querySelector(tableFieldClass);
     if (tableInput && tableInput.value !== value) {
-      tableInput.value = value;
+      // Apply appropriate formatting based on field type
+      let formattedValue = value;
+      
+      if (tableInput.classList.contains('currency')) {
+        // Format currency values
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue)) {
+          formattedValue = FormatUtils.formatCurrency(numValue);
+        }
+      } else if (tableInput.classList.contains('percentage')) {
+        // Format percentage values
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue)) {
+          formattedValue = FormatUtils.formatPercentage(numValue);
+        }
+      }
+      
+      tableInput.value = formattedValue;
 
       // Trigger change event to ensure any table-side validation/formatting occurs
       const changeEvent = new Event('change', { bubbles: true });
@@ -774,9 +834,9 @@ class EventAccordionManager {
    * Refresh the detailed view to show appropriate fields for the event type
    */
   refreshDetailedView(container, event) {
-    // Find the detailed summary container
-    const summaryContainer = container.querySelector('.event-detailed-summary');
-    if (!summaryContainer) {
+    // Find the content wrapper container
+    const contentWrapper = container.querySelector('.accordion-item-content-wrapper');
+    if (!contentWrapper) {
       return;
     }
 
@@ -795,34 +855,46 @@ class EventAccordionManager {
     const newDetailedSummary = summaryRenderer.generateDetailedSummary(event);
 
     // Replace the content
-    summaryContainer.outerHTML = newDetailedSummary;
+    contentWrapper.innerHTML = newDetailedSummary;
 
     // Re-setup handlers for the new content
-    const newContainer = container.querySelector('.accordion-item-content-wrapper');
-    if (newContainer) {
-      this.setupEditableFieldHandlers(newContainer, event);
-    }
+    this.setupEditableFieldHandlers(container, event);
   }
 
   /**
    * Find the table row corresponding to an accordion event
    */
   findTableRowForEvent(event) {
-    // CRITICAL FIX: Use table row index for reliable lookup instead of data matching
+    // First try to find by event ID (most reliable)
+    if (event.id) {
+      const tableRows = document.querySelectorAll('#Events tbody tr');
+      const rowByEventId = Array.from(tableRows).find(row => row.dataset.eventId === event.id);
+      
+      if (rowByEventId) {
+        // Update tableRowIndex to match current position
+        const currentIndex = Array.from(tableRows).indexOf(rowByEventId);
+        if (currentIndex !== -1 && event.tableRowIndex !== currentIndex) {
+          event.tableRowIndex = currentIndex;
+        }
+        return rowByEventId;
+      }
+    }
+    
+    // Fallback to index-based lookup if ID matching failed
     if (event.tableRowIndex !== undefined) {
       const tableRows = document.querySelectorAll('#Events tbody tr');
       return tableRows[event.tableRowIndex] || null;
     }
 
-    // Fallback to old method if no index available
+    // Last resort: match by data fields
     const tableRows = document.querySelectorAll('#Events tbody tr');
     return Array.from(tableRows).find(row => {
       const rowEvent = this.extractEventFromRow(row);
       return rowEvent &&
              rowEvent.name === event.name &&
-             rowEvent.type === event.type &&
              rowEvent.amount === event.amount &&
-             rowEvent.fromAge === event.fromAge;
+             rowEvent.fromAge === event.fromAge &&
+             rowEvent.toAge === event.toAge;
     });
   }
 
@@ -1000,6 +1072,27 @@ class EventAccordionManager {
     // Handle sorting and animation for accordion view
     // This will also sort the table when it applies accordion sorting
     this.refreshWithNewEventAnimation(eventData, id);
+    
+    // After animation, find and expand the newly added event
+    setTimeout(() => {
+      if (!id) return;
+      
+      // Find the accordion item with matching eventId
+      const accordionItems = document.querySelectorAll('.events-accordion-item');
+      for (const item of accordionItems) {
+        const accordionId = item.dataset.accordionId;
+        if (!accordionId) continue;
+        
+        // Find the corresponding event in the events array
+        const event = this.events.find(e => e.accordionId === accordionId);
+        if (event && event.id === id) {
+          // Found the matching event, expand it programmatically
+          console.debug('Expanding new wizard event with ID:', id, 'and accordionId:', accordionId);
+          this.toggleAccordionItem(accordionId);
+          break;
+        }
+      }
+    }, 500); // Delay to ensure animations have completed
   }
 
   /**
@@ -1311,7 +1404,24 @@ class EventAccordionManager {
       // Handle other field types normally
       const input = tableRow.querySelector(tableFieldClass);
       if (input) {
-        input.value = value;
+        // Apply appropriate formatting based on field type
+        let formattedValue = value;
+        
+        if (input.classList.contains('currency')) {
+          // Format currency values
+          const numValue = parseFloat(value);
+          if (!isNaN(numValue)) {
+            formattedValue = FormatUtils.formatCurrency(numValue);
+          }
+        } else if (input.classList.contains('percentage')) {
+          // Format percentage values
+          const numValue = parseFloat(value);
+          if (!isNaN(numValue)) {
+            formattedValue = FormatUtils.formatPercentage(numValue);
+          }
+        }
+        
+        input.value = formattedValue;
       }
     }
   }
@@ -1442,7 +1552,24 @@ class EventAccordionManager {
       if (preservedValues[mapping.key] !== undefined) {
         const input = tableRow.querySelector(mapping.selector);
         if (input) {
-          input.value = preservedValues[mapping.key];
+          // Apply appropriate formatting based on field type
+          let formattedValue = preservedValues[mapping.key];
+          
+          if (input.classList.contains('currency')) {
+            // Format currency values
+            const numValue = parseFloat(formattedValue);
+            if (!isNaN(numValue)) {
+              formattedValue = FormatUtils.formatCurrency(numValue);
+            }
+          } else if (input.classList.contains('percentage')) {
+            // Format percentage values
+            const numValue = parseFloat(formattedValue);
+            if (!isNaN(numValue)) {
+              formattedValue = FormatUtils.formatPercentage(numValue);
+            }
+          }
+          
+          input.value = formattedValue;
         }
       }
     });

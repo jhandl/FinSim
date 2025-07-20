@@ -260,9 +260,9 @@ class EventSummaryRenderer {
       return false;
     }
 
-    // Mortgages (M): Rate is interest rate, not growth rate - don't show
+    // Mortgages (M): Rate is interest rate - show it
     if (eventType === 'M') {
-      return false;
+      return true;
     }
 
     // Property purchases (R): Rate is property appreciation - show

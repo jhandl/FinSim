@@ -64,7 +64,11 @@ class DropdownUtils {
     const forwardEvents = ['mouseenter', 'mouseleave', 'focus', 'blur'];
     forwardEvents.forEach(eventName => {
       wrapper.addEventListener(eventName, (e) => {
-        const newEvent = new Event(eventName, { bubbles: true });
+        // Stop the original event from propagating to prevent infinite recursion
+        e.stopPropagation();
+        
+        // Create a new event that doesn't bubble to prevent it from coming back to the wrapper
+        const newEvent = new Event(eventName, { bubbles: false });
         toggleEl.dispatchEvent(newEvent);
       });
     });

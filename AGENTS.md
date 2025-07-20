@@ -80,13 +80,14 @@ graph TD
 *   **[`WebUI.js`](src/frontend/web/WebUI.js:1):** The web-based implementation of the UI. It manages all the DOM elements and orchestrates the various frontend components.
 *   **Event Management:** The web UI provides three ways to interact with events, all of which must remain synchronized.
     *   **[`EventsTableManager.js`](src/frontend/web/components/EventsTableManager.js:1):** Manages the traditional table view for events. This is the primary data source for the other views.
-    *   **[`EventAccordionManager.js`](src/frontend/web/components/EventAccordionManager.js:1):** Provides a collapsible accordion view of the events, which is more mobile-friendly. It reads from and syncs with the main event table.
+    *   **[`EventAccordionManager.js`](src/frontend/web/components/EventAccordionManager.js:1):** Provides a collapsible accordion view of the events, which is more mobile-friendly. It reads from and syncs with the main event table. When new events are added in accordion view, they are automatically expanded to improve user experience.
     *   **[`EventWizardManager.js`](src/frontend/web/components/EventWizardManager.js:1):** Manages a step-by-step wizard for creating new events. When the wizard completes, it adds a new row to the main event table.
 
 #### Utils & Help Systems
 
 *   **[`src/core/Utils.js`](src/core/Utils.js:1):** Core utility functions, including `serializeSimulation()` and `deserializeSimulation()`.
 *   **[`src/frontend/web/utils/`](src/frontend/web/utils/):** Various utility classes for the web UI.
+*   **[`ValidationUtils.js`](src/frontend/web/utils/ValidationUtils.js:1):** Handles validation of user inputs across the application.
 *   **[`Wizard.js`](src/frontend/web/components/Wizard.js:1):** Provides a guided tour of the application's features.
 
 ### 3.3. Data Management and Persistence

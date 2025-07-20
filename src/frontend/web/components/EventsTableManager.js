@@ -25,6 +25,8 @@ class EventsTableManager {
     // Apply initial sort after DOM settles
     setTimeout(() => this.applySort(), 0);
     this.initializeCarets();
+    // Check for empty state on initial load
+    setTimeout(() => this.checkEmptyState(), 0);
   }
 
   setupAddEventButton() {
@@ -76,6 +78,8 @@ class EventsTableManager {
       row.classList.add('deleting-last');
       setTimeout(() => {
         row.remove();
+        // Check empty state after deletion
+        this.checkEmptyState();
         // Refresh accordion if it's active
         if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
           this.webUI.eventAccordionManager.refresh();
@@ -94,6 +98,7 @@ class EventsTableManager {
     const allRows = Array.from(document.querySelectorAll('#Events tbody tr'));
     const deleteIndex = allRows.indexOf(rowToDelete);
     const rowsBelow = allRows.slice(deleteIndex + 1);
+    const isLastRowAfterDelete = allRows.length <= 1;
 
     // Get the height of the row being deleted (including borders/padding)
     const deletedRowHeight = rowToDelete.offsetHeight;
@@ -104,6 +109,11 @@ class EventsTableManager {
     setTimeout(() => {
       // Phase 2: Remove the row first, then slide up the rows below
       rowToDelete.remove();
+
+      // If this was the last row, show empty state message
+      if (isLastRowAfterDelete) {
+        this.checkEmptyState();
+      }
 
       // Now animate the rows below sliding up
       rowsBelow.forEach(row => {
@@ -321,6 +331,9 @@ class EventsTableManager {
       if (accordionContainer) {
         accordionContainer.style.display = 'none';
       }
+      
+      // Check for empty state in table view
+      this.checkEmptyState();
     } else {
       // Hide table view
       if (tableContainer) {
@@ -483,6 +496,13 @@ class EventsTableManager {
     row.dataset.rowId = rowId;
     row.dataset.originalEventType = type;
 
+    // Store creation index for natural sorting order
+    row.dataset.creationIndex = this.eventRowCounter;
+
+    // Generate unique ID for this event to track it in accordion view
+    const eventId = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    row.dataset.eventId = eventId;
+
     // Build dropdown options & find label for current selection
     const optionObjects = this.getEventTypeOptionObjects();
     const selectedObj = optionObjects.find((o) => o.value === type) || optionObjects[0];
@@ -556,14 +576,51 @@ class EventsTableManager {
     const currentScrollY = window.scrollY;
 
     const row = this.createEventRow();
+    const eventId = row.dataset.eventId;
+    console.debug('Created new event row with ID:', eventId);
+    
     tbody.appendChild(row);
+
+    // Update empty state after adding a row
+    this.updateEmptyStateMessage(true);
 
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
 
     // Refresh accordion if it's active
     if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+      console.debug('Accordion view active, refreshing with new event ID:', eventId);
+      
+      // First refresh the accordion to include the new event
       this.webUI.eventAccordionManager.refresh();
+      
+      // Then find and expand the newly added event
+      setTimeout(() => {
+        // Find the accordion item with matching eventId
+        const accordionItems = document.querySelectorAll('.events-accordion-item');
+        console.debug(`Found ${accordionItems.length} accordion items, searching for event ID:`, eventId);
+        
+        for (const item of accordionItems) {
+          const accordionId = item.dataset.accordionId;
+          if (!accordionId) continue;
+          
+          // Find the corresponding event in the accordion manager's events array
+          const event = this.webUI.eventAccordionManager.events.find(e => e.accordionId === accordionId);
+          if (event) {
+            console.debug(`Checking accordion item ${accordionId} with event ID:`, event.id);
+          }
+          
+          if (event && event.id === eventId) {
+            // Found the matching event, expand it programmatically
+            console.debug('SUCCESS: Expanding new event with ID:', eventId, 'and accordionId:', accordionId);
+            this.webUI.eventAccordionManager.toggleAccordionItem(accordionId);
+            
+            // Also scroll it into view
+            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            break;
+          }
+        }
+      }, 100); // Small delay to ensure the accordion has been refreshed
     }
 
     // Prevent any automatic focus that might cause scrolling
@@ -577,6 +634,8 @@ class EventsTableManager {
 
     // Do not apply sort immediately.
     // The row will be sorted on blur after being edited.
+    
+    return { row, id: eventId };
   }
 
   getEventTypeOptionObjects() {
@@ -804,7 +863,13 @@ class EventsTableManager {
       : [];
 
     if (this.sortKeys.length === 0) {
+      // When sorting is deactivated, restore natural creation order
+      if (window.RowSorter) {
+        RowSorter.sortRows(tbody, [{ col: 'creation-index', dir: 'asc' }]);
+      }
       this.updateHeaderIndicators();
+      // Update accordion row indices after restoring natural order
+      this.updateAccordionRowIndices();
       // Notify accordion that sorting was cleared
       this.notifyAccordionOfSortChange();
       return;
@@ -816,17 +881,53 @@ class EventsTableManager {
 
     this.updateHeaderIndicators();
 
+    // CRITICAL FIX: Update tableRowIndex values in accordion manager after sorting
+    this.updateAccordionRowIndices();
+
     // Notify accordion of sort change
     this.notifyAccordionOfSortChange();
+  }
+
+  /**
+   * Update tableRowIndex values in accordion manager after sorting
+   * This ensures that the accordion view can correctly map to table rows
+   * even after the table has been sorted
+   */
+  updateAccordionRowIndices() {
+    if (!this.webUI.eventAccordionManager) return;
+    
+    const tableRows = document.querySelectorAll('#Events tbody tr');
+    const eventIdToIndexMap = new Map();
+    
+    // Create a map of eventId to new table row index
+    Array.from(tableRows).forEach((row, index) => {
+      const eventId = row.dataset.eventId;
+      if (eventId) {
+        eventIdToIndexMap.set(eventId, index);
+      }
+    });
+    
+    // Update tableRowIndex for each event in the accordion manager
+    this.webUI.eventAccordionManager.events.forEach(event => {
+      const newIndex = eventIdToIndexMap.get(event.id);
+      if (newIndex !== undefined) {
+        event.tableRowIndex = newIndex;
+      }
+    });
   }
 
   /**
    * Notify accordion manager of sorting changes
    */
   notifyAccordionOfSortChange() {
-    if (this.webUI.eventAccordionManager && this.viewMode === 'accordion') {
+    if (this.webUI.eventAccordionManager) {
+      // Always update row indices when sorting changes
+      this.updateAccordionRowIndices();
+      
       // Only refresh if accordion is currently visible
-      this.webUI.eventAccordionManager.refresh();
+      if (this.viewMode === 'accordion') {
+        this.webUI.eventAccordionManager.refresh();
+      }
     }
   }
 
@@ -1045,6 +1146,9 @@ class EventsTableManager {
     if (tbody) {
       tbody.appendChild(row);
 
+      // Update empty state after adding a row
+      this.updateEmptyStateMessage(true);
+
       // Setup formatting for new inputs
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();
@@ -1061,6 +1165,7 @@ class EventsTableManager {
     // Create the event
     const result = this.createEventFromWizard(eventData);
     const row = result.row;
+    const id = result.id;
 
     // Apply sorting and animation for table view
     if (this.sortKeys.length > 0) {
@@ -1070,6 +1175,10 @@ class EventsTableManager {
       setTimeout(() => {
         if (row) {
           row.classList.add('new-event-highlight');
+          // Make sure the event ID is preserved after sorting
+          if (id && !row.dataset.eventId) {
+            row.dataset.eventId = id;
+          }
           setTimeout(() => {
             row.classList.remove('new-event-highlight');
           }, 800); // Match animation duration
@@ -1079,6 +1188,10 @@ class EventsTableManager {
       // No sorting active, just highlight the new row
       if (row) {
         row.classList.add('new-event-highlight');
+        // Make sure the event ID is preserved
+        if (id && !row.dataset.eventId) {
+          row.dataset.eventId = id;
+        }
         setTimeout(() => {
           row.classList.remove('new-event-highlight');
         }, 800); // Match animation duration
@@ -1196,6 +1309,55 @@ class EventsTableManager {
            cleanRowAmount === cleanEventAmount &&
            fromAgeInput && fromAgeInput.value === eventData.fromAge &&
            toAgeInput && toAgeInput.value === eventData.toAge;
+  }
+
+  /**
+   * Check if the events table is empty and show appropriate message
+   */
+  checkEmptyState() {
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return;
+
+    const hasRows = tbody.querySelectorAll('tr').length > 0;
+    this.updateEmptyStateMessage(hasRows);
+  }
+
+  /**
+   * Update empty state message visibility
+   * @param {boolean} hasEvents - Whether there are events in the table
+   */
+  updateEmptyStateMessage(hasEvents) {
+    let emptyStateEl = document.querySelector('.table-empty-state');
+    
+    if (!hasEvents) {
+      // No events - show empty state message
+      if (!emptyStateEl) {
+        const tableContainer = document.querySelector('.events-section .table-container');
+        if (tableContainer) {
+          // Create empty state element
+          emptyStateEl = document.createElement('div');
+          emptyStateEl.className = 'table-empty-state';
+          emptyStateEl.innerHTML = `
+            <p>No events yet. Add events with the wizard or using the Add Event button.</p>
+          `;
+          
+          // Position it properly within the table container
+          const table = tableContainer.querySelector('#Events');
+          if (table) {
+            // Insert after the table
+            table.insertAdjacentElement('afterend', emptyStateEl);
+          } else {
+            // Fallback: append to container
+            tableContainer.appendChild(emptyStateEl);
+          }
+        }
+      } else {
+        emptyStateEl.style.display = 'block';
+      }
+    } else if (emptyStateEl) {
+      // Has events - hide empty state message
+      emptyStateEl.style.display = 'none';
+    }
   }
 
 }
