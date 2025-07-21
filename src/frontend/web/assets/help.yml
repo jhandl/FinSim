@@ -480,6 +480,7 @@ WizardSteps:
 # Event Type
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     popover:
@@ -488,6 +489,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["NOP"]
@@ -608,6 +610,7 @@ WizardSteps:
 # Event Name
 
   - element: "#EventName"
+    accordion-element: ".accordion-edit-name"
     tours: [full, mini]
     card: events
     popover:
@@ -737,6 +740,7 @@ WizardSteps:
 # Event Amount
 
   - element: "#EventAmount"
+    accordion-element: ".accordion-edit-amount"
     tours: [full, mini]
     card: events
     popover:
@@ -866,6 +870,7 @@ WizardSteps:
 # Event From Age
 
   - element: "#EventFromAge"
+    accordion-element: ".accordion-edit-fromage"
     tours: [full, mini]
     card: events
     popover:
@@ -994,6 +999,7 @@ WizardSteps:
 # Event To Age
 
   - element: "#EventToAge"
+    accordion-element: ".accordion-edit-toage"
     tours: [full, mini]
     card: events
     popover:
@@ -1122,6 +1128,7 @@ WizardSteps:
 # Event Rate
 
   - element: "#EventRate"
+    accordion-element: ".accordion-edit-rate"
     tours: [full, mini]
     card: events
     popover:
@@ -1250,6 +1257,7 @@ WizardSteps:
 # Event Match
 
   - element: "#EventMatch"
+    accordion-element: ".accordion-edit-match"
     tours: [full, mini]
     card: events
     popover:

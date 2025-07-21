@@ -530,8 +530,8 @@ class EventAccordionManager {
   setupEditableFieldHandlers(container, event) {
     // Handle event type custom dropdown (same as table view)
     const typeInput = container.querySelector('.accordion-edit-type');
-    const toggleEl = container.querySelector(`#AccordionEventTypeToggle_${event.accordionId}`);
-    const dropdownEl = container.querySelector(`#AccordionEventTypeOptions_${event.accordionId}`);
+    const toggleEl = container.querySelector(`#AccordionEventTypeToggle_${event.rowId}`);
+    const dropdownEl = container.querySelector(`#AccordionEventTypeOptions_${event.rowId}`);
 
     if (typeInput && toggleEl && dropdownEl && this.webUI.eventsTableManager) {
       // Set current value
@@ -573,6 +573,13 @@ class EventAccordionManager {
 
       // Store reference for potential future updates
       container._eventTypeDropdown = dropdown;
+
+      // Make the hidden input point to the visible wrapper so Driver.js can
+      // highlight the dropdown (same trick used in table view)
+      if (dropdown && dropdown.wrapper) {
+        typeInput._dropdownWrapper = dropdown.wrapper;
+        //
+      }
     }
 
     // Define editable fields and their validation types
@@ -1502,7 +1509,7 @@ class EventAccordionManager {
    * Update the accordion dropdown toggle text to show the new event type
    */
   updateAccordionDropdownToggle(container, event) {
-    const toggleEl = container.querySelector(`#AccordionEventTypeToggle_${event.accordionId}`);
+    const toggleEl = container.querySelector(`#AccordionEventTypeToggle_${event.rowId}`);
     const dropdown = container._eventTypeDropdown;
 
     if (toggleEl && dropdown && this.webUI.eventsTableManager) {
@@ -1515,7 +1522,7 @@ class EventAccordionManager {
         toggleEl.textContent = selectedOption.label;
 
         // Update the dropdown's selected state
-        const dropdownContainer = container.querySelector(`#AccordionEventTypeOptions_${event.accordionId}`);
+        const dropdownContainer = container.querySelector(`#AccordionEventTypeOptions_${event.rowId}`);
         if (dropdownContainer) {
           // Remove selected class from all options
           dropdownContainer.querySelectorAll('[data-value]').forEach(el => {

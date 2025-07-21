@@ -231,9 +231,9 @@ class EventSummaryRenderer {
    * Only salary events WITH pension contributions show this field
    */
   showsEmployerMatchField(eventType) {
-    // Only SI and SI2 (salary WITH pension) show employer match
-    // SInp and SI2np (salary WITHOUT pension) don't show this field
-    return ['SI', 'SI2'].includes(eventType);
+    // Only salary events WITH pension and NOP show employer match field.
+    // SInp and SI2np (salary WITHOUT pension) don't show this field.
+    return ['SI', 'SI2', 'NOP'].includes(eventType);
   }
 
   /**
@@ -327,9 +327,9 @@ class EventSummaryRenderer {
         <label>Event Type:</label>
         <div class="editable-field">
           <input type="hidden" class="accordion-edit-type" value="${event.type}" data-accordion-id="${event.accordionId}" data-original-type="${event.type}" data-sort-key="event-type">
-          <div class="event-type-dd visualization-control" id="AccordionEventType_${event.accordionId}">
-            <span id="AccordionEventTypeToggle_${event.accordionId}" class="dd-toggle pseudo-select">${currentEventTypeInfo.label}</span>
-            <div id="AccordionEventTypeOptions_${event.accordionId}" class="visualization-dropdown" style="display:none;"></div>
+          <div class="event-type-dd visualization-control" id="AccordionEventType_${event.rowId}">
+            <span id="AccordionEventTypeToggle_${event.rowId}" class="dd-toggle pseudo-select">${currentEventTypeInfo.label}</span>
+            <div id="AccordionEventTypeOptions_${event.rowId}" class="visualization-dropdown" style="display:none;"></div>
           </div>
         </div>
       </div>

@@ -206,6 +206,10 @@ class Wizard {
     // Deep-copy to prevent accidental mutation of the original config
     const stepsCopy = JSON.parse(JSON.stringify(sourceSteps));
 
+    // Determine current view mode for later checks (accordion vs table)
+    const currentMode = this.getCurrentEventsMode ? this.getCurrentEventsMode() : 'table';
+    // NOTE: No auto-expansion here; we'll expand lazily when we actually navigate to the first accordion field.
+
     this.tableState = this.getEventTableState();
 
     // Header buttons that might live inside the burger menu on mobile
@@ -216,11 +220,22 @@ class Wizard {
       '#startWizard'
     ];
 
-    return stepsCopy.filter(step => {
+    const filteredSteps = stepsCopy.filter(step => {
       // 1) Tour visibility filtering via `tours` key
       if (step.tours && !step.tours.includes(this.currentTourId)) {
         return false;
       }
+
+      // BEGIN ADD: View mode filtering via `eventModes` key
+      if (step.eventModes && !step.eventModes.includes(currentMode)) {
+        return false;
+      }
+
+      // Swap selector when accordion mode is active and alternative provided
+      if (currentMode === 'accordion' && step['accordion-element']) {
+        step.element = step['accordion-element'];
+      }
+      // END ADD
 
       // Steps without elements are always valid
       if (!step.element) return true;
@@ -259,7 +274,12 @@ class Wizard {
           return element !== null;
         }
 
-        // For other elements (form fields, buttons), check both existence and visibility
+        // For other elements (form fields, buttons), handle accordion fields specially
+        if (currentMode === 'accordion' && (step.element.startsWith('#AccordionEventTypeToggle_') || step.element.startsWith('.accordion-edit-'))) {
+          // Keep accordion field steps even if the element doesn't exist yet (collapsed)
+          return true;
+        }
+
         const element = document.querySelector(step.element);
         return element !== null && this.isElementVisible(element);
       } else {
@@ -281,7 +301,59 @@ class Wizard {
         }
       }
     });
+
+    // DEBUG: Log resulting selectors in accordion mode
+    if (currentMode === 'accordion') {
+      //
+    }
+
+    return filteredSteps;
   }
+
+  // BEGIN ADD: Ensure first accordion item expanded for wizard selectors
+  async ensureFirstAccordionExpanded() {
+    try {
+      const webUI = WebUI.getInstance();
+      if (!webUI || !webUI.eventAccordionManager) return;
+      const mgr = webUI.eventAccordionManager;
+      if (!mgr.events || mgr.events.length === 0) return;
+      const firstEvent = mgr.events[0];
+      if (!firstEvent || !firstEvent.accordionId) return;
+      if (mgr.expandedItems && mgr.expandedItems.has(firstEvent.accordionId)) {
+        this._autoExpandedAccordionId = firstEvent.accordionId;
+        return;
+      }
+      mgr.toggleAccordionItem(firstEvent.accordionId);
+      // Wait for the CSS transition (max-height 0.3s) to finish so that
+      // Driver.js calculates the correct bounding box for the highlight.
+      await new Promise(resolve => setTimeout(resolve, 350));
+
+      this._autoExpandedAccordionId = firstEvent.accordionId;
+      this._accordionExpandedByWizard = true;
+    } catch (err) {
+      console.error('Wizard: failed to auto-expand accordion event', err);
+    }
+  }
+  // END ADD
+
+  // BEGIN ADD: helper to collapse auto-expanded accordion
+  collapseAutoExpandedAccordion() {
+    if (!this._accordionExpandedByWizard || !this._autoExpandedAccordionId) return;
+    try {
+      const webUI = WebUI.getInstance();
+      if (webUI && webUI.eventAccordionManager) {
+        const mgr = webUI.eventAccordionManager;
+        if (mgr.expandedItems && mgr.expandedItems.has(this._autoExpandedAccordionId)) {
+          mgr.toggleAccordionItem(this._autoExpandedAccordionId);
+        }
+      }
+    } catch (err) {
+      console.error('Wizard: error collapsing accordion', err);
+    }
+    this._autoExpandedAccordionId = null;
+    this._accordionExpandedByWizard = false;
+  }
+  // END ADD
 
   // Freeze page scroll while wizard is active
   freezeScroll() {
@@ -389,7 +461,7 @@ class Wizard {
         if (nextIndex < this.validSteps.length) {
           const nextElement = document.querySelector(this.validSteps[nextIndex].element);
           // Handle burger menu BEFORE moving to next step
-          await this.handleBurgerMenuBeforeStep(nextElement, nextIndex);
+          await this.exposeHiddenElement(nextIndex);
           if (nextElement && !this.isMobile) {
             // Only focus on desktop to avoid keyboard issues on mobile
             nextElement.focus();
@@ -404,7 +476,7 @@ class Wizard {
         if (prevIndex >= 0) {
           const prevElement = document.querySelector(this.validSteps[prevIndex].element);
           // Handle burger menu BEFORE moving to previous step
-          await this.handleBurgerMenuBeforeStep(prevElement, prevIndex);
+          await this.exposeHiddenElement(prevIndex);
           if (prevElement && !this.isMobile) {
             // Only focus on desktop to avoid keyboard issues on mobile
             prevElement.focus();
@@ -461,6 +533,14 @@ class Wizard {
           }
         }
 
+        // Accordion auto-collapse when leaving event (initial driver instance)
+        if (this.getCurrentEventsMode && this.getCurrentEventsMode() === 'accordion' && this._autoExpandedAccordionId) {
+          const withinAcc = element ? element.closest('.events-accordion-item') : null;
+          if (!withinAcc && this._accordionExpandedByWizard) {
+            this.collapseAutoExpandedAccordion();
+          }
+        }
+
         // Add 'done' class dynamically based on button label to suppress arrows
         const nextBtn = document.querySelector('.driver-popover-next-btn');
         if (nextBtn && nextBtn.textContent.trim().toLowerCase() === 'done') {
@@ -486,7 +566,7 @@ class Wizard {
     // Handle burger menu for initial step before starting
     if (startingStepIndex < this.validSteps.length) {
       const initialElement = document.querySelector(this.validSteps[startingStepIndex].element);
-      this.handleBurgerMenuBeforeStep(initialElement, startingStepIndex).then(() => {
+      this.exposeHiddenElement(startingStepIndex).then(() => {
         this.tour.drive(startingStepIndex);
       });
     } else {
@@ -513,11 +593,6 @@ class Wizard {
    * @param {number} [startingIndex=0] – optional starting step.
    */
   async _runTour(steps, startingIndex = 0) {
-    if (!steps || steps.length === 0) {
-      console.warn('_runTour called with no steps');
-      return;
-    }
-
     // Use filterValidSteps to adapt selectors (events table IDs, etc.)
     const originalSteps = this.config ? this.config.steps : null;
     if (this.config) {
@@ -571,7 +646,7 @@ class Wizard {
         const nextIdx = this.tour.getActiveIndex() + 1;
         if (nextIdx < this.validSteps.length) {
           const nextEl = document.querySelector(this.validSteps[nextIdx].element);
-          await this.handleBurgerMenuBeforeStep(nextEl, nextIdx);
+          await this.exposeHiddenElement(nextIdx);
           if (nextEl && !this.isMobile) nextEl.focus();
           this.tour.moveNext();
         } else {
@@ -582,7 +657,7 @@ class Wizard {
         const prevIdx = this.tour.getActiveIndex() - 1;
         if (prevIdx >= 0) {
           const prevEl = document.querySelector(this.validSteps[prevIdx].element);
-          await this.handleBurgerMenuBeforeStep(prevEl, prevIdx);
+          await this.exposeHiddenElement(prevIdx);
           if (prevEl && !this.isMobile) prevEl.focus();
         }
         this.tour.movePrevious();
@@ -615,7 +690,7 @@ class Wizard {
 
     // Handle burger menu for the initial step
     const initialElement = document.querySelector(this.validSteps[startingIndex].element);
-    await this.handleBurgerMenuBeforeStep(initialElement, startingIndex);
+    await this.exposeHiddenElement(startingIndex);
 
     this.tour.drive(startingIndex);
   }
@@ -657,6 +732,9 @@ class Wizard {
   }
 
   finishTour() {
+    // Collapse auto-expanded accordion if still open
+    this.collapseAutoExpandedAccordion();
+
     this.cleanupHighlighting();
 
     if (this.tour) {
@@ -805,7 +883,7 @@ class Wizard {
           
           if (targetIndex >= 0 && targetIndex < this.validSteps.length) {
             const targetElement = document.querySelector(this.validSteps[targetIndex].element);
-            this.handleBurgerMenuBeforeStep(targetElement, targetIndex).then(() => {
+            this.exposeHiddenElement(targetIndex).then(() => {
               direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
               const currentIndex = this.tour.getActiveIndex();
               const currentElement = document.querySelector(this.validSteps[currentIndex].element);
@@ -925,6 +1003,26 @@ class Wizard {
     return isMobileUserAgent || (hasTouchSupport && (isSmallScreen || isMobileViewport));
   }
 
+  // BEGIN ADD: Utility to detect current events view mode (table vs accordion)
+  getCurrentEventsMode() {
+    // Try to use EventsTableManager state if available
+    try {
+      const webUI = WebUI.getInstance();
+      if (webUI && webUI.eventsTableManager && webUI.eventsTableManager.viewMode) {
+        return webUI.eventsTableManager.viewMode;
+      }
+    } catch (_) {
+      // Ignore and fall back to DOM inference
+    }
+    // Fallback: inspect DOM visibility
+    const accordionContainer = document.querySelector('.events-accordion-container');
+    if (accordionContainer && accordionContainer.style.display !== 'none') {
+      return 'accordion';
+    }
+    return 'table';
+  }
+  // END ADD
+
   // Prevent focus on input elements during wizard on mobile
   preventFocus(event) {
     if (!this.wizardActive || !this.isMobile) return;
@@ -1016,7 +1114,23 @@ class Wizard {
   }
 
   // Handle burger menu BEFORE highlighting a step
-  async handleBurgerMenuBeforeStep(element, stepIndex = null) {
+  async exposeHiddenElement(stepIndex) {
+    // -------------------------------------------------------
+    // 0. Accordion auto-expand logic (runs BEFORE burger menu)
+    // -------------------------------------------------------
+    try {
+      if (this.getCurrentEventsMode && this.getCurrentEventsMode() === 'accordion') {
+        const step = stepIndex !== null ? this.validSteps[stepIndex] : null;
+        if (step && step.element && (step.element.startsWith('#AccordionEventTypeToggle_') || step.element.startsWith('.accordion-edit-'))) {
+          await this.ensureFirstAccordionExpanded();
+          // Give the DOM a tick to render new elements
+          await new Promise(r => setTimeout(r, 80));
+        }
+      }
+    } catch (err) {
+      console.error('Wizard: accordion auto-expand error', err);
+    }
+
     const burgerMenu = window.mobileBurgerMenuInstance;
     if (!burgerMenu) return;
     
@@ -1173,6 +1287,10 @@ class Wizard {
 
     const stepsCopy = this.originalConfig.steps.map(step => JSON.parse(JSON.stringify(step)));
 
+    // BEGIN ADD: Detect current mode for filtering/selector swapping
+    const currentMode = this.getCurrentEventsMode ? this.getCurrentEventsMode() : 'table';
+    // END ADD
+
     const filtered = stepsCopy.filter(step => {
       // Filter by tours key
       if (step.tours && !step.tours.includes(tourId)) return false;
@@ -1184,8 +1302,20 @@ class Wizard {
         return false;
       }
 
+      // BEGIN ADD: View mode filtering via `eventModes` key
+      if (step.eventModes && !step.eventModes.includes(currentMode)) return false;
+      // END ADD
+
       return true;
     });
+
+    // BEGIN ADD: Swap selector for accordion mode when applicable
+    filtered.forEach(step => {
+      if (currentMode === 'accordion' && step['accordion-element']) {
+        step.element = step['accordion-element'];
+      }
+    });
+    // END ADD
 
     // Process content with age/year placeholders for UI display
     filtered.forEach(step => {
