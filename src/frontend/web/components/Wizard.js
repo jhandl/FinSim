@@ -382,205 +382,41 @@ class Wizard {
     this.savedScrollPos = null;
   }
 
-  async start(fromStep = undefined) {
-    if (!this.config) {
-      await this.loadConfig();
-    } else {
-      // Refresh working config from original with current age/year mode
-      this.config = JSON.parse(JSON.stringify(this.originalConfig));
-      if (this.config.steps) {
-        this.config.steps = this.config.steps.map(step => {
-          if (step.popover) {
-            if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
-              // Re-render with ContentRenderer to process age/year placeholders
-              step.popover.description = ContentRenderer.render(
-                step.popover.contentType,
-                this.processAgeYearInContent(step.popover.content),
-                { context: 'wizard', compact: true }
-              );
-            } else if (step.popover.description) {
-              // Process age/year placeholders in legacy HTML descriptions
-              step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
-            }
-          }
-          return step;
-        });
-      }
-    }
 
-    // Mark tour type and filter steps accordingly
-    this.currentTourId = 'full';
-    this.validSteps = this.filterValidSteps();
 
-    // Replace old welcome/how-to steps with welcome modal triggers
-    this.validSteps = this.validSteps.map(step => {
-      if (!step.element && step.popover &&
-          (step.popover.popoverClass === 'welcome-popover' ||
-           step.popover.popoverClass === 'howto-popover')) {
-        // Replace with a special step that triggers the welcome modal
-        return {
-          element: 'body', // Use body as a dummy element
-          popover: {
-            title: 'Welcome',
-            description: 'Loading welcome information...',
-            showButtons: ['close'],
-            onPopoverRender: () => {
-              // When this step is shown, immediately show the welcome modal instead
-              setTimeout(() => {
-                this.finishTour();
-                const webUI = WebUI.getInstance();
-                if (webUI) {
-                  webUI.showWelcomeModal();
-                }
-              }, 100);
-            }
-          }
-        };
-      }
-      return step;
-    });
 
-    let startingStepIndex = fromStep !== undefined ? fromStep : (this.lastFocusedWasInput ? (this.getLastFocusedFieldIndex() || this.lastStepIndex) : this.lastStepIndex);
-    if (startingStepIndex > 1 && startingStepIndex < this.validSteps.length && !this.isMobile) {
-      const element = document.querySelector(this.validSteps[startingStepIndex].element);
-      if (element) {
-        // Only focus on desktop to avoid keyboard issues on mobile
-        element.focus();
-      }
-    }
-
-    this.tour = this.driver({
-      showProgress: false,
-      animate: true,
-      smoothScroll: true,
-      overlayOpacity: 0.5,
-      allowKeyboardControl: true,
-      steps: this.validSteps,
-      onNextClick: async (element) => {
-        const nextIndex = this.tour.getActiveIndex() + 1;
-        if (nextIndex < this.validSteps.length) {
-          const nextElement = document.querySelector(this.validSteps[nextIndex].element);
-          // Handle burger menu BEFORE moving to next step
-          await this.exposeHiddenElement(nextIndex);
-          if (nextElement && !this.isMobile) {
-            // Only focus on desktop to avoid keyboard issues on mobile
-            nextElement.focus();
-          }
-          this.tour.moveNext();
-        } else {
-          this.finishTour();
-        }
-      },
-      onPrevClick: async (element) => {
-        const prevIndex = this.tour.getActiveIndex() - 1;
-        if (prevIndex >= 0) {
-          const prevElement = document.querySelector(this.validSteps[prevIndex].element);
-          // Handle burger menu BEFORE moving to previous step
-          await this.exposeHiddenElement(prevIndex);
-          if (prevElement && !this.isMobile) {
-            // Only focus on desktop to avoid keyboard issues on mobile
-            prevElement.focus();
-          }
-        }
-        this.tour.movePrevious();
-      },
-      onDestroyStarted: () => this.finishTour(),
-      onHighlighted: (element) => {
-        // Clean up any residual inline border styles from the previous element
-        this.cleanupInlineStyles();
-
-        // Simple burger menu handling - just open it if element needs it
-        this.handleBurgerMenuSimple(element);
-
-        const popover = document.querySelector('.driver-popover');
-        if (popover) {
-          // Existing logic for the #load-example-scenario button
-          const loadExampleBtn = popover.querySelector('#load-example-scenario');
-          if (loadExampleBtn && !loadExampleBtn.getAttribute('data-click-attached')) {
-            loadExampleBtn.setAttribute('data-click-attached', 'true');
-            loadExampleBtn.addEventListener('click', () => {
-              WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
-              this.finishTour();
-            });
-          }
-
-          // Focus management for step 0 (welcome step)
-          if (this.tour && typeof this.tour.getActiveIndex === 'function' && this.tour.getActiveIndex() === 0) {
-            // Make sure popover is focusable
-            if (!popover.hasAttribute('tabindex')) {
-              popover.setAttribute('tabindex', '-1');
-            }
-            
-            // Try to find the next button
-            const nextButton = popover.querySelector('.driver-popover-next-btn') || 
-                              popover.querySelector('[data-driver="next"]') ||
-                              popover.querySelector('.driver-btn.driver-next');
-            
-            // Check if we have a focused element that can handle keyboard events
-            const currentFocus = document.activeElement;
-            
-            // If current focus is body (auto startup) or not a good focus target, establish proper focus
-            if (currentFocus === document.body || currentFocus === document.documentElement) {
-              // First try the next button
-              if (nextButton) {
-                nextButton.focus({ preventScroll: true });
-              } else {
-                // Make body focusable and focus it
-                document.body.setAttribute('tabindex', '-1');
-                document.body.focus({ preventScroll: true });
-              }
-            }
-          }
-        }
-
-        // Accordion auto-collapse when leaving event (initial driver instance)
-        if (this.getCurrentEventsMode && this.getCurrentEventsMode() === 'accordion' && this._autoExpandedAccordionId) {
-          const withinAcc = element ? element.closest('.events-accordion-item') : null;
-          if (!withinAcc && this._accordionExpandedByWizard) {
-            this.collapseAutoExpandedAccordion();
-          }
-        }
-
-        // Add 'done' class dynamically based on button label to suppress arrows
-        const nextBtn = document.querySelector('.driver-popover-next-btn');
-        if (nextBtn && nextBtn.textContent.trim().toLowerCase() === 'done') {
-          nextBtn.classList.add('done');
-        }
-      }
-    });
-
-    document.addEventListener('keydown', this.handleKeys);
-    
-    // Disable mobile keyboard to prevent it from covering the wizard popover
-    this.disableMobileKeyboard();
-    
-    // Add visual indicator that wizard is active and set up focus prevention
-    this.wizardActive = true;
-    if (this.isMobile) {
-      document.body.setAttribute('data-wizard-active', 'true');
-      document.addEventListener('focusin', this.preventFocus, true);
-      document.addEventListener('touchstart', this.preventTouch, true);
-      document.addEventListener('click', this.preventTouch, true);
-    }
-    
-    // Handle burger menu for initial step before starting
-    if (startingStepIndex < this.validSteps.length) {
-      const initialElement = document.querySelector(this.validSteps[startingStepIndex].element);
-      this.exposeHiddenElement(startingStepIndex).then(() => {
-        this.tour.drive(startingStepIndex);
-      });
-    } else {
-      this.tour.drive(startingStepIndex);
-    }
-  }
 
   getLastFocusedFieldIndex() {
-    const index = this.validSteps.findIndex(step => {
-      let elementSelector = step.element;
+    if (!this.lastFocusedField) {
+      return null;
+    }
+
+    // First pass: look for exact matches
+    let exactMatchIndex = -1;
+    let containerMatchIndex = -1;
+
+    for (let i = 0; i < this.validSteps.length; i++) {
+      const step = this.validSteps[i];
+      const elementSelector = step.element;
       const stepElement = document.querySelector(elementSelector);
-      return stepElement === this.lastFocusedField;
-    });
-    return index >= 0 ? index : null;
+
+      if (!stepElement) continue;
+
+      // Check if the step element is exactly the focused field
+      if (stepElement === this.lastFocusedField) {
+        exactMatchIndex = i;
+        break; // Exact match takes priority, stop searching
+      }
+
+      // Check if the focused field is contained within the step element (only if no exact match yet)
+      if (containerMatchIndex === -1 && stepElement.contains && stepElement.contains(this.lastFocusedField)) {
+        containerMatchIndex = i;
+        // Don't break - continue looking for exact matches
+      }
+    }
+
+    const finalIndex = exactMatchIndex >= 0 ? exactMatchIndex : containerMatchIndex;
+    return finalIndex >= 0 ? finalIndex : null;
   }
 
   /**
@@ -593,21 +429,38 @@ class Wizard {
    * @param {number} [startingIndex=0] – optional starting step.
    */
   async _runTour(steps, startingIndex = 0) {
-    // Use filterValidSteps to adapt selectors (events table IDs, etc.)
-    const originalSteps = this.config ? this.config.steps : null;
-    if (this.config) {
-      this.config.steps = steps; // temporarily swap so filterValidSteps knows mapping
-    }
+    // CORRECT FIX: We need filterValidSteps() for selector adaptation and visibility checks
+    // But we should NOT do the tour-type filtering again since steps are already filtered by type
+    // The issue is that full/help tours call filterValidSteps() twice with different contexts
 
-    this.validSteps = this.filterValidSteps(steps);
+    // For full/help tours: steps are already filtered by filterValidSteps() in start()
+    // For quick/mini tours: steps are filtered by _getFilteredSteps() but need filterValidSteps() for selectors
 
-    if (this.config && originalSteps) {
-      this.config.steps = originalSteps; // restore
+    if (this.currentTourId === 'quick' || this.currentTourId === 'mini') {
+      // Quick/mini tours need filterValidSteps for selector adaptation
+      const originalSteps = this.config ? this.config.steps : null;
+      if (this.config) {
+        this.config.steps = steps; // temporarily swap so filterValidSteps knows mapping
+      }
+
+      this.validSteps = this.filterValidSteps(steps);
+
+      if (this.config && originalSteps) {
+        this.config.steps = originalSteps; // restore
+      }
+    } else {
+      // Full/help tours already have properly filtered and adapted steps
+      this.validSteps = steps;
     }
 
     if (this.validSteps.length === 0) {
-      console.warn('No valid steps after filtering');
+      console.warn('No valid steps after processing');
       return;
+    }
+
+    // Ensure startingIndex is within bounds
+    if (startingIndex >= this.validSteps.length) {
+      startingIndex = 0;
     }
 
     // ------------------------------------------------------------------
@@ -634,9 +487,9 @@ class Wizard {
       }
     }
 
-    // Prepare Driver.js config – progress bar only for non-mini tours
+    // Prepare Driver.js config – progress bar for full/help tours, not for mini tours
     const driverCfg = {
-      showProgress: this.currentTourId !== 'mini',
+      showProgress: this.currentTourId === 'full' || this.currentTourId === 'help',
       animate: true,
       smoothScroll: true,
       overlayOpacity: 0.5,
@@ -663,7 +516,7 @@ class Wizard {
         this.tour.movePrevious();
       },
       onDestroyStarted: () => this.finishTour(),
-      onHighlighted: (el) => {
+      onHighlighted: async (el) => {
         this.cleanupInlineStyles();
         this.handleBurgerMenuSimple(el);
 
@@ -671,6 +524,68 @@ class Wizard {
         const nextBtn = document.querySelector('.driver-popover-next-btn');
         if (nextBtn && nextBtn.textContent.trim().toLowerCase() === 'done') {
           nextBtn.classList.add('done');
+        }
+
+        // Accordion auto-collapse when leaving event - SHARED BY ALL TOUR TYPES
+        if (this.getCurrentEventsMode && this.getCurrentEventsMode() === 'accordion' && this._autoExpandedAccordionId) {
+          const withinAcc = el ? el.closest('.events-accordion-item') : null;
+          if (!withinAcc && this._accordionExpandedByWizard) {
+            this.collapseAutoExpandedAccordion();
+
+            // Wait for accordion collapse animation to complete before highlight recalculation
+            // This prevents the highlight box from being sized for the expanded accordion
+            setTimeout(() => {
+              // Force highlight recalculation by triggering a resize event
+              // The Bubbles.js library listens for resize events and recalculates the highlight
+              window.dispatchEvent(new Event('resize'));
+            }, 350);
+          }
+        }
+
+        // Demo button logic for full/help tours only
+        if (this.currentTourId === 'full' || this.currentTourId === 'help') {
+          const popover = document.querySelector('.driver-popover');
+          if (popover) {
+            // Logic for the #load-example-scenario button
+            const loadExampleBtn = popover.querySelector('#load-example-scenario');
+            if (loadExampleBtn && !loadExampleBtn.getAttribute('data-click-attached')) {
+              loadExampleBtn.setAttribute('data-click-attached', 'true');
+              loadExampleBtn.addEventListener('click', () => {
+                WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
+                this.finishTour();
+              });
+            }
+
+            // Logic for the #load-demo-scenario button
+            const loadDemoBtn = popover.querySelector('#load-demo-scenario');
+            if (loadDemoBtn && !loadDemoBtn.getAttribute('data-click-attached')) {
+              loadDemoBtn.setAttribute('data-click-attached', 'true');
+              loadDemoBtn.addEventListener('click', () => {
+                WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Demo");
+                this.finishTour();
+              });
+            }
+
+            // Logic for the #load-demo-scenario-header button
+            const loadDemoHeaderBtn = popover.querySelector('#load-demo-scenario-header');
+            if (loadDemoHeaderBtn && !loadDemoHeaderBtn.getAttribute('data-click-attached')) {
+              loadDemoHeaderBtn.setAttribute('data-click-attached', 'true');
+              loadDemoHeaderBtn.addEventListener('click', () => {
+                WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Demo");
+                this.finishTour();
+              });
+            }
+
+            // Logic for the #load-demo-scenario-mobile button
+            const loadDemoMobileBtn = popover.querySelector('#load-demo-scenario-mobile');
+            if (loadDemoMobileBtn && !loadDemoMobileBtn.getAttribute('data-click-attached')) {
+              loadDemoMobileBtn.setAttribute('data-click-attached', 'true');
+              loadDemoMobileBtn.addEventListener('click', () => {
+                WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Demo");
+                this.finishTour();
+              });
+            }
+          }
         }
       }
     };
@@ -681,6 +596,11 @@ class Wizard {
     document.addEventListener('keydown', this.handleKeys);
     this.disableMobileKeyboard();
     this.wizardActive = true;
+
+    // NOTE: Removed freezeScroll() call to allow proper scrolling for all tour types
+    // The original implementation froze scroll for full/help tours, preventing them
+    // from scrolling to bring highlighted elements to the top of the page
+
     if (this.isMobile) {
       document.body.setAttribute('data-wizard-active', 'true');
       document.addEventListener('focusin', this.preventFocus, true);
@@ -689,7 +609,6 @@ class Wizard {
     }
 
     // Handle burger menu for the initial step
-    const initialElement = document.querySelector(this.validSteps[startingIndex].element);
     await this.exposeHiddenElement(startingIndex);
 
     this.tour.drive(startingIndex);
@@ -935,7 +854,7 @@ class Wizard {
             if (tableStep >= 0) {
               document.activeElement.blur();
               this.lastFocusedField = null;
-              this.start(tableStep);
+              this.start({ type: 'help', startAtStep: tableStep });
               return null;
             }
           } else {
@@ -951,7 +870,7 @@ class Wizard {
             if (nextNonTableStep >= 0) {
               document.activeElement.blur();
               this.lastFocusedField = null;
-              this.start(nextNonTableStep);
+              this.start({ type: 'help', startAtStep: nextNonTableStep });
               return null;
             }
           } else {
@@ -974,17 +893,17 @@ class Wizard {
               const eventTypeField = targetRow.querySelector(`#EventType_${targetRowId}`);
               if (eventTypeField) {
                 eventTypeField.focus();
-                this.start(this.tour.getActiveIndex());
+                this.start({ type: 'help', startAtStep: this.tour.getActiveIndex() });
                 eventTypeField.blur();
                 return null;
               }
             } else {
-              this.start(this.tour.getActiveIndex());
+              this.start({ type: 'help', startAtStep: this.tour.getActiveIndex() });
               return null;
             }
           } else if (targetField && this.isMobile) {
             // On mobile, restart wizard at current step without focusing
-            this.start(this.tour.getActiveIndex());
+            this.start({ type: 'help', startAtStep: this.tour.getActiveIndex() });
             return null;
           }
         }
@@ -1182,8 +1101,8 @@ class Wizard {
     const isBurgerMenuButton = burgerMenuButtons.includes(baseElementId);
     
     if (!isBurgerMenuButton) {
-      // Close burger menu if we opened it and we're moving to a non-burger-menu element
-      if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
+      // Close burger menu before highlighting non-menu elements, regardless of who opened it
+      if (burgerMenu.isOpen) {
         burgerMenu.closeMenu();
         this.wizardOpenedBurgerMenu = false;
         this.unfreezeScroll();
@@ -1337,38 +1256,138 @@ class Wizard {
     return filtered;
   }
 
-  async startTour(tourId, card = null) {
-    if (!tourId) {
-      console.warn('startTour requires a tourId');
+  /**
+   * Unified entry point for all tour types.
+   * Replaces the separate start() and startTour() methods with a single,
+   * parameter-based approach that handles all tour variations.
+   *
+   * @param {Object|number} options - Tour configuration options, or fromStep for backward compatibility
+   * @param {string} options.type - Tour type: 'full', 'quick', 'mini', 'help'
+   * @param {string} [options.card] - Card identifier for mini tours
+   * @param {number} [options.startAtStep] - Starting step index for help tours
+   */
+  async start(options = {}) {
+    // Handle backward compatibility: if called without options or with just a number (fromStep),
+    // treat it as the original start() method behavior (help tour)
+    let actualOptions = options;
+    if (typeof options === 'number' || (typeof options === 'object' && Object.keys(options).length === 0)) {
+      // Called as start() or start(fromStep) - original behavior was help tour
+      actualOptions = { type: 'help', startAtStep: typeof options === 'number' ? options : undefined };
+    }
+
+    const { type = 'help', card = null, startAtStep = undefined } = actualOptions;
+
+    // Parameter validation
+    if (type === 'mini' && !card) {
+      console.warn('Mini tours require a card parameter');
       return;
     }
 
+    // Load or refresh configuration
     if (!this.config) {
       await this.loadConfig();
+    } else {
+      // Refresh working config from original with current age/year mode
+      this.config = JSON.parse(JSON.stringify(this.originalConfig));
+      if (this.config.steps) {
+        this.config.steps = this.config.steps.map(step => {
+          if (step.popover) {
+            if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
+              // Re-render with ContentRenderer to process age/year placeholders
+              step.popover.description = ContentRenderer.render(
+                step.popover.contentType,
+                this.processAgeYearInContent(step.popover.content),
+                { context: 'wizard', compact: true }
+              );
+            } else if (step.popover.description) {
+              // Process age/year placeholders in legacy HTML descriptions
+              step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
+            }
+          }
+          return step;
+        });
+      }
     }
 
-    // ------------------------------------------------------------------
-    // Modern unified path using YAML tags + _runTour()
-    // ------------------------------------------------------------------
+    // Set tour type and get filtered steps
+    this.currentTourId = type;
 
-    if (tourId === 'full' || tourId === 'quick' || tourId === 'mini') {
-      this.currentTourId = tourId;
+    // Get steps for the tour type
+    let steps;
+    let startingStepIndex = 0;
 
-      // For mini tours ensure card is specified
-      if (tourId === 'mini' && !card) {
-        console.warn('startTour("mini") requires a card parameter');
-        return;
+    if (type === 'full' || type === 'help') {
+      // Use the full tour path with welcome modal replacement and help-specific logic
+      // Help tours use the same steps as full tours, just starting at a different position
+      this.currentTourId = 'full'; // Both full and help tours use 'full' tour steps
+
+      this.validSteps = this.filterValidSteps();
+      steps = this.validSteps;
+
+      // Set the actual tour ID for display purposes
+      this.currentTourId = type;
+
+      // Replace old welcome/how-to steps with welcome modal triggers (full tours only)
+      if (type === 'full') {
+        steps = steps.map(step => {
+          if (!step.element && step.popover &&
+              (step.popover.popoverClass === 'welcome-popover' ||
+               step.popover.popoverClass === 'howto-popover')) {
+            // Replace with a special step that triggers the welcome modal
+            return {
+              element: 'body', // Use body as a dummy element
+              popover: {
+                title: 'Welcome',
+                description: 'Loading welcome information...',
+                showButtons: ['close'],
+                onPopoverRender: () => {
+                  // When this step is shown, immediately show the welcome modal instead
+                  setTimeout(() => {
+                    this.finishTour();
+                    const webUI = WebUI.getInstance();
+                    if (webUI) {
+                      webUI.showWelcomeModal();
+                    }
+                  }, 100);
+                }
+              }
+            };
+          }
+          return step;
+        });
       }
 
-      const steps = this._getFilteredSteps(tourId, card);
+      // Calculate starting step for help tours
+      const focusedFieldIndex = this.getLastFocusedFieldIndex();
+
+      startingStepIndex = startAtStep !== undefined ? startAtStep :
+        (this.lastFocusedWasInput ? (focusedFieldIndex || this.lastStepIndex) : this.lastStepIndex);
+
+      // Ensure startingStepIndex is within valid bounds
+      if (startingStepIndex >= steps.length) {
+        startingStepIndex = 0; // Reset to beginning if index is out of bounds
+      } else if (startingStepIndex < 0) {
+        startingStepIndex = 0; // Ensure non-negative index
+      }
+
+      if (startingStepIndex > 1 && startingStepIndex < steps.length && !this.isMobile) {
+        const element = document.querySelector(steps[startingStepIndex].element);
+        if (element) {
+          // Only focus on desktop to avoid keyboard issues on mobile
+          element.focus();
+        }
+      }
+    } else {
+      // Use the filtered steps for quick/mini tours
+      steps = this._getFilteredSteps(type, card);
 
       if (steps.length === 0) {
-        console.warn(`No steps found for tour "${tourId}"${card ? ` and card "${card}"` : ''}`);
+        console.warn(`No steps found for tour "${type}"${card ? ` and card "${card}"` : ''}`);
         return;
       }
 
       // Mini-tour tweaks: show a "Done" button on the last (or only) step.
-      if (tourId === 'mini') {
+      if (type === 'mini') {
         if (steps.length === 1) {
           const step = steps[0];
           if (step && step.popover) {
@@ -1392,10 +1411,14 @@ class Wizard {
         }
       }
 
-      await this._runTour(steps, 0);
-      return;
+      startingStepIndex = 0; // Quick/mini tours always start at the beginning
     }
 
-    console.warn(`Unknown tourId: ${tourId}`);
+    // Now use the unified _runTour method for ALL tour types
+    await this._runTour(steps, startingStepIndex);
   }
+
+
+
+
 }

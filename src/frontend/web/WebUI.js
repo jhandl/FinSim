@@ -179,14 +179,14 @@ class WebUI extends AbstractUI {
           // Callback for "Quick Tour" button - start the quick tour
           const wizard = Wizard.getInstance();
           if (wizard) {
-            wizard.startTour('quick'); // Start the quick tour
+            wizard.start({ type: 'quick' }); // Start the quick tour
           }
         },
         () => {
           // Callback for "Full Tour" button - start the original wizard tour from header buttons
           const wizard = Wizard.getInstance();
           if (wizard) {
-            wizard.start(0); // Start at header overview
+            wizard.start({ type: 'help', startAtStep: 0 }); // Start at header overview
           }
         }
       );
@@ -402,7 +402,7 @@ class WebUI extends AbstractUI {
         }
         // Use wizard's built-in logic only if there was a recently focused input field
         if (wizard.lastFocusedWasInput && wizard.lastFocusedField) {
-          wizard.start();
+          wizard.start({ type: 'help' });
         } else {
           this.showWelcomeModal();
         }
@@ -417,7 +417,7 @@ class WebUI extends AbstractUI {
         if (window.__openDropdowns) {
           window.__openDropdowns.forEach((closer) => { try { if (typeof closer === 'function') closer(); } catch (_) {} });
         }
-        wizard.start(0);
+        wizard.start({ type: 'help', startAtStep: 0 });
       });
     }
     document.addEventListener('keydown', (event) => {
@@ -429,7 +429,7 @@ class WebUI extends AbstractUI {
         }
         // For keyboard shortcut, use same logic as Help button
         if (wizard.lastFocusedWasInput && wizard.lastFocusedField) {
-          wizard.start();
+          wizard.start({ type: 'help' });
         } else {
           this.showWelcomeModal();
         }
@@ -580,7 +580,7 @@ class WebUI extends AbstractUI {
         return; // A tour is already active, ignore additional clicks
       }
       try {
-        wizard.startTour('mini', cardType);
+        wizard.start({ type: 'mini', card: cardType });
       } catch (error) {
         console.error('Error starting mini tour:', error);
       }
