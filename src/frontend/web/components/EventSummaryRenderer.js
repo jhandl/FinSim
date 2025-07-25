@@ -160,7 +160,6 @@ class EventSummaryRenderer {
       'DBI': 'Defined Benefit Income',
       'FI': 'Tax-free Income',
       'E': 'Expense',
-      'E1': 'One-off Expense',
       'R': 'Real Estate',
       'M': 'Mortgage',
       'SM': 'Stock Market',
@@ -189,19 +188,7 @@ class EventSummaryRenderer {
     return 'other';
   }
 
-  /**
-   * Get icon for category
-   */
-  getCategoryIcon(category) {
-    const iconMap = {
-      'income': 'plus-circle',
-      'expense': 'minus-circle',
-      'property': 'home',
-      'investment': 'chart-line',
-      'other': 'circle'
-    };
-    return iconMap[category] || 'circle';
-  }
+
 
   /**
    * Event type classification methods (same as EventsTableManager)
@@ -211,7 +198,7 @@ class EventSummaryRenderer {
   }
 
   isOutflow(eventType) {
-    return ['E', 'E1'].includes(eventType);
+    return ['E'].includes(eventType);
   }
 
   isStockMarket(eventType) {
@@ -241,8 +228,8 @@ class EventSummaryRenderer {
    * Based on actual simulation behavior and event type meanings
    */
   showsToAgeField(eventType, event = null) {
-    // E1 (One-off Expense): Never show To Age field since it's automatically set to fromAge
-    if (eventType === 'E1') {
+    // One-off expenses: Never show To Age field since it's automatically set to fromAge
+    if (event && event.isOneOff) {
       return false;
     }
 
@@ -255,8 +242,8 @@ class EventSummaryRenderer {
    * Based on what the rate field means for each event type
    */
   showsGrowthRateField(eventType, event = null) {
-    // E1 (One-off Expense): Never show Growth Rate field since it occurs only once
-    if (eventType === 'E1') {
+    // One-off expenses: Never show Growth Rate field since it occurs only once
+    if (event && event.isOneOff) {
       return false;
     }
 

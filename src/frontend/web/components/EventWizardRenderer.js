@@ -18,21 +18,26 @@ class EventWizardRenderer {
 
     // Description text
     const description = document.createElement('p');
-    description.textContent = step.content.text;
+    description.textContent = this.processTextVariables(step.content.text, wizardState);
     container.appendChild(description);
 
     // Period inputs container
     const periodContainer = document.createElement('div');
     periodContainer.className = 'event-wizard-period-inputs';
 
+    // Apply label positioning class if specified
+    const labelPosition = step.labelPosition || 'top'; // default to top for period inputs
+    periodContainer.classList.add(`label-position-${labelPosition}`);
+
     // From Age/Year input
     const fromGroup = document.createElement('div');
     fromGroup.className = 'event-wizard-input-group event-wizard-period-from';
-    
+    fromGroup.classList.add(`label-position-${labelPosition}`);
+
     const fromLabel = document.createElement('label');
     fromLabel.textContent = this.getAgeYearLabel('From');
     fromLabel.htmlFor = 'wizard-fromAge';
-    
+
     const fromInput = document.createElement('input');
     fromInput.type = 'text';
     fromInput.id = 'wizard-fromAge';
@@ -40,7 +45,7 @@ class EventWizardRenderer {
     fromInput.placeholder = '';
     fromInput.inputMode = 'numeric';
     fromInput.pattern = '[0-9]*';
-    
+
     // Set current value if exists
     const currentFromValue = wizardState.data.fromAge;
     if (currentFromValue !== undefined) {
@@ -53,11 +58,12 @@ class EventWizardRenderer {
     // To Age/Year input
     const toGroup = document.createElement('div');
     toGroup.className = 'event-wizard-input-group event-wizard-period-to';
-    
+    toGroup.classList.add(`label-position-${labelPosition}`);
+
     const toLabel = document.createElement('label');
     toLabel.textContent = this.getAgeYearLabel('To');
     toLabel.htmlFor = 'wizard-toAge';
-    
+
     const toInput = document.createElement('input');
     toInput.type = 'text';
     toInput.id = 'wizard-toAge';
@@ -65,7 +71,7 @@ class EventWizardRenderer {
     toInput.placeholder = '';
     toInput.inputMode = 'numeric';
     toInput.pattern = '[0-9]*';
-    
+
     // Set current value if exists
     const currentToValue = wizardState.data.toAge;
     if (currentToValue !== undefined) {
@@ -83,23 +89,67 @@ class EventWizardRenderer {
     if (step.content.help) {
       const help = document.createElement('div');
       help.className = 'event-wizard-help';
-      help.textContent = step.content.help;
+      help.textContent = this.processTextVariables(step.content.help, wizardState);
       container.appendChild(help);
     }
 
     // Add input event listeners to save values
+    // When the user is typing, keep the wizardState updated **and** clear any
+    // previous validation error/warning so the field can be re-validated on blur.
     fromInput.addEventListener('input', () => {
       wizardState.data.fromAge = fromInput.value;
+      const wizardManager = this.webUI?.eventWizardManager;
+      if (wizardManager) {
+        wizardManager.clearWizardFieldValidation(fromInput);
+      }
     });
 
     toInput.addEventListener('input', () => {
       wizardState.data.toAge = toInput.value;
+      const wizardManager = this.webUI?.eventWizardManager;
+      if (wizardManager) {
+        wizardManager.clearWizardFieldValidation(toInput);
+      }
+    });
+
+    const validationRules = (step.content && step.content.validation) || '';
+    const requiresFrom = validationRules.includes('required') || validationRules.includes('fromAgeRequired');
+    const requiresTo = validationRules.includes('required');
+
+    fromInput.addEventListener('blur', () => {
+      const wizardManager = this.webUI?.eventWizardManager;
+      if (!wizardManager) return;
+
+      // If the From field is required but empty, flag error immediately.
+      if (requiresFrom && fromInput.value.trim() === '') {
+        wizardManager.showWizardFieldValidation(fromInput, 'This field is required');
+      } else {
+        wizardManager.validateWizardField(fromInput, 'fromAge', 'age');
+      }
+    });
+
+    toInput.addEventListener('blur', () => {
+      const wizardManager = this.webUI?.eventWizardManager;
+
+      if (!wizardManager) return;
+
+      // If To age is required but empty (only when 'required' specified)
+      if (requiresTo && toInput.value.trim() === '') {
+        wizardManager.showWizardFieldValidation(toInput, 'This field is required');
+      } else {
+        wizardManager.validateWizardField(toInput, 'toAge', 'age');
+      }
     });
 
     // Add Enter key listeners to advance to next step
     const handleEnterKey = (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
+
+        // Trigger blur so validations run before attempting to advance
+        fromInput.blur();
+        toInput.blur();
+
         // Get the wizard manager instance and advance to next step
         const wizardManager = this.webUI.eventWizardManager;
         if (wizardManager && wizardManager.isActive) {
@@ -126,7 +176,7 @@ class EventWizardRenderer {
 
     // Description text
     const description = document.createElement('p');
-    description.textContent = step.content.text;
+    description.textContent = this.processTextVariables(step.content.text, wizardState);
     container.appendChild(description);
 
     // Summary details
@@ -158,7 +208,7 @@ class EventWizardRenderer {
 
     // Description text
     const description = document.createElement('p');
-    description.textContent = step.content.text;
+    description.textContent = this.processTextVariables(step.content.text, wizardState);
     container.appendChild(description);
 
     // Mortgage details container
@@ -190,21 +240,25 @@ class EventWizardRenderer {
 
     mortgageContainer.appendChild(calculationSummary);
 
+    // Apply label positioning class if specified
+    const labelPosition = step.labelPosition || 'left'; // default to left for mortgage inputs
+
     // Mortgage rate input
     const rateGroup = document.createElement('div');
     rateGroup.className = 'event-wizard-input-group';
-    
+    rateGroup.classList.add(`label-position-${labelPosition}`);
+
     const rateLabel = document.createElement('label');
-    rateLabel.textContent = 'Mortgage Interest Rate (%)';
+    rateLabel.textContent = 'Interest Rate (%)';
     rateLabel.htmlFor = 'wizard-mortgageRate';
-    
+
     const rateInput = document.createElement('input');
     rateInput.type = 'text';
     rateInput.id = 'wizard-mortgageRate';
     rateInput.name = 'mortgageRate';
-    rateInput.placeholder = '3.5';
+    rateInput.placeholder = '';
     rateInput.className = 'percentage-input';
-    
+
     // Set current value if exists
     const currentRate = wizardState.data.mortgageRate;
     if (currentRate !== undefined) {
@@ -218,11 +272,12 @@ class EventWizardRenderer {
     // Mortgage term input
     const termGroup = document.createElement('div');
     termGroup.className = 'event-wizard-input-group';
-    
+    termGroup.classList.add(`label-position-${labelPosition}`);
+
     const termLabel = document.createElement('label');
-    termLabel.textContent = 'Mortgage Term (years)';
+    termLabel.textContent = 'Term (years)';
     termLabel.htmlFor = 'wizard-mortgageTerm';
-    
+
     const termInput = document.createElement('input');
     termInput.type = 'text';
     termInput.id = 'wizard-mortgageTerm';
@@ -230,7 +285,7 @@ class EventWizardRenderer {
     termInput.placeholder = '';
     termInput.inputMode = 'numeric';
     termInput.pattern = '[0-9]*';
-    
+
     // Set current value if exists
     const currentTerm = wizardState.data.mortgageTerm;
     if (currentTerm !== undefined) {
@@ -247,7 +302,7 @@ class EventWizardRenderer {
     if (step.content.help) {
       const help = document.createElement('div');
       help.className = 'event-wizard-help';
-      help.textContent = step.content.help;
+      help.textContent = this.processTextVariables(step.content.help, wizardState);
       container.appendChild(help);
     }
 
@@ -281,6 +336,41 @@ class EventWizardRenderer {
   }
 
   /**
+   * Process variables in text content
+   * @param {string} text - The text content with variables
+   * @param {Object} wizardState - Current wizard state
+   * @returns {string} Text with variables replaced
+   */
+  processTextVariables(text, wizardState) {
+    if (!text) return text;
+
+    let processedText = text;
+    const data = wizardState.data;
+
+    // Replace common placeholders
+    processedText = processedText.replace(/{name}/g, data.name || 'Unnamed Event');
+    processedText = processedText.replace(/{amount}/g, this.formatCurrency(data.amount));
+    processedText = processedText.replace(/{fromAge}/g, data.fromAge || '?');
+    processedText = processedText.replace(/{toAge}/g, data.toAge || '?');
+    processedText = processedText.replace(/{rate}/g, data.rate ? `${data.rate}%` : 'inflation rate');
+    processedText = processedText.replace(/{propertyValue}/g, this.formatCurrency(data.propertyValue));
+
+    // Replace frequency with human-readable text
+    if (data.frequency) {
+      const frequencyMap = {
+        'oneoff': 'one-time',
+        'weekly': 'weekly',
+        'monthly': 'monthly',
+        'yearly': 'annual'
+      };
+      const frequencyText = frequencyMap[data.frequency] || data.frequency;
+      processedText = processedText.replace(/{frequency}/g, frequencyText);
+    }
+
+    return processedText;
+  }
+
+  /**
    * Generate summary text from template and wizard data
    * @param {Object} step - The step configuration
    * @param {Object} wizardState - Current wizard state
@@ -288,19 +378,9 @@ class EventWizardRenderer {
    */
   generateSummaryText(step, wizardState) {
     let template = step.content.template || 'Event details will be shown here.';
-    
-    // Replace template variables with actual values
-    const data = wizardState.data;
-    
-    // Replace common placeholders
-    template = template.replace(/{name}/g, data.name || 'Unnamed Event');
-    template = template.replace(/{amount}/g, this.formatCurrency(data.amount));
-    template = template.replace(/{fromAge}/g, data.fromAge || '?');
-    template = template.replace(/{toAge}/g, data.toAge || '?');
-    template = template.replace(/{rate}/g, data.rate ? `${data.rate}%` : 'inflation rate');
-    template = template.replace(/{propertyValue}/g, this.formatCurrency(data.propertyValue));
-    
-    return template;
+
+    // Use the shared variable processing method
+    return this.processTextVariables(template, wizardState);
   }
 
   /**

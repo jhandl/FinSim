@@ -499,6 +499,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["SI"]
@@ -508,6 +509,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["SInp"]
@@ -517,6 +519,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["SI2"]
@@ -526,6 +529,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["SI2np"]
@@ -535,6 +539,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["UI"]
@@ -544,6 +549,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["RI"]
@@ -553,6 +559,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["DBI"]
@@ -562,6 +569,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["FI"]
@@ -571,6 +579,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["E"]
@@ -580,6 +589,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["SM"]
@@ -589,6 +599,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["R"]
@@ -598,6 +609,7 @@ WizardSteps:
       align: "center"
 
   - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
     eventTypes: ["M"]

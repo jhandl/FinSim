@@ -1,0 +1,636 @@
+/* Event Wizard – Dedicated, compact styling
+   (Loaded after simulator.css, so these rules override earlier ones) */
+
+/* --- Base Modal Overlay --- */
+.wizard-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+/* Apply top alignment for keyboard only on touch/mobile screens */
+@media (hover: none), (max-width: 915px) {
+  .wizard-overlay.keyboard-active {
+    align-items: flex-start;
+    padding-top: 1rem;
+  }
+}
+
+/* --- Modal container --- */
+.event-wizard-modal {
+  background: white;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: auto !important;      /* adapt to content */
+  max-width: 560px !important; /* prevent overly wide screens */
+  min-width: 320px !important; /* reasonable minimum */
+  max-height: 85vh;    /* leave some breathing room vertically */
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Use dynamic viewport units where supported so the modal never gets hidden
+   behind mobile browser UI or the on-screen keyboard. */
+@supports (height: 100dvh) {
+  .event-wizard-modal {
+    /* 85 % of the *visible* viewport height */
+    max-height: 85dvh;
+    /* Respect iOS safe-area on devices with a home indicator */
+    max-height: calc(85dvh - env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.event-wizard-step-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* --- Header --- */
+.event-wizard-step-header {
+  padding: 1rem 1rem 0.75rem;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  text-align: center; /* Center title and step counter */
+}
+
+/* --- Header title size for ALL pages --- */
+.event-wizard-step-header h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.event-wizard-progress {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+/* --- Body --- */
+.event-wizard-step-body {
+  flex: 1;
+  padding: 1.25rem;
+  overflow-y: auto;
+  background: white;
+}
+
+/* --- Footer --- */
+.event-wizard-step-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e9ecef;
+    background: #f8f9fa;
+}
+
+/* --- Button Container --- */
+.event-wizard-buttons {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+/* --- Buttons --- */
+.event-wizard-button {
+    padding: 0.45rem 0.9rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    color: #333;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+}
+
+.event-wizard-button:hover:not(:disabled) {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.event-wizard-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.event-wizard-button-primary {
+    background: var(--primary-color, #007bff);
+    color: white;
+    border-color: var(--primary-color, #007bff);
+}
+
+.event-wizard-button-primary:hover:not(:disabled) {
+    background: #0056b3;
+    border-color: #0056b3;
+}
+
+/* --- Content Styles --- */
+.event-wizard-intro {
+    text-align: center;
+}
+
+/* --- Input Groups --- */
+.event-wizard-input-group {
+    margin: 1rem 0;
+    /* Default: Place the label on the left and the input on the right */
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+/* Label styling inside wizard input groups */
+.event-wizard-input-group label {
+    /* Allow the label to take up available space and wrap if it is long */
+    flex: 1 1 auto;
+    margin-right: 0.75rem;
+    white-space: normal; /* enable wrapping */
+    text-align: left;
+
+    /* Ensure label typography matches period description text */
+    font-size: 1rem;       /* Same as default body text */
+    font-weight: 400;      /* Normal weight to align with description paragraphs */
+    color: #333;           /* Consistent text color */
+}
+
+/* --- Label Position Variants --- */
+
+/* Top positioned labels */
+.event-wizard-input-group.label-position-top {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.event-wizard-input-group.label-position-top label {
+    margin-right: 0;
+    margin-bottom: 0.5rem;
+    width: 100%;
+}
+
+/* Left positioned labels (default behavior) */
+.event-wizard-input-group.label-position-left {
+    flex-direction: row;
+    align-items: center;
+}
+
+.event-wizard-input-group.label-position-left label {
+    margin-right: 0.75rem;
+    margin-bottom: 0;
+    text-align: right;
+}
+
+/* Right positioned labels */
+.event-wizard-input-group.label-position-right {
+    flex-direction: row-reverse;
+    align-items: center;
+}
+
+.event-wizard-input-group.label-position-right label {
+    margin-right: 0;
+    margin-left: 0.75rem;
+    text-align: right;
+}
+
+/* Bottom positioned labels */
+.event-wizard-input-group.label-position-bottom {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.event-wizard-input-group.label-position-bottom label {
+    margin-right: 0;
+    margin-top: 0.5rem;
+    width: 100%;
+    order: 2;
+}
+
+.event-wizard-input-group input {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.6rem !important;
+    font-size: 0.9rem !important;
+    display: block;
+}
+
+/* Default left positioning: push input to the right */
+.event-wizard-input-group.label-position-left input,
+.event-wizard-input-group:not([class*="label-position"]) input {
+    margin-left: auto;
+}
+
+/* Top and bottom positioning: don't override input widths */
+.event-wizard-input-group.label-position-top input,
+.event-wizard-input-group.label-position-bottom input {
+    margin-left: 0;
+}
+
+/* Right positioning: input stays on left side */
+.event-wizard-input-group.label-position-right input {
+    margin-left: 0;
+}
+
+/* Ensure dropdowns or <select> elements follow the same positioning rules */
+.event-wizard-input-group.label-position-left .dropdown-wrapper,
+.event-wizard-input-group.label-position-left select,
+.event-wizard-input-group:not([class*="label-position"]) .dropdown-wrapper,
+.event-wizard-input-group:not([class*="label-position"]) select {
+    margin-left: auto;
+    display: block;
+}
+
+.event-wizard-input-group.label-position-top .dropdown-wrapper,
+.event-wizard-input-group.label-position-top select,
+.event-wizard-input-group.label-position-bottom .dropdown-wrapper,
+.event-wizard-input-group.label-position-bottom select {
+    margin-left: 0;
+    display: block;
+}
+
+.event-wizard-input-group.label-position-right .dropdown-wrapper,
+.event-wizard-input-group.label-position-right select {
+    margin-left: 0;
+    display: block;
+}
+
+.event-wizard-input-group input:focus {
+    outline: none;
+    border-color: var(--primary-color, #007bff);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.event-wizard-help {
+    font-size: 0.875rem;
+    color: #666;
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+/* --- Choice Options --- */
+.event-wizard-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 1rem 0;
+}
+
+.event-wizard-choice-option {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.6rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.event-wizard-choice-option:hover {
+    border-color: var(--primary-color, #007bff);
+    background: #f8f9fa;
+}
+
+.event-wizard-choice-option.selected {
+    border-color: var(--primary-color, #007bff);
+    background: rgba(0, 123, 255, 0.1);
+}
+
+.event-wizard-choice-option input[type="radio"] {
+    display: none;
+}
+
+.event-wizard-choice-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: #333;
+    font-size: 0.95rem;
+    text-align: center;
+    display: block;
+}
+
+.event-wizard-choice-description {
+    font-size: 0.875rem;
+    color: #666;
+    text-align: center;
+    display: block;
+}
+
+
+
+
+
+
+
+/* --- Selection Modal --- */
+.event-wizard-selection-modal {
+    max-width: 500px;
+}
+
+.event-wizard-selection-subtitle {
+    margin: 0.5rem 0 0 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.wizard-selection-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* --- Selection grid (first page) --- */
+.wizard-selection-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.7rem;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+  text-align: center;
+  box-shadow: inset 0 0 6px 1px rgba(0,0,0,0.06);
+}
+
+.wizard-selection-option:hover {
+    border-color: var(--primary-color, #007bff);
+    background: #f8f9fa;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.wizard-option-content h4 {
+    margin: 0 0 0.25rem 0;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.wizard-option-category {
+    margin: 0;
+    color: #666;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* --- Period Input Styles --- */
+.wizard-period-inputs {
+    display: flex;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.wizard-period-from,
+.wizard-period-to {
+    flex: 1;
+}
+
+.wizard-period-inputs label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.wizard-period-inputs input {
+    width: 6ch;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.wizard-period-inputs input:focus {
+    outline: none;
+    border-color: var(--primary-color, #007bff);
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Period inputs inherit label positioning from their parent input groups */
+.event-wizard-input-group.label-position-left .wizard-period-from,
+.event-wizard-input-group.label-position-left .wizard-period-to {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.event-wizard-input-group.label-position-left .wizard-period-inputs label {
+    margin-bottom: 0;
+    margin-right: 0.5rem;
+    white-space: nowrap;
+}
+
+.event-wizard-input-group.label-position-right .wizard-period-from,
+.event-wizard-input-group.label-position-right .wizard-period-to {
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.event-wizard-input-group.label-position-right .wizard-period-inputs label {
+    margin-bottom: 0;
+    margin-left: 0.5rem;
+    white-space: nowrap;
+}
+
+.event-wizard-input-group.label-position-bottom .wizard-period-inputs label {
+    order: 2;
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+}
+
+/* --- Summary Styles --- */
+.wizard-summary-details {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.wizard-summary-text {
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+/* --- Mortgage Styles --- */
+.wizard-mortgage-details {
+    margin: 1rem 0;
+}
+
+.wizard-mortgage-calculation {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.calculation-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    padding: 0.25rem 0;
+    border-bottom: none;
+}
+
+.calculation-row:last-child {
+    margin-bottom: 0;
+    font-weight: 600;
+    border-top: 2px solid #dee2e6;
+    border-bottom: none;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.calculation-total {
+    font-weight: 600;
+    border-top: 2px solid #dee2e6;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.calculation-payment {
+    color: var(--primary-color, #007bff);
+    font-weight: 600;
+}
+
+/* --- Category shading (like event table) --- */
+.wizard-category-income {
+  box-shadow: inset 0 0 6px 1px rgba(76, 175, 80, 0.4) !important; /* green */
+}
+.wizard-category-expense {
+  box-shadow: inset 0 0 6px 1px rgba(239, 83, 80, 0.4) !important; /* red */
+}
+.wizard-category-property {
+  box-shadow: inset 0 0 6px 1px rgba(66, 165, 245, 0.4) !important; /* blue */
+}
+.wizard-category-investment {
+  box-shadow: inset 0 0 6px 1px rgba(251, 192, 45, 0.4) !important; /* yellow */
+}
+
+/* --- Stronger modal shading after category selected --- */
+.wizard-modal-category.wizard-category-income {
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.45), 0 0 16px 6px rgba(76, 175, 80, 0.35) !important;
+}
+.wizard-modal-category.wizard-category-expense {
+  box-shadow: 0 0 0 3px rgba(239, 83, 80, 0.45), 0 0 16px 6px rgba(239, 83, 80, 0.35) !important;
+}
+.wizard-modal-category.wizard-category-property {
+  box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.45), 0 0 16px 6px rgba(66, 165, 245, 0.35) !important;
+}
+.wizard-modal-category.wizard-category-investment {
+  box-shadow: 0 0 0 3px rgba(251, 192, 45, 0.55), 0 0 16px 6px rgba(251, 192, 45, 0.45) !important;
+}
+
+/* --- Input sizing by content type --- */
+.currency-input {
+  width: 15ch;
+}
+
+.percentage-input {
+  width: 6ch;
+}
+
+.age-input {
+  width: 6ch;
+}
+
+/* Name and description fields should be wider */
+input[name="alias"],
+input[name="description"] {
+  width: 40ch;
+}
+
+/* --- Validation Styles --- */
+.wizard-validation-message {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    display: block;
+}
+
+.wizard-validation-message.error {
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+}
+
+.wizard-validation-message.warning {
+    color: #856404;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+}
+
+.event-wizard-modal input.validation-error {
+    border-color: var(--error-color);
+    box-shadow: 0 0 0 0.2rem rgba(255, 128, 128, 0.25);
+}
+
+.event-wizard-modal input.validation-warning {
+    border-color: var(--warning-color);
+    box-shadow: 0 0 0 0.2rem rgba(255, 224, 102, 0.25);
+}
+
+/* --- Dropdown wrapper for validation compatibility --- */
+.dropdown-wrapper {
+    display: inline-block;
+}
+
+.dropdown-wrapper.warning .dd-toggle {
+    background-color: var(--warning-color);
+}
+
+/* --- Period age/year inputs override flex expansion --- */
+.wizard-period-inputs .wizard-period-from input,
+.wizard-period-inputs .wizard-period-to input {
+  width: 6ch;
+  flex: 0 0 auto; /* stop flex stretching */
+}
+
+/* --- Mobile responsiveness --- */
+@media (max-width: 768px) {
+  .event-wizard-modal {
+    width: 95%;
+    max-width: 95vw; /* ensure it never exceeds viewport */
+    max-height: 90vh;
+  }
+
+  .event-wizard-step-header,
+  .event-wizard-step-body,
+  .event-wizard-step-footer {
+      padding: 1rem;
+  }
+
+  .event-wizard-buttons {
+      flex-direction: row; /* keep buttons side-by-side on small screens */
+  }
+
+  .event-wizard-button {
+      width: auto; /* prevent buttons from stretching full width */
+  }
+
+  .wizard-period-inputs {
+      flex-direction: column;
+      gap: 0.75rem;
+  }
+  /* Compact spacing on small screens so navigation buttons stay visible */
+  .event-wizard-input-group,
+  .wizard-mortgage-details {
+      margin: 0.5rem 0;
+  }
+
+  .wizard-mortgage-calculation {
+      margin-bottom: 0.75rem;
+      padding: 0.75rem;
+  }
+
+  /* Reduce body padding for additional vertical space */
+  .event-wizard-step-body {
+      padding: 0.75rem;
+  }
+}

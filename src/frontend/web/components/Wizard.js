@@ -134,7 +134,7 @@ class Wizard {
     const rowId = row.dataset.rowId;
 
     const typeInputHidden = row.querySelector(`input.event-type`);
-    const nameInput = row.querySelector(`input#EventName_${rowId}`);
+    const nameInput = row.querySelector(`input#EventAlias_${rowId}`);
     const amountInput = row.querySelector(`input#EventAmount_${rowId}`);
     const fromAgeInput = row.querySelector(`input#EventFromAge_${rowId}`);
     const toAgeInput = row.querySelector(`input#EventToAge_${rowId}`);
@@ -914,11 +914,13 @@ class Wizard {
 
   // Detect if we're on a mobile device
   detectMobile() {
+    if (window.DeviceUtils && window.DeviceUtils.isMobile) {
+      return window.DeviceUtils.isMobile();
+    }
     const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const hasTouchSupport = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     const isSmallScreen = window.innerWidth <= 768;
     const isMobileViewport = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    
     return isMobileUserAgent || (hasTouchSupport && (isSmallScreen || isMobileViewport));
   }
 

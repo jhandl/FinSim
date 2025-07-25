@@ -171,14 +171,6 @@ class TestWizard {
     this.wizardActive = false;
   }
 
-  async start(fromStep = undefined) {
-    // Simplified implementation for testing
-    this.currentTourId = 'full';
-    return Promise.resolve();
-  }
-
-
-
   async start(options = {}) {
     // Handle backward compatibility: if called without options or with just a number (fromStep),
     // treat it as the original start() method behavior (help tour)
@@ -772,3 +764,4 @@ describe('Wizard Component', () => {
     });
   });
 });
+

@@ -10,8 +10,20 @@ class EventWizardManager {
     this.wizardState = {};
     this.isActive = false;
     this.renderer = new EventWizardRenderer(webUI);
+    // Store cleanup for viewport resize listener
+    this._viewportCleanup = null;
+    // Track if keyboard is active to keep modal pinned across steps
+    this._keyboardActive = false;
+    // Detect mobile once using shared utility
+    this.isMobile = (window.DeviceUtils && window.DeviceUtils.isMobile) ? window.DeviceUtils.isMobile() : true;
+    // BEGIN ADD: timestamp of last successful nextStep call to suppress accidental double-advances
+    this._lastNextStep = 0;
+    // END ADD
+    this._pendingNextTimeouts = []; // Store any auto-advance timeouts to cancel on navigation
     this.loadWizardConfiguration();
   }
+
+  // detectMobile helper removed – use DeviceUtils instead
 
   async loadWizardConfiguration() {
     try {
@@ -149,6 +161,12 @@ class EventWizardManager {
     // Create modal container
     const modal = document.createElement('div');
     modal.className = 'wizard-modal event-wizard-modal';
+
+    // Add category-based class for stronger shading on subsequent pages
+    if (this.currentWizard && this.currentWizard.category) {
+      const catClass = `wizard-category-${this.currentWizard.category}`;
+      modal.classList.add('wizard-modal-category', catClass);
+    }
     modal.id = 'eventWizardModal';
 
     // Create modal content
@@ -157,6 +175,57 @@ class EventWizardManager {
 
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
+
+    // --- Ensure modal height fits within visible viewport (keyboard safe) ---
+    if (this._viewportCleanup) {
+      // Remove any previous listener first
+      this._viewportCleanup();
+      this._viewportCleanup = null;
+    }
+    this._viewportCleanup = this.setupViewportResizeListener(modal, overlay);
+
+    // Helper to determine if an element triggers the soft keyboard
+    const isTextualInput = (el) => {
+      if (!el) return false;
+      if (el.tagName === 'TEXTAREA') return true;
+      if (el.tagName === 'INPUT') {
+        const badTypes = ['radio', 'checkbox', 'hidden', 'range', 'button', 'submit', 'reset', 'file', 'color', 'date', 'datetime-local', 'month', 'time', 'week'];
+        const type = el.getAttribute('type')?.toLowerCase() || 'text';
+        return !badTypes.includes(type);
+      }
+      return false;
+    };
+
+    // Toggle keyboard-active class on overlay when inputs gain / lose focus
+    const keyboardActivate = (e) => {
+      if (!this.isMobile) return; // desktop: ignore
+      if (!isTextualInput(e.target)) return;
+      this._keyboardActive = true;
+      overlay.classList.add('keyboard-active');
+    };
+
+    const keyboardDeactivate = () => {
+      if (!this.isMobile) return;
+      setTimeout(() => {
+        const active = document.activeElement;
+        const stillInside = overlay.contains(active) && isTextualInput(active);
+        if (!stillInside) {
+          overlay.classList.remove('keyboard-active');
+          this._keyboardActive = false;
+        }
+      }, 100);
+    };
+
+    overlay.addEventListener('focusin', keyboardActivate);
+    overlay.addEventListener('focusout', keyboardDeactivate);
+
+    // Store for cleanup
+    this._keyboardFocusHandlers = { overlay, keyboardActivate, keyboardDeactivate };
+
+    // If keyboard was active on previous step, keep modal pinned immediately
+    if (this._keyboardActive) {
+      overlay.classList.add('keyboard-active');
+    }
 
     // Add event listeners
     this.setupModalEventListeners(overlay, modal, step);
@@ -168,6 +237,39 @@ class EventWizardManager {
         firstInput.focus();
       }
     }, 100);
+
+    // If the current step has no input elements, ensure the modal is centered
+    // even if the previous step had the keyboard active.
+    if (!this.isMobile || !modal.querySelector('input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="color"]):not([type="date"]):not([type="datetime-local"]):not([type="month"]):not([type="time"]):not([type="week"], textarea')) {
+      overlay.classList.remove('keyboard-active');
+      this._keyboardActive = false;
+    }
+  }
+
+  /**
+   * Sets up a resize listener that keeps the wizard modal inside the visible
+   * viewport (e.g. above the on-screen keyboard). Returns a cleanup function.
+   * @param {HTMLElement} modal
+   * @returns {Function} cleanup callback to remove the listener
+   */
+  setupViewportResizeListener(modal, overlay) {
+    if (!modal) return () => {};
+
+    const viewport = window.visualViewport || window;
+
+    const resize = () => {
+      const visibleHeight = window.visualViewport
+        ? window.visualViewport.height
+        : window.innerHeight;
+      modal.style.maxHeight = Math.round(visibleHeight * 0.9) + 'px';
+    };
+
+    // Initial adjustment
+    resize();
+
+    viewport.addEventListener('resize', resize);
+
+    return () => viewport.removeEventListener('resize', resize);
   }
 
   /**
@@ -261,11 +363,7 @@ class EventWizardManager {
     const container = document.createElement('div');
     container.className = 'event-wizard-intro';
 
-    if (step.content.icon) {
-      const icon = document.createElement('div');
-      icon.className = `event-wizard-icon event-wizard-icon-${step.content.icon}`;
-      container.appendChild(icon);
-    }
+
 
     const text = document.createElement('p');
     text.textContent = step.content.text;
@@ -281,35 +379,45 @@ class EventWizardManager {
     const container = document.createElement('div');
     container.className = 'event-wizard-input';
 
-    // Description text
-    const description = document.createElement('p');
-    description.textContent = step.content.text;
-    container.appendChild(description);
-
     // Input field
     const inputGroup = document.createElement('div');
     inputGroup.className = 'event-wizard-input-group';
 
+    // Apply label positioning class if specified
+    const labelPosition = step.labelPosition || 'left'; // default to left
+    inputGroup.classList.add(`label-position-${labelPosition}`);
+
+    // Create label element for all positioning types
+    const label = document.createElement('label');
+    const idSuffix = step.field === 'name' ? 'alias' : step.field;
+    label.htmlFor = `wizard-${idSuffix}`;
+    label.textContent = this.renderer.processTextVariables(step.content.text, this.wizardState);
+
     const input = document.createElement('input');
-    input.type = step.content.inputType === 'currency' ? 'text' : 
+    input.type = step.content.inputType === 'currency' ? 'text' :
                  step.content.inputType === 'percentage' ? 'text' : 'text';
-    input.id = `wizard-${step.field}`;
-    input.name = step.field;
+    input.id = `wizard-${idSuffix}`;
+    input.name = idSuffix;
     input.placeholder = step.content.placeholder || '';
-    
+
     // Set current value if exists
     const currentValue = this.wizardState.data[step.field];
     if (currentValue !== undefined) {
       input.value = currentValue;
     }
 
-    // Add input formatting for currency/percentage
+    // Add input formatting for currency/percentage/age
     if (step.content.inputType === 'currency') {
       input.className = 'currency-input';
     } else if (step.content.inputType === 'percentage') {
       input.className = 'percentage-input';
+    } else if (step.content.inputType === 'age') {
+      input.className = 'age-input';
     }
 
+    // Add label and input to group in the correct order
+    // (CSS will handle the visual positioning)
+    inputGroup.appendChild(label);
     inputGroup.appendChild(input);
     container.appendChild(inputGroup);
 
@@ -317,13 +425,19 @@ class EventWizardManager {
     if (step.content.help) {
       const help = document.createElement('div');
       help.className = 'event-wizard-help';
-      help.textContent = step.content.help;
+      help.textContent = this.renderer.processTextVariables(step.content.help, this.wizardState);
       container.appendChild(help);
     }
 
-    // Add input event listener to save value and validate
+    // Add input event listener: only update state and clear validation while typing
     input.addEventListener('input', () => {
       this.wizardState.data[step.field] = input.value;
+      // Clear any existing validation styling/message while user is actively editing
+      this.clearWizardFieldValidation(input);
+    });
+
+    // Validate when the user leaves the field (blur) to give feedback after editing
+    input.addEventListener('blur', () => {
       this.validateWizardField(input, step.field, step.content.inputType);
     });
 
@@ -331,7 +445,9 @@ class EventWizardManager {
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        this.nextStep();
+        // Force blur so validation runs before attempting to advance
+        input.blur();
+        this.nextStep('input');
       }
     });
 
@@ -389,31 +505,28 @@ class EventWizardManager {
       choiceElement.appendChild(radio);
       choiceElement.appendChild(label);
 
-      // Add click handler
-      choiceElement.addEventListener('click', (e) => {
-        // Prevent double-clicks
-        if (choiceElement.classList.contains('selected')) {
-          return;
+      // Add click handler: advance immediately without timers
+      choiceElement.addEventListener('click', () => {
+        const alreadySelected = choiceElement.classList.contains('selected');
+
+        if (!alreadySelected) {
+          // Clear other selections
+          choicesContainer.querySelectorAll('.event-wizard-choice-option').forEach(opt => {
+            opt.classList.remove('selected');
+            opt.querySelector('input').checked = false;
+          });
+
+          // Select this option
+          choiceElement.classList.add('selected');
+          radio.checked = true;
+          this.wizardState.data[step.stepId] = choice.value;
+
+          // Handle special cases when choices are made
+          this.handleChoiceSpecialCases(step.stepId, choice.value);
         }
 
-        // Clear other selections
-        choicesContainer.querySelectorAll('.event-wizard-choice-option').forEach(opt => {
-          opt.classList.remove('selected');
-          opt.querySelector('input').checked = false;
-        });
-
-        // Select this option
-        choiceElement.classList.add('selected');
-        radio.checked = true;
-        this.wizardState.data[step.stepId] = choice.value;
-
-        // Handle special cases when choices are made
-        this.handleChoiceSpecialCases(step.stepId, choice.value);
-
-        // Auto-advance to next step after a short delay for visual feedback
-        setTimeout(() => {
-          this.nextStep();
-        }, 300);
+        // Proceed to next step immediately (duplicate rapid calls are already guarded in nextStep)
+        this.nextStep('choice');
       });
 
       choicesContainer.appendChild(choiceElement);
@@ -430,7 +543,13 @@ class EventWizardManager {
     const container = document.createElement('div');
     container.className = 'event-wizard-buttons';
 
-    const buttons = step.showButtons || ['back', 'next'];
+    let buttons = step.showButtons || ['back', 'next'];
+
+    // BEGIN ADD: For choice steps, remove 'next' button so user must make a selection
+    if (step.contentType === 'choice') {
+      buttons = buttons.filter(btn => btn !== 'next');
+    }
+    // END ADD
 
     buttons.forEach(buttonType => {
       const button = document.createElement('button');
@@ -444,7 +563,13 @@ class EventWizardManager {
           break;
         case 'next':
           button.textContent = 'Next';
-          button.addEventListener('click', () => this.nextStep());
+          button.addEventListener('click', () => {
+            // Trigger blur on active element so its validation fires first
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+              document.activeElement.blur();
+            }
+            this.nextStep('button');
+          });
           break;
         case 'create':
           button.textContent = 'Create Event';
@@ -470,10 +595,111 @@ class EventWizardManager {
   }
 
   // Navigation methods
-  nextStep() {
+  nextStep(origin = 'unknown') {
+    // BEGIN ADD: suppress duplicate rapid calls (e.g. duplicate click bubbling) RIGHT AT ENTRY
+    // ----- Block navigation if current modal still has validation errors -----
+    const activeModal = document.getElementById('eventWizardModal');
+    if (activeModal && activeModal.querySelector('.validation-error')) {
+      return;
+    }
+    const now = Date.now();
+    if (now - (this._lastNextStep || 0) < 200) {
+      return; // Ignore rapid duplicate invocation
+    }
+    this._lastNextStep = now;
+
+    // BEGIN ADD: Required field validation for current step before advancing
+    if (this.currentWizard && this.currentWizard.steps) {
+      const currentStepConfig = this.currentWizard.steps[this.currentStep];
+
+      // Only validate when moving FORWARD (next button / Enter key auto-advance)
+      // We skip validation when current step is the last visible summary step where createEvent() takes over.
+      if (currentStepConfig && currentStepConfig.contentType === 'input') {
+        const validationRules = (currentStepConfig.content && currentStepConfig.content.validation) || '';
+        const rules = validationRules.split('|').map(r => r.trim());
+
+        if (rules.includes('required')) {
+          const fieldName = currentStepConfig.field;
+          const value = (this.wizardState.data && this.wizardState.data[fieldName]) || '';
+
+          if (!value || value.toString().trim() === '') {
+            const modal = document.getElementById('eventWizardModal');
+            if (modal) {
+              const idSuffix = fieldName === 'name' ? 'alias' : fieldName;
+              const inputEl = modal.querySelector(`#wizard-${idSuffix}`);
+              if (inputEl) {
+                // Clear any previous validation on this input first
+                this.clearWizardFieldValidation(inputEl);
+                this.showWizardFieldValidation(inputEl, 'This field is required');
+                inputEl.focus();
+              }
+            }
+            return; // Prevent advancing to the next step until field is filled
+          }
+        }
+
+        // Optional: handle positive numeric rule (e.g. "required|positive")
+        if (rules.includes('positive')) {
+          const fieldName = currentStepConfig.field;
+          const value = (this.wizardState.data && this.wizardState.data[fieldName]) || '';
+          if (value && value.toString().trim() !== '') {
+            // Determine validation type from inputType
+            const inputType = (currentStepConfig.content && currentStepConfig.content.inputType) || '';
+            let numeric = null;
+            if (inputType === 'currency') {
+              numeric = ValidationUtils.validateValue('money', value);
+            } else if (inputType === 'percentage') {
+              numeric = ValidationUtils.validateValue('percentage', value);
+            }
+            if (numeric !== null && numeric <= 0) {
+              const modal = document.getElementById('eventWizardModal');
+              if (modal) {
+                const idSuffix = fieldName === 'name' ? 'alias' : fieldName;
+                const inputEl = modal.querySelector(`#wizard-${idSuffix}`);
+                if (inputEl) {
+                  this.clearWizardFieldValidation(inputEl);
+                  this.showWizardFieldValidation(inputEl, 'Value must be positive');
+                  inputEl.focus();
+                }
+              }
+              return; // Prevent advance
+            }
+          }
+        }
+      }
+      // Validate period steps (fromAge/toAge relationship) right before advancing
+      else if (currentStepConfig && currentStepConfig.contentType === 'period') {
+        const fromVal = (this.wizardState.data && this.wizardState.data.fromAge) || '';
+        const toVal = (this.wizardState.data && this.wizardState.data.toAge) || '';
+
+        // Only check relationship if both values are present
+        if (fromVal && toVal) {
+          const relationship = ValidationUtils.validateAgeRelationship(fromVal, toVal);
+          if (!relationship.isValid) {
+            const modal = document.getElementById('eventWizardModal');
+            if (modal) {
+              const toInputEl = modal.querySelector('#wizard-toAge');
+              if (toInputEl) {
+                this.clearWizardFieldValidation(toInputEl);
+                this.showWizardFieldValidation(toInputEl, relationship.message);
+                toInputEl.focus();
+              }
+            }
+            return; // Prevent advancing until relationship is valid
+          }
+        }
+      }
+    }
+    // END ADD: validation logic
     if (!this.currentWizard || !this.currentWizard.steps) {
       console.error('Cannot navigate: currentWizard or steps not available');
       return;
+    }
+
+    // Cancel any still-pending auto-advance timers from the previous step
+    if (this._pendingNextTimeouts && this._pendingNextTimeouts.length) {
+      this._pendingNextTimeouts.forEach(t => clearTimeout(t));
+      this._pendingNextTimeouts = [];
     }
 
     // Find next valid step (skip steps that don't meet conditions)
@@ -668,21 +894,37 @@ class EventWizardManager {
   handleSpecialCases() {
     const data = this.wizardState.data;
 
-    // For one-time expenses, change event type to E1 and set appropriate fields
-    if (this.wizardState.eventType === 'E' && data.type === 'oneoff') {
-      // Change event type to E1 for one-off expenses
-      this.wizardState.eventType = 'E1';
-      // Set toAge equal to fromAge for one-time expenses
-      data.toAge = data.fromAge;
-      // Set growth rate to blank for one-time expenses (uses inflation rate)
-      data.rate = '';
+    // For one-time expenses or frequency-based adjustments
+    if (this.wizardState.eventType === 'E') {
+      const freq = data.frequency || 'yearly';
+
+      // Convert entered amount to an annual figure for weekly or monthly frequencies
+      const parseAmount = (val) => {
+        const num = parseFloat(String(val).replace(/[^0-9.]/g, ''));
+        return isNaN(num) ? 0 : num;
+      };
+
+      let annualAmount = parseAmount(data.amount);
+      if (freq === 'weekly') {
+        annualAmount *= 52;
+      } else if (freq === 'monthly') {
+        annualAmount *= 12;
+      }
+      // Round to nearest integer to keep consistent formatting
+      data.amount = Math.round(annualAmount);
+
+      // Handle one-off expenses
+      if (freq === 'oneoff') {
+        // Set isOneOff for one-off expenses
+        data.isOneOff = true;
+        data.toAge = data.fromAge;
+        data.rate = '';
+      }
     }
 
-    // For E1 (one-off expense) events, set toAge equal to fromAge and growth rate to blank
-    if (this.wizardState.eventType === 'E1') {
-      // Set toAge equal to fromAge for one-off expenses
+    // Ensure one-off events still follow single-age rules
+    if (data.isOneOff) {
       data.toAge = data.fromAge;
-      // Set growth rate to blank for one-off expenses (uses inflation rate)
       data.rate = '';
     }
 
@@ -734,10 +976,13 @@ class EventWizardManager {
       return false;
     }
 
-    const amountValidation = ValidationUtils.validateRequired(data.amount, 'Amount');
-    if (!amountValidation.isValid) {
-      alert(amountValidation.message);
-      return false;
+    // Skip amount validation for Stock Market events which do not use an amount field
+    if (this.wizardState.eventType !== 'SM') {
+      const amountValidation = ValidationUtils.validateRequired(data.amount, 'Amount');
+      if (!amountValidation.isValid) {
+        alert(amountValidation.message);
+        return false;
+      }
     }
 
     const fromAgeValidation = ValidationUtils.validateRequired(data.fromAge, 'Starting age/year');
@@ -747,9 +992,11 @@ class EventWizardManager {
     }
 
     // Validate numeric values
-    if (ValidationUtils.validateValue('money', data.amount) === null) {
-      alert('Please enter a valid amount');
-      return false;
+    if (this.wizardState.eventType !== 'SM') {
+      if (ValidationUtils.validateValue('money', data.amount) === null) {
+        alert('Please enter a valid amount');
+        return false;
+      }
     }
 
     if (ValidationUtils.validateValue('age', data.fromAge) === null) {
@@ -771,12 +1018,16 @@ class EventWizardManager {
       }
     }
 
-    // Validate rate if present
+    // Validate rate
     if (data.rate && data.rate.trim() !== '') {
       if (ValidationUtils.validateValue('percentage', data.rate) === null) {
         alert('Please enter a valid rate');
         return false;
       }
+    } else if (this.wizardState.eventType === 'SM') {
+      // For Stock Market events, rate is mandatory
+      alert('Market growth value is required');
+      return false;
     }
 
     // Validate match if present
@@ -874,11 +1125,28 @@ class EventWizardManager {
       overlay.remove();
     }
 
+    // Clean up viewport resize listener if present
+    if (this._viewportCleanup) {
+      this._viewportCleanup();
+      this._viewportCleanup = null;
+    }
+
+    // Remove focus handlers if present
+    if (this._keyboardFocusHandlers) {
+      const { overlay, keyboardActivate, keyboardDeactivate } = this._keyboardFocusHandlers;
+      overlay.removeEventListener('focusin', keyboardActivate);
+      overlay.removeEventListener('focusout', keyboardDeactivate);
+      this._keyboardFocusHandlers = null;
+    }
+
     // Complete reset of wizard state
     this.isActive = false;
     this.currentWizard = null;
     this.currentStep = 0;
     this.wizardState = {};
+    // BEGIN ADD: clear duplicate-guard timestamp
+    this._lastNextStep = 0;
+    // END ADD
 
     // Remove event listeners
     document.removeEventListener('keydown', this.handleKeyDown.bind(this));
@@ -892,5 +1160,8 @@ class EventWizardManager {
     this.currentStep = 0;
     this.wizardState = {};
     this.isActive = false;
+    // BEGIN ADD: clear duplicate-guard timestamp
+    this._lastNextStep = 0;
+    // END ADD
   }
 }

@@ -463,7 +463,7 @@ class EventsTableManager {
   }
 
   isOutflow(eventType) {
-      return ['E', 'E1'].includes(eventType); // SM handled separately
+      return ['E'].includes(eventType); // SM handled separately
   }
 
   isStockMarket(eventType) {
@@ -516,7 +516,7 @@ class EventsTableManager {
               <div id="EventTypeOptions_${rowId}" class="visualization-dropdown" style="display:none;"></div>
           </div>
       </td>
-      <td><input type="text" id="EventName_${rowId}" class="event-name" value="${name}"></td>
+      <td><input type="text" id="EventAlias_${rowId}" class="event-name" value="${name}"></td>
       <td><input type="text" id="EventAmount_${rowId}" class="event-amount currency" inputmode="numeric" pattern="[0-9]*" step="1000" value="${amount}"></td>
       <td><input type="text" id="EventFromAge_${rowId}" class="event-from-age" inputmode="numeric" pattern="[0-9]*" value="${fromAge}"></td>
       <td><input type="text" id="EventToAge_${rowId}" class="event-to-age" inputmode="numeric" pattern="[0-9]*" value="${toAge}"></td>
@@ -667,7 +667,6 @@ class EventsTableManager {
         { value: 'DBI', label: 'Defined Benefit Income' },
         { value: 'FI', label: 'Tax-free Income' },
         { value: 'E', label: 'Expense' },
-        { value: 'E1', label: 'One-off Expense' },
         { value: 'R', label: 'Real Estate' },
         { value: 'M', label: 'Mortgage' },
         { value: 'SM', label: 'Stock Market' },
@@ -1037,16 +1036,10 @@ class EventsTableManager {
       const option = document.createElement('div');
       option.className = 'wizard-selection-option';
       option.dataset.eventType = wizard.eventType;
-
-      // Get category color
-      const wizardManager = this.webUI.eventWizardManager;
-      const categoryConfig = wizardManager.wizardData.WizardConfig?.categories?.[wizard.category];
-      const categoryColor = categoryConfig?.color || '#007bff';
+      option.dataset.category = wizard.category; // expose category to CSS
+      option.classList.add(`wizard-category-${wizard.category}`);
 
       option.innerHTML = `
-        <div class="wizard-option-icon" style="background-color: ${categoryColor}">
-          <i class="fas fa-${this.getCategoryIcon(wizard.category)}"></i>
-        </div>
         <div class="wizard-option-content">
           <h4>${wizard.name}</h4>
         </div>
@@ -1201,20 +1194,7 @@ class EventsTableManager {
     return result;
   }
 
-  /**
-   * Get icon for category
-   * @param {string} category - Category name
-   * @returns {string} Font Awesome icon name
-   */
-  getCategoryIcon(category) {
-    const icons = {
-      'income': 'plus-circle',
-      'expense': 'minus-circle',
-      'property': 'home',
-      'investment': 'chart-line'
-    };
-    return icons[category] || 'circle';
-  }
+
 
   /**
    * Format category name for display

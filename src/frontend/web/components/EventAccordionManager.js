@@ -222,7 +222,7 @@ class EventAccordionManager {
   }
 
   isOutflow(eventType) {
-    return ['E', 'E1'].includes(eventType);
+    return ['E'].includes(eventType);
   }
 
   isStockMarket(eventType) {
@@ -722,22 +722,6 @@ class EventAccordionManager {
             }
             break;
 
-          case 'E1': // One-off Expense
-            // Set toAge = fromAge and rate = '' (inflation)
-            if (fromAgeInput && toAgeInput && fromAgeInput.value) {
-              toAgeInput.value = fromAgeInput.value; // One-off expense
-
-              // Force a change event on toAge to ensure it's recognized as a one-off expense
-              const changeEvent = new Event('change', { bubbles: true });
-              toAgeInput.dispatchEvent(changeEvent);
-            }
-            if (rateInput) {
-              rateInput.value = ''; // Use inflation rate by default
-            }
-            if (matchInput) {
-              matchInput.value = ''; // No match for expenses
-            }
-            break;
 
           case 'R': // Real Estate (Property)
             // Property has purchase date (fromAge) and sale date (toAge)

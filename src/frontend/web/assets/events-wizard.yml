@@ -1,6 +1,13 @@
 # Events Wizard Configuration
 # This file defines wizard flows for guided event creation
 # Similar to help.yml but focused on step-by-step event creation
+#
+# Label Positioning:
+# Each step can specify a 'labelPosition' attribute to control how labels are positioned relative to input fields:
+# - "top": Label appears above the input field (default)
+# - "left": Label appears to the left of the input field
+# - "right": Label appears to the right of the input field
+# - "bottom": Label appears below the input field
 
 EventWizards:
 
@@ -51,6 +58,7 @@ EventWizards:
         title: "Name Your Income"
         contentType: "input"
         field: "name"
+        labelPosition: "top"
         content:
           text: "Give this income a descriptive name."
           validation: "required"
@@ -60,6 +68,7 @@ EventWizards:
         title: "Annual Amount"
         contentType: "input"
         field: "amount"
+        labelPosition: "left"
         content:
           text: "Enter the annual amount for this income."
           inputType: "currency"
@@ -71,20 +80,23 @@ EventWizards:
         title: "Income Period"
         contentType: "period"
         fields: ["fromAge", "toAge"]
+        labelPosition: "left"
         content:
           text: "When will you receive this income?"
           help: "Enter the age range during which you'll receive this income."
+          validation: "required|positive"
         showButtons: ["back", "next"]
 
       - stepId: "growth"
         title: "Growth Rate"
         contentType: "input"
         field: "rate"
+        labelPosition: "left"
         content:
           text: "What annual growth rate do you expect?"
           inputType: "percentage"
           validation: "optional"
-          help: "Leave blank to use inflation rate. Typical growth is 2-5% annually."
+          help: "Leave blank to use inflation rate."
           defaultValue: "inflation"
         showButtons: ["back", "next"]
         condition: "incomeType !== 'defined_benefit'"
@@ -112,7 +124,7 @@ EventWizards:
           text: "Does your employer match pension contributions? If so, up to what percentage?"
           inputType: "percentage"
           validation: "optional"
-          help: "Many employers match contributions up to 3-6% of salary. Enter 0 if no match."
+          help: "Leave blank if no match."
         showButtons: ["back", "next"]
         condition: "incomeType === 'salary' && pensionContribution === 'yes'"
 
@@ -131,49 +143,57 @@ EventWizards:
     description: "Add a regular or one-time expense"
     difficulty: "simple"
     steps:
-      - stepId: "type"
-        title: "Expense Type"
+      - stepId: "frequency"
+        title: "Expense Frequency"
         contentType: "choice"
         content:
-          text: "What type of expense is this?"
+          text: "How often does this expense occur?"
           choices:
             - value: "oneoff"
               title: "One-off"
               description: "A single expense that occurs once"
-            - value: "ongoing"
-              title: "Spanning multiple years"
-              description: "Regular ongoing expenses over multiple years"
+            - value: "weekly"
+              title: "Weekly"
+              description: "Occurs every week"
+            - value: "monthly"
+              title: "Monthly"
+              description: "Occurs every month"
+            - value: "yearly"
+              title: "Yearly"
+              description: "Occurs once per year"
         showButtons: ["back", "next"]
         
       - stepId: "name"
         title: "Name Your Expense"
         contentType: "input"
         field: "name"
+        labelPosition: "top"
         content:
           text: "Give this expense a descriptive name."
           validation: "required"
         showButtons: ["back", "next"]
         
-      - stepId: "amount"
-        title: "Annual Cost"
+      - stepId: "cost"
+        title: "Cost"
         contentType: "input"
         field: "amount"
+        labelPosition: "left"
         content:
-          text: "What's the annual cost of this expense?"
+          text: "What's the {frequency} cost of this expense?"
           inputType: "currency"
           validation: "required|positive"
-          help: "For one-time expenses, enter the total cost. For ongoing expenses, enter the yearly amount."
         showButtons: ["back", "next"]
         
       - stepId: "period"
         title: "Expense Period"
         contentType: "period"
         fields: ["fromAge", "toAge"]
+        labelPosition: "left"
         content:
           text: "During what period will you have this expense?"
-          help: "Enter the age range during which you'll have this expense."
+          validation: "required|positive"
         showButtons: ["back", "next"]
-        condition: "type !== 'oneoff'"
+        condition: "frequency !== 'oneoff'"
 
       - stepId: "timing"
         title: "When will this expense occur?"
@@ -183,9 +203,8 @@ EventWizards:
           text: "At what age will you have this one-time expense?"
           inputType: "age"
           validation: "required|positive"
-          help: "Enter the age when this expense will occur."
         showButtons: ["back", "next"]
-        condition: "type === 'oneoff'"
+        condition: "frequency === 'oneoff'"
 
       - stepId: "growth"
         title: "Cost Growth"
@@ -195,10 +214,10 @@ EventWizards:
           text: "How much do you expect this expense to grow annually?"
           inputType: "percentage"
           validation: "optional"
-          help: "Leave blank to use inflation rate. Living expenses typically grow with inflation."
+          help: "Leave blank to use inflation rate."
           defaultValue: "inflation"
         showButtons: ["back", "next"]
-        condition: "type !== 'oneoff'"
+        condition: "frequency !== 'oneoff'"
         
       - stepId: "summary"
         title: "Review & Create"
@@ -206,51 +225,6 @@ EventWizards:
         content:
           text: "Review your expense details:"
           template: "**{name}**: {amount} annually from age {fromAge} to {toAge}"
-        showButtons: ["back", "create"]
-
-  # One-off Expense Wizard (Simple Flow)
-  - eventType: "E1"
-    name: "One-off Expense"
-    category: "expense"
-    description: "Add a single, non-recurring expense"
-    difficulty: "simple"
-    steps:
-      - stepId: "name"
-        title: "Name Your Expense"
-        contentType: "input"
-        field: "name"
-        content:
-          text: "Give this one-off expense a descriptive name."
-          validation: "required"
-        showButtons: ["back", "next"]
-
-      - stepId: "amount"
-        title: "Expense Amount"
-        contentType: "input"
-        field: "amount"
-        content:
-          text: "What's the total cost of this one-off expense?"
-          inputType: "currency"
-          validation: "required|positive"
-        showButtons: ["back", "next"]
-
-      - stepId: "timing"
-        title: "When will this expense occur?"
-        contentType: "input"
-        field: "fromAge"
-        content:
-          text: "At what age will you have this expense?"
-          inputType: "age"
-          validation: "required|positive"
-          help: "Enter the age when this expense will occur."
-        showButtons: ["back", "next"]
-
-      - stepId: "summary"
-        title: "Review & Create"
-        contentType: "summary"
-        content:
-          text: "Review your one-off expense details:"
-          template: "**{name}**: {amount} at age {fromAge}"
         showButtons: ["back", "create"]
 
   # Property Purchase Wizard (Complex Flow)
@@ -276,22 +250,12 @@ EventWizards:
         title: "Property Name"
         contentType: "input"
         field: "name"
+        labelPosition: "top"
         content:
           text: "Give this property a name for your reference."
           validation: "required"
-          help: "If using a mortgage, the mortgage event will use the same name."
         showButtons: ["back", "next"]
-        
-      - stepId: "name"
-        title: "Property Name"
-        contentType: "input"
-        field: "name"
-        content:
-          text: "Give this property a name for your reference."
-          validation: "required"
-          help: "If using a mortgage, the mortgage event will use the same name."
-        showButtons: ["back", "next"]
-        
+           
       - stepId: "cash_purchase_price"
         title: "Property Purchase Price"
         contentType: "input"
@@ -300,7 +264,6 @@ EventWizards:
           text: "What's the total purchase price of the property?"
           inputType: "currency"
           validation: "required|positive"
-          help: "This is the full amount you'll pay for the property."
         showButtons: ["back", "next"]
         condition: "financing === 'cash'"
 
@@ -323,7 +286,6 @@ EventWizards:
           text: "How much will you pay as a down payment?"
           inputType: "currency"
           validation: "required|positive"
-          help: "This is the initial payment you'll make when purchasing the property."
         showButtons: ["back", "next"]
         condition: "financing === 'mortgage'"
         
@@ -331,29 +293,30 @@ EventWizards:
         title: "Purchase & Sale Timing"
         contentType: "period"
         fields: ["fromAge", "toAge"]
+        labelPosition: "left"
         content:
           text: "When will you buy and sell this property?"
-          help: "Purchase age is when you buy it. Sale age is when you sell it (leave blank if you plan to keep it)."
+          help: "If you don't plan to sell it, leave the second field blank."
+          validation: "fromAgeRequired|positive"
         showButtons: ["back", "next"]
         
       - stepId: "appreciation"
         title: "Property Appreciation"
         contentType: "input"
         field: "rate"
+        labelPosition: "left"
         content:
           text: "What annual appreciation rate do you expect?"
           inputType: "percentage"
           validation: "optional"
-          help: "Historical property appreciation is typically 2-4% annually."
-          defaultValue: "3"
         showButtons: ["back", "next"]
         
       - stepId: "mortgage_setup"
         title: "Mortgage Details"
         contentType: "mortgage"
+        labelPosition: "left"
         content:
-          text: "Now let's set up the mortgage for this property."
-          help: "We'll create a separate mortgage event linked to this property."
+          text: ""
         showButtons: ["back", "next"]
         condition: "financing === 'mortgage'"
         
@@ -363,6 +326,51 @@ EventWizards:
         content:
           text: "Review your property purchase:"
           template: "**{name}**: Purchase for {propertyValue}, down payment {amount}, from age {fromAge} to {toAge}"
+        showButtons: ["back", "create"]
+
+  # Market Event Wizard (Investment Category)
+  - eventType: "SM"
+    name: "Market Event"
+    category: "investment"
+    steps:
+      - stepId: "name"
+        title: "Name this Event"
+        contentType: "input"
+        field: "name"
+        labelPosition: "top"
+        content:
+          text: "Give this market scenario a descriptive name."
+          validation: "required"
+        showButtons: ["back", "next"]
+
+      - stepId: "period"
+        title: "Scenario Period"
+        contentType: "period"
+        fields: ["fromAge", "toAge"]
+        labelPosition: "left"
+        content:
+          text: "During which ages/years does this market scenario apply?"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+
+      - stepId: "growth"
+        title: "Total Market Growth"
+        contentType: "input"
+        field: "rate"
+        labelPosition: "left"
+        content:
+          text: "Market gain/loss over that period?"
+          inputType: "percentage"
+          validation: "required"
+          help: "Use negative percentages for declines."
+        showButtons: ["back", "next"]
+
+      - stepId: "summary"
+        title: "Review & Create"
+        contentType: "summary"
+        content:
+          text: "Review your market event:"
+          template: "**{name}**: {rate} total from age {fromAge} to {toAge}"
         showButtons: ["back", "create"]
 
 # Wizard UI Configuration
@@ -383,13 +391,9 @@ WizardConfig:
   categories:
     income:
       color: "#28a745"
-      icon: "plus-circle"
     expense:
-      color: "#dc3545" 
-      icon: "minus-circle"
+      color: "#dc3545"
     property:
       color: "#6f42c1"
-      icon: "home"
     investment:
       color: "#007bff"
-      icon: "chart-line"

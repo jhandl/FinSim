@@ -2412,8 +2412,9 @@ footer {
 /* Events Table Actions */
 .events-table-actions {
     display: flex;
-    gap: 0.75rem;
-    justify-content: flex-end;
+    flex-direction: row; /* keep buttons side-by-side on small screens */
+    gap: 0.75rem; /* match desktop spacing */
+    justify-content: flex-end; /* keep them right-aligned */
     align-items: center;
     margin-top: 1rem;
 }
@@ -2425,6 +2426,7 @@ footer {
     cursor: pointer;
     transition: all 0.2s ease;
     border: 1px solid;
+    width: auto; /* prevent full-width buttons */
 }
 
 .primary-button {
@@ -2449,394 +2451,9 @@ footer {
     border-color: #adb5bd;
 }
 
-/* Event Wizard Modal Styles */
-.wizard-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 10000;
-}
 
-.event-wizard-modal {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    width: 90%;
-    max-width: 600px;
-    max-height: 80vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
 
-.event-wizard-step-content {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
 
-.event-wizard-step-header {
-    padding: 1.5rem 1.5rem 1rem;
-    border-bottom: 1px solid #e9ecef;
-    background: #f8f9fa;
-}
-
-.event-wizard-step-header h3 {
-    margin: 0 0 0.5rem 0;
-    color: #333;
-    font-size: 1.25rem;
-}
-
-.event-wizard-progress {
-    font-size: 0.875rem;
-    color: #666;
-}
-
-.event-wizard-step-body {
-    flex: 1;
-    padding: 1.5rem;
-    overflow-y: auto;
-    background: white;
-}
-
-.event-wizard-step-footer {
-    padding: 1rem 1.5rem;
-    border-top: 1px solid #e9ecef;
-    background: #f8f9fa;
-}
-
-.event-wizard-buttons {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: flex-end;
-}
-
-.event-wizard-button {
-    padding: 0.5rem 1rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: white;
-    color: #333;
-    cursor: pointer;
-    font-size: 0.875rem;
-    transition: all 0.2s ease;
-}
-
-.event-wizard-button:hover:not(:disabled) {
-    background: #f8f9fa;
-    border-color: #adb5bd;
-}
-
-.event-wizard-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.event-wizard-button-primary {
-    background: var(--primary-color, #007bff);
-    color: white;
-    border-color: var(--primary-color, #007bff);
-}
-
-.event-wizard-button-primary:hover:not(:disabled) {
-    background: #0056b3;
-    border-color: #0056b3;
-}
-
-/* Event Wizard Content Styles */
-.event-wizard-intro {
-    text-align: center;
-}
-
-.event-wizard-icon {
-    width: 48px;
-    height: 48px;
-    margin: 0 auto 1rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    color: white;
-}
-
-.event-wizard-icon-salary {
-    background: #28a745;
-}
-
-.event-wizard-icon-expense {
-    background: #dc3545;
-}
-
-.event-wizard-icon-property {
-    background: #6f42c1;
-}
-
-.event-wizard-input-group {
-    margin: 1rem 0;
-}
-
-.event-wizard-input-group input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
-}
-
-.event-wizard-input-group input:focus {
-    outline: none;
-    border-color: var(--primary-color, #007bff);
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.event-wizard-help {
-    font-size: 0.875rem;
-    color: #666;
-    margin-top: 0.5rem;
-}
-
-.event-wizard-choices {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    margin: 1rem 0;
-}
-
-.event-wizard-choice-option {
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 1rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.event-wizard-choice-option:hover {
-    border-color: var(--primary-color, #007bff);
-    background: #f8f9fa;
-}
-
-.event-wizard-choice-option.selected {
-    border-color: var(--primary-color, #007bff);
-    background: rgba(0, 123, 255, 0.1);
-}
-
-.event-wizard-choice-option input[type="radio"] {
-    display: none;
-}
-
-.event-wizard-choice-title {
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-    color: #333;
-}
-
-.event-wizard-choice-description {
-    font-size: 0.875rem;
-    color: #666;
-}
-
-/* Event Wizard Period Content Styles */
-.event-wizard-period-inputs {
-    display: flex;
-    gap: 1rem;
-    margin: 1rem 0;
-}
-
-.event-wizard-period-from,
-.event-wizard-period-to {
-    flex: 1;
-}
-
-/* Event Wizard Summary Content Styles */
-.event-wizard-summary-details {
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 4px;
-    padding: 1rem;
-    margin: 1rem 0;
-}
-
-.event-wizard-summary-text {
-    font-size: 0.9rem;
-    line-height: 1.5;
-}
-
-/* Event Wizard Mortgage Content Styles */
-.event-wizard-mortgage-details {
-    margin: 1rem 0;
-}
-
-.event-wizard-mortgage-calculation {
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 4px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-
-.calculation-row {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
-}
-
-.calculation-row:last-child {
-    margin-bottom: 0;
-    font-weight: 600;
-    border-top: 1px solid #dee2e6;
-    padding-top: 0.5rem;
-}
-
-/* Period Input Styles */
-.wizard-period-inputs {
-    display: flex;
-    gap: 1rem;
-    margin: 1rem 0;
-}
-
-.wizard-period-from,
-.wizard-period-to {
-    flex: 1;
-}
-
-.wizard-period-inputs label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-    color: #333;
-}
-
-.wizard-period-inputs input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
-}
-
-.wizard-period-inputs input:focus {
-    outline: none;
-    border-color: var(--primary-color, #007bff);
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-/* Summary Styles */
-.wizard-summary-details {
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 4px;
-    padding: 1rem;
-    margin: 1rem 0;
-}
-
-.wizard-summary-text {
-    font-size: 1rem;
-    line-height: 1.5;
-}
-
-/* Mortgage Styles */
-.wizard-mortgage-details {
-    margin: 1rem 0;
-}
-
-.wizard-mortgage-calculation {
-    background: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 4px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-
-.calculation-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.25rem 0;
-    border-bottom: 1px solid #e9ecef;
-}
-
-.calculation-row:last-child {
-    border-bottom: none;
-}
-
-.calculation-total {
-    font-weight: 600;
-    border-top: 2px solid #dee2e6;
-    padding-top: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-.calculation-payment {
-    color: var(--primary-color, #007bff);
-    font-weight: 600;
-}
-
-/* Event Wizard Selection Modal */
-.event-wizard-selection-modal {
-    max-width: 500px;
-}
-
-.event-wizard-selection-subtitle {
-    margin: 0.5rem 0 0 0;
-    color: #666;
-    font-size: 0.9rem;
-}
-
-.wizard-selection-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.wizard-selection-option {
-    display: flex;
-    align-items: center;
-    padding: 1rem;
-    border: 1px solid #e9ecef;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    background: white;
-}
-
-.wizard-selection-option:hover {
-    border-color: var(--primary-color, #007bff);
-    background: #f8f9fa;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.wizard-option-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 1rem;
-    color: white;
-    font-size: 1.25rem;
-}
-
-.wizard-option-content h4 {
-    margin: 0 0 0.25rem 0;
-    color: #333;
-    font-size: 1rem;
-}
-
-.wizard-option-category {
-    margin: 0;
-    color: #666;
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
 
 /* Events Accordion Styles */
 .events-accordion-container {
@@ -3121,6 +2738,7 @@ footer {
     justify-self: start;
     text-align: left;
     white-space: nowrap;
+    margin-left: 0.5rem; /* Added extra spacing between amount and period */
 }
 
 /* When wrapping is needed, revert to old behavior with title and details rows */
@@ -3167,6 +2785,7 @@ footer {
 
 .events-accordion-container.force-wrap .event-summary-period {
     color: #6c757d;
+    margin-left: 0; /* Reset margin for wrapped layout */
 }
 
 .event-summary-title {
@@ -3411,36 +3030,7 @@ footer {
     }
 }
 
-/* Wizard validation styles */
-.wizard-validation-message {
-    font-size: 0.75rem;
-    margin-top: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    display: block;
-}
 
-.wizard-validation-message.error {
-    color: #721c24;
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-}
-
-.wizard-validation-message.warning {
-    color: #856404;
-    background-color: #fff3cd;
-    border: 1px solid #ffeaa7;
-}
-
-.event-wizard-modal input.validation-error {
-    border-color: var(--error-color);
-    box-shadow: 0 0 0 0.2rem rgba(255, 128, 128, 0.25);
-}
-
-.event-wizard-modal input.validation-warning {
-    border-color: var(--warning-color);
-    box-shadow: 0 0 0 0.2rem rgba(255, 224, 102, 0.25);
-}
 
 /* Dropdown wrapper for validation compatibility */
 .dropdown-wrapper {
@@ -3517,30 +3107,6 @@ footer {
 
 /* Mobile responsiveness */
 @media (max-width: 768px) {
-    .event-wizard-modal {
-        width: 95%;
-        max-height: 90vh;
-    }
-
-    .event-wizard-step-header,
-    .event-wizard-step-body,
-    .event-wizard-step-footer {
-        padding: 1rem;
-    }
-
-    .event-wizard-buttons {
-        flex-direction: column;
-    }
-
-    .event-wizard-button {
-        width: 100%;
-    }
-
-    .wizard-period-inputs {
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-
     /* Accordion mobile styles */
 
     .accordion-item-header {
@@ -3570,6 +3136,17 @@ footer {
 
     .events-table-actions button {
         width: 100%;
+    }
+
+    /* --- Override: Keep wizard/add-event buttons inline on mobile --- */
+    .events-table-actions {
+        flex-direction: row !important; /* side-by-side */
+        gap: 0.75rem !important; /* consistent spacing */
+        justify-content: flex-end !important; /* right align */
+    }
+
+    .events-table-actions button {
+        width: auto !important; /* prevent full-width buttons */
     }
 }
 

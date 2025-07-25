@@ -27,26 +27,36 @@ class ValidationUtils {
     switch (type) {
       case 'money':
       case 'currency': {
-        let s = str.replace(/[,\s]/g, '');
-        s = s.replace(/^[€\$]/, '');
+        // Strip common formatting characters and leading currency symbols
+        let s = str.replace(/[\s,]/g, '');
+        s = s.replace(/^[€£\$]/, '');
+
+        // Detect multiplier suffix (K, M, k, m)
         let multiplier = 1;
         if (/[Kk]$/.test(s)) {
           multiplier = 1000;
-          s = s.slice(0, -1);
-        } else if (/[Mm]{1,2}$/.test(s)) {
+          s = s.slice(0,  -1);
+        } else if (/[Mm]{2}$/.test(s)) {
           multiplier = 1000000;
-          s = s.replace(/[Mm]/, '');
+          s = s.slice(0, -2);
+        } else if (/[Mm]$/.test(s)) {
+          multiplier = 1000000;
+          s = s.slice(0, -1);
         }
+
+        // Allow optional leading minus sign and exactly one decimal point, no other characters
+        // e.g. "-1200", "1000.50", "1.5" (after suffix removed)
+        if (!/^-?\d+(?:\.\d+)?$/.test(s)) return null;
+
         const num = parseFloat(s);
-        if (isNaN(num)) return null;
         return num * multiplier;
       }
       case 'percentage': {
-        let s = str.replace(/%/g, '');
-        s = s.replace(/\s+/g, '');
+        let s = str.replace(/%/g, '').replace(/\s+/g, '');
+        // Strict numeric pattern: optional leading -, digits, optional decimal
+        if (!/^-?\d+(?:\.\d+)?$/.test(s)) return null;
         const num = parseFloat(s);
-        if (isNaN(num)) return null;
-        return num / 100; // always return decimal representation
+        return num / 100; // normalise to decimal representation
       }
       case 'age':
       case 'year': {

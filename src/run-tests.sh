@@ -18,6 +18,8 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CORE_DIR="$SCRIPT_DIR/core"
 TESTS_DIR="$SCRIPT_DIR/tests"
+# Added root directory variable for running Jest tests from repository root
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Function to display usage
 show_usage() {
@@ -118,7 +120,8 @@ run_test() {
 
 # Function to find all test files
 find_test_files() {
-    find "$TESTS_DIR" -name "*.js" -type f | sort
+    # Exclude Jest UI tests (files ending with .test.js) which are handled separately by Jest
+    find "$TESTS_DIR" -name "*.js" ! -name "*.test.js" -type f | sort
 }
 
 # Function to list available tests
@@ -182,7 +185,18 @@ main() {
         echo
         echo -e " Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
         echo
-        
+
+        # Run Jest-powered UI tests
+        echo -e "${BLUE}Running Jest UI tests...${NC}"
+        cd "$ROOT_DIR"
+        if npx jest --runInBand; then
+            echo -e "${GREEN}✅ Jest UI tests passed${NC}"
+        else
+            echo -e "${RED}❌ Jest UI tests failed${NC}"
+            exit 1
+        fi
+
+        # Exit status based on earlier custom test results (failed variable)
         if [ $failed -eq 0 ]; then
             exit 0
         else
@@ -193,12 +207,21 @@ main() {
         # Run specific test
         local test_name="$1"
         local test_file="$TESTS_DIR/$test_name.js"
-        
+
         if [ ! -f "$test_file" ]; then
             echo -e "${RED}Error: Test file not found: $test_file${NC}"
             exit 1
         fi
-        
+
+        # If the file is a Jest test, run it with Jest instead of the custom test framework
+        if [[ "$test_file" == *.test.js ]]; then
+            echo -e "${BLUE}Running Jest test: $test_name${NC}"
+            cd "$ROOT_DIR"
+            npx jest --runInBand "$test_file"
+            exit $?
+        fi
+
+        # Otherwise use the custom Node-based test runner
         run_test "$test_file"
     fi
 }
