@@ -224,12 +224,27 @@ class EventSummaryRenderer {
   }
 
   /**
+   * Check if an event is a one-off expense
+   * One-off expenses are type 'E' events where fromAge equals toAge
+   */
+  isOneOffExpense(event) {
+    if (!event || event.type !== 'E') {
+      return false;
+    }
+
+    const fromAge = parseInt(event.fromAge);
+    const toAge = parseInt(event.toAge);
+
+    return !isNaN(fromAge) && !isNaN(toAge) && fromAge === toAge;
+  }
+
+  /**
    * Check if event should show To Age field in UI
    * Based on actual simulation behavior and event type meanings
    */
   showsToAgeField(eventType, event = null) {
     // One-off expenses: Never show To Age field since it's automatically set to fromAge
-    if (event && event.isOneOff) {
+    if (event && this.isOneOffExpense(event)) {
       return false;
     }
 
@@ -243,7 +258,7 @@ class EventSummaryRenderer {
    */
   showsGrowthRateField(eventType, event = null) {
     // One-off expenses: Never show Growth Rate field since it occurs only once
-    if (event && event.isOneOff) {
+    if (event && this.isOneOffExpense(event)) {
       return false;
     }
 

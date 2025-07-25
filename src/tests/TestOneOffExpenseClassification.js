@@ -1,6 +1,6 @@
 /* Test for One-off Expense Classification and UI Integration
  *
- * This test verifies that one-off expenses (E events with isOneOff = true) are properly classified and integrated:
+ * This test verifies that one-off expenses (E events with fromAge === toAge) are properly classified and integrated:
  * 1. 'E' events are classified as outflow events.
  * 2. One-off expenses have correct field visibility (To Age and Rate are hidden).
  * 3. One-off expenses display correct summary text with "at age X" format.
@@ -67,16 +67,22 @@ const testDefinition = {
 
       // Mock EventSummaryRenderer methods
       const mockSummaryRenderer = {
+        isOneOffExpense: function(event) {
+          if (!event || event.type !== 'E') return false;
+          const fromAge = parseInt(event.fromAge);
+          const toAge = parseInt(event.toAge);
+          return !isNaN(fromAge) && !isNaN(toAge) && fromAge === toAge;
+        },
         showsToAgeField: function(eventType, event) {
-          return !(event && event.isOneOff);
+          return !(event && this.isOneOffExpense(event));
         },
         showsGrowthRateField: function(eventType, event) {
-          return !(event && event.isOneOff);
+          return !(event && this.isOneOffExpense(event));
         }
       };
 
-      const oneOffEvent = { type: 'E', isOneOff: true };
-      const recurringEvent = { type: 'E', isOneOff: false };
+      const oneOffEvent = { type: 'E', fromAge: '30', toAge: '30' };
+      const recurringEvent = { type: 'E', fromAge: '30', toAge: '35' };
 
       // Test 'To Age' field visibility
       if (mockSummaryRenderer.showsToAgeField('E', oneOffEvent)) {

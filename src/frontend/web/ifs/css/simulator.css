@@ -2409,6 +2409,11 @@ footer {
     box-shadow: inset 0 0 6px 1px rgba(251, 192, 45, 0.4); /* soft yellow */
 }
 
+/* Thin dark grey border for Event Type selectors in table view (exclude NOP) */
+#Events .pseudo-select:not(.nop) {
+    border-color: #BBB; /* dark grey */
+}
+
 /* Events Table Actions */
 .events-table-actions {
     display: flex;
@@ -3171,4 +3176,30 @@ footer {
 #Events th:nth-child(6) { width: 72px; } /* Rate */
 #Events th:nth-child(7) { width: 52px; } /* Match */
 #Events th:nth-child(8) { width: 36px; } /* Delete button */
+
+/* ----------------------------------------------
+   Accordion Item Borders (non-NOP)
+   ---------------------------------------------- */
+/* Default (collapsed) – header shows full border */
+.events-accordion-item:not(.nop) .accordion-item-header {
+    border: 1px solid #BBB;
+    border-radius: 3.6px;
+}
+
+/* Expanded state – header loses bottom edge; content completes the outline */
+.events-accordion-item:not(.nop).expanded .accordion-item-header {
+    border-bottom: none;
+    border-radius: 3.6px 3.6px 0 0;
+}
+
+.events-accordion-item:not(.nop).expanded .accordion-item-content {
+    border: 1px solid #BBB;
+    border-top: none;
+    border-radius: 0 0 3.6px 3.6px;
+}
+
+.events-accordion-item:not(.nop).collapsing .accordion-item-header {
+    border-bottom: none;
+    border-radius: 3.6px 3.6px 0 0;
+}
 

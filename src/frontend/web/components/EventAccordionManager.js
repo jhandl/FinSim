@@ -162,6 +162,11 @@ class EventAccordionManager {
       item.classList.add(colorClass);
     }
 
+    // Mark No-Operation events for special styling
+    if (event.type === 'NOP') {
+      item.classList.add('nop');
+    }
+
     const isExpanded = this.expandedItems.has(event.accordionId);
     
     // Create summary renderer instance
@@ -285,10 +290,21 @@ class EventAccordionManager {
       // Collapse with animation - first update the button state
       expandBtn.classList.remove('expanded');
       expandBtn.title = 'Expand';
+
+      // Temporarily mark as collapsing to delay bottom border
+      item.classList.add('collapsing');
+
+      // Remove expanded class from root item for styling
+      item.classList.remove('expanded');
       
       // Then start the collapse animation
       content.classList.remove('expanded');
       
+      // Wait for collapse transition (matching CSS 300ms) before clearing collapsing class
+      setTimeout(() => {
+        item.classList.remove('collapsing');
+      }, 300);
+
       // Update tracking state
       this.expandedItems.delete(accordionId);
     } else {
@@ -313,6 +329,9 @@ class EventAccordionManager {
       // Then expand with animation
       requestAnimationFrame(() => {
         content.classList.add('expanded');
+        // Add expanded class to root item for styling and ensure collapsing flag cleared
+        item.classList.add('expanded');
+        item.classList.remove('collapsing');
         expandBtn.classList.add('expanded');
         expandBtn.title = 'Collapse';
         this.expandedItems.add(accordionId);

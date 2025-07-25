@@ -915,17 +915,9 @@ class EventWizardManager {
 
       // Handle one-off expenses
       if (freq === 'oneoff') {
-        // Set isOneOff for one-off expenses
-        data.isOneOff = true;
         data.toAge = data.fromAge;
         data.rate = '';
       }
-    }
-
-    // Ensure one-off events still follow single-age rules
-    if (data.isOneOff) {
-      data.toAge = data.fromAge;
-      data.rate = '';
     }
 
     // For income wizard, determine the correct event type based on choices

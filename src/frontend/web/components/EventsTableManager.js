@@ -478,8 +478,13 @@ class EventsTableManager {
       const typeVal = row.querySelector('.event-type')?.value;
       const toggle  = row.querySelector('.dd-toggle');
       if (!toggle) return;
-      toggle.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market');
-      if (this.isStockMarket(typeVal)) {
+      /* Reset all possible styling classes, including the new 'nop' marker */
+      toggle.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market', 'nop');
+
+      /* Apply appropriate class based on the event type */
+      if (typeVal === 'NOP') {
+          toggle.classList.add('nop');
+      } else if (this.isStockMarket(typeVal)) {
           toggle.classList.add('stock-market');
       } else if (this.isRealEstate(typeVal)) {
           toggle.classList.add('real-estate');
