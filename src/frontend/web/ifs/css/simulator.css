@@ -3210,3 +3210,18 @@ footer {
     border-radius: 3.6px 3.6px 0 0;
 }
 
+/* View Toggle Icons */
+.view-toggle span:not(.mode-toggle-active) i {
+    color: #b0b0b0; /* Same medium grey as other inactive icons */
+}
+
+.view-toggle span.mode-toggle-active i {
+    color: var(--primary-color);
+}
+
+.view-toggle i {
+    font-size: 0.9em;
+    vertical-align: top;
+    padding-top: 0.1rem;
+}
+
