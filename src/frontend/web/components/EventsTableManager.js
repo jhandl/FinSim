@@ -547,7 +547,6 @@ class EventsTableManager {
       options: optionObjects,
       selectedValue: selectedObj.value,
       width: 200,
-      header: 'Event Type',
       onSelect: (val, label) => {
         typeInput.value = val;
         toggleEl.textContent = label;

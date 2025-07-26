@@ -122,65 +122,16 @@ class ChartManager {
               pointRadius: 0,
               order: 1
             },
+            // Re-ordered stacked datasets so legend order aligns with visual stack (bottom → top)
             {
-              label: 'Cash',
-              borderColor: '#FFB74D',
-              backgroundColor: '#FFE0B2',
+              label: 'Salaries',
+              borderColor: '#90A4AE',
+              backgroundColor: '#CFD8DC',
               fill: true,
               data: [],
               stack: 'main',
               pointRadius: 0,
-              order: 9
-            },
-            {
-              label: 'Shares',
-              borderColor: '#81C784',
-              backgroundColor: '#C8E6C9',
-              fill: true,
-              data: [],
-              stack: 'main',
-              pointRadius: 0,
-              order: 8
-            },
-            {
-              label: 'Index Funds',
-              borderColor: '#9575CD',
-              backgroundColor: '#E1BEE7',
-              fill: true,
-              data: [],
-              stack: 'main',
-              pointRadius: 0,
-              order: 7
-            },
-            {
-              label: 'S.Pension',
-              borderColor: '#64B5F6',
-              backgroundColor: '#BBDEFB',
-              fill: true,
-              data: [],
-              stack: 'main',
-              pointRadius: 0,
-              order: 6
-            },
-            {
-              label: 'P.Pension',
-              borderColor: '#4FC3F7',
-              backgroundColor: '#B3E5FC',
-              fill: true,
-              data: [],
-              stack: 'main',
-              pointRadius: 0,
-              order: 5
-            },
-            {
-              label: 'RSUs',
-              borderColor: '#F06292',
-              backgroundColor: '#F8BBD0',
-              fill: true,
-              data: [],
-              stack: 'main',
-              pointRadius: 0,
-              order: 4
+              order: 2
             },
             {
               label: 'Rental',
@@ -193,14 +144,64 @@ class ChartManager {
               order: 3
             },
             {
-              label: 'Salaries',
-              borderColor: '#90A4AE',
-              backgroundColor: '#CFD8DC',
+              label: 'RSUs',
+              borderColor: '#F06292',
+              backgroundColor: '#F8BBD0',
               fill: true,
               data: [],
               stack: 'main',
               pointRadius: 0,
-              order: 2
+              order: 4
+            },
+            {
+              label: 'P.Pension',
+              borderColor: '#4FC3F7',
+              backgroundColor: '#B3E5FC',
+              fill: true,
+              data: [],
+              stack: 'main',
+              pointRadius: 0,
+              order: 5
+            },
+            {
+              label: 'S.Pension',
+              borderColor: '#64B5F6',
+              backgroundColor: '#BBDEFB',
+              fill: true,
+              data: [],
+              stack: 'main',
+              pointRadius: 0,
+              order: 6
+            },
+            {
+              label: 'Index Funds',
+              borderColor: '#9575CD',
+              backgroundColor: '#E1BEE7',
+              fill: true,
+              data: [],
+              stack: 'main',
+              pointRadius: 0,
+              order: 7
+            },
+            {
+              label: 'Shares',
+              borderColor: '#81C784',
+              backgroundColor: '#C8E6C9',
+              fill: true,
+              data: [],
+              stack: 'main',
+              pointRadius: 0,
+              order: 8
+            },
+            {
+              label: 'Cash',
+              borderColor: '#FFB74D',
+              backgroundColor: '#FFE0B2',
+              fill: true,
+              data: [],
+              stack: 'main',
+              pointRadius: 0,
+              order: 9
             }
           ]
         },
@@ -214,7 +215,22 @@ class ChartManager {
             legend: {
               position: 'right',
               onClick: null,
-              labels: legendLabelsConfig
+              labels: {
+                ...legendLabelsConfig,
+                // Keep Inflows and Outflows at the top, reverse the rest
+                sort: (a, b) => {
+                  const fixed = ['Inflows', 'Outflows'];
+                  const aFixed = fixed.includes(a.text);
+                  const bFixed = fixed.includes(b.text);
+                  if (aFixed && bFixed) {
+                    return fixed.indexOf(a.text) - fixed.indexOf(b.text);
+                  }
+                  if (aFixed) return -1;
+                  if (bFixed) return 1;
+                  // Reverse remaining items based on dataset order
+                  return b.datasetIndex - a.datasetIndex;
+                }
+              }
             }
           }
         }
@@ -231,32 +247,15 @@ class ChartManager {
         data: {
           labels: [],
           datasets: [
+            // Assets Chart – datasets rearranged for correct legend order (bottom → top)
             {
-              label: 'Index Funds',
-              borderColor: '#9575CD',
-              backgroundColor: '#E1BEE7',
+              label: 'R.Estate',
+              borderColor: '#90A4AE',
+              backgroundColor: '#CFD8DC',
               fill: true,
               data: [],
               pointRadius: 0,
-              order: 4
-            },
-            {
-              label: 'Shares',
-              borderColor: '#81C784',
-              backgroundColor: '#C8E6C9',
-              fill: true,
-              data: [],
-              pointRadius: 0,
-              order: 3
-            },
-            {
-              label: 'Pension',
-              borderColor: '#64B5F6',
-              backgroundColor: '#BBDEFB',
-              fill: true,
-              data: [],
-              pointRadius: 0,
-              order: 2
+              order: 0
             },
             {
               label: 'Cash',
@@ -268,13 +267,31 @@ class ChartManager {
               order: 1
             },
             {
-              label: 'R.Estate',
-              borderColor: '#90A4AE',
-              backgroundColor: '#CFD8DC',
+              label: 'Pension',
+              borderColor: '#64B5F6',
+              backgroundColor: '#BBDEFB',
               fill: true,
               data: [],
               pointRadius: 0,
-              order: 0
+              order: 2
+            },
+            {
+              label: 'Shares',
+              borderColor: '#81C784',
+              backgroundColor: '#C8E6C9',
+              fill: true,
+              data: [],
+              pointRadius: 0,
+              order: 3
+            },
+            {
+              label: 'Index Funds',
+              borderColor: '#9575CD',
+              backgroundColor: '#E1BEE7',
+              fill: true,
+              data: [],
+              pointRadius: 0,
+              order: 4
             }
           ]
         },
@@ -288,7 +305,11 @@ class ChartManager {
             legend: {
               position: 'right',
               onClick: null,
-              labels: legendLabelsConfig
+              labels: {
+                ...legendLabelsConfig,
+                // Reverse legend for assets chart so it matches visual stacking
+                sort: (a, b) => b.datasetIndex - a.datasetIndex
+              }
             }
           }
         }
@@ -313,24 +334,25 @@ class ChartManager {
       this.cashflowChart.data.labels[i] = data.Age;
       this.cashflowChart.data.datasets[0].data[i] = data.NetIncome;
       this.cashflowChart.data.datasets[1].data[i] = data.Expenses;
-      this.cashflowChart.data.datasets[2].data[i] = data.IncomeCash;
-      this.cashflowChart.data.datasets[3].data[i] = data.IncomeSharesRent;
-      this.cashflowChart.data.datasets[4].data[i] = data.IncomeFundsRent;
-      this.cashflowChart.data.datasets[5].data[i] = data.IncomeStatePension;
-      this.cashflowChart.data.datasets[6].data[i] = data.IncomePrivatePension;
-      this.cashflowChart.data.datasets[7].data[i] = data.IncomeRSUs;
-      this.cashflowChart.data.datasets[8].data[i] = data.IncomeRentals;
-      this.cashflowChart.data.datasets[9].data[i] = data.IncomeSalaries;
+      // Updated mapping to match re-ordered datasets
+      this.cashflowChart.data.datasets[2].data[i] = data.IncomeSalaries;
+      this.cashflowChart.data.datasets[3].data[i] = data.IncomeRentals;
+      this.cashflowChart.data.datasets[4].data[i] = data.IncomeRSUs;
+      this.cashflowChart.data.datasets[5].data[i] = data.IncomePrivatePension;
+      this.cashflowChart.data.datasets[6].data[i] = data.IncomeStatePension;
+      this.cashflowChart.data.datasets[7].data[i] = data.IncomeFundsRent;
+      this.cashflowChart.data.datasets[8].data[i] = data.IncomeSharesRent;
+      this.cashflowChart.data.datasets[9].data[i] = data.IncomeCash;
 
       this.cashflowChart.update();
 
-      // Update Assets Chart
+      // Update Assets Chart – adjusted to new dataset indices
       this.assetsChart.data.labels[i] = data.Age;
-      this.assetsChart.data.datasets[0].data[i] = data.FundsCapital;
-      this.assetsChart.data.datasets[1].data[i] = data.SharesCapital;
+      this.assetsChart.data.datasets[0].data[i] = data.RealEstateCapital;
+      this.assetsChart.data.datasets[1].data[i] = data.Cash;
       this.assetsChart.data.datasets[2].data[i] = data.PensionFund;
-      this.assetsChart.data.datasets[3].data[i] = data.Cash;
-      this.assetsChart.data.datasets[4].data[i] = data.RealEstateCapital;
+      this.assetsChart.data.datasets[3].data[i] = data.SharesCapital;
+      this.assetsChart.data.datasets[4].data[i] = data.FundsCapital;
       this.assetsChart.update();
     } catch (error) {
       // Silently fail as this is not critical

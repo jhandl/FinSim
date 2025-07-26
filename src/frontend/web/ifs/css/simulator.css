@@ -1158,7 +1158,7 @@ th {
 #Events {
     width: 774px; /* Fixed width 774px instead of 100% */
     border-collapse: collapse;
-    margin-bottom: 1rem;
+    margin-bottom: 0.25rem; /* tighter spacing below the table */
     table-layout: flex; /* Keep fixed layout */
     min-width: 774px; /* Same as width to prevent resizing */
     max-width: 774px; /* Same as width to prevent resizing */
@@ -2421,7 +2421,7 @@ footer {
     gap: 0.75rem; /* match desktop spacing */
     justify-content: flex-end; /* keep them right-aligned */
     align-items: center;
-    margin-top: 1rem;
+    margin-top: 0.25rem; /* tighter spacing above the buttons */
 }
 
 .events-table-actions button {
@@ -2552,25 +2552,21 @@ footer {
     }
 }
 
-.events-accordion-item:hover {
-    background-color: #f8f9fa;
-}
-
-/* Color coding for accordion items (same as table event type selector) */
+/* Color coding for accordion items */
 .events-accordion-item.inflow {
-    box-shadow: inset 0 0 6px 1px rgba(76, 175, 80, 0.4);
+    box-shadow: inset 0 0 8px 2px rgba(76, 175, 80, 0.4); /* rich green */
 }
 
 .events-accordion-item.outflow {
-    box-shadow: inset 0 0 6px 1px rgba(239, 83, 80, 0.4);
+    box-shadow: inset 0 0 8px 2px rgba(239, 83, 80, 0.45); /* vivid red */
 }
 
 .events-accordion-item.real-estate {
-    box-shadow: inset 0 0 6px 1px rgba(66, 165, 245, 0.4);
+    box-shadow: inset 0 0 8px 2px rgba(66, 165, 245, 0.45); /* bright blue */
 }
 
 .events-accordion-item.stock-market {
-    box-shadow: inset 0 0 6px 1px rgba(255, 193, 7, 0.4);
+    box-shadow: inset 0 0 8px 2px rgba(255, 193, 7, 0.45); /* bold yellow */
 }
 
 .accordion-item-header {
@@ -2800,25 +2796,14 @@ footer {
 }
 
 .event-name {
-    font-weight: 600;
     color: var(--text-color);
     font-size: 1rem;
 }
 
 .event-type-badge {
-    background-color: #e9ecef;
-    color: #495057;
-    padding: 0.125rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    color: var(--text-color);
+    font-weight: normal;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%; /* Take full width of parent container */
-    display: inline-block; /* Required for text-overflow to work */
 }
 
 .event-summary-details {
@@ -2828,7 +2813,6 @@ footer {
 }
 
 .detail-amount {
-    font-weight: 600;
     color: var(--text-color);
 }
 
@@ -2865,7 +2849,6 @@ footer {
 
 .detail-row span {
     color: var(--text-color);
-    font-weight: 600;
 }
 
 /* Override bold styling for pseudo-select dropdown in accordion */
@@ -3199,6 +3182,30 @@ footer {
 }
 
 .events-accordion-item:not(.nop).collapsing .accordion-item-header {
+    border-bottom: none;
+    border-radius: 3.6px 3.6px 0 0;
+}
+
+/* Pseudo-select borders for Event Type in table view */
+#Events .pseudo-select.nop {
+    border-color: #BBB; /* light grey for NOP */
+}
+
+/* Accordion item borders for NOP events */
+.events-accordion-item.nop .accordion-item-header {
+    border: 1px solid #BBB;
+    border-radius: 3.6px;
+}
+.events-accordion-item.nop.expanded .accordion-item-header {
+    border-bottom: none;
+    border-radius: 3.6px 3.6px 0 0;
+}
+.events-accordion-item.nop.expanded .accordion-item-content {
+    border: 1px solid #BBB;
+    border-top: none;
+    border-radius: 0 0 3.6px 3.6px;
+}
+.events-accordion-item.nop.collapsing .accordion-item-header {
     border-bottom: none;
     border-radius: 3.6px 3.6px 0 0;
 }

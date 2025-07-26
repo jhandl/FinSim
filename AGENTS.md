@@ -11,7 +11,7 @@ The core philosophy is to provide a private, powerful, and transparent tool for 
 *   **Detailed Financial Simulation:** Models income, expenses, investments, and taxes over a lifetime.
 *   **Irish Tax System Focus:** Accurately calculates Irish PAYE (IT, PRSI, USC) and Capital Gains Tax (CGT), including deemed disposal on ETFs.
 *   **Scenario Planning:** Users can define custom life events (e.g., salary changes, property purchases, market crashes) to see their impact.
-*   **Multiple Event Views:** Events can be viewed and managed in a traditional table, a collapsible accordion, or created via a step-by-step wizard.
+*   **Dual Event Management Interface:** Users can choose between table and accordion views for event management, with seamless switching and real-time synchronization. Both views support direct editing, wizard-based creation, and comprehensive event lifecycle management.
 *   **Monte Carlo Analysis:** In addition to deterministic projections, the simulator can run thousands of simulations with market volatility to assess the probability of success.
 *   **Data Persistence:** Scenarios can be saved to and loaded from local CSV files.
 
@@ -78,10 +78,10 @@ graph TD
 
 *   **[`UIManager.js`](src/frontend/UIManager.js:1):** An abstraction layer that sits between the core simulator and the UI, allowing the core to remain UI-agnostic.
 *   **[`WebUI.js`](src/frontend/web/WebUI.js:1):** The web-based implementation of the UI. It manages all the DOM elements and orchestrates the various frontend components.
-*   **Event Management:** The web UI provides three ways to interact with events, all of which must remain synchronized.
-    *   **[`EventsTableManager.js`](src/frontend/web/components/EventsTableManager.js:1):** Manages the traditional table view for events. This is the primary data source for the other views.
-    *   **[`EventAccordionManager.js`](src/frontend/web/components/EventAccordionManager.js:1):** Provides a collapsible accordion view of the events, which is more mobile-friendly. It reads from and syncs with the main event table. When new events are added in accordion view, they are automatically expanded to improve user experience.
-    *   **[`EventWizardManager.js`](src/frontend/web/components/EventWizardManager.js:1):** Manages a step-by-step wizard for creating new events. When the wizard completes, it adds a new row to the main event table.
+*   **Event Management:** The web UI provides a sophisticated dual-view event management system with three integrated components:
+    *   **[`EventsTableManager.js`](src/frontend/web/components/EventsTableManager.js:1):** Manages the traditional table view for events and serves as the primary data source. Provides view toggle functionality, sorting, validation, and direct table editing capabilities.
+    *   **[`EventAccordionManager.js`](src/frontend/web/components/EventAccordionManager.js:1):** Provides a mobile-friendly collapsible accordion view with in-situ editing capabilities. Features include real-time field validation, event type changes that trigger wizards with pre-populated data, automatic expansion of new events, and bidirectional synchronization with the table view.
+    *   **[`EventWizardManager.js`](src/frontend/web/components/EventWizardManager.js:1):** Manages step-by-step wizards for creating and editing events. Supports pre-population of existing event data, handles complex event types (like property purchases with mortgages), and integrates seamlessly with both table and accordion views.
 
 #### Utils & Help Systems
 
@@ -90,7 +90,34 @@ graph TD
 *   **[`ValidationUtils.js`](src/frontend/web/utils/ValidationUtils.js:1):** Handles validation of user inputs across the application.
 *   **[`Wizard.js`](src/frontend/web/components/Wizard.js:1):** Provides a guided tour of the application's features.
 
-### 3.3. Data Management and Persistence
+### 3.3. Event Management System Details
+
+The event management system is a core feature that provides users with flexible ways to create, edit, and manage financial events:
+
+#### Dual View Architecture
+*   **Table View:** Traditional spreadsheet-like interface for power users who prefer direct data entry and bulk editing
+*   **Accordion View:** Mobile-friendly collapsible interface optimized for touch interaction and smaller screens
+*   **Seamless Switching:** Users can toggle between views instantly with automatic data synchronization
+
+#### In-Situ Editing Capabilities
+*   **Real-time Validation:** Field validation occurs as users type, with immediate feedback for errors and warnings
+*   **Event Type Changes:** Changing an event type in accordion view triggers a wizard pre-populated with existing data
+*   **Bidirectional Sync:** Changes in either view immediately reflect in the other view
+*   **Field Visibility Logic:** Context-aware field display based on event type (e.g., hiding irrelevant fields)
+
+#### Wizard Integration
+*   **Event Creation:** Step-by-step guided creation of complex events with validation at each step
+*   **Event Editing:** Existing events can be modified through wizards that preserve current values
+*   **Complex Event Types:** Handles sophisticated scenarios like property purchases with automatic mortgage creation
+*   **Pre-population:** Wizards can be launched with existing event data for modification workflows
+
+#### Advanced Features
+*   **Automatic Sorting:** Events are automatically sorted by age/year with smooth animations
+*   **Event Highlighting:** New events are highlighted with pulse animations for better user feedback
+*   **Responsive Design:** Both views adapt to different screen sizes and orientations
+*   **Keyboard Navigation:** Full keyboard support for accessibility and power user workflows
+
+### 3.4. Data Management and Persistence
 
 User scenarios are persisted as CSV files, handled by the `serializeSimulation()` and `deserializeSimulation()` functions in [`src/core/Utils.js`](src/core/Utils.js:1) and managed on the frontend by [`FileManager.js`](src/frontend/web/components/FileManager.js:1).
 
@@ -119,7 +146,7 @@ The automated tests **only cover the core logic**. All UI-related changes must b
 ## 5. Important Guidelines
 
 *   **JavaScript Compatibility:** Core files (in [`src/core/`](src/core/)) **must** remain compatible with the Google Apps Script JavaScript environment. This means **no modern JS features like `import`/`export` modules or classes in some contexts**. All core code should be written in a way that can be copy-pasted into a `.gs` file and run.
-*   **Event View Compatibility:** Any changes to the event structure or how events are handled must be tested against all three event views: the table, the accordion, and the wizard.
+*   **Event View Compatibility:** Any changes to the event structure or how events are handled must be tested against both event views (table and accordion) and the wizard system. The table view serves as the single source of truth, with the accordion view providing a synchronized alternative interface. Changes must maintain bidirectional synchronization and preserve all editing capabilities across views.
 *   **Configuration over Hardcoding:** Any constants, especially those related to tax rules, should be placed in the `finance-simulation-config-X.XX.json` file.
 *   **Write Tests:** Any new feature or bug fix for the core logic should be accompanied by a corresponding test. 
 *   **UI Testin:** Rely on the user for all UI testing and validation. The user is always running a local server. Don't start a new server and don't open browser windows.

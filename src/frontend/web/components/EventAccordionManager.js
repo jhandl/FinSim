@@ -566,7 +566,6 @@ class EventAccordionManager {
         options: optionObjects,
         selectedValue: event.type,
         width: 200,
-        header: 'Event Type',
         onSelect: (newType, label) => {
           if (newType !== event.type) {
             // Update the hidden input
@@ -586,6 +585,21 @@ class EventAccordionManager {
 
             // Update field visibility in accordion view without regenerating
             this.updateAccordionFieldVisibility(container, event, currentValues);
+
+            // Refresh accordion header summary to reflect new type
+            this.refreshEventSummary(event);
+
+            // Update color-coding/shadow of the accordion item
+            const accordionItem = container.closest('.events-accordion-item');
+            if (accordionItem) {
+              accordionItem.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market');
+              const newColorClass = this.getEventColorClass(newType);
+              if (newColorClass) {
+                accordionItem.classList.add(newColorClass);
+              }
+            }
+            // If sorting is active, re-apply sorting to move item to correct position
+            this.applySortingWithAnimation();
           }
         }
       });
@@ -1467,9 +1481,21 @@ class EventAccordionManager {
             input.value = preservedValues[field.key];
           }
 
-          // Update rate field label based on event type
-          if (field.key === 'rate') {
-            this.updateRateFieldLabel(row, event.type);
+          // Update the field label based on event type if supported
+          const labelEl = row.querySelector('label');
+          if (labelEl) {
+            let lbl;
+            switch(field.key) {
+              case 'amount':
+                lbl = this.fieldLabelsManager.getFieldLabel(event.type, 'amount'); break;
+              case 'toAge':
+                lbl = this.fieldLabelsManager.getFieldLabel(event.type, 'toAge'); break;
+              case 'rate':
+                lbl = this.fieldLabelsManager.getFieldLabel(event.type, 'rate'); break;
+              case 'match':
+                lbl = this.fieldLabelsManager.getFieldLabel(event.type, 'match'); break;
+            }
+            if (lbl) labelEl.textContent = `${lbl}:`;
           }
         } else {
           row.style.display = 'none';
