@@ -141,24 +141,24 @@ class Wizard {
     const rateInput = row.querySelector(`input#EventRate_${rowId}`);
     const matchInput = row.querySelector(`input#EventMatch_${rowId}`);
 
-    const hasNonDefaultValues = 
-        (typeInputHidden && typeInputHidden.value && typeInputHidden.value !== "NOP") ||
-        (nameInput && nameInput.value.trim() !== '') ||
-        (amountInput && amountInput.value.trim() !== '') ||
-        (fromAgeInput && fromAgeInput.value.trim() !== '') ||
-        (toAgeInput && toAgeInput.value.trim() !== '') ||
-        (rateInput && rateInput.value.trim() !== '') ||
-        (matchInput && matchInput.value.trim() !== '');
+    const hasNonDefaultValues =
+      (typeInputHidden && typeInputHidden.value && typeInputHidden.value !== "NOP") ||
+      (nameInput && nameInput.value.trim() !== '') ||
+      (amountInput && amountInput.value.trim() !== '') ||
+      (fromAgeInput && fromAgeInput.value.trim() !== '') ||
+      (toAgeInput && toAgeInput.value.trim() !== '') ||
+      (rateInput && rateInput.value.trim() !== '') ||
+      (matchInput && matchInput.value.trim() !== '');
 
     const state = {
-        isEmpty: false,
-        rows: rows.length,
-        rowIsEmpty: !hasNonDefaultValues,
-        eventType: typeInputHidden ? typeInputHidden.value : null,
-        focusedRow,
-        rowId
+      isEmpty: false,
+      rows: rows.length,
+      rowIsEmpty: !hasNonDefaultValues,
+      eventType: typeInputHidden ? typeInputHidden.value : null,
+      focusedRow,
+      rowId
     };
-    
+
     return state;
   }
 
@@ -174,8 +174,8 @@ class Wizard {
 
     // Additional check for opacity and dimensions
     if (style.opacity === '0' ||
-        element.offsetWidth === 0 ||
-        element.offsetHeight === 0) {
+      element.offsetWidth === 0 ||
+      element.offsetHeight === 0) {
       return false;
     }
 
@@ -476,7 +476,7 @@ class Wizard {
         }
       } else {
         const first = this.validSteps[0];
-        const last  = this.validSteps[this.validSteps.length - 1];
+        const last = this.validSteps[this.validSteps.length - 1];
         if (first && first.popover) {
           first.popover.showButtons = ['next'];
         }
@@ -615,8 +615,13 @@ class Wizard {
   }
 
   followFocus(event) {
-    if (!event.target.matches('#startWizard') && 
-        !event.target.closest('#mobileMenuToggle, #mobileMenu')) {
+    // Skip if this is a programmatic focus from vertical navigation
+    if (this._programmaticFocus) {
+      return;
+    }
+
+    if (!event.target.matches('#startWizard') &&
+      !event.target.closest('#mobileMenuToggle, #mobileMenu')) {
       if (event.target.matches('input, textarea, select') || event.target.classList.contains('visualization-control')) {
         this.lastFocusedField = event.target;
         this.lastFocusedWasInput = true;
@@ -635,8 +640,8 @@ class Wizard {
     // Clear field tracking when clicking on non-input elements that are not part of the burger menu
     // This ensures clicks on non-focusable elements reset last focused state
     if (!isBurgerMenuClick &&
-        !event.target.matches('input, textarea, select') &&
-        !event.target.classList.contains('visualization-control')) {
+      !event.target.matches('input, textarea, select') &&
+      !event.target.classList.contains('visualization-control')) {
       this.lastFocusedField = null;
       this.lastFocusedWasInput = false;
     }
@@ -668,9 +673,9 @@ class Wizard {
       this.wizardOpenedBurgerMenu = false;
       this.unfreezeScroll();
     }
-    
+
     document.removeEventListener('keydown', this.handleKeys);
-    
+
     this.wizardActive = false;
     if (this.isMobile) {
       document.body.removeAttribute('data-wizard-active');
@@ -678,12 +683,12 @@ class Wizard {
       document.removeEventListener('touchstart', this.preventTouch, true);
       document.removeEventListener('click', this.preventTouch, true);
     }
-    
+
     this.enableMobileKeyboard();
-    
+
     // Restore page scroll after wizard finishes
     this.unfreezeScroll();
-    
+
     // Only update lastStepIndex if tour was completed normally
     if (this.tour && typeof this.tour.getActiveIndex === 'function') {
       this.lastStepIndex = this.tour.getActiveIndex();
@@ -780,26 +785,26 @@ class Wizard {
     };
 
     const direction = moveActions[event.key]?.(event);
-    
+
     if (direction !== undefined) {
       event.preventDefault();
       if (direction === 'next' || direction === 'previous') {
-        const canMove = direction === 'next' 
-          ? this.tour.hasNextStep() 
+        const canMove = direction === 'next'
+          ? this.tour.hasNextStep()
           : this.tour.hasPreviousStep();
-        
+
         if (canMove) {
           // Remove focus from the current field if it's an input or select
           if (document.activeElement && document.activeElement.matches('input, select')) {
             document.activeElement.blur();
             this.lastFocusedField = null;
           }
-          
+
           // Handle burger menu before navigation
-          const targetIndex = direction === 'next' 
-            ? this.tour.getActiveIndex() + 1 
+          const targetIndex = direction === 'next'
+            ? this.tour.getActiveIndex() + 1
             : this.tour.getActiveIndex() - 1;
-          
+
           if (targetIndex >= 0 && targetIndex < this.validSteps.length) {
             const targetElement = document.querySelector(this.validSteps[targetIndex].element);
             this.exposeHiddenElement(targetIndex).then(() => {
@@ -846,15 +851,20 @@ class Wizard {
         const tbody = document.querySelector('#Events tbody');
         const rows = Array.from(tbody.querySelectorAll('tr'));
         const currentRowIndex = rows.indexOf(currentState.focusedRow);
-        
+
         let targetRow;
         if (direction === 'up') {
           if (currentRowIndex === 0) {
+            // For mini tours, stay at the current position instead of moving to events section
+            if (this.currentTourId === 'mini') {
+              return null; // Don't move, stay at current field
+            }
+            // For help/full tours, move to the events section overview step
             const tableStep = this.validSteps.findIndex(step => step.element === '.events-section');
-            if (tableStep >= 0) {
+            if (tableStep >= 0 && this.tour) {
               document.activeElement.blur();
               this.lastFocusedField = null;
-              this.start({ type: 'help', startAtStep: tableStep });
+              this.tour.drive(tableStep);
               return null;
             }
           } else {
@@ -862,15 +872,19 @@ class Wizard {
           }
         } else if (direction === 'down') {
           if (currentRowIndex === rows.length - 1) {
-            // Find the first step after all table-related steps
+            // For mini tours, stay at the current position instead of moving to next section
+            if (this.currentTourId === 'mini') {
+              return null; // Don't move, stay at current field
+            }
+            // For help/full tours, move to the next non-table step
             const currentStep = this.tour.getActiveIndex();
             const nextNonTableStep = this.validSteps.findIndex((step, index) => {
               return index > currentStep && (!step.element || !step.element.includes('Event'));
             });
-            if (nextNonTableStep >= 0) {
+            if (nextNonTableStep >= 0 && this.tour) {
               document.activeElement.blur();
               this.lastFocusedField = null;
-              this.start({ type: 'help', startAtStep: nextNonTableStep });
+              this.tour.drive(nextNonTableStep);
               return null;
             }
           } else {
@@ -884,32 +898,118 @@ class Wizard {
           const currentFieldId = currentField.id;
           const fieldType = currentFieldId.split('_')[0];
           const targetField = targetRow.querySelector(`#${fieldType}_${targetRowId}`);
-          
-          if (targetField && !this.isMobile) {
-            // Only focus on desktop to avoid keyboard issues on mobile
-            targetField.focus();
-            // If the field is hidden, focus will not succeed, so focus the Event Type field instead
-            if (document.activeElement !== targetField) {
-              const eventTypeField = targetRow.querySelector(`#EventType_${targetRowId}`);
-              if (eventTypeField) {
-                eventTypeField.focus();
-                this.start({ type: 'help', startAtStep: this.tour.getActiveIndex() });
-                eventTypeField.blur();
-                return null;
-              }
-            } else {
-              this.start({ type: 'help', startAtStep: this.tour.getActiveIndex() });
-              return null;
+
+          if (targetField) {
+            // Update lastFocusedField to the new target
+            this.lastFocusedField = targetField;
+
+            if (!this.isMobile) {
+              // Focus the target field on desktop
+              // Set a flag to prevent followFocus from interfering
+              this._programmaticFocus = true;
+              targetField.focus();
+              // Clear the flag after a short delay
+              setTimeout(() => {
+                this._programmaticFocus = false;
+              }, 10);
             }
-          } else if (targetField && this.isMobile) {
-            // On mobile, restart wizard at current step without focusing
-            this.start({ type: 'help', startAtStep: this.tour.getActiveIndex() });
+
+            // Update the table state to reflect the new row
+            this.tableState = this.getEventTableState();
+
+            // Update ALL event-related steps to point to the new row AND update their content
+            this.validSteps.forEach(step => {
+              if (step.element && step.element.includes('Event') && step.element.includes('_')) {
+                // Extract the field type from the step element (e.g., "EventType" from "#EventType_123")
+                const stepFieldType = step.element.replace(/#(Event[A-Za-z]+)_.*/, '$1');
+                // Update to point to the same field type in the new row
+                step.element = `#${stepFieldType}_${targetRowId}`;
+
+                // Update the step content based on the current event type
+                this.updateStepContentForEventType(step, stepFieldType);
+              }
+            });
+
+            // Find the current step that matches our field type
+            const currentStepIndex = this.tour.getActiveIndex();
+
+            // Re-drive the current step to update the highlight
+            if (this.tour && currentStepIndex >= 0) {
+              this.tour.drive(currentStepIndex);
+            }
             return null;
           }
         }
       }
     }
     return direction === 'up' ? 'previous' : 'next';
+  }
+
+  /**
+   * Updates a step's content based on the current event type
+   * @param {Object} step - The step to update
+   * @param {string} stepFieldType - The field type (e.g., "EventType", "EventAlias")
+   */
+  updateStepContentForEventType(step, stepFieldType) {
+    if (!this.originalConfig || !this.originalConfig.steps || !this.tableState) {
+      return;
+    }
+
+    // Find all original steps that match this field type
+    const matchingOriginalSteps = this.originalConfig.steps.filter(originalStep => {
+      if (!originalStep.element) return false;
+
+      // Check if this step is for the same field type
+      const originalFieldType = originalStep.element.replace(/#(Event[A-Za-z]+)(_.*)?$/, '$1');
+      return originalFieldType === stepFieldType;
+    });
+
+    // Find the best matching step for the current event type
+    let bestMatch = null;
+
+    for (const originalStep of matchingOriginalSteps) {
+      // Check if this step matches the current event type
+      if (originalStep.eventTypes) {
+        if (originalStep.eventTypes.includes(this.tableState.eventType)) {
+          bestMatch = originalStep;
+          break; // Exact match found
+        }
+      } else if (originalStep.noEventTypes) {
+        if (!originalStep.noEventTypes.includes(this.tableState.eventType)) {
+          bestMatch = originalStep;
+          break; // Negative match found
+        }
+      } else if (!bestMatch) {
+        // No event type restriction - use as fallback
+        bestMatch = originalStep;
+      }
+    }
+
+    // Update the step's popover content if we found a match
+    if (bestMatch && bestMatch.popover && step.popover) {
+      // Copy the popover content from the best match
+      if (bestMatch.popover.description) {
+        step.popover.description = bestMatch.popover.description;
+      }
+      if (bestMatch.popover.title) {
+        step.popover.title = bestMatch.popover.title;
+      }
+
+      // Handle structured content if present
+      if (bestMatch.popover.contentType && bestMatch.popover.content) {
+        step.popover.contentType = bestMatch.popover.contentType;
+        step.popover.content = bestMatch.popover.content;
+
+        // Re-render the content if ContentRenderer is available
+        if (typeof ContentRenderer !== 'undefined') {
+          step.popover.description = ContentRenderer.render(
+            bestMatch.popover.contentType,
+            this.processAgeYearInContent(bestMatch.popover.content),
+            { context: 'wizard', compact: true }
+          );
+        }
+      }
+    }
   }
 
   // Detect if we're on a mobile device
@@ -947,7 +1047,7 @@ class Wizard {
   // Prevent focus on input elements during wizard on mobile
   preventFocus(event) {
     if (!this.wizardActive || !this.isMobile) return;
-    
+
     const target = event.target;
     if (target && (target.matches('input[type="text"], input[type="number"], textarea, select'))) {
       event.preventDefault();
@@ -960,7 +1060,7 @@ class Wizard {
   // Prevent touch/click on input elements during wizard on mobile
   preventTouch(event) {
     if (!this.wizardActive || !this.isMobile) return;
-    
+
     const target = event.target;
     if (target && (target.matches('input[type="text"], input[type="number"], textarea, select'))) {
       event.preventDefault();
@@ -972,9 +1072,9 @@ class Wizard {
   // Prevent mobile keyboard from showing during wizard
   disableMobileKeyboard() {
     if (!this.isMobile) return;
-    
+
     const inputs = document.querySelectorAll('input[type="text"], input[type="number"], textarea, select');
-    
+
     inputs.forEach(input => {
       // Store original states
       this.originalInputStates.set(input, {
@@ -984,7 +1084,7 @@ class Wizard {
         pointerEvents: input.style.pointerEvents,
         userSelect: input.style.userSelect
       });
-      
+
       if (input.tagName.toLowerCase() !== 'select') {
         // Multiple approaches to prevent keyboard
         input.setAttribute('inputmode', 'none');
@@ -1005,7 +1105,7 @@ class Wizard {
   // Restore inputs to their original state
   enableMobileKeyboard() {
     if (!this.isMobile || this.originalInputStates.size === 0) return;
-    
+
     const inputs = document.querySelectorAll('input[type="text"], input[type="number"], textarea, select');
     inputs.forEach(input => {
       const originalState = this.originalInputStates.get(input);
@@ -1030,7 +1130,7 @@ class Wizard {
         }
       }
     });
-    
+
     this.originalInputStates.clear();
   }
 
@@ -1054,14 +1154,14 @@ class Wizard {
 
     const burgerMenu = window.mobileBurgerMenuInstance;
     if (!burgerMenu) return;
-    
+
     // Check if burger menu toggle is visible (indicates mobile mode)
     const burgerToggle = document.getElementById('mobileMenuToggle');
     if (!burgerToggle) return;
-    
+
     const burgerToggleStyle = window.getComputedStyle(burgerToggle);
     const burgerMenuAvailable = burgerToggleStyle.display !== 'none';
-    
+
     if (!burgerMenuAvailable) {
       // Close burger menu if we opened it and we're back to desktop
       if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
@@ -1071,7 +1171,7 @@ class Wizard {
       }
       return;
     }
-    
+
     // Get the step configuration to determine which element we should target
     const step = stepIndex !== null ? this.validSteps[stepIndex] : null;
     if (!step) {
@@ -1083,7 +1183,7 @@ class Wizard {
       }
       return;
     }
-    
+
     // Extract the base element ID from the step configuration
     const stepElementSelector = step.element;
     if (!stepElementSelector || typeof stepElementSelector !== 'string') {
@@ -1095,13 +1195,13 @@ class Wizard {
       }
       return;
     }
-    
+
     const baseElementId = stepElementSelector.replace('#', '').replace('Mobile', '').replace('Header', '');
-    
+
     // Define burger menu buttons by their base IDs
     const burgerMenuButtons = ['saveSimulation', 'loadSimulation', 'loadDemoScenario', 'startWizard'];
     const isBurgerMenuButton = burgerMenuButtons.includes(baseElementId);
-    
+
     if (!isBurgerMenuButton) {
       // Close burger menu before highlighting non-menu elements, regardless of who opened it
       if (burgerMenu.isOpen) {
@@ -1111,24 +1211,24 @@ class Wizard {
       }
       return;
     }
-    
+
     // Determine the correct desktop element ID
     let desktopElementId = baseElementId;
     if (baseElementId === 'loadDemoScenario') {
       desktopElementId = 'loadDemoScenarioHeader';
     }
-    
+
     // Check if the desktop element is currently visible
     const desktopElement = document.getElementById(desktopElementId);
     if (!desktopElement) return;
-    
+
     const elementStyle = window.getComputedStyle(desktopElement);
-    const elementVisible = elementStyle.display !== 'none' && 
-                          elementStyle.visibility !== 'hidden' && 
-                          elementStyle.opacity !== '0' &&
-                          desktopElement.offsetWidth > 0 && 
-                          desktopElement.offsetHeight > 0;
-    
+    const elementVisible = elementStyle.display !== 'none' &&
+      elementStyle.visibility !== 'hidden' &&
+      elementStyle.opacity !== '0' &&
+      desktopElement.offsetWidth > 0 &&
+      desktopElement.offsetHeight > 0;
+
     if (!elementVisible) {
       // Element is hidden, so it's in the burger menu - open it and target mobile version
       if (!burgerMenu.isOpen) {
@@ -1139,13 +1239,13 @@ class Wizard {
         // Wait for animation to complete before proceeding
         await new Promise(resolve => setTimeout(resolve, 350));
       }
-      
+
       // Switch to the mobile element in the step configuration
       let mobileElementId = baseElementId + 'Mobile';
       if (baseElementId === 'loadDemoScenario') {
         mobileElementId = 'loadDemoScenarioMobile';
       }
-      
+
       const mobileElement = document.getElementById(mobileElementId);
       if (mobileElement) {
         this.validSteps[stepIndex].element = `#${mobileElementId}`;
@@ -1166,22 +1266,22 @@ class Wizard {
   handleBurgerMenuSimple(element) {
     // This is now just for cleanup or fallback cases
     if (!element || !element.id) return;
-    
+
     const burgerMenuButtons = ['saveSimulation', 'loadSimulation', 'loadDemoScenarioHeader', 'startWizard'];
     const isBurgerMenuButton = burgerMenuButtons.includes(element.id);
-    
+
     if (!isBurgerMenuButton) return;
-    
+
     const burgerMenu = window.mobileBurgerMenuInstance;
     if (!burgerMenu) return;
-    
+
     // Check if burger menu toggle is visible (indicates mobile mode)
     const burgerToggle = document.getElementById('mobileMenuToggle');
     if (!burgerToggle) return;
-    
+
     const burgerToggleStyle = window.getComputedStyle(burgerToggle);
     const burgerMenuAvailable = burgerToggleStyle.display !== 'none';
-    
+
     if (!burgerMenuAvailable) {
       // Close burger menu if we opened it and we're back to desktop
       if (this.wizardOpenedBurgerMenu && burgerMenu.isOpen) {
@@ -1333,8 +1433,8 @@ class Wizard {
       if (type === 'full') {
         steps = steps.map(step => {
           if (!step.element && step.popover &&
-              (step.popover.popoverClass === 'welcome-popover' ||
-               step.popover.popoverClass === 'howto-popover')) {
+            (step.popover.popoverClass === 'welcome-popover' ||
+              step.popover.popoverClass === 'howto-popover')) {
             // Replace with a special step that triggers the welcome modal
             return {
               element: 'body', // Use body as a dummy element
