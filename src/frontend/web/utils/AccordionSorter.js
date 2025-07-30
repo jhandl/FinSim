@@ -79,11 +79,12 @@
         // Add highlight animation class
         item.classList.add('new-event-highlight');
 
-        // Scroll the new event into view
-        item.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center'
-        });
+        // Scroll only if the item is off-screen; avoid redundant centering
+        const rect = item.getBoundingClientRect();
+        const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+        if (rect.top < 0 || rect.bottom > viewportHeight) {
+          item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
 
         // Remove highlight after animation completes
         setTimeout(() => {

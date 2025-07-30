@@ -38,7 +38,7 @@ class EventSummaryRenderer {
               <span class="event-name">${eventTypeInfo.label}</span>
             </div>
             <div class="event-summary-badge">
-              <span class="event-type-badge">${this.escapeHtml(event.name || 'Unnamed Event')}</span>
+              <span class="event-type-badge">${this.escapeHtml(event.name || '—')}</span>
             </div>
             <div class="event-summary-amount">
               ${displayValue ? `<span class="detail-amount">${displayValue}</span>` : '<span class="detail-empty">—</span>'}

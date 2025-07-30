@@ -7,6 +7,8 @@ class EventWizardManager {
     this.wizardData = null;
     this.currentWizard = null;
     this.currentStep = 0;
+    // Maintain a history stack of visited step indices for reliable back navigation
+    this._stepHistory = [];
     this.wizardState = {};
     this.isActive = false;
     this.renderer = new EventWizardRenderer(webUI);
@@ -15,12 +17,16 @@ class EventWizardManager {
     // Track if keyboard is active to keep modal pinned across steps
     this._keyboardActive = false;
     // Detect mobile once using shared utility
-    this.isMobile = (window.DeviceUtils && window.DeviceUtils.isMobile) ? window.DeviceUtils.isMobile() : true;
+    // Mobile detection: use DeviceUtils if ready, otherwise a basic UA check (desktop false)
+    this.isMobile = (window.DeviceUtils && window.DeviceUtils.isMobile)
+      ? window.DeviceUtils.isMobile()
+      : /Mobi|Android/i.test(navigator.userAgent);
     // BEGIN ADD: timestamp of last successful nextStep call to suppress accidental double-advances
     this._lastNextStep = 0;
     // END ADD
     this._pendingNextTimeouts = []; // Store any auto-advance timeouts to cancel on navigation
     this.loadWizardConfiguration();
+
   }
 
   // detectMobile helper removed – use DeviceUtils instead
@@ -48,8 +54,9 @@ class EventWizardManager {
    * @param {string} eventType - The event type code (e.g., 'SI', 'E', 'R') or wizard ID
    * @param {Object} prePopulatedData - Pre-populated data for the wizard
    * @param {Function} onComplete - Callback function when wizard completes
+   * @param {Function} onCancel - Callback function when wizard is cancelled
    */
-  startWizard(eventType, prePopulatedData = {}, onComplete = null) {
+  startWizard(eventType, prePopulatedData = {}, onComplete = null, onCancel = null) {
     if (!this.wizardData || !this.wizardData.EventWizards) {
       console.error('Wizard configuration not loaded');
       return false;
@@ -104,9 +111,12 @@ class EventWizardManager {
       eventType: wizardConfig.eventType,
       data: initialData, // Use pre-populated data if provided
       onComplete: onComplete,
+      onCancel: onCancel,
       ...options
     };
     this.isActive = true;
+    // Reset navigation history at the beginning of a new wizard
+    this._stepHistory = [];
 
     // Show the first step
     this.showCurrentStep();
@@ -400,6 +410,14 @@ class EventWizardManager {
     input.name = idSuffix;
     input.placeholder = step.content.placeholder || '';
 
+    // If this field represents numeric data, configure the input to trigger the
+    // numeric keypad on mobile devices (mirrors behaviour used for age inputs).
+    const numericInputTypes = ['currency', 'percentage', 'age', 'number'];
+    if (numericInputTypes.includes(step.content.inputType)) {
+      input.inputMode = 'numeric';
+      input.pattern = '[0-9]*';
+    }
+
     // Set current value if exists
     const currentValue = this.wizardState.data[step.field];
     if (currentValue !== undefined) {
@@ -438,7 +456,39 @@ class EventWizardManager {
 
     // Validate when the user leaves the field (blur) to give feedback after editing
     input.addEventListener('blur', () => {
+      // Primary type-specific validation
       this.validateWizardField(input, step.field, step.content.inputType);
+
+      // Additional relational validations defined in YAML (e.g. lt:otherField)
+      const validationRules = (step.content && step.content.validation) || '';
+      if (validationRules) {
+        const rules = validationRules.split('|').map(r => r.trim());
+        rules.forEach(r => {
+          // Pattern: comparator:fieldName (e.g. lt:propertyValue)
+          const m = r.match(/^(lt|lte|gt|gte):(.+)$/);
+          if (m) {
+            const comparator = m[1];
+            const otherField = m[2];
+            const otherValRaw = this.wizardState.data[otherField];
+            const thisValNum = parseFloat(input.value.replace(/[^0-9.-]/g, ''));
+            const otherValNum = parseFloat((otherValRaw || '').toString().replace(/[^0-9.-]/g, ''));
+
+            if (!isNaN(thisValNum) && !isNaN(otherValNum)) {
+              let valid = true;
+              switch (comparator) {
+                case 'lt':  valid = thisValNum < otherValNum; break;
+                case 'lte': valid = thisValNum <= otherValNum; break;
+                case 'gt':  valid = thisValNum > otherValNum; break;
+                case 'gte': valid = thisValNum >= otherValNum; break;
+              }
+              if (!valid) {
+                const message = `Value must be ${comparator} ${otherField.replace(/([A-Z])/g, ' $1').toLowerCase()}`;
+                this.showWizardFieldValidation(input, message);
+              }
+            }
+          }
+        });
+      }
     });
 
     // Add Enter key listener to advance to next step for single input pages
@@ -447,7 +497,26 @@ class EventWizardManager {
         e.preventDefault();
         // Force blur so validation runs before attempting to advance
         input.blur();
-        this.nextStep('input');
+
+        // BEGIN MODIFY: Schedule nextStep slightly later so the blur/validation cycle
+        // has a chance to update the DOM, preventing premature navigation when
+        // validation fails. Also clear any previously scheduled auto-advances to
+        // avoid multiple queued navigations from rapid key presses.
+        // Cancel any pending timeouts for this step
+        if (this._pendingNextTimeouts && this._pendingNextTimeouts.length) {
+          this._pendingNextTimeouts.forEach(t => clearTimeout(t));
+          this._pendingNextTimeouts = [];
+        }
+
+        // Schedule the actual navigation after a short delay (50-100 ms is plenty)
+        const timeoutId = setTimeout(() => {
+          this.nextStep('input');
+          // Remove this timeout reference once it has executed
+          this._pendingNextTimeouts = this._pendingNextTimeouts.filter(id => id !== timeoutId);
+        }, 60);
+
+        this._pendingNextTimeouts.push(timeoutId);
+        // END MODIFY
       }
     });
 
@@ -558,16 +627,113 @@ class EventWizardManager {
       switch (buttonType) {
         case 'back':
           button.textContent = 'Back';
-          button.addEventListener('click', () => this.previousStep());
-          button.disabled = this.currentStep === 0;
+          // Pointerdown handler for mobile (prevents click cancellation)
+          button.addEventListener('pointerdown', (e) => {
+            // For safety, ignore secondary buttons
+            if (e.button !== 0) return;
+
+            if (!this.isMobile) return; // desktop: let click handler handle navigation
+
+            const oldActive = document.activeElement;
+
+            // Helper to check if an element is a textual input that can trigger the keyboard
+            const isTextualInput = (el) => {
+              if (!el) return false;
+              if (el.tagName === 'TEXTAREA') return true;
+              if (el.tagName === 'INPUT') {
+                const badTypes = [
+                  'radio', 'checkbox', 'hidden', 'range', 'button', 'submit', 'reset',
+                  'file', 'color', 'date', 'datetime-local', 'month', 'time', 'week'
+                ];
+                const type = el.getAttribute('type')?.toLowerCase() || 'text';
+                return !badTypes.includes(type);
+              }
+              return false;
+            };
+
+            // We will re-focus the first input in the *new* modal only after the old input blurs
+            let refocused = false;
+            const handleBlur = () => {
+              if (refocused) return;
+              refocused = true;
+              // Delay to next micro-task to ensure new modal is in the DOM
+              setTimeout(() => {
+                const modal = document.getElementById('eventWizardModal');
+                if (modal) {
+                  const firstInput = modal.querySelector('input, select, textarea');
+                  if (firstInput) firstInput.focus();
+                }
+              }, 0);
+            };
+
+            if (isTextualInput(oldActive)) {
+              oldActive.addEventListener('blur', handleBlur, { once: true });
+              // Fallback: if blur somehow never fires, trigger focus after 500 ms
+              setTimeout(handleBlur, 500);
+            }
+
+            // Perform navigation before keyboard collapse to preserve click
+            // Set flag so that the overlay click generated by this touch sequence
+            // (which can target the new overlay after it is created) does not
+            // immediately close the wizard on mobile devices.
+            this._ignoreNextOverlayClick = true;
+            this.previousStep();
+
+            // Prevent the subsequent click event so we don’t navigate twice
+            e.preventDefault();
+          });
+          // Desktop click navigation (ignored on mobile)
+          button.addEventListener('click', () => {
+            if (this.isMobile) return;
+            this.previousStep();
+          });
           break;
         case 'next':
           button.textContent = 'Next';
-          button.addEventListener('click', () => {
-            // Trigger blur on active element so its validation fires first
-            if (document.activeElement && typeof document.activeElement.blur === 'function') {
-              document.activeElement.blur();
+          // Pointerdown for mobile devices only
+          button.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return; // primary touch/click only
+
+            if (!this.isMobile) return; // desktop: let click handle navigation
+
+            // Cancel pending auto-advance timers (Enter key etc.)
+            if (this._pendingNextTimeouts && this._pendingNextTimeouts.length) {
+              this._pendingNextTimeouts.forEach(t => clearTimeout(t));
+              this._pendingNextTimeouts = [];
             }
+
+            const active = document.activeElement;
+
+            const isTextualInput = (el) => {
+              if (!el) return false;
+              if (el.tagName === 'TEXTAREA') return true;
+              if (el.tagName === 'INPUT') {
+                const badTypes = [
+                  'radio', 'checkbox', 'hidden', 'range', 'button', 'submit', 'reset',
+                  'file', 'color', 'date', 'datetime-local', 'month', 'time', 'week'
+                ];
+                const type = el.getAttribute('type')?.toLowerCase() || 'text';
+                return !badTypes.includes(type);
+              }
+              return false;
+            };
+
+            if (isTextualInput(active)) {
+              const onBlur = () => {
+                this.nextStep('button');
+              };
+              active.addEventListener('blur', onBlur, { once: true });
+              // Let natural focus shift blur the input (pointerdown on button triggers this)
+            } else {
+              this.nextStep('button');
+            }
+
+            // Prevent legacy click from firing to avoid duplicate navigation
+            e.preventDefault();
+          });
+          // Desktop click handler (ignored on mobile)
+          button.addEventListener('click', () => {
+            if (this.isMobile) return;
             this.nextStep('button');
           });
           break;
@@ -596,10 +762,15 @@ class EventWizardManager {
 
   // Navigation methods
   nextStep(origin = 'unknown') {
-    // BEGIN ADD: suppress duplicate rapid calls (e.g. duplicate click bubbling) RIGHT AT ENTRY
     // ----- Block navigation if current modal still has validation errors -----
     const activeModal = document.getElementById('eventWizardModal');
     if (activeModal && activeModal.querySelector('.validation-error')) {
+      // Re-focus the first input that has the validation error so the keyboard re-opens
+      const errInput = activeModal.querySelector('input.validation-error, textarea.validation-error, select.validation-error');
+      if (errInput && typeof errInput.focus === 'function') {
+        // Defer to next micro-task to ensure blur processing is done
+        setTimeout(() => errInput.focus(), 0);
+      }
       return;
     }
     const now = Date.now();
@@ -669,12 +840,50 @@ class EventWizardManager {
       }
       // Validate period steps (fromAge/toAge relationship) right before advancing
       else if (currentStepConfig && currentStepConfig.contentType === 'period') {
+        // BEGIN MODIFY: perform required field validation for period steps when advancing
+        const validationRules = (currentStepConfig.content && currentStepConfig.content.validation) || '';
+        const requiresFrom = validationRules.includes('required') || validationRules.includes('fromAgeRequired');
+        const requiresTo = validationRules.includes('required');
+
         const fromVal = (this.wizardState.data && this.wizardState.data.fromAge) || '';
         const toVal = (this.wizardState.data && this.wizardState.data.toAge) || '';
 
+        // Check required fields first
+        if (requiresFrom && (!fromVal || fromVal.toString().trim() === '')) {
+          const modal = document.getElementById('eventWizardModal');
+          if (modal) {
+            const fromInputEl = modal.querySelector('#wizard-fromAge');
+            if (fromInputEl) {
+              this.clearWizardFieldValidation(fromInputEl);
+              this.showWizardFieldValidation(fromInputEl, 'This field is required');
+              fromInputEl.focus();
+            }
+          }
+          return; // Prevent advancing until required From age is provided
+        }
+
+        if (requiresTo && (!toVal || toVal.toString().trim() === '')) {
+          const modal = document.getElementById('eventWizardModal');
+          if (modal) {
+            const toInputEl = modal.querySelector('#wizard-toAge');
+            if (toInputEl) {
+              this.clearWizardFieldValidation(toInputEl);
+              this.showWizardFieldValidation(toInputEl, 'This field is required');
+              toInputEl.focus();
+            }
+          }
+          return; // Prevent advancing until required To age is provided
+        }
+
+        // END MODIFY: required checks complete
+
+        // Existing relationship validation
+        const fromValAfterReq = fromVal; // names unchanged but keep semantic clarity
+        const toValAfterReq = toVal;
+
         // Only check relationship if both values are present
-        if (fromVal && toVal) {
-          const relationship = ValidationUtils.validateAgeRelationship(fromVal, toVal);
+        if (fromValAfterReq && toValAfterReq) {
+          const relationship = ValidationUtils.validateAgeRelationship(fromValAfterReq, toValAfterReq);
           if (!relationship.isValid) {
             const modal = document.getElementById('eventWizardModal');
             if (modal) {
@@ -707,6 +916,8 @@ class EventWizardManager {
     while (nextStepIndex < this.currentWizard.steps.length) {
       const step = this.currentWizard.steps[nextStepIndex];
       if (this.shouldShowStep(step)) {
+        // Push the current step onto the history stack before moving forward
+        this._stepHistory.push(this.currentStep);
         this.currentStep = nextStepIndex;
         this.showCurrentStep();
         return;
@@ -721,7 +932,13 @@ class EventWizardManager {
       return;
     }
 
-    // Find previous valid step (skip steps that don't meet conditions)
+    // Pop the last visited step from history, if available
+    if (this._stepHistory && this._stepHistory.length > 0) {
+      this.currentStep = this._stepHistory.pop();
+      this.showCurrentStep();
+      return;
+    }
+    // Fallback: if history is empty, attempt to find any previous visible step
     let prevStepIndex = this.currentStep - 1;
     while (prevStepIndex >= 0) {
       const step = this.currentWizard.steps[prevStepIndex];
@@ -731,6 +948,14 @@ class EventWizardManager {
         return;
       }
       prevStepIndex--;
+    }
+
+    // If no previous step exists, close the wizard and reopen the event-type selection modal
+    const existingData = { ...(this.wizardState?.data || {}) };
+    this.cancelWizard();
+
+    if (this.webUI && this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.showWizardSelection === 'function') {
+      this.webUI.eventsTableManager.showWizardSelection(existingData);
     }
   }
 
@@ -798,6 +1023,13 @@ class EventWizardManager {
   setupModalEventListeners(overlay, modal, step) {
     // Close on overlay click
     overlay.addEventListener('click', (e) => {
+      // If the previous navigation (e.g., mobile Back button) marked the next
+      // overlay click to be ignored, consume it and reset the flag.
+      if (this._ignoreNextOverlayClick) {
+        this._ignoreNextOverlayClick = false;
+        return;
+      }
+
       if (e.target === overlay) {
         this.cancelWizard();
       }
@@ -1043,7 +1275,10 @@ class EventWizardManager {
     // Clear any existing validation styling
     this.clearWizardFieldValidation(input);
 
-    if (!value || value.trim() === '') return; // empty allowed, handled on final submit
+    if (!value || value.trim() === '') {
+      // DEBUG: empty value – required check will handle later
+      return; // empty allowed, handled on final submit
+    }
 
     // Map field types to ValidationUtils
     switch (fieldType) {
@@ -1067,6 +1302,7 @@ class EventWizardManager {
     }
 
     if (!validation.isValid) {
+      // DEBUG: invalid value log
       this.showWizardFieldValidation(input, validation.message);
     }
   }
@@ -1108,6 +1344,10 @@ class EventWizardManager {
   }
 
   cancelWizard() {
+    // Call onCancel callback if provided
+    if (this.wizardState && this.wizardState.onCancel) {
+      this.wizardState.onCancel();
+    }
     this.closeWizard();
   }
 

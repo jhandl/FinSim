@@ -181,7 +181,7 @@ module.exports = {
       const fs = require('fs');
       const path = require('path');
       
-      const configDir = path.join(__dirname, '../core/config');
+      const configDir = path.join(__dirname, 'src/core/config');
       
       try {
         // Test if config files exist and can be loaded

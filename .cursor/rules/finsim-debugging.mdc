@@ -5,7 +5,11 @@ alwaysApply: false
 ## DEBUGGING ##
 
 When fixing an issue DO NOT jump to conclusions or start making sweeping changes based on absolutely no information. Don't do that. ALWAYS debug first. That means that you need to read the relevant code, understand how it works, and then formulate 5 to 7 hypothesis, select the one or two most likely ones, ask the user if they agree (and wait for their confirmation), then add logging to confirm (only add minimal logging, it's not easy to find the needle in a haystack of a ton of logs), and only when the root cause has been unequivocally proven through the logs, only then apply a fix, without removing the logs. Then test the fix by checking the logs. If the fix didn't work, remove the logs and start over. Once you have confirmed that you fixed the issue (as proven by the logs), clean up the logs. Once that is done, you can declare that you fixed the issue. No sooner than that.
-All this also applies to UI issues that require you to look at the UI, but instead (or in addition to) logs, you can use css to add visual cues like colored borders. The user will share screenshots for you to see what's happening in the UI.
+All this also applies to UI issues that require you to look at the UI, but instead (or in addition to) logs, you can use css to add visual cues like colored borders or show data in a temporary overlay. For mobile issues, use the phonitor.js library to add a debug overlay. If necessary, the user will share screenshots for you to see what's happening in the UI.
+
+ALWAYS use the absolute minimum amount of code you possibly can. DON'T add code if you can REUSE EXISTING CODE. DON'T ADD code if you can MODIFY EXISTING CODE.
+
+NEVER EVER USE DELAYS TO TRY TO FIX TIMING ISSUES. The correct way to fix those issues is with hooks or observers that only trigger when the conditions are met.
 
 DO NOT MAKE ASSUMPTIONS ABOUT THE CAUSE OF AN ISSUE. ALWAYS DEBUG!
 

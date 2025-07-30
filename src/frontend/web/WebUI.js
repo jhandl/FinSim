@@ -1187,8 +1187,11 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     // Load field labels configuration
     await webUi.fieldLabelsManager.loadLabels();
 
-    // Show welcome modal instead of automatically starting wizard
-    webUi.showWelcomeModal();
+    // Show welcome modal based on user preference
+    const welcomeModalState = localStorage.getItem('welcomeModalState') || 'on';
+    if (welcomeModalState === 'on') {
+      webUi.showWelcomeModal();
+    }
 
     // Hide loading overlay when initialization completes successfully
     const overlay = document.getElementById('loading-overlay');

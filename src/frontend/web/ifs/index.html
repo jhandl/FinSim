@@ -89,6 +89,20 @@
                     <i class="fas fa-toggle-off"></i>
                     <span>Tooltips: <strong>off</strong></span>
                 </button>
+
+                <button id="eventsWizardToggleMobile" class="mobile-menu-button secondary-button toggle-button" data-toggle-state="on">
+                    <span>Event Wizard</span>
+                    <div class="toggle-switch active">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </button>
+                
+                <button id="welcomeModalToggleMobile" class="mobile-menu-button secondary-button toggle-button" data-toggle-state="on">
+                    <span>Intro Window</span>
+                    <div class="toggle-switch active">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </button>
                 
                 <div class="mobile-menu-divider"></div>
                 
@@ -358,7 +372,6 @@
                 </table>
             </div>
             <div class="events-table-actions">
-                <button id="addEventWizard" class="primary-button">Wizard</button>
                 <button id="addEventRow" class="secondary-button">Add Event</button>
             </div>
         </div>
@@ -447,6 +460,7 @@
     <script src="/src/frontend/AbstractUI.js"></script>
     <script src="/src/frontend/UIManager.js"></script>
     <script src="/src/frontend/web/utils/DOMUtils.js"></script>
+    <script src="/src/frontend/web/utils/DeviceUtils.js"></script>
     <script src="/src/frontend/web/utils/FormatUtils.js"></script>
     <script src="/src/frontend/web/utils/TooltipUtils.js"></script>
     <script src="/src/frontend/web/utils/DropdownUtils.js"></script>
@@ -593,18 +607,21 @@
             const demoButton = document.getElementById('loadDemoScenarioMobile');
             const helpButton = document.getElementById('startWizardMobile');
             const toggleButton = document.getElementById('experimentalToggleMobile');
+            const eventsWizardToggleButton = document.getElementById('eventsWizardToggleMobile');
             const firstDivider = document.querySelector('.mobile-menu-divider');
             const secondDivider = document.querySelectorAll('.mobile-menu-divider')[1];
             const thirdDivider = document.querySelectorAll('.mobile-menu-divider')[2];
-            
-            // Hardcoded toggle to show/hide the toggle button
+
+            // Hardcoded toggle to show/hide the experimental toggle button
             const SHOW_TOGGLE_BUTTON = false;
+            // Always show the Events Wizard toggle
+            const SHOW_EVENTS_WIZARD_TOGGLE = true;
             
             // Track which sections have visible content
             let hasRunSection = false;
             let hasSaveLoadSection = false;
             let hasDemoHelpSection = false;
-            let hasToggleSection = SHOW_TOGGLE_BUTTON;
+            let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE;
             
             if (currentWidth > breakpoints.tablet) {
                 // Desktop mode: Only show Demo/Help/Coffee buttons that are visible in header but burger menu is always available
@@ -655,9 +672,13 @@
                 secondDivider.style.display = (hasSaveLoadSection && hasDemoHelpSection) ? 'block' : 'none';
             }
             
-            // Show/hide toggle button based on the hardcoded boolean
+            // Show/hide toggle buttons based on the hardcoded booleans
             if (toggleButton) {
                 toggleButton.style.display = SHOW_TOGGLE_BUTTON ? 'flex' : 'none';
+            }
+
+            if (eventsWizardToggleButton) {
+                eventsWizardToggleButton.style.display = SHOW_EVENTS_WIZARD_TOGGLE ? 'flex' : 'none';
             }
             
             // Third divider: between Demo/Help/Toggle and Coffee (Coffee is always visible)
@@ -724,6 +745,14 @@
                     this.handleToggle(toggleMobile);
                 });
             }
+
+            // Events Wizard Toggle
+            const eventsWizardToggleMobile = document.getElementById('eventsWizardToggleMobile');
+            if (eventsWizardToggleMobile) {
+                eventsWizardToggleMobile.addEventListener('click', () => {
+                    this.handleEventsWizardToggle(eventsWizardToggleMobile);
+                });
+            }
         }
         
         syncStatusIndicator() {
@@ -784,34 +813,82 @@
                 detail: { state: newState, enabled: newState === 'on' }
             }));
         }
-        
-        initializeToggleState() {
-            const toggleButton = document.getElementById('experimentalToggleMobile');
-            if (!toggleButton) return;
-            
-            // Get saved state from localStorage
-            const savedState = localStorage.getItem('experimentalFeatureState') || 'off';
-            const icon = toggleButton.querySelector('i');
-            const textSpan = toggleButton.querySelector('span');
-            
-            // Set the initial state
-            toggleButton.setAttribute('data-toggle-state', savedState);
-            
-            // Update the icon and text based on saved state
-            if (savedState === 'on') {
-                icon.classList.remove('fa-toggle-off');
-                icon.classList.add('fa-toggle-on');
-                textSpan.innerHTML = 'Tooltips: <strong>on</strong>';
+
+        handleEventsWizardToggle(toggleButton) {
+            const currentState = toggleButton.getAttribute('data-toggle-state');
+            const newState = currentState === 'off' ? 'on' : 'off';
+            const toggleSwitch = toggleButton.querySelector('.toggle-switch');
+
+            // Update the button state
+            toggleButton.setAttribute('data-toggle-state', newState);
+
+            // Update the toggle switch visual state
+            if (newState === 'on') {
+                toggleSwitch.classList.add('active');
             } else {
-                icon.classList.remove('fa-toggle-on');
-                icon.classList.add('fa-toggle-off');
-                textSpan.innerHTML = 'Tooltips: <strong>off</strong>';
+                toggleSwitch.classList.remove('active');
             }
-            
-            // Dispatch initial event for any listeners
-            window.dispatchEvent(new CustomEvent('experimentalFeatureToggle', {
-                detail: { state: savedState, enabled: savedState === 'on' }
+
+            // Store the state in localStorage for persistence
+            localStorage.setItem('eventsWizardState', newState);
+
+            // Trigger custom event that other parts of the app can listen to
+            window.dispatchEvent(new CustomEvent('eventsWizardToggle', {
+                detail: { state: newState, enabled: newState === 'on' }
             }));
+        }
+
+        initializeToggleState() {
+            // Initialize experimental toggle
+            const toggleButton = document.getElementById('experimentalToggleMobile');
+            if (toggleButton) {
+                // Get saved state from localStorage
+                const savedState = localStorage.getItem('experimentalFeatureState') || 'off';
+                const icon = toggleButton.querySelector('i');
+                const textSpan = toggleButton.querySelector('span');
+
+                // Set the initial state
+                toggleButton.setAttribute('data-toggle-state', savedState);
+
+                // Update the icon and text based on saved state
+                if (savedState === 'on') {
+                    icon.classList.remove('fa-toggle-off');
+                    icon.classList.add('fa-toggle-on');
+                    textSpan.innerHTML = 'Tooltips: <strong>on</strong>';
+                } else {
+                    icon.classList.remove('fa-toggle-on');
+                    icon.classList.add('fa-toggle-off');
+                    textSpan.innerHTML = 'Tooltips: <strong>off</strong>';
+                }
+
+                // Dispatch initial event for any listeners
+                window.dispatchEvent(new CustomEvent('experimentalFeatureToggle', {
+                    detail: { state: savedState, enabled: savedState === 'on' }
+                }));
+            }
+
+            // Initialize Events Wizard toggle
+            const eventsWizardToggleButton = document.getElementById('eventsWizardToggleMobile');
+            if (eventsWizardToggleButton) {
+                // Get saved state from localStorage (default to 'on')
+                const savedState = localStorage.getItem('eventsWizardState') || 'on';
+                const toggleSwitch = eventsWizardToggleButton.querySelector('.toggle-switch');
+
+                // Set the initial state
+                eventsWizardToggleButton.setAttribute('data-toggle-state', savedState);
+
+                // Update the toggle switch visual state based on saved state
+                if (savedState === 'on') {
+                    toggleSwitch.classList.add('active');
+                } else {
+                    toggleSwitch.classList.remove('active');
+                }
+
+                // Dispatch initial event for any listeners
+                window.dispatchEvent(new CustomEvent('eventsWizardToggle', {
+                    detail: { state: savedState, enabled: savedState === 'on' }
+                }));
+            }
         }
     }
     
@@ -1448,5 +1525,69 @@
     </script>
     
 
+<script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggle = document.getElementById('welcomeModalToggleMobile');
+            if (!toggle) return;
+
+            const toggleSwitch = toggle.querySelector('.toggle-switch');
+            const savedState = localStorage.getItem('welcomeModalState') || 'on';
+            toggle.setAttribute('data-toggle-state', savedState);
+            if (toggleSwitch) {
+                if (savedState === 'on') {
+                    toggleSwitch.classList.add('active');
+                } else {
+                    toggleSwitch.classList.remove('active');
+                }
+            }
+
+            // Attach tooltips to toggles for all layouts
+            function attachToggleTooltip(el, text) {
+                if (!el || typeof TooltipUtils === 'undefined') return;
+                // Use reusable TooltipUtils hover/long-press behaviour
+                TooltipUtils.attachTooltip(el, text);
+                // Additionally, on mobile tap show a brief tooltip without long-press
+                el.addEventListener('click', function(ev) {
+                    if (window.innerWidth <= 768) {
+                        const tt = TooltipUtils.showTooltip(text, el, { isMobile: true });
+                        setTimeout(() => TooltipUtils.hideTooltip(tt), 2000);
+                    }
+                }, { passive: true });
+            }
+
+            // Attach tooltips to toggles (mobile & desktop will reuse same logic)
+            const eventsToggle = document.getElementById('eventsWizardToggleMobile');
+            if (typeof TooltipUtils !== 'undefined') {
+                if (eventsToggle) {
+                    attachToggleTooltip(eventsToggle, 'Toggle the Event Wizard for creating/editing events.');
+                }
+                attachToggleTooltip(toggle, 'Toggle to always show the intro window on start-up or only through the Help button.');
+            }
+
+            window.dispatchEvent(new CustomEvent('welcomeModalToggle', {
+                detail: { state: savedState, enabled: savedState === 'on' }
+            }));
+
+            toggle.addEventListener('click', function() {
+                const currentState = toggle.getAttribute('data-toggle-state');
+                const newState = currentState === 'on' ? 'off' : 'on';
+                toggle.setAttribute('data-toggle-state', newState);
+
+                if (toggleSwitch) {
+                    if (newState === 'on') {
+                        toggleSwitch.classList.add('active');
+                    } else {
+                        toggleSwitch.classList.remove('active');
+                    }
+                }
+
+                localStorage.setItem('welcomeModalState', newState);
+
+                window.dispatchEvent(new CustomEvent('welcomeModalToggle', {
+                    detail: { state: newState, enabled: newState === 'on' }
+                }));
+            });
+        });
+        </script>
 </body>
 </html> 

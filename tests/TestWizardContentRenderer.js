@@ -16,8 +16,7 @@ module.exports = {
 
         try {
             // Test 1: Verify help.yml structure and conversion
-            console.log('  Testing help.yml structure...');
-            const helpYmlPath = path.join(__dirname, '..', 'frontend', 'web', 'assets', 'help.yml');
+            const helpYmlPath = path.join(__dirname, '..', 'src', 'frontend', 'web', 'assets', 'help.yml');
             if (!fs.existsSync(helpYmlPath)) {
                 testResults.errors.push('help.yml file not found');
                 testResults.success = false;
@@ -56,8 +55,7 @@ module.exports = {
             }
 
             // Test 2: Verify ContentRenderer.js has wizard support
-            console.log('  Testing ContentRenderer.js wizard support...');
-            const contentRendererPath = path.join(__dirname, '..', 'frontend', 'web', 'components', 'ContentRenderer.js');
+            const contentRendererPath = path.join(__dirname, '..', 'src', 'frontend', 'web', 'components', 'ContentRenderer.js');
             if (!fs.existsSync(contentRendererPath)) {
                 testResults.errors.push('ContentRenderer.js file not found');
                 testResults.success = false;
@@ -103,8 +101,7 @@ module.exports = {
             }
 
             // Test 3: Verify Wizard.js has ContentRenderer integration
-            console.log('  Testing Wizard.js ContentRenderer integration...');
-            const wizardPath = path.join(__dirname, '..', 'frontend', 'web', 'components', 'Wizard.js');
+            const wizardPath = path.join(__dirname, '..', 'src', 'frontend', 'web', 'components', 'Wizard.js');
             if (!fs.existsSync(wizardPath)) {
                 testResults.errors.push('Wizard.js file not found');
                 testResults.success = false;
@@ -133,9 +130,7 @@ module.exports = {
                 }
             }
 
-            if (testResults.success) {
-                console.log('✅ All wizard content renderer tests passed');
-            } else {
+            if (!testResults.success) {
                 console.log('❌ Some wizard content renderer tests failed');
                 testResults.errors.forEach(error => console.log(`  Error: ${error}`));
             }

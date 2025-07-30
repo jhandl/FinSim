@@ -30,6 +30,23 @@ class DropdownUtils {
     // Track all open dropdowns globally
     if (!window.__openDropdowns) window.__openDropdowns = new Set();
 
+    // BEGIN ADD: Global Escape key handler (one-time registration)
+    if (!window.__dropdownEscHandlerRegistered) {
+      window.__dropdownEscHandlerRegistered = true;
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+          if (window.__openDropdowns && window.__openDropdowns.size > 0) {
+            // Clone set to avoid mutation during iteration
+            const openDropdowns = Array.from(window.__openDropdowns);
+            openDropdowns.forEach((closer) => {
+              try { closer(); } catch (_) { /* ignore individual errors */ }
+            });
+          }
+        }
+      });
+    }
+    // END ADD: Global Escape key handler
+
     if (!toggleEl || !dropdownEl) {
       console.error('DropdownUtils: toggleEl and dropdownEl are required');
       return null;
@@ -117,7 +134,21 @@ class DropdownUtils {
         div.setAttribute('data-value', opt.value);
         div.setAttribute('role', 'option');
         div.textContent = opt.label;
+
+        // Apply optional description for tooltip support
         if (opt.description) div.setAttribute('data-description', opt.description);
+
+        // Generic support for additional class names (single string or array)
+        if (opt.className) {
+          (Array.isArray(opt.className) ? opt.className : [opt.className])
+            .forEach(cls => div.classList.add(cls));
+        }
+
+        // Optional inline style string (e.g., "font-size: 1rem; font-weight:600;")
+        if (opt.style) {
+          div.style.cssText += opt.style;
+        }
+
         if (opt.selected || opt.value === selected) div.classList.add('selected');
         dropdownEl.appendChild(div);
       });
@@ -161,7 +192,6 @@ class DropdownUtils {
     // Dropdown opening / closing
     // ---------------------------------------------------------------------
     const open = () => {
-      // Close any other open dropdowns first
       window.__openDropdowns.forEach((closer) => closer());
 
       dropdownEl.style.display = 'block';
@@ -173,6 +203,8 @@ class DropdownUtils {
       const spaceBelow = vpH - iconRect.bottom;
       const spaceAbove = iconRect.top;
       const ddH = ddRect.height;
+
+
 
       dropdownEl.style.position = 'fixed';
       dropdownEl.style.zIndex = '10051';

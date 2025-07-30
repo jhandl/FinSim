@@ -634,3 +634,8 @@ input[name="description"] {
       padding: 0.75rem;
   }
 }
+
+/* Ensure no extra dividing line appears between Monthly and Annual payment rows */
+.wizard-mortgage-calculation .calculation-payment:last-child {
+    border-top: none !important;
+}

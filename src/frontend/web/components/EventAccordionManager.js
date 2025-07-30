@@ -5,7 +5,15 @@ class EventAccordionManager {
   constructor(webUI) {
     this.webUI = webUI;
     this.eventCounter = 0;
-    this.ageYearMode = 'age'; // Track current toggle mode
+    // Track current toggle mode (load from localStorage if available)
+    const storedMode = (() => {
+      try {
+        return localStorage.getItem('ageYearMode');
+      } catch (_) {
+        return null;
+      }
+    })();
+    this.ageYearMode = (storedMode === 'year') ? 'year' : 'age';
     this.accordionContainer = null;
     this.events = []; // Store event data for accordion items
     this.expandedItems = new Set(); // Track which items are expanded
@@ -335,6 +343,16 @@ class EventAccordionManager {
         expandBtn.classList.add('expanded');
         expandBtn.title = 'Collapse';
         this.expandedItems.add(accordionId);
+        // Ensure the expanded item is fully visible in the viewport (see scroll helper below)
+        // Use a transitionend listener to ensure we scroll *after* the panel
+        // is fully expanded (covers manual clicks as well as programmatic).
+        const onTransitionEnd = (ev) => {
+          if (ev.target === content && ev.propertyName === 'max-height') {
+            content.removeEventListener('transitionend', onTransitionEnd);
+            this._scrollExpandedItemIntoView(item);
+          }
+        };
+        content.addEventListener('transitionend', onTransitionEnd);
       });
     }
   }
@@ -510,39 +528,6 @@ class EventAccordionManager {
 
 
 
-
-
-  /**
-   * Animate the newly created event to draw attention
-   */
-  animateNewEvent(eventData) {
-    // Find the accordion items
-    const accordionItems = document.querySelectorAll('.events-accordion-item');
-
-    // New events are added at the end, so animate the last item
-    const lastItem = accordionItems[accordionItems.length - 1];
-
-    if (lastItem) {
-      // Add highlight animation class
-      lastItem.classList.add('new-event-highlight');
-
-      // Scroll the new event into view
-      lastItem.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
-
-      // Remove highlight after animation completes
-      setTimeout(() => {
-        lastItem.classList.remove('new-event-highlight');
-      }, 800);
-    }
-  }
-
-
-
-
-
   /**
    * Setup handlers for editable fields in the accordion
    */
@@ -567,13 +552,29 @@ class EventAccordionManager {
         selectedValue: event.type,
         width: 200,
         onSelect: (newType, label) => {
+          // Special case – Launch the interactive wizard instead of setting an event type
+          if (newType === 'WIZARD') {
+            const initialData = {
+              name: event.name,
+              amount: event.amount,
+              fromAge: event.fromAge,
+              toAge: event.toAge,
+              rate: event.rate,
+              match: event.match
+            };
+
+            // Launch wizard selection modal
+            this.webUI.eventsTableManager.showWizardSelection(initialData);
+            return;
+          }
+
           if (newType !== event.type) {
             // Update the hidden input
             typeInput.value = newType;
 
             // Clear any validation errors for the dropdown
             this.clearFieldValidation(typeInput);
-            
+
             // Preserve current field values before updating table
             const currentValues = this.preserveCurrentFieldValues(container);
 
@@ -1110,9 +1111,12 @@ class EventAccordionManager {
         // Find the corresponding event in the events array
         const event = this.events.find(e => e.accordionId === accordionId);
         if (event && event.id === id) {
-          // Found the matching event, expand it programmatically
-          console.debug('Expanding new wizard event with ID:', id, 'and accordionId:', accordionId);
-          this.toggleAccordionItem(accordionId);
+          // Expand only if not already expanded to avoid a double-toggle that would
+          // immediately collapse the item again when no empty row existed before.
+          if (!this.expandedItems.has(accordionId)) {
+            console.debug('Expanding new wizard event with ID:', id, 'and accordionId:', accordionId);
+            this.toggleAccordionItem(accordionId);
+          }
           break;
         }
       }
@@ -1635,6 +1639,51 @@ class EventAccordionManager {
     }
     if (this.resizeTimeout) {
       clearTimeout(this.resizeTimeout);
+    }
+  }
+
+  /**
+   * Ensure an expanded accordion item is fully visible in the viewport.
+   * If the expanded details would be clipped beneath the bottom (taking
+   * into account on-screen keyboards / phone chins), the page is scrolled
+   * just enough to reveal the full content. Similarly, if the item ends
+   * up too close to the very top we nudge it down slightly so the header
+   * remains readable.
+   *
+   * This helper replaces the previous centre-on-row behaviour and applies
+   * to ALL expansions (user-initiated or programmatic).
+   * @param {HTMLElement} item – The root .events-accordion-item element.
+   */
+  _scrollExpandedItemIntoView(item) {
+    if (!item) return;
+
+    const content = item.querySelector('.accordion-item-content.expanded');
+    if (!content) return;
+
+    // Prefer visualViewport if available (adjusts for on-screen keyboard)
+    const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight || document.documentElement.clientHeight;
+
+    // Reserve some space for soft-keyboard / phone chin. Tuned empirically.
+    const SOFT_BOTTOM_MARGIN = 260; // px
+    const TOP_MARGIN = 60;          // px – keep header from sticking to very top
+
+    const rect = content.getBoundingClientRect();
+
+    // Calculate how much we need to scroll so that the bottom of the
+    // expanded content sits above the soft bottom margin.
+    const bottomLimit = viewportHeight - SOFT_BOTTOM_MARGIN;
+    if (rect.bottom > bottomLimit) {
+      const diff = rect.bottom - bottomLimit;
+      window.scrollBy({ top: diff, behavior: 'smooth' });
+      return; // If we needed to scroll down, no need to check top afterwards.
+    }
+
+    // If the top of the accordion item is too close to the top, scroll up
+    // slightly so the header is comfortably visible.
+    const itemTop = item.getBoundingClientRect().top;
+    if (itemTop < TOP_MARGIN) {
+      const diff = itemTop - TOP_MARGIN;
+      window.scrollBy({ top: diff, behavior: 'smooth' });
     }
   }
 }

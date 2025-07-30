@@ -11,7 +11,7 @@
  */
 
 const path = require('path');
-const TestUtilsPath = path.join(__dirname, '..', 'core', 'TestUtils.js');
+const TestUtilsPath = path.join(__dirname, '..', 'src', 'core', 'TestUtils.js');
 const TestUtils = require(TestUtilsPath);
 
 module.exports = {
