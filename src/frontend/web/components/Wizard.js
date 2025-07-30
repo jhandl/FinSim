@@ -794,16 +794,32 @@ class Wizard {
           : this.tour.hasPreviousStep();
 
         if (canMove) {
-          // Remove focus from the current field if it's an input or select
-          if (document.activeElement && document.activeElement.matches('input, select')) {
-            document.activeElement.blur();
-            this.lastFocusedField = null;
-          }
-
-          // Handle burger menu before navigation
+          // Calculate target index first
           const targetIndex = direction === 'next'
             ? this.tour.getActiveIndex() + 1
             : this.tour.getActiveIndex() - 1;
+
+          // Remove focus from the current field if it's an input or select
+          if (document.activeElement && document.activeElement.matches('input, select')) {
+            // Set flag to prevent followFocus from interfering during navigation
+            this._programmaticFocus = true;
+            document.activeElement.blur();
+            // Don't clear lastFocusedField if we're moving within the events table
+            // This preserves table context for vertical navigation from phantom fields
+            const targetElement = targetIndex >= 0 && targetIndex < this.validSteps.length 
+              ? document.querySelector(this.validSteps[targetIndex].element) 
+              : null;
+            const isMovingWithinTable = targetElement && targetElement.id && targetElement.id.includes('Event');
+            if (!isMovingWithinTable) {
+              this.lastFocusedField = null;
+            }
+            // Clear the flag after a short delay
+            setTimeout(() => {
+              this._programmaticFocus = false;
+            }, 10);
+          }
+
+          // Handle burger menu before navigation
 
           if (targetIndex >= 0 && targetIndex < this.validSteps.length) {
             const targetElement = document.querySelector(this.validSteps[targetIndex].element);
