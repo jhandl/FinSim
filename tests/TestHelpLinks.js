@@ -16,7 +16,7 @@ module.exports = {
 
         try {
             // Read and parse help.yml file
-            const helpYmlPath = path.join(__dirname, '..', 'frontend', 'web', 'assets', 'help.yml');
+            const helpYmlPath = path.join(__dirname, '..', 'src', 'frontend', 'web', 'assets', 'help.yml');
             if (!fs.existsSync(helpYmlPath)) {
                 testResults.errors.push('help.yml file not found at expected location');
                 testResults.success = false;

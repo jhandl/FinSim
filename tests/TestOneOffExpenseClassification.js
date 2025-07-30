@@ -21,7 +21,6 @@ const testDefinition = {
 
     try {
       // Test 1: Event Type Classification
-      console.log('Testing event type classification...');
 
       // Mock EventsTableManager for testing
       const mockEventsTableManager = {
@@ -50,7 +49,6 @@ const testDefinition = {
       }
 
       // Test 2: Event Type Dropdown Options
-      console.log('Testing event type dropdown...');
 
       const options = mockEventsTableManager.getEventTypeOptionObjects();
       const e1Option = options.find(opt => opt.value === 'E1');
@@ -63,7 +61,6 @@ const testDefinition = {
       }
 
       // Test 3: Field Visibility for One-off Expenses
-      console.log('Testing field visibility for one-off expenses...');
 
       // Mock EventSummaryRenderer methods
       const mockSummaryRenderer = {
@@ -115,7 +112,6 @@ const testDefinition = {
       }
 
       // Test 4: Summary Generation
-      console.log('Testing summary generation...');
 
       // Mock EventSummaryRenderer.formatPeriod
       const mockFormatPeriod = function(fromAge, toAge) {
@@ -150,11 +146,8 @@ const testDefinition = {
         results.tests.push('✓ Multi-year expense correctly formatted as "ages X-Y"');
       }
       
-      console.log('\nTest Results:');
-      results.tests.forEach(test => console.log(test));
-      
       if (results.errors.length > 0) {
-        console.log('\nErrors:');
+        console.log('❌ One-off Expense Classification Test failed with the following errors:');
         results.errors.forEach(error => console.log('✗ ' + error));
       }
       

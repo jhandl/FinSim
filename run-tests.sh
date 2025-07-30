@@ -16,10 +16,10 @@ NC='\033[0m' # No Color
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CORE_DIR="$SCRIPT_DIR/core"
+CORE_DIR="$SCRIPT_DIR/src/core"
 TESTS_DIR="$SCRIPT_DIR/tests"
 # Added root directory variable for running Jest tests from repository root
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
 
 # Function to display usage
 show_usage() {
@@ -120,8 +120,8 @@ run_test() {
 
 # Function to find all test files
 find_test_files() {
-    # Exclude Jest UI tests (files ending with .test.js) which are handled separately by Jest
-    find "$TESTS_DIR" -name "*.js" ! -name "*.test.js" -type f | sort
+    # Exclude Jest tests (*.test.js) and Playwright tests (*.spec.js)
+    find "$TESTS_DIR" -name "*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort
 }
 
 # Function to list available tests
@@ -129,20 +129,41 @@ list_tests() {
     echo -e "${BLUE}Available FinSim Tests:${NC}"
     echo -e "${BLUE}======================${NC}"
     echo ""
-    
-    local test_files=($(find_test_files))
-    if [ ${#test_files[@]} -eq 0 ]; then
+
+    local custom_tests=( $(find "$TESTS_DIR" -name "*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort) )
+    local jest_tests=( $(find "$TESTS_DIR" -name "*.test.js" -type f | sort) )
+    local pw_tests=( $(find "$TESTS_DIR" -name "*.spec.js" -type f | sort) )
+
+    if [ ${#custom_tests[@]} -eq 0 ] && [ ${#jest_tests[@]} -eq 0 ] && [ ${#pw_tests[@]} -eq 0 ]; then
         echo -e "${YELLOW}No test files found in $TESTS_DIR${NC}"
         return 0
     fi
-    
-    for test_file in "${test_files[@]}"; do
-        local test_name=$(basename "$test_file" .js)
-        echo -e "  ${GREEN}$test_name${NC}"
-    done
-    
-    echo ""
-    echo -e "Usage: ${GREEN}./run-tests.sh [test-name]${NC}"
+
+    if [ ${#custom_tests[@]} -gt 0 ]; then
+        echo "Custom Node Tests:"
+        for f in "${custom_tests[@]}"; do
+            echo -e "  ${GREEN}$(basename "$f" .js)${NC}"
+        done
+        echo ""
+    fi
+
+    if [ ${#jest_tests[@]} -gt 0 ]; then
+        echo "Jest Tests:"
+        for f in "${jest_tests[@]}"; do
+            echo -e "  ${GREEN}$(basename "$f" .test.js)${NC}"
+        done
+        echo ""
+    fi
+
+    if [ ${#pw_tests[@]} -gt 0 ]; then
+        echo "Playwright Tests:"
+        for f in "${pw_tests[@]}"; do
+            echo -e "  ${GREEN}$(basename "$f" .spec.js)${NC}"
+        done
+        echo ""
+    fi
+
+    echo -e "Usage: ${GREEN}./run-tests.sh [test-name]${NC} (omit extension)"
     echo ""
 }
 
@@ -170,7 +191,6 @@ main() {
             echo -e "${YELLOW}No test files found in $TESTS_DIR${NC}"
             exit 0
         fi
-        
         local passed=0
         local failed=0
         
@@ -182,21 +202,58 @@ main() {
             fi
         done
         
+        # Run Jest-powered UI tests
+        cd "$ROOT_DIR"
+
+        # Run Jest with JSON output to capture pass/fail counts
+        TEMP_JSON=$(mktemp)
+        JEST_OUTPUT=$(npx jest --runInBand --json --outputFile "$TEMP_JSON" 2>&1)
+        if [ $? -eq 0 ]; then
+            echo -e "✅ PASSED: JestUITests"
+            ((passed++))
+        else
+            echo "$JEST_OUTPUT"
+            echo -e "❌ FAILED: JestUITests"
+            ((failed++))
+        fi
+
+        # -----------------------------
+        # Run Playwright end-to-end tests
+        # -----------------------------
+
+        for test_file in `find "$TESTS_DIR" -name "*.spec.js" -type f`; do
+
+            TEST_NAME=`echo $test_file | cut -d. -f1`
+            PLAYWRIGHT_OUTPUT=`npx playwright test $test_file`
+            if [ $? -eq 0 ]; then
+                echo -e "✅ PASSED: $TEST_NAME"
+                ((passed++))
+            else
+                echo "$PLAYWRIGHT_OUTPUT"
+                echo -e "❌ FAILED: $TEST_NAME"
+                ((failed++))
+            fi
+
+	done
+
+        # Final summary counts
+
+        # Cleanup temporary files
+        if [ -n "$TEMP_JSON" ] && [ -f "$TEMP_JSON" ]; then
+            rm -f "$TEMP_JSON"
+        fi
+
+        # Cleanup Playwright artifacts (test-results/, playwright-report/)
+        for dir in "test-results" "playwright-report"; do
+            if [ -d "$ROOT_DIR/$dir" ]; then
+                rm -rf "$ROOT_DIR/$dir"
+            fi
+        done
+
         echo
         echo -e " Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
         echo
 
-        # Run Jest-powered UI tests
-        echo -e "${BLUE}Running Jest UI tests...${NC}"
-        cd "$ROOT_DIR"
-        if npx jest --runInBand; then
-            echo -e "${GREEN}✅ Jest UI tests passed${NC}"
-        else
-            echo -e "${RED}❌ Jest UI tests failed${NC}"
-            exit 1
-        fi
-
-        # Exit status based on earlier custom test results (failed variable)
         if [ $failed -eq 0 ]; then
             exit 0
         else
@@ -206,23 +263,49 @@ main() {
     else
         # Run specific test
         local test_name="$1"
-        local test_file="$TESTS_DIR/$test_name.js"
 
-        if [ ! -f "$test_file" ]; then
-            echo -e "${RED}Error: Test file not found: $test_file${NC}"
+        # Determine actual file path based on common extensions
+        local base_path="$TESTS_DIR/$test_name"
+        local test_file=""
+        if [ -f "${base_path}.js" ]; then
+            test_file="${base_path}.js"
+        elif [ -f "${base_path}.test.js" ]; then
+            test_file="${base_path}.test.js"
+        elif [ -f "${base_path}.spec.js" ]; then
+            test_file="${base_path}.spec.js"
+        else
+            echo -e "${RED}Error: Test file not found for base name: $test_name${NC}"
             exit 1
         fi
 
-        # If the file is a Jest test, run it with Jest instead of the custom test framework
-        if [[ "$test_file" == *.test.js ]]; then
-            echo -e "${BLUE}Running Jest test: $test_name${NC}"
-            cd "$ROOT_DIR"
-            npx jest --runInBand "$test_file"
-            exit $?
-        fi
-
-        # Otherwise use the custom Node-based test runner
-        run_test "$test_file"
+        case "$test_file" in
+            *.test.js)
+                echo -e "${BLUE}Running Jest test: $test_name${NC}"
+                cd "$ROOT_DIR"
+                if npx jest --runInBand "$test_file"; then
+                    echo -e "${GREEN}✅ PASSED: $test_name${NC}"
+                    exit 0
+                else
+                    echo -e "${RED}❌ FAILED: $test_name${NC}"
+                    exit 1
+                fi
+                ;;
+            *.spec.js)
+                echo -e "${BLUE}Running Playwright test: $test_name${NC}"
+                cd "$ROOT_DIR"
+                if npx playwright test --reporter=list "$test_file"; then
+                    echo -e "${GREEN}✅ PASSED: $test_name${NC}"
+                    exit 0
+                else
+                    echo -e "${RED}❌ FAILED: $test_name${NC}"
+                    exit 1
+                fi
+                ;;
+            *)
+                # Custom Node-based test
+                run_test "$test_file"
+                ;;
+        esac
     fi
 }
 

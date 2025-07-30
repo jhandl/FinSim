@@ -132,8 +132,12 @@ EventWizards:
         title: "Review & Create"
         contentType: "summary"
         content:
-          text: "Review your income details:"
-          template: "**{name}**: {amount} annually from age {fromAge} to {toAge}"
+          templates:
+            - condition: "incomeType === 'salary' && pensionContribution === 'yes' && match"
+              template: "{name}: A gross salary of {amount} per year from age {fromAge} to {toAge}{growthPart}{matchPart}."
+            - condition: "incomeType === 'salary' && pensionContribution === 'yes'"
+              template: "{name}: A gross salary of {amount} per year from age {fromAge} to {toAge}{growthPart}, with employer pension contributions."
+            - template: "{name}: A {incomeType} income of {amount} per year from age {fromAge} to {toAge}{growthPart}."
         showButtons: ["back", "create"]
 
   # Expense Wizard (Simple Flow)
@@ -223,8 +227,10 @@ EventWizards:
         title: "Review & Create"
         contentType: "summary"
         content:
-          text: "Review your expense details:"
-          template: "**{name}**: {amount} annually from age {fromAge} to {toAge}"
+          templates:
+            - condition: "frequency === 'oneoff'"
+              template: "{name}: A one-off expense of {amount} at age {fromAge}{growthPart}."
+            - template: "{name}: An expense of {amount} {frequencyText} (≈ {annualAmount} per year) from age {fromAge} to {toAge}{growthPart}."
         showButtons: ["back", "create"]
 
   # Property Purchase Wizard (Complex Flow)
@@ -285,7 +291,7 @@ EventWizards:
         content:
           text: "How much will you pay as a down payment?"
           inputType: "currency"
-          validation: "required|positive"
+          validation: "required|positive|lt:propertyValue"
         showButtons: ["back", "next"]
         condition: "financing === 'mortgage'"
         
@@ -324,8 +330,10 @@ EventWizards:
         title: "Review & Create"
         contentType: "summary"
         content:
-          text: "Review your property purchase:"
-          template: "**{name}**: Purchase for {propertyValue}, down payment {amount}, from age {fromAge} to {toAge}"
+          templates:
+            - condition: "financing === 'cash'"
+              template: "{name}: A cash property purchase for {amount} at age {fromAge}."
+            - template: "{name}: Purchase for {propertyValue} with a down payment of {amount} at age {fromAge}. Loan term {mortgageTerm} years at {mortgageRate} (≈ {mortgageMonthlyPayment} per month, {mortgageAnnualPayment} per year)."
         showButtons: ["back", "create"]
 
   # Market Event Wizard (Investment Category)
@@ -369,8 +377,8 @@ EventWizards:
         title: "Review & Create"
         contentType: "summary"
         content:
-          text: "Review your market event:"
-          template: "**{name}**: {rate} total from age {fromAge} to {toAge}"
+          templates:
+            - template: "{name}: A market {direction} of {rate} from age {fromAge} to {toAge}."
         showButtons: ["back", "create"]
 
 # Wizard UI Configuration

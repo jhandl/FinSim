@@ -10,7 +10,7 @@ module.exports = {
             success: true,
             errors: []
         };
-        const TestFramework = require('../core/TestFramework.js').TestFramework;
+        const TestFramework = require('../src/core/TestFramework.js').TestFramework;
         const framework = new TestFramework();
             
         let currentVersion, versionUpdated, alertShown, alertResponse;

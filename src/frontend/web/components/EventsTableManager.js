@@ -10,7 +10,6 @@ class EventsTableManager {
     this.tooltipElement = null; // Reference to current tooltip
     this.tooltipTimeout = null; // Reference to tooltip delay timeout
     this.setupAddEventButton();
-    this.setupWizardButton();
     this.setupEventTableRowDelete();
     this.setupEventTypeChangeHandler();
     this.setupSimulationModeChangeHandler();
@@ -27,6 +26,55 @@ class EventsTableManager {
     this.initializeCarets();
     // Check for empty state on initial load
     setTimeout(() => this.checkEmptyState(), 0);
+
+    /* NEW: Apply saved preferences (view mode + age/year mode) & defaults */
+    setTimeout(() => this._applySavedPreferences(), 0);
+  }
+
+  /**
+   * NEW: Apply saved view/age-year preferences from localStorage.
+   * - viewMode key: 'viewMode' (values: 'table' | 'accordion')
+   * - ageYearMode key: 'ageYearMode' (values: 'age' | 'year')
+   *
+   * Defaults when nothing is stored:
+   *   • viewMode -> 'accordion' on mobile devices, otherwise 'table'
+   *   • ageYearMode -> 'age'
+   */
+  _applySavedPreferences() {
+    try {
+      // Retrieve stored preferences
+      const storedView = localStorage.getItem('viewMode');
+      const storedAgeYear = localStorage.getItem('ageYearMode');
+
+      // Determine preferred view mode
+      let preferredView = storedView;
+      if (!preferredView) {
+        // Default: accordion for mobile, table for desktop
+        preferredView = (typeof DeviceUtils !== 'undefined' && DeviceUtils.isMobile()) ? 'accordion' : 'table';
+      }
+
+      // Determine preferred age/year mode (default = age)
+      const preferredAgeYear = (storedAgeYear === 'year') ? 'year' : 'age';
+
+      // Apply view preference if different
+      if (preferredView !== this.viewMode) {
+        this.handleViewToggle(preferredView);
+      }
+
+      // Apply age/year preference if different
+      if (preferredAgeYear !== this.ageYearMode) {
+        this.handleAgeYearToggle(preferredAgeYear);
+      }
+
+      // Ensure accordion manager (once created) is synced with age/year mode
+      setTimeout(() => {
+        if (this.webUI.eventAccordionManager) {
+          this.webUI.eventAccordionManager.updateAgeYearMode(this.ageYearMode);
+        }
+      }, 0);
+    } catch (err) {
+      console.warn('Failed to apply saved preferences:', err);
+    }
   }
 
   setupAddEventButton() {
@@ -34,20 +82,81 @@ class EventsTableManager {
     if (addEventButton) {
       addEventButton.addEventListener('click', (e) => {
         e.preventDefault();
-        this.addEventRow();
+        this.handleAddEventClick();
+      });
+
+      // NEW: Set initial icon state based on wizard toggle
+      this.updateAddEventButtonIcons();
+
+      // NEW: Listen for wizard toggle changes to update icon dynamically
+      window.addEventListener('eventsWizardToggle', (ev) => {
+        const enabled = ev?.detail?.enabled;
+        this.updateAddEventButtonIcons(enabled);
       });
     }
   }
 
-  setupWizardButton() {
-    const wizardButton = document.getElementById('addEventWizard');
-    if (wizardButton) {
-      wizardButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.showWizardSelection();
-      });
+  /**
+   * Handle Add Event button click - either show wizard or add empty event based on toggle state
+   */
+  handleAddEventClick() {
+    // Check if Events Wizard toggle is enabled
+    const eventsWizardEnabled = this.isEventsWizardEnabled();
+
+    if (eventsWizardEnabled) {
+      // Show wizard selection (will handle empty row detection internally)
+      this.showWizardSelection();
+    } else {
+      // Check for existing empty row first
+      const existingEmptyRow = this.findEmptyEventRow();
+      if (existingEmptyRow) {
+        // Only use focusOnEmptyRow in table mode
+        if (this.viewMode !== 'accordion') {
+          this.focusOnEmptyRow(existingEmptyRow);
+        }
+      } else {
+        // Add empty event row
+        this.addEventRow();
+      }
+
+      // In accordion mode, open the empty event after a delay
+      if (this.viewMode === 'accordion') {
+        setTimeout(() => this.openEmptyInAccordion(), 200);
+      }
     }
   }
+
+  /**
+   * Check if Events Wizard is enabled via localStorage
+   * @returns {boolean} True if Events Wizard is enabled
+   */
+  isEventsWizardEnabled() {
+    const savedState = localStorage.getItem('eventsWizardState') || 'on';
+    return savedState === 'on';
+  }
+
+  /**
+   * Update the Add Event button icons depending on whether the Events Wizard is enabled.
+   * Shows a star icon on both sides of the text when enabled.
+   * @param {boolean} [wizardEnabled] – optional explicit state; falls back to localStorage lookup when omitted.
+   */
+  updateAddEventButtonIcons(wizardEnabled = undefined) {
+    const addEventButton = document.getElementById('addEventRow');
+    if (!addEventButton) return;
+
+    const enabled = (typeof wizardEnabled === 'boolean') ? wizardEnabled : this.isEventsWizardEnabled();
+
+    if (enabled) {
+      // Show star icons on both sides of the label
+      addEventButton.innerHTML = '🌟 Add Event 🌟';
+      addEventButton.classList.add('wizard-active');
+    } else {
+      // Revert to plain label
+      addEventButton.textContent = 'Add Event';
+      addEventButton.classList.remove('wizard-active');
+    }
+  }
+
 
   setupEventTableRowDelete() {
     const eventsTable = document.getElementById('Events');
@@ -157,6 +266,17 @@ class EventsTableManager {
             row.dataset.originalEventType = e.target.value;
           }
           this.updateFieldVisibility(e.target);
+          this.updateWizardIconsVisibility(row);
+        }
+      });
+
+      // Also listen for input changes on all event fields to update wizard icons
+      eventsTable.addEventListener('input', (e) => {
+        if (e.target.matches('.event-name, .event-amount, .event-from-age, .event-to-age, .event-rate, .event-match')) {
+          const row = e.target.closest('tr');
+          if (row) {
+            this.updateWizardIconsVisibility(row);
+          }
         }
       });
     }
@@ -188,6 +308,16 @@ class EventsTableManager {
         e.preventDefault();
         this.handleViewToggle('accordion');
       });
+    }
+
+    // Attach tooltips to view toggles
+    if (typeof TooltipUtils !== 'undefined') {
+      if (tableToggle) {
+        TooltipUtils.attachTooltip(tableToggle, "Table view is ideal for larger screens and when you know your way around these events.");
+      }
+      if (accordionToggle) {
+        TooltipUtils.attachTooltip(accordionToggle, "Accordion view is best for smaller screens and while you're learning the ropes.");
+      }
     }
   }
 
@@ -252,9 +382,36 @@ class EventsTableManager {
 
     // Switch between table and accordion views
     this.switchView(newMode);
+
+    // NEW: Persist preference
+    try {
+      localStorage.setItem('viewMode', newMode);
+    } catch (_) {}
   }
 
   handleAgeYearToggle(newMode) {
+    // Prevent switching to "year" mode if current age has not been provided
+    if (newMode === 'year') {
+      const startingAgeInput = 'StartingAge';
+      const startingAgeVal = parseInt(this.webUI.getValue(startingAgeInput)) || 0;
+
+      if (startingAgeVal === 0) {
+        // Inform the user and highlight the missing field
+        if (typeof this.webUI.showToast === 'function') {
+          this.webUI.showToast('Please enter your current age in order to switch to year mode.', 'Current Age Needed', 7);
+        } else {
+          alert('Please enter your current age in order to switch to year mode.');
+        }
+
+        // Highlight the missing age field so the user knows where to act
+        if (typeof this.webUI.setWarning === 'function') {
+          this.webUI.setWarning(startingAgeInput, 'Current age is required');
+        }
+
+        // Keep the toggle in its existing state
+        return;
+      }
+    }
     // Don't do anything if already in the requested mode
     if (this.ageYearMode === newMode) {
       return;
@@ -292,6 +449,11 @@ class EventsTableManager {
     // use the correct terminology (age vs year) for the new mode
     this.webUI.clearAllWarnings();
     this.webUI.validateEvents();
+
+    // Persist preference
+    try {
+      localStorage.setItem('ageYearMode', newMode);
+    } catch (_) {}
   }
 
   updateTableHeaders() {
@@ -495,6 +657,229 @@ class EventsTableManager {
       }
   }
 
+  /**
+   * Check if an event row is empty (NOP type and all fields blank)
+   */
+  isEventEmpty(row) {
+    const typeInput = row.querySelector('.event-type');
+    const nameInput = row.querySelector('.event-name');
+    const amountInput = row.querySelector('.event-amount');
+    const fromAgeInput = row.querySelector('.event-from-age');
+    const toAgeInput = row.querySelector('.event-to-age');
+    const rateInput = row.querySelector('.event-rate');
+    const matchInput = row.querySelector('.event-match');
+
+    // Check if type is NOP and all other fields are blank
+    return typeInput?.value === 'NOP' &&
+           (!nameInput?.value || nameInput.value.trim() === '') &&
+           (!amountInput?.value || amountInput.value.trim() === '') &&
+           (!fromAgeInput?.value || fromAgeInput.value.trim() === '') &&
+           (!toAgeInput?.value || toAgeInput.value.trim() === '') &&
+           (!rateInput?.value || rateInput.value.trim() === '') &&
+           (!matchInput?.value || matchInput.value.trim() === '');
+  }
+
+  /**
+   * Find the first empty event row in the table
+   * @returns {HTMLElement|null} The first empty row or null if none found
+   */
+  findEmptyEventRow() {
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return null;
+
+    const rows = tbody.querySelectorAll('tr');
+    for (const row of rows) {
+      if (this.isEventEmpty(row)) {
+        return row;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Focus on an existing empty row and open its event type dropdown
+   * @param {HTMLElement} row - The empty row to focus on
+   */
+  focusOnEmptyRow(row) {
+    // Ensure the row is visible – scroll only if it’s outside the viewport
+    const rect = row.getBoundingClientRect();
+    const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    if (rect.top < 0 || rect.bottom > viewportHeight) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Find the event type dropdown
+    const typeDropdown = row.querySelector('.event-type-dd');
+    if (typeDropdown) {
+      // Add a small delay to ensure scrolling is complete
+      setTimeout(() => {
+        // Trigger the dropdown to open
+        typeDropdown.click();
+      }, 300);
+    }
+  }
+
+  /**
+   * Open empty event in accordion mode
+   */
+  openEmptyInAccordion() {
+    const emptyRow = this.findEmptyEventRow();
+    if (!emptyRow || !this.webUI.eventAccordionManager) return;
+
+    const rowId = emptyRow.dataset.rowId;
+
+    // Fast-path: if the accordion item for this empty row is already open, show its dropdown
+    const toggleNow = document.querySelector(`#AccordionEventTypeToggle_${rowId}`);
+    if (toggleNow) {
+      const contentEl = toggleNow.closest('.accordion-item-content');
+      if (contentEl && contentEl.classList.contains('expanded')) {
+        toggleNow.click();
+        return;
+      }
+    }
+
+    // Otherwise sync accordion with current table state and proceed
+    this.webUI.eventAccordionManager.refresh();
+
+    const emptyEvent = this.webUI.eventAccordionManager.events.find(e => e.rowId === rowId);
+    if (!emptyEvent) return;
+
+    const accordionId = emptyEvent.accordionId;
+
+    // Locate the DOM element for this accordion item
+    const accordionEl = document.querySelector(`[data-accordion-id="${accordionId}"]`)?.closest('.events-accordion-item');
+
+    // Determine current expanded state BEFORE any potential toggle below
+    const isExpanded = this.webUI.eventAccordionManager.expandedItems.has(accordionId);
+
+    if (accordionEl) {
+      if (isExpanded) {
+        // Item is already open – ensure it’s fully visible (no double-scroll)
+        this.webUI.eventAccordionManager._scrollExpandedItemIntoView?.(accordionEl);
+      } else {
+        // Item collapsed – only scroll if it’s off-screen. Use block:"nearest" to
+        // avoid forcing the header to the middle which causes the later upward
+        // correction.
+        const rect = accordionEl.getBoundingClientRect();
+        const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+        if (rect.top < 0 || rect.bottom > viewportHeight) {
+          accordionEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    }
+
+    if (isExpanded) {
+      // Accordion already open – auto-show dropdown
+      const toggle = document.querySelector(`#AccordionEventTypeToggle_${rowId}`);
+      if (toggle) toggle.click();
+    } else {
+      // Accordion collapsed – just expand, leave dropdown closed
+      this.webUI.eventAccordionManager.toggleAccordionItem(accordionId);
+    }
+  }
+
+  /**
+   * Replace an empty row with event data from wizard
+   * @param {HTMLElement} emptyRow - The empty row to replace
+   * @param {Object} eventData - Data from the wizard
+   */
+  replaceEmptyRowWithEvent(emptyRow, eventData) {
+    // Create a new properly structured row with the wizard data
+    const newRow = this.createEventRow(
+      eventData.eventType || '',
+      eventData.name || '',
+      eventData.amount || '',
+      eventData.fromAge || '',
+      eventData.toAge || '',
+      eventData.rate || '',
+      eventData.match || ''
+    );
+    const newEventId = newRow.dataset.eventId; // capture ID for accordion highlight
+
+    // Preserve the position by inserting the new row before the empty row
+    const tbody = emptyRow.parentNode;
+    if (tbody) {
+      tbody.insertBefore(newRow, emptyRow);
+      // Remove the empty row
+      emptyRow.remove();
+    }
+
+    // Setup formatting for new inputs
+    this.webUI.formatUtils.setupCurrencyInputs();
+    this.webUI.formatUtils.setupPercentageInputs();
+
+    // Apply highlight animation to the new row
+    this.applyHighlightAnimation(newRow);
+
+    // Trigger sorting if needed
+    if (this.sortKeys && this.sortKeys.length > 0) {
+      this.applySortingWithAnimation();
+    } else {
+      // No sorting active – let highlight animation handle any needed scrolling
+    }
+
+    // Refresh accordion with highlight if it's active
+    if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+      this.webUI.eventAccordionManager.refreshWithNewEventAnimation(eventData, newEventId);
+    }
+  }
+
+  /**
+   * Apply highlight animation to a table row
+   * @param {HTMLElement} row - The row to animate
+   */
+  applyHighlightAnimation(row) {
+    if (!row) return;
+
+    // Find the table container to temporarily allow overflow
+    const tableContainer = row.closest('.table-container');
+    const eventsTable = document.getElementById('Events');
+
+    // Temporarily allow overflow to prevent clipping
+    if (tableContainer) {
+      tableContainer.style.overflow = 'visible';
+    }
+    if (eventsTable) {
+      eventsTable.style.overflow = 'visible';
+    }
+
+    // Add pulse animation class
+    row.classList.add('new-event-highlight');
+
+    // Remove highlight and restore overflow after animation completes
+    setTimeout(() => {
+      row.classList.remove('new-event-highlight');
+
+      // Restore original overflow settings
+      if (tableContainer) {
+        tableContainer.style.overflow = '';
+      }
+      if (eventsTable) {
+        eventsTable.style.overflow = '';
+      }
+    }, 800); // Match animation duration
+  }
+
+  /**
+   * Update wizard button visibility based on whether event is empty
+   */
+  updateWizardIconsVisibility(row) {
+    const wizardButton = row.querySelector('.wizard-icons');
+    const dropdown = row.querySelector('.event-type-dd');
+
+    if (!wizardButton || !dropdown) return;
+
+    const isEmpty = this.isEventEmpty(row);
+
+    if (isEmpty) {
+      wizardButton.style.display = 'flex';
+      dropdown.classList.add('has-wizard-icons');
+    } else {
+      wizardButton.style.display = 'none';
+      dropdown.classList.remove('has-wizard-icons');
+    }
+  }
+
   createEventRow(type = '', name = '', amount = '', fromAge = '', toAge = '', rate = '', match = '') {
     const rowId = this.generateEventRowId();
     const row = document.createElement('tr');
@@ -510,15 +895,20 @@ class EventsTableManager {
 
     // Build dropdown options & find label for current selection
     const optionObjects = this.getEventTypeOptionObjects();
-    const selectedObj = optionObjects.find((o) => o.value === type) || optionObjects[0];
+    const selectedObj = optionObjects.find((o) => o.value === type)
+                       || optionObjects.find((o) => o.value === 'NOP')
+                       || optionObjects[0];
     const selectedLabel = selectedObj.label;
 
     row.innerHTML = `
       <td>
           <input type="hidden" id="EventTypeValue_${rowId}" class="event-type" value="${selectedObj.value}">
-          <div class="event-type-dd visualization-control" id="EventType_${rowId}">
-              <span id="EventTypeToggle_${rowId}" class="dd-toggle pseudo-select">${selectedLabel}</span>
-              <div id="EventTypeOptions_${rowId}" class="visualization-dropdown" style="display:none;"></div>
+          <div class="event-type-container">
+              <button class="wizard-icons" style="display: none;" id="EventWizard_${rowId}" title="Launch wizard to create event" type="button">🌟</button>
+              <div class="event-type-dd visualization-control" id="EventType_${rowId}">
+                  <span id="EventTypeToggle_${rowId}" class="dd-toggle pseudo-select">${selectedLabel}</span>
+                  <div id="EventTypeOptions_${rowId}" class="visualization-dropdown" style="display:none;"></div>
+              </div>
           </div>
       </td>
       <td><input type="text" id="EventAlias_${rowId}" class="event-name" value="${name}"></td>
@@ -548,6 +938,25 @@ class EventsTableManager {
       selectedValue: selectedObj.value,
       width: 200,
       onSelect: (val, label) => {
+        // Special case – Launch the interactive wizard instead of setting an event type
+        if (val === 'WIZARD') {
+          const initialData = {
+            name: row.querySelector('.event-name')?.value || '',
+            amount: row.querySelector('.event-amount')?.value || '',
+            fromAge: row.querySelector('.event-from-age')?.value || '',
+            toAge: row.querySelector('.event-to-age')?.value || '',
+            rate: row.querySelector('.event-rate')?.value || '',
+            match: row.querySelector('.event-match')?.value || '',
+          };
+
+          // Open wizard selection modal with current row data pre-filled
+          this.showWizardSelection(initialData);
+
+          // Do not alter current row's type/value – simply exit
+          return;
+        }
+
+        // Normal behaviour for genuine event type selections
         typeInput.value = val;
         toggleEl.textContent = label;
         row.dataset.originalEventType = val;
@@ -568,6 +977,33 @@ class EventsTableManager {
     // Initial visibility update
     this.updateFieldVisibility(typeInput);
     this.applyTypeColouring(row);
+    this.updateWizardIconsVisibility(row);
+
+    // Add click handler for wizard button
+    const wizardButton = row.querySelector('.wizard-icons');
+    if (wizardButton) {
+      wizardButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Explicitly close the event-type dropdown (if open) before launching the wizard
+        if (row._eventTypeDropdown && typeof row._eventTypeDropdown.close === 'function') {
+          row._eventTypeDropdown.close();
+        }
+        e.stopPropagation();
+
+        // Get current row data to pre-fill wizard
+        const initialData = {
+          name: row.querySelector('.event-name')?.value || '',
+          amount: row.querySelector('.event-amount')?.value || '',
+          fromAge: row.querySelector('.event-from-age')?.value || '',
+          toAge: row.querySelector('.event-to-age')?.value || '',
+          rate: row.querySelector('.event-rate')?.value || '',
+          match: row.querySelector('.event-match')?.value || '',
+        };
+
+        // Launch wizard selection modal
+        this.showWizardSelection(initialData);
+      });
+    }
 
     return row;
   }
@@ -581,7 +1017,7 @@ class EventsTableManager {
 
     const row = this.createEventRow();
     const eventId = row.dataset.eventId;
-    console.debug('Created new event row with ID:', eventId);
+    /* Debug log removed */
     
     tbody.appendChild(row);
 
@@ -593,38 +1029,10 @@ class EventsTableManager {
 
     // Refresh accordion if it's active
     if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
-      console.debug('Accordion view active, refreshing with new event ID:', eventId);
+      /* Debug log removed */
       
       // First refresh the accordion to include the new event
       this.webUI.eventAccordionManager.refresh();
-      
-      // Then find and expand the newly added event
-      setTimeout(() => {
-        // Find the accordion item with matching eventId
-        const accordionItems = document.querySelectorAll('.events-accordion-item');
-        console.debug(`Found ${accordionItems.length} accordion items, searching for event ID:`, eventId);
-        
-        for (const item of accordionItems) {
-          const accordionId = item.dataset.accordionId;
-          if (!accordionId) continue;
-          
-          // Find the corresponding event in the accordion manager's events array
-          const event = this.webUI.eventAccordionManager.events.find(e => e.accordionId === accordionId);
-          if (event) {
-            console.debug(`Checking accordion item ${accordionId} with event ID:`, event.id);
-          }
-          
-          if (event && event.id === eventId) {
-            // Found the matching event, expand it programmatically
-            console.debug('SUCCESS: Expanding new event with ID:', eventId, 'and accordionId:', accordionId);
-            this.webUI.eventAccordionManager.toggleAccordionItem(accordionId);
-            
-            // Also scroll it into view
-            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            break;
-          }
-        }
-      }, 100); // Small delay to ensure the accordion has been refreshed
     }
 
     // Prevent any automatic focus that might cause scrolling
@@ -653,6 +1061,12 @@ class EventsTableManager {
     ];
 
     const eventTypes = [
+      {
+        value: 'WIZARD',
+        label: '✨🌟 Wizard 🌟✨',
+        className: 'dd-emphasis',
+        description: 'Launch the interactive wizard to guide you through creating complex events.'
+      },
       { value: 'NOP', label: 'No Operation' },
     ];
 
@@ -698,8 +1112,12 @@ class EventsTableManager {
       console.warn('EventsTableManager: failed to extract event type descriptions', err);
     }
 
-    // Attach description so DropdownUtils can show tooltips
-    return eventTypes.map((et) => ({ ...et, description: descMap[et.value] || et.label }));
+    // Attach description so DropdownUtils can show tooltips.
+    // Preserve any description explicitly set on the option object.
+    return eventTypes.map((et) => ({
+      ...et,
+      description: et.description || descMap[et.value] || et.label,
+    }));
   }
 
   setupTooltipHandlers() {
@@ -976,7 +1394,7 @@ class EventsTableManager {
   /**
    * Show wizard selection modal for event types
    */
-  showWizardSelection() {
+  showWizardSelection(initialData = {}) {
     // Get available wizards from the wizard manager
     const wizardManager = this.webUI.eventWizardManager;
     if (!wizardManager || !wizardManager.wizardData) {
@@ -990,15 +1408,24 @@ class EventsTableManager {
       return;
     }
 
+    // Check for existing empty row and store reference for replacement
+    // This ensures consistent behavior regardless of how the wizard was invoked
+    if (!this.pendingEmptyRowForReplacement) {
+      const existingEmptyRow = this.findEmptyEventRow();
+      if (existingEmptyRow) {
+        this.pendingEmptyRowForReplacement = existingEmptyRow;
+      }
+    }
+
     // Create selection modal
-    this.createWizardSelectionModal(wizards);
+    this.createWizardSelectionModal(wizards, initialData);
   }
 
   /**
    * Create and display wizard selection modal
    * @param {Array} wizards - Available wizard configurations
    */
-  createWizardSelectionModal(wizards) {
+  createWizardSelectionModal(wizards, initialData = {}) {
     // Remove any existing modal
     const existingModal = document.getElementById('wizardSelectionOverlay');
     if (existingModal) {
@@ -1051,7 +1478,7 @@ class EventsTableManager {
 
       // Add click handler
       option.addEventListener('click', () => {
-        this.startWizardForEventType(wizard.eventType);
+        this.startWizardForEventType(wizard.eventType, initialData);
         overlay.remove();
       });
 
@@ -1065,12 +1492,22 @@ class EventsTableManager {
     const footer = document.createElement('div');
     footer.className = 'event-wizard-step-footer';
 
+    // Use a button container to apply consistent right-alignment styles
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'event-wizard-buttons';
+
     const cancelButton = document.createElement('button');
     cancelButton.className = 'event-wizard-button';
     cancelButton.textContent = 'Cancel';
-    cancelButton.addEventListener('click', () => overlay.remove());
+    cancelButton.addEventListener('click', () => {
+      // Clear pending empty row reference when wizard selection is cancelled
+      this.pendingEmptyRowForReplacement = null;
+      overlay.remove();
+    });
 
-    footer.appendChild(cancelButton);
+    // Append the cancel button to the container, then container to footer
+    buttonContainer.appendChild(cancelButton);
+    footer.appendChild(buttonContainer);
     modal.appendChild(footer);
 
     overlay.appendChild(modal);
@@ -1078,7 +1515,19 @@ class EventsTableManager {
 
     // Close on overlay click
     overlay.addEventListener('click', (e) => {
+      // Mobile fix: if the previous Back navigation set the ignore flag, consume
+      // this first overlay click without closing the selection modal. This
+      // prevents the tap sequence that triggered Back from immediately
+      // dismissing the newly opened wizard-selection overlay on touch devices.
+      const wizardMgr = this.webUI?.eventWizardManager;
+      if (wizardMgr && wizardMgr._ignoreNextOverlayClick) {
+        wizardMgr._ignoreNextOverlayClick = false;
+        return;
+      }
+
       if (e.target === overlay) {
+        // Clear pending empty row reference when wizard selection is cancelled
+        this.pendingEmptyRowForReplacement = null;
         overlay.remove();
       }
     });
@@ -1086,6 +1535,8 @@ class EventsTableManager {
     // ESC key to close
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
+        // Clear pending empty row reference when wizard selection is cancelled
+        this.pendingEmptyRowForReplacement = null;
         overlay.remove();
         document.removeEventListener('keydown', handleKeyDown);
       }
@@ -1097,21 +1548,43 @@ class EventsTableManager {
    * Start wizard for specific event type
    * @param {string} eventType - The event type code
    */
-  startWizardForEventType(eventType) {
+  startWizardForEventType(eventType, initialData = {}) {
     const wizardManager = this.webUI.eventWizardManager;
     if (wizardManager) {
-      // Pass callback to create event when wizard completes
-      wizardManager.startWizard(eventType, {
-        onComplete: (eventData) => {
-          if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
-            // In accordion mode, let accordion manager handle creation and animation
-            this.webUI.eventAccordionManager.addEventFromWizard(eventData);
-          } else {
-            // In table mode, handle creation and sorting here
-            this.addEventFromWizardWithSorting(eventData);
-          }
+      // Check for existing empty row and store reference for replacement
+      // This ensures consistent behavior regardless of how the wizard was invoked
+      if (!this.pendingEmptyRowForReplacement) {
+        const existingEmptyRow = this.findEmptyEventRow();
+        if (existingEmptyRow) {
+          this.pendingEmptyRowForReplacement = existingEmptyRow;
         }
-      });
+      }
+
+      // Pass pre-populated data along with completion and cancellation callbacks
+      wizardManager.startWizard(eventType, initialData,
+        // onComplete callback
+        (eventData) => {
+          // Check if we need to replace an empty row
+          if (this.pendingEmptyRowForReplacement) {
+            this.replaceEmptyRowWithEvent(this.pendingEmptyRowForReplacement, eventData);
+            this.pendingEmptyRowForReplacement = null; // Clear the reference
+          } else {
+            // Normal flow - create new event
+            if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+              // In accordion mode, let accordion manager handle creation and animation
+              this.webUI.eventAccordionManager.addEventFromWizard(eventData);
+            } else {
+              // In table mode, handle creation and sorting here
+              this.addEventFromWizardWithSorting(eventData);
+            }
+          }
+        },
+        // onCancel callback
+        () => {
+          // Clear the pending empty row reference if wizard is cancelled
+          this.pendingEmptyRowForReplacement = null;
+        }
+      );
     }
   }
 
@@ -1182,7 +1655,7 @@ class EventsTableManager {
         }
       }, 400); // After FLIP animation completes
     } else {
-      // No sorting active, just highlight the new row
+      // No sorting active – let highlight animation handle any needed scrolling
       if (row) {
         row.classList.add('new-event-highlight');
         // Make sure the event ID is preserved
@@ -1252,11 +1725,12 @@ class EventsTableManager {
       // Add pulse animation class
       targetRow.classList.add('new-event-highlight');
 
-      // Scroll the new row into view
-      targetRow.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
+      // Make sure the row is visible before highlighting; scroll only if off-screen
+      const rect = targetRow.getBoundingClientRect();
+      const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+      if (rect.top < 0 || rect.bottom > viewportHeight) {
+        targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
 
       // Remove highlight and restore overflow after animation completes
       setTimeout(() => {

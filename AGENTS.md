@@ -139,7 +139,7 @@ All tests are run using the [`run-tests.sh`](src/run-tests.sh:1) script.
 
 ### 4.3. UI Testing
 
-The automated tests **only cover the core logic**. All UI-related changes must be tested manually by the user. The application is always running and available for testing in the user's browser.
+If there is no UI jest tests in the tests directory for the feature you want to test, ask the user to test them manually and offer to write a test as well. For manual testing, no server needs to be run. The server is always running and available for testing in the user's browser.
 
 **Do not** attempt to start a server, open a browser, or interact with the UI programmatically. When a UI change is ready, you should ask the user to test it.
 
@@ -149,4 +149,4 @@ The automated tests **only cover the core logic**. All UI-related changes must b
 *   **Event View Compatibility:** Any changes to the event structure or how events are handled must be tested against both event views (table and accordion) and the wizard system. The table view serves as the single source of truth, with the accordion view providing a synchronized alternative interface. Changes must maintain bidirectional synchronization and preserve all editing capabilities across views.
 *   **Configuration over Hardcoding:** Any constants, especially those related to tax rules, should be placed in the `finance-simulation-config-X.XX.json` file.
 *   **Write Tests:** Any new feature or bug fix for the core logic should be accompanied by a corresponding test. 
-*   **UI Testin:** Rely on the user for all UI testing and validation. The user is always running a local server. Don't start a new server and don't open browser windows.
+*   **UI Testin:** If you rely on the user for UI testing and validation, remember that the user is always running a local server. Don't start a new server and don't open browser windows.

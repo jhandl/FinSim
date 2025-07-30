@@ -52,7 +52,6 @@ module.exports = {
             const renderer = new MockEventWizardRenderer();
 
             // Test 1: Frequency replacement for different values
-            console.log('  Testing frequency variable replacement...');
             
             const testCases = [
                 {
@@ -86,7 +85,6 @@ module.exports = {
             }
 
             // Test 2: Multiple variable replacement
-            console.log('  Testing multiple variable replacement...');
             
             const multiVarTest = {
                 text: "Your {frequency} {name} expense of {amount}",
@@ -107,7 +105,6 @@ module.exports = {
             }
 
             // Test 3: No frequency data (should leave placeholder unchanged)
-            console.log('  Testing missing frequency data...');
             
             const noFrequencyTest = {
                 text: "What's the {frequency} cost of this expense?",
@@ -121,9 +118,7 @@ module.exports = {
                 testResults.success = false;
             }
 
-            if (testResults.success) {
-                console.log('✅ All event wizard variable replacement tests passed');
-            } else {
+            if (!testResults.success) {
                 console.log('❌ Some event wizard variable replacement tests failed');
                 testResults.errors.forEach(error => console.log(`  Error: ${error}`));
             }

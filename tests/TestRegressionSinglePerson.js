@@ -13,7 +13,7 @@
  * BASELINE CAPTURE: 2024-12-19, Tax Year: 2024/2025, Simulator Version: 1.26
  */
 
-const TestUtils = require('../core/TestUtils');
+const TestUtils = require('../src/core/TestUtils');
 
 module.exports = {
   name: "Single Person Career Regression Baseline",

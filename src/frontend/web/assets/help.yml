@@ -479,6 +479,14 @@ WizardSteps:
 ###########################################################
 # Event Type
 
+  - element: "#EventWizard"
+    tours: [full, mini]
+    card: events
+    popover:
+      description: "<p>Click this button to launch the Event Wizard to help you fill out an empty event.</p>"
+      side: "bottom"
+      align: "center"
+
   - element: "#EventType"
     accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
@@ -621,7 +629,7 @@ WizardSteps:
 ###########################################################
 # Event Name
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     accordion-element: ".accordion-edit-name"
     tours: [full, mini]
     card: events
@@ -630,7 +638,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["NOP"]
@@ -639,7 +647,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["RI"]
@@ -648,7 +656,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["SI"]
@@ -657,7 +665,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["SInp"]
@@ -666,7 +674,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["SI2"]
@@ -675,7 +683,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["SI2np"]
@@ -684,7 +692,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["UI"]
@@ -693,7 +701,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["DBI"]
@@ -702,7 +710,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["FI"]
@@ -711,7 +719,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["E"]
@@ -720,7 +728,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["SM"]
@@ -729,7 +737,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["R"]
@@ -738,7 +746,7 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
-  - element: "#EventName"
+  - element: "#EventAlias"
     tours: [full, mini]
     card: events
     eventTypes: ["M"]
@@ -1405,6 +1413,22 @@ WizardSteps:
       side: "top"
       align: "center"
 
+  - element: "#viewModeTable"
+    tours: [full, mini]
+    card: events
+    popover:
+      description: "<p>Toggle to see the events in form of a table.</p><p>This view is ideal for larger screens and when you know your way around these events. It's more like a spreadsheet, where you see all the data at a glance and can modify it directly.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#viewModeAccordion"
+    tours: [full, mini]
+    card: events
+    popover:
+      description: "<p>Toggle to see the events in form of expandable panels.</p><p>This view is best for smaller screens and when you're learning the ropes. When expanded, the event information is more like a form, with clear labels that make it easier to understand what they are for.</p>"
+      side: "bottom"
+      align: "center"
+
   - element: "#ageYearModeAge"
     tours: [full, mini]
     card: events
@@ -1417,7 +1441,7 @@ WizardSteps:
     tours: [full, mini]
     card: events
     popover:
-      description: "<p>Toggle to see the start and end points of events in terms of year.</p><p>To see the age that corresponds to a given year, hover over a year field. A tooltip will appear with the corresponding age, which might be your age or the other person's age depending on the type of event and if you're in single-person or two-person mode.</p>"
+      description: "<p>Toggle to see the start and end points of events in terms of year.</p><p>In this mode, to see the age that corresponds to a given year, hover over a year field. A tooltip will appear with the corresponding age, which might be your age or the other person's age depending on the type of event and if you're in single-person or two-person mode.</p>"
       side: "bottom"
       align: "center"
 

@@ -257,7 +257,40 @@ header.header-hidden {
     background-color: var(--secondary-color);
 }
 
+/* Toggle switch styles for mobile menu */
+.mobile-menu-button.toggle-button {
+    justify-content: space-between;
+}
 
+.toggle-switch {
+    position: relative;
+    width: 40px;
+    height: 20px;
+    background-color: #ccc;
+    border-radius: 20px;
+    transition: background-color 0.3s ease;
+    flex-shrink: 0;
+}
+
+.toggle-switch.active {
+    background-color: var(--primary-color);
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch.active .toggle-slider {
+    transform: translateX(20px);
+}
 
 .coffee-button {
     display: block;
@@ -3223,5 +3256,75 @@ footer {
     font-size: 0.9em;
     vertical-align: top;
     padding-top: 0.1rem;
+}
+
+/* Emphasized dropdown option (used by Wizard entry, but generic) */
+.visualization-dropdown div[data-value].dd-emphasis {
+    font-size: 1rem;
+}
+
+/* ------------------------------------------------------------------
+   Wizard Button for Empty Events
+-------------------------------------------------------------------*/
+
+/* Container for event type dropdown with wizard button */
+.event-type-container {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    width: 190px; /* Match original pseudo-select width exactly */
+    position: relative;
+}
+
+/* Wizard button styling */
+.wizard-icons {
+    font-size: 0.9rem;
+    line-height: 1;
+    user-select: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    width: 28px; /* Narrow button width */
+    height: 24px; /* Match dropdown height approximately */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    color: inherit;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: all 0.15s ease;
+}
+
+/* Wizard button hover effect */
+.wizard-icons:hover {
+    background: #f5f5f5;
+    border-color: #adb5bd;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+/* Wizard button active effect */
+.wizard-icons:active {
+    background: #e8e8e8;
+    border-color: #adb5bd;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1) inset;
+    transform: translateY(0);
+}
+
+/* When no button is shown, dropdown takes full width */
+.event-type-dd .pseudo-select {
+    min-width: 190px;
+    max-width: 190px;
+}
+
+/* When button is shown, dropdown takes remaining width but right edge stays aligned */
+.event-type-dd.has-wizard-icons {
+    flex: 1;
+}
+
+.event-type-dd.has-wizard-icons .pseudo-select {
+    min-width: 158px; /* 190px - 28px button - 4px gap = 158px */
+    max-width: 158px;
 }
 

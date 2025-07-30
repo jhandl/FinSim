@@ -15,8 +15,8 @@
  */
 
 const path = require('path');
-const TestUtilsPath = path.join(__dirname, '..', 'core', 'TestUtils.js');
-const TestFrameworkPath = path.join(__dirname, '..', 'core', 'TestFramework.js');
+const TestUtilsPath = path.join(__dirname, '..', 'src', 'core', 'TestUtils.js');
+const TestFrameworkPath = path.join(__dirname, '..', 'src', 'core', 'TestFramework.js');
 const TestUtils = require(TestUtilsPath);
 const { TestFramework } = require(TestFrameworkPath);
 
