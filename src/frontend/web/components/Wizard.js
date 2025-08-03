@@ -129,7 +129,41 @@ class Wizard {
     if (!tbody) return { isEmpty: true };
     const rows = tbody.querySelectorAll('tr');
     if (rows.length === 0) return { isEmpty: true };
-    const focusedRow = this.lastFocusedField ? Array.from(rows).find(row => row.contains(this.lastFocusedField)) : null;
+    let focusedRow = this.lastFocusedField ? Array.from(rows).find(row => row.contains(this.lastFocusedField)) : null;
+
+    // Accordion mode: if the last focused field is inside an accordion item (and not in the hidden table),
+    // derive the corresponding table row by matching the numeric suffix.
+    if (!focusedRow && this.lastFocusedField) {
+      const accItem = this.lastFocusedField.closest('.events-accordion-item');
+      if (accItem && accItem.getAttribute('data-accordion-id')) {
+        const accIdStr = accItem.getAttribute('data-accordion-id') || accItem.id || '';
+        const m = accIdStr.match(/(\d+)$/);
+        if (m && m[1] !== undefined) {
+          const idx = parseInt(m[1],10)+1;
+          const derivedRowId = `row_${idx}`;  // accordion-item is zero-based; table row ids start at 1
+          focusedRow = Array.from(rows).find(r => r.dataset.rowId === derivedRowId) || null;
+          
+        }
+      }
+    }
+
+    // BEGIN ADD: Fallback to first expanded accordion item when no lastFocusedField is available
+    if (!focusedRow) {
+      const expandedAcc = document.querySelector('.events-accordion-item .accordion-item-content.expanded');
+      const expandedItem = expandedAcc ? expandedAcc.closest('.events-accordion-item') : null;
+      if (expandedItem && expandedItem.getAttribute('data-accordion-id')) {
+        const accIdStr = expandedItem.getAttribute('data-accordion-id');
+        const m = accIdStr.match(/(\d+)$/);
+        if (m && m[1] !== undefined) {
+          const idx = parseInt(m[1], 10) + 1; // accordion-item is zero-based; table rows are 1-based
+          const derivedRowId = `row_${idx}`;
+          focusedRow = Array.from(rows).find(r => r.dataset.rowId === derivedRowId) || focusedRow;
+        }
+      }
+    }
+    // END ADD
+
+
     const row = focusedRow || rows[0];
     const rowId = row.dataset.rowId;
 
@@ -206,6 +240,16 @@ class Wizard {
     // Deep-copy to prevent accidental mutation of the original config
     const stepsCopy = JSON.parse(JSON.stringify(sourceSteps));
 
+      // Use the *unfiltered* master list to build the mapping so it is always available regardless of tour type
+      const masterSteps = (this.originalConfig && this.originalConfig.steps) ? this.originalConfig.steps : sourceSteps;
+      const accordionLookup = {};
+      masterSteps.forEach((st) => {
+        if (st['accordion-element'] && st.element && st.element.startsWith('#Event')) {
+          const fld = st.element.replace(/^#(Event[A-Za-z]+)$/,'$1');
+          accordionLookup[fld] = st['accordion-element'];
+        }
+      });
+
     // Determine current view mode for later checks (accordion vs table)
     const currentMode = this.getCurrentEventsMode ? this.getCurrentEventsMode() : 'table';
     // NOTE: No auto-expansion here; we'll expand lazily when we actually navigate to the first accordion field.
@@ -276,15 +320,56 @@ class Wizard {
 
         // For other elements (form fields, buttons), handle accordion fields specially
         if (currentMode === 'accordion' && (step.element.startsWith('#AccordionEventTypeToggle_') || step.element.startsWith('.accordion-edit-'))) {
-          // Keep accordion field steps even if the element doesn't exist yet (collapsed)
+          // Always scope selector to current accordion item so we highlight the correct row
+          try {
+            const rowNumMatch = this.tableState.rowId ? this.tableState.rowId.match(/row_(\d+)/) : null;
+            if (rowNumMatch && rowNumMatch[1] !== undefined) {
+              const rowNum = parseInt(rowNumMatch[1], 10);
+              const accIndex = rowNum - 1; // table rows 1-based, accordion 0-based
+              const accId = `accordion-item-${accIndex}`;
+              if (step.element.startsWith('.')) {
+                // Avoid double-prefixing
+                if (!step.element.startsWith('.events-accordion-item[')) {
+                  step.element = `.events-accordion-item[data-accordion-id="${accId}"] ${step.element}`;
+                }
+              }
+            }
+          } catch(err) {
+            console.warn('Wizard: selector scoping failed', err);
+          }
+
+          // Decide whether to keep this accordion field step
+          if (this.tableState.rowIsEmpty) {
+            // Empty row – generic guidance is useful
+            return true;
+          }
+          // Non-empty row: keep only if the step explicitly targets this event type
+          if (step.eventTypes) {
+            return step.eventTypes.includes(this.tableState.eventType);
+          }
+          if (step.noEventTypes) {
+            return !step.noEventTypes.includes(this.tableState.eventType);
+          }
+          // Generic field (no event type restrictions) → keep
           return true;
         }
 
         const element = document.querySelector(step.element);
         return element !== null && this.isElementVisible(element);
       } else {
-        // Preserve the static #EventType selector so it highlights the dropdown wrapper we assign.
-        step.element = step.element.replace(/Event([A-Za-z]+)/, `Event$1_${this.tableState.rowId}`);
+        // Map table selector to visible accordion selector when in accordion view
+          if (currentMode === 'accordion') {
+            const m = step.element.match(/^#(Event[A-Za-z]+)/);
+            if (m) {
+              const field = m[1];
+              const accSel = accordionLookup[field];
+               if (accSel) {
+                 step.element = accSel;
+               }
+            }
+          }
+          // Preserve the static #EventType selector so it highlights the dropdown wrapper we assign.
+          step.element = step.element.replace(/Event([A-Za-z]+)/, `Event$1_${this.tableState.rowId}`);
         if (this.tableState.isEmpty) {
           return false;
         } else {
@@ -302,12 +387,66 @@ class Wizard {
       }
     });
 
-    // DEBUG: Log resulting selectors in accordion mode
-    if (currentMode === 'accordion') {
-      //
-    }
+          // BEGIN ADD: Deduplicate accordion field steps so only one per field remains (prefer event-specific for current row)
+      if (currentMode === 'accordion') {
+        const fieldMap = {}; // key -> step
+        const deduped = [];
+        const getFieldKey = (sel) => {
+          if (!sel) return null;
+          // Strip accordion prefix if present
+          sel = sel.replace(/\.events-accordion-item\[.*?\]\s+/, '');
+          let m = sel.match(/\.accordion-edit-([a-z]+)/);
+          if (m && m[1]) return `edit-${m[1]}`;
+          m = sel.match(/#AccordionEventTypeToggle_row_\d+/);
+          if (m) return 'event-type-toggle';
+          return null;
+        };
 
-    return filteredSteps;
+        filteredSteps.forEach(step => {
+          const key = getFieldKey(step.element);
+          if (!key) {
+            deduped.push(step);
+            return;
+          }
+          const existing = fieldMap[key];
+          if (!existing) {
+            fieldMap[key] = step;
+            deduped.push(step);
+          } else {
+            // Prefer step whose eventTypes match current event
+            const existingMatches = existing.eventTypes && existing.eventTypes.includes(this.tableState.eventType);
+            const stepMatches = step.eventTypes && step.eventTypes.includes(this.tableState.eventType);
+            if (!existingMatches && stepMatches) {
+              // Replace generic with specific
+              const idx = deduped.indexOf(existing);
+              if (idx !== -1) deduped[idx] = step;
+              fieldMap[key] = step;
+            }
+          }
+        });
+
+        // Re-scope every accordion field selector after deduping to ensure correct prefix
+        deduped.forEach(st => {
+          if (st.element && (st.element.startsWith('#AccordionEventTypeToggle_') || st.element.includes('.accordion-edit-'))) {
+            try {
+              const rowMatch = this.tableState.rowId ? this.tableState.rowId.match(/row_(\d+)/) : null;
+              if (rowMatch && rowMatch[1] !== undefined) {
+                const accIdx = parseInt(rowMatch[1], 10) - 1;
+                const accId = `accordion-item-${accIdx}`;
+                if (st.element.startsWith('.')) {
+                  if (!st.element.startsWith('.events-accordion-item[')) {
+                    st.element = `.events-accordion-item[data-accordion-id="${accId}"] ${st.element}`;
+                  }
+                }
+              }
+            } catch(e) { /* ignore */ }
+          }
+        });
+
+        return deduped;
+      }
+
+      return filteredSteps;
   }
 
   // BEGIN ADD: Ensure first accordion item expanded for wizard selectors
@@ -317,12 +456,13 @@ class Wizard {
       if (!webUI || !webUI.eventAccordionManager) return;
       const mgr = webUI.eventAccordionManager;
       if (!mgr.events || mgr.events.length === 0) return;
-      const firstEvent = mgr.events[0];
-      if (!firstEvent || !firstEvent.accordionId) return;
-      if (mgr.expandedItems && mgr.expandedItems.has(firstEvent.accordionId)) {
-        this._autoExpandedAccordionId = firstEvent.accordionId;
+      // If at least one item is already expanded we do nothing – avoids opening the first row when
+      // the user is working in a different accordion item.
+      if (mgr.expandedItems && mgr.expandedItems.size > 0) {
         return;
       }
+      const firstEvent = mgr.events[0];
+      if (!firstEvent || !firstEvent.accordionId) return;
       mgr.toggleAccordionItem(firstEvent.accordionId);
       // Wait for the CSS transition (max-height 0.3s) to finish so that
       // Driver.js calculates the correct bounding box for the highlight.
@@ -391,27 +531,31 @@ class Wizard {
       return null;
     }
 
-    // First pass: look for exact matches
     let exactMatchIndex = -1;
     let containerMatchIndex = -1;
 
-    for (let i = 0; i < this.validSteps.length; i++) {
+    // Iterate over all steps and evaluate *all* matching elements, not just the first one.
+    outer: for (let i = 0; i < this.validSteps.length; i++) {
       const step = this.validSteps[i];
       const elementSelector = step.element;
-      const stepElement = document.querySelector(elementSelector);
+      if (!elementSelector) continue;
 
-      if (!stepElement) continue;
+      // There can be multiple elements matching the selector (one per accordion row)
+      const stepElements = document.querySelectorAll(elementSelector);
+      if (!stepElements || stepElements.length === 0) continue;
 
-      // Check if the step element is exactly the focused field
-      if (stepElement === this.lastFocusedField) {
-        exactMatchIndex = i;
-        break; // Exact match takes priority, stop searching
-      }
+      for (const el of stepElements) {
+        // Exact match takes absolute priority
+        if (el === this.lastFocusedField) {
+          exactMatchIndex = i;
+          break outer; // we found the best possible match
+        }
 
-      // Check if the focused field is contained within the step element (only if no exact match yet)
-      if (containerMatchIndex === -1 && stepElement.contains && stepElement.contains(this.lastFocusedField)) {
-        containerMatchIndex = i;
-        // Don't break - continue looking for exact matches
+        // Fallback: the element contains the focused field
+        if (containerMatchIndex === -1 && el.contains && el.contains(this.lastFocusedField)) {
+          containerMatchIndex = i;
+          // Keep looking – maybe we find an exact match later
+        }
       }
     }
 
@@ -517,6 +661,28 @@ class Wizard {
       },
       onDestroyStarted: () => this.finishTour(),
       onHighlighted: async (el) => {
+          try {
+            const idx = this.tour ? this.tour.getActiveIndex() : -1;
+            const step = (idx >= 0 && this.validSteps) ? this.validSteps[idx] : null;
+            if (step) {
+              // Determine which accordion row is being highlighted (if any)
+              let highlightRowId = 'n/a';
+              let highlightAcc = 'n/a';
+              if (el) {
+                const accEl = el.closest('.events-accordion-item');
+                if (accEl) {
+                  highlightAcc = accEl.getAttribute('data-accordion-id');
+                  const mRow = highlightAcc ? highlightAcc.match(/(\d+)$/) : null;
+                  if (mRow && mRow[1] !== undefined) {
+                    highlightRowId = `row_${parseInt(mRow[1], 10) + 1}`;
+                  }
+                }
+              }
+              // Identify bubble content source – generic vs event-specific
+              const contentTag = step.eventTypes ? `eventTypes=${step.eventTypes.join('|')}` : 'generic';
+              console.log(`Wizard Log: idx=${idx}, selector=${step.element}, content=${contentTag}, highlightRow=${highlightRowId}`);
+            }
+          } catch(e) { /* silent */ }
         this.cleanupInlineStyles();
         this.handleBurgerMenuSimple(el);
 
@@ -611,6 +777,22 @@ class Wizard {
     // Handle burger menu for the initial step
     await this.exposeHiddenElement(startingIndex);
 
+    // BEGIN DEBUG LOGGING: output selector resolution for accordion fields
+    try {
+      if (this.currentTourId === 'mini' && (this.getCurrentEventsMode && this.getCurrentEventsMode() === 'accordion')) {
+        console.groupCollapsed('Wizard Debug: Selector resolution');
+        this.validSteps.forEach((st, idx) => {
+          if (st.element && (st.element.includes('#AccordionEventTypeToggle_') || st.element.includes('.accordion-edit-'))) {
+            const el = document.querySelector(st.element);
+            console.log(`#${idx}`, st.element, '→', el);
+          }
+        });
+        console.groupEnd();
+      }
+    } catch (err) {
+      console.warn('Wizard debug logging failed', err);
+    }
+
     this.tour.drive(startingIndex);
   }
 
@@ -688,6 +870,10 @@ class Wizard {
 
     // Restore page scroll after wizard finishes
     this.unfreezeScroll();
+
+    // Reset last focused tracking so the next tour starts fresh
+    this.lastFocusedField = null;
+    this.lastFocusedWasInput = false;
 
     // Only update lastStepIndex if tour was completed normally
     if (this.tour && typeof this.tour.getActiveIndex === 'function') {
@@ -966,18 +1152,21 @@ class Wizard {
    * @param {Object} step - The step to update
    * @param {string} stepFieldType - The field type (e.g., "EventType", "EventAlias")
    */
-  updateStepContentForEventType(step, stepFieldType) {
+  updateStepContentForEventType(step, stepFieldType) {``
     if (!this.originalConfig || !this.originalConfig.steps || !this.tableState) {
       return;
     }
 
     // Find all original steps that match this field type
+    const dbgMatches = [];
     const matchingOriginalSteps = this.originalConfig.steps.filter(originalStep => {
       if (!originalStep.element) return false;
 
       // Check if this step is for the same field type
       const originalFieldType = originalStep.element.replace(/#(Event[A-Za-z]+)(_.*)?$/, '$1');
-      return originalFieldType === stepFieldType;
+      const isMatch = originalFieldType === stepFieldType;
+      if (isMatch) dbgMatches.push({ element: originalStep.element, eventTypes: originalStep.eventTypes });
+      return isMatch;
     });
 
     // Find the best matching step for the current event type
