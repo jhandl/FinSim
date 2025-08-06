@@ -16,3 +16,5 @@ DO NOT MAKE ASSUMPTIONS ABOUT THE CAUSE OF AN ISSUE. ALWAYS DEBUG!
 A local webserver is always running, so there's never need to start a new one to. DO NOT ASK THE USER TO RUN A SERVER. IT'S ALWAYS ALREADY RUNNING!
 
 The user always has a browser window open on the UI. Do not run the "Open in Browser" command. It's always already open.
+
+If logging to the console, use console.log().

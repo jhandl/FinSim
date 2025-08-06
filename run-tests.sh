@@ -261,51 +261,97 @@ main() {
         fi
         
     else
-        # Run specific test
-        local test_name="$1"
+        # Run specific test or group of tests with the same base name
+        local input_name="$1"
+        shift  # Move past the test name
 
-        # Determine actual file path based on common extensions
-        local base_path="$TESTS_DIR/$test_name"
-        local test_file=""
-        if [ -f "${base_path}.js" ]; then
-            test_file="${base_path}.js"
-        elif [ -f "${base_path}.test.js" ]; then
-            test_file="${base_path}.test.js"
-        elif [ -f "${base_path}.spec.js" ]; then
-            test_file="${base_path}.spec.js"
-        else
-            echo -e "${RED}Error: Test file not found for base name: $test_name${NC}"
-            exit 1
+        # Capture any extra arguments following the optional --args flag
+        local extra_args=()
+        if [ "$1" == "--args" ]; then
+            shift  # Remove the --args flag
+            # Collect all remaining parameters as individual array elements
+            while [ $# -gt 0 ]; do
+                extra_args+=("$1")
+                shift
+            done
         fi
 
-        case "$test_file" in
-            *.test.js)
-                echo -e "${BLUE}Running Jest test: $test_name${NC}"
-                cd "$ROOT_DIR"
-                if npx jest --runInBand "$test_file"; then
-                    echo -e "${GREEN}✅ PASSED: $test_name${NC}"
-                    exit 0
-                else
-                    echo -e "${RED}❌ FAILED: $test_name${NC}"
-                    exit 1
-                fi
-                ;;
-            *.spec.js)
-                echo -e "${BLUE}Running Playwright test: $test_name${NC}"
-                cd "$ROOT_DIR"
-                if npx playwright test --reporter=list "$test_file"; then
-                    echo -e "${GREEN}✅ PASSED: $test_name${NC}"
-                    exit 0
-                else
-                    echo -e "${RED}❌ FAILED: $test_name${NC}"
-                    exit 1
-                fi
-                ;;
-            *)
-                # Custom Node-based test
-                run_test "$test_file"
-                ;;
-        esac
+        local test_files=()
+
+        # If the user already supplied an extension (e.g., .js / .test.js / .spec.js),
+        # treat the argument as an explicit file name. Otherwise, gather all matching
+        # files that share the same base name.
+        if [[ "$input_name" == *.js ]]; then
+            # Explicit filename provided
+            if [ -f "$TESTS_DIR/$input_name" ]; then
+                test_files+=("$TESTS_DIR/$input_name")
+            else
+                echo -e "${RED}Error: Test file not found: $TESTS_DIR/$input_name${NC}"
+                exit 1
+            fi
+        else
+            # No extension – collect all matching variants (.js, .test.js, .spec.js)
+            local base_path="$TESTS_DIR/$input_name"
+            [ -f "${base_path}.js" ]       && test_files+=("${base_path}.js")
+            [ -f "${base_path}.test.js" ] && test_files+=("${base_path}.test.js")
+            [ -f "${base_path}.spec.js" ] && test_files+=("${base_path}.spec.js")
+
+            if [ ${#test_files[@]} -eq 0 ]; then
+                echo -e "${RED}Error: No test files found for base name: $input_name${NC}"
+                exit 1
+            fi
+        fi
+
+        # Run each collected test file and track pass/fail counts
+        local passed=0
+        local failed=0
+
+        for test_file in "${test_files[@]}"; do
+            local test_name=$(basename "$test_file")
+            case "$test_file" in
+                *.test.js)
+                    echo -e "${BLUE}Running Jest test: $test_name${NC}"
+                    cd "$ROOT_DIR"
+                    if npx jest --runInBand "${extra_args[@]}" "$test_file"; then
+                        echo -e "${GREEN}✅ PASSED: $test_name${NC}"
+                        ((passed++))
+                    else
+                        echo -e "${RED}❌ FAILED: $test_name${NC}"
+                        ((failed++))
+                    fi
+                    ;;
+                *.spec.js)
+                    echo -e "${BLUE}Running Playwright test: $test_name${NC}"
+                    cd "$ROOT_DIR"
+                    if npx playwright test "$test_file" --reporter=list "${extra_args[@]}"; then
+                        echo -e "${GREEN}✅ PASSED: $test_name${NC}"
+                        ((passed++))
+                    else
+                        echo -e "${RED}❌ FAILED: $test_name${NC}"
+                        ((failed++))
+                    fi
+                    ;;
+                *)
+                    # Custom Node-based test
+                    if run_test "$test_file"; then
+                        ((passed++))
+                    else
+                        ((failed++))
+                    fi
+                    ;;
+            esac
+        done
+
+        # Summary for the requested tests
+        echo
+        echo -e " Results (requested): ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
+        echo
+
+        if [ $failed -eq 0 ]; then
+            exit 0
+        else
+            exit 1
+        fi
     fi
 }
 
