@@ -5,8 +5,6 @@
 # 
 # This script runs tests from the tests/ directory using TestFramework.js directly
 
-set -e  # Exit on any error
-
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -207,8 +205,7 @@ main() {
 
         # Run Jest with JSON output to capture pass/fail counts
         TEMP_JSON=$(mktemp)
-        JEST_OUTPUT=$(npx jest --runInBand --json --outputFile "$TEMP_JSON" 2>&1)
-        if [ $? -eq 0 ]; then
+        if JEST_OUTPUT=$(npx jest --runInBand --json --outputFile "$TEMP_JSON" 2>&1); then
             echo -e "✅ PASSED: JestUITests"
             ((passed++))
         else

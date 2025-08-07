@@ -64,6 +64,8 @@ class WelcomeModal {
     document.body.classList.add('modal-open');
     this.modal.style.display = 'flex';
     setTimeout(() => {
+      // Re-enable pointer events in case they were disabled by a previous hide()
+      this.modal.style.pointerEvents = 'auto';
       this.modal.classList.add('visible');
       // Focus the modal so Esc key works immediately
       this.modal.focus();
@@ -293,6 +295,8 @@ class WelcomeModal {
   hide() {
     if (!this.modal) return;
 
+    // Immediately disable pointer events to ensure the overlay no longer blocks interactions even if CSS transitions are still running
+    this.modal.style.pointerEvents = 'none';
     this.modal.classList.remove('visible');
     setTimeout(() => {
       this.modal.style.display = 'none';
