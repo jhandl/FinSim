@@ -938,24 +938,6 @@ class EventsTableManager {
       selectedValue: selectedObj.value,
       width: 200,
       onSelect: (val, label) => {
-        // Special case – Launch the interactive wizard instead of setting an event type
-        if (val === 'WIZARD') {
-          const initialData = {
-            name: row.querySelector('.event-name')?.value || '',
-            amount: row.querySelector('.event-amount')?.value || '',
-            fromAge: row.querySelector('.event-from-age')?.value || '',
-            toAge: row.querySelector('.event-to-age')?.value || '',
-            rate: row.querySelector('.event-rate')?.value || '',
-            match: row.querySelector('.event-match')?.value || '',
-          };
-
-          // Open wizard selection modal with current row data pre-filled
-          this.showWizardSelection(initialData);
-
-          // Do not alter current row's type/value – simply exit
-          return;
-        }
-
         // Normal behaviour for genuine event type selections
         typeInput.value = val;
         toggleEl.textContent = label;
@@ -1061,12 +1043,6 @@ class EventsTableManager {
     ];
 
     const eventTypes = [
-      {
-        value: 'WIZARD',
-        label: '✨🌟 Wizard 🌟✨',
-        className: 'dd-emphasis',
-        description: 'Launch the interactive wizard to guide you through creating complex events.'
-      },
       { value: 'NOP', label: 'No Operation' },
     ];
 

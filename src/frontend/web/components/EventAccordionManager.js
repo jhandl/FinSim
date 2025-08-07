@@ -552,22 +552,6 @@ class EventAccordionManager {
         selectedValue: event.type,
         width: 200,
         onSelect: (newType, label) => {
-          // Special case – Launch the interactive wizard instead of setting an event type
-          if (newType === 'WIZARD') {
-            const initialData = {
-              name: event.name,
-              amount: event.amount,
-              fromAge: event.fromAge,
-              toAge: event.toAge,
-              rate: event.rate,
-              match: event.match
-            };
-
-            // Launch wizard selection modal
-            this.webUI.eventsTableManager.showWizardSelection(initialData);
-            return;
-          }
-
           if (newType !== event.type) {
             // Update the hidden input
             typeInput.value = newType;

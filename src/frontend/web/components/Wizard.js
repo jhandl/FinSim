@@ -428,6 +428,10 @@ class Wizard {
               if (!step.eventTypes && !step.noEventTypes) {
                 return true;
               }
+              // For single empty rows, exclude event-specific guidance to avoid duplicates
+              if (step.eventTypes || step.noEventTypes) {
+                return false;
+              }
             }
             // Evaluate event-specific or exclusion rules
             if (step.eventTypes) {

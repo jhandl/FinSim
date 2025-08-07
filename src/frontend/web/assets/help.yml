@@ -592,7 +592,7 @@ WizardSteps:
     card: events
     eventTypes: ["E"]
     popover:
-      description: "<p>An expense item. You can add an expense event for your total yearly cost of living, another one for a transcient or one-off expenses like college tuition, a car, etc.</p>"
+      description: "<p>An expense item. You can add an expense event for your total yearly cost of living, and other ones for a transcient or one-off expenses like college tuition, a car, etc.</p>"
       side: "bottom"
       align: "center"
 
