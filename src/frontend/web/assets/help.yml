@@ -83,7 +83,7 @@ WelcomeTabs:
             - "The projections are estimates based on your inputs and assumptions about future economic conditions. Not a prediction of the future."
         - question: "Is my financial data secure?"
           answer:
-            - "Yes, all your financial data stays on your computer. It's not sent to any server or stored online."
+            - "Yes, all your financial data stays on your computer or phone. It's not sent to any server or stored online."
             - "If you don't save it before closing this browser tab, it will be lost."
 
   - id: notes
@@ -94,7 +94,7 @@ WelcomeTabs:
         - title: "Disclaimer"
           description: "This is not financial advice. It's a tool to help you understand how different decisions and scenarios can affect your long term financial future. Don't make serious financial decisions without talking to a financial advisor."
         - title: "Privacy notice"
-          description: "I don't collect any data from you. The information you enter stays in your computer."
+          description: "Your financial data never leaves your computer or phone. It's all processed in your browser."
         - title: "Complementary tools"
           description: "Consider also using Irish Tax Hub's [tax calculators](https://www.irishtaxhub.ie/tools){tax calculators,suite,net income,free,pension,try calculator} and PWC's [income tax calculator](https://download.pwc.com/ie/budget-2025/income-tax-calculator.html){income tax calculator,your status,are you entitled}."
 
@@ -471,7 +471,7 @@ WizardSteps:
     tours: [quick, full, mini]
     card: events
     popover:
-      description: "<p>Add, remove, and edit the events that make up your scenario.</p><ul><li>An event is anything that is time-bound and has a financial impact, such as income, expenses, or a market crash.</li><li>Select an event type and press Help or the ? key for details.</li><li>Sort ⇅ the table by clicking a column header.</li></ul>"
+      description: "<p>Add, remove, and edit the events that make up your scenario.</p><ul><li>An event is anything that is time-bound and has a financial impact, such as income, expenses, or a market crash.</li><li>Select an event type and press Help or the ? key for details.</li><li>You can use the events wizard to help create events, and switch between table view or accordion view.</li><li>Sort ⇅ the table by clicking a column header.</li></ul>"
       side: "top"
       align: "center"
 
@@ -492,7 +492,7 @@ WizardSteps:
     tours: [full, mini]
     card: events
     popover:
-      description: "<p>Choose what kind of event this row represents: income, expense, property, market crash, etc. The fields to the right will automatically adapt to your selection.</p>"
+      description: "<p>Choose what kind of event this row represents: income, expense, property, market crash, etc. The other fields will automatically adapt to your selection.</p>"
       side: "bottom"
       align: "center"
 

@@ -1,5 +1,5 @@
 ---
-description: DEBUGGING: Read this rule when you asked to create tests.
+description: TESTING: Read this rule when you asked to create tests.
 alwaysApply: false
 ---
 ## TESTING ##

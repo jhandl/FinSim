@@ -963,6 +963,10 @@ class EventsTableManager {
 
     // Add click handler for wizard button
     const wizardButton = row.querySelector('.wizard-icons');
+    // Attach tooltip to wizard button when available
+    if (wizardButton && typeof TooltipUtils !== 'undefined') {
+      TooltipUtils.attachTooltip(wizardButton, "Launch wizard to create event");
+    }
     if (wizardButton) {
       wizardButton.addEventListener('click', (e) => {
         e.preventDefault();

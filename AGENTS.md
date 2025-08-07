@@ -150,3 +150,14 @@ If there is no UI jest tests in the tests directory for the feature you want to 
 *   **Configuration over Hardcoding:** Any constants, especially those related to tax rules, should be placed in the `finance-simulation-config-X.XX.json` file.
 *   **Write Tests:** Any new feature or bug fix for the core logic should be accompanied by a corresponding test. 
 *   **UI Testin:** If you rely on the user for UI testing and validation, remember that the user is always running a local server. Don't start a new server and don't open browser windows.
+
+## 6. Local Setup
+
+Follow these steps on a fresh machine right after cloning the repository to get the FinSim web app running locally:
+
+```bash
+npm install
+npx serve -s . -l 8080
+```
+
+Open http://localhost:8080 in your browser. The root `index.html` loads the SPA and you should see the FinSim interface. For optional testing, run `npm test` to execute unit tests or `npx playwright install` once before running e2e tests.
