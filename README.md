@@ -10,7 +10,6 @@
 - Implement analytics to replace cloudfront
 - Allow three options for retirement lump sum: not take it, limit to tax-free allowance, take it all.
 - Add an option to the pension contribution: Only contribute once hitting the high income tax bracket (this allows for downpayment saving while young; check with users if this makes sense though).
-- Auto save of changes to a scenario? Use a generic filename until the user saves with a new name. Record the name in local storage, read from it when loading. Add a clear button.
 - Something to facilitate a different type of pension contribution, where a director or other employee can have the equivalent of =<100% of their salary paid into a pension without a BIK, USC, PRSI, CGT, etc, liability.
 - Forms-like data input. While highlighting the relevant section in the background, ask questions and populate fields, with a nice animation showing the entered data moving to the corresponding sections. Auto saving along the way so if you go back it goes to step 2 etc. The personal tax credit must ask about all possible personal circumstances, like PWC's calculator.
 - Mortgage should consider variable or fixed for a # of years.
