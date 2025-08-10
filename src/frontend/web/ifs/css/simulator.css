@@ -2880,7 +2880,7 @@ footer {
     justify-content: flex-end;
     align-items: center;
     padding: 0.1rem 0;
-    gap: 1rem;
+    gap: 0.5rem;
 }
 
 .detail-row:last-child {
@@ -2906,7 +2906,7 @@ footer {
 /* Editable Fields in Accordion */
 .editable-field {
     flex: 0 0 190px;
-    width: 190px;
+    width: 180px;
 }
 
 .editable-field input,
