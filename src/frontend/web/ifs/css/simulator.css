@@ -1978,10 +1978,22 @@ footer {
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   font-size: 1rem;
-  z-index: 9999;
+  z-index: 10020; /* Above welcome modal (z-index: 10000) */
   opacity: 0.95;
   pointer-events: none;
   transition: opacity 0.3s;
+}
+
+/* Mobile: make toasts wider and higher on the screen */
+@media (max-width: 768px) {
+  .toast-message {
+    width: 90vw;
+    max-width: 90vw;
+    top: 50%;
+    bottom: auto;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
 }
 
 #Data thead tr.header-groups th:first-child,

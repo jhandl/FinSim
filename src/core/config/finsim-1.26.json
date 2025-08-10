@@ -1,9 +1,7 @@
 {
-  "latestVersion": 1.26,
-  "codeUpdateMessage": "New features are available",
-  "dataUpdateMessage": "Budget 2026 data is now available",
-  "simulationRuns": 5000,
-  "pensionContribEarningLimit": 115000,
+  "latestVersion": 1.27,
+  "codeUpdateMessage": "",
+  "dataUpdateMessage": "",
   "pensionLumpSumLimit": 0.25,
   "pensionLumpSumTaxBands": {"0": 0, "200000": 0.2, "500000": 0.4},
   "pensionMinDrawdownBands": {"0": 0, "61": 0.04, "71": 0.05}, 

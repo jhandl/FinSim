@@ -7,16 +7,12 @@ class Config {
   constructor(ui) {
     this.ui = ui;
     this.thisVersion = this.ui.getVersion();
-    // Do NOT call this.load(this.thisVersion) here.
-    // Do NOT call this.checkForUpdates() here yet, as it depends on loaded config data.
+    this._taxRuleSets = {}; // cache by country code (lowercase)
   }
 
   // Singleton
   static getInstance() {
     if (!Config_instance) {
-      // This indicates that initialize was not called or failed.
-      // Depending on strictness, could throw an error or return null.
-      // Throwing is safer to catch incorrect usage early.
       throw new Error("Config has not been initialized. Call Config.initialize() first.");
     }
     return Config_instance;
@@ -24,10 +20,65 @@ class Config {
 
   static async initialize(ui) {
     if (!Config_instance) {
-      Config_instance = new Config(ui); // Constructor is now simpler
+      Config_instance = new Config(ui);
       try {
-        await Config_instance.load(Config_instance.thisVersion); // Load data
-        Config_instance.checkForUpdates(); // Now check for updates
+        // Load the newest available config by following the latestVersion chain.
+        // This guarantees we don't keep or use obsolete fields from older files in this session.
+        const visited = {};
+        let startingVersion = String(Config_instance.thisVersion);
+        let currentVersion = startingVersion;
+        let previousVersionLoaded = null;
+        const aggregatedMessages = [];
+        while (true) {
+          if (visited[currentVersion]) {
+            break;
+          }
+          visited[currentVersion] = true;
+
+          await Config_instance.load(currentVersion);
+
+          // Collect code update message for this loaded version if it's an update step
+          if (previousVersionLoaded !== null) {
+            var codeMsg = (typeof Config_instance.codeUpdateMessage === 'string') ? Config_instance.codeUpdateMessage.trim() : '';
+            if (codeMsg && codeMsg.length > 0) {
+              console.log('codeMsg (v' + currentVersion + '): ', codeMsg);
+              aggregatedMessages.push(codeMsg);
+            }
+          }
+          previousVersionLoaded = currentVersion;
+
+          const hasLatest = (Config_instance.latestVersion !== undefined && Config_instance.latestVersion !== null);
+          const latest = hasLatest ? String(Config_instance.latestVersion) : null;
+
+          // Warn if latestVersion is missing to aid versioning diagnostics (used by tests as well)
+          if (!hasLatest) {
+            try { console.error('Config update check: latestVersion missing in loaded config for version ' + currentVersion); } catch (_) {}
+          }
+
+          // If no latest or already at latest, stop
+          if (!latest || latest === currentVersion) {
+            break;
+          }
+
+          // Found a newer version – discard the just loaded one and fetch the newer
+          currentVersion = latest;
+          // Also update thisVersion so subsequent comparisons/logs reflect the new target
+          Config_instance.thisVersion = currentVersion;
+        }
+
+        // Persist the final version if it differs from what was stored
+        if (startingVersion !== currentVersion) {
+          Config_instance.ui.setVersion(currentVersion);
+          if (aggregatedMessages.length > 0) {
+            var combined = '\n• ' + aggregatedMessages.join('\n• ');
+            Config_instance.ui.showToast(combined, 'New Features!', 10);
+          }
+        } else {
+          Config_instance.clearVersionAlert();
+        }
+
+        // Preload default country's tax ruleset so core engine has it synchronously
+        await Config_instance.getTaxRuleSet('ie');
       } catch (error) {
         // Error is already handled and alerted by load()
         // We might want to prevent the app from fully starting if config fails.
@@ -43,7 +94,7 @@ class Config {
   async load(version) {
     try {
       // Simple relative path for the configuration file
-      const url = "/src/core/config/finance-simulation-config-" + version + ".json";
+      const url = "/src/core/config/finsim-" + version + ".json";
       const jsonString = await this.ui.fetchUrl(url);
       const config = JSON.parse(jsonString);
       Object.assign(this, config);
@@ -54,31 +105,62 @@ class Config {
     }
   }
 
-  checkForUpdates() {
-    // Check if latestVersion field exists in the loaded config
-    if (!this.latestVersion) {
-      console.error('Warning: latestVersion field missing from config file. Skipping update check.');
-      this.clearVersionAlert(); // Clear any existing version alerts
-      return;
-    }
+  /**
+   * Lazily load and cache a TaxRuleSet for a given country code (e.g., 'ie').
+   * Returns the loaded TaxRuleSet instance, or null if loading fails.
+   * NOTE: Keep async to avoid blocking UI; callers that need sync access should
+   *       use getCachedTaxRuleSet() after preloading.
+   */
+  async getTaxRuleSet(countryCode) {
+    try {
+      const code = (countryCode || 'ie').toLowerCase();
+      if (this._taxRuleSets[code]) {
+        return this._taxRuleSets[code];
+      }
+      const url = "/src/core/config/tax-rules-" + code + ".json";
+      const jsonString = await this.ui.fetchUrl(url);
+      const rawRules = JSON.parse(jsonString);
+      // TaxRuleSet is defined globally by src/core/TaxRuleSet.js
+      const ruleset = new TaxRuleSet(rawRules);
+      this._taxRuleSets[code] = ruleset;
 
-    let latest = this.latestVersion.toString().split('.').map(Number);
-    let current = this.thisVersion.toString().split('.').map(Number);
-    if (latest.length > 0 && current.length > 0 && latest[0] !== current[0]) {
-      this.newCodeVersion();
-    } else if (latest.length > 1 && current.length > 1 && latest[1] !== current[1]) {
-      this.newDataVersion();
-    } else {
-      this.clearVersionAlert();
+      // Persist and notify about tax rules updates per country (non-blocking)
+      var storageKey = 'taxRules:' + code;
+      var storedVersion = localStorage.getItem(storageKey);
+      var currentVersion = String(ruleset.raw.version);
+      if (!storedVersion || storedVersion !== currentVersion) {
+        var raw = ruleset.raw || {};
+        var message = (typeof raw.updateMessage === 'string') ? raw.updateMessage.trim() : '';
+        var country = (typeof raw.countryName === 'string') ? raw.countryName.trim() : code.toUpperCase();
+        if (message.length > 0) {
+          this.ui.showToast('\n' + message, 'Tax rules updated for ' + country + ':', 10);
+        }
+        localStorage.setItem(storageKey, currentVersion)
+      }
+      return ruleset;
+    } catch (err) {
+      console.error('Error loading tax ruleset:', err);
+      return null;
     }
+  }
+
+  /**
+   * Return a cached TaxRuleSet if available, otherwise null. Does not trigger loading.
+   */
+  getCachedTaxRuleSet(countryCode) {
+    const code = (countryCode || 'ie').toLowerCase();
+    return this._taxRuleSets ? this._taxRuleSets[code] || null : null;
   }
 
   newCodeVersion() {
-    this.ui.newCodeVersion(this.latestVersion);
-  }
-
-  newDataVersion() {
-    this.ui.newDataVersion(this.latestVersion, this.dataUpdateMessage);
+    try {
+      var msg = (typeof this.codeUpdateMessage === 'string' && this.codeUpdateMessage.trim().length > 0)
+        ? (this.codeUpdateMessage.trim() + ' (v' + this.latestVersion + ')')
+        : null;
+      if (msg && this.ui && typeof this.ui.showToast === 'function') {
+        this.ui.showToast(msg, 'App Updated', 10);
+      }
+    } catch (_) {}
   }
 
   clearVersionAlert() {

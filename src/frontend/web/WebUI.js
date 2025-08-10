@@ -70,7 +70,7 @@ class WebUI extends AbstractUI {
       
       // Set initial UI state
       this.setStatus("Ready", STATUS_COLORS.INFO);
-      this.fileManager.updateLastSavedState(); // Establish baseline for new scenario
+      // Baseline will be established after Config is initialized (see DOMContentLoaded)
       
       this.updateUIForSimMode(); // Set initial UI state based on mode
       this.updateUIForEconomyMode(); // Set initial UI state for economy mode
@@ -136,26 +136,24 @@ class WebUI extends AbstractUI {
   }
 
   getVersion() {
-    return localStorage.getItem('simulatorVersion') || '1.27'; // TODO: Has to be a better way to get the starting defaultversion
+    try {
+      const key = 'simulatorVersion';
+      let stored = null;
+      try { if (typeof localStorage !== 'undefined') { stored = localStorage.getItem(key); } } catch (_) {}
+      return stored || '1.27'; // TODO: Has to be a better way to get the starting default version
+    } catch (_) {
+      return '1.27';
+    }
   }
 
   setVersion(version) {
-    localStorage.setItem('simulatorVersion', version);
+    const key = 'simulatorVersion';
+    try { localStorage.setItem(key, version); } catch (_) {}
+    try { if (typeof console !== 'undefined' && console.log) console.log('[Config] Wrote app version to storage', { key: key, newVersion: String(version) }); } catch (_) {}
     const versionSpan = document.querySelector('.version');
     if (versionSpan) {
       versionSpan.textContent = `Version ${version}`;
     }
-  }
-
-  async newDataVersion(latestVersion, dataUpdateMessage) {
-    const confirmed = await this.showAlert(`New configuration version available (${latestVersion}):\n\n${dataUpdateMessage}\n\nDo you want to update?`, 'New Version Available', true);
-    if (confirmed) {
-      this.setVersion(latestVersion);
-      this.showToast(`Configuration updated to version ${latestVersion}. Please reload the page to apply changes.`, "Reload Pending", 15);
-    } else {
-      this.showToast(`Configuration ${latestVersion} not updated.`, "Update Cancelled", 15);
-    }
-
   }
 
   showAlert(message, title = 'Warning', buttons = false) {
@@ -207,9 +205,8 @@ class WebUI extends AbstractUI {
     this.notificationUtils.setVersionHighlight(warning);
   }
 
-  newCodeVersion(latestVersion) {
-    // No action needed in web version as users always get the latest version
-  }
+  // No-op placeholder; app-level code update toast is handled in Config.newCodeVersion()
+  newCodeVersion(latestVersion) {}
 
   isPercentage(elementId) {
     const element = document.getElementById(elementId);
@@ -328,6 +325,177 @@ class WebUI extends AbstractUI {
     // Reusable tooltip
     const description = exportButton.getAttribute('data-description') || 'Export data table as CSV';
     TooltipUtils.attachTooltip(exportButton, description);
+  }
+
+  // Apply investment type labels from the loaded TaxRuleSet to existing UI fields (IE-compatible two-type layout)
+  applyInvestmentLabels() {
+    try {
+      const configInstance = Config.getInstance();
+      const ruleset = configInstance.getCachedTaxRuleSet('ie');
+      if (!ruleset) return;
+
+      const types = ruleset.getInvestmentTypes ? ruleset.getInvestmentTypes() : [];
+      const fundsType = ruleset.findInvestmentTypeByKey ? ruleset.findInvestmentTypeByKey('indexFunds') : null;
+      const sharesType = ruleset.findInvestmentTypeByKey ? ruleset.findInvestmentTypeByKey('shares') : null;
+
+      const fundsLabel = (fundsType && fundsType.label) || (types[0] && types[0].label) || 'Index Funds';
+      const sharesLabel = (sharesType && sharesType.label) || (types[1] && types[1].label) || 'Shares';
+
+      const setLabelFor = (fieldId, text) => {
+        const el = document.querySelector(`label[for="${fieldId}"]`);
+        if (el) el.textContent = text;
+      };
+
+      // Initial capitals
+      setLabelFor('InitialFunds', fundsLabel);
+      setLabelFor('InitialShares', sharesLabel);
+
+      // Allocations
+      setLabelFor('FundsAllocation', `${fundsLabel} Allocation`);
+      setLabelFor('SharesAllocation', `${sharesLabel} Allocation`);
+
+      // Drawdown priorities (labels only)
+      const prFunds = document.querySelector('[data-priority-id="PriorityFunds"] .priority-label');
+      if (prFunds) prFunds.textContent = fundsLabel;
+      const prShares = document.querySelector('[data-priority-id="PriorityShares"] .priority-label');
+      if (prShares) prShares.textContent = sharesLabel;
+
+      // Growth rates table row headings
+      const setRowHeadingForInput = (inputId, label) => {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const td = input.closest('td');
+        if (!td) return;
+        const tr = td.parentElement;
+        if (!tr) return;
+        const firstCell = tr.children && tr.children[0];
+        if (firstCell) firstCell.textContent = label;
+      };
+      setRowHeadingForInput('FundsGrowthRate', fundsLabel);
+      setRowHeadingForInput('SharesGrowthRate', sharesLabel);
+
+      // Data table headers
+      const thIncomeFunds = document.querySelector('th[data-key="IncomeFundsRent"]');
+      if (thIncomeFunds) {
+        thIncomeFunds.textContent = fundsLabel;
+        thIncomeFunds.title = `Income generated from ${fundsLabel} investments`;
+      }
+      const thIncomeShares = document.querySelector('th[data-key="IncomeSharesRent"]');
+      if (thIncomeShares) {
+        thIncomeShares.textContent = sharesLabel;
+        thIncomeShares.title = `Income generated from ${sharesLabel} investments`;
+      }
+      const thFundsCapital = document.querySelector('th[data-key="FundsCapital"]');
+      if (thFundsCapital) {
+        thFundsCapital.textContent = fundsLabel;
+        thFundsCapital.title = `Total value of your ${fundsLabel} investments`;
+      }
+      const thSharesCapital = document.querySelector('th[data-key="SharesCapital"]');
+      if (thSharesCapital) {
+        thSharesCapital.textContent = sharesLabel;
+        thSharesCapital.title = `Total value of your ${sharesLabel} investments`;
+      }
+
+      // Withdrawal rate tooltip (keep short header text)
+      const thWithdraw = document.querySelector('th[data-key="WithdrawalRate"]');
+      if (thWithdraw) {
+        // If we have more than two investment types, build a dynamic label list
+        const labelList = (types && types.length > 0) ? types.map(t => t.label).join(' + ') : `${fundsLabel} + ${sharesLabel}`;
+        thWithdraw.title = `Percentage of your liquid assets (${labelList} + Pension) that you're withdrawing to cover your expenses.`;
+      }
+
+      // Update charts legend labels via ChartManager
+      try {
+        if (this.chartManager && typeof this.chartManager.applyInvestmentLabels === 'function') {
+          this.chartManager.applyInvestmentLabels(fundsLabel, sharesLabel);
+        }
+        // Also rebuild chart datasets for dynamic investment types
+        if (this.chartManager && typeof this.chartManager.applyInvestmentTypes === 'function') {
+          this.chartManager.applyInvestmentTypes(types);
+        }
+      } catch (_) {}
+      // If there are more than two investment types, dynamically add columns for income and capital per type
+      try {
+        if (types && types.length > 2) {
+          this.applyDynamicInvestmentColumns(types);
+        }
+      } catch (_) {}
+
+    } catch (_) {
+      // Silently ignore label application issues
+    }
+  }
+
+  // Dynamically add per-investment-type income and capital columns when >2 types exist
+  applyDynamicInvestmentColumns(types) {
+    try {
+      const thead = document.querySelector('#Data thead');
+      const headerGroupsRow = thead ? thead.querySelector('tr.header-groups') : null;
+      const headerRow = thead ? thead.querySelector('tr:nth-child(2)') : null;
+      if (!thead || !headerGroupsRow || !headerRow) return;
+
+      // Remove legacy income columns (Funds/Shares) if present
+      const legacyIncomeKeys = ['IncomeFundsRent', 'IncomeSharesRent'];
+      legacyIncomeKeys.forEach(k => {
+        const th = headerRow.querySelector(`th[data-key="${k}"]`);
+        if (th) th.remove();
+      });
+      // Remove any previously added dynamic income columns to avoid duplicates
+      Array.from(headerRow.querySelectorAll('th[data-key^="Income__"]')).forEach(th => th.remove());
+
+      // Insert dynamic income columns after IncomeStatePension
+      let incomeAnchor = headerRow.querySelector('th[data-key="IncomeStatePension"]');
+      if (!incomeAnchor) return;
+      for (let i = 0; i < types.length; i++) {
+        const type = types[i];
+        const key = type && type.key ? type.key : `asset${i}`;
+        const label = type && type.label ? type.label : key;
+        const th = document.createElement('th');
+        th.setAttribute('data-key', `Income__${key}`);
+        th.title = `Income generated from ${label} investments`;
+        th.textContent = label;
+        incomeAnchor.insertAdjacentElement('afterend', th);
+        incomeAnchor = th;
+      }
+
+      // Remove legacy capital columns (Funds/Shares) and insert dynamic capitals after RealEstateCapital
+      const legacyCapitalKeys = ['FundsCapital', 'SharesCapital'];
+      legacyCapitalKeys.forEach(k => {
+        const th = headerRow.querySelector(`th[data-key="${k}"]`);
+        if (th) th.remove();
+      });
+      // Remove any previously added dynamic capital columns to avoid duplicates
+      Array.from(headerRow.querySelectorAll('th[data-key^="Capital__"]')).forEach(th => th.remove());
+      let capitalAnchor = headerRow.querySelector('th[data-key="RealEstateCapital"]');
+      if (capitalAnchor) {
+        for (let i = 0; i < types.length; i++) {
+          const type = types[i];
+          const key = type && type.key ? type.key : `asset${i}`;
+          const label = type && type.label ? type.label : key;
+          const th = document.createElement('th');
+          th.setAttribute('data-key', `Capital__${key}`);
+          th.title = `Total value of your ${label} investments`;
+          th.textContent = label;
+          capitalAnchor.insertAdjacentElement('afterend', th);
+          capitalAnchor = th;
+        }
+      }
+
+      // Adjust header group colspans for Gross Income and Assets
+      const groupCells = Array.from(headerGroupsRow.querySelectorAll('th'));
+      const grossIncomeGroup = groupCells.find(th => (th.textContent || '').trim() === 'Gross Income');
+      const assetsGroup = groupCells.find(th => (th.textContent || '').trim() === 'Assets');
+      if (grossIncomeGroup) {
+        // Salaries, Rentals, RSUs, P.Pension, S.Pension (5) + dynamic income columns (N) + Cash (1)
+        grossIncomeGroup.colSpan = 6 + types.length;
+      }
+      if (assetsGroup) {
+        // PensionFund, Cash, RealEstateCapital (3) + dynamic capital columns (N)
+        assetsGroup.colSpan = 3 + types.length;
+      }
+    } catch (_) {
+      // swallow errors to avoid breaking UI
+    }
   }
 
   setupRunSimulationButton() {
@@ -1183,6 +1351,12 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
   try {
     const webUi = WebUI.getInstance(); // Get WebUI instance
     await Config.initialize(webUi);   // Initialize Config and wait for it
+    // Tax ruleset is preloaded by Config.initialize(); no need to preload again here
+      // Apply dynamic investment labels from ruleset (first two investment types)
+      try { webUi.applyInvestmentLabels(); } catch (_) {}
+
+    // Establish baseline for new scenario now that Config is initialized (avoids extra getVersion call)
+    try { webUi.fileManager.updateLastSavedState(); } catch (_) {}
 
     // Load field labels configuration
     await webUi.fieldLabelsManager.loadLabels();

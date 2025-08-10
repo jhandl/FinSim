@@ -21,8 +21,8 @@ WelcomeTabs:
           description: "Use the toggle icons to switch between individual ({icon:user}) and couples/partnerships ({icon:user-friends}) with separate pensions and retirement ages."
         - title: "Fixed vs Variable Growth"
           description: "Toggle between a fixed growth rate ({icon:chart-line}) and a variable growth rate ({icon:chart-variable}) to simulate different market conditions and understand the probability of success."
-        - title: "Age vs Year Mode"
-          description: "Toggle between age-based and year-based planning in the Events table to better understand your timeline."
+        - title: "Events modes: Age vs Year, Table vs Accordion"
+          description: "Toggle between age-based and year-based planning in the Events table to better understand your timeline. Use the accordion view to collapse/expand the table rows in smaller screens."
 
   - id: tips-tricks
     title: Tips
@@ -359,7 +359,7 @@ WizardSteps:
     tours: [full, mini]
     card: Allocations
     popover:
-      description: "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age (${pensionContributionRateBands.min, percentage} to ${pensionContributionRateBands.max, percentage}). Do not include employer matching contributions here; there's another place for that.</p>"
+      description: "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age as per the tax rules. Do not include employer matching contributions here; there's another place for that.</p>"
       side: "right"
       align: "start"
 
@@ -375,7 +375,7 @@ WizardSteps:
     tours: [full, mini]
     card: Allocations
     popover:
-      description: "<p>Limit on your pension contribution. Tax relief applies only up to ${pensionContribEarningLimit,currency}.<ul><li><b>Yes</b>: stop at this cap (inflation-adjusted).</li><li><b>No</b>: pay tax on amounts above it.</li><li><b>Match</b>: contribute only what your employer matches (e.g. 4% you + 4% employer).</li></ul></p>"
+      description: "<p>Limit on your pension contribution. Tax relief applies only up to the annual cap defined in the current tax rules.<ul><li><b>Yes</b>: stop at this cap (inflation-adjusted).</li><li><b>No</b>: pay tax on amounts above it.</li><li><b>Match</b>: contribute only what your employer matches (e.g. 4% you + 4% employer).</li></ul></p>"
       side: "right"
       align: "start"
 

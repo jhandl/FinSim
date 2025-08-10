@@ -142,6 +142,7 @@ class TestFramework {
         'Events.js',
         'Utils.js',
         'Config.js',
+        'TaxRuleSet.js',
         'Attribution.js',
         'AttributionManager.js',
         'Revenue.js',
@@ -420,6 +421,22 @@ class TestFramework {
         vm.runInContext(`
           // Set up Config instance with actual data
           Config_instance = Object.assign(new Config(mockUI), ${fs.readFileSync(CONFIG_PATH, 'utf8')});
+          // Backward-compat: ensure simulationRuns exists for Monte Carlo tests when using older config files
+          if (!Config_instance.simulationRuns || typeof Config_instance.simulationRuns !== 'number' || Config_instance.simulationRuns <= 0) {
+            Config_instance.simulationRuns = 2000;
+          }
+          // Preload Irish tax ruleset into the Config cache for synchronous use
+          try {
+            const fs = require('fs');
+            const path = require('path');
+            const taxPath = path.join(__dirname, 'config', 'tax-rules-ie.json');
+            const rawRules = JSON.parse(fs.readFileSync(taxPath, 'utf8'));
+            const preloaded = new TaxRuleSet(rawRules);
+            Config_instance._taxRuleSets = Config_instance._taxRuleSets || {};
+            Config_instance._taxRuleSets['ie'] = preloaded;
+          } catch (e) {
+            // If preloading fails in tests, leave empty; some tests may not need it
+          }
           
           // Override Config.getInstance to return our config
           Config.getInstance = function() {

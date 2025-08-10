@@ -7,6 +7,10 @@ var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var incomeStatePension, incomePrivatePension, incomeFundsRent, incomeSharesRent, withdrawalRate;
 var incomeSalaries, incomeShares, incomeRentals, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
 var cash, indexFunds, shares;
+// Generic investment array (future replacement for specific variables)
+var investmentAssets; // [{ key, label, asset }]
+// Track per-investment-type flows to support dynamic UI columns
+var investmentIncomeByKey; // { [key: string]: number }
 var person1, person2;
 // Variables for pinch point visualization
 var perRunResults, currentRun;
@@ -91,9 +95,34 @@ function loadFromFile(file) {
 }
 
 function initializeSimulationVariables() {
-  // Initialize investment instruments
+  // Initialize investment instruments (rates sourced inside from ruleset when available)
   indexFunds = new IndexFunds(params.growthRateFunds, params.growthDevFunds);
   shares = new Shares(params.growthRateShares, params.growthDevShares);
+  // Also create generic assets array (compat path: map first two to existing ones for IE)
+  try {
+    var cfg = Config.getInstance();
+    var rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+    if (rs && typeof InvestmentTypeFactory !== 'undefined') {
+      var growthMap = {
+        indexFunds: params.growthRateFunds,
+        shares: params.growthRateShares
+      };
+      var stdevMap = {
+        indexFunds: params.growthDevFunds,
+        shares: params.growthDevShares
+      };
+      investmentAssets = InvestmentTypeFactory.createAssets(rs, growthMap, stdevMap);
+      // Bridge: ensure first two assets align to legacy objects if present
+      if (investmentAssets && investmentAssets.length > 0) {
+        if (investmentAssets[0].key === 'indexFunds') investmentAssets[0].asset = indexFunds;
+        if (investmentAssets.length > 1 && investmentAssets[1].key === 'shares') investmentAssets[1].asset = shares;
+      }
+    } else {
+      investmentAssets = [];
+    }
+  } catch (e) {
+    investmentAssets = [];
+  }
   if (params.initialFunds > 0) indexFunds.buy(params.initialFunds);
   if (params.initialShares > 0) shares.buy(params.initialShares);
 
@@ -168,6 +197,8 @@ function resetYearlyVariables() {
   incomeSharesRent = 0;
   incomeTaxFree = 0;
   pensionContribution = 0;
+  // Reset per-type income map for the year
+  investmentIncomeByKey = {};
   personalPensionContribution = 0;
   withdrawalRate = 0;
   cashDeficit = 0;
@@ -187,11 +218,28 @@ function resetYearlyVariables() {
   // Add year to global investment objects
   indexFunds.addYear();
   shares.addYear();
+  // Also update generic assets if any (avoid double-calling for legacy assets)
+  if (investmentAssets && investmentAssets.length > 0) {
+    for (var i = 0; i < investmentAssets.length; i++) {
+      var ga = investmentAssets[i].asset;
+      if (!ga || !ga.addYear) continue;
+      if (ga === indexFunds || ga === shares) continue; // skip duplicates
+      ga.addYear();
+    }
+  }
   realEstate.addYear();
   
   // Reset yearly statistics for attribution tracking
   indexFunds.resetYearlyStats();
   shares.resetYearlyStats();
+  if (investmentAssets && investmentAssets.length > 0) {
+    for (var j = 0; j < investmentAssets.length; j++) {
+      var assetObj = investmentAssets[j].asset;
+      if (!assetObj || !assetObj.resetYearlyStats) continue;
+      if (assetObj === indexFunds || assetObj === shares) continue; // skip duplicates
+      assetObj.resetYearlyStats();
+    }
+  }
 }
 
 function runSimulation() {
@@ -280,11 +328,17 @@ function processEvents() {
         if (inScope) {
           incomeSalaries += amount;
           attributionManager.record('incomesalaries', event.id, amount);
-          let p1ContribRate = person1.pensionContributionPercentageParam * getRateForKey(person1.age, config.pensionContributionRateBands);
+          // Pension contribution age bands: prefer TaxRuleSet when available
+          var _rs1 = Config.getInstance().getCachedTaxRuleSet ? Config.getInstance().getCachedTaxRuleSet('ie') : null;
+          var p1Bands = (_rs1 && typeof _rs1.getPensionContributionAgeBands === 'function') ? _rs1.getPensionContributionAgeBands() : {};
+          let p1ContribRate = person1.pensionContributionPercentageParam * getRateForKey(person1.age, p1Bands);
 
           // Handle pension capping options
-          if (params.pensionCapped === "Yes" && (amount > adjust(config.pensionContribEarningLimit))) {
-            p1ContribRate = p1ContribRate * adjust(config.pensionContribEarningLimit) / amount;
+          if (params.pensionCapped === "Yes") {
+            var p1Cap = (_rs1 && typeof _rs1.getPensionContributionAnnualCap === 'function') ? _rs1.getPensionContributionAnnualCap() : 0;
+            if (amount > adjust(p1Cap)) {
+              p1ContribRate = p1ContribRate * adjust(p1Cap) / amount;
+            }
           } else if (params.pensionCapped === "Match") {
             p1ContribRate = Math.min(event.match || 0, p1ContribRate);
           }
@@ -314,11 +368,17 @@ function processEvents() {
         if (inScope && person2) {
           incomeSalaries += amount;
           attributionManager.record('incomesalaries', event.id, amount);
-          let p2ContribRate = person2.pensionContributionPercentageParam * getRateForKey(person2.age, config.pensionContributionRateBands);
+          // Pension contribution age bands (P2)
+          var _rs2 = _rs1; // reuse same ruleset
+          var p2Bands = (_rs2 && typeof _rs2.getPensionContributionAgeBands === 'function') ? _rs2.getPensionContributionAgeBands() : {};
+          let p2ContribRate = person2.pensionContributionPercentageParam * getRateForKey(person2.age, p2Bands);
           
           // Handle pension capping options
-          if (params.pensionCapped === "Yes" && (amount > adjust(config.pensionContribEarningLimit))) {
-            p2ContribRate = p2ContribRate * adjust(config.pensionContribEarningLimit) / amount;
+          if (params.pensionCapped === "Yes") {
+            var p2Cap = (_rs2 && typeof _rs2.getPensionContributionAnnualCap === 'function') ? _rs2.getPensionContributionAnnualCap() : 0;
+            if (amount > adjust(p2Cap)) {
+              p2ContribRate = p2ContribRate * adjust(p2Cap) / amount;
+            }
           } else if (params.pensionCapped === "Match") {
             // Set personal contribution rate to match employer match rate
             p2ContribRate = Math.min(event.match || 0, p2ContribRate);
@@ -470,10 +530,35 @@ function handleInvestments() {
   let invested = 0;
   if (cash > targetCash + 0.001) {
     let surplus = cash - targetCash;
-    indexFunds.buy(surplus * params.FundsAllocation);
-    shares.buy(surplus * params.SharesAllocation);
-    invested = surplus * (params.FundsAllocation + params.SharesAllocation);
-    cash -= invested;
+    let usedDynamic = false;
+    // Dynamic distribution across generic investment assets only if there are more than the two legacy assets
+    if (investmentAssets && investmentAssets.length > 0) {
+      var allocations = getAllocationsByKey();
+      var sumInvested = 0;
+      for (var i = 0; i < investmentAssets.length; i++) {
+        var entry = investmentAssets[i];
+        var alloc = allocations[entry.key] || 0;
+        if (alloc > 0 && entry.asset && entry.asset.buy) {
+          var amount = surplus * alloc;
+          if (amount > 0) {
+            entry.asset.buy(amount);
+            sumInvested += amount;
+            usedDynamic = true;
+          }
+        }
+      }
+      if (usedDynamic) {
+        invested = sumInvested;
+        cash -= invested;
+      }
+    }
+    // Legacy two-asset investing path
+    if (!usedDynamic) {
+      indexFunds.buy(surplus * params.FundsAllocation);
+      shares.buy(surplus * params.SharesAllocation);
+      invested = surplus * (params.FundsAllocation + params.SharesAllocation);
+      cash -= invested;
+    }
   }
   if ((netIncome > expenses + invested) && (targetCash - cash > 0.001)) {
     let addToStash = netIncome - (expenses + invested);
@@ -494,6 +579,107 @@ function handleInvestments() {
 // - fromX = 3 (use X if first and second options not enough)
 //
 function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) {
+  // Dynamic generic path only when we have additional assets beyond legacy two
+  if (investmentAssets && investmentAssets.length > 2) {
+    const clonedRevenue = revenue.clone();
+    // Simulate selling all investment assets to estimate total availability after taxes
+    for (let si = 0; si < investmentAssets.length; si++) {
+      let simAsset = investmentAssets[si].asset;
+      if (simAsset && simAsset.simulateSellAll) simAsset.simulateSellAll(clonedRevenue);
+    }
+    let needed = expenses + cashDeficit - netIncome;
+    let totalPensionCapital = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+    let totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome());
+    if (needed > totalAvailable + 0.01) {
+      liquidateAll();
+      return;
+    }
+
+    cashWithdraw = 0;
+    let totalWithdraw = 0;
+    const prioritiesByKey = getDrawdownPrioritiesByKey();
+    // Determine max priority rank across assets and special buckets
+    let maxRank = 0;
+    for (let k in prioritiesByKey) { if (prioritiesByKey.hasOwnProperty(k)) { maxRank = Math.max(maxRank, prioritiesByKey[k] || 0); } }
+    maxRank = Math.max(maxRank, cashPriority || 0, pensionPriority || 0, 4);
+
+    for (let priority = 1; priority <= maxRank; priority++) {
+      let loopCount = 0;
+      while (expenses + cashDeficit - netIncome >= 1) {
+        loopCount++;
+        if (loopCount > 50) { break; }
+        needed = expenses + cashDeficit - netIncome;
+        let keepTrying = false;
+
+        // Cash bucket
+        if (priority === cashPriority) {
+          if (cash > 0.5) {
+            cashWithdraw = Math.min(cash, needed);
+            totalWithdraw += cashWithdraw;
+            cash -= cashWithdraw;
+            attributionManager.record('incomecash', 'Cash Withdrawal', cashWithdraw);
+          }
+        }
+
+        // Pension bucket (P1 then P2)
+        if (priority === pensionPriority) {
+          let p1Cap = person1.pension.capital();
+          let p2Cap = person2 ? person2.pension.capital() : 0;
+          if (p1Cap > 0.5 && (person1.phase === Phases.retired || person1.age >= person1.retirementAgeParam)) {
+            let w1 = Math.min(p1Cap, needed);
+            totalWithdraw += w1;
+            let sold1 = person1.pension.sell(w1);
+            incomePrivatePension += sold1;
+            attributionManager.record('incomeprivatepension', 'Pension Drawdown P1', sold1);
+            keepTrying = true;
+          } else if (p2Cap > 0.5 && person2 && (person2.phase === Phases.retired || person2.age >= person2.retirementAgeParam)) {
+            let w2 = Math.min(p2Cap, needed);
+            totalWithdraw += w2;
+            let sold2 = person2.pension.sell(w2);
+            incomePrivatePension += sold2;
+            attributionManager.record('incomeprivatepension', 'Pension Drawdown P2', sold2);
+            keepTrying = true;
+          }
+        }
+
+        // Investment assets at this priority
+        for (let ai = 0; ai < investmentAssets.length; ai++) {
+          let entry = investmentAssets[ai];
+          let rank = prioritiesByKey[entry.key] || 0;
+          if (rank !== priority) continue;
+          let assetObj = entry.asset;
+          if (!assetObj || !assetObj.capital) continue;
+          let cap = assetObj.capital();
+          if (cap > 0.5) {
+            let w = Math.min(cap, needed);
+            totalWithdraw += w;
+            let sold = assetObj.sell(w);
+            // Maintain legacy income buckets for the two legacy assets
+            if (assetObj === indexFunds || entry.key === 'indexFunds') {
+              incomeFundsRent += sold;
+            } else if (assetObj === shares || entry.key === 'shares') {
+              incomeSharesRent += sold;
+            }
+            // Record dynamic income for this investment type
+            try {
+              if (entry && entry.key) {
+                if (!investmentIncomeByKey) investmentIncomeByKey = {};
+                if (!investmentIncomeByKey[entry.key]) investmentIncomeByKey[entry.key] = 0;
+                investmentIncomeByKey[entry.key] += sold;
+              }
+            } catch (_) {}
+            keepTrying = true;
+          }
+        }
+
+        netIncome = cashWithdraw + revenue.netIncome();
+        if (keepTrying == false) { break; }
+      }
+    }
+    return;
+  }
+
+  // Legacy two-asset path (default for IE compatibility)
   const clonedRevenue = revenue.clone();
   indexFunds.simulateSellAll(clonedRevenue);
   shares.simulateSellAll(clonedRevenue);
@@ -511,9 +697,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
     let loopCount = 0;
     while (expenses + cashDeficit - netIncome >= 1) {
       loopCount++;
-      if (loopCount > 50) {
-        break;
-      }
+      if (loopCount > 50) { break; }
       needed = expenses + cashDeficit - netIncome;
       let keepTrying = false;
       let indexFundsCapital = indexFunds.capital();
@@ -527,7 +711,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
             totalWithdraw += cashWithdraw;
             cash -= cashWithdraw;
             attributionManager.record('incomecash', 'Cash Withdrawal', cashWithdraw);
-          };
+          }
           break;
         case pensionPriority:
           if (person1PensionCapital > 0.5 && (person1.phase === Phases.retired || person1.age >= person1.retirementAgeParam)) {
@@ -537,8 +721,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
             incomePrivatePension += soldAmount;
             attributionManager.record('incomeprivatepension', 'Pension Drawdown P1', soldAmount);
             keepTrying = true;
-          }
-          else if (person2PensionCapital > 0.5 && person2 && (person2.phase === Phases.retired || person2.age >= person2.retirementAgeParam)) {
+          } else if (person2PensionCapital > 0.5 && person2 && (person2.phase === Phases.retired || person2.age >= person2.retirementAgeParam)) {
             let withdraw = Math.min(person2PensionCapital, needed);
             totalWithdraw += withdraw;
             const soldAmount = person2.pension.sell(withdraw);
@@ -551,7 +734,13 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
           if (indexFundsCapital > 0.5) {
             let withdraw = Math.min(indexFundsCapital, needed);
             totalWithdraw += withdraw;
-            incomeFundsRent += indexFunds.sell(withdraw);
+            let soldAmt = indexFunds.sell(withdraw);
+            incomeFundsRent += soldAmt;
+            try {
+              if (!investmentIncomeByKey) investmentIncomeByKey = {};
+              if (!investmentIncomeByKey['indexFunds']) investmentIncomeByKey['indexFunds'] = 0;
+              investmentIncomeByKey['indexFunds'] += soldAmt;
+            } catch (_) {}
             keepTrying = true;
           }
           break;
@@ -559,16 +748,20 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
           if (sharesCapital > 0.5) {
             let withdraw = Math.min(sharesCapital, needed);
             totalWithdraw += withdraw;
-            incomeSharesRent += shares.sell(withdraw);
+            let soldAmt = shares.sell(withdraw);
+            incomeSharesRent += soldAmt;
+            try {
+              if (!investmentIncomeByKey) investmentIncomeByKey = {};
+              if (!investmentIncomeByKey['shares']) investmentIncomeByKey['shares'] = 0;
+              investmentIncomeByKey['shares'] += soldAmt;
+            } catch (_) {}
             keepTrying = true;
           }
           break;
         default:
       }
       netIncome = cashWithdraw + revenue.netIncome();
-      if (keepTrying == false) {
-        break;
-      }
+      if (keepTrying == false) { break; }
     }
   }
 }
@@ -588,12 +781,76 @@ function liquidateAll() {
     attributionManager.record('incomeprivatepension', 'Pension Withdrawal P2', soldAmount);
   }
   if (indexFunds.capital() > 0) {
-    incomeFundsRent += indexFunds.sell(indexFunds.capital());
+    var soldIdx = indexFunds.sell(indexFunds.capital());
+    incomeFundsRent += soldIdx;
+    try {
+      if (!investmentIncomeByKey) investmentIncomeByKey = {};
+      if (!investmentIncomeByKey['indexFunds']) investmentIncomeByKey['indexFunds'] = 0;
+      investmentIncomeByKey['indexFunds'] += soldIdx;
+    } catch (_) {}
   }
   if (shares.capital() > 0) {
-    incomeSharesRent += shares.sell(shares.capital());
+    var soldSh = shares.sell(shares.capital());
+    incomeSharesRent += soldSh;
+    try {
+      if (!investmentIncomeByKey) investmentIncomeByKey = {};
+      if (!investmentIncomeByKey['shares']) investmentIncomeByKey['shares'] = 0;
+      investmentIncomeByKey['shares'] += soldSh;
+    } catch (_) {}
+  }
+  // Also liquidate any additional generic investment assets (avoid double-selling legacy ones)
+  if (investmentAssets && investmentAssets.length > 2) {
+    for (var li = 0; li < investmentAssets.length; li++) {
+      var ent = investmentAssets[li];
+      if (!ent || !ent.asset || !ent.asset.capital) continue;
+      var assetObj = ent.asset;
+      if (assetObj === indexFunds || assetObj === shares) continue; // already liquidated above
+      var cap = assetObj.capital();
+      if (cap > 0) {
+        assetObj.sell(cap);
+      }
+    }
   }
   netIncome = cashWithdraw + revenue.netIncome();
+}
+
+// Returns an allocation map keyed by investment type key.
+// Backward-compat: map legacy Funds/Shares allocations to 'indexFunds' and 'shares'.
+function getAllocationsByKey() {
+  var map = {};
+  try {
+    // Bridge only; UI dynamic allocations to be wired in later phases
+    map['indexFunds'] = (typeof params.FundsAllocation === 'number') ? params.FundsAllocation : 0;
+    map['shares'] = (typeof params.SharesAllocation === 'number') ? params.SharesAllocation : 0;
+  } catch (e) {
+    map['indexFunds'] = 0;
+    map['shares'] = 0;
+  }
+  return map;
+}
+
+// Returns a priority map keyed by investment type key.
+// Backward-compat: derive ranks for 'indexFunds' and 'shares' from legacy params; others default to lowest priority (4).
+function getDrawdownPrioritiesByKey() {
+  var map = {};
+  try {
+    map['indexFunds'] = (typeof params.priorityFunds === 'number') ? params.priorityFunds : 0;
+    map['shares'] = (typeof params.priorityShares === 'number') ? params.priorityShares : 0;
+  } catch (e) {
+    map['indexFunds'] = 0;
+    map['shares'] = 0;
+  }
+  // Assign a default lowest priority to any additional assets
+  var defaultPriority = 4;
+  if (investmentAssets && investmentAssets.length > 0) {
+    for (var i = 0; i < investmentAssets.length; i++) {
+      var key = investmentAssets[i].key;
+      if (map[key] === undefined) {
+        map[key] = defaultPriority;
+      }
+    }
+  }
+  return map;
 }
 
 function initializeRealEstate() {
@@ -661,7 +918,7 @@ function updateYearlyData() {
   });
   
   if (!(row in dataSheet)) {
-    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0, "attributions": {} };
+    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0, "attributions": {}, "investmentIncomeByKey": {}, "investmentCapitalByKey": {} };
   }
   dataSheet[row].age += person1.age;
   dataSheet[row].year += year;
@@ -680,6 +937,33 @@ function updateYearlyData() {
   dataSheet[row].cash += cash;
   dataSheet[row].indexFundsCapital += indexFunds.capital();
   dataSheet[row].sharesCapital += shares.capital();
+  // Accumulate per-type income and capital for dynamic UI columns
+  try {
+    if (investmentIncomeByKey) {
+      for (var k in investmentIncomeByKey) {
+        if (!dataSheet[row].investmentIncomeByKey[k]) dataSheet[row].investmentIncomeByKey[k] = 0;
+        dataSheet[row].investmentIncomeByKey[k] += investmentIncomeByKey[k];
+      }
+    }
+    // Compute capitals by key while avoiding double-counting legacy assets
+    var capsByKey = {};
+    try { capsByKey['indexFunds'] = indexFunds.capital(); } catch (_) {}
+    try { capsByKey['shares'] = shares.capital(); } catch (_) {}
+    if (investmentAssets && investmentAssets.length > 0) {
+      for (var ci = 0; ci < investmentAssets.length; ci++) {
+        var centry = investmentAssets[ci];
+        if (!centry || !centry.asset || typeof centry.asset.capital !== 'function') continue;
+        var assetObj = centry.asset;
+        if (assetObj === indexFunds || assetObj === shares) continue; // skip legacy duplicates
+        var c = assetObj.capital();
+        capsByKey[centry.key] = (capsByKey[centry.key] || 0) + c;
+      }
+    }
+    for (var key in capsByKey) {
+      if (!dataSheet[row].investmentCapitalByKey[key]) dataSheet[row].investmentCapitalByKey[key] = 0;
+      dataSheet[row].investmentCapitalByKey[key] += capsByKey[key];
+    }
+  } catch (_) {}
   dataSheet[row].pensionContribution += personalPensionContribution;
   dataSheet[row].withdrawalRate += withdrawalRate;
   dataSheet[row].it += revenue.it;

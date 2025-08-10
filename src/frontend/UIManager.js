@@ -168,6 +168,18 @@ class UIManager {
       Attributions: dataSheet[row].attributions
     };
 
+    // Add dynamic per-investment-type fields so the table can render N investment types
+    try {
+      const incMap = dataSheet[row].investmentIncomeByKey || {};
+      for (const key in incMap) {
+        data['Income__' + key] = incMap[key] / scale;
+      }
+      const capMap = dataSheet[row].investmentCapitalByKey || {};
+      for (const key in capMap) {
+        data['Capital__' + key] = capMap[key] / scale;
+      }
+    } catch (_) {}
+
     this.ui.setDataRow(row, data);
     this.ui.setChartsRow(row, data);
     
@@ -237,19 +249,50 @@ class UIManager {
       // Validate age fields - basic range validation
       this.validateParameterAgeFields(params);
       
-      if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
-        this.ui.setWarning("RetirementAge", "Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
-      }
-      if (params.retirementAge < config.minPrivatePensionRetirementAge) {
-        this.ui.setWarning("RetirementAge", "Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
+      // Pension retirement age validation using TaxRuleSet where available
+      try {
+        const cfg = Config.getInstance();
+        const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+        const minOcc = (rs && typeof rs.getPensionMinRetirementAgeOccupational === 'function' && rs.getPensionMinRetirementAgeOccupational() > 0)
+          ? rs.getPensionMinRetirementAgeOccupational()
+          : config.minOccupationalPensionRetirementAge;
+        const minPriv = (rs && typeof rs.getPensionMinRetirementAgePrivate === 'function') ? rs.getPensionMinRetirementAgePrivate() : config.minPrivatePensionRetirementAge;
+        if (params.retirementAge < minOcc) {
+          this.ui.setWarning("RetirementAge", "Only occupational pension schemes allow retirement before age "+minOcc+".");
+        }
+        if (params.retirementAge < minPriv) {
+          this.ui.setWarning("RetirementAge", "Private pensions don't normally allow retirement before age "+minPriv+".");
+        }
+      } catch (_) {
+        if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
+          this.ui.setWarning("RetirementAge", "Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
+        }
+        if (params.retirementAge < config.minPrivatePensionRetirementAge) {
+          this.ui.setWarning("RetirementAge", "Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
+        }
       }
 
       // Person 2 retirement age validation against config minimums
-      if (params.p2RetirementAge < config.minOccupationalPensionRetirementAge) {
-        this.ui.setWarning("P2RetirementAge", "Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
-      }
-      if (params.p2RetirementAge < config.minPrivatePensionRetirementAge) {
-        this.ui.setWarning("P2RetirementAge", "Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
+      try {
+        const cfg = Config.getInstance();
+        const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+        const minOcc = (rs && typeof rs.getPensionMinRetirementAgeOccupational === 'function' && rs.getPensionMinRetirementAgeOccupational() > 0)
+          ? rs.getPensionMinRetirementAgeOccupational()
+          : config.minOccupationalPensionRetirementAge;
+        const minPriv = (rs && typeof rs.getPensionMinRetirementAgePrivate === 'function') ? rs.getPensionMinRetirementAgePrivate() : config.minPrivatePensionRetirementAge;
+        if (params.p2RetirementAge < minOcc) {
+          this.ui.setWarning("P2RetirementAge", "Only occupational pension schemes allow retirement before age "+minOcc+".");
+        }
+        if (params.p2RetirementAge < minPriv) {
+          this.ui.setWarning("P2RetirementAge", "Private pensions don't normally allow retirement before age "+minPriv+".");
+        }
+      } catch (_) {
+        if (params.p2RetirementAge < config.minOccupationalPensionRetirementAge) {
+          this.ui.setWarning("P2RetirementAge", "Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
+        }
+        if (params.p2RetirementAge < config.minPrivatePensionRetirementAge) {
+          this.ui.setWarning("P2RetirementAge", "Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
+        }
       }
 
       // Person 1 Validation: startingAge and retirementAge required if either provided.
@@ -281,8 +324,20 @@ class UIManager {
       }
 
       if (params.FundsAllocation + params.SharesAllocation > 1.0001) {
-        this.ui.setWarning("FundsAllocation", "Index Funds + Individual Shares allocations can't exceed 100%");
-        this.ui.setWarning("SharesAllocation", "Index Funds + Individual Shares allocations can't exceed 100%");
+        // Derive labels from ruleset if available for better UX
+        let fundsLabel = 'Index Funds', sharesLabel = 'Individual Shares';
+        try {
+          const cfg = Config.getInstance();
+          const rs = cfg.getCachedTaxRuleSet('ie');
+          if (rs && rs.findInvestmentTypeByKey) {
+            const f = rs.findInvestmentTypeByKey('indexFunds');
+            const s = rs.findInvestmentTypeByKey('shares');
+            if (f && f.label) fundsLabel = f.label;
+            if (s && s.label) sharesLabel = s.label;
+          }
+        } catch (_) {}
+        this.ui.setWarning("FundsAllocation", `${fundsLabel} + ${sharesLabel} allocations can't exceed 100%`);
+        this.ui.setWarning("SharesAllocation", `${fundsLabel} + ${sharesLabel} allocations can't exceed 100%`);
         errors = true;
       }
       
@@ -292,9 +347,21 @@ class UIManager {
       // Validate volatility parameters for variable rate mode
       if (params.economyMode === 'montecarlo') {
         if (params.growthDevPension === 0 && params.growthDevFunds === 0 && params.growthDevShares === 0) {
+          // Use dynamic labels for more helpful messages
+          let fundsLabel = 'Index Funds', sharesLabel = 'Shares';
+          try {
+            const cfg = Config.getInstance();
+            const rs = cfg.getCachedTaxRuleSet('ie');
+            if (rs && rs.findInvestmentTypeByKey) {
+              const f = rs.findInvestmentTypeByKey('indexFunds');
+              const s = rs.findInvestmentTypeByKey('shares');
+              if (f && f.label) fundsLabel = f.label;
+              if (s && s.label) sharesLabel = s.label;
+            }
+          } catch (_) {}
           this.ui.setWarning("PensionGrowthStdDev", "At least one volatility rate must be greater than 0% in variable growth mode");
-          this.ui.setWarning("FundsGrowthStdDev", "At least one volatility rate must be greater than 0% in variable growth mode");
-          this.ui.setWarning("SharesGrowthStdDev", "At least one volatility rate must be greater than 0% in variable growth mode");
+          this.ui.setWarning("FundsGrowthStdDev", `At least one of Pension, ${fundsLabel}, or ${sharesLabel} volatility must be > 0% in variable growth mode`);
+          this.ui.setWarning("SharesGrowthStdDev", `At least one of Pension, ${fundsLabel}, or ${sharesLabel} volatility must be > 0% in variable growth mode`);
           errors = true;
         }
       }
@@ -690,7 +757,15 @@ class UIManager {
       { 
         value: params.FundsAllocation, 
         fieldId: 'FundsAllocation', 
-        name: 'Index Funds Allocation',
+        name: (function(){
+          try {
+            const cfg = Config.getInstance();
+            const rs = cfg.getCachedTaxRuleSet('ie');
+            const f = rs && rs.findInvestmentTypeByKey ? rs.findInvestmentTypeByKey('indexFunds') : null;
+            if (f && f.label) return `${f.label} Allocation`;
+          } catch(_) {}
+          return 'Index Funds Allocation';
+        })(),
         min: 0, 
         max: 1,
         unit: '%'
@@ -698,7 +773,15 @@ class UIManager {
       { 
         value: params.SharesAllocation, 
         fieldId: 'SharesAllocation', 
-        name: 'Individual Shares Allocation',
+        name: (function(){
+          try {
+            const cfg = Config.getInstance();
+            const rs = cfg.getCachedTaxRuleSet('ie');
+            const s = rs && rs.findInvestmentTypeByKey ? rs.findInvestmentTypeByKey('shares') : null;
+            if (s && s.label) return `${s.label} Allocation`;
+          } catch(_) {}
+          return 'Individual Shares Allocation';
+        })(),
         min: 0, 
         max: 1,
         unit: '%'

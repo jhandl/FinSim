@@ -327,8 +327,8 @@ module.exports = {
       age: 55,
       field: 'netIncome',
       expected: {
-        min: 40000,                 // Updated to reflect net income after contributions
-        max: 50000
+        min: 39000,
+        max: 41000
       }
     },
     

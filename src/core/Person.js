@@ -74,14 +74,24 @@ class Person {
     }
     
     // State Pension: Check if age qualifies for state pension
+    var _cfg = null, _rs = null;
+    try { _cfg = Config.getInstance(); _rs = _cfg && _cfg.getCachedTaxRuleSet ? _cfg.getCachedTaxRuleSet('ie') : null; } catch (_) {}
+    var statePensionAge = (_rs && typeof _rs.getPensionMinRetirementAgeState === 'function') ? _rs.getPensionMinRetirementAgeState() : 0;
+    var spIncreases = (_rs && typeof _rs.getStatePensionIncreaseBands === 'function') ? _rs.getStatePensionIncreaseBands() : null;
     if (this.statePensionWeeklyParam && this.statePensionWeeklyParam > 0 && 
-        this.age >= config.statePensionQualifyingAge) {
+        this.age >= statePensionAge) {
       // Calculate yearly state pension (52 weeks)
       this.yearlyIncomeStatePension = 52 * adjust(this.statePensionWeeklyParam);
       
-      // Add increase if age qualifies for state pension increase
-      if (this.age >= config.statePensionIncreaseAge) {
-        this.yearlyIncomeStatePension += 52 * adjust(config.statePensionIncreaseAmount);
+      // Add increase(s) if age qualifies for state pension increase
+      if (spIncreases && typeof spIncreases === 'object') {
+        var thresholds = Object.keys(spIncreases).map(function(k){ return parseInt(k); }).sort(function(a,b){ return a-b; });
+        for (var i = 0; i < thresholds.length; i++) {
+          var t = thresholds[i];
+          if (this.age >= t) {
+            this.yearlyIncomeStatePension += 52 * adjust(spIncreases[String(t)]);
+          }
+        }
       }
     }
     

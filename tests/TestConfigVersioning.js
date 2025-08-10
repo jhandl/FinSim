@@ -101,23 +101,27 @@ module.exports = {
         };
         
         try {
-            // Test 1: Data version update detected and applied (1.26 → 1.27)
+            // Test 1: Data version update detected and applied silently (1.26 → 1.27)
             await runTest('1.26');
             if (currentVersion !== '1.27' || !versionUpdated) {
                 testResults.errors.push(`Test 1 Failed: Version not updated from 1.26 to 1.27. Got ${currentVersion}, updated: ${versionUpdated}`);
                 testResults.success = false;
             }
-            if (!alertShown || !alertShown.includes('New tax rates')) {
-                testResults.errors.push(`Test 1 Failed: Expected update message not shown. Got: ${alertShown}`);
+            if (alertShown) {
+                testResults.errors.push(`Test 1 Failed: Unexpected alert shown for data update. Got: ${alertShown}`);
                 testResults.success = false;
             }
 
-            // Test 2: User declines data version update
+            // Test 2: User declines data version update (no prompt now, still updates silently)
             await runTest('1.26', mockUi => {
                 alertResponse = false; // User clicks "no"
             });
-            if (currentVersion !== '1.26' || versionUpdated) {
-                testResults.errors.push(`Test 2 Failed: Version was updated despite user declining. Got ${currentVersion}, updated: ${versionUpdated}`);
+            if (currentVersion !== '1.27' || !versionUpdated) {
+                testResults.errors.push(`Test 2 Failed: Version not updated silently. Got ${currentVersion}, updated: ${versionUpdated}`);
+                testResults.success = false;
+            }
+            if (alertShown) {
+                testResults.errors.push(`Test 2 Failed: Unexpected alert shown when user would have declined. Got: ${alertShown}`);
                 testResults.success = false;
             }
 

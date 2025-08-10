@@ -1,0 +1,111 @@
+{
+  "country": "IE",
+  "countryName": "Ireland",
+  "version": "26.1",
+  "updateMessage": "",
+
+  "incomeTax": {
+    "personalAllowance": 0,
+    "taxCredits": {
+      "employee": 2000,
+      "age": 245
+    },
+    "ageExemptionAge": 65,
+    "ageExemptionLimit": 18000,
+    "jointFilingAllowed": true,
+    "jointBandIncreaseMax": 35000,
+    "bracketsByStatus": {
+      "single": { "0": 0.2, "44000": 0.4 },
+      "singleWithDependents": { "0": 0.2, "48000": 0.4 },
+      "married": { "0": 0.2, "53000": 0.4 }
+    }
+  },
+
+  "socialContributions": [
+    {
+      "name": "PRSI",
+      "rate": 0.041,
+      "incomeCap": null,
+      "ageAdjustments": { "70": 0 },
+      "applicableIncomeTypes": ["employment", "self"]
+    }
+  ],
+
+  "additionalTaxes": [
+    {
+      "name": "USC",
+      "brackets": { "0": 0.005, "12012": 0.02, "27382": 0.03, "70044": 0.08, "100000": 0.11 },
+      "exemptAmount": 13000,
+      "reducedRateAge": 70,
+      "reducedRateMaxIncome": 60000,
+      "ageBasedBrackets": {
+        "70": { "0": 0.005, "12012": 0.02 }
+      },
+      "base": "income"
+    }
+  ],
+
+  "capitalGainsTax": {
+    "rate": 0.33,
+    "annualExemption": 1270,
+    "allowLossOffset": true,
+    "deemedDisposalYears": 8
+  },
+
+  "dividendTax": {
+    "rate": 0.33,
+    "annualExemption": 0,
+    "withholding": false
+  },
+
+  "interestTax": {
+    "rate": 0.33,
+    "withholding": false
+  },
+
+  "wealthTax": {
+    "brackets": {},
+    "exemptions": []
+  },
+
+  "inheritanceTax": {
+    "threshold": 0,
+    "rate": 0
+  },
+
+  "pensionRules": {
+    "minRetirementAgePrivate": 60,
+    "minRetirementAgeOccupational": 60,
+    "minRetirementAgeState": 66,
+    "contributionLimits": {
+      "ageBandsPercent": { "0": 0.15, "30": 0.20, "40": 0.25, "50": 0.30, "55": 0.35, "60": 0.40 },
+      "annualCap": 115000
+    },
+    "lumpSumTaxBands": { "0": 0, "200000": 0.2, "500000": 0.4 },
+    "lumpSumMaxPercent": 0.25,
+    "minDrawdownRates": { "61": 0.04, "71": 0.05 },
+    "statePensionAge": 66,
+    "statePensionIncreaseBands": { "80": 10 }
+  },
+
+  "residencyRules": []
+  ,
+  "investmentTypes": [
+    {
+      "key": "indexFunds",
+      "label": "Index Funds",
+      "taxation": {
+        "exitTax": { "rate": 0.41, "deemedDisposalYears": 8, "allowLossOffset": false, "eligibleForAnnualExemption": false }
+      }
+    },
+    {
+      "key": "shares",
+      "label": "Shares",
+      "taxation": {
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "annualExemptionRef": "capitalGainsTax.annualExemption", "allowLossOffset": true }
+      }
+    }
+  ]
+}
+
+

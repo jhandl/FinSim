@@ -92,8 +92,9 @@ class Equity {
     // Accumulate interests
     for (let i = 0; i < this.portfolio.length; i++) {
       const holding = this.portfolio[i];
-      const gaussianValue = gaussian(this.growth, this.stdev);
-      const growthAmount = (holding.amount + holding.interest) * gaussianValue;
+      // Maintain legacy behavior: always use gaussian(mean, stdev) for growth sampling
+      const growthRate = gaussian(this.growth, this.stdev);
+      const growthAmount = (holding.amount + holding.interest) * growthRate;
       holding.interest += growthAmount;
       this.yearlyGrowth += growthAmount;
       holding.age++;
@@ -132,21 +133,103 @@ class Equity {
 class IndexFunds extends Equity {
   
   constructor(growth, stdev=0) {
-    super(config.FundsExitTax, growth, stdev);
-    this.canOffsetLosses = config.FundsCanOffsetLosses;
+    // Prefer ruleset when available to source exit tax settings
+    var ruleset = null;
+    try {
+      var cfg = Config.getInstance();
+      ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+    } catch (e) { ruleset = null; }
+
+    // Cache the investment type definition, if present
+    var indexFundsTypeDef = null;
+    try {
+      if (ruleset && typeof ruleset.findInvestmentTypeByKey === 'function') {
+        indexFundsTypeDef = ruleset.findInvestmentTypeByKey('indexFunds');
+      }
+    } catch (_) { indexFundsTypeDef = null; }
+
+    const resolveExitTaxRate = function() {
+      if (ruleset && typeof ruleset.findInvestmentTypeByKey === 'function') {
+        var t = indexFundsTypeDef || ruleset.findInvestmentTypeByKey('indexFunds');
+        if (t && t.taxation && t.taxation.exitTax && typeof t.taxation.exitTax.rate === 'number') {
+          return t.taxation.exitTax.rate;
+        }
+      }
+      return 0; // default to 0 if ruleset is unavailable
+    };
+
+    super(resolveExitTaxRate(), growth, stdev);
+
+    // Loss offset
+    this.canOffsetLosses = (function(){
+      if (ruleset && typeof ruleset.findInvestmentTypeByKey === 'function') {
+        var t = indexFundsTypeDef || ruleset.findInvestmentTypeByKey('indexFunds');
+        if (t && t.taxation && t.taxation.exitTax && typeof t.taxation.exitTax.allowLossOffset === 'boolean') {
+          return t.taxation.exitTax.allowLossOffset;
+        }
+      }
+      return false;
+    })();
+
+    // Annual exemption eligibility for exit tax (IE legacy behavior allowed it for ETF disposals)
+    this._exitTaxEligibleForAnnualExemption = (function(){
+      if (indexFundsTypeDef && indexFundsTypeDef.taxation && indexFundsTypeDef.taxation.exitTax && typeof indexFundsTypeDef.taxation.exitTax.eligibleForAnnualExemption === 'boolean') {
+        return indexFundsTypeDef.taxation.exitTax.eligibleForAnnualExemption;
+      }
+      return true; // legacy IE behavior: treat as eligible for the annual exemption
+    })();
+
+    // Deemed disposal years
+    this._deemedDisposalYears = (function(){
+      if (ruleset && typeof ruleset.findInvestmentTypeByKey === 'function') {
+        var t = indexFundsTypeDef || ruleset.findInvestmentTypeByKey('indexFunds');
+        if (t && t.taxation && t.taxation.exitTax && typeof t.taxation.exitTax.deemedDisposalYears === 'number') {
+          return t.taxation.exitTax.deemedDisposalYears;
+        }
+      }
+      return 0;
+    })();
+  }
+
+  // Ensure exit-tax classification for gains from Index Funds
+  declareRevenue(income, gains) {
+    revenue.declareInvestmentIncome(income);
+    if (gains > 0 || this.canOffsetLosses) {
+      revenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name + " Sale", {
+        category: 'exitTax',
+        eligibleForAnnualExemption: !!this._exitTaxEligibleForAnnualExemption,
+        allowLossOffset: !!this.canOffsetLosses
+      });
+    }
+  }
+
+  simulateDeclareRevenue(income, gains, testRevenue) {
+    testRevenue.declareInvestmentIncome(income);
+    if (gains > 0 || this.canOffsetLosses) {
+      testRevenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name+" Sim", {
+        category: 'exitTax',
+        eligibleForAnnualExemption: !!this._exitTaxEligibleForAnnualExemption,
+        allowLossOffset: !!this.canOffsetLosses
+      });
+    }
   }
   
   addYear() {
     super.addYear();
     // pay deemed disposal taxes for Index Funds aged multiple of 8 years
     for (let i = 0; i < this.portfolio.length; i++) {
-      if ((config.deemedDisposalYears > 0) && (this.portfolio[i].age % config.deemedDisposalYears === 0)) {
+      const dd = this._deemedDisposalYears;
+      if ((dd > 0) && (this.portfolio[i].age % dd === 0)) {
         let gains = this.portfolio[i].interest;
         this.portfolio[i].amount += gains;
         this.portfolio[i].interest = 0;
         this.portfolio[i].age = 0;
         if (gains > 0 || this.canOffsetLosses) {
-          revenue.declareInvestmentGains(gains, this.taxRate, 'Deemed Disposal');
+          revenue.declareInvestmentGains(gains, this.taxRate, 'Deemed Disposal', {
+            category: 'exitTax',
+            eligibleForAnnualExemption: !!this._exitTaxEligibleForAnnualExemption,
+            allowLossOffset: !!this.canOffsetLosses
+          });
         }
       }
     }
@@ -158,7 +241,36 @@ class IndexFunds extends Equity {
 class Shares extends Equity {
 
   constructor(growth, stdev=0) {
-    super(config.cgtRate, growth, stdev);
+    var ruleset = null;
+    try {
+      var cfg = Config.getInstance();
+      ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+    } catch (e) { ruleset = null; }
+    const cgtRate = (ruleset && typeof ruleset.getCapitalGainsRate === 'function') ? ruleset.getCapitalGainsRate() : 0;
+    super(cgtRate, growth, stdev);
+  }
+
+  // Explicitly mark CGT classification for shares
+  declareRevenue(income, gains) {
+    revenue.declareInvestmentIncome(income);
+    if (gains > 0 || this.canOffsetLosses) {
+      revenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name + " Sale", {
+        category: 'cgt',
+        eligibleForAnnualExemption: true,
+        allowLossOffset: true
+      });
+    }
+  }
+
+  simulateDeclareRevenue(income, gains, testRevenue) {
+    testRevenue.declareInvestmentIncome(income);
+    if (gains > 0 || this.canOffsetLosses) {
+      testRevenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name+" Sim", {
+        category: 'cgt',
+        eligibleForAnnualExemption: true,
+        allowLossOffset: true
+      });
+    }
   }
 
 }
@@ -170,6 +282,10 @@ class Pension extends Equity {
     super(0, growth, stdev);
     this.lumpSum = false;
     this.person = person;
+    try {
+      var cfg = Config.getInstance();
+      this._ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+    } catch (e) { this._ruleset = null; }
   }
 
   declareRevenue(income, gains) {
@@ -182,16 +298,19 @@ class Pension extends Equity {
   
   getLumpsum() {
     this.lumpSum = true;
-    let amount = this.sell(this.capital() * config.pensionLumpSumLimit);
+    var rsValue = (this._ruleset && typeof this._ruleset.getPensionLumpSumMaxPercent === 'function') ? this._ruleset.getPensionLumpSumMaxPercent() : null;
+    var maxPct = (typeof rsValue === 'number' && rsValue > 0) ? rsValue : 0;
+    let amount = this.sell(this.capital() * maxPct);
     this.lumpSum = false;
     return amount;
   }
   
   drawdown(currentAge) {
-    let ageLimits = Object.keys(config.pensionMinDrawdownBands);
+    var bands = (this._ruleset && typeof this._ruleset.getPensionMinDrawdownRates === 'function') ? this._ruleset.getPensionMinDrawdownRates() : { '0': 0 };
+    let ageLimits = Object.keys(bands);
     let minimumDrawdown = ageLimits.reduce(
-        (acc, limit) => (currentAge >= limit ? config.pensionMinDrawdownBands[limit] : acc), 
-        config.pensionMinDrawdownBands[ageLimits[0]]
+        function(acc, limit){ return (currentAge >= limit ? bands[limit] : acc); }, 
+        bands[ageLimits[0]]
     );
     return this.sell(this.capital() * minimumDrawdown);
   }

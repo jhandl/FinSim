@@ -7,7 +7,11 @@ class Revenue {
     this.attributionManager.record('income', description, amount);
 
     const contribution = contribRate * amount;
-    const relief = contribRate * Math.min(amount, adjust(config.pensionContribEarningLimit));
+    // Use ruleset annual cap for pension relief exclusively
+    var reliefAnnualCap = (this.ruleset && typeof this.ruleset.getPensionContributionAnnualCap === 'function')
+      ? this.ruleset.getPensionContributionAnnualCap()
+      : 0;
+    const relief = contribRate * Math.min(amount, adjust(reliefAnnualCap));
 
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
       this.pensionContribAmountP1 += contribution;
@@ -65,15 +69,27 @@ class Revenue {
     this.attributionManager.record('income', description, amount);
   };
     
-  declareInvestmentGains(amount, taxRate, description) {
+  declareInvestmentGains(amount, taxRate, description, options) {
+    // Backward-compatible API with optional options object for per-gain flags
+    // options: { category: 'cgt'|'exitTax', eligibleForAnnualExemption: boolean, allowLossOffset: boolean }
     if (!this.gains.hasOwnProperty(taxRate)) {
-      this.gains[taxRate] = { amount: 0, sources: {} };
+      this.gains[taxRate] = { amount: 0, sources: {}, entries: [] };
     }
-    this.gains[taxRate].amount += amount;
-    if (!this.gains[taxRate].sources[description]) {
-      this.gains[taxRate].sources[description] = 0;
+    const rateBucket = this.gains[taxRate];
+    rateBucket.amount += amount;
+    if (!rateBucket.sources[description]) {
+      rateBucket.sources[description] = 0;
     }
-    this.gains[taxRate].sources[description] += amount;
+    rateBucket.sources[description] += amount;
+    // Store detailed entry for precise CGT/Exit Tax handling
+    const entry = {
+      amount: amount,
+      description: description,
+      category: (options && (options.category === 'exitTax' || options.category === 'cgt')) ? options.category : 'cgt',
+      eligibleForAnnualExemption: options && typeof options.eligibleForAnnualExemption === 'boolean' ? options.eligibleForAnnualExemption : true,
+      allowLossOffset: options && typeof options.allowLossOffset === 'boolean' ? options.allowLossOffset : true
+    };
+    rateBucket.entries.push(entry);
   };
     
   computeTaxes() {
@@ -135,6 +151,9 @@ class Revenue {
     } else {
       this.dependentChildren = false;
     }
+    // Load the active ruleset (IE). Tests and WebUI preload it into Config for sync use.
+    const cfg = Config.getInstance();
+    this.ruleset = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
   };
 
   resetTaxAttributions() {
@@ -217,50 +236,57 @@ class Revenue {
     taxableIncomeAttribution.add('Your Pension Relief', -this.pensionContribReliefP1);
     taxableIncomeAttribution.add('Their Pension Relief', -this.pensionContribReliefP2);
 
-    let itBands = config.itSingleNoChildrenBands;
-    let marriedBandIncrease = 0;
+    // Determine brackets and married band increase using ruleset if available
+    var itBands;
+    var marriedBandIncrease = 0;
+    var status = this.married ? 'married' : 'single';
+    itBands = this.ruleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
     if (this.married) {
-      itBands = config.itMarriedBands;
-      const p1TotalSalary = this.salariesP1.reduce((sum, s) => sum + s.amount, 0);
-      const p2TotalSalary = this.person2Ref ? this.salariesP2.reduce((sum, s) => sum + s.amount, 0) : 0;
-
-      if (p1TotalSalary > 0 && p2TotalSalary > 0) { // Both have salary income
-        marriedBandIncrease = Math.min(adjust(config.itMaxMarriedBandIncrease), Math.min(p1TotalSalary, p2TotalSalary));
-      } else if (p1TotalSalary > 0) { // Only P1 has salary
-        marriedBandIncrease = Math.min(adjust(config.itMaxMarriedBandIncrease), p1TotalSalary);
-      } else if (p2TotalSalary > 0) { // Only P2 has salary
-        marriedBandIncrease = Math.min(adjust(config.itMaxMarriedBandIncrease), p2TotalSalary);
-      } // If neither has salary, marriedBandIncrease remains 0.
-    } else if (this.dependentChildren) {
-      itBands = config.itSingleDependentChildrenBands;
+      const p1TotalSalary = this.salariesP1.reduce(function(sum, s) { return sum + s.amount; }, 0);
+      const p2TotalSalary = this.person2Ref ? this.salariesP2.reduce(function(sum, s) { return sum + s.amount; }, 0) : 0;
+      var maxIncrease = adjust(this.ruleset.getIncomeTaxJointBandIncreaseMax());
+      if (p1TotalSalary > 0 && p2TotalSalary > 0) {
+        marriedBandIncrease = Math.min(maxIncrease, Math.min(p1TotalSalary, p2TotalSalary));
+      } else if (p1TotalSalary > 0) {
+        marriedBandIncrease = Math.min(maxIncrease, p1TotalSalary);
+      } else if (p2TotalSalary > 0) {
+        marriedBandIncrease = Math.min(maxIncrease, p2TotalSalary);
+      }
     }
-    
+
     let tax = this.computeProgressiveTax(itBands, taxableIncomeAttribution, 'it', 1, marriedBandIncrease);
 
     if (this.privatePensionLumpSumCountP1 > 0) {
         const lumpSumAttribution = new Attribution('pensionLumpSum');
         lumpSumAttribution.add('Pension Lump Sum P1', this.privatePensionLumpSumP1);
-        tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, lumpSumAttribution, 'it');
+        var lumpBands = this.ruleset.getPensionLumpSumTaxBands();
+        tax += this.computeProgressiveTax(lumpBands, lumpSumAttribution, 'it');
     }
     if (this.privatePensionLumpSumCountP2 > 0) {
         const lumpSumAttribution = new Attribution('pensionLumpSum');
         lumpSumAttribution.add('Pension Lump Sum P2', this.privatePensionLumpSumP2);
-        tax += this.computeProgressiveTax(config.pensionLumpSumTaxBands, lumpSumAttribution, 'it');
+        var lumpBands2 = this.ruleset.getPensionLumpSumTaxBands();
+        tax += this.computeProgressiveTax(lumpBands2, lumpSumAttribution, 'it');
     }
     
     let numSalaryEarners = (this.salariesP1.length > 0 ? 1 : 0) + (this.salariesP2.length > 0 ? 1 : 0);
-    let credit = adjust(params.personalTaxCredit + numSalaryEarners * config.itEmployeeTaxCredit);
-    if (this.person1Ref && this.person1Ref.age >= config.itExemptionAge) {
-      credit += adjust(config.ageTaxCredit);
+    var employeeCredit = this.ruleset.getIncomeTaxEmployeeCredit();
+    var ageCredit = this.ruleset.getIncomeTaxAgeCredit();
+    var ageExemptionAge = this.ruleset.getIncomeTaxAgeExemptionAge();
+    var ageExemptionLimit = this.ruleset.getIncomeTaxAgeExemptionLimit();
+
+    let credit = adjust(params.personalTaxCredit + numSalaryEarners * employeeCredit);
+    if (this.person1Ref && this.person1Ref.age >= ageExemptionAge) {
+      credit += adjust(ageCredit);
     }
-    if (this.married && this.person2Ref && this.person2Ref.age >= config.itExemptionAge) {
-      credit += adjust(config.ageTaxCredit);
+    if (this.married && this.person2Ref && this.person2Ref.age >= ageExemptionAge) {
+      credit += adjust(ageCredit);
     }
     
-    let exemption = config.itExemptionLimit * (this.married ? 2 : 1);
+    let exemption = ageExemptionLimit * (this.married ? 2 : 1);
 
-    let p1AgeEligible = (this.person1Ref && this.person1Ref.age >= config.itExemptionAge);
-    let p2AgeEligible = (this.married && this.person2Ref && this.person2Ref.age >= config.itExemptionAge);
+    let p1AgeEligible = (this.person1Ref && this.person1Ref.age >= ageExemptionAge);
+    let p2AgeEligible = (this.married && this.person2Ref && this.person2Ref.age >= ageExemptionAge);
     let isEligibleForAgeExemption = p1AgeEligible || p2AgeEligible;
     
     const taxableAmount = taxableIncomeAttribution.getTotal();
@@ -275,19 +301,23 @@ class Revenue {
   computePRSI() {
     this.prsi = 0;
 
+    // Determine PRSI rate per person from ruleset
+    var prsiRateP1 = this.person1Ref && this.ruleset ? this.ruleset.getPRSIRateForAge(this.person1Ref.age) : 0;
+    var prsiRateP2 = this.person2Ref && this.ruleset ? this.ruleset.getPRSIRateForAge(this.person2Ref.age) : 0;
+
     // PRSI for P1's PAYE income
-    if (this.person1Ref && this.person1Ref.age < config.prsiExcemptAge) {
+    if (this.person1Ref && prsiRateP1 > 0) {
         this.salariesP1.forEach(s => {
-            const prsi = s.amount * config.prsiRate;
+            const prsi = s.amount * prsiRateP1;
             this.prsi += prsi;
             this.attributionManager.record('prsi', s.description, prsi);
         });
     }
 
     // PRSI for P2's PAYE income
-    if (this.person2Ref && this.person2Ref.age < config.prsiExcemptAge) {
+    if (this.person2Ref && prsiRateP2 > 0) {
         this.salariesP2.forEach(s => {
-            const prsi = s.amount * config.prsiRate;
+            const prsi = s.amount * prsiRateP2;
             this.prsi += prsi;
             this.attributionManager.record('prsi', s.description, prsi);
         });
@@ -321,19 +351,19 @@ class Revenue {
     for (const source in nonPayeBreakdown) {
         const income = nonPayeBreakdown[source];
         if (this.person2Ref) { // Two people, split 50/50
-            if (this.person1Ref && this.person1Ref.age < config.prsiExcemptAge) {
-                const prsi = (income / 2) * config.prsiRate;
-                this.prsi += prsi;
-                this.attributionManager.record('prsi', `${source} (P1)`, prsi);
+            if (this.person1Ref && prsiRateP1 > 0) {
+                const prsi1 = (income / 2) * prsiRateP1;
+                this.prsi += prsi1;
+                this.attributionManager.record('prsi', `${source} (P1)`, prsi1);
             }
-            if (this.person2Ref.age < config.prsiExcemptAge) {
-                const prsi = (income / 2) * config.prsiRate;
-                this.prsi += prsi;
-                this.attributionManager.record('prsi', `${source} (P2)`, prsi);
+            if (this.person2Ref && prsiRateP2 > 0) {
+                const prsi2 = (income / 2) * prsiRateP2;
+                this.prsi += prsi2;
+                this.attributionManager.record('prsi', `${source} (P2)`, prsi2);
             }
         } else { // One person
-            if (this.person1Ref && this.person1Ref.age < config.prsiExcemptAge) {
-                const prsi = income * config.prsiRate;
+            if (this.person1Ref && prsiRateP1 > 0) {
+                const prsi = income * prsiRateP1;
                 this.prsi += prsi;
                 this.attributionManager.record('prsi', source, prsi);
             }
@@ -344,9 +374,8 @@ class Revenue {
   computeUSC() {
     this.usc = 0;
 
-    const uscExemptAmount = adjust(config.uscExemptAmount);
-    const uscReducedRateAge = config.uscReducedRateAge;
-    const uscReducedRateMaxIncome = adjust(config.uscReducedRateMaxIncome);
+    var uscExemptAmount = adjust(this.ruleset.getUSCExemptAmount());
+    var calcBandsFor = (age, totalIncome) => this.ruleset.getUSCBandsFor(age, totalIncome);
 
     const calculateUscForPerson = (person, personUscLiableIncomeAttribution) => {
         const totalPersonUscLiableIncome = personUscLiableIncomeAttribution.getTotal();
@@ -355,12 +384,7 @@ class Revenue {
         }
 
         const personAge = person ? person.age : undefined;
-        let bands = config.uscTaxBands;
-        if ((personAge !== undefined && personAge >= uscReducedRateAge) &&
-            (totalPersonUscLiableIncome <= uscReducedRateMaxIncome)) {
-            bands = config.uscReducedTaxBands;
-        }
-        
+        const bands = calcBandsFor(personAge, totalPersonUscLiableIncome);
         return this.computeProgressiveTax(bands, personUscLiableIncomeAttribution, 'usc');
     };
 
@@ -408,44 +432,65 @@ class Revenue {
   };
 
   computeCGT() {
-    let tax = 0;
-    let remainingRelief = adjust(config.cgtTaxRelief);
-    let totalLosses = 0;
+    // Separate handling for Exit Tax vs CGT, and respect per-gain flags
+    let totalTax = 0;
+    const annualExemption = adjust(this.ruleset.getCapitalGainsAnnualExemption());
+    let remainingExemption = annualExemption;
 
-    // Calculate total losses first
-    for (const taxRate in this.gains) {
-        if (this.gains[taxRate].amount < 0) {
-            totalLosses -= this.gains[taxRate].amount;
+    // Aggregate allowable losses from CGT entries that explicitly allow loss offset
+    let remainingAllowableLosses = 0;
+    for (const rateKey in this.gains) {
+      const bucket = this.gains[rateKey];
+      const entries = Array.isArray(bucket.entries) ? bucket.entries : [];
+      for (const entry of entries) {
+        if (entry && entry.category === 'cgt' && entry.amount < 0 && entry.allowLossOffset) {
+          remainingAllowableLosses += (-entry.amount);
         }
+      }
     }
 
-    // Process gains, sorted by tax rate descending
-    const sortedGains = Object.entries(this.gains).sort((a, b) => parseFloat(b[0]) - parseFloat(a[0]));
+    // Process gains in descending tax rate order to preserve previous behavior
+    const sortedByRate = Object.keys(this.gains)
+      .map(k => parseFloat(k))
+      .sort((a, b) => b - a);
 
-    for (const [taxRate, gainData] of sortedGains) {
-        if (gainData.amount > 0) {
-            let gainAfterLosses = Math.max(gainData.amount - totalLosses, 0);
-            totalLosses = Math.max(totalLosses - gainData.amount, 0);
-            
-            let taxableGains = Math.max(gainAfterLosses - remainingRelief, 0);
-            let usedRelief = Math.min(remainingRelief, gainAfterLosses);
-            remainingRelief = Math.max(remainingRelief - gainAfterLosses, 0);
-            
-            const taxOnThisGain = taxableGains * parseFloat(taxRate);
-            tax += taxOnThisGain;
+    for (const rate of sortedByRate) {
+      const bucket = this.gains[rate];
+      const entries = Array.isArray(bucket.entries) ? bucket.entries : [];
+      for (const entry of entries) {
+        if (!entry || entry.amount <= 0) continue; // Ignore non-positive entries here
+        const numericRate = parseFloat(rate);
+        // Treat exitTax and CGT entries similarly regarding annual exemption where flagged.
+        // ExitTax continues to ignore loss offsets unless explicitly allowed (usually false for IE).
+        let remainingForThis = entry.amount;
 
-            // Attribute the tax proportionally to the sources of this gain
-            const totalGainAmount = gainData.amount;
-            for (const source in gainData.sources) {
-                const proportion = gainData.sources[source] / totalGainAmount;
-                const attributedTax = taxOnThisGain * proportion;
-                this.attributionManager.record('cgt', source, attributedTax);
-            }
+        // Apply loss offset only for entries that allow it (generally CGT-only in IE)
+        if (entry.allowLossOffset && remainingAllowableLosses > 0) {
+          const usedLoss = Math.min(remainingAllowableLosses, remainingForThis);
+          remainingAllowableLosses -= usedLoss;
+          remainingForThis -= usedLoss;
         }
+
+        // Apply annual exemption if eligible (legacy IE behavior allowed it even for exit tax)
+        if (entry.eligibleForAnnualExemption && remainingExemption > 0 && remainingForThis > 0) {
+          const usedExemption = Math.min(remainingExemption, remainingForThis);
+          remainingExemption -= usedExemption;
+          remainingForThis -= usedExemption;
+        }
+
+        if (remainingForThis > 0) {
+          const taxOnEntry = remainingForThis * numericRate;
+          totalTax += taxOnEntry;
+          this.attributionManager.record('cgt', entry.description, taxOnEntry);
+        }
+      }
     }
-    this.cgt = tax;
-    if (remainingRelief > 0 && tax > 0) {
-        this.attributionManager.record('cgt', 'CGT Relief', -Math.min(tax, adjust(config.cgtTaxRelief)));
+
+    this.cgt = totalTax;
+    // Keep a relief line item for UI parity (match legacy semantics using currency amount)
+    if (remainingExemption < annualExemption && totalTax > 0) {
+      const usedRelief = annualExemption - remainingExemption;
+      this.attributionManager.record('cgt', 'CGT Relief', -Math.min(totalTax, usedRelief));
     }
   };
   
@@ -458,7 +503,8 @@ class Revenue {
       const gainData = this.gains[key];
       copy.gains[key] = {
         amount: gainData.amount,
-        sources: {}
+        sources: {},
+        entries: Array.isArray(gainData.entries) ? gainData.entries.map(function(e){ return { amount: e.amount, description: e.description, category: e.category, eligibleForAnnualExemption: e.eligibleForAnnualExemption, allowLossOffset: e.allowLossOffset }; }) : []
       };
     }
     // Clone primitive fields
@@ -491,6 +537,9 @@ class Revenue {
     copy.prsi = this.prsi;
     copy.usc = this.usc;
     copy.cgt = this.cgt;
+
+    // Preserve active tax ruleset for cloned computations
+    copy.ruleset = this.ruleset;
 
     // Clone marital/dependent flags
     copy.married = this.married;

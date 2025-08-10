@@ -78,11 +78,62 @@ class NotificationUtils {
   showToast(message, title, timeout=10) {
     const toast = document.createElement('div');
     toast.className = 'toast-message';
-    toast.textContent = title ? `${title}: ${message}` : message;
+    // Render markdown by default for better formatting
+    const html = this._renderMarkdown(title, message);
+    toast.innerHTML = html;
+    // Ensure line breaks are respected for any leftover plain text
+    toast.style.whiteSpace = 'normal';
     document.body.appendChild(toast);
     setTimeout(() => {
       toast.remove();
     }, timeout * 1000);
+  }
+
+  _renderMarkdown(title, message) {
+    const escapeHtml = (str) => {
+      const div = document.createElement('div');
+      div.textContent = String(str == null ? '' : str);
+      return div.innerHTML;
+    };
+
+    const toHtml = (md) => {
+      if (!md) return '';
+      // Work on escaped version to avoid XSS, then allow our markdown replacements
+      let s = escapeHtml(md);
+      // Inline code
+      s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Bold and italics (process bold first)
+      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1<\/strong>');
+      s = s.replace(/\*([^*]+)\*/g, '<em>$1<\/em>');
+      s = s.replace(/_([^_]+)_/g, '<em>$1<\/em>');
+      // Links: [text](url)
+      s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1<\/a>');
+      // Lists: lines starting with - or * → <ul><li>..</li></ul>
+      const lines = s.split(/\r?\n/);
+      const out = [];
+      let inList = false;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const isBullet = /^\s*[-*]\s+/.test(line);
+        if (isBullet) {
+          if (!inList) { out.push('<ul>'); inList = true; }
+          out.push('<li>' + line.replace(/^\s*[-*]\s+/, '') + '</li>');
+        } else {
+          if (inList) { out.push('</ul>'); inList = false; }
+          if (line.trim() === '') {
+            out.push('<br/>');
+          } else {
+            out.push(line);
+          }
+        }
+      }
+      if (inList) out.push('</ul>');
+      return out.join('\n');
+    };
+
+    const titleHtml = title ? `<strong>${toHtml(title)}</strong><br/>` : '';
+    const bodyHtml = toHtml(message);
+    return titleHtml + bodyHtml;
   }
 
   setWarning(elementId, message) {
