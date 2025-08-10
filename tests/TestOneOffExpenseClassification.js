@@ -71,9 +71,11 @@ const testDefinition = {
           return !isNaN(fromAge) && !isNaN(toAge) && fromAge === toAge;
         },
         showsToAgeField: function(eventType, event) {
-          return !(event && this.isOneOffExpense(event));
+          // New behavior: always show To Age, even for one-off expenses
+          return true;
         },
         showsGrowthRateField: function(eventType, event) {
+          // Growth rate remains hidden for one-off expenses
           return !(event && this.isOneOffExpense(event));
         }
       };
@@ -81,12 +83,12 @@ const testDefinition = {
       const oneOffEvent = { type: 'E', fromAge: '30', toAge: '30' };
       const recurringEvent = { type: 'E', fromAge: '30', toAge: '35' };
 
-      // Test 'To Age' field visibility
-      if (mockSummaryRenderer.showsToAgeField('E', oneOffEvent)) {
-        results.errors.push("'To Age' field should be hidden for one-off expenses");
+      // Test 'To Age' field visibility: now always visible, even for one-off expenses
+      if (!mockSummaryRenderer.showsToAgeField('E', oneOffEvent)) {
+        results.errors.push("'To Age' field should be visible for one-off expenses");
         results.success = false;
       } else {
-        results.tests.push("✓ 'To Age' field correctly hidden for one-off expenses");
+        results.tests.push("✓ 'To Age' field correctly visible for one-off expenses");
       }
 
       if (!mockSummaryRenderer.showsToAgeField('E', recurringEvent)) {

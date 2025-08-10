@@ -243,12 +243,7 @@ class EventSummaryRenderer {
    * Based on actual simulation behavior and event type meanings
    */
   showsToAgeField(eventType, event = null) {
-    // One-off expenses: Never show To Age field since it's automatically set to fromAge
-    if (event && this.isOneOffExpense(event)) {
-      return false;
-    }
-
-    // All other event types show To Age field (including E, R for sale date, etc.)
+    // Always show To Age field. For one-off expenses, it will equal From Age.
     return true;
   }
 

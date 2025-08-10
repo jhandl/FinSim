@@ -126,12 +126,16 @@ class Wizard {
 
   getEventTableState() {
     const tbody = document.querySelector('#Events tbody');
-    if (!tbody) return { isEmpty: true };
-    // Only consider rows that are actually visible to the user. Hidden rows
-    // (e.g. P2 events while in single mode) must be ignored so the wizard does
-    // not target elements that are not present on screen.
-    const allRows = Array.from(tbody.querySelectorAll('tr'));
-    const rows = allRows.filter(row => this.isElementVisible(row));
+    // In unit tests or early boot, selector stubs may not implement querySelectorAll.
+    // Fall back gracefully instead of throwing.
+    let rows = [];
+    if (tbody && typeof tbody.querySelectorAll === 'function') {
+      // Only consider rows that are actually visible to the user. Hidden rows
+      // (e.g. P2 events while in single mode) must be ignored so the wizard does
+      // not target elements that are not present on screen.
+      const allRows = Array.from(tbody.querySelectorAll('tr'));
+      rows = allRows.filter(row => this.isElementVisible(row));
+    }
     
     if (rows.length === 0) {
       // Accordion fallback: table rows are hidden, derive state from accordion
@@ -144,11 +148,21 @@ class Wizard {
           if (events.length > 0) {
             let chosen = null;
             try {
-              const expandedAcc = document.querySelector('.events-accordion-item .accordion-item-content.expanded');
-              const expandedItem = expandedAcc ? expandedAcc.closest('.events-accordion-item') : null;
-              if (expandedItem) {
-                const accId = expandedItem.getAttribute('data-accordion-id') || '';
+              // Prefer the accordion item that currently holds focus
+              const active = document.activeElement;
+              const focusedItem = active ? active.closest && active.closest('.events-accordion-item') : null;
+              if (focusedItem) {
+                const accId = focusedItem.getAttribute('data-accordion-id') || '';
                 chosen = events.find(e => e.accordionId === accId) || null;
+              }
+              if (!chosen) {
+                // Next, prefer the currently expanded accordion item (if any)
+                const expandedAcc = document.querySelector('.events-accordion-item .accordion-item-content.expanded');
+                const expandedItem = expandedAcc ? expandedAcc.closest('.events-accordion-item') : null;
+                if (expandedItem) {
+                  const accId = expandedItem.getAttribute('data-accordion-id') || '';
+                  chosen = events.find(e => e.accordionId === accId) || null;
+                }
               }
             } catch (_) {}
             if (!chosen) chosen = events[0];
@@ -391,7 +405,7 @@ class Wizard {
             let accIndex = 0;
             if (this.tableState && this.tableState.rowId) {
               const tbody = document.querySelector('#Events tbody');
-              if (tbody) {
+              if (tbody && typeof tbody.querySelectorAll === 'function') {
                 const rowsArr = Array.from(tbody.querySelectorAll('tr'));
                 const rowEl   = rowsArr.find(r => r.dataset.rowId === this.tableState.rowId);
                 if (rowEl) {
@@ -401,6 +415,10 @@ class Wizard {
                   const m = this.tableState.rowId.match(/row_(\d+)/);
                   accIndex = m && m[1] ? parseInt(m[1], 10) - 1 : 0;
                 }
+              } else {
+                // Environment without querySelectorAll (e.g., unit tests): use numeric suffix
+                const m = this.tableState.rowId.match(/row_(\d+)/);
+                accIndex = m && m[1] ? parseInt(m[1], 10) - 1 : 0;
               }
             }
             const accId = `accordion-item-${accIndex}`;
@@ -442,10 +460,9 @@ class Wizard {
           if (step.noEventTypes) {
             return !step.noEventTypes.includes(this.tableState.eventType);
           }
-          // Generic field (no event type restrictions): mirror table logic
-          // Keep only when row is empty (single empty event); drop when non-empty
-          const keepGeneric = !!this.tableState.rowIsEmpty;
-          return keepGeneric;
+          // Generic field (no event type restrictions): keep for dedup stage.
+          // A later pass will collapse duplicates preferring event-specific when available.
+          return true;
         }
 
         // In accordion view handle field steps specially: 
@@ -564,16 +581,14 @@ class Wizard {
             fieldMap[key] = step;
             deduped.push(step);
           } else {
-            // Prefer step whose eventTypes match current event
             const existingMatches = existing.eventTypes && existing.eventTypes.includes(this.tableState.eventType);
             const stepMatches = step.eventTypes && step.eventTypes.includes(this.tableState.eventType);
+            // If both are generic or both match current event, keep the first (stable)
+            // If existing is generic and step is event-specific, always prefer event-specific
             if (!existingMatches && stepMatches) {
-              // Prefer event-specific guidance only when the row already has data
-              if (!this.tableState.rowIsEmpty) {
-                const idx = deduped.indexOf(existing);
-                if (idx !== -1) deduped[idx] = step;
-                fieldMap[key] = step;
-              }
+              const idx = deduped.indexOf(existing);
+              if (idx !== -1) deduped[idx] = step;
+              fieldMap[key] = step;
             }
           }
         });
