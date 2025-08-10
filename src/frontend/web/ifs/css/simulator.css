@@ -2141,6 +2141,27 @@ footer {
     font-weight: bold;
 }
 
+/* Small checkmark to the left of the selected option */
+.visualization-dropdown div[data-value] {
+    position: relative; /* anchor for the checkmark */
+}
+.visualization-dropdown div[data-value].selected::before {
+    content: "\2713"; /* ✓ */
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.72rem;
+    line-height: 1;
+    color: var(--primary-color);
+    opacity: 0.9;
+}
+/* When highlighted (hover/keyboard), keep the check visible on the themed background */
+.visualization-dropdown div[data-value].selected.highlighted::before {
+    color: white;
+    opacity: 1;
+}
+
 /* Visualization Tooltip - similar to column tooltips */
 .visualization-tooltip {
     position: fixed;
