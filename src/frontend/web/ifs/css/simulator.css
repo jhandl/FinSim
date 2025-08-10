@@ -1978,6 +1978,7 @@ footer {
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   font-size: 1rem;
+  line-height: 0.7; /* compact, newline-like spacing */
   z-index: 10020; /* Above welcome modal (z-index: 10000) */
   opacity: 0.95;
   pointer-events: none;

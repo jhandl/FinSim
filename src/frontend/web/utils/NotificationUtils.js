@@ -123,12 +123,14 @@ class NotificationUtils {
           if (line.trim() === '') {
             out.push('<br/>');
           } else {
-            out.push(line);
+            // Preserve explicit newlines in plain text by inserting <br/>
+            out.push(line + '<br/>');
           }
         }
       }
       if (inList) out.push('</ul>');
-      return out.join('\n');
+      // Avoid inserting raw newlines which some mobile browsers collapse
+      return out.join('');
     };
 
     const titleHtml = title ? `<strong>${toHtml(title)}</strong><br/>` : '';
