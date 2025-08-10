@@ -127,8 +127,60 @@ class Wizard {
   getEventTableState() {
     const tbody = document.querySelector('#Events tbody');
     if (!tbody) return { isEmpty: true };
-    const rows = tbody.querySelectorAll('tr');
-    if (rows.length === 0) return { isEmpty: true };
+    // Only consider rows that are actually visible to the user. Hidden rows
+    // (e.g. P2 events while in single mode) must be ignored so the wizard does
+    // not target elements that are not present on screen.
+    const allRows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = allRows.filter(row => this.isElementVisible(row));
+    
+    if (rows.length === 0) {
+      // Accordion fallback: table rows are hidden, derive state from accordion
+      try {
+        const mode = this.getCurrentEventsMode ? this.getCurrentEventsMode() : 'table';
+        if (mode === 'accordion') {
+          const webUI = (typeof WebUI !== 'undefined') ? WebUI.getInstance() : null;
+          const mgr = webUI && webUI.eventAccordionManager ? webUI.eventAccordionManager : null;
+          const events = (mgr && Array.isArray(mgr.events)) ? mgr.events : [];
+          if (events.length > 0) {
+            let chosen = null;
+            try {
+              const expandedAcc = document.querySelector('.events-accordion-item .accordion-item-content.expanded');
+              const expandedItem = expandedAcc ? expandedAcc.closest('.events-accordion-item') : null;
+              if (expandedItem) {
+                const accId = expandedItem.getAttribute('data-accordion-id') || '';
+                chosen = events.find(e => e.accordionId === accId) || null;
+              }
+            } catch (_) {}
+            if (!chosen) chosen = events[0];
+
+            const rowId = chosen && chosen.rowId ? chosen.rowId : null;
+            const eventType = chosen && chosen.type ? chosen.type : null;
+            const rowIsEmpty = !(
+              (eventType && eventType !== 'NOP') ||
+              (chosen && (
+                (chosen.name && chosen.name.trim() !== '') ||
+                (chosen.amount && chosen.amount.trim() !== '') ||
+                (chosen.fromAge && chosen.fromAge.trim() !== '') ||
+                (chosen.toAge && chosen.toAge.trim() !== '') ||
+                (chosen.rate && chosen.rate.trim() !== '') ||
+                (chosen.match && chosen.match.trim() !== '')
+              ))
+            );
+
+            const state = {
+              isEmpty: false,
+              rows: events.length,
+              rowIsEmpty,
+              eventType,
+              focusedRow: null,
+              rowId
+            };
+            return state;
+          }
+        }
+      } catch (_) {}
+      return { isEmpty: true };
+    }
     let focusedRow = this.lastFocusedField ? Array.from(rows).find(row => row.contains(this.lastFocusedField)) : null;
 
     // Accordion mode: if the last focused field is inside an accordion item (and not in the hidden table),
@@ -166,6 +218,7 @@ class Wizard {
 
     const row = focusedRow || rows[0];
     const rowId = row.dataset.rowId;
+    
 
     const typeInputHidden = row.querySelector(`input.event-type`);
     const nameInput = row.querySelector(`input#EventAlias_${rowId}`);
@@ -255,6 +308,7 @@ class Wizard {
     // NOTE: No auto-expansion here; we'll expand lazily when we actually navigate to the first accordion field.
 
     this.tableState = this.getEventTableState();
+    
 
     // Header buttons that might live inside the burger menu on mobile
     const burgerMenuHeaderButtons = [
@@ -276,9 +330,16 @@ class Wizard {
       }
 
       // Swap selector when accordion mode is active and alternative provided
-      if (currentMode === 'accordion' && step['accordion-element']) {
-        step.element = step['accordion-element'];
-      }
+        if (currentMode === 'accordion' && step['accordion-element']) {
+          step.element = step['accordion-element'];
+          // For event type steps, ensure we target the row-specific toggle id
+          if (step.element.startsWith('#AccordionEventTypeToggle') && !step.element.includes('_')) {
+            const st = this.getEventTableState();
+            if (st && st.rowId) {
+              step.element = `#AccordionEventTypeToggle_${st.rowId}`;
+            }
+          }
+        }
       // END ADD
 
       // Steps without elements are always valid
@@ -290,7 +351,7 @@ class Wizard {
         return document.querySelector(step.element) !== null;
       }
 
-      if (!step.element.includes('Event')) {
+      if (!step.element.includes('Event') || step.element.startsWith('#AccordionEventTypeToggle')) {
         // Special case for data-section: find the visible element and update selector
         if (step.element === '.data-section') {
           const elements = document.querySelectorAll(step.element);
@@ -299,6 +360,7 @@ class Wizard {
             if (visibleElement.id) {
               step.element = `#${visibleElement.id}`;
             }
+            
             return true;
           }
           return false;
@@ -319,7 +381,7 @@ class Wizard {
         }
 
         // For other elements (form fields, buttons), handle accordion fields specially
-        if (currentMode === 'accordion' && (step.element.startsWith('#AccordionEventTypeToggle_') || step.element.startsWith('.accordion-edit-'))) {
+        if (currentMode === 'accordion' && (step.element.startsWith('#AccordionEventTypeToggle') || step.element.startsWith('.accordion-edit-'))) {
           // Always scope selector to current accordion item so we highlight the correct row
           try {
             // Determine the correct accordion index for the current row. We cannot rely on
@@ -347,7 +409,13 @@ class Wizard {
               if (!step.element.startsWith('.events-accordion-item[')) {
                 step.element = `.events-accordion-item[data-accordion-id="${accId}"] ${step.element}`;
               }
+            } else if (step.element.startsWith('#AccordionEventTypeToggle') && !step.element.includes('_')) {
+              // Target the current row's toggle specifically
+              if (this.tableState && this.tableState.rowId) {
+                step.element = `#AccordionEventTypeToggle_${this.tableState.rowId}`;
+              }
             }
+            
           } catch(err) {
             console.warn('Wizard: selector scoping failed', err);
           }
@@ -374,18 +442,22 @@ class Wizard {
           if (step.noEventTypes) {
             return !step.noEventTypes.includes(this.tableState.eventType);
           }
-          // Generic field (no event type restrictions) → keep
-          return true;
+          // Generic field (no event type restrictions): mirror table logic
+          // Keep only when row is empty (single empty event); drop when non-empty
+          const keepGeneric = !!this.tableState.rowIsEmpty;
+          return keepGeneric;
         }
 
-        // In accordion view handle field steps specially:\
-        if (currentMode === 'accordion' && (step.element.includes('.accordion-edit-') || step.element.startsWith('#AccordionEventTypeToggle_'))) {
+        // In accordion view handle field steps specially: 
+        if (currentMode === 'accordion' && (step.element.includes('.accordion-edit-') || step.element.startsWith('#AccordionEventTypeToggle'))) {
           const el = document.querySelector(step.element);
           if (!el) {
             // Field not rendered yet – keep it; ensureFirstAccordionExpanded will create it later
+            
             return true;
           }
           // Element exists: include only if visible (the EventSummaryRenderer hides non-applicable fields via display:none)
+          
           return this.isElementVisible(el);
         }
 
@@ -403,6 +475,13 @@ class Wizard {
               if (accSel) {
                 // Replace selector with accordion equivalent
                 step.element = accSel;
+                // Special-case event type toggle: append current rowId to target the
+                // row-specific toggle element (e.g. #AccordionEventTypeToggle_row_3)
+                if (step.element.startsWith('#AccordionEventTypeToggle') && !step.element.includes('_')) {
+                  if (this.tableState && this.tableState.rowId) {
+                    step.element = `#AccordionEventTypeToggle_${this.tableState.rowId}`;
+                  }
+                }
               } else {
                 // No accordion counterpart – skip this step entirely
                 return false; // filter out
@@ -414,6 +493,7 @@ class Wizard {
           if (!step.element.includes(`_${this.tableState.rowId}`)) {
             step.element = step.element.replace(/Event([A-Za-z]+)/, `Event$1_${this.tableState.rowId}`);
           }
+          
         if (this.tableState.isEmpty) {
           return false;
         } else {
@@ -449,9 +529,14 @@ class Wizard {
               return !step.noEventTypes.includes(this.tableState.eventType);
             }
           }
+
+          // Robustness: if targeting a specific event type toggle, ensure it's present before returning
+          // Note: cannot use await in this sync path; instead just no-op if missing.
         }
       }
     });
+
+    
 
           // BEGIN ADD: Deduplicate accordion field steps so only one per field remains (prefer event-specific for current row)
       if (currentMode === 'accordion') {
@@ -568,7 +653,15 @@ class Wizard {
       if (webUI && webUI.eventAccordionManager) {
         const mgr = webUI.eventAccordionManager;
         if (mgr.expandedItems && mgr.expandedItems.has(this._autoExpandedAccordionId)) {
-          mgr.toggleAccordionItem(this._autoExpandedAccordionId);
+          // Guard against missing DOM nodes after rerenders
+          const accId = this._autoExpandedAccordionId;
+          const el = document.querySelector(`[data-accordion-id="${accId}"]`);
+          if (el) {
+            mgr.toggleAccordionItem(accId);
+          } else {
+            // Element no longer exists; clean up manager state silently
+            try { mgr.expandedItems.delete(accId); } catch (_) {}
+          }
         }
       }
     } catch (err) {
@@ -686,7 +779,7 @@ class Wizard {
       return;
     }
 
-    // Ensure startingIndex is within bounds
+      // Ensure startingIndex is within bounds
     if (startingIndex >= this.validSteps.length) {
       startingIndex = 0;
     }
@@ -748,6 +841,7 @@ class Wizard {
           try {
             const idx = this.tour ? this.tour.getActiveIndex() : -1;
             const step = (idx >= 0 && this.validSteps) ? this.validSteps[idx] : null;
+            
             if (step) {
               // Determine which accordion row is being highlighted (if any)
               let highlightRowId = 'n/a';
@@ -762,9 +856,12 @@ class Wizard {
                   }
                 }
               }
+              
               // Identify bubble content source – generic vs event-specific
               const contentTag = step.eventTypes ? `eventTypes=${step.eventTypes.join('|')}` : 'generic';
             }
+
+            // (reverted) expansion-on-highlight – we now expand targets before highlighting in exposeHiddenElement()
           } catch(e) { /* silent */ }
         this.cleanupInlineStyles();
         this.handleBurgerMenuSimple(el);
@@ -778,7 +875,11 @@ class Wizard {
         // Accordion auto-collapse when leaving event - SHARED BY ALL TOUR TYPES
         if (this.getCurrentEventsMode && this.getCurrentEventsMode() === 'accordion' && this._autoExpandedAccordionId) {
           const withinAcc = el ? el.closest('.events-accordion-item') : null;
-          if (!withinAcc && this._accordionExpandedByWizard) {
+          // Peek at next step – if it's another accordion field step, keep open
+          const nextIdx = (this.tour && typeof this.tour.getActiveIndex === 'function') ? this.tour.getActiveIndex() + 1 : -1;
+          const nextStep = (nextIdx >= 0 && nextIdx < (this.validSteps?.length || 0)) ? this.validSteps[nextIdx] : null;
+          const nextIsAccordionField = !!(nextStep && nextStep.element && (nextStep.element.startsWith('#AccordionEventTypeToggle') || nextStep.element.includes('.accordion-edit-')));
+          if (!withinAcc && this._accordionExpandedByWizard && !nextIsAccordionField) {
             this.collapseAutoExpandedAccordion();
 
             // Wait for accordion collapse animation to complete before highlight recalculation
@@ -905,6 +1006,9 @@ class Wizard {
   }
 
   finishTour() {
+    // If a temporary NOP row was added for a mini tour, clean it up first
+    this.cleanupTemporaryMiniTourRow();
+
     // Collapse auto-expanded accordion if still open
     this.collapseAutoExpandedAccordion();
 
@@ -1293,7 +1397,8 @@ class Wizard {
     const hasTouchSupport = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     const isSmallScreen = window.innerWidth <= 768;
     const isMobileViewport = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    return isMobileUserAgent || (hasTouchSupport && (isSmallScreen || isMobileViewport));
+    const isMobile = isMobileUserAgent || (hasTouchSupport && (isSmallScreen || isMobileViewport));
+    return isMobile;
   }
 
   // BEGIN ADD: Utility to detect current events view mode (table vs accordion)
@@ -1302,14 +1407,18 @@ class Wizard {
     try {
       const webUI = WebUI.getInstance();
       if (webUI && webUI.eventsTableManager && webUI.eventsTableManager.viewMode) {
-        return webUI.eventsTableManager.viewMode;
+        const mode = webUI.eventsTableManager.viewMode;
+        return mode;
       }
     } catch (_) {
       // Ignore and fall back to DOM inference
     }
     // Fallback: inspect DOM visibility
     const accordionContainer = document.querySelector('.events-accordion-container');
-    if (accordionContainer && accordionContainer.style.display !== 'none') {
+    const isVisible = !!(accordionContainer && window.getComputedStyle(accordionContainer).display !== 'none');
+    const mode = isVisible ? 'accordion' : 'table';
+    
+    if (isVisible) {
       return 'accordion';
     }
     return 'table';
@@ -1406,6 +1515,14 @@ class Wizard {
     this.originalInputStates.clear();
   }
 
+  // Small helper to await element presence in DOM up to timeoutMs
+  async waitForElement(selector, timeoutMs = 600) {
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+    while (!document.querySelector(selector) && Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 30));
+    }
+  }
+
   // Handle burger menu BEFORE highlighting a step
   async exposeHiddenElement(stepIndex) {
     // -------------------------------------------------------
@@ -1414,10 +1531,56 @@ class Wizard {
     try {
       if (this.getCurrentEventsMode && this.getCurrentEventsMode() === 'accordion') {
         const step = stepIndex !== null ? this.validSteps[stepIndex] : null;
-        if (step && step.element && (step.element.startsWith('#AccordionEventTypeToggle_') || step.element.startsWith('.accordion-edit-'))) {
+        if (step && step.element && (
+            step.element.includes('#AccordionEventTypeToggle') ||
+            step.element.includes('.accordion-edit-')
+          )) {
+          
           await this.ensureFirstAccordionExpanded();
           // Give the DOM a tick to render new elements
           await new Promise(r => setTimeout(r, 80));
+
+          // After expansion, if targeting the event type toggle without a row suffix,
+          // bind it to the currently expanded accordion item (or the first item).
+          if (step.element.startsWith('#AccordionEventTypeToggle') && !step.element.includes('_')) {
+            let targetRowId = null;
+            try {
+              // Prefer the currently expanded accordion item
+              const expandedAcc = document.querySelector('.events-accordion-item .accordion-item-content.expanded');
+              const expandedItem = expandedAcc ? expandedAcc.closest('.events-accordion-item') : null;
+              if (expandedItem) {
+                const accIdStr = expandedItem.getAttribute('data-accordion-id') || '';
+                // Robust mapping: use accordion manager events to resolve rowId for this accordionId
+                try {
+                  const webUI = WebUI.getInstance();
+                  const mgr = webUI && webUI.eventAccordionManager;
+                  const ev = mgr && mgr.events ? mgr.events.find(e => e.accordionId === accIdStr) : null;
+                  targetRowId = ev && ev.rowId ? ev.rowId : null;
+                  if (!targetRowId) {
+                    // Heuristic fallback only if manager lookup fails
+                    const m = accIdStr.match(/(\d+)$/);
+                    if (m && m[1] !== undefined) {
+                      targetRowId = `row_${parseInt(m[1], 10) + 1}`;
+                    }
+                  }
+                  
+                } catch(_) {}
+              }
+              // Fallback to the first event via manager
+              if (!targetRowId) {
+                const webUI = WebUI.getInstance();
+                const mgr = webUI && webUI.eventAccordionManager;
+                if (mgr && mgr.events && mgr.events[0] && mgr.events[0].rowId) {
+                  targetRowId = mgr.events[0].rowId;
+                }
+              }
+            } catch (_) {}
+            if (targetRowId) {
+              this.validSteps[stepIndex].element = `#AccordionEventTypeToggle_${targetRowId}`;
+              // Do not trigger additional resize here; Bubbles recalculates on next highlight
+            }
+          }
+          
         }
       }
     } catch (err) {
@@ -1756,6 +1919,12 @@ class Wizard {
       }
     } else {
       // Use the filtered steps for quick/mini tours
+      // Special handling: for events card mini tour ensure a visible row exists so
+      // field bubbles can be anchored. If no visible row, insert a temporary NOP row.
+      if (type === 'mini' && card === 'events') {
+        try { await this.ensureTemporaryEventRowForMiniTour(); } catch (_) {}
+      }
+
       steps = this._getFilteredSteps(type, card);
 
       if (steps.length === 0) {
@@ -1765,6 +1934,7 @@ class Wizard {
 
       // Mini-tour tweaks: show a "Done" button on the last (or only) step.
       if (type === 'mini') {
+        
         if (steps.length === 1) {
           const step = steps[0];
           if (step && step.popover) {
@@ -1793,6 +1963,73 @@ class Wizard {
 
     // Now use the unified _runTour method for ALL tour types
     await this._runTour(steps, startingStepIndex);
+  }
+
+  /**
+   * Ensure a visible temporary NOP event row exists for the Events mini tour when the
+   * table currently has no visible rows. Marks the row so it can be removed when the
+   * tour finishes if the user did not modify it.
+   */
+  async ensureTemporaryEventRowForMiniTour() {
+    try {
+      // Create a temp row only when the table truly has NO rows at all.
+      const tbody = document.querySelector('#Events tbody');
+      const hasAnyRow = !!(tbody && tbody.querySelector('tr'));
+      
+      if (hasAnyRow) { return; }
+
+      const webUI = (typeof WebUI !== 'undefined') ? WebUI.getInstance() : null;
+      const etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
+      if (!etm) return;
+
+      const result = etm.addEventRow();
+      if (!result || !result.row) return;
+
+      // Remember the temporary row so we can clean up on finish
+      this._tempMiniTourRowId = result.row.dataset.rowId || null;
+      this._tempMiniTourEventId = result.id || null;
+      
+      
+
+      // When in accordion mode, the table manager will refresh the accordion internally.
+      // Give the DOM a tick to settle before selector computations.
+      await new Promise(r => setTimeout(r, 30));
+    } catch (_) {
+      // fail silently – mini tour can still run without a row, though with fewer anchors
+    }
+  }
+
+  /**
+   * Remove the temporary NOP row inserted for the events mini tour if it is still empty
+   * (NOP and all fields blank). Leaves the row intact if the user made any edits.
+   */
+  cleanupTemporaryMiniTourRow() {
+    if (!this._tempMiniTourRowId) return;
+    try {
+      const webUI = (typeof WebUI !== 'undefined') ? WebUI.getInstance() : null;
+      const etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
+      if (!etm) { this._tempMiniTourRowId = null; this._tempMiniTourEventId = null; return; }
+
+      const tbody = document.querySelector('#Events tbody');
+      const row = tbody ? Array.from(tbody.querySelectorAll('tr')).find(r => r.dataset.rowId === this._tempMiniTourRowId) : null;
+      if (!row) { this._tempMiniTourRowId = null; this._tempMiniTourEventId = null; return; }
+
+      const isStillEmpty = etm.isEventEmpty(row);
+      
+      if (isStillEmpty) {
+        row.remove();
+        // If accordion is visible, refresh it to reflect removal
+        if (webUI && webUI.eventAccordionManager && (webUI.eventsTableManager?.viewMode === 'accordion')) {
+          try { webUI.eventAccordionManager.refresh(); } catch (_) {}
+        }
+        
+      }
+    } catch (_) {
+      // ignore
+    } finally {
+      this._tempMiniTourRowId = null;
+      this._tempMiniTourEventId = null;
+    }
   }
 
 

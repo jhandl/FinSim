@@ -220,6 +220,31 @@ class FormatUtils {
       if (Object.prototype.hasOwnProperty.call(config, varToken)) {
         return FormatUtils.formatValue(config[varToken], format);
       }
+
+      // Fallback: resolve select variables from active country tax rules
+      try {
+        const ruleset = (typeof config.getCachedTaxRuleSet === 'function') ? config.getCachedTaxRuleSet('ie') : null;
+        if (ruleset) {
+          // Currently needed by help text for index funds deemed disposal
+          if (varToken === 'deemedDisposalYears') {
+            let dd;
+            try {
+              const types = (typeof ruleset.getInvestmentTypes === 'function') ? ruleset.getInvestmentTypes() : [];
+              const indexFunds = Array.isArray(types) ? types.find(t => t && t.key === 'indexFunds') : null;
+              if (indexFunds && indexFunds.taxation && indexFunds.taxation.exitTax && typeof indexFunds.taxation.exitTax.deemedDisposalYears === 'number') {
+                dd = indexFunds.taxation.exitTax.deemedDisposalYears;
+              }
+            } catch (_) {}
+            if (typeof dd !== 'number' && ruleset.raw && ruleset.raw.capitalGainsTax && typeof ruleset.raw.capitalGainsTax.deemedDisposalYears === 'number') {
+              dd = ruleset.raw.capitalGainsTax.deemedDisposalYears;
+            }
+            if (typeof dd === 'number') {
+              return FormatUtils.formatValue(dd, format);
+            }
+          }
+        }
+      } catch (_) {}
+
       console.warn(`Variable ${varToken} not found in config`);
       return match;
     });
