@@ -2,14 +2,16 @@
 
 ## 1. Project Overview
 
-FinSim is a sophisticated personal finance simulator, originating as a tool on Google Sheets and evolving into its current web-based form. It is designed as an educational "sandbox" that empowers users, particularly those familiar with the Irish tax system, to model their financial future by running "what-if" scenarios.
+FinSim is a personal finance simulator and educational sandbox for running "what‑if" scenarios.
 
-The core philosophy is to provide a private, powerful, and transparent tool for financial planning. Due to its origins, the core logic must maintain compatibility with the Google Apps Script JavaScript environment.
+he core philosophy is to provide a private, powerful, and transparent tool for financial planning. Due to its origins, the core logic must maintain compatibility with the Google Apps Script (GAS) environment. 
+
+A generic tax engine powers calculations via country rule files (Ireland provided by default).
 
 ## 2. Key Features
 
 *   **Detailed Financial Simulation:** Models income, expenses, investments, and taxes over a lifetime.
-*   **Irish Tax System Focus:** Accurately calculates Irish PAYE (IT, PRSI, USC) and Capital Gains Tax (CGT), including deemed disposal on ETFs.
+*   **Generic Tax Engine:** Country‑specific rule files (default: IE) loaded via `TaxRuleSet` for PAYE/PRSI/USC, CGT vs Exit Tax, pension rules, and investment type definitions.
 *   **Scenario Planning:** Users can define custom life events (e.g., salary changes, property purchases, market crashes) to see their impact.
 *   **Dual Event Management Interface:** Users can choose between table and accordion views for event management, with seamless switching and real-time synchronization. Both views support direct editing, wizard-based creation, and comprehensive event lifecycle management.
 *   **Monte Carlo Analysis:** In addition to deterministic projections, the simulator can run thousands of simulations with market volatility to assess the probability of success.
@@ -71,6 +73,7 @@ graph TD
 *   **[`Config.js`](src/core/Config.js:1):** Loads and holds all configuration parameters.
 *   **[`Events.js`](src/core/Events.js:1):** Defines the `SimEvent` class.
 *   **[`Revenue.js`](src/core/Revenue.js:1):** Responsible for all tax calculations.
+*   **[`TaxRuleSet.js`](src/core/TaxRuleSet.js:1):** Wraps country tax JSON and exposes getters consumed by `Revenue`.
 *   **[`Equities.js`](src/core/Equities.js:1):** The base class for all investment assets (`IndexFunds`, `Shares`, `Pension`).
 *   **[`RealEstate.js`](src/core/RealEstate.js:1):** Manages real estate properties and mortgages.
 
@@ -90,7 +93,14 @@ graph TD
 *   **[`ValidationUtils.js`](src/frontend/web/utils/ValidationUtils.js:1):** Handles validation of user inputs across the application.
 *   **[`Wizard.js`](src/frontend/web/components/Wizard.js:1):** Provides a guided tour of the application's features.
 
-### 3.3. Event Management System Details
+### 3.3. Generic Tax System
+
+- **Rule files:** `src/core/config/tax-rules-<country>.json` (IE included).
+- **Loader:** `Config.getTaxRuleSet(code)` loads and caches a `TaxRuleSet`; the default IE ruleset is preloaded for synchronous access via `Config.getCachedTaxRuleSet('ie')`.
+- **API:** `TaxRuleSet` exposes income tax bands/credits and age exemptions, PRSI by age, USC brackets (including reduced age/income bands), CGT annual exemption and rate, pension rules (lump‑sum bands, contribution limits, drawdown), and investment types.
+- **Usage:** `Revenue` consumes the active ruleset to compute IT, PRSI, USC, and CGT/Exit Tax with full attribution. Investment types control whether assets are taxed under Exit Tax or CGT.
+
+### 3.4. Event Management (Table + Accordion + Wizard)
 
 The event management system is a core feature that provides users with flexible ways to create, edit, and manage financial events:
 
@@ -117,9 +127,10 @@ The event management system is a core feature that provides users with flexible 
 *   **Responsive Design:** Both views adapt to different screen sizes and orientations
 *   **Keyboard Navigation:** Full keyboard support for accessibility and power user workflows
 
-### 3.4. Data Management and Persistence
+### 3.5. Data Management and Persistence
 
 User scenarios are persisted as CSV files, handled by the `serializeSimulation()` and `deserializeSimulation()` functions in [`src/core/Utils.js`](src/core/Utils.js:1) and managed on the frontend by [`FileManager.js`](src/frontend/web/components/FileManager.js:1).
+Tax rules and application configuration are loaded at startup by `Config`.
 
 ## 4. Test Framework
 
@@ -147,7 +158,7 @@ If there is no UI jest tests in the tests directory for the feature you want to 
 
 *   **JavaScript Compatibility:** Core files (in [`src/core/`](src/core/)) **must** remain compatible with the Google Apps Script JavaScript environment. This means **no modern JS features like `import`/`export` modules or classes in some contexts**. All core code should be written in a way that can be copy-pasted into a `.gs` file and run.
 *   **Event View Compatibility:** Any changes to the event structure or how events are handled must be tested against both event views (table and accordion) and the wizard system. The table view serves as the single source of truth, with the accordion view providing a synchronized alternative interface. Changes must maintain bidirectional synchronization and preserve all editing capabilities across views.
-*   **Configuration over Hardcoding:** Any constants, especially those related to tax rules, should be placed in the `finance-simulation-config-X.XX.json` file.
+*   **Configuration over Hardcoding:** Any constants, especially those related to tax rules, should be placed in the `finsim-X.XX.json` file.
 *   **Write Tests:** Any new feature or bug fix for the core logic should be accompanied by a corresponding test. 
 *   **UI Testin:** If you rely on the user for UI testing and validation, remember that the user is always running a local server. Don't start a new server and don't open browser windows.
 

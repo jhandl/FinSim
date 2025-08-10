@@ -62,8 +62,8 @@ function printHelp() {
   `  --showEqual                  Also show equal rows/fields (default false)\n` +
   `  --help                       Show this help\n` +
   `\nExamples:\n` +
-  `  node compareScenarios.js --repoA /Users/jhandl/FinSim --repoB /Users/jhandl/FinSim1 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n` +
-  `  node compareScenarios.js --fields age,year,netIncome,expenses --tolerance 0.01 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n`;
+  `  node compare.js --repoA /Users/jhandl/FinSim --repoB /Users/jhandl/FinSim1 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n` +
+  `  node compare.js --fields age,year,netIncome,expenses --tolerance 0.01 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n`;
   console.log(msg);
 }
 

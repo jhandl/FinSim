@@ -4,12 +4,12 @@
  * This test suite aims to cover Income Tax (single, married, age-related credits/exemptions),
  * PRSI (including age exemption), and USC (standard and reduced rates for seniors).
  * Expected tax amounts in assertions are derived using helper functions that directly reference
- * 'src/core/config/finance-simulation-config-1.26.json', ensuring that tests adapt to config changes.
+ * 'src/core/config/finsim-1.27.json', ensuring that tests adapt to config changes.
  */
 
 // IMPORTANT: This test relies on the simulator correctly loading and utilizing
-// 'finance-simulation-config-1.26.json' for its internal financial modeling.
-const config = require('../src/core/config/finance-simulation-config-1.26.json');
+// 'finsim-1.27.json' for its internal financial modeling.
+const config = require('../src/core/config/finsim-1.27.json');
 
 // --- Helper Functions for Tax Calculations (based on config) ---
 

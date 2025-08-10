@@ -11,7 +11,7 @@ const path = require('path');
 const vm = require('vm');
 
 // Configuration constants
-const CONFIG_FILE_NAME = 'finance-simulation-config-1.26.json';
+const CONFIG_FILE_NAME = 'finsim-1.27.json';
 const CONFIG_PATH = path.join(__dirname, 'config', CONFIG_FILE_NAME);
 
 // Test assertion types
@@ -364,7 +364,7 @@ class TestFramework {
         
         // Create mock UI object that loads the actual config
         var mockUI = {
-          getVersion: function() { return '1.26'; },
+          getVersion: function() { return '1.27'; },
           fetchUrl: function(url) {
             // Load the actual config file
             var fs = require('fs');
@@ -372,7 +372,7 @@ class TestFramework {
             // Use the global CONFIG_PATH defined in TestFramework.js
             // We need to pass it into this scope or reconstruct it.
             // Simpler to reconstruct here if __dirname is the TestFramework.js dir
-            var configPath = path.join(__dirname, 'config', 'finance-simulation-config-1.26.json');
+            var configPath = path.join(__dirname, 'config', 'finsim-1.27.json');
             return fs.readFileSync(configPath, 'utf8');
           },
           showAlert: function(msg) { console.warn(msg); },

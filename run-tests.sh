@@ -220,8 +220,8 @@ main() {
 
         for test_file in `find "$TESTS_DIR" -name "*.spec.js" -type f`; do
 
-            TEST_NAME=`echo $test_file | cut -d. -f1`
-            PLAYWRIGHT_OUTPUT=`npx playwright test $test_file`
+            TEST_NAME=$(basename "$test_file" .spec.js)
+            PLAYWRIGHT_OUTPUT=`npx playwright test "$test_file"`
             if [ $? -eq 0 ]; then
                 echo -e "✅ PASSED: $TEST_NAME"
                 ((passed++))
@@ -231,7 +231,7 @@ main() {
                 ((failed++))
             fi
 
-	done
+    done
 
         # Final summary counts
 

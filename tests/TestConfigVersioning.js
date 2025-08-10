@@ -59,8 +59,8 @@ module.exports = {
                 setVersion: (v) => { currentVersion = v; versionUpdated = true; },
                 showAlert: (m) => { alertShown = m; return alertResponse; },
                 fetchUrl: async (url) => {
-                    // Extract version from URL: /src/core/config/finance-simulation-config-1.26.json
-                    const versionMatch = url.match(/finance-simulation-config-(\d+\.\d+)\.json$/);
+                    // Extract version from URL: /src/core/config/finsim-1.26.json
+                    const versionMatch = url.match(/finsim-(\d+\.\d+)\.json$/);
                     if (!versionMatch) {
                         throw new Error('Invalid config URL format');
                     }
