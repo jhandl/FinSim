@@ -316,7 +316,7 @@ class EventsTableManager {
         TooltipUtils.attachTooltip(tableToggle, "Table view is ideal for larger screens and when you know your way around these events.");
       }
       if (accordionToggle) {
-        TooltipUtils.attachTooltip(accordionToggle, "Accordion view is best for smaller screens and while you're learning the ropes.");
+        TooltipUtils.attachTooltip(accordionToggle, "Cards view is best for smaller screens and while you're learning the ropes.");
       }
     }
   }

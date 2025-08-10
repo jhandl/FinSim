@@ -21,8 +21,8 @@ WelcomeTabs:
           description: "Use the toggle icons to switch between individual ({icon:user}) and couples/partnerships ({icon:user-friends}) with separate pensions and retirement ages."
         - title: "Fixed vs Variable Growth"
           description: "Toggle between a fixed growth rate ({icon:chart-line}) and a variable growth rate ({icon:chart-variable}) to simulate different market conditions and understand the probability of success."
-        - title: "Events modes: Age vs Year, Table vs Accordion"
-          description: "Toggle between age-based and year-based planning in the Events table to better understand your timeline. Use the accordion view to collapse/expand the table rows in smaller screens."
+        - title: "Events modes: Age vs Year, Table vs Cards"
+          description: "Toggle between age-based and year-based planning in the Events table to better understand your timeline. Use the cards view to collapse/expand the table rows in smaller screens."
 
   - id: tips-tricks
     title: Tips
@@ -471,7 +471,7 @@ WizardSteps:
     tours: [quick, full, mini]
     card: events
     popover:
-      description: "<p>Add, remove, and edit the events that make up your scenario.</p><ul><li>An event is anything that is time-bound and has a financial impact, such as income, expenses, or a market crash.</li><li>Select an event type and press Help or the ? key for details.</li><li>You can use the events wizard to help create events, and switch between table view or accordion view.</li><li>Sort ⇅ the table by clicking a column header.</li></ul>"
+      description: "<p>Add, remove, and edit the events that make up your scenario.</p><ul><li>An event is anything that is time-bound and has a financial impact, such as income, expenses, or a market crash.</li><li>Select an event type and press Help or the ? key for details.</li><li>You can use the events wizard to help create events, and switch between table view or cards view.</li><li>Sort ⇅ the table by clicking a column header.</li></ul>"
       side: "top"
       align: "center"
 
