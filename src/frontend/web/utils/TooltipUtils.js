@@ -21,6 +21,7 @@ class TooltipUtils {
     let tooltipEl      = null;
     let hoverTimeout   = null;
     let longPressTimer = null;
+    let liveUpdateHandler = null;
 
     const showTooltip = () => {
       if (tooltipEl) return;
@@ -29,6 +30,17 @@ class TooltipUtils {
       // Add highlight effect for TD elements
       if (element.tagName === 'TD') {
         element.classList.add('tooltip-highlighted');
+      }
+
+      // Live update tooltip content while the user edits the input value
+      if (tooltipEl && element && (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA')) {
+        liveUpdateHandler = () => {
+          try {
+            TooltipUtils.refreshTooltip(tooltipEl, textOrProvider, element, opts);
+          } catch (_) {}
+        };
+        element.addEventListener('input', liveUpdateHandler);
+        element.addEventListener('change', liveUpdateHandler);
       }
     };
 
@@ -49,6 +61,13 @@ class TooltipUtils {
       // Remove highlight effect for TD elements
       if (element.tagName === 'TD') {
         element.classList.remove('tooltip-highlighted');
+      }
+
+      // Remove live update listeners
+      if (liveUpdateHandler && element) {
+        try { element.removeEventListener('input', liveUpdateHandler); } catch (_) {}
+        try { element.removeEventListener('change', liveUpdateHandler); } catch (_) {}
+        liveUpdateHandler = null;
       }
     };
 
@@ -116,6 +135,52 @@ class TooltipUtils {
   }
 
   /**
+   * Refresh an existing tooltip's content and reposition it.
+   * @param {HTMLElement} tooltipEl - The tooltip element to update
+   * @param {string|Function} textOrProvider - Tooltip text or provider
+   * @param {HTMLElement|DOMRect} target - Target to position against
+   * @param {Object} [opts] - Options for positioning
+   */
+  static refreshTooltip(tooltipEl, textOrProvider, target, opts = {}) {
+    if (!tooltipEl || !textOrProvider) return;
+    let rawText;
+    try {
+      rawText = (typeof textOrProvider === 'function') ? textOrProvider() : textOrProvider;
+    } catch (_) {
+      rawText = '';
+    }
+    if (!rawText) return;
+
+    try {
+      if (typeof FormatUtils !== 'undefined') {
+        rawText = String(rawText);
+        rawText = FormatUtils.processVariables(rawText);
+        rawText = FormatUtils.replaceAgeYearPlaceholders(rawText);
+      }
+    } catch (_) {}
+
+    // Format markdown and update DOM
+    try {
+      const hasBasicMarkdown = /[*_`#\[\]()>]/.test(rawText);
+      const hasMarkdownTable = /(^|\n)\|[^\n]*\|\s*(\n)\|\s*[-: ]+\s*\|/m.test(rawText) || /(^|\n)\|[^\n]*\|/m.test(rawText);
+      if (typeof marked !== 'undefined' && (hasBasicMarkdown || hasMarkdownTable)) {
+        tooltipEl.innerHTML = marked.parse(rawText);
+      } else {
+        tooltipEl.textContent = rawText;
+      }
+    } catch (_) {
+      tooltipEl.textContent = rawText;
+    }
+
+    const targetRect = target instanceof HTMLElement ? target.getBoundingClientRect() : target;
+    if (targetRect) {
+      requestAnimationFrame(() => {
+        TooltipUtils.positionTooltip(tooltipEl, targetRect, opts);
+      });
+    }
+  }
+
+  /**
    * Hide a tooltip element.
    * @param {HTMLElement} tooltipEl - The tooltip element to hide
    */
@@ -135,10 +200,15 @@ class TooltipUtils {
     const el = document.createElement('div');
     el.className = 'visualization-tooltip';
     
-    // Format markdown if available and text contains markdown syntax
-    const formattedText = typeof marked !== 'undefined' && /[*_`#\[\]()>]/.test(text) 
-      ? marked.parse(text) 
-      : text;
+    // Format markdown if available and text contains markdown/table syntax
+    let formattedText = text;
+    try {
+      const hasBasicMarkdown = /[*_`#\[\]()>]/.test(text);
+      const hasMarkdownTable = /(^|\n)\|[^\n]*\|\s*(\n)\|\s*[-: ]+\s*\|/m.test(text) || /(^|\n)\|[^\n]*\|/m.test(text);
+      if (typeof marked !== 'undefined' && (hasBasicMarkdown || hasMarkdownTable)) {
+        formattedText = marked.parse(text);
+      }
+    } catch (_) {}
     
     if (formattedText !== text) {
       el.innerHTML = formattedText;

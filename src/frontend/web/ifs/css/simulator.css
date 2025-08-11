@@ -2204,6 +2204,21 @@ footer {
     margin: 0.2rem 0;
 }
 
+/* Ensure markdown tables in tooltips render legibly on dark background */
+.visualization-tooltip table {
+    border-collapse: collapse;
+}
+.visualization-tooltip th,
+.visualization-tooltip td {
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.5rem;
+}
+.visualization-tooltip th {
+    background-color: transparent !important; /* override global th background */
+    font-weight: 600;
+}
+
 /* Responsive adjustments for dropdown */
 @media (max-width: 768px) {
     .visualization-dropdown {

@@ -61,6 +61,7 @@ class WebUI extends AbstractUI {
       this.setupParameterTooltips(); // Setup parameter age field tooltips
       this.setupVisualizationControls(); // Setup visualization controls
       this.setupPensionCappedDropdown(); // Replace select with dropdownTool
+      this.setupPensionContributionTooltips(); // Tooltips for pension contribution inputs
       this.setupCardInfoIcons(); // Setup info icons on cards
       this.setupDataExportButton(); // Setup data table CSV export button
       this.setupIconTooltips(); // Setup tooltips for various mode toggle icons
@@ -1060,6 +1061,72 @@ class WebUI extends AbstractUI {
     document.addEventListener('scroll', () => {
       this.cancelParameterTooltip();
     }, { passive: true });
+  }
+
+  /* -------------------------------------------------------------
+   * Pension Contribution tooltip (maps entered % of max to actual % by age band)
+   * ------------------------------------------------------------- */
+  setupPensionContributionTooltips() {
+    const attach = (inputId) => {
+      const el = document.getElementById(inputId);
+      if (!el || typeof TooltipUtils === 'undefined') return;
+      TooltipUtils.attachTooltip(el, () => {
+        try {
+          // Determine entered value as a fraction (e.g., 100 -> 1.0)
+          let entered = 1; // default to 100% for clarity when empty
+          try {
+            const raw = (el.value || '').toString().trim();
+            const parsed = FormatUtils.parsePercentage(raw);
+            if (typeof parsed === 'number' && !isNaN(parsed)) entered = parsed;
+          } catch (_) {}
+
+          // Get age bands from TaxRuleSet (fallback to legacy config if needed)
+          let bands = {};
+          try {
+            const cfg = Config.getInstance();
+            const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+            bands = (rs && typeof rs.getPensionContributionAgeBands === 'function')
+              ? rs.getPensionContributionAgeBands()
+              : (cfg && cfg.pensionContributionRateBands) ? cfg.pensionContributionRateBands : {};
+          } catch (_) {
+            // Keep bands as empty object
+          }
+
+          const keys = Object.keys(bands)
+            .map(k => parseInt(k, 10))
+            .filter(n => !isNaN(n))
+            .sort((a, b) => a - b);
+
+          // If no bands, show an empty table header
+          if (keys.length === 0) {
+            return '| Age | Contrib |\n| --- | --- |';
+          }
+
+          const lines = [];
+          lines.push('| Age | Contrib |');
+          lines.push('| --- | --- |');
+
+          for (let i = 0; i < keys.length; i++) {
+            const start = keys[i];
+            const end = (i < keys.length - 1) ? (keys[i + 1] - 1) : null;
+            const label = (i === 0 && start === 0)
+              ? `<${keys[i + 1]}`
+              : (end === null ? `${start}+` : `${start}-${end}`);
+            const maxRate = parseFloat(bands[String(start)]);
+            const actual = (isNaN(maxRate) ? 0 : maxRate) * entered;
+            lines.push(`| ${label} | ${FormatUtils.formatPercentage(actual)} |`);
+          }
+
+          return lines.join('\n');
+        } catch (err) {
+          // Fallback to an empty table structure
+          return '| Age | Contrib |\n| --- | --- |';
+        }
+      });
+    };
+
+    attach('PensionContributionPercentage');
+    attach('PensionContributionPercentageP2');
   }
 
   showParameterTooltip(inputElement, fieldId) {

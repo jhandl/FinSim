@@ -18,6 +18,7 @@
    - pay off mortgage.
    - inheritance.
    - period of high inflation.
+   - change the allocations throughout the simulation.
 - Add feedback box.
 - Add registration box? Not CIO.
 - Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain. This would only make sense if that average was shown in present value.
