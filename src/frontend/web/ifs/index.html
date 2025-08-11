@@ -240,12 +240,12 @@
                     </div>
 
                     <div class="input-wrapper">
-                        <label for="PensionContributionCapped">Pension Contrib. Capped</label>
-                        <select id="PensionContributionCapped" class="string" autocomplete="off">
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                            <option value="Match">Match</option>
-                        </select>
+                        <label for="PensionContributionCappedToggle">Pension Contrib. Capped</label>
+                        <input type="hidden" id="PensionContributionCapped" class="string" value="Yes" autocomplete="off">
+                        <div class="pension-capped-dd visualization-control" id="PensionContributionCappedControl">
+                            <span id="PensionContributionCappedToggle" class="dd-toggle pseudo-select">Yes</span>
+                            <div id="PensionContributionCappedOptions" class="visualization-dropdown" style="display:none;"></div>
+                        </div>
                     </div>
                 </div>
             </div>

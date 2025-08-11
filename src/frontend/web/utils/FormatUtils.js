@@ -175,8 +175,16 @@ class FormatUtils {
 
   // Expand ${var,format} placeholders using Config values
   static processVariables(text) {
-    const config = (typeof Config !== 'undefined') ? Config.getInstance(typeof WebUI !== 'undefined' ? WebUI.getInstance() : null) : null;
-    if (!config || !text || typeof text !== 'string') return text;
+    let config = null;
+    try {
+      if (typeof Config !== 'undefined') {
+        // Do NOT instantiate WebUI here; just get existing Config if initialized
+        config = Config.getInstance();
+      }
+    } catch (_) {
+      // Config not initialized yet; continue with null to allow fallbacks
+    }
+    if (!text || typeof text !== 'string') return text;
 
     return text.replace(/\${([^}]+)}/g, (match, variable) => {
       let [varToken, format] = variable.split(',').map(s => s.trim());
@@ -195,36 +203,52 @@ class FormatUtils {
         return currentMode;
       }
 
-      // Support nested paths like pensionContributionRateBands.min
-      if (varToken.includes('.')) {
+      // Support nested paths like pensionContributionRateBands.min within Config only if available
+      if (config && varToken.includes('.')) {
         const tokens = varToken.split('.');
         let value = config;
-        for (let i = 0; i < tokens.length && value !== undefined; i++) {
+        for (let i = 0; i < tokens.length && value !== undefined && value !== null; i++) {
           const token = tokens[i];
-
-          // Handle synthetic properties like .min and .max on objects
-          if ((token === 'min' || token === 'max') && i === tokens.length - 1 && typeof value === 'object' && value !== null) {
+          if ((token === 'min' || token === 'max') && i === tokens.length - 1 && typeof value === 'object') {
             const numericValues = Object.values(value).map(v => parseFloat(v)).filter(v => !isNaN(v));
             if (numericValues.length === 0) {
-              return match; // Can't compute
+              value = undefined; // allow fallback
+              break;
             }
             value = token === 'min' ? Math.min(...numericValues) : Math.max(...numericValues);
           } else {
             value = value[token];
           }
         }
-        if (value === undefined) return match;
-        return FormatUtils.formatValue(value, format);
+        if (value !== undefined && value !== null) {
+          return FormatUtils.formatValue(value, format);
+        }
+        // If config nested lookup failed, allow fallthrough to tax rules / other fallbacks
       }
 
-      if (Object.prototype.hasOwnProperty.call(config, varToken)) {
+      if (config && Object.prototype.hasOwnProperty.call(config, varToken)) {
         return FormatUtils.formatValue(config[varToken], format);
       }
 
-      // Fallback: resolve select variables from active country tax rules
+      // Fallback: resolve variables from active country tax rules
       try {
-        const ruleset = (typeof config.getCachedTaxRuleSet === 'function') ? config.getCachedTaxRuleSet('ie') : null;
+        const ruleset = (config && typeof config.getCachedTaxRuleSet === 'function') ? config.getCachedTaxRuleSet('ie') : null;
         if (ruleset) {
+          const rawRules = ruleset.raw || {};
+
+          // Generic access to tax rules: ${taxRules.path.to.value}
+          if (varToken.startsWith('taxRules.')) {
+            const path = varToken.substring('taxRules.'.length);
+            const parts = path.split('.');
+            let val = rawRules;
+            for (let i = 0; i < parts.length && val !== undefined; i++) {
+              val = val[parts[i]];
+            }
+            if (val !== undefined) {
+              return FormatUtils.formatValue(val, format);
+            }
+          }
+
           // Currently needed by help text for index funds deemed disposal
           if (varToken === 'deemedDisposalYears') {
             let dd;
@@ -270,9 +294,10 @@ class FormatUtils {
     if (!text) return text;
     let currentMode = 'age';
     try {
-      const webUI = (typeof WebUI !== 'undefined') ? WebUI.getInstance() : null;
-      if (webUI && webUI.eventsTableManager && webUI.eventsTableManager.ageYearMode) {
-        currentMode = webUI.eventsTableManager.ageYearMode;
+      // Avoid constructing WebUI; rely on existing global instance if present
+      const existingWebUI = (typeof window !== 'undefined' && window.WebUI_instance) ? window.WebUI_instance : null;
+      if (existingWebUI && existingWebUI.eventsTableManager && existingWebUI.eventsTableManager.ageYearMode) {
+        currentMode = existingWebUI.eventsTableManager.ageYearMode;
       }
     } catch (err) {
       // Silently ignore errors and keep default

@@ -1363,6 +1363,12 @@ th {
     width: 75px;
 }
 
+/* Match original select width for pension capped pseudo-select */
+#PensionContributionCappedToggle.pseudo-select {
+    min-width: 75px;
+    max-width: 75px;
+}
+
 /* Specific width for Match column */
 #Events td:nth-child(7) .percentage-container {
     width: 52px;

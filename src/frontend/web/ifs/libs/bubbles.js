@@ -57,7 +57,13 @@
             const ts = Date.now(); // cache-bust in dev / refresh scenarios
             const xhr = new XMLHttpRequest();
             xhr.open('GET', `/src/frontend/web/assets/help.yml?t=${ts}`, false); // synchronous
-            xhr.send(null);
+            try {
+                xhr.send(null);
+            } catch (e) {
+                // If synchronous XHR is blocked or errors early, return empty object to avoid crashing
+                __helpDataCache = {};
+                return __helpDataCache;
+            }
             if (xhr.status === 200) {
                 __helpDataCache = (typeof jsyaml !== 'undefined' && jsyaml.load)
                     ? jsyaml.load(xhr.responseText)

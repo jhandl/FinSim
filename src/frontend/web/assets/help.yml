@@ -371,11 +371,11 @@ WizardSteps:
       side: "right"
       align: "start"
 
-  - element: "#PensionContributionCapped"
+  - element: "#PensionContributionCappedToggle"
     tours: [full, mini]
     card: Allocations
     popover:
-      description: "<p>Limit on your pension contribution. Tax relief applies only up to the annual cap defined in the current tax rules.<ul><li><b>Yes</b>: stop at this cap (inflation-adjusted).</li><li><b>No</b>: pay tax on amounts above it.</li><li><b>Match</b>: contribute only what your employer matches (e.g. 4% you + 4% employer).</li></ul></p>"
+      description: "<p>Limit on your pension contribution. Tax relief applies only up to the annual cap defined in the current tax rules.<ul><li><b>Yes</b>: stop at the ${taxRules.pensionRules.contributionLimits.annualCap,currency} cap (inflation-adjusted).</li><li><b>No</b>: pay tax on amounts above the ${taxRules.pensionRules.contributionLimits.annualCap,currency} cap.</li><li><b>Match</b>: contribute only what your employer matches (e.g. 4% you + 4% employer).</li></ul></p>"
       side: "right"
       align: "start"
 

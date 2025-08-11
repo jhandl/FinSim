@@ -60,6 +60,7 @@ class WebUI extends AbstractUI {
       this.setupEconomyModeToggle(); // Setup the deterministic/Monte Carlo mode toggle
       this.setupParameterTooltips(); // Setup parameter age field tooltips
       this.setupVisualizationControls(); // Setup visualization controls
+      this.setupPensionCappedDropdown(); // Replace select with dropdownTool
       this.setupCardInfoIcons(); // Setup info icons on cards
       this.setupDataExportButton(); // Setup data table CSV export button
       this.setupIconTooltips(); // Setup tooltips for various mode toggle icons
@@ -1168,6 +1169,78 @@ class WebUI extends AbstractUI {
 
     // Set initial preset
     this.onVisualizationPresetChange('default');
+  }
+
+  /* -------------------------------------------------------------
+   * Pension Capped dropdown (Yes / No / Match) with tooltips
+   * ------------------------------------------------------------- */
+  setupPensionCappedDropdown() {
+    try {
+      const hiddenInput = document.getElementById('PensionContributionCapped');
+      const toggleEl = document.getElementById('PensionContributionCappedToggle');
+      const dropdownEl = document.getElementById('PensionContributionCappedOptions');
+      if (!hiddenInput || !toggleEl || !dropdownEl) return;
+
+      // Build descriptions for each option from help.yml text used for this field
+      let yesDesc = 'Yes';
+      let noDesc = 'No';
+      let matchDesc = 'Match';
+      try {
+        const help = window.driver?.js?.getHelpData?.();
+        const step = Array.isArray(help?.WizardSteps)
+          ? help.WizardSteps.find(s => s.element === '#PensionContributionCappedToggle')
+          : null;
+        if (step && step.popover && step.popover.description) {
+          let html = String(step.popover.description);
+          try {
+            if (typeof FormatUtils !== 'undefined') {
+              html = FormatUtils.processVariables(html);
+              html = FormatUtils.replaceAgeYearPlaceholders(html);
+            }
+          } catch (_) {}
+          // Extract text inside the <li><b>Label</b>: description</li> items
+          const extract = (label) => {
+            const re = new RegExp(`<li>\\s*<b>${label}<\\/b>\\s*:\\s*([^<]+)<\\/li>`, 'i');
+            const m = html.match(re);
+            return m ? m[1].trim() : label;
+          };
+          yesDesc = extract('Yes');
+          noDesc = extract('No');
+          matchDesc = extract('Match');
+        }
+      } catch (_) {}
+
+      const current = hiddenInput.value || 'Yes';
+      toggleEl.textContent = current;
+
+      const options = [
+        { value: 'Yes', label: 'Yes', description: yesDesc },
+        { value: 'No', label: 'No', description: noDesc },
+        { value: 'Match', label: 'Match', description: matchDesc },
+      ];
+
+      this.pensionCappedDropdown = DropdownUtils.create({
+        toggleEl,
+        dropdownEl,
+        options,
+        selectedValue: current,
+        width: 180, // dropdown menu width; toggle width is controlled by CSS to 75px
+        onSelect: (val, label) => {
+          hiddenInput.value = val;
+          toggleEl.textContent = label;
+          // Fire change so listeners update
+          hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+      });
+
+      // Bridge validation styling: allow NotificationUtils to add .warning on wrapper via hidden input
+      if (this.pensionCappedDropdown && this.pensionCappedDropdown.wrapper) {
+        hiddenInput._dropdownWrapper = this.pensionCappedDropdown.wrapper;
+      }
+    } catch (err) {
+      // Non-fatal: keep native fallback if anything goes wrong
+      try { console.warn('setupPensionCappedDropdown failed', err); } catch (_) {}
+    }
   }
 
   populateVisualizationPresets() {

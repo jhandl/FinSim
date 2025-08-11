@@ -3,14 +3,14 @@
 class TooltipUtils {
   /**
    * Attach a visualization-style tooltip to a DOM element.
-   * @param {HTMLElement} element            – Target element.
-   * @param {string}      text               – Tooltip text (supports markdown).
-   * @param {Object}      [opts]             – Optional settings.
-   * @param {number}      [opts.hoverDelay]  – Delay (ms) before showing on hover.
-   * @param {number}      [opts.touchDelay]  – Delay (ms) before showing on long-press (touch).
+   * @param {HTMLElement} element                 – Target element.
+   * @param {string|Function} textOrProvider      – Tooltip text or a function () => string (supports markdown).
+   * @param {Object}      [opts]                  – Optional settings.
+   * @param {number}      [opts.hoverDelay]       – Delay (ms) before showing on hover.
+   * @param {number}      [opts.touchDelay]       – Delay (ms) before showing on long-press (touch).
    */
-  static attachTooltip(element, text, opts = {}) {
-    if (!element || !text) return;
+  static attachTooltip(element, textOrProvider, opts = {}) {
+    if (!element || !textOrProvider) return;
 
     // Remove native browser tooltip to avoid duplication
     element.removeAttribute('title');
@@ -24,7 +24,7 @@ class TooltipUtils {
 
     const showTooltip = () => {
       if (tooltipEl) return;
-      tooltipEl = TooltipUtils.showTooltip(text, element);
+      tooltipEl = TooltipUtils.showTooltip(textOrProvider, element);
       
       // Add highlight effect for TD elements
       if (element.tagName === 'TD') {
@@ -71,7 +71,8 @@ class TooltipUtils {
 
   /**
    * Show a tooltip programmatically.
-   * @param {string} text - Tooltip text (supports markdown)
+   * Performs variable substitution like the Wizard does.
+   * @param {string|Function} textOrProvider - Tooltip text (or provider) with optional ${} variables/markdown
    * @param {HTMLElement|DOMRect} target - Target element or its bounding rectangle
    * @param {Object} [opts] - Options
    * @param {boolean} [opts.isMobile] - Whether to use mobile positioning
@@ -79,10 +80,29 @@ class TooltipUtils {
    * @param {number} [opts.spacing] - Spacing from target element
    * @returns {HTMLElement} - The created tooltip element
    */
-  static showTooltip(text, target, opts = {}) {
-    if (!text) return null;
+  static showTooltip(textOrProvider, target, opts = {}) {
+    if (!textOrProvider) return null;
 
-    const tooltipEl = TooltipUtils.createTooltipElement(text);
+    // Resolve text value if a provider function was passed
+    let rawText;
+    try {
+      rawText = (typeof textOrProvider === 'function') ? textOrProvider() : textOrProvider;
+    } catch (_) {
+      rawText = '';
+    }
+    if (!rawText) return null;
+
+    // Apply variable substitution and placeholders in the same way Wizard does
+    try {
+      if (typeof FormatUtils !== 'undefined') {
+        // Guard against re-entrant WebUI/Config initialization from very early calls
+        rawText = String(rawText);
+        rawText = FormatUtils.processVariables(rawText);
+        rawText = FormatUtils.replaceAgeYearPlaceholders(rawText);
+      }
+    } catch (_) {}
+
+    const tooltipEl = TooltipUtils.createTooltipElement(rawText);
     document.body.appendChild(tooltipEl);
 
     const targetRect = target instanceof HTMLElement ? target.getBoundingClientRect() : target;
@@ -106,8 +126,9 @@ class TooltipUtils {
   }
 
   /**
-   * Create a tooltip element with formatted text.
-   * @param {string} text - Tooltip text (supports markdown)
+   * Create a tooltip element with formatted text (supports markdown).
+   * Variable placeholders are expected to be resolved before calling this.
+   * @param {string} text - Tooltip text
    * @returns {HTMLElement} - The created tooltip element
    */
   static createTooltipElement(text) {
