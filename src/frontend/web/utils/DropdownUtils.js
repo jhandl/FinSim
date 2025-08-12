@@ -90,9 +90,13 @@ class DropdownUtils {
       });
     });
 
-    // Apply custom width if provided
+    // Historical behavior let callers pass a fixed width. We now size to content.
+    // Keep any provided width only as a soft hint for minimum width; the actual width
+    // is computed on open() to fit the widest option (no wrapping).
     if (width) {
-      dropdownEl.style.width = typeof width === 'number' ? `${width}px` : width;
+      const hinted = typeof width === 'number' ? `${width}px` : width;
+      dropdownEl.style.minWidth = hinted;
+      // Do NOT set dropdownEl.style.width here; we'll compute exact width on open.
     }
 
     // -----------------------------------------------------------------
@@ -209,16 +213,49 @@ class DropdownUtils {
       dropdownEl.style.position = 'fixed';
       dropdownEl.style.zIndex = '10051';
 
+      // Compute natural width based on content (no wrap) and add a small margin
+      // Steps:
+      // 1) Temporarily allow the dropdown to shrink-to-fit content
+      // 2) Force no-wrapping to avoid multi-line items affecting width
+      // 3) Measure scrollWidth, then apply an extra margin
+      const previousWidth = dropdownEl.style.width;
+      const previousWhiteSpace = dropdownEl.style.whiteSpace;
+      dropdownEl.style.whiteSpace = 'nowrap';
+      dropdownEl.style.width = 'auto';
+
+      // If the dropdown lives in a constrained container before body-append,
+      // use scrollWidth which reflects full content width even if overflowed.
+      const contentWidth = Math.ceil(dropdownEl.scrollWidth);
+      const EXTRA_MARGIN_PX = 12; // small padding so text isn't cramped
+      let desiredWidth = contentWidth + EXTRA_MARGIN_PX;
+
+      // Ensure width is at least any hinted minWidth
+      const hintedMin = parseFloat(getComputedStyle(dropdownEl).minWidth) || 0;
+      if (hintedMin > 0) desiredWidth = Math.max(desiredWidth, Math.ceil(hintedMin));
+
+      // Apply computed width
+      dropdownEl.style.width = `${desiredWidth}px`;
+
+      // Vertical placement (unchanged)
       if (spaceBelow >= ddH + 10) {
-        dropdownEl.style.left = `${iconRect.left}px`;
         dropdownEl.style.top = `${iconRect.bottom + 2}px`;
       } else if (spaceAbove >= ddH + 10) {
-        dropdownEl.style.left = `${iconRect.left}px`;
         dropdownEl.style.top = `${iconRect.top - ddH - 2}px`;
       } else {
-        dropdownEl.style.left = `${iconRect.left}px`;
         dropdownEl.style.top = `${Math.max(10, vpH - ddH - 10)}px`;
       }
+
+      // Horizontal placement: align to toggle's left, but keep within viewport
+      const vpW = window.innerWidth;
+      let left = iconRect.left;
+      const overflowRight = left + desiredWidth + 8 - vpW; // 8px safety margin
+      if (overflowRight > 0) {
+        left = Math.max(8, vpW - desiredWidth - 8);
+      }
+      dropdownEl.style.left = `${left}px`;
+
+      // Restore visibility and finalize
+      dropdownEl.style.whiteSpace = previousWhiteSpace || 'nowrap';
 
       // Override mobile CSS centering by clearing transform so we keep calculated position
       dropdownEl.style.transform = 'none';
@@ -382,12 +419,13 @@ class DropdownUtils {
         if (window.innerWidth > 768) return;
         const tgt = e.target;
         if (!tgt.hasAttribute('data-value')) return;
+        // Always prefer showing the item's own tooltip on long-press when the menu is open
         longPressTimer = setTimeout(() => {
           const desc = tgt.getAttribute('data-description');
           if (desc) {
             tooltipEl = TooltipUtils.showTooltip(desc, tgt);
           }
-        }, 500);
+        }, 600);
       },
       { passive: true },
     );
@@ -402,10 +440,14 @@ class DropdownUtils {
     dropdownEl.addEventListener('touchmove', cancelLongPress, { passive: true });
     dropdownEl.addEventListener('touchcancel', cancelLongPress, { passive: true });
 
+    // Prevent native context menu/callouts on long-press within dropdown items
+    dropdownEl.addEventListener('contextmenu', (e) => {
+      try { e.preventDefault(); } catch (_) {}
+    }, { capture: true });
+
     /* ---------------------------------------------------------------
        Mobile long-press on the control itself (when dropdown closed)
-       Shows tooltip for the currently selected option – mirrors
-       previous bespoke implementations.                       
+       Opens help wizard for the control; falls back to tooltip
     ----------------------------------------------------------------*/
     let ctrlLongPressTimer = null;
     const cancelCtrlLongPress = () => {
@@ -428,12 +470,22 @@ class DropdownUtils {
         if (wrapper.classList.contains('warning')) return;
 
         ctrlLongPressTimer = setTimeout(() => {
+          try {
+            const wizard = (typeof Wizard !== 'undefined' && typeof Wizard.getInstance === 'function') ? Wizard.getInstance() : null;
+            if (wizard && !wizard.wizardActive) {
+              // Focus the toggle element for exact step match
+              wizard.lastFocusedField = toggleEl;
+              wizard.lastFocusedWasInput = true;
+              wizard.start({ type: 'help' });
+              return;
+            }
+          } catch (_) {}
           const sel = dropdownEl.querySelector('.selected');
           if (!sel) return;
           const desc = sel.getAttribute('data-description');
           if (!desc) return;
           tooltipEl = TooltipUtils.showTooltip(desc, controlContainer);
-        }, 500);
+        }, 600);
       },
       { passive: true },
     );

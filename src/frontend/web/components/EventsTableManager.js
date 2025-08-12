@@ -936,7 +936,6 @@ class EventsTableManager {
       dropdownEl,
       options: optionObjects,
       selectedValue: selectedObj.value,
-      width: 200,
       onSelect: (val, label) => {
         // Normal behaviour for genuine event type selections
         typeInput.value = val;

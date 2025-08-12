@@ -112,7 +112,9 @@ async function loadPage(routeConfig) {
         container.appendChild(newFrame);
         
         // Build iframe source (cache-busted)
-        newFrame.src = routeConfig.contentPath + '?v=' + new Date().getTime();
+        // Include a simple version key to help bypass stubborn caches on some browsers
+        const version = localStorage.getItem('simulatorVersion') || '1.27';
+        newFrame.src = routeConfig.contentPath + '?v=' + encodeURIComponent(version) + '&_t=' + Date.now();
         
     } catch (error) {
         document.getElementById('app-container').innerHTML = `

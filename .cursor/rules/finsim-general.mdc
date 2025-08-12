@@ -6,3 +6,5 @@ alwaysApply: true
 ## GENERAL ADVICE ##
 
 Always read [AGENTS.md](mdc:AGENTS.md) to understand the project. Never assume how the code works, always read the relevant source code files to understand the code. 
+
+It is CRITICAL that you remember to update the cache-busting date parameter in ./src/frontend/web/ifs/index.html for any javascript or css file that you edited. 

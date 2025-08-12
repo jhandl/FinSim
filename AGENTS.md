@@ -134,7 +134,9 @@ Tax rules and application configuration are loaded at startup by `Config`.
 
 ## 4. Test Framework
 
-The project uses a custom testing framework in Node.js to validate the core simulation logic.
+The project uses a custom testing framework in Node.js to validate the core simulation logic, and it's invoked through the run-tests.sh script.
+
+If you want to call the run-tests.sh script all you need to do is run './run-tests.sh <params>'. No need to call a shell to run it. Just run the command directly.
 
 ### 4.1. Kinds of Tests
 
@@ -158,9 +160,10 @@ If there is no UI jest tests in the tests directory for the feature you want to 
 
 *   **JavaScript Compatibility:** Core files (in [`src/core/`](src/core/)) **must** remain compatible with the Google Apps Script JavaScript environment. This means **no modern JS features like `import`/`export` modules or classes in some contexts**. All core code should be written in a way that can be copy-pasted into a `.gs` file and run.
 *   **Event View Compatibility:** Any changes to the event structure or how events are handled must be tested against both event views (table and accordion) and the wizard system. The table view serves as the single source of truth, with the accordion view providing a synchronized alternative interface. Changes must maintain bidirectional synchronization and preserve all editing capabilities across views.
-*   **Configuration over Hardcoding:** Any constants, especially those related to tax rules, should be placed in the `finsim-X.XX.json` file.
+*   **Configuration over Hardcoding:** Any constants, especially those related to tax rules, should be placed in the `tax-rules-<country code>.json` file, or if they're not tax-related and are general simulation settings, in the 'finsim-X.XX.json' file.
 *   **Write Tests:** Any new feature or bug fix for the core logic should be accompanied by a corresponding test. 
 *   **UI Testin:** If you rely on the user for UI testing and validation, remember that the user is always running a local server. Don't start a new server and don't open browser windows.
+*   **Cache busting:** If you make any change to a javascript or css file, you must update the cache-busting parameter at the end of that file's url in the 'SYSTEM UTILITIES' section in ./src/frontend/web/ifs/index.html (or at the beginning of that file if it's a css change) and set it to the current date (plus a version number if the date is the same), so users always get the updated version. This is VERY IMPORTANT.
 
 ## 6. Local Setup
 

@@ -269,7 +269,7 @@ class FormatUtils {
         }
       } catch (_) {}
 
-      console.warn(`Variable ${varToken} not found in config`);
+      console.warn(`Variable ${varToken} not found in config.`);
       return match;
     });
   }

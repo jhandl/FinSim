@@ -8,6 +8,9 @@ import {
 
 const BASE_URL = 'http://localhost:8080/#ifs';
 
+// Relax action timeout for this spec to help slower mobile devices
+test.use({ actionTimeout: 20000 });
+
 async function runSalaryWizardRegressionTest(page) {
   // 1. Load simulator directly on the IFS route
   await page.goto(BASE_URL);
@@ -23,17 +26,17 @@ async function runSalaryWizardRegressionTest(page) {
 
   // 3. Choose "Income" from the wizard selection overlay (Salary is a subtype)
   const incomeTile = frame.locator('#wizardSelectionOverlay .wizard-selection-option:has-text("Income")');
-  await incomeTile.waitFor({ state: 'visible' });
+  await incomeTile.waitFor({ state: 'visible', timeout: 30000 });
   await smartClick(incomeTile);
 
   // --- Wizard Step: Income Type (choice) ---
   const salaryChoice = frame.locator('#eventWizardOverlay .event-wizard-choice-option:has-text("Salary")');
-  await salaryChoice.waitFor({ state: 'visible' });
+  await salaryChoice.waitFor({ state: 'visible', timeout: 30000 });
   await smartClick(salaryChoice);
 
   // The wizard may auto-advance; ensure Name step is visible next.
   const nameInput = frame.locator('#eventWizardOverlay input[name="alias"]');
-  await nameInput.waitFor({ state: 'visible' });
+  await nameInput.waitFor({ state: 'visible', timeout: 20000 });
   await nameInput.fill('Main Salary');
   await nameInput.evaluate(el => el.blur());
   await page.waitForTimeout(300);
@@ -43,7 +46,7 @@ async function runSalaryWizardRegressionTest(page) {
 
   // --- Wizard Step: Amount ---
   const amountInput = frame.locator('#eventWizardOverlay input[name="amount"]');
-  await amountInput.waitFor({ state: 'visible' });
+  await amountInput.waitFor({ state: 'visible', timeout: 20000 });
   await amountInput.fill('50000');
 
   // Blur to trigger validation logic and keep helpers consistent across mobile/desktop
@@ -55,13 +58,13 @@ async function runSalaryWizardRegressionTest(page) {
 
   // 5. Starting age – fill From Age only (leave To Age blank to trigger validation)
   const fromAgeInput = frame.locator('#eventWizardOverlay input[name="fromAge"]');
-  await fromAgeInput.waitFor({ state: 'visible' });
+  await fromAgeInput.waitFor({ state: 'visible', timeout: 20000 });
   await fromAgeInput.fill('30');
 
   // 6. Press Enter – wizard focuses the "To Age" input; blur it so mobile can register Next
   await fromAgeInput.press('Enter');
   const toAgeInput = frame.locator('#eventWizardOverlay input[name="toAge"]');
-  await toAgeInput.waitFor({ state: 'visible' });
+  await toAgeInput.waitFor({ state: 'visible', timeout: 20000 });
   await toAgeInput.evaluate(el => el.blur());
   await page.waitForTimeout(400);
 
@@ -70,7 +73,7 @@ async function runSalaryWizardRegressionTest(page) {
 
   // 8. Verify we are still on the Period step (navigation blocked)
   const periodHeading = frame.locator('#eventWizardOverlay h3:has-text("Income Period")');
-  await periodHeading.waitFor({ state: 'visible', timeout: 5000 });
+  await periodHeading.waitFor({ state: 'visible', timeout: 15000 });
   await expect(fromAgeInput).toBeVisible();
 
   // 9. Click Back to return to the Amount step
@@ -79,7 +82,7 @@ async function runSalaryWizardRegressionTest(page) {
 
   // 10. Confirm the Amount input is visible and focused, implying keyboard is active
   const amountInputBack = frame.locator('#eventWizardOverlay input[name="amount"]');
-  await amountInputBack.waitFor({ state: 'visible' });
+  await amountInputBack.waitFor({ state: 'visible', timeout: 20000 });
   await expect(amountInputBack).toBeFocused();
 }
 

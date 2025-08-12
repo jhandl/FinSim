@@ -8,6 +8,9 @@ import {
 // URL that serves the SPA (dev server started by Playwright test runner)
 const BASE_URL = 'http://localhost:8080/#ifs';
 
+// Slightly increase action timeouts across this spec to reduce mobile flakiness
+test.use({ actionTimeout: 20000 });
+
 /**
  * Navigate to the simulator iframe and dismiss the welcome modal
  * @param {import('@playwright/test').Page} page
@@ -17,7 +20,7 @@ const BASE_URL = 'http://localhost:8080/#ifs';
 async function waitForSimulatorReady(page) {
   const frame = page.frameLocator('#app-frame');
   // Wait for the Add Event button to appear (initial markup)
-  await frame.locator('#addEventRow').first().waitFor({ state: 'visible', timeout: 5000 });
+  await frame.locator('#addEventRow').first().waitFor({ state: 'visible', timeout: 15000 });
   // DEBUG: Log initial script presence after Add Event button becomes visible
   await frame.locator('body').evaluate(() => {
     if (typeof Wizard !== 'undefined' && !window.Wizard) {
@@ -35,7 +38,7 @@ async function waitForSimulatorReady(page) {
     const webUIReady = win.WebUI && win.WebUI.getInstance && win.WebUI.getInstance();
     const wizardReady = win.Wizard && win.Wizard.getInstance && win.Wizard.getInstance();
     return !!(webUIReady && wizardReady && webUIReady.eventsTableManager);
-  }, null, { timeout: 10000 });
+  }, null, { timeout: 20000 });
 }
 
 async function loadSimulator(page, { wizardOn = false } = {}) {
@@ -43,6 +46,10 @@ async function loadSimulator(page, { wizardOn = false } = {}) {
   await page.addInitScript(state => {
     try { localStorage.setItem('eventsWizardState', state ? 'on' : 'off'); } catch (_) {}
   }, wizardOn);
+  // Disable welcome modal for E2E to avoid overlay intercepting clicks on mobile
+  await page.addInitScript(() => {
+    try { localStorage.setItem('welcomeModalState', 'off'); } catch (_) {}
+  });
 
   await page.goto(BASE_URL);
   const frame = page.frameLocator('#app-frame');

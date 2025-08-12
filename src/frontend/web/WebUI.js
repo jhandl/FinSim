@@ -60,12 +60,13 @@ class WebUI extends AbstractUI {
       this.setupEconomyModeToggle(); // Setup the deterministic/Monte Carlo mode toggle
       this.setupParameterTooltips(); // Setup parameter age field tooltips
       this.setupVisualizationControls(); // Setup visualization controls
-      this.setupPensionCappedDropdown(); // Replace select with dropdownTool
+      // Pension Capped dropdown depends on Config/tax rules; initialize after Config.initialize()
       this.setupPensionContributionTooltips(); // Tooltips for pension contribution inputs
       this.setupCardInfoIcons(); // Setup info icons on cards
       this.setupDataExportButton(); // Setup data table CSV export button
       this.setupIconTooltips(); // Setup tooltips for various mode toggle icons
       this.setupCursorEndOnFocus(); // Ensure caret is placed at the end when inputs receive focus
+      this.setupMobileLongPressHelp(); // Long-press on inputs/selects opens contextual help on mobile
       this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
       
       this.eventsTableManager.addEventRow();
@@ -1122,6 +1123,12 @@ class WebUI extends AbstractUI {
           // Fallback to an empty table structure
           return '| Age | Contrib |\n| --- | --- |';
         }
+      }, {
+        showOnFocus: true,
+        persistWhileFocused: true,
+        hideOnWizard: true,
+        suppressTouchLongPress: true,
+        tooltipClass: 'pension-tooltip'
       });
     };
 
@@ -1291,7 +1298,6 @@ class WebUI extends AbstractUI {
         dropdownEl,
         options,
         selectedValue: current,
-        width: 180, // dropdown menu width; toggle width is controlled by CSS to 75px
         onSelect: (val, label) => {
           hiddenInput.value = val;
           toggleEl.textContent = label;
@@ -1485,6 +1491,115 @@ class WebUI extends AbstractUI {
     });
   }
 
+  /**
+   * Mobile-only: Long-press on an input/select/textarea opens contextual help (same as pressing '?').
+   * Excludes dropdown toggles which are handled by DropdownUtils.
+   */
+  setupMobileLongPressHelp() {
+    try {
+      const isMobile = (typeof DeviceUtils !== 'undefined' && DeviceUtils.isMobile && DeviceUtils.isMobile());
+      if (!isMobile) return;
+
+      let longPressTimer = null;
+      let startX = 0;
+      let startY = 0;
+      let pressedElement = null;
+      const PRESS_DELAY_MS = 600;
+      const MOVE_TOLERANCE_PX = 10;
+
+      const cancelTimer = () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        pressedElement = null;
+      };
+
+      document.addEventListener(
+        'touchstart',
+        (e) => {
+          // Avoid when any dropdown is open (options have their own handlers)
+          if (window.__openDropdowns && window.__openDropdowns.size > 0) return;
+
+          // Only target native inputs – custom dropdowns handled in DropdownUtils
+          const target = e.target;
+          const inputEl = target && target.closest && target.closest('input, textarea, select');
+          if (!inputEl) return;
+          if (inputEl.disabled) return;
+
+          // Do not trigger if interacting with custom dropdown wrappers/toggles
+          if (target.closest && (target.closest('.dropdown-wrapper') || target.closest('.visualization-control') || target.closest('[id$="Toggle"]'))) {
+            return;
+          }
+
+          const touch = e.touches && e.touches[0];
+          if (!touch) return;
+          startX = touch.clientX;
+          startY = touch.clientY;
+          pressedElement = inputEl;
+
+          longPressTimer = setTimeout(() => {
+            try {
+              const wizard = (typeof Wizard !== 'undefined' && typeof Wizard.getInstance === 'function') ? Wizard.getInstance() : null;
+              if (!wizard || wizard.wizardActive) { cancelTimer(); return; }
+
+              // Close any open dropdowns before launching the wizard
+              if (window.__openDropdowns) {
+                window.__openDropdowns.forEach((closer) => { try { if (typeof closer === 'function') closer(); } catch (_) {} });
+              }
+
+              // Provide context for help
+              wizard.lastFocusedField = pressedElement;
+              wizard.lastFocusedWasInput = true;
+              wizard.start({ type: 'help' });
+            } catch (_) {
+              // no-op
+            }
+            cancelTimer();
+          }, PRESS_DELAY_MS);
+        },
+        { passive: true }
+      );
+
+      // Suppress native context menu on long-press for inputs and custom dropdown controls (mobile only)
+      document.addEventListener('contextmenu', (e) => {
+        try {
+          if (!isMobile) return;
+          const t = e.target;
+          if (!t) return;
+          if (t.closest && (
+            t.closest('input, textarea, select') ||
+            t.closest('.dropdown-wrapper') ||
+            t.closest('.visualization-control')
+          )) {
+            e.preventDefault();
+          }
+        } catch (_) {}
+      }, { capture: true });
+
+      document.addEventListener(
+        'touchmove',
+        (e) => {
+          if (!longPressTimer) return;
+          const touch = e.touches && e.touches[0];
+          if (!touch) return;
+          const dx = Math.abs(touch.clientX - startX);
+          const dy = Math.abs(touch.clientY - startY);
+          if (dx > MOVE_TOLERANCE_PX || dy > MOVE_TOLERANCE_PX) {
+            cancelTimer();
+          }
+        },
+        { passive: true }
+      );
+
+      ['touchend', 'touchcancel'].forEach((type) => {
+        document.addEventListener(type, cancelTimer, { passive: true });
+      });
+    } catch (_) {
+      // Fail safe – never block UI if feature detection fails
+    }
+  }
+
 }
 
 window.addEventListener('DOMContentLoaded', async () => { // Add async
@@ -1494,6 +1609,9 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     // Tax ruleset is preloaded by Config.initialize(); no need to preload again here
       // Apply dynamic investment labels from ruleset (first two investment types)
       try { webUi.applyInvestmentLabels(); } catch (_) {}
+
+    // Initialize controls that depend on Config/tax rules being available
+    try { webUi.setupPensionCappedDropdown(); } catch (_) {}
 
     // Establish baseline for new scenario now that Config is initialized (avoids extra getVersion call)
     try { webUi.fileManager.updateLastSavedState(); } catch (_) {}

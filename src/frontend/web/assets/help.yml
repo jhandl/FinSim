@@ -552,7 +552,7 @@ WizardSteps:
     card: events
     eventTypes: ["UI"]
     popover:
-      description: "<p>The gross income from Restricted Stock Units, provided by some employers as part of the compensation package.</p>"
+      description: "<p>The gross income from the sale of Restricted Stock Units, provided by some employers as part of the compensation package.</p>"
       side: "bottom"
       align: "center"
 

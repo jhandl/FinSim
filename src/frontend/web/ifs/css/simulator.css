@@ -1417,6 +1417,13 @@ th {
     user-select: none;           /* Standard */
 }
 
+/* Mobile-only: prevent system callout on form fields so long-press help isn't blocked */
+@media (max-width: 768px), (hover: none) {
+  input, textarea, select {
+    -webkit-touch-callout: none;
+  }
+}
+
 #Data th {
     background-color: #f5f5f5;
     font-weight: bold;
@@ -2106,7 +2113,11 @@ footer {
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    width: 140px;
+    /* Let JS compute exact width based on content. Use min-width as a floor. */
+    min-width: 140px;
+    width: auto;
+    max-width: calc(100vw - 16px);
+    white-space: nowrap; /* prevent wrapping */
     padding: 0;
 }
 
@@ -2131,6 +2142,13 @@ footer {
     color: var(--text-color);
     border-bottom: 1px solid #f0f0f0;
     font-weight: bold;
+    /* Prevent native text selection/callout on mobile to allow custom long-press tooltips */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 
 .visualization-dropdown div[data-value]:last-child {
@@ -2178,7 +2196,7 @@ footer {
     font-size: 0.8rem;
     font-weight: normal;
     white-space: nowrap;
-    z-index: 10052;
+    z-index: 10054; /* Above dropdown and other UI layers */
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.2s ease-out;
@@ -2187,6 +2205,15 @@ footer {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     max-width: 500px;
     white-space: normal;
+}
+
+/* Pension contribution tooltip: allow content-driven width on mobile only */
+@media (max-width: 768px) {
+    .visualization-tooltip.pension-tooltip {
+        width: auto;            /* shrink/expand to content */
+        max-width: 90vw;        /* still constrain to viewport */
+        display: inline-block;  /* enable intrinsic sizing */
+    }
 }
 
 .visualization-tooltip.visible {
@@ -2227,14 +2254,14 @@ footer {
         left: 50%;
         transform: translate(0, -50%);
         max-width: 90vw;
-        z-index: 10000;
+        z-index: 10050;
     }
 
     /* Mobile tooltip adjustments */
     .visualization-tooltip {
         max-width: 280px;
         width: 90vw;
-        z-index: 10000;
+        z-index: 10056; /* Ensure tooltip remains above mobile dropdown */
         background-color: rgba(0, 0, 0, 0.95);
         border-radius: 8px;
         padding: 1rem;

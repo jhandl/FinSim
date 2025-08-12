@@ -550,7 +550,6 @@ class EventAccordionManager {
         dropdownEl,
         options: optionObjects,
         selectedValue: event.type,
-        width: 200,
         onSelect: (newType, label) => {
           if (newType !== event.type) {
             // Update the hidden input

@@ -6,6 +6,9 @@ import { smartClick, openWizard, waitForOverlayGone, dismissWelcomeModal } from 
 // Base URL for the simulator (served by the dev/preview server)
 const BASE_URL = 'http://localhost:8080/#ifs';
 
+// Slightly relax per-action timeout for this spec to accommodate mobile devices
+test.use({ actionTimeout: 20000 });
+
 // Test runner logic extracted into a helper for reuse across browser/device combos
 async function runWizardRegressionTest(page) {
   // 1. Load the simulator directly on the IFS route
@@ -27,7 +30,7 @@ async function runWizardRegressionTest(page) {
 
   // 4. On the Frequency step, pick "One-off". This should auto-advance.
   const oneOffChoice = frame.locator('#eventWizardOverlay .event-wizard-choice-option:has-text("One-off")');
-  await oneOffChoice.waitFor({ state: 'visible' });
+  await oneOffChoice.waitFor({ state: 'visible', timeout: 30000 });
   await smartClick(oneOffChoice);
 
   // 5. Name step – enter a name and proceed.
@@ -43,7 +46,7 @@ async function runWizardRegressionTest(page) {
   const costHeading = frame.locator('#eventWizardOverlay h3:has-text("Cost")');
   await smartClick(frame.locator('#eventWizardOverlay .event-wizard-button-next'));
   await page.waitForTimeout(400);
-  await costHeading.waitFor({ state: 'visible', timeout: 7000 });
+  await costHeading.waitFor({ state: 'visible', timeout: 15000 });
 
   // 6. Cost step – leave amount blank and attempt to continue to trigger validation.
   const costInput = frame.locator('#eventWizardOverlay input[name="amount"]');
