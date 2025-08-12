@@ -78,64 +78,68 @@ class NotificationUtils {
   showToast(message, title, timeout=10) {
     const toast = document.createElement('div');
     toast.className = 'toast-message';
-    // Render markdown by default for better formatting
     const html = this._renderMarkdown(title, message);
     toast.innerHTML = html;
     // Ensure line breaks are respected for any leftover plain text
     toast.style.whiteSpace = 'normal';
+    // Make the toast itself interactive; we'll absorb outside via overlay
+    try { toast.style.pointerEvents = 'auto'; } catch (_) {}
     document.body.appendChild(toast);
-    setTimeout(() => {
-      toast.remove();
-    }, timeout * 1000);
+
+    // Full-viewport transparent overlay to catch and absorb outside clicks/taps
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:transparent;z-index:10019;';
+    document.body.appendChild(overlay);
+
+    // Setup outside-click/tap dismissal
+    let timeoutId;
+    const cleanup = () => {
+      try { if (timeoutId) clearTimeout(timeoutId); } catch (_) {}
+      try {
+        document.removeEventListener('pointerdown', onDocPointerDown, true);
+        document.removeEventListener('mousedown', onDocPointerDown, true);
+        document.removeEventListener('touchstart', onDocPointerDown, true);
+        document.removeEventListener('click', onDocPointerDown, true);
+      } catch (_) {}
+      try { overlay.remove(); } catch (_) {}
+      try { toast.remove(); } catch (_) {}
+    };
+
+    // Keep toast non-interactive (CSS pointer-events: none) to avoid blocking UI.
+    // Detect outside clicks using pointer coordinates vs toast bounding box.
+    const onDocPointerDown = (ev) => {
+      try {
+        const rect = toast.getBoundingClientRect();
+        const x = ev.clientX != null ? ev.clientX : (ev.touches && ev.touches[0] ? ev.touches[0].clientX : -1);
+        const y = ev.clientY != null ? ev.clientY : (ev.touches && ev.touches[0] ? ev.touches[0].clientY : -1);
+        const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+        if (!inside) { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation(); ev.preventDefault(); ev.cancelBubble = true; cleanup(); }
+      } catch (_) {
+        cleanup();
+      }
+    };
+
+    document.addEventListener('pointerdown', onDocPointerDown, true);
+    document.addEventListener('mousedown', onDocPointerDown, true);
+    document.addEventListener('touchstart', onDocPointerDown, { capture: true, passive: false });
+    document.addEventListener('click', onDocPointerDown, true);
+
+    // Overlay absorbs interactions and closes the toast
+    const onOverlayDown = (ev) => { try { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation(); ev.preventDefault(); ev.cancelBubble = true; } catch (_) {} cleanup(); };
+    overlay.addEventListener('pointerdown', onOverlayDown, { capture: true });
+    overlay.addEventListener('mousedown', onOverlayDown, { capture: true });
+    overlay.addEventListener('touchstart', onOverlayDown, { capture: true, passive: false });
+    overlay.addEventListener('click', onOverlayDown, { capture: true });
+
+    // Auto close after timeout
+    timeoutId = setTimeout(cleanup, timeout * 1000);
   }
 
   _renderMarkdown(title, message) {
-    const escapeHtml = (str) => {
-      const div = document.createElement('div');
-      div.textContent = String(str == null ? '' : str);
-      return div.innerHTML;
-    };
-
-    const toHtml = (md) => {
-      if (!md) return '';
-      // Work on escaped version to avoid XSS, then allow our markdown replacements
-      let s = escapeHtml(md);
-      // Inline code
-      s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
-      // Bold and italics (process bold first)
-      s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1<\/strong>');
-      s = s.replace(/\*([^*]+)\*/g, '<em>$1<\/em>');
-      s = s.replace(/_([^_]+)_/g, '<em>$1<\/em>');
-      // Links: [text](url)
-      s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1<\/a>');
-      // Lists: lines starting with - or * → <ul><li>..</li></ul>
-      const lines = s.split(/\r?\n/);
-      const out = [];
-      let inList = false;
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const isBullet = /^\s*[-*]\s+/.test(line);
-        if (isBullet) {
-          if (!inList) { out.push('<ul>'); inList = true; }
-          out.push('<li>' + line.replace(/^\s*[-*]\s+/, '') + '</li>');
-        } else {
-          if (inList) { out.push('</ul>'); inList = false; }
-          if (line.trim() === '') {
-            out.push('<br/>');
-          } else {
-            // Preserve explicit newlines in plain text by inserting <br/>
-            out.push(line + '<br/>');
-          }
-        }
-      }
-      if (inList) out.push('</ul>');
-      // Avoid inserting raw newlines which some mobile browsers collapse
-      return out.join('');
-    };
-
-    const titleHtml = title ? `<strong>${toHtml(title)}</strong><br/>` : '';
-    const bodyHtml = toHtml(message);
-    return titleHtml + bodyHtml;
+    const safeTitle = title == null ? '' : String(title);
+    const safeMessage = message == null ? '' : String(message);
+    const combinedMarkdown = (safeTitle ? `**${safeTitle}**\n\n` : '') + safeMessage;
+    return marked.parse(combinedMarkdown);
   }
 
   setWarning(elementId, message) {
