@@ -4,7 +4,7 @@
 
 FinSim is a personal finance simulator and educational sandbox for running "what‑if" scenarios.
 
-he core philosophy is to provide a private, powerful, and transparent tool for financial planning. Due to its origins, the core logic must maintain compatibility with the Google Apps Script (GAS) environment. 
+ The core philosophy is to provide a private, powerful, and transparent tool for financial planning. Due to its origins, the core logic must maintain compatibility with the Google Apps Script (GAS) environment. 
 
 A generic tax engine powers calculations via country rule files (Ireland provided by default).
 
@@ -74,8 +74,11 @@ graph TD
 *   **[`Events.js`](src/core/Events.js:1):** Defines the `SimEvent` class.
 *   **[`Revenue.js`](src/core/Revenue.js:1):** Responsible for all tax calculations.
 *   **[`TaxRuleSet.js`](src/core/TaxRuleSet.js:1):** Wraps country tax JSON and exposes getters consumed by `Revenue`.
-*   **[`Equities.js`](src/core/Equities.js:1):** The base class for all investment assets (`IndexFunds`, `Shares`, `Pension`).
+*   **[`Equities.js`](src/core/Equities.js:1):** The base class for core investment assets (`IndexFunds`, `Shares`, `Pension`).
 *   **[`RealEstate.js`](src/core/RealEstate.js:1):** Manages real estate properties and mortgages.
+*   **[`Attribution.js`](src/core/Attribution.js:1):** Primitive used to capture and aggregate per‑source contributions (income, taxes, gains).
+*   **[`AttributionManager.js`](src/core/AttributionManager.js:1):** Orchestrates yearly attribution tracking used across `Revenue` and the simulator.
+*   **[`InvestmentTypeFactory.js`](src/core/InvestmentTypeFactory.js:1):** Builds generic investment assets from tax‑rule `investmentTypes`, enabling dynamic per‑type assets beyond the legacy two (Funds/Shares).
 
 #### Frontend
 
@@ -96,9 +99,10 @@ graph TD
 ### 3.3. Generic Tax System
 
 - **Rule files:** `src/core/config/tax-rules-<country>.json` (IE included).
-- **Loader:** `Config.getTaxRuleSet(code)` loads and caches a `TaxRuleSet`; the default IE ruleset is preloaded for synchronous access via `Config.getCachedTaxRuleSet('ie')`.
+- **Initialization:** `Config.initialize(ui)` must be called at app start. It follows `latestVersion` pointers in `finsim-X.XX.json`, persists the selected version, and preloads the IE tax ruleset.
+- **Loader:** `Config.getTaxRuleSet(code)` asynchronously loads and caches a `TaxRuleSet`; the preloaded IE ruleset is available synchronously via `Config.getCachedTaxRuleSet('ie')`.
 - **API:** `TaxRuleSet` exposes income tax bands/credits and age exemptions, PRSI by age, USC brackets (including reduced age/income bands), CGT annual exemption and rate, pension rules (lump‑sum bands, contribution limits, drawdown), and investment types.
-- **Usage:** `Revenue` consumes the active ruleset to compute IT, PRSI, USC, and CGT/Exit Tax with full attribution. Investment types control whether assets are taxed under Exit Tax or CGT.
+- **Usage:** `Revenue` consumes the active ruleset to compute IT, PRSI, USC, and CGT/Exit Tax with full attribution. Investment types in the rules control whether assets are taxed under Exit Tax or CGT. `InvestmentTypeFactory` converts `investmentTypes` into generic assets for simulation and UI (including dynamic per‑type income/capital columns in the data table when more than two types exist).
 
 ### 3.4. Event Management (Table + Accordion + Wizard)
 
@@ -129,26 +133,28 @@ The event management system is a core feature that provides users with flexible 
 
 ### 3.5. Data Management and Persistence
 
-User scenarios are persisted as CSV files, handled by the `serializeSimulation()` and `deserializeSimulation()` functions in [`src/core/Utils.js`](src/core/Utils.js:1) and managed on the frontend by [`FileManager.js`](src/frontend/web/components/FileManager.js:1).
-Tax rules and application configuration are loaded at startup by `Config`.
+User scenarios are persisted as CSV files, handled by the `serializeSimulation()` and `deserializeSimulation()` functions in [`src/core/Utils.js`](src/core/Utils.js:1) and managed on the frontend by [`FileManager.js`](src/frontend/web/components/FileManager.js:1). Deserialization supports legacy field names (e.g., ETF/Trust) and infers modes when missing.
+
+Tax rules and application configuration are loaded at startup by `Config.initialize(ui)`, which preloads the IE ruleset for synchronous access.
 
 ## 4. Test Framework
 
-The project uses a custom testing framework in Node.js to validate the core simulation logic, and it's invoked through the run-tests.sh script.
+The project uses a custom Node.js testing framework for core simulation logic, plus Jest for UI/unit tests and Playwright e2e tests. All are orchestrated by the top‑level `run-tests.sh` script.
 
 If you want to call the run-tests.sh script all you need to do is run './run-tests.sh <params>'. No need to call a shell to run it. Just run the command directly.
 
 ### 4.1. Kinds of Tests
 
-1.  **Regression Tests:** Define a scenario and assert that the output matches a "golden standard." (e.g., [`TestRegression.js`](src/tests/TestRegression.js:1)).
-2.  **Custom Tests:** Allow for more complex validation logic (e.g., [`TestValidation.js`](src/tests/TestValidation.js:1)).
+1.  **Core Regression/Validation (Node):** Define a scenario and assert outputs or implement custom validation (see files in [`tests/`](tests/)).
+2.  **Jest UI/Unit Tests:** Browser‑like tests using JSDOM (e.g., [`Wizard.test.js`](tests/Wizard.test.js)).
+3.  **Playwright E2E:** Headed/headless browser tests under [`tests/`](tests/) with `*.spec.js`.
 
 ### 4.2. How to Add a Test
 
-All tests are run using the [`run-tests.sh`](src/run-tests.sh:1) script.
-1.  Create a new test file in [`src/tests/`](src/tests/).
-2.  Use `TestRegression.js` or `TestValidation.js` as a template.
-3.  Run a specific test with `./run-tests.sh <TestName>`.
+All tests are run using the top‑level [`run-tests.sh`](run-tests.sh) script.
+1.  Create a new test file in [`tests/`](tests/).
+2.  For core Node tests, you can use existing custom tests as a template (e.g., `tests/TestTaxRuleSet.js`). For UI tests, add `*.test.js` for Jest or `*.spec.js` for Playwright.
+3.  Run a specific test (by base name) with `./run-tests.sh <TestName>`.
 
 ### 4.3. UI Testing
 
@@ -162,7 +168,7 @@ If there is no UI jest tests in the tests directory for the feature you want to 
 *   **Event View Compatibility:** Any changes to the event structure or how events are handled must be tested against both event views (table and accordion) and the wizard system. The table view serves as the single source of truth, with the accordion view providing a synchronized alternative interface. Changes must maintain bidirectional synchronization and preserve all editing capabilities across views.
 *   **Configuration over Hardcoding:** Any constants, especially those related to tax rules, should be placed in the `tax-rules-<country code>.json` file, or if they're not tax-related and are general simulation settings, in the 'finsim-X.XX.json' file.
 *   **Write Tests:** Any new feature or bug fix for the core logic should be accompanied by a corresponding test. 
-*   **UI Testin:** If you rely on the user for UI testing and validation, remember that the user is always running a local server. Don't start a new server and don't open browser windows.
+*   **UI Testing:** If you rely on the user for UI testing and validation, remember that the user is always running a local server. Don't start a new server and don't open browser windows.
 *   **Cache busting:** If you make any change to a javascript or css file, you must update the cache-busting parameter at the end of that file's url in the 'SYSTEM UTILITIES' section in ./src/frontend/web/ifs/index.html (or at the beginning of that file if it's a css change) and set it to the current date (plus a version number if the date is the same), so users always get the updated version. This is VERY IMPORTANT.
 
 ## 6. Local Setup
