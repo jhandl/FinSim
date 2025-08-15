@@ -8,6 +8,8 @@ FinSim is a personal finance simulator and educational sandbox for running "what
 
 A generic tax engine powers calculations via country rule files (Ireland provided by default).
 
+The system is entirely hosted in GitHub Pages as a static website.
+
 ## 2. Key Features
 
 *   **Detailed Financial Simulation:** Models income, expenses, investments, and taxes over a lifetime.

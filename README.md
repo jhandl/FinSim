@@ -4,6 +4,8 @@
 # Roadmap
 
 ### Improvements
+- Feedback form: @feedback-form-plan.md
+- Monetization: @monetization-plan.md
 - Auto-save scenarios
    - Save the current scenario to the local storage when it gets dirty. When opening the page, check if there's a saved scenario. If there is, load it. If not => welcome modal.
    - Add a clear scenario button somewhere. When clearing the scenario, clean the storage as well.
@@ -18,8 +20,7 @@
    - pay off mortgage.
    - inheritance.
    - period of high inflation.
-   - change the allocations throughout the simulation.
-- Add feedback box.
+   - change the investment allocations throughout the simulation.
 - Add registration box? Not CIO.
 - Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain. This would only make sense if that average was shown in present value.
 

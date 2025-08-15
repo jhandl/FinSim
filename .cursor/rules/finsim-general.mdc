@@ -1,6 +1,4 @@
 ---
-description: This rule always applies, no matter what the task is.
-globs: 
 alwaysApply: true
 ---
 ## GENERAL ADVICE ##
