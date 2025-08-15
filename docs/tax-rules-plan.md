@@ -11,6 +11,14 @@
 
 ---
 
+## 0) Refactor policy and success criteria
+
+- **No compatibility or continuity work**: Do not add adapters, shims, aliases, or transitional layers. Expect intermediate commits to break dependents until their step is executed.
+- **Clean rewrite mandate**: Rename and refactor directly; remove all hardcoded country logic rather than emulating it.
+- **Release gate (only success criterion)**: With the Irish rules converted to v2, the post-refactor system must produce the exact same numeric results as pre-refactor for the same scenarios. This will be verified manually.
+
+---
+
 ## 1) Rename and file moves
 - **File rename**: `src/core/Revenue.js` → `src/core/Taxman.js`.
 - **Class rename**: `class Revenue` → `class Taxman`.
@@ -217,6 +225,11 @@ Create a normative specification for the neutral v2 rules that future country ru
 - **Expressions**: allow a small safe subset (comparison, boolean ops, `min`/`max`), with defined variable context; forbid arbitrary code.
 - **Validation rules**: uniqueness constraints, referential integrity (`appliesTo` and `base` keys exist), numeric ranges, bracket key format, monotonic thresholds.
 - **Examples**: a minimal valid file and a full-featured file; reference test vectors.
+- **Extensibility: adding new tax kinds/rules**:
+  - Spec changes: define a new `tax.kind` value and its schema fields; update normative JSON examples; state validation rules for the new kind.
+  - Engine changes: add a compute handler for the new `kind` in `Taxman`'s tax loop; extend `TaxRuleSet` normalization if needed; wire attribution to `tax:<id>`; add unit tests.
+  - Versioning: bump spec version (minor for additive, major for breaking); unknown kinds must fail fast with a clear error.
+  - Documentation & tests: expand this spec with a step-by-step guide and provide conformance tests/fixtures.
 
 Deliverable: `docs/tax-rules-spec.md` with the above sections and at least one fully-valid JSON example aligned with §2.
 
@@ -334,8 +347,9 @@ rg -n "\b(PRSI|USC|CGT|Exit\s*Tax|nonEuShares)\b" src frontend tests
    - Replace `nonEuShares` with generic income bases.
    - Replace `ruleset` calls with generic getters.
  - **Step 5**: Update `Config.js` to drop the `'ie'` default; add selected-country path.
- - **Step 6**: Update simulator/UI to construct `Taxman` and to bind dynamic tax columns.
+ - **Step 6**: Update simulator/UI to construct `Taxman` and to bind dynamic tax columns; bump the cache-busting date parameter in `src/frontend/web/ifs/index.html` for any JS/CSS files changed.
  - **Step 7**: Update tests to the new spec and dynamic taxes.
+ - **Step 8**: Perform the manual parity verification (see §0) comparing pre- and post-refactor outputs for IE v2 rules. Only proceed if results match exactly.
 
 ---
 
@@ -364,4 +378,32 @@ rg -n "\b(PRSI|USC|CGT|Exit\s*Tax|nonEuShares)\b" src frontend tests
 - **Generalize** `Config` country loading.
 - **Generic taxes loop** in `Taxman` (no hardcoded names).
 - **Dynamic taxes** in consumers (UI/tests).
+ - **No adapters/aliases** added; no backwards compatibility during refactor.
+ - **Manual parity check** for IE v2 rules completed with exact match.
+
+---
+
+## 12) Execution workflow and safeguards
+
+- **Feature branch**: Perform all steps on a dedicated branch; merge only after Step 8 parity passes.
+- **Commit granularity by step**: One commit (or small set) per numbered step to simplify review and rollback.
+- **Baseline capture (pre-Step 0)**: Save representative scenario inputs and outputs for parity comparison at Step 8.
+- **Schema validation**: Provide a JSON Schema and a small validation script for rules files; run it locally and in CI.
+- **Search-and-replace checklist**: Re-run the searches from §1 and §7 until zero hits remain for `Revenue`, hardcoded `'ie'` in ruleset fetches, and hardcoded tax names.
+- **Cache busting**: After any frontend asset changes, update the cache-busting date in `src/frontend/web/ifs/index.html` (reinforced in Step 6).
+- **Review focus**: Ensure no hardcoded country strings remain in engine code and all taxes flow from data.
+
+---
+
+## 13) Progress tracking checklist
+
+- [ ] Step 0: IE rules converted to v2 and validated
+- [ ] Step 1: Spec authored (`docs/tax-rules-spec.md`)
+- [ ] Step 2: Additional country file(s) drafted (optional)
+- [ ] Step 3: `TaxRuleSet` neutral API implemented
+- [ ] Step 4: `Taxman` created and replaces `Revenue`
+- [ ] Step 5: `Config` updated for explicit country selection
+- [ ] Step 6: UI/Simulator updated; cache-busting param bumped
+- [ ] Step 7: Tests updated to dynamic taxes
+- [ ] Step 8: Manual IE parity check (exact match) completed
 
