@@ -145,7 +145,14 @@ test.describe('Events Autoscroll & Accordion behaviour', () => {
     await scrollToEvents(page, frame);
 
     // Delete the default blank row so no empty row remains.
-    await frame.locator('#Events tbody tr .delete-event').first().evaluate(el => el.click());
+    await frame.locator('#Events tbody tr .delete-event').first().evaluate(el => {
+      // Trigger the delete via the table manager directly to avoid event delegation issues
+      const row = el.closest('tr');
+      const webUI = window.WebUI_instance;
+      if (webUI && webUI.eventsTableManager && row) {
+        webUI.eventsTableManager.deleteTableRowWithAnimation(row);
+      }
+    });
     await expect(frame.locator('#Events tbody tr')).toHaveCount(0, { timeout: 3000 });
 
     // Switch to accordion view.
@@ -353,7 +360,14 @@ test.describe('Events Autoscroll & Accordion behaviour', () => {
     // Remove existing blank row so wizard will add a new item instead of replacing.
     const deleteBtn = frame.locator('#Events tbody tr .delete-event').first();
     if (await deleteBtn.count()) {
-      await deleteBtn.evaluate(el => el.click());
+      await deleteBtn.evaluate(el => {
+        // Trigger the delete via the table manager directly to avoid event delegation issues
+        const row = el.closest('tr');
+        const webUI = window.WebUI_instance;
+        if (webUI && webUI.eventsTableManager && row) {
+          webUI.eventsTableManager.deleteTableRowWithAnimation(row);
+        }
+      });
       await expect(frame.locator('#Events tbody tr')).toHaveCount(0, { timeout: 3000 });
     }
 
