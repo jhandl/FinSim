@@ -145,7 +145,7 @@ class TestFramework {
         'TaxRuleSet.js',
         'Attribution.js',
         'AttributionManager.js',
-        'Revenue.js',
+        'Taxman.js',
         'Equities.js', 
         'RealEstate.js',
         'Person.js',
@@ -600,6 +600,16 @@ class TestFramework {
     }
   }
 
+  /** Helper to map legacy tax field aliases to dynamic Tax__ keys */
+  _resolveFieldAlias(rowObj, field) {
+    if (!rowObj) return field;
+    const legacyMap = { it: 'Tax__incomeTax', prsi: 'Tax__prsi', usc: 'Tax__usc', cgt: 'Tax__capitalGains' };
+    if (rowObj.hasOwnProperty(field)) return field;
+    const alt = legacyMap[field];
+    if (alt && rowObj.hasOwnProperty(alt)) return alt;
+    return field;
+  }
+
   /**
    * Get the final value of a field from the data sheet
    */
@@ -612,7 +622,9 @@ class TestFramework {
     if (validRows.length === 0) {
       throw new Error('No valid data rows found');
     }
-    return validRows[validRows.length - 1][field];
+    const lastRow = validRows[validRows.length - 1];
+    const key = this._resolveFieldAlias(lastRow, field);
+    return lastRow[key];
   }
 
   /**
@@ -624,7 +636,8 @@ class TestFramework {
     if (!row) {
       throw new Error(`No data found for age ${age}`);
     }
-    return row[field];
+    const key = this._resolveFieldAlias(row, field);
+    return row[key];
   }
 
   /**
@@ -636,7 +649,9 @@ class TestFramework {
     if (rowIndex >= validRows.length) {
       throw new Error(`Row index ${rowIndex} out of bounds (valid rows: ${validRows.length})`);
     }
-    return validRows[rowIndex][field];
+    const row = validRows[rowIndex];
+    const key = this._resolveFieldAlias(row, field);
+    return row[key];
   }
 
   /**

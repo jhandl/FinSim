@@ -232,7 +232,7 @@ class FormatUtils {
 
       // Fallback: resolve variables from active country tax rules
       try {
-        const ruleset = (config && typeof config.getCachedTaxRuleSet === 'function') ? config.getCachedTaxRuleSet('ie') : null;
+        const ruleset = (config && typeof config.getCachedTaxRuleSet === 'function') ? config.getCachedTaxRuleSet(config.getDefaultCountry()) : null;
         if (ruleset) {
           const rawRules = ruleset.raw || {};
 

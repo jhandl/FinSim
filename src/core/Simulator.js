@@ -76,7 +76,7 @@ function initializeSimulator() {
   initializeUI();
   uiManager.setStatus("Initializing", STATUS_COLORS.INFO);
   config = Config.getInstance(uiManager.ui);
-  revenue = new Revenue();
+  revenue = new Taxman();
   attributionManager = new AttributionManager();
   dataSheet = [];
   return readScenario(validate = true);
@@ -101,7 +101,7 @@ function initializeSimulationVariables() {
   // Also create generic assets array (compat path: map first two to existing ones for IE)
   try {
     var cfg = Config.getInstance();
-    var rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+    var rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
     if (rs && typeof InvestmentTypeFactory !== 'undefined') {
       var growthMap = {
         indexFunds: params.growthRateFunds,
@@ -329,7 +329,7 @@ function processEvents() {
           incomeSalaries += amount;
           attributionManager.record('incomesalaries', event.id, amount);
           // Pension contribution age bands: prefer TaxRuleSet when available
-          var _rs1 = Config.getInstance().getCachedTaxRuleSet ? Config.getInstance().getCachedTaxRuleSet('ie') : null;
+          var _rs1 = Config.getInstance().getCachedTaxRuleSet ? Config.getInstance().getCachedTaxRuleSet(Config.getInstance().getDefaultCountry()) : null;
           var p1Bands = (_rs1 && typeof _rs1.getPensionContributionAgeBands === 'function') ? _rs1.getPensionContributionAgeBands() : {};
           let p1ContribRate = person1.pensionContributionPercentageParam * getRateForKey(person1.age, p1Bands);
 
@@ -568,6 +568,8 @@ function handleInvestments() {
     success = false;
     failedAt = person1.age;
   }
+  // Final recomputation of taxes after all withdrawals/sales to ensure totals include any newly realised gains or income.
+  revenue.computeTaxes();
 }
 
 
@@ -901,8 +903,8 @@ function initializeRealEstate() {
 
 function updateYearlyData() {
   // This is used below to hide the deemed disposal tax payments, otherwise they're shown as income.
-  let FundsTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.cgt * incomeFundsRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
-  let SharesTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.cgt * incomeSharesRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
+  let FundsTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeFundsRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
+  let SharesTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeSharesRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
 
   // Capture per-run data for pinch point visualization
   if (!perRunResults[currentRun]) {
@@ -918,7 +920,7 @@ function updateYearlyData() {
   });
   
   if (!(row in dataSheet)) {
-    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0, "attributions": {}, "investmentIncomeByKey": {}, "investmentCapitalByKey": {} };
+    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0, "attributions": {}, "investmentIncomeByKey": {}, "investmentCapitalByKey": {}, "taxByKey": {} };
   }
   dataSheet[row].age += person1.age;
   dataSheet[row].year += year;
@@ -966,10 +968,10 @@ function updateYearlyData() {
   } catch (_) {}
   dataSheet[row].pensionContribution += personalPensionContribution;
   dataSheet[row].withdrawalRate += withdrawalRate;
-  dataSheet[row].it += revenue.it;
-  dataSheet[row].prsi += revenue.prsi;
-  dataSheet[row].usc += revenue.usc;
-  dataSheet[row].cgt += revenue.cgt;
+  dataSheet[row].it += revenue.getTaxTotal('incomeTax');
+  dataSheet[row].prsi += revenue.getTaxTotal('prsi');
+  dataSheet[row].usc += revenue.getTaxTotal('usc');
+  dataSheet[row].cgt += revenue.getTaxTotal('capitalGains');
   dataSheet[row].worth += realEstate.getTotalValue() + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFunds.capital() + shares.capital() + cash;
 
   // Record portfolio statistics for tooltip attribution
@@ -1010,6 +1012,16 @@ function updateYearlyData() {
       console.error(`Error getting breakdown for ${metric}:`, error);
     }
   }
+
+  // After processing standard taxes accumulation, accumulate dynamic taxTotals
+  try {
+    const totMap = revenue.taxTotals || {};
+    if (!dataSheet[row].taxByKey) dataSheet[row].taxByKey = {};
+    for (const tId in totMap) {
+      if (!dataSheet[row].taxByKey[tId]) dataSheet[row].taxByKey[tId] = 0;
+      dataSheet[row].taxByKey[tId] += totMap[tId];
+    }
+  } catch (_) {}
 
   if (!montecarlo) {
     uiManager.updateDataRow(row, (person1.age-params.startingAge) / (100-params.startingAge));

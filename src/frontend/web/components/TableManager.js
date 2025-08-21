@@ -96,6 +96,30 @@ class TableManager {
     // Clear existing cells
     row.innerHTML = '';
 
+    // Before building row, ensure headers exist for any new dynamic keys
+    const headerRow = document.querySelector('#Data thead tr:nth-child(2)');
+    if (headerRow) {
+      const existingKeys = new Set(Array.from(headerRow.querySelectorAll('th[data-key]')).map(h=>h.dataset.key));
+      const deductionsGroupTh = document.querySelector('#Data thead tr.header-groups th:nth-child(16)'); // 0-index? colSpan=5 originally
+      let addedCount = 0;
+      for (const key in data) {
+        if (key.startsWith('Tax__') && !existingKeys.has(key)) {
+          // create new header
+          const th = document.createElement('th');
+          th.setAttribute('data-key', key);
+          const labelRaw = key.substring(6); // remove Tax__
+          th.textContent = labelRaw.toUpperCase();
+          th.title = labelRaw + ' tax paid';
+          headerRow.appendChild(th);
+          existingKeys.add(key);
+          addedCount++;
+        }
+      }
+      if (addedCount>0 && deductionsGroupTh) {
+        deductionsGroupTh.colSpan = (parseInt(deductionsGroupTh.colSpan) || 5) + addedCount;
+      }
+    }
+
     // Get the order of columns from the table header, only those with data-key attributes
     const headers = Array.from(document.querySelectorAll('#Data thead th[data-key]'));
 

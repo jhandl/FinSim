@@ -25,13 +25,14 @@ show_usage() {
     echo -e "${BLUE}=================${NC}"
     echo ""
     echo "USAGE:"
-    echo "  ./run-tests.sh [test-name]"
+    echo "  ./run-tests.sh [test-name] [--runAll]"
     echo ""
     echo "EXAMPLES:"
     echo -e "  ${GREEN}./run-tests.sh${NC}                    # Run all tests"
     echo -e "  ${GREEN}./run-tests.sh TestBasicTax${NC}       # Run specific test"
     echo -e "  ${GREEN}./run-tests.sh --list${NC}             # List available tests"
     echo -e "  ${GREEN}./run-tests.sh --help${NC}             # Show this help"
+    echo -e "  ${GREEN}./run-tests.sh TestEventsAutoscroll --runAll${NC}  # Force-run Safari/iOS-skipped specs"
     echo ""
 }
 
@@ -167,6 +168,20 @@ list_tests() {
 
 # Main execution
 main() {
+    # Detect optional --runAll flag anywhere in args and export env for Playwright
+    local RUN_ALL=false
+    for arg in "$@"; do
+        if [ "$arg" == "--runAll" ]; then
+            RUN_ALL=true
+            break
+        fi
+    done
+
+    if [ "$RUN_ALL" == true ]; then
+        export FINSIM_RUN_ALL=1
+        # Strip --runAll from positional args for downstream handling
+        set -- $(printf '%s\n' "$@" | sed 's/--runAll//')
+    fi
     case "$1" in
         -h|--help|--help-script)
             show_usage

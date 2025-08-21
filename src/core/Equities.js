@@ -137,7 +137,7 @@ class IndexFunds extends Equity {
     var ruleset = null;
     try {
       var cfg = Config.getInstance();
-      ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+      ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
     } catch (e) { ruleset = null; }
 
     // Cache the investment type definition, if present
@@ -244,7 +244,7 @@ class Shares extends Equity {
     var ruleset = null;
     try {
       var cfg = Config.getInstance();
-      ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+      ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
     } catch (e) { ruleset = null; }
     const cgtRate = (ruleset && typeof ruleset.getCapitalGainsRate === 'function') ? ruleset.getCapitalGainsRate() : 0;
     super(cgtRate, growth, stdev);
@@ -284,7 +284,7 @@ class Pension extends Equity {
     this.person = person;
     try {
       var cfg = Config.getInstance();
-      this._ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+      this._ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
     } catch (e) { this._ruleset = null; }
   }
 

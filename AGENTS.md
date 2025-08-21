@@ -42,7 +42,7 @@ graph TD
     subgraph "Core Engine (GAS Compatible)"
         direction TB
         D[Simulator.js] --> E{Core Components};
-        E --> F[Revenue.js];
+        E --> F[Taxman.js];
         E --> G[Person.js];
         E --> H[Equities.js];
         E --> I[RealEstate.js];
@@ -74,12 +74,12 @@ graph TD
 *   **[`Person.js`](src/core/Person.js:1):** Represents an individual in the simulation.
 *   **[`Config.js`](src/core/Config.js:1):** Loads and holds all configuration parameters.
 *   **[`Events.js`](src/core/Events.js:1):** Defines the `SimEvent` class.
-*   **[`Revenue.js`](src/core/Revenue.js:1):** Responsible for all tax calculations.
-*   **[`TaxRuleSet.js`](src/core/TaxRuleSet.js:1):** Wraps country tax JSON and exposes getters consumed by `Revenue`.
+*   **[`Taxman.js`](src/core/Taxman.js:1):** Responsible for all tax calculations (formerly `Revenue.js`).
+*   **[`TaxRuleSet.js`](src/core/TaxRuleSet.js:1):** Wraps country tax JSON and exposes getters consumed by `Taxman`.
 *   **[`Equities.js`](src/core/Equities.js:1):** The base class for core investment assets (`IndexFunds`, `Shares`, `Pension`).
 *   **[`RealEstate.js`](src/core/RealEstate.js:1):** Manages real estate properties and mortgages.
 *   **[`Attribution.js`](src/core/Attribution.js:1):** Primitive used to capture and aggregate per‑source contributions (income, taxes, gains).
-*   **[`AttributionManager.js`](src/core/AttributionManager.js:1):** Orchestrates yearly attribution tracking used across `Revenue` and the simulator.
+*   **[`AttributionManager.js`](src/core/AttributionManager.js:1):** Orchestrates yearly attribution tracking used across `Taxman` and the simulator.
 *   **[`InvestmentTypeFactory.js`](src/core/InvestmentTypeFactory.js:1):** Builds generic investment assets from tax‑rule `investmentTypes`, enabling dynamic per‑type assets beyond the legacy two (Funds/Shares).
 
 #### Frontend
@@ -104,7 +104,7 @@ graph TD
 - **Initialization:** `Config.initialize(ui)` must be called at app start. It follows `latestVersion` pointers in `finsim-X.XX.json`, persists the selected version, and preloads the IE tax ruleset.
 - **Loader:** `Config.getTaxRuleSet(code)` asynchronously loads and caches a `TaxRuleSet`; the preloaded IE ruleset is available synchronously via `Config.getCachedTaxRuleSet('ie')`.
 - **API:** `TaxRuleSet` exposes income tax bands/credits and age exemptions, PRSI by age, USC brackets (including reduced age/income bands), CGT annual exemption and rate, pension rules (lump‑sum bands, contribution limits, drawdown), and investment types.
-- **Usage:** `Revenue` consumes the active ruleset to compute IT, PRSI, USC, and CGT/Exit Tax with full attribution. Investment types in the rules control whether assets are taxed under Exit Tax or CGT. `InvestmentTypeFactory` converts `investmentTypes` into generic assets for simulation and UI (including dynamic per‑type income/capital columns in the data table when more than two types exist).
+- **Usage:** `Taxman` consumes the active ruleset to compute income, social contributions, additional taxes, and capital gains/exit taxes with full attribution. Investment types in the rules control whether assets are taxed under Exit Tax or CGT. `InvestmentTypeFactory` converts `investmentTypes` into generic assets for simulation and UI (including dynamic per‑type income/capital columns in the data table when more than two types exist).
 
 ### 3.4. Event Management (Table + Accordion + Wizard)
 

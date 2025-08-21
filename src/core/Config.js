@@ -8,6 +8,7 @@ class Config {
     this.ui = ui;
     this.thisVersion = this.ui.getVersion();
     this._taxRuleSets = {}; // cache by country code (lowercase)
+    // defaultCountry will be loaded from config JSON (finsim-<version>.json).
   }
 
   // Singleton
@@ -78,7 +79,7 @@ class Config {
         }
 
         // Preload default country's tax ruleset so core engine has it synchronously
-        await Config_instance.getTaxRuleSet('ie');
+        await Config_instance.getTaxRuleSet(Config_instance.getDefaultCountry());
       } catch (error) {
         // Error is already handled and alerted by load()
         // We might want to prevent the app from fully starting if config fails.
@@ -106,6 +107,16 @@ class Config {
   }
 
   /**
+   * Return the default country code configured in the loaded app config.
+   * Falls back to 'ie' for backward compatibility if not set yet.
+   */
+  getDefaultCountry() {
+    return (this && typeof this.defaultCountry === 'string' && this.defaultCountry.trim().length > 0)
+      ? this.defaultCountry.trim().toLowerCase()
+      : 'ie';
+  }
+
+  /**
    * Lazily load and cache a TaxRuleSet for a given country code (e.g., 'ie').
    * Returns the loaded TaxRuleSet instance, or null if loading fails.
    * NOTE: Keep async to avoid blocking UI; callers that need sync access should
@@ -113,7 +124,7 @@ class Config {
    */
   async getTaxRuleSet(countryCode) {
     try {
-      const code = (countryCode || 'ie').toLowerCase();
+      const code = (countryCode || this.getDefaultCountry()).toLowerCase();
       if (this._taxRuleSets[code]) {
         return this._taxRuleSets[code];
       }
@@ -148,7 +159,7 @@ class Config {
    * Return a cached TaxRuleSet if available, otherwise null. Does not trigger loading.
    */
   getCachedTaxRuleSet(countryCode) {
-    const code = (countryCode || 'ie').toLowerCase();
+    const code = (countryCode || this.getDefaultCountry()).toLowerCase();
     return this._taxRuleSets ? this._taxRuleSets[code] || null : null;
   }
 

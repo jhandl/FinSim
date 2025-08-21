@@ -881,6 +881,11 @@ class Wizard {
         this.cleanupInlineStyles();
         this.handleBurgerMenuSimple(el);
 
+        // Fix popover positioning on mobile to prevent it from going off-screen
+        if (this.isMobile) {
+          this.fixPopoverPositioning();
+        }
+
         // Add 'done' class dynamically based on button label to suppress arrows
         const nextBtn = document.querySelector('.driver-popover-next-btn');
         if (nextBtn && nextBtn.textContent.trim().toLowerCase() === 'done') {
@@ -1088,6 +1093,45 @@ class Wizard {
         element.style.removeProperty('box-shadow');
       }
     });
+  }
+
+  fixPopoverPositioning() {
+    // Fix Driver.js popover positioning on mobile to prevent it from going off-screen
+    const popover = document.querySelector('.driver-popover');
+    if (!popover) return;
+
+    const rect = popover.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+
+    // Check if popover is positioned outside the viewport
+    if (rect.top < 0 || rect.bottom > viewportHeight || rect.left < 0 || rect.right > viewportWidth) {
+      // Calculate new position to keep popover within viewport
+      let newTop = rect.top;
+      let newLeft = rect.left;
+
+      // Adjust vertical position
+      if (rect.top < 0) {
+        newTop = 10; // 10px from top
+      } else if (rect.bottom > viewportHeight) {
+        newTop = viewportHeight - rect.height - 10; // 10px from bottom
+      }
+
+      // Adjust horizontal position
+      if (rect.left < 0) {
+        newLeft = 10; // 10px from left
+      } else if (rect.right > viewportWidth) {
+        newLeft = viewportWidth - rect.width - 10; // 10px from right
+      }
+
+      // Apply the new position
+      if (newTop !== rect.top || newLeft !== rect.left) {
+        popover.style.position = 'fixed';
+        popover.style.top = `${newTop}px`;
+        popover.style.left = `${newLeft}px`;
+        popover.style.transform = 'none'; // Remove any existing transforms that might interfere
+      }
+    }
   }
 
   cleanupHighlighting() {
@@ -1941,6 +1985,11 @@ class Wizard {
       }
 
       steps = this._getFilteredSteps(type, card);
+      
+      // DEBUG: Log filtered steps for mini tours
+      if (type === 'mini') {
+        console.log(`DEBUG: Mini tour steps for card "${card}":`, steps.map(s => ({ element: s.element, tours: s.tours, card: s.card })));
+      }
 
       if (steps.length === 0) {
         console.warn(`No steps found for tour "${type}"${card ? ` and card "${card}"` : ''}`);

@@ -178,6 +178,11 @@ class UIManager {
       for (const key in capMap) {
         data['Capital__' + key] = capMap[key] / scale;
       }
+      // Add dynamic tax totals
+      const taxMap = dataSheet[row].taxByKey || {};
+      for (const tId in taxMap) {
+        data['Tax__' + tId] = taxMap[tId] / scale;
+      }
     } catch (_) {}
 
     this.ui.setDataRow(row, data);
@@ -252,7 +257,7 @@ class UIManager {
       // Pension retirement age validation using TaxRuleSet where available
       try {
         const cfg = Config.getInstance();
-        const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+        const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
         const minOcc = (rs && typeof rs.getPensionMinRetirementAgeOccupational === 'function' && rs.getPensionMinRetirementAgeOccupational() > 0)
           ? rs.getPensionMinRetirementAgeOccupational()
           : config.minOccupationalPensionRetirementAge;
@@ -275,7 +280,7 @@ class UIManager {
       // Person 2 retirement age validation against config minimums
       try {
         const cfg = Config.getInstance();
-        const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+        const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
         const minOcc = (rs && typeof rs.getPensionMinRetirementAgeOccupational === 'function' && rs.getPensionMinRetirementAgeOccupational() > 0)
           ? rs.getPensionMinRetirementAgeOccupational()
           : config.minOccupationalPensionRetirementAge;
@@ -328,7 +333,7 @@ class UIManager {
         let fundsLabel = 'Index Funds', sharesLabel = 'Individual Shares';
         try {
           const cfg = Config.getInstance();
-          const rs = cfg.getCachedTaxRuleSet('ie');
+          const rs = cfg.getCachedTaxRuleSet(cfg.getDefaultCountry());
           if (rs && rs.findInvestmentTypeByKey) {
             const f = rs.findInvestmentTypeByKey('indexFunds');
             const s = rs.findInvestmentTypeByKey('shares');
@@ -351,7 +356,7 @@ class UIManager {
           let fundsLabel = 'Index Funds', sharesLabel = 'Shares';
           try {
             const cfg = Config.getInstance();
-            const rs = cfg.getCachedTaxRuleSet('ie');
+            const rs = cfg.getCachedTaxRuleSet(cfg.getDefaultCountry());
             if (rs && rs.findInvestmentTypeByKey) {
               const f = rs.findInvestmentTypeByKey('indexFunds');
               const s = rs.findInvestmentTypeByKey('shares');
@@ -760,7 +765,7 @@ class UIManager {
         name: (function(){
           try {
             const cfg = Config.getInstance();
-            const rs = cfg.getCachedTaxRuleSet('ie');
+            const rs = cfg.getCachedTaxRuleSet(cfg.getDefaultCountry());
             const f = rs && rs.findInvestmentTypeByKey ? rs.findInvestmentTypeByKey('indexFunds') : null;
             if (f && f.label) return `${f.label} Allocation`;
           } catch(_) {}
@@ -776,7 +781,7 @@ class UIManager {
         name: (function(){
           try {
             const cfg = Config.getInstance();
-            const rs = cfg.getCachedTaxRuleSet('ie');
+            const rs = cfg.getCachedTaxRuleSet(cfg.getDefaultCountry());
             const s = rs && rs.findInvestmentTypeByKey ? rs.findInvestmentTypeByKey('shares') : null;
             if (s && s.label) return `${s.label} Allocation`;
           } catch(_) {}

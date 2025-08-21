@@ -1,5 +1,6 @@
 {
     "latestVersion": "2.0",
     "codeUpdateMessage": "New Event Wizard to help you create scenarios.\n\n• Cards View for better readability.",
+    "defaultCountry": "ie",
     "simulationRuns": 2500
 }

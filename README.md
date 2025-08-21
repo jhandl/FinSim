@@ -127,6 +127,10 @@
 - Add a way for the user to get an AI explanation of a point in the graph
 - Highlight critical data points (depleted savings, SM crash, etc) with annotations on the graph.
 - Generate PDF or Excel reports summarizing simulation results for easy sharing or record-keeping
+ 
+Important notes for developers:
+- The tax engine has been renamed from `Revenue.js` to `Taxman.js`. Core tax computation is now driven by `TaxRuleSet` and the app's `defaultCountry` configuration.
+- The `defaultCountry` setting lives in `src/core/config/finsim-2.0.json` and is exposed via `Config.getDefaultCountry()`.
 - Add crypto because the laws in each country can be different for that (and let user select growth model - stock-to-flow, etc)
 - Include features for calculating loan amortization, overpayments, and refinancing scenarios
 - Add option to use historical data for the Monte Carlo simulation

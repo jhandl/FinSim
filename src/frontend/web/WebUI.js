@@ -89,11 +89,7 @@ class WebUI extends AbstractUI {
   // Singleton
   static getInstance() {
     if (!WebUI_instance) {
-      try {
-        WebUI_instance = new WebUI();
-      } catch (error) {
-        throw error; // Propagate error if WebUI creation fails
-      }
+      WebUI_instance = new WebUI();
     }
     return WebUI_instance;
   }
@@ -334,7 +330,7 @@ class WebUI extends AbstractUI {
   applyInvestmentLabels() {
     try {
       const configInstance = Config.getInstance();
-      const ruleset = configInstance.getCachedTaxRuleSet('ie');
+      const ruleset = configInstance.getCachedTaxRuleSet(configInstance.getDefaultCountry());
       if (!ruleset) return;
 
       const types = ruleset.getInvestmentTypes ? ruleset.getInvestmentTypes() : [];
@@ -1085,7 +1081,7 @@ class WebUI extends AbstractUI {
           let bands = {};
           try {
             const cfg = Config.getInstance();
-            const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet('ie') : null;
+            const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
             bands = (rs && typeof rs.getPensionContributionAgeBands === 'function')
               ? rs.getPensionContributionAgeBands()
               : (cfg && cfg.pensionContributionRateBands) ? cfg.pensionContributionRateBands : {};

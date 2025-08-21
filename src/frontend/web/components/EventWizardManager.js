@@ -1104,7 +1104,7 @@ class EventWizardManager {
       match: 0
     };
 
-    console.log('Creating mortgage event with data:', mortgageEventData);
+    // Debug logging removed
 
     // Call completion callback for mortgage event
     if (this.wizardState.onComplete) {

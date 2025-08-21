@@ -75,7 +75,7 @@ class Person {
     
     // State Pension: Check if age qualifies for state pension
     var _cfg = null, _rs = null;
-    try { _cfg = Config.getInstance(); _rs = _cfg && _cfg.getCachedTaxRuleSet ? _cfg.getCachedTaxRuleSet('ie') : null; } catch (_) {}
+    try { _cfg = Config.getInstance(); _rs = _cfg && _cfg.getCachedTaxRuleSet ? _cfg.getCachedTaxRuleSet(_cfg.getDefaultCountry()) : null; } catch (_) {}
     var statePensionAge = (_rs && typeof _rs.getPensionMinRetirementAgeState === 'function') ? _rs.getPensionMinRetirementAgeState() : 0;
     var spIncreases = (_rs && typeof _rs.getStatePensionIncreaseBands === 'function') ? _rs.getStatePensionIncreaseBands() : null;
     if (this.statePensionWeeklyParam && this.statePensionWeeklyParam > 0 && 
