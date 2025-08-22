@@ -18,6 +18,8 @@ class EventAccordionManager {
     this.events = []; // Store event data for accordion items
     this.expandedItems = new Set(); // Track which items are expanded
     this._newEventId = null;
+    // Track auto-collapse timers per accordion item (wizard-created expansions)
+    this._autoCollapseTimers = new Map();
     this.fieldLabelsManager = FieldLabelsManager.getInstance();
     this.setupAccordionContainer();
     this.setupResizeListener();
@@ -295,6 +297,8 @@ class EventAccordionManager {
     const isExpanded = this.expandedItems.has(accordionId);
 
     if (isExpanded) {
+      // Cancel any pending auto-collapse when collapsing manually/programmatically
+      this._cancelAutoCollapse(accordionId);
       // Collapse with animation - first update the button state
       expandBtn.classList.remove('expanded');
       expandBtn.title = 'Expand';
@@ -371,6 +375,52 @@ class EventAccordionManager {
           }
         }, fallbackTimeout);
       });
+    }
+  }
+
+  /**
+   * Schedule auto-collapse for a specific accordion item after a delay.
+   * Cancels on user interaction (click, focus, input) within the item.
+   */
+  _scheduleAutoCollapse(accordionId, delayMs = 5000) {
+    // Clear any existing timer for this item
+    this._cancelAutoCollapse(accordionId);
+
+    const item = document.querySelector(`.events-accordion-item[data-accordion-id="${accordionId}"]`);
+    if (!item) return;
+
+    const timerId = setTimeout(() => {
+      this._autoCollapseTimers.delete(accordionId);
+      // Only collapse if still expanded
+      if (this.expandedItems && this.expandedItems.has(accordionId)) {
+        this.toggleAccordionItem(accordionId);
+      }
+    }, delayMs);
+
+    this._autoCollapseTimers.set(accordionId, timerId);
+
+    // Cancel on first user interaction
+    const cancel = () => this._cancelAutoCollapse(accordionId);
+    try {
+      item.addEventListener('click', cancel, { once: true, passive: true });
+      item.addEventListener('focusin', cancel, { once: true, passive: true });
+      item.addEventListener('input', cancel, { once: true, passive: true });
+    } catch (_) {
+      // No-op if addEventListener options unsupported
+      item.addEventListener('click', cancel, true);
+      item.addEventListener('focusin', cancel, true);
+      item.addEventListener('input', cancel, true);
+    }
+  }
+
+  /**
+   * Cancel an existing auto-collapse timer for the given accordion item.
+   */
+  _cancelAutoCollapse(accordionId) {
+    const existing = this._autoCollapseTimers && this._autoCollapseTimers.get(accordionId);
+    if (existing) {
+      clearTimeout(existing);
+      this._autoCollapseTimers.delete(accordionId);
     }
   }
 
@@ -497,6 +547,8 @@ class EventAccordionManager {
           if (!this.expandedItems.has(accordionId)) {
             this.toggleAccordionItem(accordionId);
           }
+          // Schedule auto-collapse ~5s after expansion for wizard-created item
+          this._scheduleAutoCollapse(accordionId);
         }, 100);
       }
     }
@@ -1115,6 +1167,9 @@ class EventAccordionManager {
             console.debug('Expanding new wizard event with ID:', id, 'and accordionId:', accordionId);
             this.toggleAccordionItem(accordionId);
           }
+          // Regardless of whether it was already expanded or just expanded now,
+          // schedule auto-collapse after ~5 seconds if the user doesn't interact.
+          this._scheduleAutoCollapse(accordionId);
           break;
         }
       }

@@ -30,6 +30,7 @@ function parseArgs(argv) {
     output: 'console', // 'console' | 'json'
     forceDeterministic: false,
     showEqual: false,
+    verbose: false,
     scenarios: []
   };
 
@@ -42,12 +43,17 @@ function parseArgs(argv) {
     if (arg === '--output') { args.output = argv[++i]; continue; }
     if (arg === '--forceDeterministic') { args.forceDeterministic = true; continue; }
     if (arg === '--showEqual') { args.showEqual = true; continue; }
+    if (arg === '--verbose') { args.verbose = true; continue; }
     if (arg === '--help' || arg === '-h') { args.help = true; continue; }
     // Positional: scenario file path
     args.scenarios.push(arg);
   }
 
   return args;
+}
+
+function ts() {
+  return new Date().toISOString();
 }
 
 function printHelp() {
@@ -252,6 +258,13 @@ function mapParametersFromCsv(raw) {
 async function runWithFramework(FrameworkClass, scenarioDef, opts = {}) {
   const fw = new FrameworkClass();
   try {
+    if (opts.verbose && typeof fw.setVerbose === 'function') {
+      fw.setVerbose(true);
+    }
+    const repoLabel = opts.repoLabel || 'repo';
+    const repoPath = opts.repoPath || '';
+    console.log(`[${ts()}] [${repoLabel}] Starting simulation in ${repoPath} | scenario: ${scenarioDef.name}${opts.forceDeterministic ? ' (forceDeterministic)' : ''}`);
+
     const localScenario = prepareScenarioForRun(scenarioDef, opts);
     const loaded = fw.loadScenario(localScenario);
     if (!loaded) {
@@ -261,6 +274,12 @@ async function runWithFramework(FrameworkClass, scenarioDef, opts = {}) {
     if (!results || !results.dataSheet) {
       throw new Error('Simulation did not return dataSheet');
     }
+    const rows = toValidRows(results.dataSheet);
+    const last = rows.length > 0 ? rows[rows.length - 1] : null;
+    const finalYear = last && typeof last.year !== 'undefined' ? last.year : 'n/a';
+    const finalWorth = last && typeof last.worth !== 'undefined' ? roundValueForField('worth', last.worth) : 'n/a';
+    const mc = results && results.montecarlo ? `, montecarlo runs=${results.runs}` : '';
+    console.log(`[${ts()}] [${repoLabel}] Completed simulation | rows=${rows.length}, finalYear=${finalYear}, finalWorth=${finalWorth}${mc}`);
     return results;
   } finally {
     if (typeof fw.reset === 'function') {
@@ -391,8 +410,10 @@ async function main() {
     return;
   }
 
-  const { TestFramework: TF_A } = resolveFramework(args.repoA);
-  const { TestFramework: TF_B } = resolveFramework(args.repoB);
+  const { TestFramework: TF_A, frameworkPath: FP_A } = resolveFramework(args.repoA);
+  const { TestFramework: TF_B, frameworkPath: FP_B } = resolveFramework(args.repoB);
+  console.log(`[${ts()}] Resolved TestFramework for repoA from ${FP_A}`);
+  console.log(`[${ts()}] Resolved TestFramework for repoB from ${FP_B}`);
 
   const allReports = [];
   let anyDiffs = false;
@@ -401,9 +422,10 @@ async function main() {
     const scenarioAbs = path.resolve(scenPath);
     const scenarioDef = loadScenarioDefinition(scenarioAbs);
 
+    console.log(`[${ts()}] Launching simulations for scenario '${scenarioDef.name}' on repoA and repoB...`);
     const [resA, resB] = await Promise.all([
-      runWithFramework(TF_A, scenarioDef, { forceDeterministic: args.forceDeterministic }),
-      runWithFramework(TF_B, scenarioDef, { forceDeterministic: args.forceDeterministic })
+      runWithFramework(TF_A, scenarioDef, { forceDeterministic: args.forceDeterministic, repoLabel: 'repoA', repoPath: args.repoA, verbose: args.verbose }),
+      runWithFramework(TF_B, scenarioDef, { forceDeterministic: args.forceDeterministic, repoLabel: 'repoB', repoPath: args.repoB, verbose: args.verbose })
     ]);
 
     const rowsA = toValidRows(resA.dataSheet);
