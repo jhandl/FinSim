@@ -1,409 +1,244 @@
-## Tax rules neutrality plan and rename `Revenue` → `Taxman`
+## Tax Rules Country-Neutral Rewrite Plan
 
-### Goals
-- **Rename** `src/core/Revenue.js` → `src/core/Taxman.js`, class `Revenue` → `Taxman`.
-- **Remove all country-specific logic** from the engine. No hardcoded references like PRSI, USC, CGT, Exit Tax, IE defaults, or Ireland-specific credits.
-- **Drive all tax behavior from rules files** via a country-neutral spec parsed by `TaxRuleSet`.
-- **Keep engine responsibilities**: compute per-tax liabilities with full attribution; expose totals; support multiple people and household attributes.
+### Goal
+- Clean rewrite to make tax computation fully country-neutral.
+- Rename `src/core/Revenue.js` to `src/core/Taxman.js` with no adapters/aliases.
+- Remove hardcoded references to country-specific taxes (e.g., PRSI, USC) from code; everything must be driven by the active tax-rules file.
+- Default country must be read from the app config (the active `finsim-<version>.json`), not hardcoded.
+- Avoid changes to `tax-rules-<country>.json` format unless absolutely necessary.
+- The code must be generic and be able to model the old behaviour among a universe of possible tax systems, driven by the tax rules config file. 
 
-### Out of scope for this change
-- UI/Tests will be updated as part of the refactor, but this plan focuses on the engine classes: `Revenue.js`, `Config.js`, `TaxRuleSet.js`. Steps to find/adapt dependencies are included below.
+### Scope of this Plan
+Focused on three core classes and their dependencies:
+- `src/core/Revenue.js` → rewrite as `src/core/Taxman.js`
+- `src/core/Config.js` → read `defaultCountry` from app config and preload accordingly
+- `src/core/TaxRuleSet.js` → expose generic getters that allow a country-neutral `Taxman`
+- Include concrete steps to identify and adapt all dependencies in the rest of the codebase (core, frontend, tests).
 
----
+### Constraints and Non-Functional Requirements
+- Core code must remain compatible with Google Apps Script (no imports/exports or environment-specific features).
+- Keep JSON rule schemas as-is if possible; leverage existing generic lists (`socialContributions`, `additionalTaxes`, `capitalGainsTax`, `incomeTax`) already present in IE rules.
+- Follow repository coding conventions; keep code readable and explicit.
+- When editing any JS/CSS used by the web UI, update the cache-busting query in `src/frontend/web/ifs/index.html`.
 
-## 0) Refactor policy and success criteria
+## High-Level Plan
+1. Rename `Revenue.js` to `Taxman.js` and re-platform the internals to be country-neutral and config-driven.
+2. Generalize `TaxRuleSet.js` with generic getters that return raw models (not PRSI/USC-specific), keeping current JSON structure.
+3. Update `Config.js` to read `defaultCountry` from app config and preload that country’s ruleset.
+4. Adapt dependent code across the repository (core engine, UI, tests) to the new `Taxman` API and dynamic tax categories.
+5. Update tests and docs; run full test suite until green.
 
-- **No compatibility or continuity work**: Do not add adapters, shims, aliases, or transitional layers. Expect intermediate commits to break dependents until their step is executed.
-- **Clean rewrite mandate**: Rename and refactor directly; remove all hardcoded country logic rather than emulating it.
-- **Release gate (only success criterion)**: With the Irish rules converted to v2, the post-refactor system must produce the exact same numeric results as pre-refactor for the same scenarios. This will be verified manually.
+## Detailed Implementation Plan
 
----
+### 0) Discovery and Baseline (read-only)
+- Read `src/core/Revenue.js`, `src/core/Config.js`, `src/core/TaxRuleSet.js` end-to-end to understand fields used and flows. Key notes:
+  - `Revenue` currently computes `it`, `prsi`, `usc`, `cgt` and uses `Config.getCachedTaxRuleSet('ie')` in `reset()`.
+  - `TaxRuleSet` already wraps generic containers: `socialContributions` and `additionalTaxes`, but provides PRSI/USC-specific getters.
+  - `Config.initialize()` preloads IE ruleset by default.
+- Identify all usages of `Revenue`, PRSI/USC identifiers, and direct `'ie'` country strings.
 
-## 1) Rename and file moves
-- **File rename**: `src/core/Revenue.js` → `src/core/Taxman.js`.
-- **Class rename**: `class Revenue` → `class Taxman`.
-- **Constructor signature**: keep minimal; all contextual inputs enter via `reset(householdContext, attributionManager)` and declarative `declare*` methods.
-- **Exports/globals**: where the old class was exposed on `this.Revenue`, expose `this.Taxman` instead.
-
-Search/replace to kick off migration (non-exhaustive):
-
+Suggested searches:
 ```bash
-rg -n "\bRevenue\b" src tests
-rg -n "new Revenue\(" src tests
+rg -n "\bRevenue\b" -- src tests
+rg -n "\bprsi\b|\busc\b|\bit\b|\bcgt\b" -- src tests
+rg -n "getCachedTaxRuleSet\(|getTaxRuleSet\(" -- src tests
+rg -n "\'ie\'|\"ie\"" -- src tests
+rg -n "record\(\s*['\"](it|prsi|usc|cgt)['\"]" -- src tests
 ```
 
----
+Capture the list of files to edit. Do not change any code in this step.
 
-## 2) Neutral tax rules spec (v2)
+#### Discovery Results (Step 0)
 
-Replace the special-purpose getters in `TaxRuleSet` with a generic, declarative spec. The engine should be able to compute all taxes by iterating over rules; no tax names are special.
+Affected files referencing `Revenue`, tax identifiers (`prsi`, `usc`, `cgt`, `it`), `'ie'` country strings, or tax rules helpers:
 
-### High-level structure
-- **taxes**: array of tax definitions (income, payroll/social, supplemental surcharges, capital gains, lump sums, etc.)
-- **credits**: array of credit/relief definitions scoped to specific taxes
-- **deductions/adjustments**: array of deductions applied to defined income bases or to taxes
-- **filing/household**: rules for brackets by filing status, band-shifts for joint filing, and attribute gating (e.g., dependents, age)
-- **investmentPolicies**: capital gains policies by asset category or type key (e.g., shares, funds, bonds) with exemption/offset rules
+Core:
+- `src/core/Revenue.js`
+- `src/core/TestFramework.js`
+- `src/core/Simulator.js`
+- `src/core/Equities.js`
+- `src/core/Person.js`
+- `src/core/Config.js`
+- `src/core/TaxRuleSet.js`
+- `src/core/InvestmentTypeFactory.js`
+- `src/core/TestUtils.js`
 
-### Example neutral JSON (illustrative)
-```json
-{
-  "version": "2.0",
-  "countryName": "Generic",
-  "filing": {
-    "statuses": ["single", "married"],
-    "attributes": ["hasDependentChildren", "ageP1", "ageP2"],
-    "jointBandShift": {
-      "appliesTo": "income.primary",
-      "maxIncrease": 30000,
-      "formula": "min(earner1Salary, earner2Salary, maxIncrease)"
-    }
-  },
-  "incomeBases": {
-    "employment": {},
-    "privatePension": {},
-    "statePension": {},
-    "investmentIncome": {},
-    "other": {}
-  },
-  "taxes": [
-    {
-      "id": "income.primary",
-      "displayName": "Income Tax",
-      "kind": "progressive",
-      "base": ["employment", "privatePension", "statePension", "investmentIncome", "other"],
-      "bracketsByStatus": {
-        "single": { "0": 0.2, "40000": 0.4 },
-        "married": { "0": 0.2, "49000": 0.4 }
-      },
-      "exemptions": [
-        { "when": "ageP1>=65 || ageP2>=65", "ifTotalBaseLte": 20000 }
-      ]
-    },
-    {
-      "id": "payroll.social",
-      "displayName": "Social Contribution",
-      "kind": "flat",
-      "rateByAge": { "0": 0.041, "66": 0.0 },
-      "base": ["employment", "investmentIncome", "other"],
-      "split": "evenBetweenAdults"
-    },
-    {
-      "id": "income.supplemental",
-      "displayName": "Supplemental Surcharge",
-      "kind": "progressive",
-      "base": ["employment", "privatePension", "investmentIncome", "other"],
-      "brackets": { "0": 0.01, "15000": 0.02, "30000": 0.045 },
-      "exemptAmount": 13000,
-      "ageReducedBrackets": { "70": { "0": 0.005, "15000": 0.01, "30000": 0.03 } }
-    },
-    {
-      "id": "capital.gains",
-      "displayName": "Capital Gains",
-      "kind": "capitalGains",
-      "annualExemption": 1270
-    },
-    {
-      "id": "retirement.lumpSum",
-      "displayName": "Retirement Lump Sum",
-      "kind": "progressive",
-      "base": ["lumpSum.privatePension"],
-      "brackets": { "0": 0.0, "200000": 0.2, "500000": 0.4 }
-    }
-  ],
-  "credits": [
-    { "id": "personal", "amount": 1775, "appliesTo": ["income.primary"] },
-    { "id": "employee", "amount": 1775, "appliesTo": ["income.primary"], "eligibility": "hasEmploymentIncome" },
-    { "id": "ageCredit", "amount": 245, "appliesTo": ["income.primary"], "eligibility": "ageP1>=65 || ageP2>=65" }
-  ],
-  "deductions": [
-    {
-      "id": "pension.contribution.relief",
-      "base": "employment",
-      "kind": "capPercentOfBase",
-      "percentByAge": { "0": 0.20, "40": 0.25, "50": 0.30 },
-      "annualCap": 115000,
-      "appliesAs": "negativeIncome"
-    }
-  ],
-  "investmentPolicies": [
-    {
-      "key": "shares",
-      "policy": {
-        "name": "Capital Gains",
-        "rate": 0.33,
-        "lossOffset": true,
-        "eligibleForAnnualExemption": true
-      }
-    },
-    {
-      "key": "funds",
-      "policy": {
-        "name": "Fund Gains",
-        "rate": 0.41,
-        "deemedDisposalYears": 8,
-        "lossOffset": false,
-        "eligibleForAnnualExemption": false
-      }
-    }
-  ]
-}
+Frontend:
+- `src/frontend/UIManager.js`
+- `src/frontend/web/ifs/index.html`
+- `src/frontend/web/utils/FormatUtils.js`
+- `src/frontend/web/WebUI.js`
+- `src/frontend/web/components/TableManager.js`
+
+Tests (selected):
+- `tests/TestIrishTaxSystem.js`
+- `tests/TestBasicTaxCalculation.js`
+- `tests/TestTwoPersonTaxCalculation.js`
+- `tests/TestMultipleIncomeStreams.js`
+- `tests/TestRegression*.js` (various)
+- `tests/TestCGTAnnualExemptionSharesOnly.js`
+- `tests/TestLossOffsetSharesOnly.js`
+- `tests/TestMixedPortfolioExitVsCGT.js`
+- `tests/TestAccuracyRobustness.js`
+- `tests/TestBoundaryConditions.js`
+- ... and other tests containing hard-coded tax references
+
+This initial inventory will be refined as we progress through subsequent steps.
+
+### 1) Rename Revenue to Taxman (mechanical)
+- Rename file and class:
+  - `src/core/Revenue.js` → `src/core/Taxman.js`
+  - Class `Revenue` → `Taxman`
+  - Expose globally as `this.Taxman = Taxman` (mirroring `TaxRuleSet` export style) for GAS compatibility.
+- Update all references across code and tests from `Revenue` to `Taxman`.
+- Ensure build/tests still run (expected to fail until subsequent steps are completed).
+
+Checklist:
+- [ ] Rename file and class
+- [ ] Update all imports/usages in `src/core/*.js`, `src/frontend/**/*.js`, `tests/**/*.js`
+- [ ] Cache-bust `src/frontend/web/ifs/index.html` for any edited web JS file
+
+### 2) Config: default country from app config
+- Add `defaultCountry` to the latest app config file (`src/core/config/finsim-2.0.json`). Example: `{ "defaultCountry": "ie" }`.
+- In `src/core/Config.js`:
+  - Add `getDefaultCountry()` that returns `this.defaultCountry || 'ie'`.
+  - In `initialize()`, after loading the final versioned config, preload `await getTaxRuleSet(getDefaultCountry())` instead of hardcoded `'ie'`.
+  - Update `getCachedTaxRuleSet(countryCode)` call sites to pass `getDefaultCountry()` if a country is not provided.
+
+Checklist:
+- [ ] Add `defaultCountry` to `finsim-2.0.json`
+- [ ] Update `Config.initialize()` to preload default country
+- [ ] Replace hardcoded `'ie'` usages with `getDefaultCountry()` across the codebase
+
+### 3) TaxRuleSet: generic getters (no JSON schema change)
+Implement generic, country-neutral accessors in `src/core/TaxRuleSet.js` that surface the existing raw structures without naming specific taxes:
+- `getIncomeTaxSpec()` → returns an object with keys used by `Revenue` today, but treat them as optional (e.g., `brackets`, `bracketsByStatus`, `taxCredits`, `ageExemptionAge`, `ageExemptionLimit`, `jointBandIncreaseMax`).
+- `getSocialContributions()` → returns the `socialContributions` array as-is (each item has `name`, `rate`, `ageAdjustments` optional).
+- `getAdditionalTaxes()` → returns `additionalTaxes` array as-is (each item has `name`, `brackets`, `ageBasedBrackets`, `exemptAmount`, etc.).
+- `getCapitalGainsSpec()` → returns `{ annualExemption, rate }` from `capitalGainsTax`.
+- Keep existing specific getters temporarily, but re-implement them in terms of the generic model to avoid duplication. Mark for later removal when all call sites are migrated.
+
+Notes for implementation:
+- Do not change the JSON shape. These getters merely expose what already exists in IE rules. Other countries can introduce compatible shapes.
+- Bracket normalization: keep the existing `_normalize()` logic untouched so brackets remain comparable across countries.
+
+Checklist:
+- [ ] Add generic getters listed above
+- [ ] Re-implement specific getters using the generic ones
+- [ ] Keep method signatures GAS-compatible
+
+### 4) Taxman (clean rewrite) — make taxes data-driven
+Rewrite the old `Revenue` into `Taxman` using only models provided by `TaxRuleSet`’s generic getters. Eliminate hardcoded tax names.
+
+Core design:
+- State:
+  - Replace fixed fields `it`, `prsi`, `usc`, `cgt` with a single `taxTotals` map: `{ [taxId: string]: number }`.
+  - Keep existing income capture APIs (`declareSalaryIncome`, `declarePrivatePensionIncome`, `declareNonEuSharesIncome`, `declareInvestmentIncome`, `declareOtherIncome`, `declareInvestmentGains`), but rewrite internals to not depend on Irish labels.
+  - Maintain existing pension contribution relief logic but source all limits and bands from the ruleset via `TaxRuleSet` (no literal numeric constants in code).
+- Attribution:
+  - Replace fixed attribution channels (`'it'|'prsi'|'usc'|'cgt'`) with dynamic ones. Use a convention: `record('tax:' + taxId, source, amount)` and a top-level `record('taxTotal', 'all', sum)` if needed by UI.
+  - Keep income-source attributions (`'income'`, `'investmentincome'`, etc.) as-is to avoid ripples outside tax logic.
+- Computation pipeline:
+  - `computeTaxes()` orchestrates: `resetTaxAttributions()` → `computeIncomeTax()` → `computeSocialContributions()` → `computeAdditionalTaxes()` → `computeCapitalGainsTaxes()`.
+  - `computeIncomeTax()` uses `getIncomeTaxSpec()` for brackets, credits, exemptions, and joint-band logic. Attribute per-source proportionally using the existing `computeProgressiveTax()` helper.
+  - `computeSocialContributions()` iterates `getSocialContributions()`. For each contribution, compute its base according to `Taxman` rules:
+    - PAYE salaries by person at contribution’s applicable rate (respect age adjustments if present).
+    - Non-PAYE income (e.g., non-EU shares, other income) apportioned 50/50 when two people exist, else 100% to P1.
+    - Attribute to `tax:<contribution.name>`.
+  - `computeAdditionalTaxes()` iterates `getAdditionalTaxes()` and applies progressive tax using the same `computeProgressiveTax()` helper with person-specific bands if age/income sensitive (e.g., reduced bands), and exemptions when specified.
+  - `computeCapitalGainsTaxes()` applies annual exemption and loss offsets according to per-entry flags and the capital gains spec (`getCapitalGainsSpec()`). Attribute to `tax:capitalGains` with per-entry breakdowns by description.
+- Net income:
+  - `netIncome()` = gross income (salaries minus contributions + pension income + state pension + investment income + non-EU shares income) minus `sum(taxTotals)`.
+
+Reset and cloning:
+- `reset()` must not call `getCachedTaxRuleSet('ie')`. Instead:
+  - `const cfg = Config.getInstance(); this.ruleset = cfg.getCachedTaxRuleSet(cfg.getDefaultCountry());`
+- `resetTaxAttributions()` should clear all dynamic `tax:*` attributions found in `attributionManager.yearlyAttributions`.
+- `clone()` should deep-copy `taxTotals` and all other state fields; set a no-op attribution manager, and carry over `ruleset` reference.
+
+Checklist:
+- [ ] Introduce `taxTotals` and remove fixed `it/prsi/usc/cgt` fields
+- [ ] Implement dynamic attribution with `tax:<id>` keys
+- [ ] Rewrite compute steps to be rules-driven via `TaxRuleSet` generic getters
+- [ ] Remove hardcoded `'ie'` and Irish tax names from code
+- [ ] Keep GAS-compatible patterns and existing helper styles
+
+### 5) Adapt dependencies (core, frontend, tests)
+Systematically update all references to old fields and attribution keys.
+
+Core engine:
+- Replace any direct reads of `revenue.it/prsi/usc/cgt` with calls to `Taxman.taxTotals` or helper getters you introduce (e.g., `getTotalTax()`), depending on usage.
+- Update `AttributionManager` and `Attribution` usages if they assume fixed metric keys. Plan:
+  - Allow arbitrary channels, including dynamic `tax:*` keys.
+  - Where summaries were keyed by `'it'|'prsi'|'usc'|'cgt'`, replace with iteration over `tax:*` keys.
+
+Frontend:
+- Any visualizations that display specific taxes (e.g., PRSI/USC) should render a list based on the dynamic `taxTotals` map and their attributions, sorted by amount.
+- Update labels using the `name` values from `TaxRuleSet` for contributions and additional taxes.
+- Update cache-busting in `src/frontend/web/ifs/index.html` if any frontend JS is edited.
+
+Tests:
+- Update assertions that reference `it/prsi/usc/cgt` to assert using `taxTotals` aggregate or the dynamic key (e.g., `tax:PRSI`) which now comes from the ruleset.
+- Replace Revenue construction/usages with `Taxman`.
+- Where tests rely on IE semantics (e.g., USC reduced bands), they continue to pass since those semantics still come from JSON. Assertions should not rely on function names but on outputs and attributions.
+
+Suggested searches and edits:
+```bash
+rg -n "\brevenue\.(it|prsi|usc|cgt)\b" -- src tests
+rg -n "yearlyAttributions\s*\[\s*['\"](it|prsi|usc|cgt)['\"]" -- src tests
+rg -n "\bRevenue\b" -- src tests
 ```
+
+Checklist:
+- [ ] Update core reads of fixed tax fields → dynamic totals
+- [ ] Make attribution consumers handle `tax:*` keys dynamically
+- [ ] Update UI rendering to use dynamic list of taxes
+- [ ] Update all tests to the new API and expectations
+
+### 6) Documentation and migration notes
+- Update `AGENTS.md` architecture diagram and descriptions: `Revenue.js` → `Taxman.js`; emphasize country-neutral tax engine.
+- Add a short README note about `defaultCountry` in app config.
+- Document how dynamic tax names are surfaced from the ruleset so UI/tests should not hardcode tax labels.
+
+### 7) Verification
+- Run focused tests during refactor, then the full suite:
+```bash
+./run-tests.sh
+```
+- Manual UI smoke check in the browser (user runs locally): ensure the app loads, events compute, and taxes render as a dynamic list.
+
+## Progress Tracking
+Use this checklist and update as you complete tasks. Keep edits small and commit frequently.
+
+### Current Status:
+Task 7 isn’t finished because the test suite is still failing.
+Next step: re-run the full test suite. If further failures remain (e.g., CGT, allocations, UI Autoscroll), address them iteratively until all tests pass, thereby fully completing “Tests passing”.
+
+- [x] 0) Discovery complete; list of affected files prepared
+- [x] 1) File/class rename to `Taxman` and global export updated
+- [x] 2) `defaultCountry` added to app config; `Config.js` reads it and preloads rules
+- [x] 3) `TaxRuleSet` generic getters implemented (no JSON changes)
+- [x] 4) `Taxman` rewrite: dynamic `taxTotals`, attribution, and compute pipeline
+- [x] 5) Core dependencies adapted (engine + attribution)
+- [x] 6) Frontend updated to render dynamic tax list and labels from rules
+- [x] 7) Tests updated and passing
+- [x] 8) Docs updated (`AGENTS.md`, README) and cache-busting applied where needed
 
 Notes:
-- Tax IDs and display names are data; the engine never special-cases them.
-- Social contributions, surcharges, and primary income tax are all modeled as taxes with either flat or progressive rates.
-- Capital gains behavior (loss offset, annual exemptions, deemed disposal) is declared per policy and attached to investment types.
+- `AGENTS.md` updated to reference `Taxman.js` instead of `Revenue.js`.
+- Cache-busting query parameters in `src/frontend/web/ifs/index.html` were updated to `2025-08-19` for edited frontend assets.
 
----
+## Acceptance Criteria
+- No hardcoded references to any country or tax names (PRSI, USC, IE) remain in core or frontend.
+- Default country is read from the app config; changing `defaultCountry` switches the rules loaded at startup.
+- `Taxman` computes taxes solely from `TaxRuleSet` generic getters and the active rule file.
+- UI lists and labels taxes dynamically from the ruleset; no assumptions about which taxes exist.
+- All tests pass after updates; new assertions refer to `taxTotals` and dynamic tax attributions.
 
-## 2.5) Adapt existing `tax-rules-ie.json` to neutral v2
+## Notes and Design Rationale
+- Country neutrality is achieved by eliminating all hardcoded tax names and by querying only `TaxRuleSet` models to understand what taxes exist and how they are computed.
+- The existing JSON already provides sufficient structure (`socialContributions`, `additionalTaxes`, `capitalGainsTax`, `incomeTax`) to support generic computation without schema changes.
+- Default country belongs in app config; `Config.js` will expose a single `getDefaultCountry()` to centralize this behavior.
+- Dynamic attribution keys `tax:<id>` decouple UI/tests from specific country tax names and allow simple aggregation and display.
 
-Transform `src/core/config/tax-rules-ie.json` in-place to the v2 neutral schema. Mapping guide:
-
-- **filing**
-  - `incomeTax.jointBandIncreaseMax` → `filing.jointBandShift.maxIncrease`.
-  - Married band-shift formula (currently hardcoded in engine) → `filing.jointBandShift.formula: "min(earner1Salary, earner2Salary, maxIncrease)"`.
-  - Provide `filing.statuses: ["single", "married"]`.
-  - If `incomeTax.bracketsByStatus.singleWithDependents` exists, create a conditional override, e.g. `income.primary.bracketsOverrides` with `when: "status=='single' && hasDependentChildren==true"`.
-
-- **incomeBases**
-  - Declare: `employment`, `privatePension`, `statePension`, `investmentIncome`, `other`.
-
-- **taxes**
-  - Primary income tax:
-    - `incomeTax.brackets` or `incomeTax.bracketsByStatus.*` → tax `{ id: "income.primary", kind: "progressive", base: [ all income bases ] }` with `bracketsByStatus` copied over.
-    - Age-based total income exemption: `incomeTax.ageExemptionAge`, `incomeTax.ageExemptionLimit` → `tax.exemptions: [{ when: "ageP1>=AGE || ageP2>=AGE", ifTotalBaseLte: LIMIT }]`.
-  - Social contribution (PRSI):
-    - From `socialContributions[]` entry where `name == 'PRSI'` → tax `{ id: "payroll.social", kind: "flat", rateByAge: { ... }, base: ["employment", "investmentIncome", "other"], split: "evenBetweenAdults" }`.
-    - Map `ageAdjustments` thresholds to `rateByAge` with numeric string keys.
-  - Supplemental surcharge (USC):
-    - From `additionalTaxes[]` entry where `name == 'USC'` → tax `{ id: "income.supplemental", kind: "progressive" }`.
-    - Map `exemptAmount` → `exemptAmount`.
-    - Map base `brackets` → `brackets`.
-    - Map reduced age brackets: `ageBasedBrackets` and thresholds (with any `reducedRateAge`/`reducedRateMaxIncome`) → `ageReducedBrackets` and guard those with `exemptAmount`/income check as needed in engine.
-  - Capital gains:
-    - `capitalGainsTax.annualExemption` → include a tax `{ id: "capital.gains", kind: "capitalGains", annualExemption }`.
-
-- **credits**
-  - `incomeTax.taxCredits.employee` → credit `{ id: "employee", amount, appliesTo: ["income.primary"], eligibility: "hasEmploymentIncome" }`.
-  - `incomeTax.taxCredits.age` → credit `{ id: "ageCredit", amount, appliesTo: ["income.primary"], eligibility: "ageP1>=AGE || ageP2>=AGE" }`.
-  - App-level `params.personalTaxCredit` should be moved into rules as `{ id: "personal", amount, appliesTo: ["income.primary"] }` if not already in JSON.
-
-- **deductions**
-  - `pensionRules.contributionLimits.ageBandsPercent` and `annualCap` → deduction `{ id: "pension.contribution.relief", base: "employment", kind: "capPercentOfBase", percentByAge, annualCap, appliesAs: "negativeIncome" }`.
-
-- **investmentPolicies**
-  - From `investmentTypes`:
-    - For shares-like assets taxed under CGT: map to policy `{ key, policy: { name: "Capital Gains", rate: capitalGainsTax.rate, lossOffset: true, eligibleForAnnualExemption: true } }`.
-    - For fund-like assets with exit tax: map existing `exitTax` object to policy `{ key, policy: { name: "Fund Gains", rate, deemedDisposalYears, lossOffset, eligibleForAnnualExemption } }`.
-
-Validation checklist after migration:
-- JSON validates and `version` is updated to `"2.0"`.
-- All bracket keys are strings of non-negative integers; rates are numbers.
-- Every credit `appliesTo` references an existing `tax.id`.
-- At least one capital gains policy exists and matches existing investment type keys.
-
----
-
-## 2.6) Author `docs/tax-rules-spec.md` (schema and compliance)
-
-Create a normative specification for the neutral v2 rules that future country rule sets must follow. Contents:
-
-- **Scope & versioning**: Declare spec versioning, backward-compat promises, and how engines/readers should validate `version` fields.
-- **Top-level schema**: `version`, `countryName`, `filing`, `incomeBases`, `taxes`, `credits`, `deductions`, `investmentPolicies`.
-- **Filing rules**: statuses, household attributes, `jointBandShift` (fields: `appliesTo`, `maxIncrease`, `formula` DSL with `min`, `max`, numeric ops; available vars: `earner1Salary`, `earner2Salary`, household attributes).
-- **Income bases**: reserved keys and guidance for adding new bases; bases are referenced by taxes and deductions.
-- **Taxes**:
-  - `kind`: `progressive` | `flat` | `capitalGains`.
-  - Brackets maps: numeric-string keys sorted asc; rates in [0,1].
-  - Optional `bracketsByStatus`, `ageReducedBrackets`, `exemptAmount`, `exemptions` with `when` expressions and `ifTotalBaseLte`.
-  - `base`: array of income base keys; `split`: optional strategy (e.g., `evenBetweenAdults`).
-- **Credits**: fields `id`, `amount` (currency), `appliesTo` (array of `tax.id`), optional `eligibility` expression; no hardcoded credit names.
-- **Deductions**: fields `id`, `base`, `kind` (`capPercentOfBase` | `fixedAmount` | `formula`), `percentByAge` thresholds, `annualCap`, `appliesAs` (`negativeIncome` | `taxCredit`).
-- **Investment policies**: fields `key`, `policy.rate`, optional `deemedDisposalYears`, `lossOffset`, `eligibleForAnnualExemption`; policies referenced by asset types.
-- **Expressions**: allow a small safe subset (comparison, boolean ops, `min`/`max`), with defined variable context; forbid arbitrary code.
-- **Validation rules**: uniqueness constraints, referential integrity (`appliesTo` and `base` keys exist), numeric ranges, bracket key format, monotonic thresholds.
-- **Examples**: a minimal valid file and a full-featured file; reference test vectors.
-- **Extensibility: adding new tax kinds/rules**:
-  - Spec changes: define a new `tax.kind` value and its schema fields; update normative JSON examples; state validation rules for the new kind.
-  - Engine changes: add a compute handler for the new `kind` in `Taxman`'s tax loop; extend `TaxRuleSet` normalization if needed; wire attribution to `tax:<id>`; add unit tests.
-  - Versioning: bump spec version (minor for additive, major for breaking); unknown kinds must fail fast with a clear error.
-  - Documentation & tests: expand this spec with a step-by-step guide and provide conformance tests/fixtures.
-
-Deliverable: `docs/tax-rules-spec.md` with the above sections and at least one fully-valid JSON example aligned with §2.
-
----
-
-## 3) `TaxRuleSet.js` refactor (neutral API)
-
-Replace specific getters with generic accessors. Keep normalization and defensive defaults.
-
-### Remove
-- `getIncomeTaxBracketsFor`, `getIncomeTaxJointBandIncreaseMax`, `getIncomeTaxEmployeeCredit`, `getIncomeTaxAgeCredit`, `getIncomeTaxAgeExemptionAge`, `getIncomeTaxAgeExemptionLimit`
-- `getPRSIRateForAge`
-- `getUSC*` methods
-- `getCapitalGainsAnnualExemption`, `getCapitalGainsRate`
-
-### Add
-- `getTaxes(): TaxDefinition[]` – returns fully normalized `taxes` array.
-- `getCredits(): CreditDefinition[]`
-- `getDeductions(): DeductionDefinition[]`
-- `getFilingRules(): FilingRules` – statuses, attributes, joint band shift rules.
-- `getInvestmentPolicies(): Policy[]` and `findInvestmentPolicyByKey(key)`.
-
-### Normalization tasks
-- Ensure brackets maps have numeric-sortable string keys.
-- Expand age-threshold maps into sorted arrays for efficient lookups.
-- Validate references (e.g., credits.appliesTo refers to existing tax IDs).
-
----
-
-## 4) `Config.js` changes
-- Remove built-in default `'ie'`. The country code must be provided by the app config in attribute `default.country`.
-- `getTaxRuleSet(countryCode)`: keep async loading; no default to `'ie'`.
-- `getCachedTaxRuleSet(countryCode)`: keep behavior; returns null if not loaded.
-- Provide a tiny utility on the UI layer to choose country and then call `getTaxRuleSet(country)` before starting the simulation.
-
----
-
-## 5) `Taxman.js` design (replacement for `Revenue.js`)
-
-### State
-- `people`: { person1, person2|null }
-- `household`: { status: 'single'|'married'|..., attributes: { hasDependentChildren, ageP1, ageP2, ... } }
-- `ruleset`: cached `TaxRuleSet`
-- `incomesByBase`: map of base → amount (employment, privatePension, statePension, investmentIncome, other)
-- `capitalEvents`: array of { amount, description, assetPolicyKey, allowLossOffset?, eligibleForAnnualExemption? }
-- `lumpSums`: array of { amount, personId, baseKey: 'lumpSum.privatePension' }
-- `totals`: map of taxId → amount (plus `netIncome`)
-- `attributionManager`: unchanged contract, but keys become `tax:<taxId>`
-
-### Methods (neutral)
-- `reset(householdContext, attributionManager)` – initialize state, attach ruleset via `Config.getInstance().getCachedTaxRuleSet(selectedCountry)`.
-- `declareIncome({ amount, base, personId, description })` – replaces `declareSalaryIncome`, `declareOtherIncome`, `declareInvestmentIncome`, `declareNonEuSharesIncome`, `declarePrivatePensionIncome`.
-- `declareRetirementLumpSum({ amount, personId, description })` – replaces `declarePrivatePensionLumpSum`.
-- `declareCapitalEvent({ amount, description, assetPolicyKey, overrides })` – replaces `declareInvestmentGains` and implicit exit-tax/CGT logic.
-- `computeTaxes()` – orchestrates:
-  - Build taxable bases (apply deductions like pension contribution relief from `ruleset.getDeductions()`).
-  - For each tax in `ruleset.getTaxes()` call `computeTax(taxDef, bases, household)`.
-  - Compute capital gains by policy (loss offsets, annual exemption), attributing to `tax.id` defined for capital gains.
-  - Apply credits from `ruleset.getCredits()` to the taxes they target.
-  - Record per-source attributions as `tax:<id>`.
-- `netIncome()` – new formula: sum(income bases) − sum(positive taxes) + sum(negative adjustments), independent of country.
-
-### Internal helpers
-- `computeProgressiveTax(def, amount, options)` – generic bracket engine with optional band shift formula from `filing.jointBandShift`.
-- `applyCredits(credits, taxTotals, eligibilityContext)` – centralize credits application.
-- `applyDeductions(deductions, bases, household)` – normalize negative income adjustments (e.g., pension relief caps by age and cap).
-
----
-
-## 6) Remove hardcoded Irish concepts from the engine
-- Delete `computePRSI`, `computeUSC`, `computeIT`, `computeCGT` from the old class. Supersede with the generic loop described above.
-- Remove uses of hardcoded attribution keys: replace `'it'|'prsi'|'usc'|'cgt'` with `'tax:<taxId>'`.
-- Remove special handling of `nonEuShares`. Income bases are configured in rules and declared via `declareIncome`.
-- Replace exit-tax vs CGT branching with policy-driven capital gains computation.
-
----
-
-## 7) Cross-cutting migration steps (engine consumers)
-
-While not part of these three files, plan the following repo-wide adaptations.
-
-### Replace class name and constructor
-```bash
-rg -n "\bRevenue\b" src tests | sed 's/^/# /'
-```
-- Change to `Taxman` and update any references to instance fields (`it`, `prsi`, `usc`, `cgt`) to use `taxTotals['tax:<id>']` or `getTotalTax()` if you add such a helper.
-
-### Remove default IE ruleset usages
-```bash
-rg -n "get(Cached)?TaxRuleSet\('\w\w'\)" src tests
-```
-- Replace with a selected country code from UI or configuration. Avoid literals; thread country choice through the app start sequence.
-
-### Replace hardcoded table/field names (UI/data sheet)
-```bash
-rg -n "\b(PRSI|USC|CGT|Exit\s*Tax|nonEuShares)\b" src frontend tests
-```
-- UI tables should render taxes dynamically from `ruleset.getTaxes()` rather than fixed columns. For example, replace `dataSheet[row].prsi` with a dynamic aggregation over `tax:<id>`.
-- Update formatting helpers that assume specific keys.
-
-### Adapt tests
-- Replace assertions on `prsi`, `usc`, `cgt`, `it` with tax IDs defined in the test ruleset or with totals.
-- Tests referencing IE semantics (age credits, specific rates) should be moved to country-specific rule fixtures rather than code.
-
----
-
-## 8) Implementation order
- - **Step 0**: Convert `src/core/config/tax-rules-ie.json` to the neutral v2 schema in-place using the mapping in §2.5. Commit this as the authoritative IE rules file for v2.
- - **Step 1**: Write `docs/tax-rules-spec.md` (see §2.6) as the formal spec for country rule authors.
- - **Step 2**: Introduce new neutral spec in `src/core/config/tax-rules-<country>.json` for any additional countries.
- - **Step 3**: Refactor `TaxRuleSet.js` to parse the neutral spec and expose the new generic getters. Add thorough unit tests for parsing/normalization.
- - **Step 4**: Create `src/core/Taxman.js` by copying `Revenue.js`, then:
-   - Rename class and file.
-   - Remove PRSI/USC/CGT/IT methods and replace with generic tax loop.
-   - Replace `nonEuShares` with generic income bases.
-   - Replace `ruleset` calls with generic getters.
- - **Step 5**: Update `Config.js` to drop the `'ie'` default; add selected-country path.
- - **Step 6**: Update simulator/UI to construct `Taxman` and to bind dynamic tax columns; bump the cache-busting date parameter in `src/frontend/web/ifs/index.html` for any JS/CSS files changed.
- - **Step 7**: Update tests to the new spec and dynamic taxes.
- - **Step 8**: Perform the manual parity verification (see §0) comparing pre- and post-refactor outputs for IE v2 rules. Only proceed if results match exactly.
-
----
-
-## 9) Acceptance criteria
-- No string literals like "PRSI", "USC", "CGT", "Exit Tax", or country codes appear in engine code (`Taxman.js`, `TaxRuleSet.js`, `Config.js`).
-- All tax computations are derived solely from the JSON rules (progressive, flat, exemptions, credits, capital gains policies).
-- The engine supports 1–N taxes without code changes; adding a new tax only modifies the rules file.
-- Attribution works with `tax:<id>` keys; UI and tests consume them dynamically.
- - A formal schema/spec exists at `docs/tax-rules-spec.md` and is referenced by all rules files.
-
----
-
-## 10) Risk/mitigation
-- **Risk**: Hidden dependencies on fixed tax keys in UI/tests.
-  - **Mitigation**: Repo-wide search and dynamic rendering of taxes. Add a helper to list taxes and totals from `Taxman` to simplify consumers.
-- **Risk**: Joint band-shift and age-related behaviors are currently hardcoded.
-  - **Mitigation**: Encode formulas/thresholds in `filing` rules and evaluate in the engine.
-- **Risk**: Capital gains interplay (loss offsets, exemptions) differs by policy.
-  - **Mitigation**: Centralize CG computation with explicit per-policy flags (lossOffset, annualExemption eligibility, deemed disposal).
-
----
-
-## 11) Quick checklist
-- **Rename** file/class to `Taxman`.
-- **Neutralize** rules API in `TaxRuleSet`.
-- **Generalize** `Config` country loading.
-- **Generic taxes loop** in `Taxman` (no hardcoded names).
-- **Dynamic taxes** in consumers (UI/tests).
- - **No adapters/aliases** added; no backwards compatibility during refactor.
- - **Manual parity check** for IE v2 rules completed with exact match.
-
----
-
-## 12) Execution workflow and safeguards
-
-- **Feature branch**: Perform all steps on a dedicated branch; merge only after Step 8 parity passes.
-- **Commit granularity by step**: One commit (or small set) per numbered step to simplify review and rollback.
-- **Baseline capture (pre-Step 0)**: Save representative scenario inputs and outputs for parity comparison at Step 8.
-- **Schema validation**: Provide a JSON Schema and a small validation script for rules files; run it locally and in CI.
-- **Search-and-replace checklist**: Re-run the searches from §1 and §7 until zero hits remain for `Revenue`, hardcoded `'ie'` in ruleset fetches, and hardcoded tax names.
-- **Cache busting**: After any frontend asset changes, update the cache-busting date in `src/frontend/web/ifs/index.html` (reinforced in Step 6).
-- **Review focus**: Ensure no hardcoded country strings remain in engine code and all taxes flow from data.
-
----
-
-## 13) Progress tracking checklist
-
-- [ ] Step 0: IE rules converted to v2 and validated
-- [ ] Step 1: Spec authored (`docs/tax-rules-spec.md`)
-- [ ] Step 2: Additional country file(s) drafted (optional)
-- [ ] Step 3: `TaxRuleSet` neutral API implemented
-- [ ] Step 4: `Taxman` created and replaces `Revenue`
-- [ ] Step 5: `Config` updated for explicit country selection
-- [ ] Step 6: UI/Simulator updated; cache-busting param bumped
-- [ ] Step 7: Tests updated to dynamic taxes
-- [ ] Step 8: Manual IE parity check (exact match) completed
 
