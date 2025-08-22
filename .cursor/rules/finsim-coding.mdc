@@ -4,7 +4,7 @@ alwaysApply: false
 ---
 ## CODING ##
 
-When implementing a change, do it in the most elegant, no-nonsense way possible, with the absolute minimum amount of code possible, and strictly adhere to the way the existing code already works. Don't add code if you can reuse existing code. Don't add code if you can modify existing code. NO HACKS!
+When implementing a change, do it in the most elegant, no-nonsense way possible, with the absolute minimum amount of code possible, and strictly adhere to the way the existing code already works. Don't add code if you can reuse existing code. Don't add code if you can modify existing code. Don't add unnecessary code, like surrounding everything with try-catch blocks, checking for undefined and classes, or redefining global variables locally, even where it's clear that the code won't throw because the classes have been loaded or imported, variables have been defined, etc. Read the situation before inserting mindless code. I understand defensive coding, but you tend to take it to ridiculous levels where the code becomes both slow and unreadable. NO HACKS THOUGH!
 
 After you finished making a change and the user is happy with it, consider updating AGENTS.md if the change is significant enough. The update should either keep the file consistent with the code, or add a high-level and concise description of the new code. There should be no commentary of the evolution of the file.
 
