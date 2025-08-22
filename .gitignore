@@ -1,2 +1,7 @@
 .DS_Store
 node_modules/
+.kiro/steering/finsim-coding.md
+.kiro/steering/finsim-debugging.md
+.kiro/steering/finsim-general.md
+.kiro/steering/finsim-planing.md
+.kiro/steering/finsim-testing.md
