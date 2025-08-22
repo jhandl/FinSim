@@ -42,18 +42,43 @@ export async function waitForOverlayGone(page, timeout = 5000) {
 
 export async function dismissWelcomeModal(page, frame){
   const sel='.welcome-modal.visible';
-  if(!(await frame.locator(sel).count())) return;
-  const close=frame.locator(`${sel} .welcome-modal-close`);
-  if(await close.count()) await smartClick(close,{preferProgrammatic:true});
-  await page.waitForTimeout(300);
-  if(await frame.locator(sel).count()) await frame.locator('body').press('Escape').catch(()=>{});
-  await page.waitForTimeout(300);
-  if(await frame.locator(sel).count()){
-    const ov=frame.locator(sel);const box=await ov.boundingBox();
-    if(box) await ov.click({position:{x:box.width-3,y:box.height-3},force:true});
+  const MAX_ATTEMPTS = 3;
+  for(let attempt=0; attempt<MAX_ATTEMPTS; attempt++){
+    try{
+      // Re-resolve the iframe each attempt to survive reload/navigation
+      const curFrame = page.frameLocator('#app-frame');
+      if(!(await curFrame.locator(sel).count())) return;
+
+      const close=curFrame.locator(`${sel} .welcome-modal-close`);
+      if(await close.count()) await smartClick(close,{preferProgrammatic:true});
+      await page.waitForTimeout(300);
+
+      if(await curFrame.locator(sel).count()){
+        await curFrame.locator('body').press('Escape').catch(()=>{});
+      }
+      await page.waitForTimeout(300);
+
+      if(await curFrame.locator(sel).count()){
+        const ov=curFrame.locator(sel);
+        const box=await ov.boundingBox();
+        if(box) await ov.click({position:{x:box.width-3,y:box.height-3},force:true});
+      }
+
+      await curFrame.locator(sel).waitFor({state:'hidden',timeout:5000});
+      await page.waitForTimeout(600);
+      return;
+    }catch(err){
+      const msg = (err && err.message) ? err.message : String(err);
+      const transient = msg.includes('Execution context was destroyed') || msg.includes('frame was detached');
+      if(transient && attempt < MAX_ATTEMPTS-1){
+        // Wait for the iframe element to be attached again, then retry
+        await page.locator('#app-frame').waitFor({ state:'attached', timeout: 5000 }).catch(()=>{});
+        await page.waitForTimeout(200);
+        continue;
+      }
+      throw err;
+    }
   }
-  await frame.locator(sel).waitFor({state:'hidden',timeout:5000});
-  await page.waitForTimeout(600);
 }
 
 export async function openWizard(page, frame){

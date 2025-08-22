@@ -1986,11 +1986,6 @@ class Wizard {
 
       steps = this._getFilteredSteps(type, card);
       
-      // DEBUG: Log filtered steps for mini tours
-      if (type === 'mini') {
-        console.log(`DEBUG: Mini tour steps for card "${card}":`, steps.map(s => ({ element: s.element, tours: s.tours, card: s.card })));
-      }
-
       if (steps.length === 0) {
         console.warn(`No steps found for tour "${type}"${card ? ` and card "${card}"` : ''}`);
         return;

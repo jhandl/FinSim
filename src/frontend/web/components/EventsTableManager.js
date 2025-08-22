@@ -386,7 +386,7 @@ class EventsTableManager {
     // NEW: Persist preference
     try {
       localStorage.setItem('viewMode', newMode);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   handleAgeYearToggle(newMode) {
@@ -453,7 +453,7 @@ class EventsTableManager {
     // Persist preference
     try {
       localStorage.setItem('ageYearMode', newMode);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   updateTableHeaders() {
@@ -461,15 +461,15 @@ class EventsTableManager {
     const toHeader = document.getElementById('toAgeHeader');
 
     if (fromHeader && toHeader) {
-      const setText=(el,txt)=>{const span=el.querySelector('.header-text'); if(span){span.textContent=txt;} else {el.childNodes[0].textContent=txt;}};
+      const setText = (el, txt) => { const span = el.querySelector('.header-text'); if (span) { span.textContent = txt; } else { el.childNodes[0].textContent = txt; } };
       if (this.ageYearMode === 'age') {
-        setText(fromHeader,'From Age');
-        setText(toHeader,'To Age');
+        setText(fromHeader, 'From Age');
+        setText(toHeader, 'To Age');
         fromHeader.classList.remove('year-mode');
         toHeader.classList.remove('year-mode');
       } else {
-        setText(fromHeader,'From Year');
-        setText(toHeader,'To Year');
+        setText(fromHeader, 'From Year');
+        setText(toHeader, 'To Year');
         fromHeader.classList.add('year-mode');
         toHeader.classList.add('year-mode');
       }
@@ -493,7 +493,7 @@ class EventsTableManager {
       if (accordionContainer) {
         accordionContainer.style.display = 'none';
       }
-      
+
       // Check for empty state in table view
       this.checkEmptyState();
     } else {
@@ -525,32 +525,32 @@ class EventsTableManager {
   convertExistingInputValues(currentMode, newMode) {
     const startingAge = parseInt(this.webUI.getValue('StartingAge')) || 0;
     const p2StartingAge = parseInt(this.webUI.getValue('P2StartingAge')) || 0;
-    
+
     if (startingAge === 0) return;
-    
+
     const currentYear = new Date().getFullYear();
     const tbody = document.querySelector('#Events tbody');
     if (!tbody) return;
-    
+
     tbody.querySelectorAll('tr').forEach(row => {
       if (row.style.display === 'none') return;
-      
+
       const eventType = row.querySelector('.event-type')?.value;
       if (!eventType) return;
-      
+
       const isP2Event = eventType === 'SI2' || eventType === 'SI2np';
       const relevantStartingAge = isP2Event ? p2StartingAge : startingAge;
       if (relevantStartingAge === 0) return;
-      
+
       const birthYear = currentYear - relevantStartingAge;
-      
+
       ['.event-from-age', '.event-to-age'].forEach(selector => {
         const input = row.querySelector(selector);
         if (!input?.value) return;
-        
+
         const currentValue = parseInt(input.value);
         if (isNaN(currentValue)) return;
-        
+
         if (currentMode === 'age' && newMode === 'year') {
           input.value = birthYear + currentValue;
         } else if (currentMode === 'year' && newMode === 'age') {
@@ -598,7 +598,7 @@ class EventsTableManager {
         if (input) {
           const isHidden = required[field] === 'hidden';
           input.style.visibility = isHidden ? 'hidden' : 'visible';
-          
+
           // For percentage inputs, also hide the container with the % symbol
           const container = input.closest('.percentage-container');
           if (container) {
@@ -609,52 +609,52 @@ class EventsTableManager {
     });
     const rateInput = row.querySelector('.event-rate');
     if (rateInput) {
-        rateInput.placeholder = (!required || !required.rate || required.rate === 'optional') ? 'inflation' : '';
+      rateInput.placeholder = (!required || !required.rate || required.rate === 'optional') ? 'inflation' : '';
     }
   }
 
   generateEventRowId() {
-      return `row_${++this.eventRowCounter}`;
+    return `row_${++this.eventRowCounter}`;
   }
 
   /* ------------------------------------------------------------
      Inflow / Outflow visual helpers
   ------------------------------------------------------------ */
   isInflow(eventType) {
-      return ['SI', 'SInp', 'SI2', 'SI2np', 'UI', 'RI', 'DBI', 'FI'].includes(eventType);
+    return ['SI', 'SInp', 'SI2', 'SI2np', 'UI', 'RI', 'DBI', 'FI'].includes(eventType);
   }
 
   isOutflow(eventType) {
-      return ['E'].includes(eventType); // SM handled separately
+    return ['E'].includes(eventType); // SM handled separately
   }
 
   isStockMarket(eventType) {
-      return ['SM'].includes(eventType);
+    return ['SM'].includes(eventType);
   }
 
   isRealEstate(eventType) {
-      return ['R', 'M'].includes(eventType);
+    return ['R', 'M'].includes(eventType);
   }
 
   applyTypeColouring(row) {
-      const typeVal = row.querySelector('.event-type')?.value;
-      const toggle  = row.querySelector('.dd-toggle');
-      if (!toggle) return;
-      /* Reset all possible styling classes, including the new 'nop' marker */
-      toggle.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market', 'nop');
+    const typeVal = row.querySelector('.event-type')?.value;
+    const toggle = row.querySelector('.dd-toggle');
+    if (!toggle) return;
+    /* Reset all possible styling classes, including the new 'nop' marker */
+    toggle.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market', 'nop');
 
-      /* Apply appropriate class based on the event type */
-      if (typeVal === 'NOP') {
-          toggle.classList.add('nop');
-      } else if (this.isStockMarket(typeVal)) {
-          toggle.classList.add('stock-market');
-      } else if (this.isRealEstate(typeVal)) {
-          toggle.classList.add('real-estate');
-      } else if (this.isInflow(typeVal)) {
-          toggle.classList.add('inflow');
-      } else if (this.isOutflow(typeVal)) {
-          toggle.classList.add('outflow');
-      }
+    /* Apply appropriate class based on the event type */
+    if (typeVal === 'NOP') {
+      toggle.classList.add('nop');
+    } else if (this.isStockMarket(typeVal)) {
+      toggle.classList.add('stock-market');
+    } else if (this.isRealEstate(typeVal)) {
+      toggle.classList.add('real-estate');
+    } else if (this.isInflow(typeVal)) {
+      toggle.classList.add('inflow');
+    } else if (this.isOutflow(typeVal)) {
+      toggle.classList.add('outflow');
+    }
   }
 
   /**
@@ -671,12 +671,12 @@ class EventsTableManager {
 
     // Check if type is NOP and all other fields are blank
     return typeInput?.value === 'NOP' &&
-           (!nameInput?.value || nameInput.value.trim() === '') &&
-           (!amountInput?.value || amountInput.value.trim() === '') &&
-           (!fromAgeInput?.value || fromAgeInput.value.trim() === '') &&
-           (!toAgeInput?.value || toAgeInput.value.trim() === '') &&
-           (!rateInput?.value || rateInput.value.trim() === '') &&
-           (!matchInput?.value || matchInput.value.trim() === '');
+      (!nameInput?.value || nameInput.value.trim() === '') &&
+      (!amountInput?.value || amountInput.value.trim() === '') &&
+      (!fromAgeInput?.value || fromAgeInput.value.trim() === '') &&
+      (!toAgeInput?.value || toAgeInput.value.trim() === '') &&
+      (!rateInput?.value || rateInput.value.trim() === '') &&
+      (!matchInput?.value || matchInput.value.trim() === '');
   }
 
   /**
@@ -704,19 +704,49 @@ class EventsTableManager {
     // Ensure the row is visible – scroll only if it’s outside the viewport
     const rect = row.getBoundingClientRect();
     const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-    if (rect.top < 0 || rect.bottom > viewportHeight) {
+    const needsScroll = rect.top < 0 || rect.bottom > viewportHeight;
+    if (needsScroll) {
       row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    // Find the event type dropdown
-    const typeDropdown = row.querySelector('.event-type-dd');
-    if (typeDropdown) {
-      // Add a small delay to ensure scrolling is complete
-      setTimeout(() => {
-        // Trigger the dropdown to open
-        typeDropdown.click();
-      }, 300);
+    const openDropdownProgrammatically = () => {
+      // Prefer programmatic API when available for robustness
+      if (row._eventTypeDropdown && typeof row._eventTypeDropdown.open === 'function') {
+        try { row._eventTypeDropdown.open(); return; } catch (_) { /* fallback below */ }
+      }
+      const toggle = row.querySelector('.event-type-dd');
+      if (toggle) {
+        try { toggle.click(); } catch (_) { /* ignore */ }
+      }
+    };
+
+    // If we scrolled, wait until the row position stabilizes before opening (Safari-friendly)
+    if (needsScroll) {
+      const start = Date.now();
+      let lastTop = row.getBoundingClientRect().top;
+      let stableCount = 0;
+      const checkStable = () => {
+        const nowTop = row.getBoundingClientRect().top;
+        if (Math.abs(nowTop - lastTop) < 1) {
+          stableCount++;
+        } else {
+          stableCount = 0;
+        }
+        lastTop = nowTop;
+        if (stableCount >= 3 || Date.now() - start > 1500) {
+          openDropdownProgrammatically();
+        } else {
+          requestAnimationFrame(checkStable);
+        }
+      };
+      requestAnimationFrame(checkStable);
+    } else {
+      // Already in view – open on next frame
+      requestAnimationFrame(openDropdownProgrammatically);
     }
+
+    // Safety retry in case the first attempt gets ignored under load
+    setTimeout(() => openDropdownProgrammatically(), 1200);
   }
 
   /**
@@ -896,8 +926,8 @@ class EventsTableManager {
     // Build dropdown options & find label for current selection
     const optionObjects = this.getEventTypeOptionObjects();
     const selectedObj = optionObjects.find((o) => o.value === type)
-                       || optionObjects.find((o) => o.value === 'NOP')
-                       || optionObjects[0];
+      || optionObjects.find((o) => o.value === 'NOP')
+      || optionObjects[0];
     const selectedLabel = selectedObj.label;
 
     row.innerHTML = `
@@ -927,9 +957,9 @@ class EventsTableManager {
     /* =============================================================
        Instantiate dropdown for this row
     ============================================================= */
-    const typeInput   = row.querySelector(`#EventTypeValue_${rowId}`);
-    const toggleEl    = row.querySelector(`#EventTypeToggle_${rowId}`);
-    const dropdownEl  = row.querySelector(`#EventTypeOptions_${rowId}`);
+    const typeInput = row.querySelector(`#EventTypeValue_${rowId}`);
+    const toggleEl = row.querySelector(`#EventTypeToggle_${rowId}`);
+    const dropdownEl = row.querySelector(`#EventTypeOptions_${rowId}`);
 
     const dropdown = DropdownUtils.create({
       toggleEl,
@@ -948,7 +978,7 @@ class EventsTableManager {
     });
     // Keep reference for later refreshes
     row._eventTypeDropdown = dropdown;
-    
+
     // Store reference to the dropdown wrapper on the hidden input element
     // This allows the validation system to find the visible element to style
     if (dropdown.wrapper) {
@@ -1003,7 +1033,7 @@ class EventsTableManager {
     const row = this.createEventRow();
     const eventId = row.dataset.eventId;
     /* Debug log removed */
-    
+
     tbody.appendChild(row);
 
     // Update empty state after adding a row
@@ -1015,7 +1045,7 @@ class EventsTableManager {
     // Refresh accordion if it's active
     if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
       /* Debug log removed */
-      
+
       // First refresh the accordion to include the new event
       this.webUI.eventAccordionManager.refresh();
     }
@@ -1031,7 +1061,7 @@ class EventsTableManager {
 
     // Do not apply sort immediately.
     // The row will be sorted on blur after being edited.
-    
+
     return { row, id: eventId };
   }
 
@@ -1146,7 +1176,7 @@ class EventsTableManager {
 
     const isP2Event = eventType === 'SI2' || eventType === 'SI2np';
     const relevantStartingAge = isP2Event ? p2StartingAge : startingAge;
-    
+
     if (relevantStartingAge === 0) return null;
 
     const birthYear = currentYear - relevantStartingAge;
@@ -1188,7 +1218,7 @@ class EventsTableManager {
   scheduleTooltip(inputElement) {
     // Clear any existing timeout
     this.cancelTooltip();
-    
+
     // Schedule tooltip to show after delay
     this.tooltipTimeout = setTimeout(() => {
       this.showAlternativeTooltip(inputElement);
@@ -1202,7 +1232,7 @@ class EventsTableManager {
       clearTimeout(this.tooltipTimeout);
       this.tooltipTimeout = null;
     }
-    
+
     // Hide any visible tooltip
     this.hideTooltip();
   }
@@ -1238,7 +1268,7 @@ class EventsTableManager {
         }
 
         // Apply the sort
-        setTimeout(()=>this.applySort(true),0);
+        setTimeout(() => this.applySort(true), 0);
       });
     });
   }
@@ -1296,10 +1326,10 @@ class EventsTableManager {
    */
   updateAccordionRowIndices() {
     if (!this.webUI.eventAccordionManager) return;
-    
+
     const tableRows = document.querySelectorAll('#Events tbody tr');
     const eventIdToIndexMap = new Map();
-    
+
     // Create a map of eventId to new table row index
     Array.from(tableRows).forEach((row, index) => {
       const eventId = row.dataset.eventId;
@@ -1307,7 +1337,7 @@ class EventsTableManager {
         eventIdToIndexMap.set(eventId, index);
       }
     });
-    
+
     // Update tableRowIndex for each event in the accordion manager
     this.webUI.eventAccordionManager.events.forEach(event => {
       const newIndex = eventIdToIndexMap.get(event.id);
@@ -1324,7 +1354,7 @@ class EventsTableManager {
     if (this.webUI.eventAccordionManager) {
       // Always update row indices when sorting changes
       this.updateAccordionRowIndices();
-      
+
       // Only refresh if accordion is currently visible
       if (this.viewMode === 'accordion') {
         this.webUI.eventAccordionManager.refresh();
@@ -1743,10 +1773,10 @@ class EventsTableManager {
     const cleanEventAmount = eventData.amount ? eventData.amount.toString() : '';
 
     return typeInput && typeInput.value === eventData.eventType &&
-           nameInput && nameInput.value === eventData.name &&
-           cleanRowAmount === cleanEventAmount &&
-           fromAgeInput && fromAgeInput.value === eventData.fromAge &&
-           toAgeInput && toAgeInput.value === eventData.toAge;
+      nameInput && nameInput.value === eventData.name &&
+      cleanRowAmount === cleanEventAmount &&
+      fromAgeInput && fromAgeInput.value === eventData.fromAge &&
+      toAgeInput && toAgeInput.value === eventData.toAge;
   }
 
   /**
@@ -1766,7 +1796,7 @@ class EventsTableManager {
    */
   updateEmptyStateMessage(hasEvents) {
     let emptyStateEl = document.querySelector('.table-empty-state');
-    
+
     if (!hasEvents) {
       // No events - show empty state message
       if (!emptyStateEl) {
@@ -1778,7 +1808,7 @@ class EventsTableManager {
           emptyStateEl.innerHTML = `
             <p>No events yet. Add events with the wizard or using the Add Event button.</p>
           `;
-          
+
           // Position it properly within the table container
           const table = tableContainer.querySelector('#Events');
           if (table) {

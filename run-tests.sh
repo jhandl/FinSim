@@ -179,8 +179,15 @@ main() {
 
     if [ "$RUN_ALL" == true ]; then
         export FINSIM_RUN_ALL=1
-        # Strip --runAll from positional args for downstream handling
-        set -- $(printf '%s\n' "$@" | sed 's/--runAll//')
+        # Rebuild positional args array excluding --runAll while preserving
+        # original argument quoting and whitespace.
+        local new_args=()
+        for a in "$@"; do
+            if [ "$a" != "--runAll" ]; then
+                new_args+=("$a")
+            fi
+        done
+        set -- "${new_args[@]}"
     fi
     case "$1" in
         -h|--help|--help-script)

@@ -346,13 +346,30 @@ class EventAccordionManager {
         // Ensure the expanded item is fully visible in the viewport (see scroll helper below)
         // Use a transitionend listener to ensure we scroll *after* the panel
         // is fully expanded (covers manual clicks as well as programmatic).
+        let scrollCalled = false;
+        
         const onTransitionEnd = (ev) => {
           if (ev.target === content && ev.propertyName === 'max-height') {
             content.removeEventListener('transitionend', onTransitionEnd);
-            this._scrollExpandedItemIntoView(item);
+            if (!scrollCalled) {
+              scrollCalled = true;
+              this._scrollExpandedItemIntoView(item);
+            }
           }
         };
         content.addEventListener('transitionend', onTransitionEnd);
+        
+        // Fallback timeout in case transitionend doesn't fire (Safari compatibility)
+        // Use longer timeout on mobile devices which may be slower under load
+        const isMobile = window.innerWidth < 800;
+        const fallbackTimeout = isMobile ? 800 : 500;
+        setTimeout(() => {
+          if (!scrollCalled) {
+            scrollCalled = true;
+            content.removeEventListener('transitionend', onTransitionEnd);
+            this._scrollExpandedItemIntoView(item);
+          }
+        }, fallbackTimeout);
       });
     }
   }
@@ -474,8 +491,6 @@ class EventAccordionManager {
     if (foundItem) {
       const accordionId = foundItem.dataset.accordionId;
       if (accordionId) {
-        console.debug('Expanding highlighted new event with ID:', this._newEventId, 'and accordionId:', accordionId);
-        
         // Expand the item after a short delay to allow the highlight animation to start
         setTimeout(() => {
           // Only expand if not already expanded
@@ -1643,30 +1658,47 @@ class EventAccordionManager {
     const content = item.querySelector('.accordion-item-content.expanded');
     if (!content) return;
 
-    // Prefer visualViewport if available (adjusts for on-screen keyboard)
-    const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight || document.documentElement.clientHeight;
+    // Use requestAnimationFrame to ensure DOM is fully updated after expansion
+    requestAnimationFrame(() => {
+      // Prefer visualViewport if available (adjusts for on-screen keyboard)
+      const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight || document.documentElement.clientHeight;
 
-    // Reserve some space for soft-keyboard / phone chin. Tuned empirically.
-    const SOFT_BOTTOM_MARGIN = 260; // px
-    const TOP_MARGIN = 60;          // px – keep header from sticking to very top
+      // Reserve some space for soft-keyboard / phone chin. Tuned empirically.
+      const SOFT_BOTTOM_MARGIN = 260; // px
+      const TOP_MARGIN = 60;          // px – keep header from sticking to very top
 
-    const rect = content.getBoundingClientRect();
+      const rect = content.getBoundingClientRect();
 
-    // Calculate how much we need to scroll so that the bottom of the
-    // expanded content sits above the soft bottom margin.
-    const bottomLimit = viewportHeight - SOFT_BOTTOM_MARGIN;
-    if (rect.bottom > bottomLimit) {
-      const diff = rect.bottom - bottomLimit;
-      window.scrollBy({ top: diff, behavior: 'smooth' });
-      return; // If we needed to scroll down, no need to check top afterwards.
-    }
+      // Capture header top before any scroll to compute safe limits
+      const itemTopBefore = item.getBoundingClientRect().top;
 
-    // If the top of the accordion item is too close to the top, scroll up
-    // slightly so the header is comfortably visible.
-    const itemTop = item.getBoundingClientRect().top;
-    if (itemTop < TOP_MARGIN) {
-      const diff = itemTop - TOP_MARGIN;
-      window.scrollBy({ top: diff, behavior: 'smooth' });
-    }
+      // Calculate how much we need to scroll so that the bottom of the
+      // expanded content sits above the soft bottom margin.
+      const bottomLimit = viewportHeight - SOFT_BOTTOM_MARGIN;
+      if (rect.bottom > bottomLimit) {
+        const diff = rect.bottom - bottomLimit;
+        // Do not scroll so far that the header moves above TOP_MARGIN
+        const maxAllowedDownScroll = Math.max(0, itemTopBefore - TOP_MARGIN);
+        const appliedDownScroll = Math.min(diff, maxAllowedDownScroll);
+        if (appliedDownScroll > 0) {
+          window.scrollBy({ top: appliedDownScroll, behavior: 'smooth' });
+        }
+        // Do not early-return; we will perform a follow-up top safety check below
+      }
+
+      // If the top of the accordion item is too close to the top, scroll up
+      // slightly so the header is comfortably visible.
+      const ensureTopSafety = () => {
+        const itemTopNow = item.getBoundingClientRect().top;
+        if (itemTopNow < TOP_MARGIN) {
+          const adjust = itemTopNow - TOP_MARGIN;
+          window.scrollBy({ top: adjust, behavior: 'smooth' });
+        }
+      };
+
+      // Allow smooth scroll to start before checking top safety; slightly longer on mobile
+      const isMobile = window.innerWidth < 800;
+      setTimeout(ensureTopSafety, isMobile ? 250 : 120);
+    });
   }
 }
