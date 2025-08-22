@@ -1169,6 +1169,19 @@ class EventWizardManager {
         }
       }
     }
+    // Map non-salary income selections to their corresponding event codes
+    else if (this.wizardState.eventType === 'SI' && data.incomeType) {
+      const nonSalaryMap = {
+        rsu: 'UI',
+        rental: 'RI',
+        defined_benefit: 'DBI',
+        tax_free: 'FI'
+      };
+      const mappedType = nonSalaryMap[data.incomeType];
+      if (mappedType) {
+        this.wizardState.eventType = mappedType;
+      }
+    }
   }
 
   /**
