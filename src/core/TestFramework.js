@@ -631,7 +631,42 @@ class TestFramework {
       // Create a proper UIManager mock that matches the real UIManager interface
       function MockUIManager(mockUI) { this.ui = mockUI; }
       MockUIManager.prototype.updateProgress = function(status) {};
-      MockUIManager.prototype.updateDataSheet = function(runs, perRunResults) {};
+      MockUIManager.prototype.updateDataSheet = function(runs, perRunResults) {
+        try {
+          if (!Array.isArray(dataSheet) || !runs || runs <= 1) { return; }
+          // Average accumulated numeric fields across Monte Carlo runs so tests read normalized values
+          for (var i = 1; i <= row; i++) {
+            var r = dataSheet[i];
+            if (!r || typeof r !== 'object') { continue; }
+            var numericFields = [
+              'age','year','incomeSalaries','incomeRSUs','incomeRentals','incomePrivatePension','incomeStatePension',
+              'incomeFundsRent','incomeSharesRent','incomeCash','realEstateCapital','netIncome','expenses','pensionFund',
+              'cash','indexFundsCapital','sharesCapital','pensionContribution','withdrawalRate','worth'
+            ];
+            for (var fi = 0; fi < numericFields.length; fi++) {
+              var key = numericFields[fi];
+              if (typeof r[key] === 'number') { r[key] = r[key] / runs; }
+            }
+            // Average dynamic maps if present
+            if (r.investmentIncomeByKey) {
+              for (var k in r.investmentIncomeByKey) { if (r.investmentIncomeByKey.hasOwnProperty(k)) { r.investmentIncomeByKey[k] = r.investmentIncomeByKey[k] / runs; } }
+            }
+            if (r.investmentCapitalByKey) {
+              for (var ck in r.investmentCapitalByKey) { if (r.investmentCapitalByKey.hasOwnProperty(ck)) { r.investmentCapitalByKey[ck] = r.investmentCapitalByKey[ck] / runs; } }
+            }
+            if (r.taxByKey) {
+              for (var t in r.taxByKey) { if (r.taxByKey.hasOwnProperty(t)) { r.taxByKey[t] = r.taxByKey[t] / runs; } }
+            }
+            // Also average any dynamic Tax__ columns that may exist directly on the row
+            for (var prop in r) {
+              if (!r.hasOwnProperty(prop)) continue;
+              if (prop && prop.indexOf('Tax__') === 0 && typeof r[prop] === 'number') {
+                r[prop] = r[prop] / runs;
+              }
+            }
+          }
+        } catch (_) { /* noop in tests */ }
+      };
       MockUIManager.prototype.updateStatusCell = function(successes, runs) {};
       MockUIManager.prototype.clearWarnings = function() {};
       MockUIManager.prototype.setStatus = function(status, color) {};
