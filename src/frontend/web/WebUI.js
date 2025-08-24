@@ -1606,6 +1606,18 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
       // Apply dynamic investment labels from ruleset (first two investment types)
       try { webUi.applyInvestmentLabels(); } catch (_) {}
 
+    // Minimal trigger to ensure tax headers exist: build row 0 then remove it
+    try {
+      if (webUi.tableManager && typeof webUi.tableManager.setDataRow === 'function') {
+        webUi.tableManager.setDataRow(0, {});
+        const temp = document.getElementById('data_row_0');
+        if (temp && temp.parentNode) temp.parentNode.removeChild(temp);
+      }
+    } catch (_) {}
+
+    // Attach TooltipUtils to static data table headers (replace native title tooltips)
+    try { document.querySelectorAll('#Data thead th[title]').forEach(th => { const txt = th.getAttribute('title'); if (!txt) return; th.removeAttribute('title'); TooltipUtils.attachTooltip(th, txt, { hoverDelay: 150, touchDelay: 250 }); }); } catch (_) {}
+
     // Initialize controls that depend on Config/tax rules being available
     try { webUi.setupPensionCappedDropdown(); } catch (_) {}
 

@@ -5,6 +5,8 @@
   "updateMessage": "",
 
   "incomeTax": {
+    "name": "IT",
+    "tooltip": "Income Tax paid on taxable income",
     "personalAllowance": 0,
     "taxCredits": {
       "employee": 2000,
@@ -24,6 +26,7 @@
   "socialContributions": [
     {
       "name": "PRSI",
+      "tooltip": "Pay Related Social Insurance contributions",
       "rate": 0.041,
       "incomeCap": null,
       "ageAdjustments": { "70": 0 },
@@ -34,6 +37,7 @@
   "additionalTaxes": [
     {
       "name": "USC",
+      "tooltip": "Universal Social Charge paid",
       "brackets": { "0": 0.005, "12012": 0.02, "27382": 0.03, "70044": 0.08, "100000": 0.11 },
       "incomeExemptionThreshold": 13000,
       "reducedRateAge": 70,
@@ -46,6 +50,8 @@
   ],
 
   "capitalGainsTax": {
+    "name": "CGT",
+    "tooltip": "Capital Gains Tax (and Exit Tax) paid on investment gains.",
     "rate": 0.33,
     "annualExemption": 1270,
     "allowLossOffset": true,

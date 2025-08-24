@@ -306,15 +306,58 @@ class TaxRuleSet {
     // 3) Special-case common aliases
     if (idLower === 'incometax' || idLower === 'it') {
       const itSpec = this.getIncomeTaxSpec();
-      return (itSpec && itSpec.displayName) ? itSpec.displayName : 'Income Tax';
+      const dn = (itSpec && (itSpec.displayName || itSpec.name));
+      return dn ? dn : 'Income Tax';
     }
     if (idLower === 'capitalgains' || idLower === 'cgt') {
-      const cgtSpec = this.getCapitalGainsSpec();
-      return (cgtSpec && cgtSpec.displayName) ? cgtSpec.displayName : 'Capital Gains Tax';
+      const cgtRaw = this.raw.capitalGainsTax || {};
+      const dn = cgtRaw.displayName || cgtRaw.name;
+      return dn ? dn : 'Capital Gains Tax';
     }
 
     // Fallback to the provided identifier
     return rawId;
+  }
+
+  getTooltipForTax(taxId) {
+    const raw=String(taxId||''),low=raw.toLowerCase();
+    if(!this._taxTipIndex){const idx=Object.create(null),add=(k,v)=>{if(k&&v)idx[k]=v;};const it=this.raw.incomeTax||{},cgt=this.raw.capitalGainsTax||{};add('incomeTax',it.tooltip);add('capitalGains',cgt.tooltip);this.getSocialContributions().forEach(t=>{if(t){add(t.id,t.tooltip);add((t.name||'').toLowerCase(),t.tooltip);}});this.getAdditionalTaxes().forEach(t=>{if(t){add(t.id,t.tooltip);add((t.name||'').toLowerCase(),t.tooltip);}});this._taxTipIndex=idx;}
+    return this._taxTipIndex[raw]||this._taxTipIndex[low]||null;
+  }
+
+  /**
+   * Return tax IDs in the exact order they are defined in the rules file.
+   * Respects top-level key order and array element order.
+   */
+  getTaxOrder() {
+    var order = [];
+    try {
+      var topKeys = Object.keys(this.raw || {});
+      for (var i = 0; i < topKeys.length; i++) {
+        var k = topKeys[i];
+        if (k === 'incomeTax') {
+          order.push('incomeTax');
+        } else if (k === 'socialContributions') {
+          var sc = this.getSocialContributions();
+          for (var si = 0; si < sc.length; si++) {
+            var s = sc[si];
+            var sid = (s && (s.id || s.name)) ? String(s.id || s.name).toLowerCase() : null;
+            if (sid) order.push(sid);
+          }
+        } else if (k === 'additionalTaxes') {
+          var ad = this.getAdditionalTaxes();
+          for (var ai = 0; ai < ad.length; ai++) {
+            var a = ad[ai];
+            var aid = (a && (a.id || a.name)) ? String(a.id || a.name).toLowerCase() : null;
+            if (aid) order.push(aid);
+          }
+        } else if (k === 'capitalGainsTax') {
+          order.push('capitalGains');
+        }
+      }
+    } catch (_) {}
+    if (order.length === 0) order = ['incomeTax', 'capitalGains'];
+    return order;
   }
 
   // ----- Generic helpers for additional taxes -----

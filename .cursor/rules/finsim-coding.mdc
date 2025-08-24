@@ -4,8 +4,33 @@ alwaysApply: false
 ---
 ## CODING ##
 
-When implementing a change, do it in the most elegant, no-nonsense way possible, with the absolute minimum amount of code possible, and strictly adhere to the way the existing code already works. Don't add code if you can reuse existing code. Don't add code if you can modify existing code. Don't add unnecessary code, like surrounding everything with try-catch blocks, checking for undefined and classes, or redefining global variables locally, even where it's clear that the code won't throw because the classes have been loaded or imported, variables have been defined, etc. Read the situation before inserting mindless code. I understand defensive coding, but you tend to take it to ridiculous levels where the code becomes both slow and unreadable. NO HACKS THOUGH!
+When implementing a change, do it in the most elegant, no-nonsense way possible, with the absolute minimum amount of code possible, in harmony with existing code. Don't add code if you can reuse existing code. Don't add code if you can modify existing code. Don't add unnecessary code, like surrounding everything with try-catch blocks, checking for undefined and classes, or redefining global variables locally, even where it's clear that the code won't throw because the classes have been loaded or imported, variables have been defined, etc. Read the situation before inserting mindless code. I understand defensive coding, but you tend to take it to ridiculous levels where the code becomes both slow and unreadable. NO HACKS THOUGH!
+
+### SIMPLICITY ENFORCEMENT (Do First) ###
+
+This is the Golden Rule: "Use the absolute minimum amount of code possible". Here it is in detail:
+
+Before adding any new function or block >5 lines, ask:
+- Can I trigger an existing code path to achieve the result? If yes, do that.
+- Can I modify one call-site or add a 1–3 line shim instead of duplicating logic? Prefer that.
+- Does this create a second source of truth for behavior already implemented elsewhere? If yes, stop and reuse.
+
+Heuristics:
+- Prefer “call once, then clean up” patterns over new initialization code.
+- If a feature already happens after event X, try invoking X rather than re-implementing its internals.
+- If multiple files need changes, try a single, central minimal edit that preserves existing flow.
+
+Hard rules:
+- No new initializers that replicate existing logic.
+- No speculative abstractions; only extract after two concrete uses.
+- New code must be shorter than the combined diff it replaces.
+
+### Updating documentation ###
 
 After you finished making a change and the user is happy with it, consider updating AGENTS.md if the change is significant enough. The update should either keep the file consistent with the code, or add a high-level and concise description of the new code. There should be no commentary of the evolution of the file.
 
+### Testing ###
+
+If the change is not related to the core calculations, don't run the tests. You can ask the user to run tests instead.
+ 
 A local webserver is always running, so there's never need to start a new one to. DO NOT ASK THE USER TO RUN A SERVER. IT'S ALWAYS ALREADY RUNNING!

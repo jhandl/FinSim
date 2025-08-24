@@ -151,29 +151,16 @@ class TableManager {
           } catch (_) {}
         }
 
-        // 3) If still empty, derive from ruleset
+        // 3) If still empty, derive in exact file order from ruleset
         if (!order || order.length === 0) {
           try {
             const cfg = Config.getInstance();
             const rs = (cfg.getCachedTaxRuleSet ? (cfg.getCachedTaxRuleSet(cfg.getDefaultCountry && cfg.getDefaultCountry())) : null) || (cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet() : null);
-            const idsMap = { incomeTax: true, capitalGains: true };
-            if (rs && typeof rs.getSocialContributions === 'function') {
-              const sc = rs.getSocialContributions() || [];
-              for (let i = 0; i < sc.length; i++) {
-                const s = sc[i];
-                const sid = (s && (s.id || s.name)) ? String(s.id || s.name).toLowerCase() : null;
-                if (sid) idsMap[sid] = true;
-              }
+            if (rs && typeof rs.getTaxOrder === 'function') {
+              order = rs.getTaxOrder();
+            } else {
+              order = ['incomeTax', 'capitalGains'];
             }
-            if (rs && typeof rs.getAdditionalTaxes === 'function') {
-              const ad = rs.getAdditionalTaxes() || [];
-              for (let i = 0; i < ad.length; i++) {
-                const a = ad[i];
-                const aid = (a && (a.id || a.name)) ? String(a.id || a.name).toLowerCase() : null;
-                if (aid) idsMap[aid] = true;
-              }
-            }
-            order = Object.keys(idsMap);
           } catch (_) {
             order = ['incomeTax', 'capitalGains'];
           }
@@ -213,7 +200,8 @@ class TableManager {
             }
           } catch (_) {}
           th.textContent = displayName;
-          th.title = displayName + ' tax paid';
+          let tip = displayName + ' tax paid'; try { const cfg3 = Config.getInstance(); const rs3 = cfg3.getCachedTaxRuleSet ? cfg3.getCachedTaxRuleSet() : null; const t = rs3 && rs3.getTooltipForTax && rs3.getTooltipForTax(taxId); if (t) tip = t; } catch (_){ }
+          TooltipUtils.attachTooltip(th, tip, { hoverDelay: 150, touchDelay: 250 });
 
           if (anchor) {
             if (anchor.nextSibling) {

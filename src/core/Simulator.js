@@ -130,24 +130,7 @@ function initializeSimulationVariables() {
   // Initialize stable tax ids from ruleset for consistent Tax__ columns
   try {
     var _rs = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })();
-    var idsMap = { incomeTax: true, capitalGains: true };
-    if (_rs && typeof _rs.getSocialContributions === 'function') {
-      var sc = _rs.getSocialContributions() || [];
-      for (var si = 0; si < sc.length; si++) {
-        var s = sc[si];
-        var sid = (s && (s.id || s.name)) ? String(s.id || s.name).toLowerCase() : null;
-        if (sid) idsMap[sid] = true;
-      }
-    }
-    if (_rs && typeof _rs.getAdditionalTaxes === 'function') {
-      var ad = _rs.getAdditionalTaxes() || [];
-      for (var ai = 0; ai < ad.length; ai++) {
-        var a = ad[ai];
-        var aid = (a && (a.id || a.name)) ? String(a.id || a.name).toLowerCase() : null;
-        if (aid) idsMap[aid] = true;
-      }
-    }
-    stableTaxIds = Object.keys(idsMap);
+    stableTaxIds = (_rs && typeof _rs.getTaxOrder === 'function') ? _rs.getTaxOrder() : ['incomeTax', 'capitalGains'];
   } catch (e) {
     stableTaxIds = ['incomeTax', 'capitalGains'];
   }

@@ -467,7 +467,7 @@
     <script src="/src/frontend/web/utils/ErrorModalUtils.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/utils/FieldLabelsManager.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/utils/ValidationUtils.js?v=2025-08-19"></script>
-    <script src="/src/frontend/web/components/TableManager.js?v=2025-08-23-3"></script>
+    <script src="/src/frontend/web/components/TableManager.js?v=2025-08-24-taxheaders-4"></script>
     <script src="/src/frontend/web/components/EventsTableManager.js?v=2025-08-21"></script>
     <script src="/src/frontend/web/components/EventSummaryRenderer.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/components/EventAccordionManager.js?v=2025-08-22"></script>
@@ -480,8 +480,8 @@
     <script src="/src/frontend/web/components/ContentRenderer.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/components/WelcomeModal.js?v=2025-01-20"></script>
     <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=2025-08-19"></script>
-    <script src="/src/frontend/web/WebUI.js?v=2025-08-19"></script>
-    <script src="/src/core/TaxRuleSet.js?v=2025-08-23-usc"></script>
+    <script src="/src/frontend/web/WebUI.js?v=2025-08-24-taxheaders-4"></script>
+    <script src="/src/core/TaxRuleSet.js?v=2025-08-24-taxnames-2"></script>
     <script src="/src/core/Config.js?v=2025-01-20"></script>
     <script src="/src/core/Events.js?v=2025-08-19"></script>
     <script src="/src/core/Person.js?v=2025-08-19"></script>
@@ -492,7 +492,7 @@
     <script src="/src/core/Utils.js?v=2025-08-22"></script>
     <script src="/src/core/Attribution.js?v=2025-08-19"></script>
     <script src="/src/core/AttributionManager.js?v=2025-01-20"></script>
-    <script src="/src/core/Simulator.js?v=2025-08-23-5"></script>
+    <script src="/src/core/Simulator.js?v=2025-08-24-taxes-2"></script>
     
     <!-- Init app name after Config is initialized -->
     <script>
@@ -1374,176 +1374,6 @@
     });
     </script>
 
-    <!-- Column Header Tooltip Manager -->
-    <script>
-    // Handle column header tooltips with real DOM elements and accurate positioning
-    document.addEventListener('DOMContentLoaded', function() {
-        const columnHeaders = document.querySelectorAll('#Data th[title]');
-        let activeTooltip = null;
-        let activeHeader = null;
-        
-        // Store original titles and remove them to prevent browser tooltips
-        const originalTitles = new Map();
-        columnHeaders.forEach(header => {
-            const title = header.getAttribute('title');
-            if (title) {
-                originalTitles.set(header, title);
-                header.removeAttribute('title');
-                header.setAttribute('data-tooltip', title);
-            }
-        });
-        
-        // Function to create tooltip element
-        function createTooltip(header, text) {
-            const tooltip = document.createElement('div');
-            tooltip.className = 'column-tooltip';
-            tooltip.textContent = text;
-            tooltip.setAttribute('data-header-id', header.dataset.key || Math.random().toString(36).substr(2, 9));
-            document.body.appendChild(tooltip);
-            return tooltip;
-        }
-        
-        // Function to position tooltip accurately
-        function positionTooltip(header, tooltip) {
-            const isMobile = window.innerWidth <= 768;
-            if (isMobile) {
-                // Mobile uses fixed positioning (handled by CSS)
-                return;
-            }
-            
-            // Get measurements
-            const headerRect = header.getBoundingClientRect();
-            const tooltipRect = tooltip.getBoundingClientRect();
-            const viewportWidth = window.innerWidth;
-            
-            // Calculate positions relative to the viewport for body-appended tooltip
-            const headerWidth = headerRect.width;
-            const tooltipWidth = tooltipRect.width;
-            
-            // Position above the header
-            let left = headerRect.left + (headerWidth - tooltipWidth) / 2;
-            let top = headerRect.top - tooltipRect.height - 10;
-            
-            const margin = 10;
-            
-            // Adjust for left clipping
-            if (left < margin) {
-                left = margin;
-            }
-            // Adjust for right clipping
-            else if (left + tooltipWidth > viewportWidth - margin) {
-                left = viewportWidth - tooltipWidth - margin;
-            }
-            
-            // Position tooltip relative to viewport
-            tooltip.style.position = 'fixed';
-            tooltip.style.left = left + 'px';
-            tooltip.style.top = top + 'px';
-        }
-        
-        // Function to show tooltip
-        function showTooltip(header) {
-            // Don't create if already showing for this header
-            if (activeHeader === header && activeTooltip) {
-                return;
-            }
-            
-            // Hide any existing tooltip immediately
-            hideTooltip();
-            
-            const text = header.getAttribute('data-tooltip');
-            if (!text) return;
-            
-            const tooltip = createTooltip(header, text);
-            activeTooltip = tooltip;
-            activeHeader = header;
-            
-            // Position and show
-            requestAnimationFrame(() => {
-                positionTooltip(header, tooltip);
-                tooltip.classList.add('visible');
-            });
-        }
-        
-        // Function to hide tooltip immediately
-        function hideTooltip() {
-            if (activeTooltip && activeHeader) {
-                activeTooltip.classList.remove('visible');
-                if (activeTooltip.parentNode) {
-                    activeTooltip.parentNode.removeChild(activeTooltip);
-                }
-                activeTooltip = null;
-                activeHeader = null;
-            }
-        }
-        
-        // Add event listeners to each column header
-        columnHeaders.forEach(header => {
-            // Desktop hover events
-            header.addEventListener('mouseenter', function() {
-                if (window.innerWidth > 768) {
-                    showTooltip(this);
-                }
-            });
-            
-            header.addEventListener('mouseleave', function() {
-                if (window.innerWidth > 768) {
-                    hideTooltip();
-                }
-            });
-            
-            // Mobile touch events
-            header.addEventListener('touchstart', function(e) {
-                if (window.innerWidth <= 768) {
-                    e.preventDefault();
-                    
-                    if (activeHeader === this) {
-                        hideTooltip();
-                    } else {
-                        showTooltip(this);
-                    }
-                }
-            }, { passive: false });
-        });
-        
-        // Hide tooltip when touching/clicking elsewhere
-        document.addEventListener('touchstart', function(e) {
-            if (window.innerWidth <= 768) {
-                const isColumnHeader = e.target.closest('#Data th[data-tooltip]');
-                if (!isColumnHeader && activeTooltip) {
-                    hideTooltip();
-                }
-            }
-        }, { passive: true });
-        
-        document.addEventListener('click', function(e) {
-            const isColumnHeader = e.target.closest('#Data th[data-tooltip]');
-            if (!isColumnHeader && activeTooltip) {
-                hideTooltip();
-            }
-        });
-        
-        // Hide tooltip on scroll
-        document.addEventListener('scroll', function() {
-            if (activeTooltip) {
-                hideTooltip();
-            }
-        }, { passive: true });
-        
-        // Hide tooltip on orientation change and window resize
-        window.addEventListener('orientationchange', function() {
-            if (activeTooltip) {
-                hideTooltip();
-            }
-        });
-        
-        window.addEventListener('resize', function() {
-            if (activeTooltip) {
-                hideTooltip();
-            }
-        });
-    });
-    </script>
 
     <!-- Error Modal -->
     <div id="errorModal" class="modal">
