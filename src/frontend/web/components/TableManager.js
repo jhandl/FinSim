@@ -279,8 +279,48 @@ class TableManager {
             } else {
                 // Check for specific attribution first, then fall back to general 'income' for income columns
                 breakdown = data.Attributions[attributionKey];
+                // Special handling for dynamic tax columns: map 'Tax__<id>' to attribution key 'tax:<id>'
+                if (!breakdown && key.indexOf('Tax__') === 0) {
+                    try {
+                        const taxId = key.substring(5);
+                        breakdown = data.Attributions['tax:' + taxId] || data.Attributions['tax:' + taxId.toLowerCase()] || breakdown;
+                    } catch (_) {}
+                }
                 if (!breakdown && key.startsWith('income') && data.Attributions.income) {
                     breakdown = data.Attributions.income;
+                }
+
+                // Consolidated display for capital gains tax: show pre-relief by category and relief at end
+                if (key === 'Tax__capitalGains' && data.Attributions) {
+                    try {
+                        const cap = data.Attributions['tax:capitalGains'] || {};
+                        let fundsPost = 0;
+                        let sharesPost = 0;
+                        let relief = 0; // positive value for magnitude
+                        for (const src in cap) {
+                            const amt = cap[src] || 0;
+                            if (src === 'CGT Relief' && amt < 0) { relief += (-amt); continue; }
+                            const s = String(src).toLowerCase();
+                            // Heuristics: index funds and deemed disposal entries belong to funds/exit tax
+                            if (s.includes('index') || s.includes('fund')) {
+                                fundsPost += amt;
+                            } else if (s.includes('deemed')) {
+                                fundsPost += amt;
+                            } else if (s.includes('share')) {
+                                sharesPost += amt;
+                            } else {
+                                // Unknown label: assign to shares by default (CGT category)
+                                sharesPost += amt;
+                            }
+                        }
+                        const fundsPre = fundsPost; // exit tax not subject to CGT relief
+                        const sharesPre = sharesPost + relief; // reconstruct pre-relief tax for shares
+                        const synthetic = {};
+                        synthetic['Index Funds gains'] = fundsPre;
+                        synthetic['Shares gains'] = sharesPre;
+                        synthetic['CGT Relief'] = -relief;
+                        breakdown = synthetic;
+                    } catch (_) {}
                 }
             }
             

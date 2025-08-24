@@ -570,6 +570,8 @@ class Taxman {
     // Track separate totals for CGT-typed entries and exit-tax-typed entries
     let totalCGTTax = 0;
     let totalExitTax = 0;
+    // Track display-only relief tax saved (for tooltips), without affecting totals
+    let displayReliefTax = 0;
 
     for (const rate of sortedByRate) {
       const bucket = this.gains[rate];
@@ -591,6 +593,10 @@ class Taxman {
           const usedExemption = Math.min(remainingExemption, remainingForThis);
           remainingExemption -= usedExemption;
           remainingForThis -= usedExemption;
+          // Record display-only tax relief corresponding to exempted gains at this entry's rate
+          if (usedExemption > 0 && isFinite(numericRate) && numericRate > 0) {
+            displayReliefTax += usedExemption * numericRate;
+          }
         }
 
         if (remainingForThis > 0) {
@@ -609,16 +615,15 @@ class Taxman {
       }
     }
 
-    // After processing entries, apply CGT-specific relief (annual exemption) only
-    // against the CGT portion, not against exit tax.
-    let reliefApplied = 0;
-    if (remainingExemption < annualExemption && totalCGTTax > 0) {
-      const usedRelief = annualExemption - remainingExemption;
-      reliefApplied = Math.min(totalCGTTax, usedRelief);
-      if (reliefApplied > 0) this._recordTax('capitalGains', 'CGT Relief', -reliefApplied);
-    }
+    // Compute total tax combining exit tax and CGT (annual exemption already applied to CGT entries above)
+    totalTax = totalExitTax + totalCGTTax;
 
-    totalTax = totalExitTax + (totalCGTTax - reliefApplied);
+    // Display-only attribution: show a CGT Relief line for tooltip without altering totals
+    try {
+      if (this.attributionManager && displayReliefTax > 0) {
+        this.attributionManager.record('tax:capitalGains', 'CGT Relief', -displayReliefTax);
+      }
+    } catch (_) {}
   };
   
   clone() {

@@ -42,7 +42,6 @@ class Config {
           if (previousVersionLoaded !== null) {
             var codeMsg = (typeof Config_instance.codeUpdateMessage === 'string') ? Config_instance.codeUpdateMessage.trim() : '';
             if (codeMsg && codeMsg.length > 0) {
-              console.log('codeMsg (v' + currentVersion + '): ', codeMsg);
               aggregatedMessages.push(codeMsg);
             }
           }
