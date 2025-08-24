@@ -469,7 +469,7 @@ function roundValueForField(field, value) {
   return Math.round(value);
 }
 
-function compareSheets(rowsA, rowsB, fields, tolerancePercent) {
+function compareSheets(rowsA, rowsB, fields, tolerancePercent, keyMapA, keyMapB) {
   const maxRows = Math.max(rowsA.length, rowsB.length);
   const diffs = [];
   for (let i = 0; i < maxRows; i++) {
@@ -480,8 +480,11 @@ function compareSheets(rowsA, rowsB, fields, tolerancePercent) {
       continue;
     }
     for (const field of fields) {
-      const va = roundValueForField(field, a[field]);
-      const vb = roundValueForField(field, b[field]);
+      // Resolve actual underlying keys per-repo when provided (use field as fallback)
+      const keyA = (keyMapA && keyMapA[field]) ? keyMapA[field] : field;
+      const keyB = (keyMapB && keyMapB[field]) ? keyMapB[field] : field;
+      const va = roundValueForField(field, a[keyA]);
+      const vb = roundValueForField(field, b[keyB]);
       if (typeof va !== 'number' || typeof vb !== 'number') continue;
       const diffAbs = Math.abs(va - vb);
       // Use symmetric denominator to avoid infinite percentages when expected is 0
@@ -569,6 +572,70 @@ async function main() {
     const rowsA = toValidRows(resA.dataSheet);
     const rowsB = toValidRows(resB.dataSheet);
 
+    // Build optional key maps to resolve display-name aliases to actual Tax__ keys
+    const buildKeyMap = (rows) => {
+      if (!rows || rows.length === 0) return null;
+      const sample = rows[0];
+      const map = Object.create(null);
+      // Map Tax__ keys to multiple lookup forms
+      for (const k of Object.keys(sample)) {
+        if (!k) continue;
+        if (k.indexOf('Tax__') === 0) {
+          // Field reported in compare fields may be the display name or id without Tax__ prefix
+          const id = k.substring(5);
+          if (id) {
+            // Map various lookup forms to this actual key
+            map[id] = k;
+            map[id.toLowerCase()] = k;
+            map[id.replace(/\s+/g, '')] = k;
+            map[id.toLowerCase().replace(/\s+/g, '')] = k;
+            // Also map the full Tax__ key to the actual key (identity)
+            map['Tax__' + id] = k;
+          }
+        }
+      }
+
+      // If this repo exposes short legacy keys (e.g., 'it','prsi','usc','cgt'), map canonical Tax__ keys to them
+      const knownShorts = { it: 'incomeTax', prsi: 'prsi', usc: 'usc', cgt: 'capitalGains' };
+      for (const k of Object.keys(sample)) {
+        if (!k) continue;
+        const lk = k.toLowerCase();
+        if (knownShorts[lk]) {
+          const canonical = knownShorts[lk];
+          // Map Tax__canonical -> actual short key in this repo
+          map['Tax__' + canonical] = k;
+          map[canonical] = k;
+          map[canonical.toLowerCase()] = k;
+          map[lk] = k;
+        }
+      }
+      // Add common legacy short aliases if corresponding Tax__ keys exist
+      // incomeTax -> it, prsi, usc, capitalGains -> cgt
+      if (map['incometax'] || map['incomeTax']) {
+        map['it'] = map['incometax'] || map['incomeTax'];
+      }
+      if (map['prsi']) {
+        map['prsi'] = map['prsi'];
+      }
+      if (map['usc']) {
+        map['usc'] = map['usc'];
+      }
+      if (map['capitalgains'] || map['capitalGains']) {
+        map['cgt'] = map['capitalgains'] || map['capitalGains'];
+      }
+      return map;
+    };
+
+    const keyMapA = buildKeyMap(rowsA);
+    const keyMapB = buildKeyMap(rowsB);
+
+    if (args.verbose) {
+      const sampleA = rowsA && rowsA.length > 0 ? rowsA[0] : null;
+      const sampleB = rowsB && rowsB.length > 0 ? rowsB[0] : null;
+      console.log(`🔧 DEBUG: sampleA keys: ${sampleA ? Object.keys(sampleA).join(',') : '<none>'}`);
+      console.log(`🔧 DEBUG: sampleB keys: ${sampleB ? Object.keys(sampleB).join(',') : '<none>'}`);
+    }
+
     const fields = (args.fields && args.fields.length > 0)
       ? args.fields
       : (function() {
@@ -577,7 +644,55 @@ async function main() {
         return Array.from(new Set(autoA.concat(autoB)));
       })();
 
-    const diffs = compareSheets(rowsA, rowsB, fields, args.tolerance);
+    if (args.verbose) {
+      console.log(`🔧 DEBUG: keyMapA keys: ${keyMapA ? Object.keys(keyMapA).join(',') : '<none>'}`);
+      console.log(`🔧 DEBUG: keyMapB keys: ${keyMapB ? Object.keys(keyMapB).join(',') : '<none>'}`);
+      console.log(`🔧 DEBUG: detected fields before normalization: ${fields.join(', ')}`);
+    }
+
+    // Normalize requested fields to canonical keys to avoid duplicate/ambiguous comparisons
+    const normalizeFields = (fieldsList, mapA, mapB) => {
+      const seen = Object.create(null);
+      const out = [];
+      for (const f of fieldsList) {
+        let canonical = f;
+        // If it's already a Tax__ key, keep as-is
+        if (!String(f).startsWith('Tax__')) {
+          // Try maps (A then B) to resolve aliases like 'it' -> 'Tax__incomeTax'
+          if (mapA && mapA[f]) canonical = mapA[f];
+          else if (mapB && mapB[f]) canonical = mapB[f];
+          else {
+            // Also try lowercased / whitespace-stripped forms
+            const lc = String(f).toLowerCase().replace(/\s+/g, '');
+            if (mapA && mapA[lc]) canonical = mapA[lc];
+            else if (mapB && mapB[lc]) canonical = mapB[lc];
+          }
+        }
+        if (!seen[canonical]) {
+          seen[canonical] = true;
+          out.push(canonical);
+        }
+      }
+      return out;
+    };
+
+    const normFields = normalizeFields(fields, keyMapA, keyMapB);
+    if (args.verbose) {
+      console.log(`🔧 DEBUG: normalized fields: ${normFields.join(', ')}`);
+      // For tax fields, show how they map to underlying keys and sample values
+      const sampleA = rowsA && rowsA.length > 0 ? rowsA[0] : null;
+      const sampleB = rowsB && rowsB.length > 0 ? rowsB[0] : null;
+      for (const f of normFields) {
+        if (String(f).indexOf('Tax__') === 0) {
+          const kA = (keyMapA && keyMapA[f]) ? keyMapA[f] : f;
+          const kB = (keyMapB && keyMapB[f]) ? keyMapB[f] : f;
+          const vA = sampleA && typeof sampleA[kA] !== 'undefined' ? sampleA[kA] : '<missing>';
+          const vB = sampleB && typeof sampleB[kB] !== 'undefined' ? sampleB[kB] : '<missing>';
+          console.log(`🔧 DEBUG: field ${f} -> repoA key ${kA} (sample=${vA}), repoB key ${kB} (sample=${vB})`);
+        }
+      }
+    }
+    const diffs = compareSheets(rowsA, rowsB, normFields, args.tolerance, keyMapA, keyMapB);
     anyDiffs = anyDiffs || diffs.length > 0;
 
     const report = {
@@ -585,7 +700,7 @@ async function main() {
       scenarioPath: scenarioAbs,
       repoA: args.repoA,
       repoB: args.repoB,
-      fields,
+      fields: normFields,
       tolerance: args.tolerance,
       diffs
     };
