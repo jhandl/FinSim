@@ -117,6 +117,14 @@ class Config {
   }
 
   /**
+   * Return the application name configured in the loaded app config.
+   * Falls back to 'Financial Simulator' if not set.
+   */
+  getApplicationName() {
+    return this.applicationName || 'Financial Simulator';
+  }
+
+  /**
    * Lazily load and cache a TaxRuleSet for a given country code (e.g., 'ie').
    * Returns the loaded TaxRuleSet instance, or null if loading fails.
    * NOTE: Keep async to avoid blocking UI; callers that need sync access should

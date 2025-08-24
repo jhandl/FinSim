@@ -160,10 +160,6 @@ class UIManager {
       SharesCapital: dataSheet[row].sharesCapital / scale,
       PensionContribution: dataSheet[row].pensionContribution / scale,
       WithdrawalRate: dataSheet[row].withdrawalRate / scale,
-      IT: dataSheet[row].it / scale,
-      PRSI: dataSheet[row].prsi / scale,
-      USC: dataSheet[row].usc / scale,
-      CGT: dataSheet[row].cgt / scale,
       Worth: dataSheet[row].worth / scale,
       Attributions: dataSheet[row].attributions
     };
@@ -178,11 +174,18 @@ class UIManager {
       for (const key in capMap) {
         data['Capital__' + key] = capMap[key] / scale;
       }
-      // Add dynamic tax totals
+      // Add dynamic tax totals with display names from tax ruleset
       const taxMap = dataSheet[row].taxByKey || {};
       for (const tId in taxMap) {
         data['Tax__' + tId] = taxMap[tId] / scale;
       }
+      
+      // Also add legacy hardcoded tax fields for backward compatibility with existing UI components
+      // These will be dynamically populated from the taxByKey map
+      if (taxMap.incomeTax !== undefined) data.IT = taxMap.incomeTax / scale;
+      if (taxMap.prsi !== undefined) data.PRSI = taxMap.prsi / scale;
+      if (taxMap.usc !== undefined) data.USC = taxMap.usc / scale;
+      if (taxMap.capitalGains !== undefined) data.CGT = taxMap.capitalGains / scale;
     } catch (_) {}
 
     this.ui.setDataRow(row, data);

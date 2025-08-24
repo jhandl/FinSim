@@ -16,6 +16,8 @@ var person1, person2;
 var perRunResults, currentRun;
 // Variables for earned net income tracking
 var earnedNetIncome, householdPhase;
+// Stable tax ids for consistent Tax__... columns per run
+var stableTaxIds;
 
 const Phases = {
   growth: 'growth',
@@ -100,8 +102,7 @@ function initializeSimulationVariables() {
   shares = new Shares(params.growthRateShares, params.growthDevShares);
   // Also create generic assets array (compat path: map first two to existing ones for IE)
   try {
-    var cfg = Config.getInstance();
-    var rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
+    var rs = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })();
     if (rs && typeof InvestmentTypeFactory !== 'undefined') {
       var growthMap = {
         indexFunds: params.growthRateFunds,
@@ -125,6 +126,31 @@ function initializeSimulationVariables() {
   }
   if (params.initialFunds > 0) indexFunds.buy(params.initialFunds);
   if (params.initialShares > 0) shares.buy(params.initialShares);
+
+  // Initialize stable tax ids from ruleset for consistent Tax__ columns
+  try {
+    var _rs = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })();
+    var idsMap = { incomeTax: true, capitalGains: true };
+    if (_rs && typeof _rs.getSocialContributions === 'function') {
+      var sc = _rs.getSocialContributions() || [];
+      for (var si = 0; si < sc.length; si++) {
+        var s = sc[si];
+        var sid = (s && (s.id || s.name)) ? String(s.id || s.name).toLowerCase() : null;
+        if (sid) idsMap[sid] = true;
+      }
+    }
+    if (_rs && typeof _rs.getAdditionalTaxes === 'function') {
+      var ad = _rs.getAdditionalTaxes() || [];
+      for (var ai = 0; ai < ad.length; ai++) {
+        var a = ad[ai];
+        var aid = (a && (a.id || a.name)) ? String(a.id || a.name).toLowerCase() : null;
+        if (aid) idsMap[aid] = true;
+      }
+    }
+    stableTaxIds = Object.keys(idsMap);
+  } catch (e) {
+    stableTaxIds = ['incomeTax', 'capitalGains'];
+  }
 
   // Initialize Person 1 (P1)
   const p1SpecificParams = {
@@ -329,7 +355,7 @@ function processEvents() {
           incomeSalaries += amount;
           attributionManager.record('incomesalaries', event.id, amount);
           // Pension contribution age bands: prefer TaxRuleSet when available
-          var _rs1 = Config.getInstance().getCachedTaxRuleSet ? Config.getInstance().getCachedTaxRuleSet(Config.getInstance().getDefaultCountry()) : null;
+          var _rs1 = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })();
           var p1Bands = (_rs1 && typeof _rs1.getPensionContributionAgeBands === 'function') ? _rs1.getPensionContributionAgeBands() : {};
           let p1ContribRate = person1.pensionContributionPercentageParam * getRateForKey(person1.age, p1Bands);
 
@@ -369,7 +395,7 @@ function processEvents() {
           incomeSalaries += amount;
           attributionManager.record('incomesalaries', event.id, amount);
           // Pension contribution age bands (P2)
-          var _rs2 = _rs1; // reuse same ruleset
+          var _rs2 = _rs1 || (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })(); // reuse or fetch ruleset
           var p2Bands = (_rs2 && typeof _rs2.getPensionContributionAgeBands === 'function') ? _rs2.getPensionContributionAgeBands() : {};
           let p2ContribRate = person2.pensionContributionPercentageParam * getRateForKey(person2.age, p2Bands);
           
@@ -920,7 +946,22 @@ function updateYearlyData() {
   });
   
   if (!(row in dataSheet)) {
-    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "it": 0, "prsi": 0, "usc": 0, "cgt": 0, "worth": 0, "attributions": {}, "investmentIncomeByKey": {}, "investmentCapitalByKey": {}, "taxByKey": {} };
+    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "worth": 0, "attributions": {}, "investmentIncomeByKey": {}, "investmentCapitalByKey": {}, "taxByKey": {} };
+    // Pre-initialize stable tax columns for consistency across rows
+    if (stableTaxIds && stableTaxIds.length > 0) {
+      for (var ti = 0; ti < stableTaxIds.length; ti++) {
+        var tcol = 'Tax__' + stableTaxIds[ti];
+        if (dataSheet[row][tcol] === undefined) dataSheet[row][tcol] = 0;
+      }
+    }
+    
+    // Initialize dynamic tax columns based on current tax totals
+    if (revenue && revenue.taxTotals) {
+      for (const taxId in revenue.taxTotals) {
+        const taxColumnName = `Tax__${taxId}`;
+        dataSheet[row][taxColumnName] = 0;
+      }
+    }
   }
   dataSheet[row].age += person1.age;
   dataSheet[row].year += year;
@@ -968,10 +1009,18 @@ function updateYearlyData() {
   } catch (_) {}
   dataSheet[row].pensionContribution += personalPensionContribution;
   dataSheet[row].withdrawalRate += withdrawalRate;
-  dataSheet[row].it += revenue.getTaxTotal('incomeTax');
-  dataSheet[row].prsi += revenue.getTaxTotal('prsi');
-  dataSheet[row].usc += revenue.getTaxTotal('usc');
-  dataSheet[row].cgt += revenue.getTaxTotal('capitalGains');
+  
+  // Populate dynamic tax columns
+  if (revenue && revenue.taxTotals) {
+    for (const taxId in revenue.taxTotals) {
+      const taxColumnName = `Tax__${taxId}`;
+      if (!dataSheet[row][taxColumnName]) {
+        dataSheet[row][taxColumnName] = 0;
+      }
+      dataSheet[row][taxColumnName] += revenue.getTaxByType(taxId);
+    }
+  }
+  
   dataSheet[row].worth += realEstate.getTotalValue() + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFunds.capital() + shares.capital() + cash;
 
   // Record portfolio statistics for tooltip attribution

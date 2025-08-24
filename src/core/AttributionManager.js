@@ -11,7 +11,7 @@ class AttributionManager {
 
   /**
    * Records a financial value with its source attribution.
-   * @param {string} metric The name of the metric (e.g., "it", "usc").
+   * @param {string} metric The name of the metric (e.g., "tax:incomeTax", "tax:socialContrib").
    * @param {string} source The description of the source.
    * @param {number} amount The amount from this source.
    */

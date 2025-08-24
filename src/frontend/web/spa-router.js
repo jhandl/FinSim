@@ -7,12 +7,12 @@
 // Route configurations
 const routes = {
     '/': {
-        title: 'Ireland Financial Simulator - Home',
+        titleTemplate: ' - Home',
         contentPath: '/src/frontend/web/landing/index.html',
         favicon: '/src/frontend/web/ifs/IFS.ico'
     },
     '/#ifs': {
-        title: 'Ireland Financial Simulator',
+        titleTemplate: '',
         contentPath: '/src/frontend/web/ifs/index.html',
         favicon: '/src/frontend/web/ifs/IFS.ico'
     }
@@ -91,7 +91,16 @@ function handleRoute(route) {
 async function loadPage(routeConfig) {
     try {
         // Update document title and favicon
-        document.title = routeConfig.title;
+        let title;
+        try {
+            // Try to get the configurable application name
+            const appName = Config.getInstance().getApplicationName();
+            title = appName + routeConfig.titleTemplate;
+        } catch (error) {
+            // Fallback to generic name if Config is not available yet
+            title = 'Financial Simulator' + routeConfig.titleTemplate;
+        }
+        document.title = title;
         updateFavicon(routeConfig.favicon);
         
         // Get the container

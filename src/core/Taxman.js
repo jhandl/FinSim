@@ -113,13 +113,6 @@ class Taxman {
     this.computeSocialContributionsGeneric();
     this.computeAdditionalTaxesGeneric();
     this.computeCGT();
-
-    // Derive legacy numeric fields from dynamic taxTotals for backward compatibility (to be removed later)
-    this.it = this.taxTotals['incomeTax'] || 0;
-    this.prsi = this.taxTotals['prsi'] || 0;
-    this.usc = this.taxTotals['usc'] || 0;
-    this.cgt = this.taxTotals['capitalGains'] || 0;
-
   };
 
   netIncome() {
@@ -128,10 +121,7 @@ class Taxman {
                   (this.privatePensionP1 + this.privatePensionP2) + 
                   this.statePension + this.investmentIncome + this.nonEuShares;
     
-    // Use dynamic taxTotals if available; else fall back to legacy fields
-    const totalTax = (this.taxTotals && Object.keys(this.taxTotals).length > 0)
-      ? Object.values(this.taxTotals).reduce((a,b)=>a+b,0)
-      : Math.max(this.it + this.prsi + this.usc + this.cgt, 0);
+    const totalTax = this.getAllTaxesTotal();
     return gross - totalTax;
   };
   
@@ -157,11 +147,7 @@ class Taxman {
     this.salariesP1 = [];
     this.salariesP2 = [];
 
-    this.it = 0;
-    this.prsi = 0;
-    this.usc = 0;
-    this.cgt = 0;
-    // New dynamic tax totals map for country-neutral engine
+    // Dynamic tax totals map for country-neutral engine
     this.taxTotals = {};
 
     this.person1Ref = person1 || null;
@@ -188,7 +174,7 @@ class Taxman {
     if (this.attributionManager && this.attributionManager.yearlyAttributions) {
       const keys = Object.keys(this.attributionManager.yearlyAttributions);
       for (const k of keys) {
-        if (k === 'it' || k === 'prsi' || k === 'usc' || k === 'cgt' || k.startsWith('tax:')) {
+        if (k.startsWith('tax:')) {
           this.attributionManager.yearlyAttributions[k] = new Attribution(k);
         }
       }
@@ -345,14 +331,20 @@ class Taxman {
     let isEligibleForAgeExemption = p1AgeEligible || p2AgeEligible;
     
     const taxableAmount = taxableIncomeAttribution.getTotal();
-    if (isEligibleForAgeExemption && taxableAmount <= adjust(exemption) && (this.privatePensionLumpSumCountP1 === 0 && this.privatePensionLumpSumCountP2 === 0)) {
-      this.it = 0;
+    const ageExempt = (isEligibleForAgeExemption && taxableAmount <= adjust(exemption) && (this.privatePensionLumpSumCountP1 === 0 && this.privatePensionLumpSumCountP2 === 0));
+    if (ageExempt) {
+      // Clear any previously recorded income tax for age exemption case
+      this.taxTotals['incomeTax'] = 0;
+      // Also clear attribution slices for income tax to avoid UI inconsistencies
+      try {
+        if (this.attributionManager && this.attributionManager.yearlyAttributions && this.attributionManager.yearlyAttributions['tax:incomeTax']) {
+          this.attributionManager.yearlyAttributions['tax:incomeTax'] = new Attribution('tax:incomeTax');
+        }
+      } catch (_) {}
     } else {
-      this.it = Math.max(tax - credit, 0);
+      // Apply credits exactly once as a negative record against band taxes already recorded above
+      this._recordTax('incomeTax', 'Tax Credit', -Math.min(tax, credit));
     }
-    // Record tax credit as a negative amount to offset tax bands above.
-    this._recordTax('incomeTax', 'Tax Credit', -Math.min(tax, credit));
-    // No additional record for total to avoid double-counting (tax bands already recorded earlier).
   };
 
   /**
@@ -415,8 +407,6 @@ class Taxman {
       applyForPerson(this.person1Ref, this.salariesP1, nonPayeIncomeAttribution, contribObj);
       if (this.person2Ref) applyForPerson(this.person2Ref, this.salariesP2, nonPayeIncomeAttribution, contribObj);
     }
-    // Legacy mapping
-    this.prsi = this.taxTotals['prsi'] || 0;
   }
 
   /**
@@ -452,15 +442,27 @@ class Taxman {
 
     for (const taxObj of extras) {
       const taxId = String(taxObj.name||'addtax').toLowerCase();
-      const exemptRaw = (this.ruleset && typeof this.ruleset.getAdditionalTaxExemptAmount === 'function')
+      // New dual exemption model:
+      // - incomeExemptionThreshold (cliff): if total income <= threshold, no tax; if above, tax applies on full base
+      // - deductibleExemptionAmount (deduction): subtract this amount from taxable base before applying brackets
+      // Backward-compat: legacy exemptAmount behaves like deductibleExemptionAmount
+      const thresholdRaw = (this.ruleset && typeof this.ruleset.getAdditionalTaxIncomeExemptionThreshold === 'function')
+        ? this.ruleset.getAdditionalTaxIncomeExemptionThreshold(taxObj.name)
+        : (typeof taxObj.incomeExemptionThreshold === 'number' ? taxObj.incomeExemptionThreshold : 0);
+      const deductibleRawExplicit = (this.ruleset && typeof this.ruleset.getAdditionalTaxDeductibleExemptionAmount === 'function')
+        ? this.ruleset.getAdditionalTaxDeductibleExemptionAmount(taxObj.name)
+        : (typeof taxObj.deductibleExemptionAmount === 'number' ? taxObj.deductibleExemptionAmount : 0);
+      const legacyExemptRaw = (this.ruleset && typeof this.ruleset.getAdditionalTaxExemptAmount === 'function')
         ? this.ruleset.getAdditionalTaxExemptAmount(taxObj.name)
         : (typeof taxObj.exemptAmount === 'number' ? taxObj.exemptAmount : 0);
-      const exempt = adjust(exemptRaw);
+      const threshold = adjust(thresholdRaw);
+      const deductible = adjust(deductibleRawExplicit > 0 ? deductibleRawExplicit : legacyExemptRaw);
 
       const processPerson = (person, attr) => {
         if (!person) return 0;
         const totalInc = attr.getTotal();
-        if (totalInc<=exempt) return 0;
+        // Apply cliff threshold first: if income is at or below threshold, no tax at all
+        if (threshold > 0 && totalInc <= threshold) return 0;
         // Prefer using ruleset helpers where available (e.g., USC special handling)
         // Fallback to taxObj.brackets / ageBasedBrackets otherwise.
         let bands = taxObj.brackets || {};
@@ -491,17 +493,40 @@ class Taxman {
           bands = taxObj.brackets || bands;
         }
 
-        // Apply exempt amount by shifting band limits so the first taxed amount
-        // starts after the exempt threshold.
-        // If an exempt amount is configured, remove that exempt portion from
-        // the attribution before computing progressive tax so bands remain
-        // unchanged but applied only to income above the exemption.
-        if (exempt > 0) {
-          const total = attr.getTotal();
-          if (total <= exempt) return 0;
-          // Legacy Revenue.js computes additional taxes (USC) using the
-          // progressive bands when income exceeds the exempt threshold.
-          return this.computeProgressiveTax(bands, attr, taxId);
+        // If a deductible amount is configured, compute tax on the taxable
+        // portion (total - deductible) and attribute the tax proportionally to
+        // the actual taxable shares of each source. Also ensure band
+        // selection uses the taxable total so brackets are chosen
+        // consistently with the taxable base.
+        const total = attr.getTotal();
+        if (deductible > 0) {
+          if (total <= deductible) return 0;
+
+          // Taxable total after exemption
+          const taxableTotal = total - deductible;
+
+          // If ruleset helper exists, prefer bands selected for the taxable total
+          try {
+            if (this.ruleset && typeof this.ruleset.getAdditionalTaxBandsFor === 'function') {
+              bands = this.ruleset.getAdditionalTaxBandsFor(taxObj.name, person.age, taxableTotal) || bands;
+            }
+          } catch (e) {
+            // swallow and fall back to previously determined bands
+            bands = bands || {};
+          }
+
+          // Build a scaled attribution representing only the taxable shares
+          const taxableAttr = new Attribution(attr.name + ':taxable');
+          const breakdown = attr.getBreakdown();
+          const scale = taxableTotal / total;
+          if (!isFinite(scale) || scale <= 0) return 0;
+          for (const src in breakdown) {
+            const val = breakdown[src] * scale;
+            if (val !== 0) taxableAttr.add(src, val);
+          }
+
+          // Compute progressive tax on the scaled attribution (no limitShift)
+          return this.computeProgressiveTax(bands, taxableAttr, taxId);
         }
 
         return this.computeProgressiveTax(bands, attr, taxId);
@@ -594,7 +619,6 @@ class Taxman {
     }
 
     totalTax = totalExitTax + (totalCGTTax - reliefApplied);
-    this.cgt = totalTax;
   };
   
   clone() {
@@ -631,10 +655,7 @@ class Taxman {
     copy.salariesP1 = this.salariesP1.map(s => ({...s}));
     copy.salariesP2 = this.salariesP2.map(s => ({...s}));
 
-    copy.it = this.it;
-    copy.prsi = this.prsi;
-    copy.usc = this.usc;
-    copy.cgt = this.cgt;
+    copy.taxTotals = this.taxTotals ? {...this.taxTotals} : {};
 
     copy.ruleset = this.ruleset;
 
@@ -651,14 +672,32 @@ class Taxman {
   };
 
   /**
+   * Get a specific tax amount by tax ID.
+   * Returns 0 when the tax id has not been recorded.
+   * @param {string} taxId The lowercase identifier of the tax (e.g., 'incomeTax', 'prsi').
+   */
+  getTaxByType(taxId) {
+    if (!taxId) return 0;
+    return (this.taxTotals && this.taxTotals[taxId]) ? this.taxTotals[taxId] : 0;
+  }
+
+  /**
+   * Get the sum of all taxes.
+   * @returns {number} The total of all recorded taxes.
+   */
+  getAllTaxesTotal() {
+    if (!this.taxTotals || Object.keys(this.taxTotals).length === 0) return 0;
+    return Object.values(this.taxTotals).reduce((a, b) => a + b, 0);
+  }
+
+  /**
    * Compatibility helper for legacy consumers (e.g., Simulator.js) that expect
    * a method to fetch the total amount of a particular tax bucket.
    * Returns 0 when the tax id has not been recorded.
    * @param {string} taxId The lowercase identifier of the tax (e.g., 'incomeTax', 'prsi').
    */
   getTaxTotal(taxId) {
-    if (!taxId) return 0;
-    return (this.taxTotals && this.taxTotals[taxId]) ? this.taxTotals[taxId] : 0;
+    return this.getTaxByType(taxId);
   }
 }
 

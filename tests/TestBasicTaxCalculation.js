@@ -71,7 +71,7 @@ module.exports = {
       type: 'exact_value',
       target: 'age',
       age: 31,                     // Test at age 31 (second year of income)
-      field: 'it',                 // Income tax field
+      field: 'it',                  // Legacy alias mapped by framework
       expected: 7071.5,            // Actual calculated income tax
       tolerance: 10                // Allow €10 tolerance for rounding
     },
@@ -82,7 +82,7 @@ module.exports = {
       type: 'exact_value',
       target: 'age',
       age: 31,
-      field: 'prsi',
+      field: 'prsi',               // Legacy alias mapped by framework
       expected: 2050,              // Actual calculated PRSI
       tolerance: 10
     },
@@ -93,7 +93,7 @@ module.exports = {
       type: 'exact_value',
       target: 'age',
       age: 31,
-      field: 'usc',
+      field: 'usc',                // Legacy alias mapped by framework
       expected: 1036.92,           // Updated to match current simulation output
       tolerance: 5
     },

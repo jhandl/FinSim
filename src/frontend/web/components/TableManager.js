@@ -4,6 +4,8 @@ class TableManager {
 
   constructor(webUI) {
     this.webUI = webUI;
+    // One-time tax header initialization flag per simulation
+    this._taxHeaderInitialized = false;
   }
 
   getTableData(groupId, columnCount, includeHiddenEventTypes = false) {
@@ -96,27 +98,146 @@ class TableManager {
     // Clear existing cells
     row.innerHTML = '';
 
+    // Reset header init at the start of each simulation (first row)
+    if (rowIndex === 0 || rowIndex === 1) {
+      this._taxHeaderInitialized = false;
+    }
+
     // Before building row, ensure headers exist for any new dynamic keys
     const headerRow = document.querySelector('#Data thead tr:nth-child(2)');
     if (headerRow) {
       const existingKeys = new Set(Array.from(headerRow.querySelectorAll('th[data-key]')).map(h=>h.dataset.key));
-      const deductionsGroupTh = document.querySelector('#Data thead tr.header-groups th:nth-child(16)'); // 0-index? colSpan=5 originally
-      let addedCount = 0;
-      for (const key in data) {
-        if (key.startsWith('Tax__') && !existingKeys.has(key)) {
-          // create new header
+      // Find the Deductions group header cell via data attribute for robustness
+      let deductionsGroupTh = null;
+      try {
+        deductionsGroupTh = document.querySelector('#Data thead tr.header-groups th[data-group="deductions"]');
+      } catch (_) { deductionsGroupTh = null; }
+
+      // Note: Pre-existing legacy tax headers (IT/PRSI/USC/CGT) should not exist in the DOM.
+      // Dynamic tax headers are created below solely from simulation data + ruleset.
+
+      // Add any new dynamic tax columns that don't already exist, ordered by stableTaxIds
+      if (!this._taxHeaderInitialized) {
+        // Build stable order list from global simulator or from ruleset/union as fallback
+        let order = [];
+        // 1) Prefer stableTaxIds exposed globally
+        try {
+          if (typeof window !== 'undefined' && Array.isArray(window.stableTaxIds) && window.stableTaxIds.length > 0) {
+            order = window.stableTaxIds.slice();
+          } else if (typeof stableTaxIds !== 'undefined' && Array.isArray(stableTaxIds) && stableTaxIds.length > 0) {
+            order = stableTaxIds.slice();
+          }
+        } catch (_) {}
+
+        // 2) If not available, attempt union of all Tax__* keys from existing dataSheet rows (if present)
+        if (!order || order.length === 0) {
+          try {
+            if (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) {
+              const union = {};
+              for (let ri = 0; ri < dataSheet.length; ri++) {
+                const rowObj = dataSheet[ri];
+                if (!rowObj) continue;
+                const keys = Object.keys(rowObj);
+                for (let ki = 0; ki < keys.length; ki++) {
+                  const k = keys[ki];
+                  if (k && k.indexOf('Tax__') === 0) {
+                    const id = k.substring(5);
+                    if (id) union[id] = true;
+                  }
+                }
+              }
+              order = Object.keys(union);
+            }
+          } catch (_) {}
+        }
+
+        // 3) If still empty, derive from ruleset
+        if (!order || order.length === 0) {
+          try {
+            const cfg = Config.getInstance();
+            const rs = (cfg.getCachedTaxRuleSet ? (cfg.getCachedTaxRuleSet(cfg.getDefaultCountry && cfg.getDefaultCountry())) : null) || (cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet() : null);
+            const idsMap = { incomeTax: true, capitalGains: true };
+            if (rs && typeof rs.getSocialContributions === 'function') {
+              const sc = rs.getSocialContributions() || [];
+              for (let i = 0; i < sc.length; i++) {
+                const s = sc[i];
+                const sid = (s && (s.id || s.name)) ? String(s.id || s.name).toLowerCase() : null;
+                if (sid) idsMap[sid] = true;
+              }
+            }
+            if (rs && typeof rs.getAdditionalTaxes === 'function') {
+              const ad = rs.getAdditionalTaxes() || [];
+              for (let i = 0; i < ad.length; i++) {
+                const a = ad[i];
+                const aid = (a && (a.id || a.name)) ? String(a.id || a.name).toLowerCase() : null;
+                if (aid) idsMap[aid] = true;
+              }
+            }
+            order = Object.keys(idsMap);
+          } catch (_) {
+            order = ['incomeTax', 'capitalGains'];
+          }
+        }
+
+        // Also include any Tax__ keys present in this first row's data that aren't in order
+        try {
+          const currentTaxKeys = Object.keys(data).filter(k => k.indexOf('Tax__') === 0).map(k => k.substring(5));
+          const inOrder = {};
+          for (let i = 0; i < order.length; i++) inOrder[String(order[i]).toLowerCase()] = true;
+          for (let j = 0; j < currentTaxKeys.length; j++) {
+            const low = String(currentTaxKeys[j]).toLowerCase();
+            if (!inOrder[low]) order.push(currentTaxKeys[j]);
+          }
+        } catch (_) {}
+
+        // Determine insertion anchor: last existing tax th; fallback to PensionContribution before it
+        const taxThs = Array.from(headerRow.querySelectorAll('th[data-key^="Tax__"]'));
+        const pensionTh = headerRow.querySelector('th[data-key="PensionContribution"]');
+        let anchor = taxThs.length > 0 ? taxThs[taxThs.length - 1] : (pensionTh || null);
+
+        // Create th for each tax id in order if not present
+        for (let oi = 0; oi < order.length; oi++) {
+          const taxId = order[oi];
+          const key = 'Tax__' + taxId;
+          if (existingKeys.has(key)) continue;
+
           const th = document.createElement('th');
           th.setAttribute('data-key', key);
-          const labelRaw = key.substring(6); // remove Tax__
-          th.textContent = labelRaw.toUpperCase();
-          th.title = labelRaw + ' tax paid';
-          headerRow.appendChild(th);
+          // Get display name from tax ruleset if available
+          let displayName = String(taxId).toUpperCase();
+          try {
+            const cfg2 = Config.getInstance();
+            const rs2 = cfg2.getCachedTaxRuleSet ? cfg2.getCachedTaxRuleSet() : null;
+            if (rs2 && typeof rs2.getDisplayNameForTax === 'function') {
+              displayName = rs2.getDisplayNameForTax(taxId);
+            }
+          } catch (_) {}
+          th.textContent = displayName;
+          th.title = displayName + ' tax paid';
+
+          if (anchor) {
+            if (anchor.nextSibling) {
+              headerRow.insertBefore(th, anchor.nextSibling);
+            } else {
+              headerRow.appendChild(th);
+            }
+          } else if (pensionTh) {
+            headerRow.insertBefore(th, pensionTh);
+          } else {
+            headerRow.appendChild(th);
+          }
+          anchor = th;
           existingKeys.add(key);
-          addedCount++;
         }
+
+        // Mark headers initialized for this run
+        this._taxHeaderInitialized = true;
       }
-      if (addedCount>0 && deductionsGroupTh) {
-        deductionsGroupTh.colSpan = (parseInt(deductionsGroupTh.colSpan) || 5) + addedCount;
+
+      // Fix colspan calculation: count actual tax columns instead of adding to base
+      if (deductionsGroupTh) {
+        const taxColumnCount = headerRow.querySelectorAll('th[data-key^="Tax__"]').length;
+        deductionsGroupTh.colSpan = taxColumnCount + 1; // +1 for PensionContribution
       }
     }
 
@@ -126,26 +247,25 @@ class TableManager {
     // Create cells and format values in the order of the headers
     headers.forEach(header => {
       const key = header.dataset.key;
-      const value = data[key];
+      const v = (data[key] == null ? 0 : data[key]);
 
-      if (value !== undefined) {
-        const td = document.createElement('td');
-        
-        // Create a container for the cell content
-        const contentContainer = document.createElement('div');
-        contentContainer.className = 'cell-content';
-        
-        // Add the formatted value
-        if (key === 'Age' || key === 'Year') {
-          contentContainer.textContent = value.toString();
-        } else if (key === 'WithdrawalRate') {
-          contentContainer.textContent = value.toLocaleString("en-IE", {style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2});
-        } else {
-          contentContainer.textContent = value.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
-        }
-        
-        // Add tooltip for attributable values
-        let hasTooltip = false;
+      const td = document.createElement('td');
+      
+      // Create a container for the cell content
+      const contentContainer = document.createElement('div');
+      contentContainer.className = 'cell-content';
+      
+      // Add the formatted value
+      if (key === 'Age' || key === 'Year') {
+        contentContainer.textContent = v.toString();
+      } else if (key === 'WithdrawalRate') {
+        contentContainer.textContent = v.toLocaleString("en-IE", {style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2});
+      } else {
+        contentContainer.textContent = v.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
+      }
+      
+      // Add tooltip for attributable values
+      let hasTooltip = false;
         if (data.Attributions) {
             // Convert table column key to lowercase to match attribution keys
             let attributionKey = key.toLowerCase();
@@ -227,7 +347,12 @@ class TableManager {
                     }));
                     
                     // Calculate max width including potential tax amount
-                    const potentialTax = (data.IT || 0) + (data.USC || 0) + (data.PRSI || 0) + (data.CGT || 0);
+                    let potentialTax = 0;
+                    for (const dataKey in data) {
+                        if (dataKey.startsWith('Tax__')) {
+                            potentialTax += (data[dataKey] || 0);
+                        }
+                    }
                     const formattedTax = potentialTax.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
                     const maxAmountWidth = Math.max(
                         ...formattedAmounts.map(item => item.formatted.length),
@@ -244,26 +369,26 @@ class TableManager {
                 }
                 
                 // Only attach tooltip and show 'i' icon if there's meaningful content to display
-                if (tooltipText.trim() !== '' && value >= 1) {
+                // Guard with normalized cell value v >= 1 to avoid errors on tiny/zero values
+                if (breakdown && tooltipText.trim() !== '' && v >= 1) {
                     TooltipUtils.attachTooltip(td, tooltipText);
                     hasTooltip = true;
                 }
             }
         }
 
-        // Add the content container to the cell
-        td.appendChild(contentContainer);
-        
-        // Add 'i' icon if the cell has a tooltip
-        if (hasTooltip) {
-            const infoIcon = document.createElement('span');
-            infoIcon.className = 'cell-info-icon';
-            infoIcon.textContent = 'i';
-            contentContainer.appendChild(infoIcon);
-        }
-
-        row.appendChild(td);
+      // Add the content container to the cell
+      td.appendChild(contentContainer);
+      
+      // Add 'i' icon if the cell has a tooltip
+      if (hasTooltip) {
+          const infoIcon = document.createElement('span');
+          infoIcon.className = 'cell-info-icon';
+          infoIcon.textContent = 'i';
+          contentContainer.appendChild(infoIcon);
       }
+
+      row.appendChild(td);
     });
   }
 

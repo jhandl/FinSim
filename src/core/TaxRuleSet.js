@@ -99,14 +99,14 @@ class TaxRuleSet {
 
   /**
    * Return array of social contribution descriptors as provided by the JSON
-   * (e.g., [{name:'PRSI', rate:0.04, ageAdjustments:{66:0}}])
+   * (e.g., [{name:'socialContrib', rate:0.04, ageAdjustments:{66:0}}])
    */
   getSocialContributions() {
     return Array.isArray(this.raw.socialContributions) ? this.raw.socialContributions : [];
   }
 
   /**
-   * Return array of additional taxes (e.g., USC) exactly as in JSON.
+   * Return array of additional taxes (e.g., universalSocialCharge) exactly as in JSON.
    */
   getAdditionalTaxes() {
     return Array.isArray(this.raw.additionalTaxes) ? this.raw.additionalTaxes : [];
@@ -259,24 +259,62 @@ class TaxRuleSet {
     return pr.statePensionIncreaseBands || {};
   }
 
-  // ----- Social Contributions (PRSI) -----
-  getPRSIRateForAge(age) {
-    var list = this.getSocialContributions();
-    for (var i = 0; i < list.length; i++) {
-      var sc = list[i];
-      if (sc && sc.name === 'PRSI') {
-        var rate = typeof sc.rate === 'number' ? sc.rate : 0;
-        var ageAdj = sc.ageAdjustments || {};
-        var thresholds = Object.keys(ageAdj).map(function(k){return parseInt(k);}).sort(function(a,b){return a-b;});
-        for (var j = 0; j < thresholds.length; j++) {
-          if (age >= thresholds[j]) {
-            rate = ageAdj[String(thresholds[j])];
-          }
-        }
-        return rate || 0;
+  // ----- Generic helpers for tax display names -----
+  /**
+   * Return the display name for a tax by its ID, looking across all tax categories.
+   * Searches social contributions, additional taxes, and capital gains tax.
+   * Returns the tax ID if no display name is found.
+   */
+  getDisplayNameForTax(taxId) {
+    // Defensive normalization
+    const rawId = (taxId == null) ? '' : String(taxId);
+    const idLower = rawId.toLowerCase();
+
+    // Build lazy cache: map IDs and lowercase names to display names
+    if (!this._taxDisplayIndex) {
+      const index = Object.create(null);
+      const add = function(key, value) {
+        if (!key) return;
+        if (index[key] === undefined) index[key] = value;
+      };
+
+      const socialContribs = this.getSocialContributions();
+      for (let i = 0; i < socialContribs.length; i++) {
+        const tax = socialContribs[i];
+        if (!tax) continue;
+        const display = (tax.displayName || tax.name || tax.id || '');
+        if (typeof tax.id === 'string' && tax.id) add(tax.id, display);
+        if (typeof tax.name === 'string' && tax.name) add(tax.name.toLowerCase(), display);
       }
+
+      const additionalTaxes = this.getAdditionalTaxes();
+      for (let i = 0; i < additionalTaxes.length; i++) {
+        const tax = additionalTaxes[i];
+        if (!tax) continue;
+        const display = (tax.displayName || tax.name || tax.id || '');
+        if (typeof tax.id === 'string' && tax.id) add(tax.id, display);
+        if (typeof tax.name === 'string' && tax.name) add(tax.name.toLowerCase(), display);
+      }
+
+      this._taxDisplayIndex = index;
     }
-    return 0;
+
+    // O(1) lookups
+    if (this._taxDisplayIndex[rawId] !== undefined) return this._taxDisplayIndex[rawId] || rawId;
+    if (this._taxDisplayIndex[idLower] !== undefined) return this._taxDisplayIndex[idLower] || rawId;
+
+    // 3) Special-case common aliases
+    if (idLower === 'incometax' || idLower === 'it') {
+      const itSpec = this.getIncomeTaxSpec();
+      return (itSpec && itSpec.displayName) ? itSpec.displayName : 'Income Tax';
+    }
+    if (idLower === 'capitalgains' || idLower === 'cgt') {
+      const cgtSpec = this.getCapitalGainsSpec();
+      return (cgtSpec && cgtSpec.displayName) ? cgtSpec.displayName : 'Capital Gains Tax';
+    }
+
+    // Fallback to the provided identifier
+    return rawId;
   }
 
   // ----- Generic helpers for additional taxes -----
@@ -288,6 +326,33 @@ class TaxRuleSet {
     for (let i = 0; i < list.length; i++) {
       const tax = list[i];
       if (tax && tax.name === name) return typeof tax.exemptAmount === 'number' ? tax.exemptAmount : 0;
+    }
+    return 0;
+  }
+
+  /**
+   * Return configured income exemption threshold (cliff) for an additional tax by name.
+   * When total income is at or below this threshold, the tax is not applied at all;
+   * when above, tax applies to the full base with no reduction.
+   */
+  getAdditionalTaxIncomeExemptionThreshold(name) {
+    const list = this.getAdditionalTaxes();
+    for (let i = 0; i < list.length; i++) {
+      const tax = list[i];
+      if (tax && tax.name === name) return typeof tax.incomeExemptionThreshold === 'number' ? tax.incomeExemptionThreshold : 0;
+    }
+    return 0;
+  }
+
+  /**
+   * Return configured deductible exemption amount for an additional tax by name.
+   * This amount is subtracted from the taxable base before applying brackets.
+   */
+  getAdditionalTaxDeductibleExemptionAmount(name) {
+    const list = this.getAdditionalTaxes();
+    for (let i = 0; i < list.length; i++) {
+      const tax = list[i];
+      if (tax && tax.name === name) return typeof tax.deductibleExemptionAmount === 'number' ? tax.deductibleExemptionAmount : 0;
     }
     return 0;
   }

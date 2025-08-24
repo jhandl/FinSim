@@ -10,9 +10,6 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-// Configuration constants
-const CONFIG_FILE_NAME = 'finsim-1.27.json';
-const CONFIG_PATH = path.join(__dirname, 'config', CONFIG_FILE_NAME);
 
 // Test assertion types
 const AssertionTypes = {
@@ -40,17 +37,127 @@ class TestFramework {
   }
 
   /**
+   * Convenience: load a scenario JSON file and execute the core simulation
+   * @param {string} filePath - Path to the scenario JSON file
+   * @returns {Object|null} - Simulation results or null on failure
+   */
+  async executeCoreSimulationFromFile(filePath) {
+    try {
+      // Ensure core modules are loaded and VM is initialized
+      if (!this.loadCoreModules()) {
+        console.error('Failed to load core modules');
+        return null;
+      }
+
+      // Ensure VM has the same mock UI setup as the inline-run path
+      this.ensureVMUIManagerMocks(null, null);
+
+      // Call the VM-side UIManager.loadFromFile to populate testParams/testEvents
+      // Resolve path relative to project root if needed
+      const absolutePath = path.isAbsolute(filePath) ? filePath : path.resolve(__dirname, '..', filePath);
+      vm.runInContext(`UIManager.prototype.loadFromFile && UIManager.prototype.loadFromFile(${JSON.stringify(absolutePath)})`, this.simulationContext);
+
+      // Initialize Config inside the VM using the mocked WebUI and await completion
+      const p = vm.runInContext('Config.initialize(WebUI.getInstance())', this.simulationContext);
+      await p;
+
+      // Now execute the simulation using the VM's run() function
+      vm.runInContext('var start = Date.now();', this.simulationContext);
+      vm.runInContext('run(); simulationResults = { dataSheet, success, failedAt, executionTime: (Date.now()-start) }', this.simulationContext);
+      const results = vm.runInContext('simulationResults', this.simulationContext);
+      return results;
+    } catch (error) {
+      console.error(`Error executing simulation from file: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
    * Reset the framework to a clean state for isolated tests
    */
   reset() {
+    if (this.verbose) {
+      console.log('🔄 Starting comprehensive TestFramework reset...');
+    }
+
+    // Reset test state
     this.testResults = [];
     this.currentTest = null;
     this.coreModulesLoaded = false;
-    // Important: Also reset the singleton instance in the VM context
-    if (this.simulationContext && this.simulationContext.Config_instance) {
-      this.simulationContext.Config_instance = null;
+
+    // Comprehensive singleton reset within VM context
+    let singletonsReset = 0;
+    if (this.simulationContext) {
+      const singletonNames = [
+        'Config_instance',
+        'WebUI_instance', 
+        'GasUI_instance',
+        'wizard_instance'
+      ];
+
+      for (const singletonName of singletonNames) {
+        if (this.simulationContext[singletonName]) {
+          this.simulationContext[singletonName] = null;
+          singletonsReset++;
+          if (this.verbose) {
+            console.log(`  ✓ Reset singleton: ${singletonName}`);
+          }
+        }
+      }
+
+      // Reset FieldLabelsManager._instance if it exists
+      if (this.simulationContext.FieldLabelsManager && this.simulationContext.FieldLabelsManager._instance) {
+        this.simulationContext.FieldLabelsManager._instance = null;
+        singletonsReset++;
+        if (this.verbose) {
+          console.log('  ✓ Reset singleton: FieldLabelsManager._instance');
+        }
+      }
+
+      // VM Context cleanup - reset all global variables and state
+      const contextVarsToReset = [
+        'uiManager', 'params', 'events', 'config', 'dataSheet', 'row', 'errors',
+        'age', 'year', 'phase', 'periods', 'failedAt', 'success', 'montecarlo',
+        'revenue', 'realEstate', 'stockGrowthOverride', 'netIncome', 'expenses',
+        'savings', 'targetCash', 'cashWithdraw', 'cashDeficit', 'incomeStatePension',
+        'incomePrivatePension', 'incomeFundsRent', 'incomeSharesRent', 'withdrawalRate',
+        'cash', 'indexFunds', 'shares', 'incomeSalaries', 'incomeShares', 'incomeRentals',
+        'incomeDefinedBenefit', 'incomeTaxFree', 'pensionContribution', 'person1', 'person2'
+      ];
+
+      let contextVarsReset = 0;
+      for (const varName of contextVarsToReset) {
+        if (this.simulationContext.hasOwnProperty(varName)) {
+          this.simulationContext[varName] = null;
+          contextVarsReset++;
+        }
+      }
+
+      if (this.verbose && contextVarsReset > 0) {
+        console.log(`  ✓ Reset ${contextVarsReset} VM context variables`);
+      }
     }
+
+    // Clear simulation context
     this.simulationContext = null;
+
+    // Comprehensive module cache clearing for core directory
+    let modulesClearedCount = 0;
+    const coreModulePath = path.join(__dirname);
+    
+    for (const modulePath in require.cache) {
+      // Clear all modules from the core directory
+      if (modulePath.startsWith(coreModulePath)) {
+        delete require.cache[modulePath];
+        modulesClearedCount++;
+      }
+    }
+
+    if (this.verbose) {
+      console.log(`  ✓ Cleared ${modulesClearedCount} modules from require cache`);
+      console.log(`  ✓ Reset ${singletonsReset} singleton instances`);
+      console.log('🔄 TestFramework reset complete - ready for isolated test execution');
+    }
   }
 
   /**
@@ -73,6 +180,13 @@ class TestFramework {
         JSON: JSON,
         require: require,
         __dirname: __dirname,
+        
+        // Simple localStorage polyfill for Config.getTaxRuleSet() persistence
+        localStorage: {
+          _storage: {},
+          getItem: function(key) { return this._storage[key] || null; },
+          setItem: function(key, value) { this._storage[key] = String(value); }
+        },
         
         // Variables that will be populated by the core files
         SimEvent: null,
@@ -310,167 +424,110 @@ class TestFramework {
    */
   async executeCoreSimulation(params, events) {
     try {
-      // Set up the simulation parameters in the context
-      vm.runInContext(`
-        // Create a proper UIManager mock that matches the real UIManager interface
-        function MockUIManager(mockUI) {
-          this.ui = mockUI;
+      // Ensure VM has the mock UI setup and helpers in place
+      this.ensureVMUIManagerMocks(params, events);
+
+      // Debug logging: Show when Config.initialize() is called and what version is being loaded
+      if (this.verbose) {
+        console.log('🔧 DEBUG: Calling Config.initialize() in VM context...');
+        const initialVersion = vm.runInContext('localStorage.getItem("finsim-version") || "1.27"', this.simulationContext);
+        console.log(`🔧 DEBUG: Initial version from localStorage: ${initialVersion}`);
+      }
+
+      // Initialize Config inside the VM using the mocked WebUI and await completion
+      const p = vm.runInContext('Config.initialize(WebUI.getInstance())', this.simulationContext);
+      await p;
+
+      // Debug logging: Show config object properties after initialization
+      if (this.verbose) {
+        try {
+          const config = vm.runInContext('Config.getInstance()', this.simulationContext);
+          const configVersion = vm.runInContext('Config.getInstance().thisVersion', this.simulationContext);
+          const configDefaultCountry = vm.runInContext('Config.getInstance().getDefaultCountry()', this.simulationContext);
+          const configAppName = vm.runInContext('Config.getInstance().getApplicationName()', this.simulationContext);
+          console.log(`🔧 DEBUG: Config initialized successfully`);
+          console.log(`🔧 DEBUG: Final config version loaded: ${configVersion}`);
+          console.log(`🔧 DEBUG: Config default country: ${configDefaultCountry}`);
+          console.log(`🔧 DEBUG: Config application name: ${configAppName}`);
+          
+          // Show some key config properties if they exist
+          const simulationRuns = vm.runInContext('Config.getInstance().simulationRuns || "not set"', this.simulationContext);
+          console.log(`🔧 DEBUG: Config simulation runs: ${simulationRuns}`);
+        } catch (e) {
+          console.log(`🔧 DEBUG: Error accessing config properties: ${e.message}`);
         }
-        
-        MockUIManager.prototype.updateProgress = function(status) {};
-        MockUIManager.prototype.updateDataSheet = function(runs) {
-          // Apply Monte Carlo averaging if we did multiple runs
-          if (montecarlo && runs > 1) {
-            for (let i = 1; i <= row; i++) {
-              if (dataSheet[i]) {
-                // Average all accumulated values by dividing by the number of runs
-                dataSheet[i].age = dataSheet[i].age / runs;
-                dataSheet[i].year = dataSheet[i].year / runs;
-                dataSheet[i].incomeSalaries = dataSheet[i].incomeSalaries / runs;
-                dataSheet[i].incomeRSUs = dataSheet[i].incomeRSUs / runs;
-                dataSheet[i].incomeRentals = dataSheet[i].incomeRentals / runs;
-                dataSheet[i].incomePrivatePension = dataSheet[i].incomePrivatePension / runs;
-                dataSheet[i].incomeStatePension = dataSheet[i].incomeStatePension / runs;
-                dataSheet[i].incomeFundsRent = dataSheet[i].incomeFundsRent / runs;
-                dataSheet[i].incomeSharesRent = dataSheet[i].incomeSharesRent / runs;
-                dataSheet[i].incomeCash = dataSheet[i].incomeCash / runs;
-                dataSheet[i].realEstateCapital = dataSheet[i].realEstateCapital / runs;
-                dataSheet[i].netIncome = dataSheet[i].netIncome / runs;
-                dataSheet[i].expenses = dataSheet[i].expenses / runs;
+      }
+
+      // Debug logging: Show parameters and events being used before calling run()
+      if (this.verbose) {
+        console.log('🔧 DEBUG: About to call run() function...');
+        try {
+          const vmParams = vm.runInContext('testParams', this.simulationContext);
+          const vmEvents = vm.runInContext('testEvents', this.simulationContext);
+          console.log(`🔧 DEBUG: Parameters loaded: ${vmParams ? Object.keys(vmParams).length + ' keys' : 'null'}`);
+          console.log(`🔧 DEBUG: Events loaded: ${vmEvents ? vmEvents.length + ' events' : 'null'}`);
           
-                dataSheet[i].pensionFund = dataSheet[i].pensionFund / runs;
-                dataSheet[i].cash = dataSheet[i].cash / runs;
-                dataSheet[i].indexFundsCapital = dataSheet[i].indexFundsCapital / runs;
-                dataSheet[i].sharesCapital = dataSheet[i].sharesCapital / runs;
-                dataSheet[i].pensionContribution = dataSheet[i].pensionContribution / runs;
-                dataSheet[i].withdrawalRate = dataSheet[i].withdrawalRate / runs;
-                dataSheet[i].it = dataSheet[i].it / runs;
-                dataSheet[i].prsi = dataSheet[i].prsi / runs;
-                dataSheet[i].usc = dataSheet[i].usc / runs;
-                dataSheet[i].cgt = dataSheet[i].cgt / runs;
-                dataSheet[i].worth = dataSheet[i].worth / runs;
-              }
-            }
-          }
-        };
-        MockUIManager.prototype.updateStatusCell = function(successes, runs) {};
-        MockUIManager.prototype.clearWarnings = function() {};
-        MockUIManager.prototype.setStatus = function(status, color) {};
-        MockUIManager.prototype.saveToFile = function() {};
-        MockUIManager.prototype.loadFromFile = function(file) {};
-        MockUIManager.prototype.updateDataRow = function(row, progress) {};
-        MockUIManager.prototype.readParameters = function(validate) { return params; };
-        MockUIManager.prototype.readEvents = function(validate) { return events; };
-        
-        // Create mock UI object that loads the actual config
-        var mockUI = {
-          getVersion: function() { return '1.27'; },
-          fetchUrl: function(url) {
-            // Load the actual config file
-            var fs = require('fs');
-            var path = require('path');
-            // Use the global CONFIG_PATH defined in TestFramework.js
-            // We need to pass it into this scope or reconstruct it.
-            // Simpler to reconstruct here if __dirname is the TestFramework.js dir
-            var configPath = path.join(__dirname, 'config', 'finsim-1.27.json');
-            return fs.readFileSync(configPath, 'utf8');
-          },
-          showAlert: function(msg) { console.warn(msg); },
-          newCodeVersion: function() {},
-          newDataVersion: function() {},
-          clearVersionNote: function() {},
-          setVersionHighlight: function() {}
-        };
-        
-        // Set up STATUS_COLORS constant
-        STATUS_COLORS = {
-          ERROR: "#ff8080",
-          WARNING: "#ffe066",
-          SUCCESS: "#9fdf9f",
-          INFO: "#E0E0E0",
-          WHITE: "#FFFFFF"
-        };
-        
-        // Set up UIManager and WebUI for the simulator
-        UIManager = MockUIManager;
-        WebUI = {
-          getInstance: function() { return mockUI; }
-        };
-        
-        uiManager = new UIManager(mockUI);
-
-        // Set up parameters
-        params = ${JSON.stringify(params)};
-        
-        // Convert event objects to SimEvent instances
-        events = ${JSON.stringify(events)}.map(function(e) {
-          return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match);
-        });
-
-        // Initialize config
-        config = {};
-        Object.assign(config, JSON.parse(uiManager.ui.fetchUrl('')));
-        
-        // Initialize other required objects
-        dataSheet = [];
-        errors = false;
-        
-      `, this.simulationContext);
-
-        // Set up Config instance with actual config data
-        vm.runInContext(`
-          // Set up Config instance with actual data
-          Config_instance = Object.assign(new Config(mockUI), ${fs.readFileSync(CONFIG_PATH, 'utf8')});
-          // Backward-compat: ensure simulationRuns exists for Monte Carlo tests when using older config files
-          if (!Config_instance.simulationRuns || typeof Config_instance.simulationRuns !== 'number' || Config_instance.simulationRuns <= 0) {
-            Config_instance.simulationRuns = 2000;
-          }
-          // Preload Irish tax ruleset into the Config cache for synchronous use
-          try {
-            const fs = require('fs');
-            const path = require('path');
-            const taxPath = path.join(__dirname, 'config', 'tax-rules-ie.json');
-            const rawRules = JSON.parse(fs.readFileSync(taxPath, 'utf8'));
-            const preloaded = new TaxRuleSet(rawRules);
-            Config_instance._taxRuleSets = Config_instance._taxRuleSets || {};
-            Config_instance._taxRuleSets['ie'] = preloaded;
-          } catch (e) {
-            // If preloading fails in tests, leave empty; some tests may not need it
+          if (vmParams) {
+            console.log(`🔧 DEBUG: Key parameters - startingAge: ${vmParams.startingAge}, targetAge: ${vmParams.targetAge}, initialSavings: ${vmParams.initialSavings}`);
           }
           
-          // Override Config.getInstance to return our config
-          Config.getInstance = function() {
-            return Config_instance;
-          };
-        `, this.simulationContext);
-        
-        // Use the simulator - call run() just like the web UI does
-        vm.runInContext(`
-          function runTestSimulation() {
-            var startTime = Date.now();
-            
-            try {
-              run();
-              
-              return {
-                dataSheet: dataSheet,
-                success: success,
-                failedAt: failedAt,
-                executionTime: Date.now() - startTime
-              };
-            } catch (error) {
-              console.error('Error in simulation:', error.message);
-              console.error('Error stack:', error.stack);
-              throw error;
-            }
-          }
-          
-          // Execute the simulation
-          var simulationResults = runTestSimulation();
-        `, this.simulationContext);
+          // Verify we're using the real Simulator.js run() function
+          const runFunctionExists = vm.runInContext('typeof run === "function"', this.simulationContext);
+          const runFunctionSource = vm.runInContext('run.toString().substring(0, 100)', this.simulationContext);
+          console.log(`🔧 DEBUG: run() function exists: ${runFunctionExists}`);
+          console.log(`🔧 DEBUG: run() function source preview: ${runFunctionSource}...`);
+        } catch (e) {
+          console.log(`🔧 DEBUG: Error accessing VM parameters/events: ${e.message}`);
+        }
+      }
+
+      // Record start time inside VM and run the simulation, then collect results
+      vm.runInContext('var start = Date.now();', this.simulationContext);
+      vm.runInContext('run(); simulationResults = { dataSheet, success, failedAt, executionTime: (Date.now()-start) }', this.simulationContext);
 
       // Extract results from context
       const results = vm.runInContext('simulationResults', this.simulationContext);
+
+      // Debug logging: Show simulation results including dataSheet info, final year, and final net worth
+      if (this.verbose) {
+        console.log('🔧 DEBUG: Simulation completed, analyzing results...');
+        console.log(`🔧 DEBUG: Simulation success: ${results.success}`);
+        console.log(`🔧 DEBUG: Simulation failed at age: ${results.failedAt || 'N/A'}`);
+        console.log(`🔧 DEBUG: Execution time: ${results.executionTime}ms`);
+        
+        if (results.dataSheet && Array.isArray(results.dataSheet)) {
+          const validRows = results.dataSheet.filter(r => r && typeof r === 'object');
+          console.log(`🔧 DEBUG: DataSheet total rows: ${results.dataSheet.length}`);
+          console.log(`🔧 DEBUG: DataSheet valid rows: ${validRows.length}`);
+          
+          if (validRows.length > 0) {
+            const firstRow = validRows[0];
+            const lastRow = validRows[validRows.length - 1];
+            console.log(`🔧 DEBUG: First row age: ${firstRow.age}, year: ${firstRow.year}`);
+            console.log(`🔧 DEBUG: Final row age: ${lastRow.age}, year: ${lastRow.year}`);
+            console.log(`🔧 DEBUG: Final net worth: €${lastRow.worth ? lastRow.worth.toLocaleString() : 'N/A'}`);
+            console.log(`🔧 DEBUG: Final cash: €${lastRow.cash ? lastRow.cash.toLocaleString() : 'N/A'}`);
+            console.log(`🔧 DEBUG: Final pension fund: €${lastRow.pensionFund ? lastRow.pensionFund.toLocaleString() : 'N/A'}`);
+            
+            // Dump first few and last few rows for debugging
+            this.dumpDataSheetRows(validRows, 'DEBUG');
+          } else {
+            console.log('🔧 DEBUG: No valid data rows found in dataSheet');
+          }
+        } else {
+          console.log('🔧 DEBUG: DataSheet is not a valid array');
+        }
+      }
+
+      // If Config exposed its resolved version inside the VM, attach it to results for reporting
+      try {
+        const config = vm.runInContext('config', this.simulationContext);
+        if (config && config.thisVersion !== undefined && results && typeof results === 'object') {
+          results.configVersion = config.thisVersion;
+        }
+      } catch (e) {
+        // ignore if VM variable isn't present
+      }
       
       // Check if Monte Carlo was used and apply averaging
       const montecarlo = vm.runInContext('montecarlo', this.simulationContext);
@@ -489,6 +546,127 @@ class TestFramework {
       console.error(`Error executing simulation: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Dump the first few and last few rows of the dataSheet for debugging purposes
+   * @param {Array} dataSheet - Array of data rows
+   * @param {string} prefix - Prefix for log messages (default: 'DEBUG')
+   */
+  dumpDataSheetRows(dataSheet, prefix = 'DEBUG') {
+    if (!dataSheet || !Array.isArray(dataSheet) || dataSheet.length === 0) {
+      console.log(`🔧 ${prefix}: No dataSheet rows to dump`);
+      return;
+    }
+
+    const validRows = dataSheet.filter(r => r && typeof r === 'object');
+    if (validRows.length === 0) {
+      console.log(`🔧 ${prefix}: No valid dataSheet rows to dump`);
+      return;
+    }
+
+    console.log(`🔧 ${prefix}: Dumping dataSheet rows (${validRows.length} total valid rows)`);
+    
+    // Show first 3 rows
+    const firstRowsCount = Math.min(3, validRows.length);
+    console.log(`🔧 ${prefix}: First ${firstRowsCount} rows:`);
+    for (let i = 0; i < firstRowsCount; i++) {
+      const row = validRows[i];
+      console.log(`🔧 ${prefix}:   Row ${i}: age=${row.age}, year=${row.year}, worth=${row.worth ? '€' + row.worth.toLocaleString() : 'N/A'}, cash=${row.cash ? '€' + row.cash.toLocaleString() : 'N/A'}`);
+    }
+
+    // Show last 3 rows if we have more than 3 total rows
+    if (validRows.length > 3) {
+      const lastRowsCount = Math.min(3, validRows.length);
+      const startIndex = validRows.length - lastRowsCount;
+      console.log(`🔧 ${prefix}: Last ${lastRowsCount} rows:`);
+      for (let i = startIndex; i < validRows.length; i++) {
+        const row = validRows[i];
+        console.log(`🔧 ${prefix}:   Row ${i}: age=${row.age}, year=${row.year}, worth=${row.worth ? '€' + row.worth.toLocaleString() : 'N/A'}, cash=${row.cash ? '€' + row.cash.toLocaleString() : 'N/A'}`);
+      }
+    }
+
+    // Show a sample of key fields from the final row
+    if (validRows.length > 0) {
+      const finalRow = validRows[validRows.length - 1];
+      console.log(`🔧 ${prefix}: Final row detailed breakdown:`);
+      console.log(`🔧 ${prefix}:   Age: ${finalRow.age}, Year: ${finalRow.year}`);
+      console.log(`🔧 ${prefix}:   Net Worth: €${finalRow.worth ? finalRow.worth.toLocaleString() : 'N/A'}`);
+      console.log(`🔧 ${prefix}:   Cash: €${finalRow.cash ? finalRow.cash.toLocaleString() : 'N/A'}`);
+      console.log(`🔧 ${prefix}:   Pension Fund: €${finalRow.pensionFund ? finalRow.pensionFund.toLocaleString() : 'N/A'}`);
+      console.log(`🔧 ${prefix}:   Index Funds: €${finalRow.indexFundsCapital ? finalRow.indexFundsCapital.toLocaleString() : 'N/A'}`);
+      console.log(`🔧 ${prefix}:   Shares: €${finalRow.sharesCapital ? finalRow.sharesCapital.toLocaleString() : 'N/A'}`);
+      console.log(`🔧 ${prefix}:   Net Income: €${finalRow.netIncome ? finalRow.netIncome.toLocaleString() : 'N/A'}`);
+      console.log(`🔧 ${prefix}:   Expenses: €${finalRow.expenses ? finalRow.expenses.toLocaleString() : 'N/A'}`);
+    }
+  }
+
+  /**
+   * Ensure the VM context has the same Mock UIManager/WebUI/STATUS_COLORS
+   * and readParameters/readEvents helpers as used by the inline-run path.
+   * If params/events are provided they will be seeded into VM-level
+   * testParams/testEvents; if null they are left to be populated by
+   * UIManager.prototype.loadFromFile inside the VM.
+   */
+  ensureVMUIManagerMocks(params, events) {
+    if (!this.simulationContext) return;
+
+    const paramsJson = params ? JSON.stringify(params) : 'null';
+    const eventsJson = events ? JSON.stringify(events) : 'null';
+    // Median computation disabled in mock.
+
+    vm.runInContext(`
+      // Optionally seed testParams/testEvents when provided by host
+      var __seededParams = ${paramsJson};
+      var __seededEvents = ${eventsJson};
+      var testParams = null; var testEvents = [];
+      // Note: median computation intentionally omitted in VM mock
+      if (__seededParams) {
+        testParams = __seededParams;
+      }
+      if (__seededEvents) {
+        testEvents = __seededEvents.map(function(e) { return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match); });
+      }
+
+      // Create a proper UIManager mock that matches the real UIManager interface
+      function MockUIManager(mockUI) { this.ui = mockUI; }
+      MockUIManager.prototype.updateProgress = function(status) {};
+      MockUIManager.prototype.updateDataSheet = function(runs, perRunResults) {};
+      MockUIManager.prototype.updateStatusCell = function(successes, runs) {};
+      MockUIManager.prototype.clearWarnings = function() {};
+      MockUIManager.prototype.setStatus = function(status, color) {};
+      MockUIManager.prototype.saveToFile = function() {};
+      MockUIManager.prototype.loadFromFile = function(file) {
+        try {
+          var fs = require('fs'); var path = require('path'); var filePath = file;
+          if (!path.isAbsolute(filePath)) { filePath = path.resolve(__dirname, filePath); }
+          var content = fs.readFileSync(filePath, 'utf8'); var parsed = JSON.parse(content);
+          var params = (parsed && parsed.scenario && parsed.scenario.parameters) ? parsed.scenario.parameters : (parsed.params || parsed.testParams || {});
+          var eventsArr = (parsed && parsed.scenario && parsed.scenario.events) ? parsed.scenario.events : (parsed.events || parsed.testEvents || []);
+          testParams = params;
+          testEvents = eventsArr.map(function(e) { return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match); });
+        } catch (e) { throw new Error('Failed to load scenario file: ' + (e && e.message ? e.message : e)); }
+      };
+      MockUIManager.prototype.updateDataRow = function(row, progress) {};
+      MockUIManager.prototype.readParameters = function(validate) { return testParams; };
+      MockUIManager.prototype.readEvents = function(validate) { return testEvents; };
+      MockUIManager.prototype.flush = function() {};
+
+      var mockUI = {
+        getVersion: function() { var storedVersion = localStorage.getItem('finsim-version'); return storedVersion || '1.27'; },
+        setVersion: function(version) { localStorage.setItem('finsim-version', version); },
+        fetchUrl: function(url) { var fs = require('fs'); var path = require('path'); if (url.startsWith('/src/core/config/')) { var filename = path.basename(url); var configPath = path.join(__dirname, 'config', filename); return fs.readFileSync(configPath, 'utf8'); } throw new Error('Unsupported URL pattern: ' + url); },
+        showAlert: function(msg) { console.warn(msg); return true; },
+        showToast: function(message, title, timeout) {},
+        clearVersionNote: function() {}, setVersionHighlight: function() {},
+        newDataVersion: function(version, message) { if (this.showAlert(message)) { this.setVersion(version); } },
+        newCodeVersion: function() {}, flush: function() {}
+      };
+
+      STATUS_COLORS = { ERROR: "#ff8080", WARNING: "#ffe066", SUCCESS: "#9fdf9f", INFO: "#E0E0E0", WHITE: "#FFFFFF" };
+      UIManager = MockUIManager;
+      WebUI = { getInstance: function() { return mockUI; } };
+    `, this.simulationContext);
   }
 
   /**
@@ -603,10 +781,48 @@ class TestFramework {
   /** Helper to map legacy tax field aliases to dynamic Tax__ keys */
   _resolveFieldAlias(rowObj, field) {
     if (!rowObj) return field;
-    const legacyMap = { it: 'Tax__incomeTax', prsi: 'Tax__prsi', usc: 'Tax__usc', cgt: 'Tax__capitalGains' };
+
+    // If the field exists directly, use it
     if (rowObj.hasOwnProperty(field)) return field;
-    const alt = legacyMap[field];
-    if (alt && rowObj.hasOwnProperty(alt)) return alt;
+
+    // Normalize incoming field for case-insensitive comparison
+    const lname = String(field || '').toLowerCase();
+
+    // Basic fallback mapping to ensure core aliases resolve even if dynamic lookup fails
+    const basicLegacyMap = { it: 'Tax__incomeTax', prsi: 'Tax__prsi', usc: 'Tax__usc', cgt: 'Tax__capitalGains' };
+    if (basicLegacyMap[lname] && rowObj.hasOwnProperty(basicLegacyMap[lname])) return basicLegacyMap[lname];
+
+    // Try to resolve legacy field names dynamically using the tax ruleset
+    try {
+      const config = this.simulationContext?.Config_instance || vm.runInContext('Config_instance', this.simulationContext);
+      if (config) {
+        const taxRuleSet = config.getCachedTaxRuleSet();
+        if (taxRuleSet) {
+          // Gather candidate tax lists
+          const groups = [
+            taxRuleSet.getSocialContributions && taxRuleSet.getSocialContributions(),
+            taxRuleSet.getAdditionalTaxes && taxRuleSet.getAdditionalTaxes()
+          ];
+
+          for (const group of groups) {
+            if (!Array.isArray(group)) continue;
+            for (const tax of group) {
+              const tid = String(tax.id || '').toLowerCase();
+              const tname = String(tax.name || '').toLowerCase();
+              const tdisplay = String(tax.displayName || '').toLowerCase().replace(/\s+/g, '');
+
+              if (lname === tid || lname === tname || (tdisplay && lname === tdisplay)) {
+                const altKey = `Tax__${tax.id}`;
+                if (rowObj.hasOwnProperty(altKey)) return altKey;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // ignore and fall through to final return
+    }
+
     return field;
   }
 
@@ -727,8 +943,11 @@ class TestFramework {
    * Validate trend over time
    */
   validateTrend(dataSheet, field, expected) {
-    // This is a simplified trend validation - could be enhanced
-    const values = dataSheet.map(row => row[field]);
+    // Use alias resolution so legacy names (e.g., 'it', 'prsi', 'usc') work
+    const values = dataSheet.map(row => {
+      const key = this._resolveFieldAlias(row, field);
+      return row ? row[key] : undefined;
+    });
     
     let success = false;
     let message = '';

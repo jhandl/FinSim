@@ -42,7 +42,7 @@ class WelcomeModal {
           {
             id: 'getting-started',
             title: 'Getting Started',
-            content: '<p>Welcome to the Ireland Financial Simulator!</p><p>This tool helps you understand how different decisions affect your financial future.</p>'
+            content: `<p>Welcome to the ${Config.getInstance().getApplicationName()}!</p><p>This tool helps you understand how different decisions affect your financial future.</p>`
           }
         ]
       };
@@ -85,7 +85,7 @@ class WelcomeModal {
     this.modal.innerHTML = `
       <div class="welcome-modal-content">
         <div class="welcome-modal-header">
-          <h2 class="welcome-modal-title">Welcome to Ireland Financial Simulator</h2>
+          <h2 class="welcome-modal-title">Welcome to ${Config.getInstance().getApplicationName()}</h2>
           <button class="welcome-modal-close" aria-label="Close">&times;</button>
         </div>
         <div class="welcome-modal-body">

@@ -35,7 +35,7 @@
     {
       "name": "USC",
       "brackets": { "0": 0.005, "12012": 0.02, "27382": 0.03, "70044": 0.08, "100000": 0.11 },
-      "exemptAmount": 13000,
+      "incomeExemptionThreshold": 13000,
       "reducedRateAge": 70,
       "reducedRateMaxIncome": 60000,
       "ageBasedBrackets": {

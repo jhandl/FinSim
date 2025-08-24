@@ -8,7 +8,7 @@
  *     --repoA /Users/jhandl/FinSim \
  *     --repoB /Users/jhandl/FinSim1 \
  *     --tolerance 0.01 \
- *     --fields age,year,incomeSalaries,netIncome,expenses,pensionFund,cash,indexFundsCapital,sharesCapital,pensionContribution,it,prsi,usc,cgt,worth \
+ *     --fields age,year,incomeSalaries,netIncome,expenses,pensionFund,cash,indexFundsCapital,sharesCapital,pensionContribution,Tax__incomeTax,Tax__socialContrib,Tax__additionalTax,Tax__capitalGains,worth \
  *     /path/to/scenario1.csv /path/to/scenario2.csv
  *
  * Notes:
@@ -69,7 +69,7 @@ function printHelp() {
   `  --help                       Show this help\n` +
   `\nExamples:\n` +
   `  node compare.js --repoA /Users/jhandl/FinSim --repoB /Users/jhandl/FinSim1 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n` +
-  `  node compare.js --fields age,year,netIncome,expenses --tolerance 0.01 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n`;
+  `  node compare.js --fields age,year,netIncome,expenses,Tax__incomeTax,Tax__socialContrib --tolerance 0.01 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n`;
   console.log(msg);
 }
 
@@ -133,29 +133,41 @@ function sanitizeScenario(s) {
 function parseCsvScenario(csvPath) {
   const content = fs.readFileSync(csvPath, 'utf8');
   const lines = content.split(/\r?\n/).map(l => l.trim());
-  if (!/^#\s*Ireland\s+Financial\s+Simulator\s+v[0-9]+\.[0-9]+\s+Save\s+File/i.test(lines[0] || '')) {
-    throw new Error('Not a valid FinSim scenario CSV (missing header).');
+  // Accept any of:
+  // - "# FinSim v<version>"
+  // - "# <Any> Financial Simulator v<version>"
+  // - Legacy: "# Ireland Financial Simulator v<version> Save File"
+  const headerLine = lines[0] || '';
+  const headerPatterns = [
+    /^#\s*FinSim\s+v[0-9]+\.[0-9]+(?:\s+Save\s+File)?$/i,
+    /^#\s*.*Financial\s+Simulator\s+v[0-9]+\.[0-9]+(?:\s+Save\s+File)?$/i,
+    /^#\s*Ireland\s+Financial\s+Simulator\s+v[0-9]+\.[0-9]+\s+Save\s+File$/i
+  ];
+  const validHeader = headerPatterns.some(re => re.test(headerLine));
+  if (!validHeader) {
+    throw new Error('Invalid scenario CSV header. Expected first line like "# FinSim v<version>", "# <Name> Financial Simulator v<version>", or legacy "# Ireland Financial Simulator v<version> Save File".');
   }
   let section = '';
   const paramRaw = {}; // raw key->value as in CSV
   const events = [];
   let inEvents = false;
+  let inParameters = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line) continue;
-    if (line.startsWith('#')) { section = line; continue; }
 
-    if (section.includes('Parameters')) {
+    if (line.includes('# Parameters')) { inParameters = true; continue; }
+    if (inParameters) {
       const idx = line.indexOf(',');
-      if (idx === -1) continue;
-      const key = line.slice(0, idx);
-      const value = line.slice(idx + 1);
-      paramRaw[key] = value;
-      continue;
+      if (idx !== -1) {
+        const key = line.slice(0, idx);
+        const value = line.slice(idx + 1);
+        paramRaw[key] = value;
+      }
     }
 
-    if (line.includes('# Events')) { inEvents = true; continue; }
+    if (line.includes('# Events')) { inParameters = false; inEvents = true; continue; }
     if (inEvents) {
       if (line.startsWith('Type,')) continue; // header
       const parts = line.split(',');
@@ -164,7 +176,7 @@ function parseCsvScenario(csvPath) {
       const name = ((parts[1] || '').trim()).replace(/%2C/g, ',');
       const amount = parseNumber(parts[2]);
       const fromAge = parseNumber(parts[3]);
-      const toAge = parts[4] !== undefined && parts[4] !== '' ? parseNumber(parts[4]) : undefined;
+      const toAge = parseNumber(parts[4]);
       const rate = parsePercent(parts[5]);
       const match = parsePercent(parts[6]);
       if (type) {
@@ -265,20 +277,149 @@ async function runWithFramework(FrameworkClass, scenarioDef, opts = {}) {
     const repoPath = opts.repoPath || '';
     console.log(`[${ts()}] [${repoLabel}] Starting simulation in ${repoPath} | scenario: ${scenarioDef.name}${opts.forceDeterministic ? ' (forceDeterministic)' : ''}`);
 
+    // Debug logging: Show scenario preparation details
+    if (opts.verbose) {
+      console.log(`🔧 DEBUG [${repoLabel}]: Preparing scenario for execution...`);
+      console.log(`🔧 DEBUG [${repoLabel}]: Original scenario parameters keys: ${Object.keys(scenarioDef.scenario?.parameters || {}).length}`);
+      console.log(`🔧 DEBUG [${repoLabel}]: Original scenario events count: ${(scenarioDef.scenario?.events || []).length}`);
+    }
+
     const localScenario = prepareScenarioForRun(scenarioDef, opts);
+    
+    // Debug logging: Show prepared scenario details
+    if (opts.verbose) {
+      const params = localScenario.scenario?.parameters || {};
+      console.log(`🔧 DEBUG [${repoLabel}]: Prepared scenario parameters:`);
+      console.log(`🔧 DEBUG [${repoLabel}]:   startingAge: ${params.startingAge}, targetAge: ${params.targetAge}`);
+      console.log(`🔧 DEBUG [${repoLabel}]:   initialSavings: ${params.initialSavings}, retirementAge: ${params.retirementAge}`);
+      console.log(`🔧 DEBUG [${repoLabel}]:   simulation_mode: ${params.simulation_mode}, economyMode: ${params.economyMode}`);
+      console.log(`🔧 DEBUG [${repoLabel}]:   growthDevPension: ${params.growthDevPension}, growthDevFunds: ${params.growthDevFunds}, growthDevShares: ${params.growthDevShares}`);
+      console.log(`🔧 DEBUG [${repoLabel}]: Prepared scenario events: ${(localScenario.scenario?.events || []).length} events`);
+    }
+
+    console.log(`[${ts()}] [${repoLabel}] Loading scenario into TestFramework...`);
     const loaded = fw.loadScenario(localScenario);
     if (!loaded) {
       throw new Error('loadScenario() failed');
     }
+
+    // Debug logging: Show when Config.initialize() is about to be called
+    if (opts.verbose) {
+      console.log(`🔧 DEBUG [${repoLabel}]: About to call fw.runSimulation() which will trigger Config.initialize()...`);
+      console.log(`🔧 DEBUG [${repoLabel}]: TestFramework verbose mode: ${fw.verbose || false}`);
+    }
+
+    console.log(`[${ts()}] [${repoLabel}] Running simulation (this will call Config.initialize() internally)...`);
     const results = await fw.runSimulation();
+    
     if (!results || !results.dataSheet) {
       throw new Error('Simulation did not return dataSheet');
     }
+
+    // Debug logging: Show config version and properties after simulation
+    if (opts.verbose) {
+      console.log(`🔧 DEBUG [${repoLabel}]: Simulation completed, analyzing results...`);
+      if (results.configVersion !== undefined) {
+        console.log(`🔧 DEBUG [${repoLabel}]: Config version used in simulation: ${results.configVersion}`);
+      } else {
+        console.log(`🔧 DEBUG [${repoLabel}]: Config version not available in results`);
+      }
+      
+      // Show Monte Carlo information
+      if (results.montecarlo) {
+        console.log(`🔧 DEBUG [${repoLabel}]: Monte Carlo simulation detected with ${results.runs} runs`);
+      } else {
+        console.log(`🔧 DEBUG [${repoLabel}]: Deterministic simulation (no Monte Carlo)`);
+      }
+    }
+
     const rows = toValidRows(results.dataSheet);
+    
+    // Debug logging: Show dataSheet analysis
+    if (opts.verbose) {
+      console.log(`🔧 DEBUG [${repoLabel}]: DataSheet analysis:`);
+      console.log(`🔧 DEBUG [${repoLabel}]:   Total dataSheet length: ${results.dataSheet ? results.dataSheet.length : 'null'}`);
+      console.log(`🔧 DEBUG [${repoLabel}]:   Valid rows count: ${rows.length}`);
+      
+      if (rows.length > 0) {
+        const firstRow = rows[0];
+        const lastRow = rows[rows.length - 1];
+        
+        console.log(`🔧 DEBUG [${repoLabel}]: First row details:`);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Age: ${firstRow.age}, Year: ${firstRow.year}`);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Net Worth: €${firstRow.worth ? firstRow.worth.toLocaleString() : 'N/A'}`);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Cash: €${firstRow.cash ? firstRow.cash.toLocaleString() : 'N/A'}`);
+        
+        console.log(`🔧 DEBUG [${repoLabel}]: Last row details:`);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Age: ${lastRow.age}, Year: ${lastRow.year}`);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Net Worth: €${lastRow.worth ? lastRow.worth.toLocaleString() : 'N/A'}`);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Cash: €${lastRow.cash ? lastRow.cash.toLocaleString() : 'N/A'}`);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Pension Fund: €${lastRow.pensionFund ? lastRow.pensionFund.toLocaleString() : 'N/A'}`);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Index Funds: €${lastRow.indexFundsCapital ? lastRow.indexFundsCapital.toLocaleString() : 'N/A'}`);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Shares: €${lastRow.sharesCapital ? lastRow.sharesCapital.toLocaleString() : 'N/A'}`);
+        
+        // Show first few and last few rows for detailed debugging
+        console.log(`🔧 DEBUG [${repoLabel}]: First 3 rows summary:`);
+        const firstRowsCount = Math.min(3, rows.length);
+        for (let i = 0; i < firstRowsCount; i++) {
+          const row = rows[i];
+          console.log(`🔧 DEBUG [${repoLabel}]:   Row ${i}: age=${row.age}, year=${row.year}, worth=${row.worth ? '€' + row.worth.toLocaleString() : 'N/A'}`);
+        }
+        
+        if (rows.length > 3) {
+          console.log(`🔧 DEBUG [${repoLabel}]: Last 3 rows summary:`);
+          const lastRowsCount = Math.min(3, rows.length);
+          const startIndex = rows.length - lastRowsCount;
+          for (let i = startIndex; i < rows.length; i++) {
+            const row = rows[i];
+            console.log(`🔧 DEBUG [${repoLabel}]:   Row ${i}: age=${row.age}, year=${row.year}, worth=${row.worth ? '€' + row.worth.toLocaleString() : 'N/A'}`);
+          }
+        }
+        
+        // Show key financial metrics progression
+        console.log(`🔧 DEBUG [${repoLabel}]: Key financial metrics progression:`);
+        const sampleIndices = [0, Math.floor(rows.length / 4), Math.floor(rows.length / 2), Math.floor(3 * rows.length / 4), rows.length - 1];
+        for (const idx of sampleIndices) {
+          if (idx < rows.length) {
+            const row = rows[idx];
+            console.log(`🔧 DEBUG [${repoLabel}]:   Age ${row.age}: worth=${row.worth ? '€' + row.worth.toLocaleString() : 'N/A'}, netIncome=${row.netIncome ? '€' + row.netIncome.toLocaleString() : 'N/A'}, expenses=${row.expenses ? '€' + row.expenses.toLocaleString() : 'N/A'}`);
+          }
+        }
+      } else {
+        console.log(`🔧 DEBUG [${repoLabel}]: No valid rows found in dataSheet!`);
+      }
+    }
+
     const last = rows.length > 0 ? rows[rows.length - 1] : null;
     const finalYear = last && typeof last.year !== 'undefined' ? last.year : 'n/a';
     const finalWorth = last && typeof last.worth !== 'undefined' ? roundValueForField('worth', last.worth) : 'n/a';
     const mc = results && results.montecarlo ? `, montecarlo runs=${results.runs}` : '';
+    
+    // Debug logging: Final net worth calculation verification
+    if (opts.verbose && last) {
+      console.log(`🔧 DEBUG [${repoLabel}]: Final net worth calculation verification:`);
+      console.log(`🔧 DEBUG [${repoLabel}]:   Raw final worth value: ${last.worth}`);
+      console.log(`🔧 DEBUG [${repoLabel}]:   Rounded final worth: ${finalWorth}`);
+      console.log(`🔧 DEBUG [${repoLabel}]:   Final year: ${finalYear}`);
+      console.log(`🔧 DEBUG [${repoLabel}]:   Final age: ${last.age}`);
+      
+      // Verify the worth calculation by showing components
+      const components = [];
+      if (typeof last.cash === 'number') components.push(`cash: €${last.cash.toLocaleString()}`);
+      if (typeof last.pensionFund === 'number') components.push(`pension: €${last.pensionFund.toLocaleString()}`);
+      if (typeof last.indexFundsCapital === 'number') components.push(`funds: €${last.indexFundsCapital.toLocaleString()}`);
+      if (typeof last.sharesCapital === 'number') components.push(`shares: €${last.sharesCapital.toLocaleString()}`);
+      
+      if (components.length > 0) {
+        console.log(`🔧 DEBUG [${repoLabel}]:   Worth components: ${components.join(', ')}`);
+        
+        // Calculate manual sum to verify
+        const manualSum = (last.cash || 0) + (last.pensionFund || 0) + (last.indexFundsCapital || 0) + (last.sharesCapital || 0);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Manual sum of components: €${manualSum.toLocaleString()}`);
+        console.log(`🔧 DEBUG [${repoLabel}]:   Difference from reported worth: €${Math.abs((last.worth || 0) - manualSum).toLocaleString()}`);
+      }
+    }
+    
     console.log(`[${ts()}] [${repoLabel}] Completed simulation | rows=${rows.length}, finalYear=${finalYear}, finalWorth=${finalWorth}${mc}`);
     return results;
   } finally {
@@ -412,8 +553,6 @@ async function main() {
 
   const { TestFramework: TF_A, frameworkPath: FP_A } = resolveFramework(args.repoA);
   const { TestFramework: TF_B, frameworkPath: FP_B } = resolveFramework(args.repoB);
-  console.log(`[${ts()}] Resolved TestFramework for repoA from ${FP_A}`);
-  console.log(`[${ts()}] Resolved TestFramework for repoB from ${FP_B}`);
 
   const allReports = [];
   let anyDiffs = false;
@@ -422,7 +561,6 @@ async function main() {
     const scenarioAbs = path.resolve(scenPath);
     const scenarioDef = loadScenarioDefinition(scenarioAbs);
 
-    console.log(`[${ts()}] Launching simulations for scenario '${scenarioDef.name}' on repoA and repoB...`);
     const [resA, resB] = await Promise.all([
       runWithFramework(TF_A, scenarioDef, { forceDeterministic: args.forceDeterministic, repoLabel: 'repoA', repoPath: args.repoA, verbose: args.verbose }),
       runWithFramework(TF_B, scenarioDef, { forceDeterministic: args.forceDeterministic, repoLabel: 'repoB', repoPath: args.repoB, verbose: args.verbose })
@@ -431,9 +569,13 @@ async function main() {
     const rowsA = toValidRows(resA.dataSheet);
     const rowsB = toValidRows(resB.dataSheet);
 
-    const fields = args.fields && args.fields.length > 0
+    const fields = (args.fields && args.fields.length > 0)
       ? args.fields
-      : detectNumericFields(rowsA.length > 0 ? rowsA : rowsB);
+      : (function() {
+        const autoA = rowsA.length > 0 ? detectNumericFields(rowsA) : [];
+        const autoB = rowsB.length > 0 ? detectNumericFields(rowsB) : [];
+        return Array.from(new Set(autoA.concat(autoB)));
+      })();
 
     const diffs = compareSheets(rowsA, rowsB, fields, args.tolerance);
     anyDiffs = anyDiffs || diffs.length > 0;

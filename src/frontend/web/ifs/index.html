@@ -6,15 +6,15 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Ireland Financial Simulator</title>
-    <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico?v=2025-08-19-1">
+    <title></title>
+    <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico?v=2025-08-23-usc">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-    <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=2025-08-22">
-    <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=2025-08-19-1">
-    <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-19-1">
-    <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-19-1"/>
-    <script src="/src/frontend/web/ifs/libs/bubbles.js?v=2025-08-19-1"></script>
-    <script src="/src/frontend/web/ifs/libs/chart.js?v=2025-08-19-1"></script>
+    <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=2025-01-20">
+    <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=2025-08-23-usc">
+    <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-23-usc">
+    <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-23-usc"/>
+    <script src="/src/frontend/web/ifs/libs/bubbles.js?v=2025-08-23-usc"></script>
+    <script src="/src/frontend/web/ifs/libs/chart.js?v=2025-08-23-usc"></script>
     <script src="/src/frontend/web/ifs/libs/js-yaml.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -25,8 +25,8 @@
     <!-- Loading overlay above will be hidden by JS once initialization completes -->
     <header class="header-hidden">
         <div class="header-left">
-            <a href="/" class="app-icon-link" style="display: none;"><img src="/src/frontend/web/ifs/IFS.ico" alt="Ireland Financial Simulator" class="app-icon"></a>
-            <h1 class="app-name"><a href="/">Ireland Financial Simulator</a></h1>
+            <a href="/" class="app-icon-link" style="display: none;"><img src="/src/frontend/web/ifs/IFS.ico" alt="" class="app-icon"></a>
+            <h1 class="app-name"><a href="/"></a></h1>
         </div>
         <div class="header-center-right">
             <div class="header-center">
@@ -412,7 +412,7 @@
                                 </div>
                             </th>
                             <th colspan="8">Gross Income</th>
-                            <th colspan="5">Deductions</th>
+                            <th colspan="1" data-group="deductions">Deductions</th>
                             <th colspan="2">Net Cashflow</th>
                             <th colspan="5">Assets</th>
                             <th colspan="2"></th>
@@ -428,10 +428,6 @@
                             <th data-key="IncomeFundsRent" title="Income generated from index fund investments">Index Funds</th>
                             <th data-key="IncomeSharesRent" title="Income generated from Investment Trusts or individual shares">Shares</th>
                             <th data-key="IncomeCash" title="Withdrawals from cash savings">Cash</th>
-                            <th data-key="IT" title="Income Tax paid on taxable income">IT</th>
-                            <th data-key="PRSI" title="Pay Related Social Insurance contributions">PRSI</th>
-                            <th data-key="USC" title="Universal Social Charge paid">USC</th>
-                            <th data-key="CGT" title="Capital Gains Tax (and Exit Tax) paid on investment gains.">CGT</th>
                             <th data-key="PensionContribution" title="Amount contributed to private pensions (excluding employer match)">P. Contrib</th>
                             <th data-key="NetIncome" title="Total income after all taxes and deductions">Inflows</th>
                             <th data-key="Expenses" title="Total annual expenses">Outflows</th>
@@ -458,7 +454,7 @@
 
     <!-- SYSTEM UTILITIES SECTION -->
     <script src="/src/frontend/AbstractUI.js?v=2025-08-19"></script>
-    <script src="/src/frontend/UIManager.js?v=2025-08-19"></script>
+    <script src="/src/frontend/UIManager.js?v=2025-01-20"></script>
     <script src="/src/frontend/web/utils/DOMUtils.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/utils/DeviceUtils.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/utils/FormatUtils.js?v=2025-08-19"></script>
@@ -471,7 +467,7 @@
     <script src="/src/frontend/web/utils/ErrorModalUtils.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/utils/FieldLabelsManager.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/utils/ValidationUtils.js?v=2025-08-19"></script>
-    <script src="/src/frontend/web/components/TableManager.js?v=2025-08-19"></script>
+    <script src="/src/frontend/web/components/TableManager.js?v=2025-08-23-3"></script>
     <script src="/src/frontend/web/components/EventsTableManager.js?v=2025-08-21"></script>
     <script src="/src/frontend/web/components/EventSummaryRenderer.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/components/EventAccordionManager.js?v=2025-08-22"></script>
@@ -482,22 +478,72 @@
     <script src="/src/frontend/web/components/DragAndDrop.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/components/Wizard.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/components/ContentRenderer.js?v=2025-08-19"></script>
-    <script src="/src/frontend/web/components/WelcomeModal.js?v=2025-08-19"></script>
+    <script src="/src/frontend/web/components/WelcomeModal.js?v=2025-01-20"></script>
     <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=2025-08-19"></script>
     <script src="/src/frontend/web/WebUI.js?v=2025-08-19"></script>
-    <script src="/src/core/TaxRuleSet.js?v=2025-08-19"></script>
-    <script src="/src/core/Config.js?v=2025-08-19"></script>
+    <script src="/src/core/TaxRuleSet.js?v=2025-08-23-usc"></script>
+    <script src="/src/core/Config.js?v=2025-01-20"></script>
     <script src="/src/core/Events.js?v=2025-08-19"></script>
     <script src="/src/core/Person.js?v=2025-08-19"></script>
-    <script src="/src/core/Taxman.js?v=2025-08-19"></script>
+    <script src="/src/core/Taxman.js?v=2025-01-20"></script>
     <script src="/src/core/Equities.js?v=2025-08-19"></script>
     <script src="/src/core/InvestmentTypeFactory.js?v=2025-08-19"></script>
     <script src="/src/core/RealEstate.js?v=2025-08-19"></script>
-    <script src="/src/core/Utils.js?v=2025-08-19"></script>
+    <script src="/src/core/Utils.js?v=2025-08-22"></script>
     <script src="/src/core/Attribution.js?v=2025-08-19"></script>
-    <script src="/src/core/AttributionManager.js?v=2025-08-19"></script>
-    <script src="/src/core/Simulator.js?v=2025-08-19-1"></script>
+    <script src="/src/core/AttributionManager.js?v=2025-01-20"></script>
+    <script src="/src/core/Simulator.js?v=2025-08-23-5"></script>
     
+    <!-- Init app name after Config is initialized -->
+    <script>
+    // Update document title, header app-name and app-icon alt using Config once available
+    (function() {
+        async function applyAppName() {
+            try {
+                // Wait until Config is initialized in WebUI flow; Config.getInstance() will throw if not ready
+                let appName = null;
+                try {
+                    if (window.Config && typeof Config.getInstance === 'function') {
+                        appName = Config.getInstance().getApplicationName();
+                    }
+                } catch (_) {
+                    // If Config isn't initialized yet, listen for DOMContentLoaded completion in WebUI which initializes Config
+                    // Fallback: poll until Config is ready (short-lived polling)
+                    const start = Date.now();
+                    while (Date.now() - start < 3000) {
+                        try { if (window.Config && typeof Config.getInstance === 'function') { appName = Config.getInstance().getApplicationName(); break; } } catch (_) {}
+                        await new Promise(r => setTimeout(r, 100));
+                    }
+                }
+
+                if (!appName) appName = 'Ireland Financial Simulator';
+
+                // Set document title
+                try { document.title = appName; } catch (_) {}
+
+                // Update header name anchor text
+                try {
+                    const appNameEl = document.querySelector('.app-name a');
+                    if (appNameEl) appNameEl.textContent = appName;
+                } catch (_) {}
+
+                // Update app icon alt
+                try {
+                    const icon = document.querySelector('.app-icon');
+                    if (icon) icon.setAttribute('alt', appName);
+                } catch (_) {}
+            } catch (err) { /* swallow errors */ }
+        }
+
+        // Defer applying name until after WebUI initializes Config; DOMContentLoaded may have already fired
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            // Slight delay to allow WebUI to call Config.initialize
+            setTimeout(applyAppName, 50);
+        } else {
+            document.addEventListener('DOMContentLoaded', function() { setTimeout(applyAppName, 50); });
+        }
+    })();
+    </script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const showLink = document.getElementById('show-data-link');

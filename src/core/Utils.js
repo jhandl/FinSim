@@ -92,8 +92,8 @@ function serializeSimulation(ui) {
     // Get events data, including hidden event types (like SI2 in single mode)
     const events = ui.getTableData('Events', 6, true);
 
-    // Create CSV content
-    let csvContent = "# Ireland Financial Simulator v" + ui.getVersion() + " Save File\n";
+    // Create CSV content (always save with FinSim header for forward compatibility)
+    let csvContent = "# FinSim v" + ui.getVersion() + " Save File\n";
     csvContent += "# Parameters\n";
     for (const [key, value] of Object.entries(parameters)) {
         // Convert undefined values to empty strings to avoid "undefined" in CSV
@@ -124,18 +124,20 @@ function serializeSimulation(ui) {
 function deserializeSimulation(content, ui) {
     const lines = content.split('\n').map(line => line.trim());
 
-    // Verify file format and extract version (not used yet)
+    // Verify file format and extract version (accept legacy and new headers)
     let fileVersion = null;
-    if (lines[0].includes('Ireland Financial Simulator v')) {
-        const versionMatch = lines[0].match(/v(\d+\.\d+)/);
-        if (versionMatch && versionMatch[1]) {
-            fileVersion = parseFloat(versionMatch[1]);
-        }
+    const headerLine = lines[0] || '';
+    const finSimMatch = headerLine.match(/FinSim\s+v(\d+\.\d+)/);
+    const irelandMatch = headerLine.match(/Ireland\s+Financial\s+Simulator\s+v(\d+\.\d+)/);
+    if (finSimMatch) {
+        fileVersion = parseFloat(finSimMatch[1]);
+    } else if (irelandMatch) {
+        fileVersion = parseFloat(irelandMatch[1]);
     } else {
         // Not a recognized simulator file or very old format without 'vX.Y'
         throw new Error('Invalid or unrecognized scenario file format.');
     }
-    if (fileVersion === null) {
+    if (fileVersion === null || isNaN(fileVersion)) {
         throw new Error('Could not determine scenario file version.');
     }
 

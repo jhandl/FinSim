@@ -69,7 +69,18 @@ run_test() {
     cd "$CORE_DIR"
     node -e "
         const { TestFramework } = require('./TestFramework.js');
-        const testDefinition = require('$test_file');
+        let testDefinition;
+        try {
+            testDefinition = require('$test_file');
+        } catch (error) {
+            console.error('❌ FAILED: $test_name');
+            if (error && (error.stack || error.message)) {
+                console.error(error.stack || ('  Error: ' + error.message));
+            } else {
+                console.error('  Error: Failed to load test file');
+            }
+            process.exit(1);
+        }
         
         // Check if this is a custom test
         if (testDefinition.isCustomTest && testDefinition.runCustomTest) {
@@ -88,7 +99,10 @@ run_test() {
                     }
                 })
                 .catch(error => {
-                    console.error('❌ ERROR: $test_name - ' + error.message);
+                    console.error('❌ FAILED: $test_name');
+                    if (error && (error.stack || error.message)) {
+                        console.error(error.stack || ('  Error: ' + error.message));
+                    }
                     process.exit(1);
                 });
         } else {
@@ -110,7 +124,10 @@ run_test() {
                     }
                 })
                 .catch(error => {
-                    console.error('❌ ERROR: $test_name - ' + error.message);
+                    console.error('❌ FAILED: $test_name');
+                    if (error && (error.stack || error.message)) {
+                        console.error(error.stack || ('  Error: ' + error.message));
+                    }
                     process.exit(1);
                 });
         }
