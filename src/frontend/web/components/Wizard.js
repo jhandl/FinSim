@@ -1034,6 +1034,11 @@ class Wizard {
 
     this.cleanupHighlighting();
 
+    // Only update lastStepIndex if tour was completed normally
+    if (this.tour && typeof this.tour.getActiveIndex === 'function') {
+      this.lastStepIndex = this.tour.getActiveIndex();
+    }
+    
     if (this.tour) {
       this.tour.destroy();
       this.tour = null;
@@ -1065,11 +1070,6 @@ class Wizard {
     // Reset last focused tracking so the next tour starts fresh
     this.lastFocusedField = null;
     this.lastFocusedWasInput = false;
-
-    // Only update lastStepIndex if tour was completed normally
-    if (this.tour && typeof this.tour.getActiveIndex === 'function') {
-      this.lastStepIndex = this.tour.getActiveIndex();
-    }
   }
 
   cleanupInlineStyles() {
@@ -1382,7 +1382,7 @@ class Wizard {
    * @param {Object} step - The step to update
    * @param {string} stepFieldType - The field type (e.g., "EventType", "EventAlias")
    */
-  updateStepContentForEventType(step, stepFieldType) {``
+  updateStepContentForEventType(step, stepFieldType) {
     if (!this.originalConfig || !this.originalConfig.steps || !this.tableState) {
       return;
     }
