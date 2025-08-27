@@ -45,6 +45,21 @@ class TaxRuleSet {
     return this.raw.country || 'IE';
   }
 
+  getNumberLocale() {
+    var locale = this.raw.locale || {};
+    return typeof locale.numberLocale === 'string' ? locale.numberLocale : 'en-IE';
+  }
+
+  getCurrencyCode() {
+    var locale = this.raw.locale || {};
+    return typeof locale.currencyCode === 'string' ? locale.currencyCode : 'EUR';
+  }
+
+  getCurrencySymbol() {
+    var locale = this.raw.locale || {};
+    return typeof locale.currencySymbol === 'string' ? locale.currencySymbol : '€';
+  }
+
   // ----- Income Tax -----
   getIncomeTaxBracketsFor(status, hasDependentChildren) {
     var it = this.raw.incomeTax || {};

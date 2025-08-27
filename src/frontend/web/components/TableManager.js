@@ -247,9 +247,9 @@ class TableManager {
       if (key === 'Age' || key === 'Year') {
         contentContainer.textContent = v.toString();
       } else if (key === 'WithdrawalRate') {
-        contentContainer.textContent = v.toLocaleString("en-IE", {style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2});
+        contentContainer.textContent = FormatUtils.formatPercentage(v);
       } else {
-        contentContainer.textContent = v.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
+        contentContainer.textContent = FormatUtils.formatCurrency(v);
       }
       
       // Add tooltip for attributable values
@@ -344,7 +344,7 @@ class TableManager {
                         
                         return {
                             source: displaySource,
-                            formatted: Math.abs(amount).toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})
+                            formatted: FormatUtils.formatCurrency(Math.abs(amount))
                         };
                     }).filter(item => item !== null);
                     
@@ -371,7 +371,7 @@ class TableManager {
                     const formattedAmounts = breakdownEntries.map(([source, amount]) => ({
                         source,
                         amount,
-                        formatted: amount.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0})
+                        formatted: FormatUtils.formatCurrency(amount)
                     }));
                     
                     // Calculate max width including potential tax amount
@@ -381,7 +381,7 @@ class TableManager {
                             potentialTax += (data[dataKey] || 0);
                         }
                     }
-                    const formattedTax = potentialTax.toLocaleString("en-IE", {style: 'currency', currency: 'EUR', maximumFractionDigits: 0});
+                    const formattedTax = FormatUtils.formatCurrency(potentialTax);
                     const maxAmountWidth = Math.max(
                         ...formattedAmounts.map(item => item.formatted.length),
                         formattedTax.length

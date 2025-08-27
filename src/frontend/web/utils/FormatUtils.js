@@ -2,13 +2,39 @@
 
 class FormatUtils {
   
+  static getLocaleSettings() {
+    let numberLocale = 'en-IE';
+    let currencyCode = 'EUR';
+    let currencySymbol = '€';
+    
+    try {
+      const config = Config.getInstance();
+      const ruleset = config.getCachedTaxRuleSet();
+      if (ruleset) {
+        numberLocale = ruleset.getNumberLocale();
+        currencyCode = ruleset.getCurrencyCode();
+        currencySymbol = ruleset.getCurrencySymbol();
+      }
+    } catch (err) {
+      // Config not available or not initialized, use fallbacks
+    }
+    
+    return {
+      numberLocale,
+      currencyCode,
+      currencySymbol
+    };
+  }
+
   static formatCurrency(value) {
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return value;
     
-    return numValue.toLocaleString('en-IE', {
+    const localeSettings = FormatUtils.getLocaleSettings();
+    // Always display whole numbers for currency (no decimal digits)
+    return numValue.toLocaleString(localeSettings.numberLocale, {
       style: 'currency',
-      currency: 'EUR',
+      currency: localeSettings.currencyCode,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     });
@@ -33,9 +59,32 @@ class FormatUtils {
 
   static parseCurrency(value) {
     if (typeof value !== 'string') return value;
-    value = value.replace(/[€,]/g, '');
-    const numValue = parseFloat(value);
-    return isNaN(numValue) ? undefined : numValue;
+    const { numberLocale, currencySymbol, currencyCode } = FormatUtils.getLocaleSettings();
+    const escSym = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Remove symbol (anywhere) and spaces
+    let s = value.replace(new RegExp(escSym, 'g'), '').replace(/\s+/g, '');
+
+    // Derive separators using formatToParts
+    const parts = new Intl.NumberFormat(numberLocale).formatToParts(12345.6);
+    const group = parts.find(p => p.type === 'group')?.value || ',';
+    const decimal = parts.find(p => p.type === 'decimal')?.value || '.';
+
+    // If decimals are not allowed (app policy), reject values containing a decimal separator
+    // Policy: allow decimals if locale uses a decimal separator in currency formatting
+    const allowDecimals = !!(new Intl.NumberFormat(numberLocale, { style: 'currency', currency: currencyCode }).formatToParts(1.1).find(p => p.type === 'decimal'));
+
+    // Remove group separators
+    s = s.split(group).join('');
+
+    // If value contains locale decimal and decimals are disallowed, reject
+    if (!allowDecimals && s.indexOf(decimal) !== -1) return undefined;
+
+    // Normalise decimal to '.' for parseFloat
+    if (decimal !== '.') s = s.replace(decimal, '.');
+
+    const num = parseFloat(s);
+    return isNaN(num) ? undefined : num;
   }
 
   static formatBoolean(value) {
@@ -123,7 +172,24 @@ class FormatUtils {
       // Remove type="number" to prevent browser validation of formatted numbers
       input.type = 'text';
       input.inputMode = 'numeric';
-      input.pattern = '[0-9\$€,]*';
+      const localeSettings = FormatUtils.getLocaleSettings();
+      const currencySymbol = localeSettings.currencySymbol || '';
+      const currencySymbolEscaped = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Derive locale group and decimal separators
+      const parts = new Intl.NumberFormat(localeSettings.numberLocale).formatToParts(12345.6);
+      const groupSep = parts.find(p => p.type === 'group')?.value || ',';
+      const decimalSep = parts.find(p => p.type === 'decimal')?.value || '.';
+
+      // Escape separators for regex
+      const escGroup = groupSep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escDecimal = decimalSep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Support optional leading '-' and multi-character currency symbols as one token (non-capturing group)
+      // Pattern allows digits, group separator, and optional decimal separator plus digits
+      // Example resulting pattern: ^-?(?:€|EUR)?[0-9,]*?(?:\.[0-9]*)?$
+      const symbolToken = currencySymbolEscaped ? `(?:${currencySymbolEscaped})?` : '';
+      input.pattern = `^-?${symbolToken}[0-9${escGroup}]*?(?:${escDecimal}[0-9]*)?$`;
     });
 
     // Use direct event listeners instead of delegation for better reliability
@@ -145,8 +211,9 @@ class FormatUtils {
 
       // Format initial value if it exists and isn't already formatted
       const value = input.value;
-      if (value && value.indexOf('€') === -1) {
-        const number = parseFloat(value);
+      const { currencySymbol } = FormatUtils.getLocaleSettings();
+      if (value && value.indexOf(currencySymbol) === -1) {
+        const number = FormatUtils.parseCurrency(value);
         if (!isNaN(number)) {
           input.value = FormatUtils.formatCurrency(number);
         }

@@ -185,16 +185,7 @@ class ChartManager {
                   label += ': ';
                 }
                 if (context.parsed.y !== null) {
-                  // Check if FormatUtils is available
-                  if (typeof FormatUtils !== 'undefined' && FormatUtils.formatCurrency) {
-                    label += FormatUtils.formatCurrency(context.parsed.y);
-                  } else {
-                    // Fallback if FormatUtils isn't available
-                    label += new Intl.NumberFormat('en-IE', {
-                      style: 'currency',
-                      currency: 'EUR'
-                    }).format(context.parsed.y);
-                  }
+                  label += FormatUtils.formatCurrency(context.parsed.y);
                 }
                 return label;
               }

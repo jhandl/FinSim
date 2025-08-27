@@ -4,6 +4,12 @@
   "version": "26.1",
   "updateMessage": "",
 
+  "locale": {
+    "numberLocale": "en-IE",
+    "currencyCode": "EUR",
+    "currencySymbol": "€"
+  },
+
   "incomeTax": {
     "name": "IT",
     "tooltip": "Income Tax paid on taxable income",

@@ -27,9 +27,30 @@ class ValidationUtils {
     switch (type) {
       case 'money':
       case 'currency': {
-        // Strip common formatting characters and leading currency symbols
-        let s = str.replace(/[\s,]/g, '');
-        s = s.replace(/^[€£\$]/, '');
+        // Preserve an optional leading minus sign (possibly separated by spaces
+        // from the currency symbol), then strip formatting characters and symbols.
+        let sign = 1;
+        let tmp = str;
+        const leadingMinusMatch = tmp.match(/^\s*-\s*/);
+        if (leadingMinusMatch) {
+          sign = -1;
+          tmp = tmp.replace(/^\s*-\s*/, '');
+        }
+
+        // Remove spaces and thousands separators (commas)
+        let s = tmp.replace(/[\s,]/g, '');
+
+        // Get dynamic currency symbol and create regex pattern
+        const localeSettings = FormatUtils.getLocaleSettings();
+        const currencySymbol = localeSettings.currencySymbol || '';
+        // Escape any regex metacharacters in the currency symbol
+        const esc = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // Remove leading/trailing currency symbol tokens (spaces already removed above)
+        const leadingCurrencyRegex = new RegExp(`^${esc}`);
+        s = s.replace(leadingCurrencyRegex, '');
+        const trailingCurrencyRegex = new RegExp(`${esc}$`);
+        s = s.replace(trailingCurrencyRegex, '');
 
         // Detect multiplier suffix (K, M, k, m)
         let multiplier = 1;
@@ -49,7 +70,7 @@ class ValidationUtils {
         if (!/^-?\d+(?:\.\d+)?$/.test(s)) return null;
 
         const num = parseFloat(s);
-        return num * multiplier;
+        return num * multiplier * sign;
       }
       case 'percentage': {
         let s = str.replace(/%/g, '').replace(/\s+/g, '');
