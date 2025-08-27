@@ -482,7 +482,19 @@ class TableManager {
     dataRows.forEach(row => {
       const cells = Array.from(row.cells);
       const rowData = cells.map(cell => {
-        let value = cell.textContent.trim();
+        // Prefer the formatted cell content container when present so we can
+        // exclude UI-only bits like the tooltip 'i' icon from the exported text.
+        let value = '';
+        const contentContainer = cell.querySelector('.cell-content');
+        if (contentContainer) {
+          const clone = contentContainer.cloneNode(true);
+          // Remove any info icons or other UI-only markers
+          const infoIcons = clone.querySelectorAll('.cell-info-icon');
+          infoIcons.forEach(el => el.remove());
+          value = clone.textContent.trim();
+        } else {
+          value = cell.textContent.trim();
+        }
 
         // Handle values that contain commas by wrapping in quotes
         if (value.includes(',')) {
