@@ -102,6 +102,20 @@ class EventWizardRenderer {
       if (wizardManager) {
         wizardManager.clearWizardFieldValidation(fromInput);
       }
+      // If fromAge equals toAge, clear any previously entered growth rate
+      try {
+        const f = fromInput.value.trim();
+        const t = toInput.value.trim();
+        if (f !== '' && t !== '' && parseInt(f) === parseInt(t)) {
+          // Clear rate in wizard state and UI
+          wizardState.data.rate = '';
+          const rateEl = document.getElementById('wizard-rate');
+          if (rateEl) {
+            rateEl.value = '';
+            if (wizardManager) wizardManager.clearWizardFieldValidation(rateEl);
+          }
+        }
+      } catch (_) {}
     });
 
     toInput.addEventListener('input', () => {
@@ -110,6 +124,20 @@ class EventWizardRenderer {
       if (wizardManager) {
         wizardManager.clearWizardFieldValidation(toInput);
       }
+      // If fromAge equals toAge, clear any previously entered growth rate
+      try {
+        const f = fromInput.value.trim();
+        const t = toInput.value.trim();
+        if (f !== '' && t !== '' && parseInt(f) === parseInt(t)) {
+          // Clear rate in wizard state and UI
+          wizardState.data.rate = '';
+          const rateEl = document.getElementById('wizard-rate');
+          if (rateEl) {
+            rateEl.value = '';
+            if (wizardManager) wizardManager.clearWizardFieldValidation(rateEl);
+          }
+        }
+      } catch (_) {}
     });
 
     const validationRules = (step.content && step.content.validation) || '';
@@ -410,7 +438,57 @@ class EventWizardRenderer {
 
     const template = this.getSummaryTemplate(step, wizardState) || 'Event details will be shown here.';
 
-    return this.processTextVariables(template, wizardState);
+    // Determine whether this wizard path requested a growth rate step
+    const growthRequested = this.stepRequestsGrowth(step, wizardState);
+    // Pass growthRequested flag into variable computation via a shallow wrapper
+    // so that placeholders like {growthPart} are filled according to requirement.
+    return this.processTextVariablesWithGrowth(template, wizardState, growthRequested);
+  }
+
+  /**
+   * Determine if the current step/wizard path requested a growth/rate input
+   * We consider the wizard step definitions: if any prior step explicitly
+   * requested the 'rate' field (i.e., a step with field === 'rate' that
+   * was visible according to conditions), we treat growth as requested.
+   */
+  stepRequestsGrowth(step, wizardState) {
+    try {
+      const wizard = this.webUI.eventWizardManager?.currentWizard;
+      if (!wizard || !Array.isArray(wizard.steps)) return false;
+      // Find any step earlier in the flow that has field === 'rate'
+      for (const s of wizard.steps) {
+        if (!s) continue;
+        if (s.field === 'rate') {
+          // Use shouldShowStep logic similar to manager but with local data
+          const cond = s.condition;
+          if (!cond) return true;
+          // Evaluate condition against wizardState safely
+          try {
+            const ctx = { ...wizardState.data, ...wizardState };
+            return this.evaluateCondition(cond, ctx);
+          } catch (_) {
+            return false;
+          }
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  // Helper that computes variables with growthRequested and processes text
+  processTextVariablesWithGrowth(text, wizardState, growthRequested) {
+    if (!text) return text;
+    const data = wizardState.data || {};
+    // Compute derived variables with growth flag
+    // Determine if this is a property event to choose wording
+    const isProperty = (wizardState && wizardState.eventType) ? ['R', 'M'].includes(wizardState.eventType) : false;
+    const derived = this.computeDerivedVariables(data, growthRequested, isProperty);
+    const variables = { ...data, ...derived };
+
+    return text.replace(/\{([^}]+)\}/g, (match, key) => {
+      const val = variables[key];
+      return (val !== undefined && val !== null && val !== '') ? val : '';
+    });
   }
 
   /**
@@ -461,7 +539,7 @@ class EventWizardRenderer {
    * Compute derived / formatted variables that can be referenced in templates.
    * Keeps display logic centralised and generic.
    */
-  computeDerivedVariables(data) {
+  computeDerivedVariables(data, growthRequested = false, isProperty = false) {
     const derived = {};
 
     // Bold name for visual emphasis
@@ -490,16 +568,24 @@ class EventWizardRenderer {
     }
 
     // Growth / rate helpers
-    if ('rate' in data) {
+    if (growthRequested) {
       if (data.rate === undefined || data.rate === '' || data.rate === 'inflation') {
+        const verb = isProperty ? 'appreciating' : 'growing';
         derived.rate = 'inflation';
-        derived.growthPart = ', growing with inflation';
+        // Requirement: when growth was requested but left empty, summary must include
+        // "growing at the inflation rate" (or "appreciating at the inflation rate")
+        derived.growthPart = `, ${verb} at the inflation rate`;
       } else {
         const n = parseFloat(data.rate);
         if (!isNaN(n)) {
+          // Choose verb based on property vs other event and sign of rate
+          let verb;
+          if (isProperty) verb = (n < 0) ? 'depreciating' : 'appreciating';
+          else verb = (n < 0) ? 'shrinking' : 'growing';
+
           derived.rate = `${Math.abs(n)}%`;
           derived.rateAbs = Math.abs(n);
-          derived.growthPart = `, growing at ${Math.abs(n)}% per year`;
+          derived.growthPart = `, ${verb} at ${Math.abs(n)}% per year`;
           derived.direction = n < 0 ? 'crash' : 'boom';
         } else {
           derived.growthPart = '';
@@ -532,9 +618,44 @@ class EventWizardRenderer {
       derived.mortgageTerm = data.mortgageTerm;
     }
 
+    // Down payment percentage (for property purchase summaries)
+    if (data.propertyValue !== undefined && data.amount !== undefined) {
+      const pv = toNumber(data.propertyValue);
+      const dp = toNumber(data.amount);
+      if (pv > 0 && dp >= 0) {
+        const pct = Math.round((dp / pv) * 100);
+        derived.downPaymentPct = `${pct}%`;
+      } else {
+        derived.downPaymentPct = '';
+      }
+    } else {
+      derived.downPaymentPct = '';
+    }
+
     // Typing helpers
     if (data.incomeType) derived.incomeType = data.incomeType.replace('_', ' ');
 
+    // Period / timing helper used in summary templates
+    if (data.fromAge !== undefined && data.fromAge !== null && data.fromAge !== '') {
+      const from = parseInt(data.fromAge);
+      const to = parseInt(data.toAge);
+      const mode = this.webUI?.eventsTableManager?.ageYearMode || 'age';
+      const unit = mode === 'age' ? 'age' : 'year';
+
+      if (!isNaN(from)) {
+        if (isNaN(to) || to === 999) {
+          derived.periodPhrase = `from ${unit} ${from}`;
+        } else if (from === to) {
+          derived.periodPhrase = `at ${unit} ${from}`;
+        } else {
+          derived.periodPhrase = `from ${unit} ${from} to ${unit} ${to}`;
+        }
+      } else {
+        derived.periodPhrase = '';
+      }
+    } else {
+      derived.periodPhrase = '';
+    }
     return derived;
   }
 
@@ -583,7 +704,7 @@ class EventWizardRenderer {
 
     // Update the calculation display
     const paymentRows = monthlyPayment > 0 ? `
-      <div class="calculation-row calculation-payment">
+      <div class="calculation-row calculation-payment-monthly">
         <span>Monthly Payment:</span>
         <span>${this.formatCurrency(monthlyPayment)}</span>
       </div>
@@ -650,12 +771,13 @@ class EventWizardRenderer {
    * @returns {string} Formatted currency string
    */
   formatCurrency(value) {
-    const num = parseFloat(value) || 0;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(num);
+    // Use shared FormatUtils so currency symbol and locale come from the active TaxRuleSet
+    try {
+      return FormatUtils.formatCurrency(value);
+    } catch (err) {
+      // Fallback to simple number if FormatUtils isn't available
+      const num = parseFloat(value) || 0;
+      return num.toString();
+    }
   }
 }

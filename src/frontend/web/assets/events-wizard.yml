@@ -99,7 +99,7 @@ EventWizards:
           help: "Leave blank to use inflation rate."
           defaultValue: "inflation"
         showButtons: ["back", "next"]
-        condition: "incomeType !== 'defined_benefit'"
+        condition: "fromAge !== toAge"
 
       - stepId: "pensionContribution"
         title: "Pension Contribution"
@@ -134,10 +134,10 @@ EventWizards:
         content:
           templates:
             - condition: "incomeType === 'salary' && pensionContribution === 'yes' && match"
-              template: "{name}: A gross salary of {amount} per year from age {fromAge} to {toAge}{growthPart}{matchPart}."
+              template: "{name}: A gross salary of {amount} per year {periodPhrase}{growthPart}{matchPart}."
             - condition: "incomeType === 'salary' && pensionContribution === 'yes'"
-              template: "{name}: A gross salary of {amount} per year from age {fromAge} to {toAge}{growthPart}, with employer pension contributions."
-            - template: "{name}: A {incomeType} income of {amount} per year from age {fromAge} to {toAge}{growthPart}."
+              template: "{name}: A gross salary of {amount} per year {periodPhrase}{growthPart}."
+            - template: "{name}: A {incomeType} income of {amount} per year {periodPhrase}{growthPart}."
         showButtons: ["back", "create"]
 
   # Expense Wizard (Simple Flow)
@@ -221,7 +221,7 @@ EventWizards:
           help: "Leave blank to use inflation rate."
           defaultValue: "inflation"
         showButtons: ["back", "next"]
-        condition: "frequency !== 'oneoff'"
+        condition: "frequency !== 'oneoff' && fromAge !== toAge"
         
       - stepId: "summary"
         title: "Review & Create"
@@ -230,7 +230,7 @@ EventWizards:
           templates:
             - condition: "frequency === 'oneoff'"
               template: "{name}: A one-off expense of {amount} at age {fromAge}{growthPart}."
-            - template: "{name}: An expense of {amount} {frequencyText} (≈ {annualAmount} per year) from age {fromAge} to {toAge}{growthPart}."
+            - template: "{name}: An expense of {amount} {frequencyText} (≈ {annualAmount} per year) {periodPhrase}{growthPart}."
         showButtons: ["back", "create"]
 
   # Property Purchase Wizard (Complex Flow)
@@ -316,6 +316,7 @@ EventWizards:
           inputType: "percentage"
           validation: "optional"
         showButtons: ["back", "next"]
+        condition: "fromAge !== toAge"
         
       - stepId: "mortgage_setup"
         title: "Mortgage Details"
@@ -332,8 +333,8 @@ EventWizards:
         content:
           templates:
             - condition: "financing === 'cash'"
-              template: "{name}: A cash property purchase for {amount} at age {fromAge}."
-            - template: "{name}: Purchase for {propertyValue} with a down payment of {amount} at age {fromAge}. Loan term {mortgageTerm} years at {mortgageRate} (≈ {mortgageMonthlyPayment} per month, {mortgageAnnualPayment} per year)."
+              template: "{name}: A cash property purchase for {amount} {periodPhrase}{growthPart}."
+            - template: "{name}: Purchase for {propertyValue} with a down payment of {amount} ({downPaymentPct}) {periodPhrase}{growthPart}. Loan term {mortgageTerm} years at {mortgageRate} (≈ {mortgageMonthlyPayment} per month, {mortgageAnnualPayment} per year)."
         showButtons: ["back", "create"]
 
   # Market Event Wizard (Investment Category)
@@ -378,7 +379,7 @@ EventWizards:
         contentType: "summary"
         content:
           templates:
-            - template: "{name}: A market {direction} of {rate} from age {fromAge} to {toAge}."
+            - template: "{name}: A market {direction} of {rate} {periodPhrase}."
         showButtons: ["back", "create"]
 
 # Wizard UI Configuration

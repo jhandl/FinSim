@@ -482,7 +482,9 @@ class EventWizardManager {
                 case 'gte': valid = thisValNum >= otherValNum; break;
               }
               if (!valid) {
-                const message = `Value must be ${comparator} ${otherField.replace(/([A-Z])/g, ' $1').toLowerCase()}`;
+                const comparatorTextMap = { lt: 'less than', lte: 'less than or equal to', gt: 'greater than', gte: 'greater than or equal to' };
+                const comparatorText = comparatorTextMap[comparator] || comparator;
+                const message = `Value must be ${comparatorText} ${otherField.replace(/([A-Z])/g, ' $1').toLowerCase()}`;
                 this.showWizardFieldValidation(input, message);
               }
             }
@@ -980,8 +982,12 @@ class EventWizardManager {
    * @returns {boolean} - Whether the condition is met
    */
   evaluateCondition(condition) {
-    if (!condition || !this.wizardState.data) {
+    if (!condition) {
       return true;
+    }
+    if (!this.wizardState || !this.wizardState.data) {
+      // No state to evaluate against -> do not show conditional steps
+      return false;
     }
 
     try {
@@ -998,22 +1004,43 @@ class EventWizardManager {
         expression = expression.replace(/\bsimulationMode\b/g, `"${simulationMode}"`);
       }
 
-      // Handle common field references
+      // Replace field names with JSON-encoded values so types are preserved
       Object.keys(data).forEach(key => {
         const value = data[key];
-        const regex = new RegExp(`\\b${key}\\b`, 'g');
-        expression = expression.replace(regex, `"${value}"`);
+        // Escape key for regex
+        const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`\\b${escapedKey}\\b`, 'g');
+        const replacement = (value === undefined) ? 'undefined' : JSON.stringify(value);
+        expression = expression.replace(regex, replacement);
       });
 
-      // Normalize quotes to all be double quotes
+      // Normalize quotes to double quotes for any literal strings in the condition
       expression = expression.replace(/'/g, '"');
 
-      // Evaluate the expression safely
-      // Support simple comparison operations and logical AND
-      if (/^"[^"]*"\s*(===|!==)\s*"[^"]*"(\s*&&\s*"[^"]*"\s*(===|!==)\s*"[^"]*")*$/.test(expression)) {
-        return eval(expression);
+      // Remove quoted strings for safety checks
+      const withoutStrings = expression.replace(/"[^"\\]*"/g, '');
+
+      // Ensure remaining characters are only allowed operators / punctuation / numbers / whitespace
+      if (!/^[\s0-9.\-+*/%<>=!&|()?:,]*$/.test(withoutStrings)) {
+        // If there are bare identifiers left, allow only boolean/null/undefined literals
+        const identifiers = withoutStrings.match(/\b[A-Za-z_][A-Za-z0-9_]*\b/g) || [];
+        const allowed = new Set(['true', 'false', 'null', 'undefined']);
+        for (let id of identifiers) {
+          if (!allowed.has(id)) {
+            return false; // unsafe identifier present -> do not show
+          }
+        }
       }
-      return true; // Default to showing step if condition can't be evaluated
+
+      // At this point the expression is considered safe to evaluate
+      try {
+        // Use Function constructor instead of eval for slightly better scoping
+        const fn = new Function('return (' + expression + ');');
+        return Boolean(fn());
+      } catch (err) {
+        console.warn('Failed to evaluate wizard condition expression:', expression, err);
+        return false;
+      }
     } catch (error) {
       console.warn('Error evaluating step condition:', condition, error);
       return true; // Default to showing step on error
