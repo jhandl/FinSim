@@ -15,8 +15,13 @@
     "tooltip": "Income Tax paid on taxable income",
     "personalAllowance": 0,
     "taxCredits": {
-      "employee": 2000,
-      "age": 245
+      "employee": {
+        "min": {
+          "amount": 2000,
+          "rate": 0.20
+        }
+      },
+      "age": { "0": 0, "65": 245 }
     },
     "ageExemptionAge": 65,
     "ageExemptionLimit": 18000,

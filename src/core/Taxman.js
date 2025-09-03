@@ -316,7 +316,44 @@ class Taxman {
     var ageExemptionAge = this.ruleset.getIncomeTaxAgeExemptionAge();
     var ageExemptionLimit = this.ruleset.getIncomeTaxAgeExemptionLimit();
 
-    let credit = adjust(params.personalTaxCredit + numSalaryEarners * employeeCredit);
+    // Compute per-person employee credit honoring declarative `min` / `max`
+    var empSpec = (this.ruleset && typeof this.ruleset.getIncomeTaxEmployeeCreditSpec === 'function')
+      ? this.ruleset.getIncomeTaxEmployeeCreditSpec()
+      : { amount: employeeCredit, min: null, max: null };
+
+    // Sum PAYE salaries per person
+    const p1TotalSalary = this.salariesP1.reduce(function(sum, s) { return sum + s.amount; }, 0);
+    const p2TotalSalary = this.salariesP2.reduce(function(sum, s) { return sum + s.amount; }, 0);
+
+    const computePerPersonEmployeeCredit = (salaryTotal) => {
+      if (!salaryTotal || salaryTotal <= 0) return 0;
+      var base = empSpec.amount || 0;
+      var candidate = base;
+      // Apply `min` rule if present: credit = min(base, salaryTotal * rate) or min(base, amount)
+      if (empSpec.min) {
+        var minByRate = (empSpec.min.rate && typeof empSpec.min.rate === 'number') ? salaryTotal * empSpec.min.rate : null;
+        var minByAmount = (empSpec.min.amount && typeof empSpec.min.amount === 'number') ? empSpec.min.amount : null;
+        var minCandidates = [];
+        if (minByRate !== null) minCandidates.push(minByRate);
+        if (minByAmount !== null) minCandidates.push(minByAmount);
+        if (minCandidates.length > 0) candidate = Math.min(base, Math.min.apply(null, minCandidates));
+      }
+      // Apply `max` rule if present: candidate = Math.min(candidate, salaryTotal * rate or amount)
+      if (empSpec.max) {
+        var maxByRate = (empSpec.max.rate && typeof empSpec.max.rate === 'number') ? salaryTotal * empSpec.max.rate : null;
+        var maxByAmount = (empSpec.max.amount && typeof empSpec.max.amount === 'number') ? empSpec.max.amount : null;
+        var maxCandidates = [];
+        if (maxByRate !== null) maxCandidates.push(maxByRate);
+        if (maxByAmount !== null) maxCandidates.push(maxByAmount);
+        if (maxCandidates.length > 0) candidate = Math.min(candidate, Math.max.apply(null, maxCandidates));
+      }
+      return candidate;
+    };
+
+    var empCreditP1 = computePerPersonEmployeeCredit(p1TotalSalary);
+    var empCreditP2 = computePerPersonEmployeeCredit(p2TotalSalary);
+
+    let credit = adjust(params.personalTaxCredit + empCreditP1 + empCreditP2);
     if (this.person1Ref && this.person1Ref.age >= ageExemptionAge) {
       credit += adjust(ageCredit);
     }

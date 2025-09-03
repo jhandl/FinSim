@@ -83,13 +83,66 @@ class TaxRuleSet {
   getIncomeTaxEmployeeCredit() {
     var it = this.raw.incomeTax || {};
     var credits = it.taxCredits || {};
-    return typeof credits.employee === 'number' ? credits.employee : 0;
+    // Backwards-compatible: allow numeric or object forms
+    if (typeof credits.employee === 'number') return credits.employee;
+    if (credits.employee && typeof credits.employee === 'object') {
+      // Prefer explicit amount if provided
+      if (typeof credits.employee.amount === 'number') return credits.employee.amount;
+      // Support declarative forms: min.amount or max.amount
+      if (credits.employee.min && typeof credits.employee.min === 'object' && typeof credits.employee.min.amount === 'number') return credits.employee.min.amount;
+      if (credits.employee.max && typeof credits.employee.max === 'object' && typeof credits.employee.max.amount === 'number') return credits.employee.max.amount;
+    }
+    return 0;
+  }
+
+  /**
+   * Return a normalized employee credit specification supporting declarative
+   * functions like `min`/`max`. Backwards-compatibly accepts a numeric value.
+   * Returns { amount, min: { amount, rate } | null, max: { amount, rate } | null }
+   */
+  getIncomeTaxEmployeeCreditSpec() {
+    var it = this.raw.incomeTax || {};
+    var credits = it.taxCredits || {};
+    var e = credits.employee;
+    var spec = { amount: 0, min: null, max: null };
+    if (typeof e === 'number') {
+      spec.amount = e;
+      return spec;
+    }
+    if (e && typeof e === 'object') {
+      // Prefer explicit amount, otherwise fall back to min.amount or max.amount when present
+      if (typeof e.amount === 'number') spec.amount = e.amount;
+      else if (e.min && typeof e.min === 'object' && typeof e.min.amount === 'number') spec.amount = e.min.amount;
+      else if (e.max && typeof e.max === 'object' && typeof e.max.amount === 'number') spec.amount = e.max.amount;
+      if (e.min && typeof e.min === 'object') {
+        spec.min = { amount: (typeof e.min.amount === 'number') ? e.min.amount : null,
+                     rate: (typeof e.min.rate === 'number') ? e.min.rate : null };
+      }
+      if (e.max && typeof e.max === 'object') {
+        spec.max = { amount: (typeof e.max.amount === 'number') ? e.max.amount : null,
+                     rate: (typeof e.max.rate === 'number') ? e.max.rate : null };
+      }
+    }
+    return spec;
   }
 
   getIncomeTaxAgeCredit() {
     var it = this.raw.incomeTax || {};
     var credits = it.taxCredits || {};
-    return typeof credits.age === 'number' ? credits.age : 0;
+    // Support numeric age credit or an object keyed by age thresholds
+    if (typeof credits.age === 'number') return credits.age;
+    if (credits.age && typeof credits.age === 'object') {
+      // Choose the highest age threshold value if present (e.g., {"0":0, "65":245})
+      try {
+        var keys = Object.keys(credits.age).map(function(k){ return parseInt(k); }).filter(function(n){ return !isNaN(n); }).sort(function(a,b){ return a-b; });
+        if (keys.length > 0) {
+          var highest = keys[keys.length - 1];
+          var val = credits.age[String(highest)];
+          if (typeof val === 'number') return val;
+        }
+      } catch (_) {}
+    }
+    return 0;
   }
 
   getIncomeTaxAgeExemptionAge() {
