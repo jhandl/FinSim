@@ -4,8 +4,16 @@
 # Roadmap
 
 ### Improvements
+- Move to WASM
+   - Set up build process
+   - Move code to new private repo (or rename repo and create new finsim repo for prod)
+   - Compile
 - Feedback form: @feedback-form-plan.md
 - Monetization: @monetization-plan.md
+   - Pay what you want subscription 
+   - Think how to prevent password / token sharing
+- Horizontal timeline showing life events
+- For mobile the floating + button
 - Auto-save scenarios
    - Save the current scenario to the local storage when it gets dirty. When opening the page, check if there's a saved scenario. If there is, load it. If not => welcome modal.
    - Add a clear scenario button somewhere. When clearing the scenario, clean the storage as well.
@@ -13,8 +21,6 @@
 - Allow three options for retirement lump sum: not take it, limit to tax-free allowance, take it all.
 - Add an option to the pension contribution: Only contribute once hitting the high income tax bracket (this allows for downpayment saving while young; check with users if this makes sense though).
 - Something to facilitate a different type of pension contribution, where a director or other employee can have the equivalent of =<100% of their salary paid into a pension without a BIK, USC, PRSI, CGT, etc, liability.
-- Forms-like data input. While highlighting the relevant section in the background, ask questions and populate fields, with a nice animation showing the entered data moving to the corresponding sections. Auto saving along the way so if you go back it goes to step 2 etc. The personal tax credit must ask about all possible personal circumstances, like PWC's calculator.
-- Mortgage should consider variable or fixed for a # of years.
 - New events: 
    - increase pension contribution rate.
    - pay off mortgage.
@@ -22,11 +28,15 @@
    - period of high inflation.
    - change the investment allocations throughout the simulation.
 - Add registration box? Not CIO.
-- Allow to specify a max drawdown %. If failing during retirement, reduce expenses to drawdown income and show the gap or the average expenses the pension can sustain. This would only make sense if that average was shown in present value.
+- Make the wizard available in accordion mode for empty NOP events.
+- Let's do the Cloudflare Worker option. Add the feedback button to the burger menu, and the input form should include an optional email field and the text input field. It should look great in both mobile and desktop.
+- Document the separate configs and the versioning system
+- Rename Wizard to Tours
+- When we load a scenario that has a country move and the destination country has a new version, or when the user creates an event with such a move, we have to show the 'tax rules update' toast notification.
+- Research tax rules for when a tax resident of country A moves to country B and becomes tax resident there.
 
 ### SEO
 - "Educational Sandbox", "What if lab", "not a crystal ball", "Personbal Finance Lab", "Learn by doing, experimenting, and visualizing"
-- Ask on reddit: What "what if" scenario are you most curious about running for your long term financial future?
 - "Not affiliated with any financial institution"
 - "It empowers you to ask those what if questions and see potential futures, visualized over decades, helps you think through the possibilities. Hopefully you gain valuable insights into your own financial future." 
 - "Less overwhelmed by the sheer complexity of financial planning"
@@ -34,7 +44,7 @@
    - About my history with finances, copy the ones I already sent as guest posts:
       - https://www.firedave.com/jorge-interview-retirement-simulator/
       - https://www.firedave.com/interview-2-jorge-dollar-cost-averaging-market-crash-stress-test/
-   - Based on the answers to the reddit post, write blog posts about the most common scenarios.
+   - Ask on reddit: What "what if" scenario are you most curious about running for your long term financial future? Based on the answers, write blog posts about the most common scenarios.
    - About "not affiliated with any financial institution"
    - About "less overwhelmed by the sheer complexity of financial planning"
    - About "educational sandbox"
@@ -90,7 +100,6 @@
 
 ### Feedback
 - Escala para ayudar a calcular el rate de sueldo
-- Event type para "gasto de unica vez" sin tener que poner dos veces el mismo año (y sin rate)
 - Dar ejemplos de rate de real estate como hice con volatility
     - Para eso estaría bueno fetchear los datos de algún sitio, asignarlos a config y usar una variable
 
@@ -101,7 +110,6 @@
 
 ## Version 3 - "Modernize"
 - Make things more generic so they apply to different systems (notepad "Generic Tax System").
-- Move core (only premium features) to backend (initially my mac, then Google functions or AWS lambda), ideally with toggle to still run in the browser for dev.
 - Reimplement the UI in React
 
 ## Version 4 - "Complete"
@@ -112,7 +120,6 @@
 - Add a step function to represent government's delayed updates
 - Add self-employed option, joint declaration, etc
 - Change input system to capture the details needed for things like personal tax credits, benefits, etc.
-- Show median age money ran out, 5 and 95% percentile.
 
 ## Version 5 - "Expand"
 - Enable sharing with scenario(s) included
@@ -133,7 +140,6 @@ Important notes for developers:
 - The `defaultCountry` setting lives in `src/core/config/finsim-2.0.json` and is exposed via `Config.getDefaultCountry()`.
 - Add crypto because the laws in each country can be different for that (and let user select growth model - stock-to-flow, etc)
 - Include features for calculating loan amortization, overpayments, and refinancing scenarios
-- Add option to use historical data for the Monte Carlo simulation
 - Allow user to select compare scenarios:
   - Show the graphs with a list of radio buttons to select which one to show, run on demand and draw gradually
   - Allow selecting two scenarios and add a slider to the graph to compare them (like disaster area photos)
