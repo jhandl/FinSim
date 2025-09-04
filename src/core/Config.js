@@ -69,9 +69,21 @@ class Config {
         // Persist the final version if it differs from what was stored
         if (startingVersion !== currentVersion) {
           Config_instance.ui.setVersion(currentVersion);
-          if (aggregatedMessages.length > 0) {
-            var combined = '\n• ' + aggregatedMessages.join('\n• ');
-            Config_instance.ui.showToast(combined, 'New Features!', 10);
+          // Only show the aggregated "New Features" toast if the client had
+          // previously stored a version in localStorage. New or private sessions
+          // (no stored version) should not receive this one-time toast.
+          try {
+            const hasStored = !!(Config_instance.ui && Config_instance.ui._hasStoredVersion);
+            if (hasStored && aggregatedMessages.length > 0) {
+              var combined = '\n• ' + aggregatedMessages.join('\n• ');
+              Config_instance.ui.showToast(combined, 'New Features!', 10);
+            }
+          } catch (_) {
+            // If anything goes wrong, fall back to previous behaviour and show the toast
+            if (aggregatedMessages.length > 0) {
+              var combined = '\n• ' + aggregatedMessages.join('\n• ');
+              Config_instance.ui.showToast(combined, 'New Features!', 10);
+            }
           }
         } else {
           Config_instance.clearVersionAlert();

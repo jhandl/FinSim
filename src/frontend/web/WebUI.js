@@ -139,8 +139,12 @@ class WebUI extends AbstractUI {
       const key = 'simulatorVersion';
       let stored = null;
       try { if (typeof localStorage !== 'undefined') { stored = localStorage.getItem(key); } } catch (_) {}
+      // Record whether a version was actually present in localStorage so callers
+      // (e.g. Config.initialize) can decide whether to show one-time update toasts.
+      try { this._hasStoredVersion = (stored !== null && stored !== undefined); } catch (_) { this._hasStoredVersion = false; }
       return stored || '1.27'; // TODO: Has to be a better way to get the starting default version
     } catch (_) {
+      try { this._hasStoredVersion = false; } catch (_) {}
       return '1.27';
     }
   }

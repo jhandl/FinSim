@@ -81,12 +81,12 @@ function initializeSimulator() {
   revenue = new Taxman();
   attributionManager = new AttributionManager();
   dataSheet = [];
-  return readScenario(validate = true);
+  return readScenario(true);
 }
 
 function saveToFile() {
   uiManager.setStatus("Preparing to save", STATUS_COLORS.INFO);
-  if (readScenario(validate = false)) {
+  if (readScenario(false)) {
     uiManager.saveToFile();
   }
   uiManager.setStatus("", STATUS_COLORS.INFO);
