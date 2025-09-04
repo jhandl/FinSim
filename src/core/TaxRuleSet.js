@@ -290,6 +290,13 @@ class TaxRuleSet {
     return typeof pr.lumpSumMaxPercent === 'number' ? pr.lumpSumMaxPercent : 0;
   }
 
+  // Return the declared Defined Benefit specification from the ruleset.
+  // This MUST be provided by the rules file to define how DBI is treated.
+  getDefinedBenefitSpec() {
+    var pr = this.raw.pensionRules || {};
+    return pr.definedBenefit || null;
+  }
+
   getPensionContributionAgeBands() {
     var pr = this.raw.pensionRules || {};
     var contrib = pr.contributionLimits || {};

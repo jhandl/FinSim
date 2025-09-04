@@ -440,7 +440,34 @@ function processEvents() {
         if (inScope) {
           incomeDefinedBenefit += amount;
           attributionManager.record('incomedefinedbenefit', event.id, amount);
-          revenue.declareSalaryIncome(amount, 0, person1, event.id);
+
+          // Load ruleset and fetch declared DBI treatment spec. There is NO
+          // default — the ruleset must declare how DBI is to be treated.
+          var _rs_dbi = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })();
+          var dbiSpec = (_rs_dbi && typeof _rs_dbi.getDefinedBenefitSpec === 'function') ? _rs_dbi.getDefinedBenefitSpec() : null;
+
+          if (!dbiSpec || !dbiSpec.treatment) {
+            // Fail-fast: require explicit declaration in ruleset. Surface an error via UI status.
+            errors = true;
+            try { uiManager.setStatus("Tax rules error: Defined Benefit behaviour is not defined in the active ruleset.", STATUS_COLORS.ERROR); } catch (_) {}
+            break;
+          }
+
+          switch (dbiSpec.treatment) {
+            case 'privatePension':
+              // Route to private pension pipeline so lump-sum and drawdown logic apply
+              revenue.declarePrivatePensionIncome(amount, person1, event.id);
+              break;
+            case 'salary':
+              // Use declared contribRate if present; require explicit numeric when present
+              var contrib = (dbiSpec.salary && typeof dbiSpec.salary.contribRate === 'number') ? dbiSpec.salary.contribRate : 0;
+              revenue.declareSalaryIncome(amount, contrib, person1, event.id);
+              break;
+            default:
+              errors = true;
+              try { uiManager.setStatus("Tax rules error: Unknown DBI treatment '" + String(dbiSpec.treatment) + "'.", STATUS_COLORS.ERROR); } catch (_) {}
+              break;
+          }
         }
         break;
 
