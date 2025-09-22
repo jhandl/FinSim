@@ -499,47 +499,88 @@ class TableManager {
       throw new Error('Data table headers not found');
     }
 
-    const headers = Array.from(headerRow.cells)
-      .filter(cell => cell.hasAttribute('data-key'))
-      .map(cell => cell.textContent.trim());
+    // Build a complete list of header keys (include hidden ones as well)
+    const headerThs = Array.from(headerRow.querySelectorAll('th[data-key]'));
+    const headerKeys = headerThs.map(th => th.getAttribute('data-key'));
+    const headerLabels = headerThs.map(th => (th.textContent || '').trim());
 
-    // Get data rows
-    const dataRows = Array.from(table.querySelectorAll('tbody tr'));
-
-    if (dataRows.length === 0) {
+    // Determine number of data rows from dataSheet (authoritative), fallback to DOM if unavailable
+    const ds = (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) ? dataSheet : null;
+    const totalRows = ds ? Math.max(0, ds.length - 1) : Array.from(table.querySelectorAll('tbody tr')).length;
+    if (totalRows === 0) {
       throw new Error('No data to export. Please run a simulation first.');
     }
 
-    // Build CSV content
-    let csvContent = headers.join(',') + '\n';
+    // Determine scaling (Monte Carlo average) if available
+    let scale = 1;
+    try {
+      const runs = (this.webUI && this.webUI.lastSimulationResults && this.webUI.lastSimulationResults.runs) ? this.webUI.lastSimulationResults.runs : 1;
+      if (typeof runs === 'number' && runs > 0) scale = runs;
+    } catch (_) {}
 
-    dataRows.forEach(row => {
-      const cells = Array.from(row.cells);
-      const rowData = cells.map(cell => {
-        // Prefer the formatted cell content container when present so we can
-        // exclude UI-only bits like the tooltip 'i' icon from the exported text.
-        let value = '';
-        const contentContainer = cell.querySelector('.cell-content');
-        if (contentContainer) {
-          const clone = contentContainer.cloneNode(true);
-          // Remove any info icons or other UI-only markers
-          const infoIcons = clone.querySelectorAll('.cell-info-icon');
-          infoIcons.forEach(el => el.remove());
-          value = clone.textContent.trim();
+    // Helper to fetch a numeric value from a dataSheet row by header key
+    const getValueForKey = (rowObj, key) => {
+      if (!rowObj) return 0;
+      try {
+        if (key === 'Age') return rowObj.age / scale;
+        if (key === 'Year') return rowObj.year / scale;
+        if (key === 'WithdrawalRate') return rowObj.withdrawalRate / scale;
+
+        // Dynamic income per investment type
+        if (key.indexOf('Income__') === 0) {
+          const k = key.substring('Income__'.length);
+          const map = rowObj.investmentIncomeByKey || {};
+          return (map[k] || 0) / scale;
+        }
+
+        // Dynamic capital per investment type
+        if (key.indexOf('Capital__') === 0) {
+          const k = key.substring('Capital__'.length);
+          const map = rowObj.investmentCapitalByKey || {};
+          return (map[k] || 0) / scale;
+        }
+
+        // Dynamic tax totals
+        if (key.indexOf('Tax__') === 0) {
+          // Prefer flattened key if present, else use taxByKey map
+          if (typeof rowObj[key] === 'number') return rowObj[key] / scale;
+          const taxId = key.substring('Tax__'.length);
+          const tmap = rowObj.taxByKey || {};
+          return (tmap[taxId] || 0) / scale;
+        }
+
+        // Standard fields: derive row key by lowercasing first letter
+        // Special-case legacy FundsCapital → indexFundsCapital
+        let dsKey = key.charAt(0).toLowerCase() + key.slice(1);
+        if (key === 'FundsCapital') dsKey = 'indexFundsCapital';
+        if (typeof rowObj[dsKey] === 'number') return rowObj[dsKey] / scale;
+      } catch (_) { /* fall through to zero */ }
+      return 0;
+    };
+
+    // Build CSV header
+    let csvContent = headerLabels.join(',') + '\n';
+
+    // Build CSV rows directly from dataSheet to include hidden columns as zeros
+    for (let i = 1; i <= totalRows; i++) {
+      const rowObj = ds ? ds[i] : null;
+      const rowValues = headerKeys.map(key => {
+        let raw = getValueForKey(rowObj, key);
+        // Format based on key semantics
+        let text = '';
+        if (key === 'Age' || key === 'Year') {
+          text = (typeof raw === 'number') ? String(Math.round(raw)) : '';
+        } else if (key === 'WithdrawalRate' || /rate$/i.test(key)) {
+          try { text = FormatUtils.formatPercentage(raw); } catch (_) { text = String(raw); }
         } else {
-          value = cell.textContent.trim();
+          try { text = FormatUtils.formatCurrency(raw); } catch (_) { text = String(raw); }
         }
-
-        // Handle values that contain commas by wrapping in quotes
-        if (value.includes(',')) {
-          value = `"${value}"`;
-        }
-
-        return value;
+        // Quote if contains comma
+        if (text.indexOf(',') !== -1) text = '"' + text + '"';
+        return text;
       });
-
-      csvContent += rowData.join(',') + '\n';
-    });
+      csvContent += rowValues.join(',') + '\n';
+    }
 
     return csvContent;
   }

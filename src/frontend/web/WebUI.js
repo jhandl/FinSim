@@ -282,7 +282,7 @@ class WebUI extends AbstractUI {
       loadDemoButton.addEventListener('click', async () => {
         try {
           // Unsaved changes check is now handled in loadFromUrl
-          await this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
+          await this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "demo");
           // After successfully loading the demo scenario, scroll to graphs and run the simulation
           const runButton = document.getElementById('runSimulation');
           if (runButton && !this.isSimulationRunning) {
