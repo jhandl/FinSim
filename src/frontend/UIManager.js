@@ -72,9 +72,17 @@ class UIManager {
       }
     }
     
-    if (montecarlo) {   
+    // Apply income visibility before rendering rows so header and data align
+    try {
+      if (this.ui && this.ui.tableManager && typeof this.ui.tableManager.applyIncomeVisibilityAfterSimulation === 'function') {
+        this.ui.tableManager.applyIncomeVisibilityAfterSimulation();
+      }
+    } catch (_) { /* no-op */ }
+
+    if (montecarlo) {
+      // Re-render rows using runs count to ensure proper averaging inside updateDataRow
       for (let i = 1; i <= row; i++) {
-        this.updateDataRow(i, i/row, runs, rowColors[i]);
+        this.updateDataRow(i, i / row, runs, rowColors[i]);
       }
     } else {
       // For single runs, also apply colors if available
@@ -151,6 +159,8 @@ class UIManager {
       IncomeFundsRent: dataSheet[row].incomeFundsRent / scale,
       IncomeSharesRent: dataSheet[row].incomeSharesRent / scale,
       IncomeCash: dataSheet[row].incomeCash / scale,
+      IncomeDefinedBenefit: dataSheet[row].incomeDefinedBenefit / scale,
+      IncomeTaxFree: dataSheet[row].incomeTaxFree / scale,
       RealEstateCapital: dataSheet[row].realEstateCapital / scale,
       NetIncome: dataSheet[row].netIncome / scale,
       Expenses: dataSheet[row].expenses / scale,

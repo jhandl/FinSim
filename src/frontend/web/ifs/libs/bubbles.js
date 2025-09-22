@@ -492,7 +492,6 @@
             }
 
             const prefSide = step.popover?.side || 'right';
-            // DEBUG: capture info about viewport and popover metrics
             const debugInfo = { stepIndex: this.activeIdx, prefSide, vw: window.innerWidth, vh: window.innerHeight };
             const margin = 12;
             const pop = this.pop.root;

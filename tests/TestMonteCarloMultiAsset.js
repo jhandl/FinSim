@@ -179,7 +179,7 @@ module.exports = {
       tolerance: 1
     },
 
-    // Test 6e: DEBUG - Check expenses at age 48 (when expense event should still be active)
+    // Test 6e: Check expenses at age 48 (when expense event should still be active)
     {
       type: 'comparison',
       target: 'age',

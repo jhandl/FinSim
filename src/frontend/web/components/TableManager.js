@@ -6,6 +6,8 @@ class TableManager {
     this.webUI = webUI;
     // One-time tax header initialization flag per simulation
     this._taxHeaderInitialized = false;
+    // Flag to track if income visibility has been initialized
+    this._incomeVisibilityInitialized = false;
   }
 
   getTableData(groupId, columnCount, includeHiddenEventTypes = false) {
@@ -101,6 +103,23 @@ class TableManager {
     // Reset header init at the start of each simulation (first row)
     if (rowIndex === 0 || rowIndex === 1) {
       this._taxHeaderInitialized = false;
+    }
+
+    // On initial page load, show only pinned income columns
+    if (!this._incomeVisibilityInitialized) {
+      const taxRuleSet = Config.getInstance().getCachedTaxRuleSet();
+      const pinnedTypes = taxRuleSet.getPinnedIncomeTypes() || [];
+      
+      // Create visibility map with only pinned types visible
+      const initialVisibility = {};
+      pinnedTypes.forEach(type => {
+        initialVisibility[String(type).toLowerCase()] = true;
+      });
+      
+      const webUI = WebUI.getInstance();
+      const types = Config.getInstance().getCachedTaxRuleSet().getInvestmentTypes();
+      webUI.applyDynamicColumns(types, initialVisibility);
+      this._incomeVisibilityInitialized = true;
     }
 
     // Before building row, ensure headers exist for any new dynamic keys
@@ -227,13 +246,15 @@ class TableManager {
         const taxColumnCount = headerRow.querySelectorAll('th[data-key^="Tax__"]').length;
         deductionsGroupTh.colSpan = taxColumnCount + 1; // +1 for PensionContribution
       }
+      // Refresh dynamic group border markers after potential header changes
+      try { if (this.webUI && typeof this.webUI.updateGroupBorders === 'function') { this.webUI.updateGroupBorders(); } } catch (_) {}
     }
 
-    // Get the order of columns from the table header, only those with data-key attributes
-    const headers = Array.from(document.querySelectorAll('#Data thead th[data-key]'));
+    // Get the order of columns from the table header, only visible ones with data-key attributes
+    const headers = Array.from(document.querySelectorAll('#Data thead th[data-key]')).filter(h => h.style.display !== 'none');
 
     // Create cells and format values in the order of the headers
-    headers.forEach(header => {
+    headers.forEach((header, headerIndex) => {
       const key = header.dataset.key;
       const v = (data[key] == null ? 0 : data[key]);
 
@@ -416,6 +437,19 @@ class TableManager {
           contentContainer.appendChild(infoIcon);
       }
 
+      // Apply dynamic group border alignment based on header markers
+      try {
+        if (header.hasAttribute('data-group-end')) {
+          td.setAttribute('data-group-end', '1');
+          td.style.borderRight = '3px solid #666';
+        }
+        // Ensure last data cell closes the table with a right border
+        if (headerIndex === headers.length - 1) {
+          td.setAttribute('data-group-end', '1');
+          td.style.borderRight = '3px solid #666';
+        }
+      } catch (_) {}
+
       row.appendChild(td);
     });
   }
@@ -552,6 +586,23 @@ class TableManager {
     } catch (error) {
       this.webUI.notificationUtils.showAlert(error.message, 'Error');
     }
+  }
+
+  applyIncomeVisibilityAfterSimulation() {
+    const incomeVisibility = this.webUI.getIncomeColumnVisibility();
+    const config = Config.getInstance();
+    const taxRuleSet = config.getCachedTaxRuleSet();
+    const investmentTypes = taxRuleSet.getInvestmentTypes();
+    
+    // Apply visibility to table
+    this.webUI.applyDynamicColumns(investmentTypes, incomeVisibility);
+    
+    // Apply visibility to chart to match table
+    this.webUI.chartManager.applyIncomeVisibility(incomeVisibility);
+
+    // Persist last computed visibility for end-of-run application in a single step
+    try { this.webUI.lastIncomeVisibility = incomeVisibility; } catch (_) {}
+
   }
 
 }

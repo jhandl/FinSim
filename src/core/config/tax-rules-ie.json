@@ -126,7 +126,8 @@
         "capitalGains": { "rateRef": "capitalGainsTax.rate", "annualExemptionRef": "capitalGainsTax.annualExemption", "allowLossOffset": true }
       }
     }
-  ]
+  ],
+
+  "pinnedIncomeTypes": ["incomeSalaries", "incomeStatePension", "incomeCash"]
+
 }
-
-

@@ -1477,22 +1477,9 @@ th {
     border-left: 3px solid #666;
 }
 
-/* Vertical separators between groups */
-#Data td:nth-child(2),
-#Data th:nth-child(2),
-#Data td:nth-child(10),
-#Data th:nth-child(10), 
-#Data td:nth-child(15),
-#Data th:nth-child(15),
-#Data td:nth-child(17),
-#Data th:nth-child(17),
-#Data td:nth-child(22),
-#Data th:nth-child(22),
-#Data th:nth-child(24),
-#Data td:nth-child(24)
-{
-    border-right: 3px solid #666;
-}
+/* Vertical separators between groups – dynamic via data-group-end markers */
+#Data thead tr:nth-child(2) th[data-group-end="1"] { border-right: 3px solid #666; }
+#Data tbody td[data-group-end="1"] { border-right: 3px solid #666; }
 
 
 #Data tbody tr:nth-child(even) {

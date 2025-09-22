@@ -522,6 +522,10 @@ class TaxRuleSet {
     }
     return null;
   }
+
+  getPinnedIncomeTypes() {
+    return Array.isArray(this.raw.pinnedIncomeTypes) ? this.raw.pinnedIncomeTypes : [];
+  }
 }
 
 // Make TaxRuleSet available in the context (e.g., for tests)

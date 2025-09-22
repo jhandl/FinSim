@@ -420,7 +420,7 @@ class WebUI extends AbstractUI {
       // If there are more than two investment types, dynamically add columns for income and capital per type
       try {
         if (types && types.length > 2) {
-          this.applyDynamicInvestmentColumns(types);
+          this.applyDynamicColumns(types);
         }
       } catch (_) {}
 
@@ -429,8 +429,77 @@ class WebUI extends AbstractUI {
     }
   }
 
+  getIncomeColumnVisibility() {
+    const visibility = {};
+    const threshold = 0.5;
+
+    // Get pinned income types from tax rules
+    const taxRuleSet = Config.getInstance().getCachedTaxRuleSet();
+    const pinnedTypes = (taxRuleSet && taxRuleSet.getPinnedIncomeTypes) ? (taxRuleSet.getPinnedIncomeTypes() || []) : [];
+
+    // Mark pinned types as always visible (keys are compared lowercased)
+    for (let i = 0; i < pinnedTypes.length; i++) {
+      visibility[String(pinnedTypes[i]).toLowerCase()] = true;
+    }
+
+    // TODO: THIS SHOULD NOT EXIST. HAVING TO TRANSLATE KEYS LIKE THIS IS A HUGE CODE SMELL.
+    // Helper to normalize raw dataSheet income keys to header keys
+    const toVisibilityKey = (lowerKey) => {
+      // Map legacy two-type income columns to dynamic header keys
+      if (lowerKey === 'incomefundsrent') return 'income__indexfunds';
+      if (lowerKey === 'incomesharesrent') return 'income__shares';
+      // Keep DBI and TaxFree distinct – do NOT merge
+      return lowerKey; // e.g., incomesalaries, incomedefinedbenefit, incometaxfree, incomecash, income__custom
+    };
+
+    // Scan dataSheet for income columns with non-zero values
+    try {
+      const ds = (typeof dataSheet !== 'undefined') ? dataSheet : null;
+      const length = Array.isArray(ds) ? ds.length : 0;
+      if (length > 0) {
+        // Build union of ALL income keys across ALL rows (rows are 1-based)
+        const visKeyToSourceKeys = {};
+        for (let r = 1; r < length; r++) {
+          const rowObj = ds[r];
+          if (!rowObj) continue;
+          const keys = Object.keys(rowObj);
+          for (let i = 0; i < keys.length; i++) {
+            const k = keys[i];
+            const lk = String(k).toLowerCase();
+            if (!lk.startsWith('income')) continue;
+            const vKey = toVisibilityKey(lk);
+            if (!visKeyToSourceKeys[vKey]) visKeyToSourceKeys[vKey] = [];
+            if (visKeyToSourceKeys[vKey].indexOf(k) === -1) visKeyToSourceKeys[vKey].push(k);
+          }
+        }
+
+        // For each visibility key, show if ANY row has a non-zero value in ANY of its source keys
+        const visKeys = Object.keys(visKeyToSourceKeys);
+        for (let i = 0; i < visKeys.length; i++) {
+          const vKey = visKeys[i];
+          if (visibility[vKey]) continue; // already pinned
+          const sourceKeys = visKeyToSourceKeys[vKey] || [];
+          let hasNonZeroValue = false;
+          for (let r = 1; r < length && !hasNonZeroValue; r++) {
+            const rowObj = ds[r];
+            if (!rowObj) continue;
+            for (let s = 0; s < sourceKeys.length; s++) {
+              const value = rowObj[sourceKeys[s]];
+              if (typeof value === 'number' && Math.abs(value) > threshold) { hasNonZeroValue = true; break; }
+            }
+          }
+          visibility[vKey] = hasNonZeroValue;
+        }
+      }
+    } catch (err) {
+      // If anything goes wrong, keep pinned-only to avoid breaking UI
+      try { console.warn('getIncomeColumnVisibility failed', err); } catch (_) {}
+    }
+    return visibility;
+  }
+
   // Dynamically add per-investment-type income and capital columns when >2 types exist
-  applyDynamicInvestmentColumns(types) {
+  applyDynamicColumns(types, incomeVisibility) {
     try {
       const thead = document.querySelector('#Data thead');
       const headerGroupsRow = thead ? thead.querySelector('tr.header-groups') : null;
@@ -446,19 +515,35 @@ class WebUI extends AbstractUI {
       // Remove any previously added dynamic income columns to avoid duplicates
       Array.from(headerRow.querySelectorAll('th[data-key^="Income__"]')).forEach(th => th.remove());
 
-      // Insert dynamic income columns after IncomeStatePension
-      let incomeAnchor = headerRow.querySelector('th[data-key="IncomeStatePension"]');
-      if (!incomeAnchor) return;
-      for (let i = 0; i < types.length; i++) {
-        const type = types[i];
-        const key = type && type.key ? type.key : `asset${i}`;
-        const label = type && type.label ? type.label : key;
-        const th = document.createElement('th');
-        th.setAttribute('data-key', `Income__${key}`);
-        th.title = `Income generated from ${label} investments`;
-        th.textContent = label;
-        incomeAnchor.insertAdjacentElement('afterend', th);
-        incomeAnchor = th;
+      // Insert dynamic income columns so that IncomeCash remains LAST in Gross Income
+      const cashTh = headerRow.querySelector('th[data-key="IncomeCash"]');
+      if (cashTh) {
+        for (let i = 0; i < types.length; i++) {
+          const type = types[i];
+          const key = type && type.key ? type.key : `asset${i}`;
+          const label = type && type.label ? type.label : key;
+          const th = document.createElement('th');
+          th.setAttribute('data-key', `Income__${key}`);
+          th.title = `Income generated from ${label} investments`;
+          th.textContent = label;
+          cashTh.insertAdjacentElement('beforebegin', th);
+        }
+      } else {
+        // Fallback: append after the last existing income column
+        const incomeHeaders = Array.from(headerRow.querySelectorAll('th[data-key^="Income"]'));
+        let incomeAnchor = incomeHeaders.length > 0 ? incomeHeaders[incomeHeaders.length - 1] : null;
+        if (!incomeAnchor) return;
+        for (let i = 0; i < types.length; i++) {
+          const type = types[i];
+          const key = type && type.key ? type.key : `asset${i}`;
+          const label = type && type.label ? type.label : key;
+          const th = document.createElement('th');
+          th.setAttribute('data-key', `Income__${key}`);
+          th.title = `Income generated from ${label} investments`;
+          th.textContent = label;
+          incomeAnchor.insertAdjacentElement('afterend', th);
+          incomeAnchor = th;
+        }
       }
 
       // Remove legacy capital columns (Funds/Shares) and insert dynamic capitals after RealEstateCapital
@@ -484,21 +569,131 @@ class WebUI extends AbstractUI {
         }
       }
 
+      // Handle income column visibility if provided
+      if (incomeVisibility) {
+        // After line 526 (in the income visibility handling section)
+        const incomeHeaders = headerRow.querySelectorAll('th[data-key^="Income"]');
+
+        // 1) Build target visible list deterministically from header order
+        const visibilityList = Array.from(incomeHeaders).map(th => {
+          const key = th.getAttribute('data-key').toLowerCase();
+          return !!incomeVisibility[key];
+        });
+
+        // 2) Apply header visibility from the list
+        Array.from(incomeHeaders).forEach((th, i) => {
+          th.style.display = visibilityList[i] ? '' : 'none';
+        });
+
+        // 3) Rebuild body rows to match new header set
+        try {
+          const uiMgr = (typeof window !== 'undefined' && window.uiManager) ? window.uiManager : (typeof uiManager !== 'undefined' ? uiManager : null);
+          if (uiMgr && typeof uiMgr.updateDataRow === 'function') {
+            const ds = (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) ? dataSheet : null;
+            const total = (typeof row === 'number' && row > 0) ? row : (ds ? Math.max(0, ds.length - 1) : 0);
+            for (let i = 1; i <= total; i++) {
+              uiMgr.updateDataRow(i, i / Math.max(1, total));
+            }
+          }
+        } catch (_) {}
+      }
+
       // Adjust header group colspans for Gross Income and Assets
       const groupCells = Array.from(headerGroupsRow.querySelectorAll('th'));
       const grossIncomeGroup = groupCells.find(th => (th.textContent || '').trim() === 'Gross Income');
       const assetsGroup = groupCells.find(th => (th.textContent || '').trim() === 'Assets');
       if (grossIncomeGroup) {
-        // Salaries, Rentals, RSUs, P.Pension, S.Pension (5) + dynamic income columns (N) + Cash (1)
-        grossIncomeGroup.colSpan = 6 + types.length;
+        // Compute from number of visible income <th> elements
+        const incomeHeaders = Array.from(headerRow.querySelectorAll('th[data-key^="Income"]'));
+        const visibleCount = incomeHeaders.filter(th => th.style.display !== 'none').length;
+        grossIncomeGroup.colSpan = visibleCount;
       }
       if (assetsGroup) {
         // PensionFund, Cash, RealEstateCapital (3) + dynamic capital columns (N)
         assetsGroup.colSpan = 3 + types.length;
       }
+
+      // Update vertical group borders to align with the new dynamic layout
+      try { if (typeof this.updateGroupBorders === 'function') this.updateGroupBorders(); } catch (_) {}
+
+      // Rows rebuilt above; header groups updated below
     } catch (_) {
       // swallow errors to avoid breaking UI
     }
+  }
+
+  // Mark the last column of each top-level group so borders can align dynamically
+  updateGroupBorders() {
+    try {
+      const table = document.getElementById('Data');
+      if (!table) return;
+      const thead = table.querySelector('thead');
+      if (!thead) return;
+      const headerRow = thead.querySelector('tr:nth-child(2)');
+      if (!headerRow) return;
+
+      const allHeaders = Array.from(headerRow.querySelectorAll('th[data-key]'));
+      if (allHeaders.length === 0) return;
+      const headers = allHeaders.filter(h => h.style.display !== 'none');
+
+      // Helper predicates
+      const isIncome = (k) => k.indexOf('Income') === 0;
+      const isTax = (k) => k.indexOf('Tax__') === 0;
+      // Asset group includes pension, cash, real estate and investment capitals ONLY
+      const isAsset = (k) => (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' || k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
+
+      // Clear existing markers and borders
+      for (let i = 0; i < allHeaders.length; i++) {
+        allHeaders[i].removeAttribute('data-group-end');
+        allHeaders[i].style.borderRight = '';
+      }
+
+      // Compute group-end indices
+      const findLastIndex = (predicate) => {
+        for (let i = headers.length - 1; i >= 0; i--) {
+          if (predicate(headers[i].dataset.key)) return i;
+        }
+        return -1;
+      };
+
+      // After Year column
+      const yearIdx = headers.findIndex(th => th.dataset.key === 'Year');
+
+      // Gross Income: last header with key starting with 'Income'
+      const incomeLastIdx = findLastIndex(k => isIncome(k));
+
+      // Deductions: last Tax__ column, fallback to PensionContribution
+      let deductionsLastIdx = findLastIndex(k => isTax(k));
+      if (deductionsLastIdx === -1) deductionsLastIdx = headers.findIndex(th => th.dataset.key === 'PensionContribution');
+
+      // Net Cashflow: after Expenses
+      const netCashflowLastIdx = headers.findIndex(th => th.dataset.key === 'Expenses');
+
+      // Assets: last asset column (dynamic capitals if present)
+      let assetsLastIdx = findLastIndex(k => isAsset(k));
+      // If no dynamic capitals present, fall back to SharesCapital (static) if visible
+      if (assetsLastIdx === -1) {
+        assetsLastIdx = headers.findIndex(th => th.dataset.key === 'SharesCapital');
+        if (assetsLastIdx === -1) assetsLastIdx = headers.findIndex(th => th.dataset.key === 'RealEstateCapital');
+      }
+
+      // Build list of boundary indices (skip -1)
+      const boundaryIdxs = [yearIdx, incomeLastIdx, deductionsLastIdx, netCashflowLastIdx, assetsLastIdx].filter(i => i >= 0);
+
+      // Apply markers and visual border to headers
+      for (let i = 0; i < boundaryIdxs.length; i++) {
+        const th = headers[boundaryIdxs[i]];
+        th.setAttribute('data-group-end', '1');
+        th.style.borderRight = '3px solid #666';
+      }
+
+      // Always close the table with a right-side border on the last column
+      if (headers.length > 0) {
+        const lastTh = headers[headers.length - 1];
+        lastTh.setAttribute('data-group-end', '1');
+        lastTh.style.borderRight = '3px solid #666';
+      }
+    } catch (_) {}
   }
 
   setupRunSimulationButton() {
@@ -532,6 +727,8 @@ class WebUI extends AbstractUI {
       
       this.setStatus('Running...');
       runButton.offsetHeight; // This forces the browser to recalculate layout immediately
+
+      // Do not rebuild chart datasets here; defer to end-of-run to avoid mid-run resets
 
       setTimeout(() => {
         try {
@@ -791,6 +988,21 @@ class WebUI extends AbstractUI {
   flush() {    
     // flush() is called at the end of updateStatusCell, which signals simulation completion
     if (this.isSimulationRunning) {
+      // End-of-run: rebuild datasets transactionally and re-apply visibility to ensure single-step update
+      try {
+        const cfg = Config.getInstance();
+        const rs = (cfg && typeof cfg.getCachedTaxRuleSet === 'function') ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry && cfg.getDefaultCountry()) : null;
+        const types = (rs && typeof rs.getInvestmentTypes === 'function') ? (rs.getInvestmentTypes() || []) : [];
+        if (this.chartManager && typeof this.chartManager.applyInvestmentTypes === 'function') {
+          this.chartManager.applyInvestmentTypes(types, { preserveData: true, transactional: true });
+        }
+        // Recompute income visibility now that dataSheet is fully updated, then apply to chart
+        if (this.chartManager && typeof this.chartManager.applyIncomeVisibility === 'function') {
+          const incomeVisibility = this.getIncomeColumnVisibility();
+          this.chartManager.applyIncomeVisibility(incomeVisibility);
+        }
+      } catch (_) {}
+
       this.isSimulationRunning = false;
       const runButton = document.getElementById('runSimulation');
       if (runButton) {
@@ -1621,6 +1833,25 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
 
     // Attach TooltipUtils to static data table headers (replace native title tooltips)
     try { document.querySelectorAll('#Data thead th[title]').forEach(th => { const txt = th.getAttribute('title'); if (!txt) return; th.removeAttribute('title'); TooltipUtils.attachTooltip(th, txt, { hoverDelay: 150, touchDelay: 250 }); }); } catch (_) {}
+
+    // After labels and headers are present, apply pinned-only income visibility
+    try {
+      const cfg = Config.getInstance();
+      const rs = (cfg.getCachedTaxRuleSet ? (cfg.getCachedTaxRuleSet(cfg.getDefaultCountry && cfg.getDefaultCountry())) : null) || (cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet() : null);
+      if (rs && typeof rs.getInvestmentTypes === 'function') {
+        const investmentTypes = rs.getInvestmentTypes() || [];
+        const pinned = (typeof rs.getPinnedIncomeTypes === 'function') ? (rs.getPinnedIncomeTypes() || []) : [];
+        const pinnedVisibility = {};
+        for (let i = 0; i < pinned.length; i++) {
+          pinnedVisibility[String(pinned[i]).toLowerCase()] = true;
+        }
+        // Rebuild chart datasets to include dynamic investment income/capital, but preserve any data
+        try { webUi.chartManager.applyInvestmentTypes(investmentTypes, { preserveData: true, transactional: true }); } catch (_) {}
+        // Apply initial pinned-only visibility to both table and chart
+        webUi.applyDynamicColumns(investmentTypes, pinnedVisibility);
+        try { webUi.chartManager.applyIncomeVisibility(pinnedVisibility); } catch (_) {}
+      }
+    } catch (_) {}
 
     // Initialize controls that depend on Config/tax rules being available
     try { webUi.setupPensionCappedDropdown(); } catch (_) {}

@@ -956,7 +956,7 @@ function updateYearlyData() {
   });
   
   if (!(row in dataSheet)) {
-    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "worth": 0, "attributions": {}, "investmentIncomeByKey": {}, "investmentCapitalByKey": {}, "taxByKey": {} };
+    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "incomeDefinedBenefit": 0, "incomeTaxFree": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "worth": 0, "attributions": {}, "investmentIncomeByKey": {}, "investmentCapitalByKey": {}, "taxByKey": {} };
     // Pre-initialize stable tax columns for consistency across rows
     if (stableTaxIds && stableTaxIds.length > 0) {
       for (var ti = 0; ti < stableTaxIds.length; ti++) {
@@ -978,11 +978,13 @@ function updateYearlyData() {
   dataSheet[row].incomeSalaries += incomeSalaries;
   dataSheet[row].incomeRSUs += incomeShares;
   dataSheet[row].incomeRentals += incomeRentals;
-  dataSheet[row].incomePrivatePension += incomePrivatePension + incomeDefinedBenefit;
+  dataSheet[row].incomePrivatePension += incomePrivatePension;
   dataSheet[row].incomeStatePension += incomeStatePension;
   dataSheet[row].incomeFundsRent += incomeFundsRent;
   dataSheet[row].incomeSharesRent += incomeSharesRent;
-  dataSheet[row].incomeCash += Math.max(cashWithdraw, 0) + incomeTaxFree;
+  dataSheet[row].incomeCash += Math.max(cashWithdraw, 0);
+  dataSheet[row].incomeDefinedBenefit += incomeDefinedBenefit;
+  dataSheet[row].incomeTaxFree += incomeTaxFree;
   dataSheet[row].realEstateCapital += realEstate.getTotalValue();
   dataSheet[row].netIncome += netIncome;
   dataSheet[row].expenses += expenses;
@@ -1088,4 +1090,5 @@ function updateYearlyData() {
   // At the end of the year, when updating the data sheet
   // dataSheet[row].sharesCapital = shares.capital();
 }
+
 

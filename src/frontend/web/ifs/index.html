@@ -9,7 +9,7 @@
     <title></title>
     <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico?v=2025-08-23-usc">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-    <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=2025-01-20">
+    <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=2025-09-21-1">
     <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=2025-08-23-usc">
     <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-23-usc">
     <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-23-usc"/>
@@ -425,10 +425,12 @@
                             <th data-key="IncomeRSUs" title="Income from Restricted Stock Units (RSUs) vesting">RSUs</th>
                             <th data-key="IncomePrivatePension" title="Withdrawals from private pension funds">P.Pension</th>
                             <th data-key="IncomeStatePension" title="State pension payments received">S.Pension</th>
+                            <th data-key="IncomeDefinedBenefit" title="Defined Benefit pension income">DBI</th>
+                            <th data-key="IncomeTaxFree" title="Tax-free income">Tax Free</th>
                             <th data-key="IncomeFundsRent" title="Income generated from index fund investments">Index Funds</th>
                             <th data-key="IncomeSharesRent" title="Income generated from Investment Trusts or individual shares">Shares</th>
                             <th data-key="IncomeCash" title="Withdrawals from cash savings">Cash</th>
-                            <th data-key="PensionContribution" title="Amount contributed to private pensions (excluding employer match)">P. Contrib</th>
+                            <th data-key="PensionContribution" title="Amount contributed to private pensions (excluding employer match)">P.Contrib</th>
                             <th data-key="NetIncome" title="Total income after all taxes and deductions">Inflows</th>
                             <th data-key="Expenses" title="Total annual expenses">Outflows</th>
                             <th data-key="PensionFund" title="Total value of private pension funds">Pension</th>
@@ -467,20 +469,20 @@
     <script src="/src/frontend/web/utils/ErrorModalUtils.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/utils/FieldLabelsManager.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/utils/ValidationUtils.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/components/TableManager.js?v=2025-09-04"></script>
+    <script src="/src/frontend/web/components/TableManager.js?v=2025-09-21-2"></script>
     <script src="/src/frontend/web/components/EventsTableManager.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/components/EventSummaryRenderer.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/components/EventAccordionManager.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/components/EventWizardRenderer.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/components/EventWizardManager.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/components/ChartManager.js?v=2025-09-04"></script>
+    <script src="/src/frontend/web/components/ChartManager.js?v=2025-09-22-4"></script>
     <script src="/src/frontend/web/components/FileManager.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/components/DragAndDrop.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/components/Wizard.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/components/ContentRenderer.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/components/WelcomeModal.js?v=2025-09-04"></script>
     <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/WebUI.js?v=2025-09-04"></script>
+    <script src="/src/frontend/web/WebUI.js?v=2025-09-22-1"></script>
     <script src="/src/core/TaxRuleSet.js?v=2025-09-04"></script>
     <script src="/src/core/Config.js?v=2025-09-04"></script>
     <script src="/src/core/Events.js?v=2025-09-04"></script>
@@ -492,7 +494,7 @@
     <script src="/src/core/Utils.js?v=2025-09-04"></script>
     <script src="/src/core/Attribution.js?v=2025-09-04"></script>
     <script src="/src/core/AttributionManager.js?v=2025-09-04"></script>
-    <script src="/src/core/Simulator.js?v=2025-09-04"></script>
+    <script src="/src/core/Simulator.js?v=2025-09-19"></script>
     
     <!-- Init app name after Config is initialized -->
     <script>

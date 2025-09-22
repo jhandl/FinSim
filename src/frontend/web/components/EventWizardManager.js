@@ -1316,7 +1316,6 @@ class EventWizardManager {
     this.clearWizardFieldValidation(input);
 
     if (!value || value.trim() === '') {
-      // DEBUG: empty value – required check will handle later
       return; // empty allowed, handled on final submit
     }
 
@@ -1342,7 +1341,6 @@ class EventWizardManager {
     }
 
     if (!validation.isValid) {
-      // DEBUG: invalid value log
       this.showWizardFieldValidation(input, validation.message);
     }
   }

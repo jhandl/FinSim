@@ -21,7 +21,7 @@ async function waitForSimulatorReady(page) {
   const frame = page.frameLocator('#app-frame');
   // Wait for the Add Event button to appear (initial markup)
   await frame.locator('#addEventRow').first().waitFor({ state: 'visible', timeout: 15000 });
-  // DEBUG: Log initial script presence after Add Event button becomes visible
+  // Log initial script presence after Add Event button becomes visible
   await frame.locator('body').evaluate(() => {
     if (typeof Wizard !== 'undefined' && !window.Wizard) {
       window.Wizard = Wizard;
