@@ -1,7 +1,7 @@
 {
   "country": "IE",
   "countryName": "Ireland",
-  "version": "26.2",
+  "version": "27.0",
   "updateMessage": "",
 
   "locale": {
@@ -38,7 +38,7 @@
     {
       "name": "PRSI",
       "tooltip": "Pay Related Social Insurance contributions",
-      "rate": 0.041,
+      "rate": 0.042,
       "incomeCap": null,
       "ageAdjustments": { "70": 0 },
       "applicableIncomeTypes": ["employment", "self"]
@@ -49,7 +49,7 @@
     {
       "name": "USC",
       "tooltip": "Universal Social Charge paid",
-      "brackets": { "0": 0.005, "12012": 0.02, "27382": 0.03, "70044": 0.08, "100000": 0.11 },
+      "brackets": { "0": 0.005, "12012": 0.02, "28700": 0.03, "70044": 0.08, "100000": 0.11 },
       "incomeExemptionThreshold": 13000,
       "reducedRateAge": 70,
       "reducedRateMaxIncome": 60000,
@@ -116,7 +116,7 @@
       "key": "indexFunds",
       "label": "Index Funds",
       "taxation": {
-        "exitTax": { "rate": 0.41, "deemedDisposalYears": 8, "allowLossOffset": false, "eligibleForAnnualExemption": false }
+        "exitTax": { "rate": 0.38, "deemedDisposalYears": 8, "allowLossOffset": false, "eligibleForAnnualExemption": false }
       }
     },
     {

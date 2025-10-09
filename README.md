@@ -1,5 +1,6 @@
 # Bugs
-- I don't think RSUs are getting computed.
+- Real Estate equity is possibly not being computed correctly.
+- PRSI tax credit is not being applied.
 
 # Roadmap
 
