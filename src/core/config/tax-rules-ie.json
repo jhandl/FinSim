@@ -1,8 +1,8 @@
 {
   "country": "IE",
   "countryName": "Ireland",
-  "version": "27.0",
-  "updateMessage": "",
+  "version": "26.4",
+  "updateMessage": "Incorporates Budget 2026 changes and PRSI increased to 4.2%",
 
   "locale": {
     "numberLocale": "en-IE",
