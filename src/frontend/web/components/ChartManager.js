@@ -3,6 +3,7 @@
 class ChartManager {
 
   constructor() {
+    this.cachedRowData = {};
     try {
       this.setupCharts();
     } catch (error) {
@@ -141,8 +142,6 @@ class ChartManager {
           this.cashflowIncomeLabelByKey[key] = label;
         });
         this.cashflowCashDatasetIndex = baseDatasets.length + dynamicIncomeDatasets.length;
-        this.rebuildDatasetIndexMaps();
-        this.cashflowChart.update();
         if (options.transactional) { try { this.cashflowChart.options.animation = prevAnimCF; } catch (_) {} }
       }
 
@@ -178,9 +177,12 @@ class ChartManager {
         this.assetsChart.data.datasets = newAssetsDatasets;
         this.assetsCapitalStartIndex = baseFixedWithoutCash.length;
         this.assetsCapitalKeys = invTypes.map(t => t.key);
-        this.rebuildDatasetIndexMaps();
-        this.assetsChart.update();
         if (options.transactional) { try { this.assetsChart.options.animation = prevAnimAS; } catch (_) {} }
+      }
+      this.rebuildDatasetIndexMaps();
+      if (!this._repopulateFromCache()) {
+        if (this.cashflowChart) this.cashflowChart.update();
+        if (this.assetsChart) this.assetsChart.update();
       }
     } catch (_) {
       // Swallow errors silently to avoid breaking UI
@@ -291,10 +293,11 @@ class ChartManager {
         ...dynamicIncomeDatasets
       ];
 
-      // Update chart
-      this.cashflowChart.update();
       // Rebuild index maps to reflect filtered datasets
       this.rebuildDatasetIndexMaps();
+      if (!this._repopulateFromCache() && this.cashflowChart) {
+        this.cashflowChart.update();
+      }
     } catch (_) {
       // Swallow errors silently to avoid breaking UI
     }
@@ -650,10 +653,17 @@ class ChartManager {
     }
   }
 
-  updateChartsRow(rowIndex, data) {
+  updateChartsRow(rowIndex, data, options) {
     try {
       if (!this.chartsInitialized) {
         return;
+      }
+      const opts = options || {};
+      if (!opts.skipCacheStore) {
+        if (rowIndex === 1) {
+          this.cachedRowData = {};
+        }
+        this.cachedRowData[rowIndex] = Object.assign({}, data);
       }
       
       const i = rowIndex-1;
@@ -685,7 +695,9 @@ class ChartManager {
       }
       if (cfL['Cash'] !== undefined) this.cashflowChart.data.datasets[cfL['Cash']].data[i] = data.IncomeCash;
 
-      this.cashflowChart.update();
+      if (!opts.skipCashflowUpdate && this.cashflowChart) {
+        this.cashflowChart.update();
+      }
 
       // Update Assets Chart – adjusted to new dataset indices
       this.assetsChart.data.labels[i] = data.Age;
@@ -705,9 +717,45 @@ class ChartManager {
           this.assetsChart.data.datasets[idx].data[i] = val;
         }
       }
-      this.assetsChart.update();
+      if (!opts.skipAssetsUpdate && this.assetsChart) {
+        this.assetsChart.update();
+      }
     } catch (error) {
       // Silently fail as this is not critical
+    }
+  }
+
+  _repopulateFromCache() {
+    try {
+      if (!this.chartsInitialized) return false;
+      const cached = this.cachedRowData || {};
+      const keys = Object.keys(cached);
+      if (keys.length === 0) return false;
+
+      const numericKeys = keys.map(function(k) { return parseInt(k, 10); }).filter(function(n) { return !isNaN(n); }).sort(function(a, b) { return a - b; });
+      if (numericKeys.length === 0) return false;
+
+      let prevAnimCF, prevAnimAS;
+      try { prevAnimCF = (this.cashflowChart && this.cashflowChart.options) ? this.cashflowChart.options.animation : undefined; } catch (_) {}
+      try { prevAnimAS = (this.assetsChart && this.assetsChart.options) ? this.assetsChart.options.animation : undefined; } catch (_) {}
+      try { if (this.cashflowChart && this.cashflowChart.options) this.cashflowChart.options.animation = false; } catch (_) {}
+      try { if (this.assetsChart && this.assetsChart.options) this.assetsChart.options.animation = false; } catch (_) {}
+
+      for (let idx = 0; idx < numericKeys.length; idx++) {
+        const rowIndex = numericKeys[idx];
+        const rowData = cached[rowIndex];
+        if (!rowData) continue;
+        this.updateChartsRow(rowIndex, rowData, { skipCashflowUpdate: true, skipAssetsUpdate: true, skipCacheStore: true });
+      }
+
+      if (this.cashflowChart) this.cashflowChart.update();
+      if (this.assetsChart) this.assetsChart.update();
+
+      try { if (this.cashflowChart && this.cashflowChart.options) this.cashflowChart.options.animation = prevAnimCF; } catch (_) {}
+      try { if (this.assetsChart && this.assetsChart.options) this.assetsChart.options.animation = prevAnimAS; } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -723,6 +771,13 @@ class ChartManager {
           this.cashflowChart.data.labels = this.cashflowChart.data.labels.slice(0, maxAgeIndex + 1);
           this.cashflowChart.data.datasets.forEach(dataset => {
             dataset.data = dataset.data.slice(0, maxAgeIndex + 1);
+          });
+          const cached = this.cachedRowData || {};
+          Object.keys(cached).forEach(key => {
+            const rowIdx = parseInt(key, 10);
+            if (!isNaN(rowIdx) && (rowIdx - 1) > maxAgeIndex) {
+              delete cached[key];
+            }
           });
         };
         this.cashflowChart.update();
@@ -742,4 +797,3 @@ class ChartManager {
     }
   }
 } 
-
