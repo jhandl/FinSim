@@ -510,6 +510,9 @@ class ChartManager {
                   }
                   if (aFixed) return -1;
                   if (bFixed) return 1;
+                  // Ensure S.Pension appears above P.Pension in the legend without changing dataset draw order
+                  if (a.text === 'S.Pension' && b.text === 'P.Pension') return -1;
+                  if (a.text === 'P.Pension' && b.text === 'S.Pension') return 1;
                   const ao = (a.dataset && typeof a.dataset.order === 'number') ? a.dataset.order : 0;
                   const bo = (b.dataset && typeof b.dataset.order === 'number') ? b.dataset.order : 0;
                   if (ao !== bo) return ao - bo;
