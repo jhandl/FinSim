@@ -1284,7 +1284,6 @@ class EventsTableManager {
   }
 
   applySort() {
-    return;
     const tbody = document.querySelector('#Events tbody');
     if (!tbody) return;
 
