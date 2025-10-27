@@ -160,7 +160,71 @@ class FormatUtils {
   setupCurrencyInputs() {
     const currencyInputs = document.querySelectorAll('input.currency');
     
-    // Create container elements all at once
+    // Helpers to derive per-input locale settings using hidden row hints
+    const getInputLocaleSettings = (input) => {
+      try {
+        const row = input.closest('tr');
+        // Prefer explicit country hint when present (unambiguous for shared currencies)
+        const countryHint = row && row.querySelector ? (row.querySelector('.event-country')?.value || '') : '';
+        const code = row && row.querySelector ? (row.querySelector('.event-currency')?.value || '') : '';
+        const cfg = Config.getInstance();
+        if (countryHint) {
+          try {
+            const rs = cfg.getCachedTaxRuleSet(countryHint.toLowerCase());
+            if (rs) {
+              return {
+                numberLocale: (rs.getNumberLocale && rs.getNumberLocale()) || FormatUtils.getLocaleSettings().numberLocale,
+                currencyCode: (rs.getCurrencyCode && rs.getCurrencyCode()) || FormatUtils.getLocaleSettings().currencyCode,
+                currencySymbol: (rs.getCurrencySymbol && rs.getCurrencySymbol()) || ''
+              };
+            }
+          } catch(_) { /* fall through to currency-based lookup */ }
+        }
+        if (code) {
+          const countries = (typeof cfg.getAvailableCountries === 'function') ? cfg.getAvailableCountries() : [];
+          for (let i = 0; i < countries.length; i++) {
+            try {
+              const c = countries[i];
+              const rs = cfg.getCachedTaxRuleSet(c.code.toLowerCase());
+              if (rs && typeof rs.getCurrencyCode === 'function' && rs.getCurrencyCode() === code) {
+                return {
+                  numberLocale: (rs.getNumberLocale && rs.getNumberLocale()) || FormatUtils.getLocaleSettings().numberLocale,
+                  currencyCode: rs.getCurrencyCode(),
+                  currencySymbol: (rs.getCurrencySymbol && rs.getCurrencySymbol()) || ''
+                };
+              }
+            } catch(_) { /* try next */ }
+          }
+        }
+      } catch(_) {}
+      return FormatUtils.getLocaleSettings();
+    };
+
+    const parseWithLocale = (text, ls) => {
+      if (text == null) return undefined;
+      if (typeof text !== 'string') text = String(text);
+      const escSym = (ls.currencySymbol || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      let s = text.replace(new RegExp(escSym, 'g'), '').replace(/\s+/g, '');
+      const parts = new Intl.NumberFormat(ls.numberLocale).formatToParts(12345.6);
+      const group = parts.find(p => p.type === 'group')?.value || ',';
+      const decimal = parts.find(p => p.type === 'decimal')?.value || '.';
+      s = s.split(group).join('');
+      if (decimal !== '.') s = s.split(decimal).join('.');
+      const num = parseFloat(s);
+      return isNaN(num) ? undefined : num;
+    };
+
+    const formatWithLocale = (num, ls) => {
+      const n = parseFloat(num);
+      if (isNaN(n)) return num;
+      try {
+        return n.toLocaleString(ls.numberLocale, { style: 'currency', currency: ls.currencyCode, minimumFractionDigits: 0, maximumFractionDigits: 0 }).replace(/\s/g, '');
+      } catch(_) {
+        return String(Math.round(n));
+      }
+    };
+
+    // Create container elements and apply per-input patterns
     currencyInputs.forEach(input => {
       if (!input.parentElement.classList.contains('currency-container')) {
         const container = document.createElement('div');
@@ -172,22 +236,14 @@ class FormatUtils {
       // Remove type="number" to prevent browser validation of formatted numbers
       input.type = 'text';
       input.inputMode = 'numeric';
-      const localeSettings = FormatUtils.getLocaleSettings();
-      const currencySymbol = localeSettings.currencySymbol || '';
-      const currencySymbolEscaped = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-      // Derive locale group and decimal separators
-      const parts = new Intl.NumberFormat(localeSettings.numberLocale).formatToParts(12345.6);
+      const ls = getInputLocaleSettings(input);
+      const currencySymbolEscaped = (ls.currencySymbol || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const parts = new Intl.NumberFormat(ls.numberLocale).formatToParts(12345.6);
       const groupSep = parts.find(p => p.type === 'group')?.value || ',';
       const decimalSep = parts.find(p => p.type === 'decimal')?.value || '.';
-
-      // Escape separators for regex
       const escGroup = groupSep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const escDecimal = decimalSep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-      // Support optional leading '-' and multi-character currency symbols as one token (non-capturing group)
-      // Pattern allows digits, group separator, and optional decimal separator plus digits
-      // Example resulting pattern: ^-?(?:€|EUR)?[0-9,]*?(?:\.[0-9]*)?$
       const symbolToken = currencySymbolEscaped ? `(?:${currencySymbolEscaped})?` : '';
       input.pattern = `^-?${symbolToken}[0-9${escGroup}]*?(?:${escDecimal}[0-9]*)?$`;
     });
@@ -195,27 +251,28 @@ class FormatUtils {
     // Use direct event listeners instead of delegation for better reliability
     currencyInputs.forEach(input => {
       input.addEventListener('focus', function() {
-        // On focus, show the raw number
-        const value = FormatUtils.parseCurrency(this.value);
+        const ls = getInputLocaleSettings(this);
+        const value = parseWithLocale(this.value, ls);
         if (!isNaN(value)) {
           this.value = value;
         }
       });
 
       input.addEventListener('blur', function() {
-        const value = FormatUtils.parseCurrency(this.value);
+        const ls = getInputLocaleSettings(this);
+        const value = parseWithLocale(this.value, ls);
         if (!isNaN(value)) {
-          this.value = FormatUtils.formatCurrency(value);
+          this.value = formatWithLocale(value, ls);
         }
       });
 
-      // Format initial value if it exists and isn't already formatted
+      // Format initial value if it exists and isn't already formatted according to its locale
+      const ls = getInputLocaleSettings(input);
       const value = input.value;
-      const { currencySymbol } = FormatUtils.getLocaleSettings();
-      if (value && value.indexOf(currencySymbol) === -1) {
-        const number = FormatUtils.parseCurrency(value);
+      if (value && (ls.currencySymbol && value.indexOf(ls.currencySymbol) === -1)) {
+        const number = parseWithLocale(value, ls);
         if (!isNaN(number)) {
-          input.value = FormatUtils.formatCurrency(number);
+          input.value = formatWithLocale(number, ls);
         }
       }
     });

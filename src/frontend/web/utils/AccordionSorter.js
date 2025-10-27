@@ -54,7 +54,24 @@
 
     // Use shared sorting utility
     if (window.SortingUtils) {
-      window.SortingUtils.sortElements(container, items, sortKeys, getValueWithManager, {
+      // Inject relocation-first tie-breaker when sorting by from-age
+      const enhancedKeys = sortKeys.map(function(k) {
+        if (k && k.col === 'from-age') {
+          const tieBreaker = function(a, b) {
+            // Determine event types via manager mapping
+            const aVal = getAccordionValue(a, 'event-type', accordionManager) || '';
+            const bVal = getAccordionValue(b, 'event-type', accordionManager) || '';
+            const aIsReloc = typeof aVal === 'string' && aVal.indexOf('MV-') === 0;
+            const bIsReloc = typeof bVal === 'string' && bVal.indexOf('MV-') === 0;
+            if (aIsReloc && !bIsReloc) return -1;
+            if (!aIsReloc && bIsReloc) return 1;
+            return 0;
+          };
+          return { col: k.col, dir: k.dir, tieBreaker: tieBreaker };
+        }
+        return k;
+      });
+      window.SortingUtils.sortElements(container, items, enhancedKeys, getValueWithManager, {
         duration: 350,
         easing: 'ease',
         ...options

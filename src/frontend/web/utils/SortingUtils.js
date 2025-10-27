@@ -67,11 +67,19 @@
     const firstPos = new Map();
     elements.forEach(el => firstPos.set(el, el.getBoundingClientRect().top));
 
-    // Sort elements
+    // Sort elements with optional per-column tie-breakers
     const sorted = elements.slice().sort((a, b) => {
-      for (const { col, dir } of sortKeys) {
+      for (const key of sortKeys) {
+        const col = key.col;
+        const dir = key.dir;
         const cmp = compareValues(getValueFn(a, col), getValueFn(b, col), dir);
         if (cmp !== 0) return dir === 'desc' ? -cmp : cmp;
+
+        // If values tie and a tieBreaker is provided, use it
+        if (key.tieBreaker && typeof key.tieBreaker === 'function') {
+          const tb = key.tieBreaker(a, b);
+          if (tb !== 0) return dir === 'desc' ? -tb : tb;
+        }
       }
       return 0;
     });

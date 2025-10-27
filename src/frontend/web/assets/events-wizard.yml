@@ -382,6 +382,79 @@ EventWizards:
             - template: "{name}: A market {direction} of {rate} {periodPhrase}."
         showButtons: ["back", "create"]
 
+  # Relocation Wizard (Minimal Flow)
+  - eventType: "MV"
+    name: "Relocation"
+    category: "relocation"
+    steps:
+      - stepId: "intro"
+        title: "Relocation"
+        contentType: "intro"
+        content:
+          text: "You are planning to relocate to {destCountryName}. This will affect your tax residency, currency ({destCurrency}), and cost of living ({destCoL}). Default inflation is {destInflation}."
+        showButtons: ["next"]
+
+      - stepId: "name"
+        title: "Event Name (optional)"
+        contentType: "input"
+        field: "name"
+        labelPosition: "left"
+        content:
+          text: "Event name (optional)"
+          validation: "optional"
+        showButtons: ["back", "next"]
+
+      - stepId: "timing"
+        title: "When will you relocate?"
+        contentType: "input"
+        field: "fromAge"
+        labelPosition: "left"
+        content:
+          text: "At what age will you relocate?"
+          inputType: "age"
+          validation: "required|positive"
+          help: "This is when your tax residency will change to the new country."
+        showButtons: ["back", "next"]
+
+      - stepId: "cost"
+        title: "Relocation Cost"
+        contentType: "input"
+        field: "amount"
+        labelPosition: "left"
+        content:
+          text: "What is the one-time cost of relocating?"
+          inputType: "currency"
+          validation: "optional"
+          help: "Include moving expenses, visa fees, travel costs, etc. Leave blank if no cost."
+        showButtons: ["back", "next"]
+
+      - stepId: "inflation"
+        title: "Inflation Rate Override"
+        contentType: "input"
+        field: "rate"
+        labelPosition: "left"
+        content:
+          text: "Override the destination country's default inflation rate?"
+          inputType: "percentage"
+          validation: "optional"
+          help: "Leave blank to use the destination country's default inflation rate from tax rules."
+          defaultValue: "default"
+        showButtons: ["back", "next"]
+
+      - stepId: "summary"
+        title: "Review & Create"
+        contentType: "summary"
+        content:
+          templates:
+            - condition: "amount && rate"
+              template: "Relocate to {destCountryName} at age {fromAge} with moving cost of {amount} (inflation override: {rate})."
+            - condition: "amount"
+              template: "Relocate to {destCountryName} at age {fromAge} with moving cost of {amount}."
+            - condition: "rate"
+              template: "Relocate to {destCountryName} at age {fromAge} (inflation override: {rate})."
+            - template: "Relocate to {destCountryName} at age {fromAge}."
+        showButtons: ["back", "create"]
+
 # Wizard UI Configuration
 WizardConfig:
   modal:
@@ -406,3 +479,5 @@ WizardConfig:
       color: "#6f42c1"
     investment:
       color: "#007bff"
+    relocation:
+      color: "#ff6b6b"

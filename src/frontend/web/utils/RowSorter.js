@@ -44,7 +44,23 @@
 
     // Use shared sorting utility if available
     if (window.SortingUtils) {
-      window.SortingUtils.sortElements(tbody, rows, sortKeys, getCellValue, options);
+      // Inject relocation-first tie-breaker when sorting by from-age
+      const enhancedKeys = sortKeys.map(function(k) {
+        if (k && k.col === 'from-age') {
+          const tieBreaker = function(a, b) {
+            const aType = getCellValue(a, 'event-type') || '';
+            const bType = getCellValue(b, 'event-type') || '';
+            const aIsReloc = typeof aType === 'string' && aType.indexOf('MV-') === 0;
+            const bIsReloc = typeof bType === 'string' && bType.indexOf('MV-') === 0;
+            if (aIsReloc && !bIsReloc) return -1;
+            if (!aIsReloc && bIsReloc) return 1;
+            return 0;
+          };
+          return { col: k.col, dir: k.dir, tieBreaker: tieBreaker };
+        }
+        return k;
+      });
+      window.SortingUtils.sortElements(tbody, rows, enhancedKeys, getCellValue, options);
     } else {
       // Fallback to original implementation
       const sorted = rows.slice().sort((a, b) => {

@@ -16,8 +16,10 @@ class AttributionManager {
    * @param {number} amount The amount from this source.
    */
   record(metric, source, amount) {
-    if (!this.yearlyAttributions[metric]) {
-      this.yearlyAttributions[metric] = new Attribution(metric);
+    if (this.yearlyAttributions[metric]) {
+      this.yearlyAttributions[metric].setCountryContext(this.currentCountry, this.year);
+    } else {
+      this.yearlyAttributions[metric] = new Attribution(metric, this.currentCountry, this.year);
     }
     this.yearlyAttributions[metric].add(source, amount);
   }
@@ -32,10 +34,29 @@ class AttributionManager {
   }
 
   /**
-   * Resets all yearly attribution data.
+   * Returns the currency-normalized total for a given metric.
+   * @param {string} metric The name of the metric.
+   * @returns {Object|null} The normalized total object, or null if metric not found.
    */
-  reset() {
+  getNormalizedTotal(metric) {
+    var attribution = this.getAttribution(metric);
+    if (!attribution) return null;
+    return attribution.getNormalizedTotal(this.baseCountry);
+  }
+
+  /**
+   * Resets all yearly attribution data.
+   * @param {string} currentCountry The current country code (ISO-2 like "ie", "ar").
+   * @param {number} year The simulation year.
+   * @param {string} baseCountry The base country code for normalization.
+   */
+  reset(currentCountry, year, baseCountry) {
     this.yearlyAttributions = {};
+    this.currentCountry = currentCountry;
+    this.year = year;
+    if (baseCountry && !this.baseCountry) {
+      this.baseCountry = baseCountry;
+    }
   }
 
   /**

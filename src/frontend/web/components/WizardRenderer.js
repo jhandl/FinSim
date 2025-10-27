@@ -1,0 +1,237 @@
+/* Generic Wizard Renderer (non-module, browser global) */
+
+class WizardRenderer {
+
+  constructor(context) {
+    this.context = context; // typically webUI
+    this.manager = null; // may be set by manager
+  }
+
+  render(step, wizardState) {
+    const content = document.createElement('div');
+    content.className = `event-wizard-content event-wizard-content-${step.contentType}`;
+    switch (step.contentType) {
+      case 'intro':
+        content.appendChild(this.renderIntroContent(step, wizardState));
+        break;
+      case 'input':
+        content.appendChild(this.renderInputContent(step, wizardState));
+        break;
+      case 'choice':
+        content.appendChild(this.renderChoiceContent(step, wizardState));
+        break;
+      case 'period':
+        if (typeof this.renderPeriodContent === 'function') content.appendChild(this.renderPeriodContent(step, wizardState));
+        break;
+      case 'summary':
+        if (typeof this.renderSummaryContent === 'function') content.appendChild(this.renderSummaryContent(step, wizardState));
+        break;
+      case 'mortgage':
+        if (typeof this.renderMortgageContent === 'function') content.appendChild(this.renderMortgageContent(step, wizardState));
+        break;
+      default:
+        content.appendChild(this.renderTextContent(step));
+    }
+    return content;
+  }
+
+  renderIntroContent(step, wizardState) {
+    const container = document.createElement('div');
+    container.className = 'event-wizard-intro';
+    const text = document.createElement('p');
+    try {
+      text.textContent = this.processTextVariables(step.content.text, wizardState);
+    } catch (_) {
+      text.textContent = step.content.text;
+    }
+    container.appendChild(text);
+    return container;
+  }
+
+  renderInputContent(step, wizardState) {
+    const container = document.createElement('div');
+    container.className = 'event-wizard-input';
+
+    const inputGroup = document.createElement('div');
+    inputGroup.className = 'event-wizard-input-group';
+    const labelPosition = step.labelPosition || 'left';
+    inputGroup.classList.add(`label-position-${labelPosition}`);
+
+    const label = document.createElement('label');
+    const idSuffix = step.field === 'name' ? 'alias' : step.field;
+    label.htmlFor = `wizard-${idSuffix}`;
+    label.textContent = this.processTextVariables(step.content.text, wizardState);
+
+    const input = document.createElement('input');
+    input.type = (step.content.inputType === 'currency' || step.content.inputType === 'percentage' || step.content.inputType === 'age') ? 'text' : 'text';
+    input.id = `wizard-${idSuffix}`;
+    input.name = idSuffix;
+    input.placeholder = step.content.placeholder || '';
+
+    const numericInputTypes = ['currency','percentage','age','number'];
+    if (numericInputTypes.includes(step.content.inputType)) {
+      input.inputMode = 'numeric';
+      input.pattern = '[0-9]*';
+    }
+
+    const currentValue = wizardState.data[step.field];
+    if (currentValue !== undefined) input.value = currentValue;
+
+    if (step.content.inputType === 'currency') input.className = 'currency-input';
+    else if (step.content.inputType === 'percentage') input.className = 'percentage-input';
+    else if (step.content.inputType === 'age') input.className = 'age-input';
+
+    inputGroup.appendChild(label);
+    inputGroup.appendChild(input);
+    container.appendChild(inputGroup);
+
+    if (step.content.help) {
+      const help = document.createElement('div');
+      help.className = 'event-wizard-help';
+      help.textContent = this.processTextVariables(step.content.help, wizardState);
+      container.appendChild(help);
+    }
+
+    input.addEventListener('input', () => {
+      wizardState.data[step.field] = input.value;
+      const mgr = this.manager || this.context?.eventsWizard?.manager;
+      if (mgr && typeof mgr.clearWizardFieldValidation === 'function') mgr.clearWizardFieldValidation(input);
+    });
+
+    input.addEventListener('blur', () => {
+      const mgr = this.manager || this.context?.eventsWizard?.manager;
+      if (mgr && typeof mgr.validateWizardField === 'function') mgr.validateWizardField(input, step.field, step.content.inputType);
+      const validationRules = (step.content && step.content.validation) || '';
+      if (!mgr || !validationRules) return;
+      const rules = validationRules.split('|').map(r => r.trim());
+      rules.forEach((r) => {
+        const m = r.match(/^(lt|lte|gt|gte):(.+)$/);
+        if (!m) return;
+        const comparator = m[1];
+        const otherField = m[2];
+        const otherValRaw = wizardState.data[otherField];
+        const thisValNum = parseFloat(input.value.replace(/[^0-9.-]/g, ''));
+        const otherValNum = parseFloat((otherValRaw || '').toString().replace(/[^0-9.-]/g, ''));
+        if (isNaN(thisValNum) || isNaN(otherValNum)) return;
+        let valid = true;
+        switch (comparator) {
+          case 'lt': valid = thisValNum < otherValNum; break;
+          case 'lte': valid = thisValNum <= otherValNum; break;
+          case 'gt': valid = thisValNum > otherValNum; break;
+          case 'gte': valid = thisValNum >= otherValNum; break;
+        }
+        if (!valid) {
+          const comparatorTextMap = { lt: 'less than', lte: 'less than or equal to', gt: 'greater than', gte: 'greater than or equal to' };
+          const comparatorText = comparatorTextMap[comparator] || comparator;
+          const message = `Value must be ${comparatorText} ${otherField.replace(/([A-Z])/g, ' $1').toLowerCase()}`;
+          if (typeof mgr.showWizardFieldValidation === 'function') mgr.showWizardFieldValidation(input, message);
+        }
+      });
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+        const mgr = this.manager || this.context?.eventsWizard?.manager;
+        if (!mgr || !mgr.isActive) return;
+        if (mgr._pendingNextTimeouts && mgr._pendingNextTimeouts.length) {
+          mgr._pendingNextTimeouts.forEach(t => clearTimeout(t));
+          mgr._pendingNextTimeouts = [];
+        }
+        const timeoutId = setTimeout(() => {
+          mgr.nextStep('input');
+          mgr._pendingNextTimeouts = (mgr._pendingNextTimeouts || []).filter(id => id !== timeoutId);
+        }, 60);
+        mgr._pendingNextTimeouts.push(timeoutId);
+      }
+    });
+
+    return container;
+  }
+
+  renderChoiceContent(step, wizardState) {
+    const container = document.createElement('div');
+    container.className = 'event-wizard-choice';
+
+    const description = document.createElement('p');
+    description.textContent = step.content.text;
+    container.appendChild(description);
+
+    const choicesContainer = document.createElement('div');
+    choicesContainer.className = 'event-wizard-choices';
+
+    step.content.choices.forEach((choice, index) => {
+      const choiceElement = document.createElement('div');
+      choiceElement.className = 'event-wizard-choice-option';
+      choiceElement.dataset.value = choice.value;
+
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'wizardChoice';
+      radio.value = choice.value;
+      radio.id = `choice-${index}`;
+
+      const currentValue = wizardState.data[step.stepId];
+      if (currentValue === choice.value) {
+        radio.checked = true;
+        choiceElement.classList.add('selected');
+      }
+
+      const label = document.createElement('label');
+      label.htmlFor = `choice-${index}`;
+      const title = document.createElement('div');
+      title.className = 'event-wizard-choice-title';
+      title.textContent = choice.title;
+      const desc = document.createElement('div');
+      desc.className = 'event-wizard-choice-description';
+      desc.textContent = choice.description;
+      label.appendChild(title);
+      label.appendChild(desc);
+
+      choiceElement.appendChild(radio);
+      choiceElement.appendChild(label);
+
+      choiceElement.addEventListener('click', () => {
+        const alreadySelected = choiceElement.classList.contains('selected');
+        if (!alreadySelected) {
+          choicesContainer.querySelectorAll('.event-wizard-choice-option').forEach(opt => {
+            opt.classList.remove('selected');
+            const inp = opt.querySelector('input');
+            if (inp) inp.checked = false;
+          });
+          choiceElement.classList.add('selected');
+          radio.checked = true;
+          wizardState.data[step.stepId] = choice.value;
+          const mgr = this.manager || this.context?.eventsWizard?.manager;
+          if (mgr && typeof mgr.handleChoiceSpecialCases === 'function') mgr.handleChoiceSpecialCases(step.stepId, choice.value);
+        }
+        const mgr = this.manager || this.context?.eventsWizard?.manager;
+        if (mgr) mgr.nextStep('choice');
+      });
+
+      choicesContainer.appendChild(choiceElement);
+    });
+
+    container.appendChild(choicesContainer);
+    return container;
+  }
+
+  renderTextContent(step) {
+    const container = document.createElement('div');
+    container.innerHTML = `<p>${step.content.text || 'Content not available'}</p>`;
+    return container;
+  }
+
+  // Utilities
+  processTextVariables(text, wizardState) {
+    if (!text) return text;
+    const data = (wizardState && wizardState.data) ? wizardState.data : {};
+    return text.replace(/\{([^}]+)\}/g, (m, key) => {
+      const val = data[key];
+      return (val !== undefined && val !== null && val !== '') ? val : '';
+    });
+  }
+}
+
+

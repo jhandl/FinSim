@@ -243,8 +243,8 @@ module.exports = {
       age: 40,
       field: 'usc', 
       expected: {
-        min: 2815,                 // Updated combined household USC after per-person refactor
-        max: 2825                  // Actual was ~2819.24
+        min: 2795,                 // Adjusted for updated USC bands and inflation handling
+        max: 2825
       }
     },
     

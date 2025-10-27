@@ -1,5 +1,3 @@
-/* This file has to work only on the website */
-
 var WebUI_instance = null;
 
 class WebUI extends AbstractUI {
@@ -34,7 +32,7 @@ class WebUI extends AbstractUI {
       this.fileManager = new FileManager(this);
       this.eventsTableManager = new EventsTableManager(this);
       this.eventAccordionManager = new EventAccordionManager(this);
-      this.eventWizardManager = new EventWizardManager(this);
+      this.eventsWizard = new EventsWizard(this);
       this.dragAndDrop = new DragAndDrop();
 
       // Initialize WelcomeModal with error checking
@@ -67,9 +65,10 @@ class WebUI extends AbstractUI {
       this.setupIconTooltips(); // Setup tooltips for various mode toggle icons
       this.setupCursorEndOnFocus(); // Ensure caret is placed at the end when inputs receive focus
       this.setupMobileLongPressHelp(); // Long-press on inputs/selects opens contextual help on mobile
+      this.setupStatusClickHandler(); // Setup click handler for relocation impact status
       this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
       
-      this.eventsTableManager.addEventRow();
+      // Defer adding the initial empty event row until after Config is initialized
       
       // Set initial UI state
       this.setStatus("Ready", STATUS_COLORS.INFO);
@@ -112,6 +111,63 @@ class WebUI extends AbstractUI {
 
   clearAllWarnings() {
     this.notificationUtils.clearAllWarnings();
+  }
+
+  updateStatusForRelocationImpacts(events) {
+    let count = 0;
+    for (let i = 0; i < events.length; i++) {
+      if (events[i].relocationImpact) count++;
+    }
+    const statusElement = document.getElementById('progress');
+    if (count > 0) {
+      // Show count only; icon is rendered via CSS ::before for consistent sizing/color
+      this.setStatus(String(count), STATUS_COLORS.WARNING);
+      statusElement.classList.add('relocation-impact');
+      this.relocationImpactCount = count;
+    } else {
+      // Guard against overwriting active statuses
+      const currentText = statusElement ? (statusElement.textContent || '') : '';
+      const isRunning = currentText === 'Running...';
+      const isError = statusElement && statusElement.classList.contains('error');
+      if (!isRunning && !isError) {
+        this.setStatus("Ready", STATUS_COLORS.INFO);
+      }
+      statusElement.classList.remove('relocation-impact');
+      this.relocationImpactCount = null;
+    }
+  }
+
+  setupStatusClickHandler() {
+    this.statusElement = document.getElementById('progress');
+    this.statusElement.addEventListener('click', () => {
+      if (this.statusElement.classList.contains('relocation-impact') && this.relocationImpactCount) {
+        this.showAlert(
+          `Cannot run simulation. ${this.relocationImpactCount} events need attention due to relocations in your timeline. Click the warning badges (⚠️) on affected events to resolve them.`,
+          "Relocation Impacts Need Review"
+        ).then(() => {
+          if (this.eventsTableManager && typeof this.eventsTableManager.navigateToFirstImpact === 'function') {
+            this.eventsTableManager.navigateToFirstImpact();
+          }
+        });
+      }
+    });
+
+    // Also bind click handler for mobile status indicator if present
+    const mobileStatusElement = document.getElementById('progressMobile');
+    if (mobileStatusElement) {
+      mobileStatusElement.addEventListener('click', () => {
+        if (mobileStatusElement.classList.contains('relocation-impact') && this.relocationImpactCount) {
+          this.showAlert(
+            `Cannot run simulation. ${this.relocationImpactCount} events need attention due to relocations in your timeline. Click the warning badges (⚠️) on affected events to resolve them.`,
+            "Relocation Impacts Need Review"
+          ).then(() => {
+            if (this.eventsTableManager && typeof this.eventsTableManager.navigateToFirstImpact === 'function') {
+              this.eventsTableManager.navigateToFirstImpact();
+            }
+          });
+        }
+      });
+    }
   }
 
   getTableData(groupId, columnCount = 1, includeHiddenEventTypes = false) {
@@ -259,6 +315,14 @@ class WebUI extends AbstractUI {
 
   loadFromFile(file) {
     return this.fileManager.loadFromFile(file);
+  }
+
+  // Lightweight proxy to read events without creating a new UIManager instance
+  readEvents(validate = false) {
+    if (typeof uiManager !== 'undefined' && uiManager) {
+      return uiManager.readEvents(validate);
+    }
+    return new UIManager(this).readEvents(validate);
   }
 
   setupChangeListener() {
@@ -590,7 +654,7 @@ class WebUI extends AbstractUI {
           const uiMgr = (typeof window !== 'undefined' && window.uiManager) ? window.uiManager : (typeof uiManager !== 'undefined' ? uiManager : null);
           if (uiMgr && typeof uiMgr.updateDataRow === 'function') {
             const ds = (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) ? dataSheet : null;
-            const total = (typeof row === 'number' && row > 0) ? row : (ds ? Math.max(0, ds.length - 1) : 0);
+            const total = ds ? Math.max(0, ds.length - 1) : 0;
             for (let i = 1; i <= total; i++) {
               uiMgr.updateDataRow(i, i / Math.max(1, total));
             }
@@ -712,47 +776,84 @@ class WebUI extends AbstractUI {
       // Clear all warnings at the start of each simulation attempt
       this.clearAllWarnings();
 
-      this.isSimulationRunning = true;
-      runButton.disabled = true;
-      runButton.classList.add('disabled');
-      runButton.style.pointerEvents = 'none';
-      
-      // Also disable the mobile run button if it exists
-      const mobileRunButton = document.getElementById('runSimulationMobile');
-      if (mobileRunButton) {
-        mobileRunButton.disabled = true;
-        mobileRunButton.classList.add('disabled');
-        mobileRunButton.style.pointerEvents = 'none';
-      }
-      
-      this.setStatus('Running...');
-      runButton.offsetHeight; // This forces the browser to recalculate layout immediately
+      // Check for relocation impacts if feature is enabled
+      try {
+        if (Config.getInstance().isRelocationEnabled()) {
+          // Ensure relocation impacts are freshly analyzed before gating
+          const events = this.readEvents(false);
+          const startCountry = this.eventsTableManager.getStartCountry();
+          const summary = RelocationImpactDetector.analyzeEvents(events, startCountry);
+          // Ensure relocation impact badges/indicators are refreshed immediately after analysis
+          if (this.eventsTableManager && typeof this.eventsTableManager.updateRelocationImpactIndicators === 'function') {
+            this.eventsTableManager.updateRelocationImpactIndicators(events);
+          }
+          this.updateStatusForRelocationImpacts(events);
+          const hasImpacts = summary && summary.totalImpacted > 0;
 
-      // Do not rebuild chart datasets here; defer to end-of-run to avoid mid-run resets
+          if (hasImpacts) {
+            // Reset UI state since we're not proceeding yet
+            this.isSimulationRunning = false;
 
-      setTimeout(() => {
-        try {
-          run();
-        } catch (error) {
-          this.setError(error);
-          // Re-enable button on error
-          this.isSimulationRunning = false;
-          runButton.disabled = false;
-          runButton.classList.remove('disabled');
-          runButton.style.pointerEvents = '';
-          
-          // Also re-enable mobile button on error
-          const mobileRunButton = document.getElementById('runSimulationMobile');
-          if (mobileRunButton) {
-            mobileRunButton.disabled = false;
-            mobileRunButton.classList.remove('disabled');
-            mobileRunButton.style.pointerEvents = '';
-          }      
+            this.showAlert(
+              `Cannot run simulation. ${summary.totalImpacted} events need attention due to relocations in your timeline. Click the warning badges (⚠️) on affected events to resolve them.`,
+              "Relocation Impacts Need Review"
+            ).then(() => {
+              if (this.eventsTableManager && typeof this.eventsTableManager.navigateToFirstImpact === 'function') {
+                this.eventsTableManager.navigateToFirstImpact();
+              }
+            });
+            return; // Don't proceed with normal flow
+          }
         }
-      }, 50); // Increased from 0 to 50ms to allow browser to render visual changes before CPU-intensive simulation
+      } catch (err) {
+        // Log error but don't block simulation
+        console.error('Error checking relocation impacts:', err);
+      }
+
+      // No impacts or relocation disabled - proceed normally
+      const mobileRunButton = document.getElementById('runSimulationMobile');
+      this.proceedWithSimulation(runButton, mobileRunButton);
     };
 
     runButton.addEventListener('click', this.handleRunSimulation);
+  }
+
+  proceedWithSimulation(runButton, mobileRunButton) {
+    this.isSimulationRunning = true;
+    runButton.disabled = true;
+    runButton.classList.add('disabled');
+    runButton.style.pointerEvents = 'none';
+    
+    if (mobileRunButton) {
+      mobileRunButton.disabled = true;
+      mobileRunButton.classList.add('disabled');
+      mobileRunButton.style.pointerEvents = 'none';
+    }
+    
+    this.setStatus('Running...');
+    runButton.offsetHeight; // This forces the browser to recalculate layout immediately
+
+    // Do not rebuild chart datasets here; defer to end-of-run to avoid mid-run resets
+
+    setTimeout(() => {
+      try {
+        run();
+      } catch (error) {
+        this.setError(error);
+        // Re-enable button on error
+        this.isSimulationRunning = false;
+        runButton.disabled = false;
+        runButton.classList.remove('disabled');
+        runButton.style.pointerEvents = '';
+        
+        // Also re-enable mobile button on error
+        if (mobileRunButton) {
+          mobileRunButton.disabled = false;
+          mobileRunButton.classList.remove('disabled');
+          mobileRunButton.style.pointerEvents = '';
+        }      
+      }
+    }, 50); // Increased from 0 to 50ms to allow browser to render visual changes before CPU-intensive simulation
   }
 
   setupWizardInvocation() {
@@ -1528,6 +1629,119 @@ class WebUI extends AbstractUI {
     }
   }
 
+  setupStartCountryDropdown() {
+    try {
+      const config = Config.getInstance();
+      if (!config.isRelocationEnabled()) return;
+
+      const inputGroup = document.querySelector('#startingPosition .input-group');
+      if (!inputGroup) return;
+
+      // Create wrapper div
+      const wrapper = document.createElement('div');
+      wrapper.className = 'input-wrapper';
+
+      // Create label
+      const label = document.createElement('label');
+      label.setAttribute('for', 'StartCountry');
+      label.textContent = 'Current Country';
+      wrapper.appendChild(label);
+
+      // Create hidden input
+      const hiddenInput = document.createElement('input');
+      hiddenInput.type = 'hidden';
+      hiddenInput.id = 'StartCountry';
+      hiddenInput.className = 'string';
+      hiddenInput.autocomplete = 'off';
+      wrapper.appendChild(hiddenInput);
+
+      // Create dropdown control div
+      const controlDiv = document.createElement('div');
+      controlDiv.className = 'start-country-dd visualization-control';
+      controlDiv.id = 'StartCountryControl';
+
+      // Create toggle span
+      const toggleSpan = document.createElement('span');
+      toggleSpan.id = 'StartCountryToggle';
+      toggleSpan.className = 'dd-toggle pseudo-select';
+      controlDiv.appendChild(toggleSpan);
+
+      // Create options div
+      const optionsDiv = document.createElement('div');
+      optionsDiv.id = 'StartCountryOptions';
+      optionsDiv.className = 'visualization-dropdown';
+      optionsDiv.style.display = 'none';
+      controlDiv.appendChild(optionsDiv);
+
+      wrapper.appendChild(controlDiv);
+
+      // Insert after first child (after "Your Current Age")
+      const firstChild = inputGroup.firstElementChild;
+      if (firstChild) {
+        inputGroup.insertBefore(wrapper, firstChild);
+      } else {
+        inputGroup.appendChild(wrapper);
+      }
+
+      // Populate options
+      const availableCountries = config.getAvailableCountries();
+      const options = availableCountries.map(c => ({ value: c.code, label: c.name }));
+
+      this.startCountryDropdown = DropdownUtils.create({
+        toggleEl: toggleSpan,
+        dropdownEl: optionsDiv,
+        options,
+        selectedValue: '',
+        onSelect: (val, label) => {
+          hiddenInput.value = val;
+          toggleSpan.textContent = label;
+          // Fire change so listeners update
+          hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+      });
+
+      // Bridge validation styling
+      if (this.startCountryDropdown && this.startCountryDropdown.wrapper) {
+        hiddenInput._dropdownWrapper = this.startCountryDropdown.wrapper;
+      }
+
+      // Fetch user country
+      return this.fetchUserCountry();
+    } catch (err) {
+      // Non-fatal
+      try { console.warn('setupStartCountryDropdown failed', err); } catch (_) {}
+    }
+  }
+
+  async fetchUserCountry() {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const response = await fetch('https://ipapi.co/country/', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      const country = (await response.text()).toLowerCase();
+      const config = Config.getInstance();
+      const available = config.getAvailableCountries();
+      const match = available.find(c => c.code.toLowerCase() === country);
+      if (match) {
+        this.setValue('StartCountry', match.code);
+        // Also update the visible dropdown label/selected state (avoid re-dispatching change)
+        const optionsEl = document.getElementById('StartCountryOptions');
+        const toggleEl = document.getElementById('StartCountryToggle');
+        if (optionsEl && toggleEl) {
+          optionsEl.querySelectorAll('[data-value]').forEach(el => el.classList.remove('selected'));
+          const optEl = optionsEl.querySelector(`[data-value="${match.code}"]`);
+          if (optEl) {
+            optEl.classList.add('selected');
+            toggleEl.textContent = optEl.textContent;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch user country:', e);
+    }
+  }
+
   populateVisualizationPresets() {
     const dropdown = document.getElementById('presetOptions');
     if (!dropdown) return;
@@ -1822,6 +2036,10 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
       // Apply dynamic investment labels from ruleset (first two investment types)
       try { webUi.applyInvestmentLabels(); } catch (_) {}
 
+    // Create the initial empty event row as early as possible post-Config init
+    // so tests and UI logic can safely target row_1 without racing later steps
+    try { webUi.eventsTableManager && webUi.eventsTableManager.addEventRow(); } catch (_) {}
+
     // Minimal trigger to ensure tax headers exist: build row 0 then remove it
     try {
       if (webUi.tableManager && typeof webUi.tableManager.setDataRow === 'function') {
@@ -1837,7 +2055,7 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     // After labels and headers are present, apply pinned-only income visibility
     try {
       const cfg = Config.getInstance();
-      const rs = (cfg.getCachedTaxRuleSet ? (cfg.getCachedTaxRuleSet(cfg.getDefaultCountry && cfg.getDefaultCountry())) : null) || (cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet() : null);
+      const rs = (cfg.getCachedTaxRuleSet ? (cfg.getCachedTaxRuleSet(cfg.getDefaultCountry())) : null) || (cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet() : null);
       if (rs && typeof rs.getInvestmentTypes === 'function') {
         const investmentTypes = rs.getInvestmentTypes() || [];
         const pinned = (typeof rs.getPinnedIncomeTypes === 'function') ? (rs.getPinnedIncomeTypes() || []) : [];
@@ -1852,9 +2070,16 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
         try { webUi.chartManager.applyIncomeVisibility(pinnedVisibility); } catch (_) {}
       }
     } catch (_) {}
+    
+    // Apply saved preferences (view mode + age/year) now that Config is ready
+    try { webUi.eventsTableManager && webUi.eventsTableManager._applySavedPreferences(); } catch (_) {}
 
     // Initialize controls that depend on Config/tax rules being available
     try { webUi.setupPensionCappedDropdown(); } catch (_) {}
+    // IMPORTANT: Create StartCountry controls before any code may read it
+    try { await webUi.setupStartCountryDropdown(); } catch (_) {}
+
+    // (Initial row already added earlier)
 
     // Establish baseline for new scenario now that Config is initialized (avoids extra getVersion call)
     try { webUi.fileManager.updateLastSavedState(); } catch (_) {}

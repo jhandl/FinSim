@@ -65,11 +65,67 @@ class EventAccordionManager {
   renderAccordion() {
     if (!this.accordionContainer) return;
 
-    // Create accordion items for existing events
+    // Build minimal inline header + items
+    const header = document.createElement('div');
+    header.className = 'events-accordion-header';
+    header.innerHTML = `
+      <div class="accordion-header-row">
+        <div class="accordion-header-left"></div>
+        <div class="accordion-header-main">
+          <div class="accordion-col sortable" data-col="event-type">Event Type <span class="sort-caret">⇅</span></div>
+          <div class="accordion-col sortable" data-col="event-name">Name <span class="sort-caret">⇅</span></div>
+          <div class="accordion-col sortable" data-col="event-amount">Amount <span class="sort-caret">⇅</span></div>
+          <div class="accordion-col sortable" data-col="from-age">${this.ageYearMode === 'year' ? 'Year' : 'Period'} <span class="sort-caret">⇅</span></div>
+        </div>
+        <div class="accordion-header-right"></div>
+      </div>
+    `;
+
+    const tableManager = this.webUI && this.webUI.eventsTableManager;
+    if (tableManager) {
+      // Click-to-sort
+      header.querySelectorAll('.sortable').forEach(colEl => {
+        colEl.addEventListener('click', () => {
+          const col = colEl.getAttribute('data-col');
+          if (!col) return;
+          if (tableManager.sortColumn !== col) {
+            tableManager.sortColumn = col;
+            tableManager.sortDir = 'asc';
+          } else {
+            if (tableManager.sortDir === 'asc') tableManager.sortDir = 'desc';
+            else if (tableManager.sortDir === 'desc') { tableManager.sortColumn = null; tableManager.sortDir = null; }
+            else tableManager.sortDir = 'asc';
+          }
+          setTimeout(() => { tableManager.applySort(); updateIndicators(); }, 0);
+        });
+      });
+
+      // Indicator sync (minimal)
+      const updateIndicators = () => {
+        header.querySelectorAll('.sortable').forEach(h => {
+          h.classList.remove('sorted-asc', 'sorted-desc', 'sorted-secondary');
+          const c = h.querySelector('.sort-caret'); if (c) c.textContent = '⇅';
+        });
+        const keys = tableManager.sortKeys || [];
+        if (keys.length) {
+          const p = keys[0];
+          const ph = header.querySelector(`.sortable[data-col="${p.col}"]`);
+          if (ph) {
+            ph.classList.add(p.dir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+            const c = ph.querySelector('.sort-caret'); if (c) c.textContent = p.dir === 'asc' ? '▲' : '▼';
+          }
+        }
+      };
+      // Initialize
+      updateIndicators();
+    }
+
     const items = this.createAccordionItems();
 
     this.accordionContainer.innerHTML = '';
+    if (header) this.accordionContainer.appendChild(header);
     this.accordionContainer.appendChild(items);
+
   }
 
 
@@ -101,12 +157,14 @@ class EventAccordionManager {
     }
   }
 
+
   /**
    * Sync events from the table to accordion data structure
    */
   syncEventsFromTable() {
     this.events = [];
-    const tableRows = document.querySelectorAll('#Events tbody tr');
+    // Align with readEvents: only consider visible rows
+    const tableRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none');
     
     tableRows.forEach((row, index) => {
       const event = this.extractEventFromRow(row);
@@ -141,7 +199,7 @@ class EventAccordionManager {
 
       if (!typeInput) return null;
 
-      return {
+      const event = {
         type: typeInput.value || '',
         name: nameInput?.value || '',
         amount: amountInput?.value || '',
@@ -151,6 +209,53 @@ class EventAccordionManager {
         match: matchInput?.value || '',
         rowId: row.dataset.rowId || ''
       };
+
+      // Extract currency field
+      const currencyInput = row.querySelector('.event-currency');
+      if (currencyInput && currencyInput.value) {
+        event.currency = currencyInput.value;
+      }
+
+      // Extract linkedCountry field
+      const linkedCountryInput = row.querySelector('.event-linked-country');
+      if (linkedCountryInput && linkedCountryInput.value) {
+        event.linkedCountry = linkedCountryInput.value;
+      }
+
+      // Extract linkedEventId field
+      const linkedEventIdInput = row.querySelector('.event-linked-event-id');
+      if (linkedEventIdInput && linkedEventIdInput.value) {
+        event.linkedEventId = linkedEventIdInput.value;
+      }
+
+      // Extract resolutionOverride field
+      const overrideInput = row.querySelector('.event-resolution-override');
+      if (overrideInput && overrideInput.value) {
+        event.resolutionOverride = overrideInput.value;
+      }
+
+      // Prefer robust dataset-based relocation impact propagated by table manager
+      if (row.dataset && row.dataset.relocationImpact === '1') {
+        event.relocationImpact = {
+          category: row.dataset.relocationImpactCategory || '',
+          message: row.dataset.relocationImpactMessage || '',
+          autoResolvable: row.dataset.relocationImpactAuto === '1',
+          mvEventId: row.dataset.relocationImpactMvId || undefined
+        };
+      } else {
+        // Fallback to reading from events array via matching by eventId when available
+        try {
+          const tableEvents = this.webUI.readEvents(false);
+          const tableRows = document.querySelectorAll('#Events tbody tr');
+          const currentIndex = Array.from(tableRows).indexOf(row);
+          const tableEvent = tableEvents[currentIndex];
+          if (tableEvent && tableEvent.relocationImpact) {
+            event.relocationImpact = tableEvent.relocationImpact;
+          }
+        } catch (_) {}
+      }
+
+      return event;
     } catch (error) {
       console.warn('Error extracting event from row:', error);
       return null;
@@ -187,7 +292,7 @@ class EventAccordionManager {
       <div class="accordion-item-header" data-accordion-id="${event.accordionId}">
         <div class="accordion-item-controls-left">
           <button class="accordion-expand-btn ${isExpanded ? 'expanded' : ''}" title="${isExpanded ? 'Collapse' : 'Expand'}">
-            +
+            ▶
           </button>
         </div>
         <div class="accordion-item-summary">
@@ -210,6 +315,12 @@ class EventAccordionManager {
     // Render details if expanded
     if (isExpanded) {
       this.renderItemDetails(item, event);
+    }
+
+    // Attach tooltip
+    const badge = item.querySelector('.relocation-impact-badge');
+    if (badge && event.relocationImpact) {
+      TooltipUtils.attachTooltip(badge, event.relocationImpact.message, {hoverDelay: 300, touchDelay: 400});
     }
 
     return item;
@@ -259,7 +370,9 @@ class EventAccordionManager {
     if (header) {
       header.addEventListener('click', (e) => {
         // Don't toggle if clicking on buttons
-        if (e.target.closest('.accordion-expand-btn') || e.target.closest('.accordion-delete-btn')) {
+        if (e.target.closest('.accordion-expand-btn') || 
+            e.target.closest('.accordion-delete-btn') || 
+            e.target.closest('.relocation-impact-badge')) {
           return;
         }
         e.preventDefault();
@@ -280,6 +393,253 @@ class EventAccordionManager {
         this.deleteEvent(event);
       });
     }
+
+    // Add click handler for badge
+    const impactBadge = item.querySelector('.relocation-impact-badge');
+    if (impactBadge) {
+      impactBadge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const accordionId = event.accordionId;
+        this.expandResolutionPanel(accordionId);
+      });
+    }
+  }
+
+  /**
+   * Expand inline resolution panel below the accordion item
+   */
+  expandResolutionPanel(accordionId) {
+    // Select the root accordion item, not just the header
+    const item = (document.querySelector(`.events-accordion-item[data-accordion-id="${accordionId}"]`) ||
+                 (document.querySelector(`[data-accordion-id="${accordionId}"]`) && document.querySelector(`[data-accordion-id="${accordionId}"]`).closest('.events-accordion-item')));
+    if (!item) return;
+
+    const event = this.events.find(e => e.accordionId === accordionId);
+    if (!event || !event.relocationImpact) return;
+
+    // Check if item is expanded
+    if (!this.expandedItems.has(accordionId)) {
+      this.toggleAccordionItem(accordionId);
+    }
+
+    const content = item.querySelector('.accordion-item-content');
+    if (!content) return;
+
+    // Check if panel already exists (support both wrapped and unwrapped markup)
+    const existingPanel = content.querySelector('.resolution-panel-container') || content.querySelector('.resolution-panel-expander');
+    if (existingPanel) return;
+
+    // Generate panel content with real table rowId so data-row-id on buttons matches table
+    const panelContent = this.webUI.eventsTableManager.createResolutionPanelContent(event, event.rowId);
+
+    // Inject panel HTML at the start of .accordion-item-content-wrapper
+    const wrapper = content.querySelector('.accordion-item-content-wrapper');
+    if (wrapper) {
+      wrapper.insertAdjacentHTML('afterbegin', panelContent);
+    }
+
+    // Animate expansion using inner expander for smoother layout change
+    const expander = content.querySelector('.resolution-panel-expander');
+    const containerEl = content.querySelector('.resolution-panel-container');
+    if (expander) {
+      // Ensure starting state
+      expander.style.height = '0px';
+      expander.style.overflow = 'hidden';
+      if (containerEl) {
+        try { containerEl.classList.add('panel-anim'); } catch (_) {}
+      }
+      // Next frame, expand to content height and fade-in content
+      requestAnimationFrame(() => {
+        const fullHeight = expander.scrollHeight;
+        if (containerEl) {
+          try { containerEl.classList.add('visible'); } catch (_) {}
+        }
+        expander.style.height = fullHeight + 'px';
+        const onOpened = (e) => {
+          if (e.target !== expander) return;
+          expander.style.height = 'auto';
+          expander.removeEventListener('transitionend', onOpened);
+        };
+        expander.addEventListener('transitionend', onOpened);
+      });
+    }
+
+    // Setup close button handler
+    const closeBtn = content.querySelector('.panel-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => this.collapseResolutionPanel(accordionId));
+    }
+
+    // Delegated click handler for resolution actions in accordion view
+    const interactionRoot = containerEl || content;
+    const etm = this.webUI && this.webUI.eventsTableManager;
+    if (interactionRoot && etm) {
+      interactionRoot.addEventListener('click', (ev) => {
+        const tab = ev.target && ev.target.closest && ev.target.closest('.resolution-tab');
+        if (tab) {
+          ev.preventDefault();
+          etm.handleResolutionTabSelection(interactionRoot, tab);
+          return;
+        }
+
+        const btn = ev.target && ev.target.closest && ev.target.closest('.resolution-apply');
+        if (!btn) return;
+        ev.stopPropagation();
+        ev.preventDefault();
+
+        const action = btn.getAttribute('data-action');
+        const rowId = btn.getAttribute('data-row-id') || event.rowId;
+        if (!action) return;
+
+        switch (action) {
+          case 'split': {
+            const detail = btn.closest('.resolution-detail');
+            const input = detail ? detail.querySelector('.part2-amount-input') : null;
+            const part2Amount = input ? input.value : undefined;
+            etm.splitEventAtRelocation(rowId, part2Amount);
+            break;
+          }
+          case 'peg': {
+            const currency = btn.getAttribute('data-currency');
+            etm.pegCurrencyToOriginal(rowId, currency);
+            break;
+          }
+          case 'accept': {
+            const amount = btn.getAttribute('data-suggested-amount');
+            const currency = btn.getAttribute('data-suggested-currency');
+            etm.acceptSuggestion(rowId, amount, currency);
+            break;
+          }
+          case 'link': {
+            const detail = btn.closest('.resolution-detail');
+            const sel = detail ? detail.querySelector('.country-selector') : null;
+            const selectedCountry = sel ? sel.value : undefined;
+            etm.linkPropertyToCountry(rowId, selectedCountry);
+            break;
+          }
+          case 'convert':
+            etm.convertToPensionless(rowId);
+            break;
+          case 'review':
+            etm.markAsReviewed(rowId);
+            break;
+          default:
+            break;
+        }
+      });
+      etm.bindResolutionTabAccessibility(interactionRoot);
+    }
+
+    // Attach tooltip for PPP suggestion input in accordion view as well
+    try {
+      if (this.webUI && this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.attachSplitTooltip === 'function') {
+        this.webUI.eventsTableManager.attachSplitTooltip(containerEl || content);
+      }
+    } catch (_) {}
+
+    // Mark item as having panel
+    item.dataset.hasResolutionPanel = '1';
+
+    // Setup collapse triggers (outside click and ESC)
+    this._setupPanelCollapseTriggers(accordionId, item);
+  }
+
+  /**
+   * Collapse the resolution panel for the given accordion item
+   */
+  collapseResolutionPanel(accordionId) {
+    // Ensure we operate on the root item
+    const item = (document.querySelector(`.events-accordion-item[data-accordion-id="${accordionId}"]`) ||
+                 (document.querySelector(`[data-accordion-id="${accordionId}"]`) && document.querySelector(`[data-accordion-id="${accordionId}"]`).closest('.events-accordion-item')));
+    if (!item) return;
+
+    // Support both wrapped and unwrapped markup; prefer expander for smooth height animation
+    const expander = item.querySelector('.resolution-panel-expander');
+    const containerEl = item.querySelector('.resolution-panel-container');
+    if (!expander && !containerEl) return;
+
+    // Fade out content
+    if (containerEl) {
+      try { containerEl.classList.remove('visible'); } catch (_) {}
+    }
+
+    if (expander) {
+      // Set explicit current height, then transition to 0
+      const current = expander.scrollHeight;
+      expander.style.height = current + 'px';
+      // Force reflow
+      // eslint-disable-next-line no-unused-expressions
+      expander.offsetHeight;
+      requestAnimationFrame(() => {
+        expander.style.height = '0px';
+      });
+      const onClosed = (e) => {
+        if (e.target !== expander) return;
+        expander.removeEventListener('transitionend', onClosed);
+        // Remove the entire expander block
+        const wrapperToRemove = expander;
+        if (wrapperToRemove && wrapperToRemove.parentNode) {
+          wrapperToRemove.remove();
+        }
+      };
+      expander.addEventListener('transitionend', onClosed);
+    } else if (containerEl) {
+      // Fallback: no expander; remove after fade
+      setTimeout(() => { if (containerEl.parentNode) containerEl.parentNode.remove(); }, 300);
+    }
+
+    // Clear reference
+    delete item.dataset.hasResolutionPanel;
+
+    // Remove collapse triggers
+    this._removePanelCollapseTriggers(item);
+  }
+
+  /**
+   * Setup event listeners for panel collapse triggers (outside click and ESC)
+   */
+  _setupPanelCollapseTriggers(accordionId, item) {
+    // Clean up any existing handlers first to avoid duplicates
+    this._removePanelCollapseTriggers(item);
+
+    // Click-outside handler: collapse when clicking anywhere outside this accordion item
+    const clickOutsideHandler = (e) => {
+      try {
+        if (item && !item.contains(e.target)) {
+          this.collapseResolutionPanel(accordionId);
+        }
+      } catch (_) { /* ignore */ }
+    };
+    document.addEventListener('click', clickOutsideHandler);
+    item._panelClickOutsideHandler = clickOutsideHandler;
+
+    // ESC key handler
+    const escHandler = (e) => {
+      if (e && e.key === 'Escape') {
+        this.collapseResolutionPanel(accordionId);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+    item._panelEscHandler = escHandler;
+  }
+
+  /**
+   * Remove event listeners for panel collapse triggers
+   */
+  _removePanelCollapseTriggers(item) {
+    if (!item) return;
+    try {
+      if (item._panelClickOutsideHandler) {
+        document.removeEventListener('click', item._panelClickOutsideHandler);
+        delete item._panelClickOutsideHandler;
+      }
+    } catch (_) { /* ignore */ }
+    try {
+      if (item._panelEscHandler) {
+        document.removeEventListener('keydown', item._panelEscHandler);
+        delete item._panelEscHandler;
+      }
+    } catch (_) { /* ignore */ }
   }
 
   /**
@@ -347,6 +707,7 @@ class EventAccordionManager {
         expandBtn.classList.add('expanded');
         expandBtn.title = 'Collapse';
         this.expandedItems.add(accordionId);
+        // Do not auto-open resolution panels; user will open explicitly if desired
         // Ensure the expanded item is fully visible in the viewport (see scroll helper below)
         // Use a transitionend listener to ensure we scroll *after* the panel
         // is fully expanded (covers manual clicks as well as programmatic).
@@ -386,7 +747,7 @@ class EventAccordionManager {
     // Clear any existing timer for this item
     this._cancelAutoCollapse(accordionId);
 
-    const item = document.querySelector(`.events-accordion-item[data-accordion-id="${accordionId}"]`);
+    const item = document.querySelector('.events-accordion-item[data-accordion-id="' + accordionId + '"]');
     if (!item) return;
 
     const timerId = setTimeout(() => {
@@ -448,6 +809,24 @@ class EventAccordionManager {
    * Refresh the accordion view with current table data
    */
   refresh() {
+    // Before re-render, collapse any open resolution panels to avoid leaking listeners
+    try {
+      const items = document.querySelectorAll('.events-accordion-item');
+      items.forEach((item) => {
+        const hasPanelFlag = item && item.dataset && item.dataset.hasResolutionPanel === '1';
+        const hasPanelDom = item && (item.querySelector('.resolution-panel-container') || item.querySelector('.resolution-panel-expander'));
+        if (hasPanelFlag || hasPanelDom) {
+          const id = item.dataset && item.dataset.accordionId;
+          if (id) {
+            this.collapseResolutionPanel(id);
+          } else {
+            // Fallback: ensure any collapse triggers are removed
+            this._removePanelCollapseTriggers(item);
+          }
+        }
+      });
+    } catch (_) {}
+
     // Re-render the accordion
     this.renderAccordion();
     this.applySortingWithAnimation();
@@ -460,7 +839,7 @@ class EventAccordionManager {
     
     // Restore expanded state
     [...this.expandedItems].forEach(id => {
-      const item = document.querySelector(`.events-accordion-item[data-accordion-id="${id}"]`);
+      const item = document.querySelector(`[data-accordion-id="${id}"]`);
       if (item) {
         this.toggleAccordionItem(id, true);
       }
@@ -505,6 +884,8 @@ class EventAccordionManager {
     // Also sort the table (without notification to avoid recursion)
     const tbody = document.querySelector('#Events tbody');
     if (tbody && window.RowSorter) {
+      // Close any open inline resolution panels in the table before DOM reorder
+      try { tableManager && tableManager.collapseAllResolutionPanels && tableManager.collapseAllResolutionPanels(); } catch (_) {}
       window.RowSorter.sortRows(tbody, tableManager.sortKeys);
     }
 
@@ -617,10 +998,62 @@ class EventAccordionManager {
         dropdownEl,
         options: optionObjects,
         selectedValue: event.type,
-        onSelect: (newType, label) => {
-          if (newType !== event.type) {
+        onSelect: async (val, label) => {
+          // Handle Relocation (MV) specially to open country selection modal in card mode
+          if (val === 'MV' && this.webUI && this.webUI.eventsTableManager) {
+            const etm = this.webUI.eventsTableManager;
+            // If underlying table row for this accordion event is empty NOP, mark for replacement
+            try {
+              const rowRef = this.findTableRowForEvent(event);
+              const wasEmpty = rowRef && typeof etm.isEventEmpty === 'function' ? etm.isEventEmpty(rowRef) : false;
+              if (wasEmpty) {
+                etm.pendingEmptyRowForReplacement = rowRef;
+              }
+            } catch (_) {}
+
+            // Open country selection using centralized modal
+            etm.showCountrySelectionModal((code, name) => {
+              const full = `MV-${code.toUpperCase()}`;
+              // Sync to table without defaults and update local state/label
+              this.syncFieldToTableWithoutDefaults(event, '.event-type', full);
+              event.type = full;
+              if (toggleEl) toggleEl.textContent = `→ ${name}`;
+
+              // Honor wizard toggle: if off, stop here; fields stay blank
+              if (!etm.isEventsWizardEnabled()) {
+                return;
+              }
+
+              // Preload destination ruleset so currency/inflation are available immediately
+              try {
+                const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
+                if (cfg && typeof cfg.getTaxRuleSet === 'function') {
+                  Promise.resolve(cfg.getTaxRuleSet(code.toLowerCase()))
+                    .catch(() => {})
+                    .finally(() => {
+                      // Launch MV wizard with destination context; name remains optional
+                      etm.startWizardForEventType('MV', {
+                        eventType: full,
+                        destCountryCode: code,
+                        destCountryName: name
+                      });
+                    });
+                  return;
+                }
+              } catch (_) {}
+              // Fallback: start wizard without preloading if cfg not ready
+              etm.startWizardForEventType('MV', {
+                eventType: full,
+                destCountryCode: code,
+                destCountryName: name
+              });
+            });
+            return;
+          }
+
+          if (val !== event.type) {
             // Update the hidden input
-            typeInput.value = newType;
+            typeInput.value = val;
 
             // Clear any validation errors for the dropdown
             this.clearFieldValidation(typeInput);
@@ -629,10 +1062,10 @@ class EventAccordionManager {
             const currentValues = this.preserveCurrentFieldValues(container);
 
             // Update the table with the new event type (without setting defaults)
-            this.syncFieldToTableWithoutDefaults(event, '.event-type', newType);
+            this.syncFieldToTableWithoutDefaults(event, '.event-type', val);
 
             // Update the event object for immediate UI refresh
-            event.type = newType;
+            event.type = val;
 
             // Update field visibility in accordion view without regenerating
             this.updateAccordionFieldVisibility(container, event, currentValues);
@@ -644,7 +1077,7 @@ class EventAccordionManager {
             const accordionItem = container.closest('.events-accordion-item');
             if (accordionItem) {
               accordionItem.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market');
-              const newColorClass = this.getEventColorClass(newType);
+              const newColorClass = this.getEventColorClass(val);
               if (newColorClass) {
                 accordionItem.classList.add(newColorClass);
               }
@@ -978,7 +1411,7 @@ class EventAccordionManager {
    */
   handleEventTypeChange(event, newType) {
     // Get the wizard manager
-    const wizardManager = this.webUI.eventWizardManager;
+    const wizardManager = (this.webUI.eventsWizard && this.webUI.eventsWizard.manager) || this.webUI.eventsWizard;
     if (!wizardManager) {
       console.error('Wizard manager not available');
       return;
@@ -1036,6 +1469,26 @@ class EventAccordionManager {
 
     // Update the stored original event type
     tableRow.dataset.originalEventType = wizardData.eventType || '';
+
+    // For MV-* ensure visible label shows as arrow + country in table dropdown
+    try {
+      const tVal = wizardData && wizardData.eventType;
+      if (tVal && typeof tVal === 'string' && tVal.indexOf('MV-') === 0) {
+        const code = tVal.substring(3).toLowerCase();
+        const countries = Config.getInstance().getAvailableCountries();
+        const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
+        const label = match ? `→ ${match.name}` : tVal;
+        const toggleEl = tableRow.querySelector(`#EventTypeToggle_${tableRow.dataset.rowId}`);
+        if (toggleEl) toggleEl.textContent = label;
+        const dropdown = tableRow._eventTypeDropdown;
+        if (dropdown) {
+          const baseOpts = this.webUI.eventsTableManager.getEventTypeOptionObjects();
+          const synthetic = match ? { value: tVal, label, description: `Relocation to ${match.name}` } : { value: tVal, label: tVal };
+          const opts = baseOpts.find(o => o.value === tVal) ? baseOpts : baseOpts.concat([synthetic]);
+          try { dropdown.setOptions(opts); } catch (_) {}
+        }
+      }
+    } catch (_) {}
 
     // Refresh accordion to show updated data
     this.refresh();
@@ -1116,6 +1569,20 @@ class EventAccordionManager {
         if (matchingRow) {
           matchingRow.remove();
           this.refresh(); // Refresh accordion after deletion
+          // Re-analyze relocation impacts after deletion and refresh badges/status
+          try {
+            if (Config.getInstance().isRelocationEnabled()) {
+              var events = this.webUI.readEvents(false);
+              var startCountry = this.webUI.eventsTableManager && this.webUI.eventsTableManager.getStartCountry ? this.webUI.eventsTableManager.getStartCountry() : undefined;
+              RelocationImpactDetector.analyzeEvents(events, startCountry);
+              if (this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.updateRelocationImpactIndicators === 'function') {
+                this.webUI.eventsTableManager.updateRelocationImpactIndicators(events);
+              }
+              this.webUI.updateStatusForRelocationImpacts(events);
+            // Ensure accordion view reflects latest table state
+            this.refresh();
+            }
+          } catch (_) { /* non-fatal */ }
         }
       }, 400); // Match the animation duration
     } else {
@@ -1164,7 +1631,6 @@ class EventAccordionManager {
           // Expand only if not already expanded to avoid a double-toggle that would
           // immediately collapse the item again when no empty row existed before.
           if (!this.expandedItems.has(accordionId)) {
-            console.debug('Expanding new wizard event with ID:', id, 'and accordionId:', accordionId);
             this.toggleAccordionItem(accordionId);
           }
           // Regardless of whether it was already expanded or just expanded now,
@@ -1200,8 +1666,9 @@ class EventAccordionManager {
    * Calculate optimal width for event type name column
    */
   calculateOptimalEventTypeWidth() {
-    // Get all possible event type labels
-    const eventTypeOptions = this.webUI.eventsTableManager?.getEventTypeOptionObjects() || [];
+    // Get all possible event type labels, but only after Config is initialized
+    let eventTypeOptions = [];
+    try { Config.getInstance(); eventTypeOptions = this.webUI.eventsTableManager?.getEventTypeOptionObjects() || []; } catch (_) { eventTypeOptions = []; }
 
     // Create a temporary element to measure text width
     const testElement = document.createElement('span');
@@ -1452,7 +1919,18 @@ class EventAccordionManager {
         if (toggleEl && dropdown && this.webUI.eventsTableManager) {
           // Get the label for the new event type
           const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects();
-          const selectedOption = optionObjects.find(opt => opt.value === value);
+          let selectedOption = optionObjects.find(opt => opt.value === value);
+          // If MV-* and not present in options, synthesize arrow label for display
+          if (!selectedOption && value && typeof value === 'string' && value.indexOf('MV-') === 0) {
+            try {
+              const code = value.substring(3).toLowerCase();
+              const countries = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance().getAvailableCountries() : [];
+              const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
+              if (match) {
+                selectedOption = { value: value, label: `→ ${match.name}`, description: `Relocation to ${match.name}` };
+              }
+            } catch (_) {}
+          }
 
           if (selectedOption) {
             // Update the visible toggle text
@@ -1461,10 +1939,12 @@ class EventAccordionManager {
             // Update the dropdown's selected state
             const dropdownContainer = tableRow.querySelector('.visualization-dropdown');
             if (dropdownContainer) {
+              // Remove selected class from all options
               dropdownContainer.querySelectorAll('[data-value]').forEach(el => {
                 el.classList.remove('selected');
               });
 
+              // Add selected class to the new option
               const newSelectedOption = dropdownContainer.querySelector(`[data-value="${value}"]`);
               if (newSelectedOption) {
                 newSelectedOption.classList.add('selected');
@@ -1601,7 +2081,18 @@ class EventAccordionManager {
     if (toggleEl && dropdown && this.webUI.eventsTableManager) {
       // Get the label for the new event type
       const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects();
-      const selectedOption = optionObjects.find(opt => opt.value === event.type);
+      let selectedOption = optionObjects.find(opt => opt.value === event.type);
+      // If MV-* and not present in options, synthesize arrow label for display
+      if (!selectedOption && event.type && typeof event.type === 'string' && event.type.indexOf('MV-') === 0) {
+        try {
+          const code = event.type.substring(3).toLowerCase();
+          const countries = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance().getAvailableCountries() : [];
+          const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
+          if (match) {
+            selectedOption = { value: event.type, label: `→ ${match.name}`, description: `Relocation to ${match.name}` };
+          }
+        } catch (_) {}
+      }
 
       if (selectedOption) {
         // Update the visible toggle text

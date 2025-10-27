@@ -315,10 +315,11 @@ test('Mini tour in table view highlights each first-row field', async ({ page })
     }
   });
 
-  // Iterate through the tour steps until the tour finishes
-  for (let guard = 0; guard < 30; guard++) { // safety guard
+  // Iterate through the tour steps until the tour finishes. Wait for first popover explicitly.
+  await frame.locator('.driver-popover').first().waitFor({ state: 'visible', timeout: 6000 });
+  for (let guard = 0; guard < 50; guard++) { // safety guard (mobile can be slower)
     // Wait for pop-over to appear
-    await frame.locator('.driver-popover').waitFor({ state: 'visible' });
+    await frame.locator('.driver-popover').first().waitFor({ state: 'visible', timeout: 4000 });
     // On some overview steps there might be no highlighted element – only check when present
     const highlightLocator = frame.locator('.driver-highlighted-element');
     if (await highlightLocator.count() > 0) {
@@ -388,8 +389,9 @@ test('Mini tour in accordion view auto-expands and collapses first event', async
   let expandedSeen = false;
 
   // Iterate through tour steps and ensure they point to first accordion item
-  for (let guard = 0; guard < 40; guard++) {
-    await frame.locator('.driver-popover').waitFor({ state: 'visible' });
+  for (let guard = 0; guard < 50; guard++) {
+    // Be tolerant on slower mobile emulation; wait up to 2s for the popover each step
+    await frame.locator('.driver-popover').waitFor({ state: 'visible', timeout: 2000 });
     const highlightLocator = frame.locator('.driver-highlighted-element');
     if (await highlightLocator.count() > 0) {
       await expect(highlightLocator).toBeVisible();

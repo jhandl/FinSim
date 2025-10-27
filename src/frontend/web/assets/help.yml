@@ -179,6 +179,14 @@ WizardSteps:
       side: "right"
       align: "center"
       
+  - element: "#StartCountryToggle"
+    tours: [full, mini]
+    card: startingPosition
+    popover:
+      description: "<p>Select your current country of residence.</p><p>This sets the active tax rules for calculations. You can add relocation events to change countries during the plan.</p>"
+      side: "right"
+      align: "start"
+
   - element: "#StartingAge"
     tours: [full, mini]
     card: startingPosition

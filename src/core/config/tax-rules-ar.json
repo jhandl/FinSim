@@ -1,0 +1,104 @@
+{
+  "country": "AR",
+  "countryName": "Argentina",
+  "version": "1.0",
+  "updateMessage": "",
+
+  "locale": {
+    "numberLocale": "es-AR",
+    "currencyCode": "ARS",
+    "currencySymbol": "$"
+  },
+
+  "inflationRate": 0.15,
+
+  "incomeTax": {
+    "name": "Impuesto a las Ganancias",
+    "personalAllowance": 0,
+    "taxCredits": {},
+    "bracketsByStatus": {
+      "single": {
+        "0": 0.05,
+        "500000": 0.09,
+        "1000000": 0.12,
+        "1500000": 0.15,
+        "2000000": 0.19,
+        "2500000": 0.23,
+        "3000000": 0.27,
+        "3500000": 0.31,
+        "4000000": 0.35
+      },
+      "married": {
+        "0": 0.05,
+        "750000": 0.09,
+        "1500000": 0.12,
+        "2250000": 0.15,
+        "3000000": 0.19,
+        "3750000": 0.23,
+        "4500000": 0.27,
+        "5250000": 0.31,
+        "6000000": 0.35
+      }
+    }
+  },
+
+  "socialContributions": [
+    {
+      "name": "ANSES",
+      "rate": 0.11,
+      "applicableIncomeTypes": ["employment"]
+    },
+    {
+      "name": "Obra Social",
+      "rate": 0.03,
+      "applicableIncomeTypes": ["employment"]
+    }
+  ],
+
+  "capitalGainsTax": {
+    "rate": 0.15,
+    "annualExemption": 0,
+    "allowLossOffset": true
+  },
+
+  "pensionRules": {
+    "minRetirementAgeState": 65,
+    "statePensionAge": 65,
+    "pensionSystem": {
+      "type": "state_only"
+    },
+    "contributionLimits": {},
+    "lumpSumTaxBands": {},
+    "minDrawdownRates": {}
+  },
+
+  "residencyRules": {
+    "postEmigrationTaxYears": 0,
+    "taxesForeignIncome": false
+  },
+
+  "investmentTypes": [
+    {
+      "key": "indexFunds",
+      "label": "Index Funds",
+      "taxation": {
+        "capitalGains": {
+          "rateRef": "capitalGainsTax.rate",
+          "allowLossOffset": true
+        }
+      }
+    },
+    {
+      "key": "shares",
+      "label": "Shares",
+      "taxation": {
+        "capitalGains": {
+          "rateRef": "capitalGainsTax.rate",
+          "allowLossOffset": true
+        }
+      }
+    }
+  ],
+
+  "pinnedIncomeTypes": ["incomeSalaries", "incomeStatePension", "incomeCash"]
+}

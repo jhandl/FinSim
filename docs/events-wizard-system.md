@@ -8,7 +8,7 @@ The Events Wizard System provides a guided, step-by-step interface for creating 
 
 ### Core Components
 
-#### 1. EventWizardManager (`src/frontend/web/components/EventWizardManager.js`)
+#### 1. WizardManager (`src/frontend/web/components/WizardManager.js`)
 - **Purpose**: Central orchestrator for wizard functionality
 - **Responsibilities**:
   - Loading wizard configuration from YAML
@@ -16,7 +16,7 @@ The Events Wizard System provides a guided, step-by-step interface for creating 
   - Handling step navigation and validation
   - Coordinating with other UI components
 
-#### 2. EventWizardRenderer (`src/frontend/web/components/EventWizardRenderer.js`)
+#### 2. WizardRenderer (`src/frontend/web/components/WizardRenderer.js`)
 - **Purpose**: Specialized rendering for complex wizard content types
 - **Responsibilities**:
   - Rendering period selection interfaces (fromAge/toAge)
@@ -56,7 +56,7 @@ The Events Wizard System provides a guided, step-by-step interface for creating 
 ### 1. Initialization
 ```javascript
 // Start wizard for specific event type
-eventWizardManager.startWizard('SI', prePopulatedData, onComplete);
+webUI.eventsWizard.startWizard('SI', prePopulatedData, onComplete);
 ```
 
 ### 2. Step Processing

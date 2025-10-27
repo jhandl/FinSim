@@ -481,11 +481,14 @@ class TestFramework {
         }
       }
 
-      // Record start time inside VM and run the simulation, then collect results
+      // Record start time inside VM and run the simulation, awaiting completion if async
       vm.runInContext('var start = Date.now();', this.simulationContext);
-      vm.runInContext('run(); simulationResults = { dataSheet, success, failedAt, executionTime: (Date.now()-start) }', this.simulationContext);
-
-      // Extract results from context
+      const runPromise = vm.runInContext('run()', this.simulationContext);
+      if (runPromise && typeof runPromise.then === 'function') {
+        await runPromise;
+      }
+      // Collect results after run() has completed
+      vm.runInContext('simulationResults = { dataSheet: dataSheet, success: success, failedAt: failedAt, executionTime: (Date.now()-start) }', this.simulationContext);
       const results = vm.runInContext('simulationResults', this.simulationContext);
 
       // Debug logging: Show simulation results including dataSheet info, final year, and final net worth

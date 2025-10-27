@@ -76,6 +76,12 @@ function serializeSimulation(ui) {
         economy_mode: ui.getValue('economy_mode')
     };
 
+    // Conditionally add StartCountry if relocation is enabled
+    const config = Config.getInstance();
+    if (config.isRelocationEnabled()) {
+      parameters.StartCountry = ui.getValue('StartCountry');
+    }
+
     // Format special values (percentages and booleans)
     for (const [key, value] of Object.entries(parameters)) {
         // Skip formatting if value is undefined or null

@@ -8,6 +8,9 @@ class Config {
     this.ui = ui;
     this.thisVersion = this.ui.getVersion();
     this._taxRuleSets = {}; // cache by country code (lowercase)
+    this._economicData = null;
+    this._simulationStartYear = null;
+    this._countryCodeToName = null; // lazy-built map for O(1) name lookup
     // defaultCountry will be loaded from config JSON (finsim-<version>.json).
   }
 
@@ -89,6 +92,11 @@ class Config {
           Config_instance.clearVersionAlert();
         }
 
+        Config_instance._simulationStartYear = new Date().getFullYear();
+        // Cache-bust economic data to ensure latest file is fetched
+        var dataUrl = '/src/core/config/findata.json?v=2025-10-18-1';
+        Config_instance._economicData = new EconomicData(dataUrl);
+
         // Preload default country's tax ruleset so core engine has it synchronously
         await Config_instance.getTaxRuleSet(Config_instance.getDefaultCountry());
       } catch (error) {
@@ -110,6 +118,8 @@ class Config {
       const jsonString = await this.ui.fetchUrl(url);
       const config = JSON.parse(jsonString);
       Object.assign(this, config);
+      // Invalidate derived maps so they rebuild against the loaded config
+      this._countryCodeToName = null;
     } catch (err) {
       console.error('Error loading configuration:', err);
       this.ui.showAlert("Can't load configuration file for version " + version);
@@ -133,6 +143,60 @@ class Config {
    */
   getApplicationName() {
     return this.applicationName || 'Financial Simulator';
+  }
+
+  /**
+   * Return whether relocation features are enabled in the loaded app config.
+   * Falls back to false if not set.
+   */
+  isRelocationEnabled() {
+    // Only enable when explicitly enabled AND a non-empty availableCountries list is provided in config
+    return (this.relocationFeatureEnabled === true)
+      && Array.isArray(this.availableCountries)
+      && this.availableCountries.length > 0;
+  }
+
+  /**
+   * Return the available countries array configured in the loaded app config.
+   * Falls back to a default array with the default country if not set.
+   */
+  getAvailableCountries() {
+    return Array.isArray(this.availableCountries) ? this.availableCountries : [{code: this.getDefaultCountry(), name: 'Default'}];
+  }
+
+  getEconomicData() {
+    return this._economicData;
+  }
+
+  getSimulationStartYear() {
+    return this._simulationStartYear;
+  }
+
+  getCountryMap() {
+    if (!this._countryCodeToName) {
+      var list = this.getAvailableCountries();
+      var map = {};
+      for (var i = 0; i < list.length; i++) {
+        var item = list[i] || {};
+        var code = (item.code || '').toString().trim().toLowerCase();
+        if (code) {
+          map[code] = item.name || code.toUpperCase();
+        }
+      }
+      this._countryCodeToName = map;
+    }
+    return this._countryCodeToName;
+  }
+
+  /**
+   * Return the country display name for a given code using availableCountries.
+   * Falls back to the uppercased code when not found.
+   */
+  getCountryNameByCode(code) {
+    var c = (code || '').toString().trim().toLowerCase();
+    if (!c) return '';
+    var map = this.getCountryMap();
+    return map[c] || c.toUpperCase();
   }
 
   /**
@@ -180,6 +244,53 @@ class Config {
   getCachedTaxRuleSet(countryCode) {
     const code = (countryCode || this.getDefaultCountry()).toLowerCase();
     return this._taxRuleSets ? this._taxRuleSets[code] || null : null;
+  }
+
+  /**
+   * Synchronize cached tax rulesets with the events in the scenario.
+   * Loads rulesets for countries referenced by MV-* events and startCountry.
+   * Discards cached rulesets for countries not referenced.
+   * Always keeps the default country ruleset loaded.
+   * @param {Array} events - Array of SimEvent objects
+   * @param {string} startCountry - The starting country code from scenario parameters
+   * @returns {Promise} Resolves when all required rulesets are loaded
+   */
+  async syncTaxRuleSetsWithEvents(events, startCountry) {
+    // Early exit when relocation feature is disabled
+    if (!this.isRelocationEnabled()) return Promise.resolve([]);
+    var required = new Set();
+    required.add(this.getDefaultCountry());
+    if (startCountry && typeof startCountry === 'string') {
+      required.add(startCountry.toLowerCase());
+    }
+
+    if (Array.isArray(events)) {
+      for (var i = 0; i < events.length; i++) {
+        var evt = events[i];
+        if (evt && typeof evt.type === 'string' && evt.type.indexOf('MV-') === 0) {
+          var code = evt.type.substring(3).toLowerCase();
+          if (code) {
+            required.add(code);
+          }
+        }
+      }
+    }
+
+    var cached = Object.keys(this._taxRuleSets || {});
+    for (var j = 0; j < cached.length; j++) {
+      if (!required.has(cached[j])) {
+        delete this._taxRuleSets[cached[j]];
+      }
+    }
+
+    var toLoad = [];
+    required.forEach(function (code) {
+      if (!this._taxRuleSets[code]) {
+        toLoad.push(this.getTaxRuleSet(code));
+      }
+    }.bind(this));
+
+    return Promise.all(toLoad);
   }
 
   newCodeVersion() {

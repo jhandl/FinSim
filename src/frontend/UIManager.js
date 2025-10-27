@@ -252,6 +252,19 @@ class UIManager {
       economyMode: this.ui.getValue("economy_mode")
     };
 
+    // Guard StartCountry access: only read from DOM when relocation is enabled; otherwise rely on default
+    try {
+      const cfg = Config.getInstance();
+      if (cfg && typeof cfg.isRelocationEnabled === 'function' && cfg.isRelocationEnabled()) {
+        params.StartCountry = this.ui.getValue('StartCountry');
+      } else {
+        params.StartCountry = undefined; // Simulator will fall back to cfg.getDefaultCountry()
+      }
+    } catch (_) {
+      // If Config isn't ready, leave StartCountry undefined and allow downstream fallbacks
+      params.StartCountry = undefined;
+    }
+
     // In deterministic mode, override volatility parameters to 0 to ensure fixed growth rates
     // This ensures equity classes receive 0 standard deviation and use only the mean growth rate
     if (params.economyMode === 'deterministic') {
@@ -394,22 +407,29 @@ class UIManager {
 
   validateRequiredFields(params) {
     // Check absolute minimum required fields to run a simulation
-    
+
     // Starting Age is mandatory
     if (!this.hasValue(params.startingAge)) {
       this.ui.setWarning("StartingAge", UIManager.REQUIRED_FIELD_MESSAGE);
       errors = true;
     }
-    
+
     // Target Age is mandatory
     if (!this.hasValue(params.targetAge)) {
       this.ui.setWarning("TargetAge", UIManager.REQUIRED_FIELD_MESSAGE);
       errors = true;
     }
-    
+
     // Retirement Age is mandatory
     if (!this.hasValue(params.retirementAge)) {
       this.ui.setWarning("RetirementAge", UIManager.REQUIRED_FIELD_MESSAGE);
+      errors = true;
+    }
+
+    // StartCountry is mandatory if relocation is enabled
+    const config = Config.getInstance();
+    if (config.isRelocationEnabled() && !this.hasValue(params.StartCountry)) {
+      this.ui.setWarning('StartCountry', UIManager.REQUIRED_FIELD_MESSAGE);
       errors = true;
     }
   }
@@ -417,6 +437,15 @@ class UIManager {
   readEvents(validate=true) {
     const events = [];
     const rows = this.ui.getTableData("Events", 6);
+
+    // Build list of visible event table rows to hydrate relocationImpact from dataset (web UI only)
+    let __visibleEventRows = null;
+    try {
+      if (typeof document !== 'undefined') {
+        __visibleEventRows = Array.from(document.querySelectorAll('#Events tbody tr'))
+          .filter(function(row) { return row && row.style.display !== 'none'; });
+      }
+    } catch (_) { /* Non-DOM environments (GAS) */ }
 
     for (const [i, [name, amount, fromAge, toAge, rate, match]] of rows.entries()) {
       const pos = name.indexOf(":");
@@ -461,7 +490,7 @@ class UIManager {
           "SM": "Stock Market"
         });
 
-        if (!valid.hasOwnProperty(type)) {
+        if (!(valid.hasOwnProperty(type) || /^MV-[A-Z]{2,}$/.test(type))) {
           const validTypesMsg = Object.keys(valid)
             .map(key => `${key} (${valid[key]})`)
             .join(", ");
@@ -497,12 +526,48 @@ class UIManager {
       }
 
 
-      events.push(new SimEvent(
+      const eventObj = new SimEvent(
         type, id, amount, processedFromAge,
         (processedToAge === "" && (type === "R" || type === "DBI")) ? 999 : processedToAge,
         (rate === "") ? undefined : rate,
         (match === "") ? undefined : match
-      ))
+      );
+      events.push(eventObj);
+
+      // Read hidden fields from DOM row (mirror accordion extraction)
+      try {
+        if (__visibleEventRows) {
+          const domRow = __visibleEventRows[events.length - 1];
+          if (domRow) {
+            const currencyInput = domRow.querySelector('.event-currency');
+            if (currencyInput && currencyInput.value) eventObj.currency = currencyInput.value;
+
+            const linkedCountryInput = domRow.querySelector('.event-linked-country');
+            if (linkedCountryInput && linkedCountryInput.value) eventObj.linkedCountry = linkedCountryInput.value;
+
+            const linkedEventIdInput = domRow.querySelector('.event-linked-event-id');
+            if (linkedEventIdInput && linkedEventIdInput.value) eventObj.linkedEventId = linkedEventIdInput.value;
+
+            const overrideInput = domRow.querySelector('.event-resolution-override');
+            if (overrideInput && overrideInput.value) eventObj.resolutionOverride = overrideInput.value;
+          }
+        }
+      } catch (_) { /* never block readEvents on hidden-field hydration */ }
+
+      // Hydrate relocationImpact from corresponding DOM row dataset if available
+      try {
+        if (__visibleEventRows) {
+          const domRow = __visibleEventRows[events.length - 1];
+          if (domRow && domRow.dataset && domRow.dataset.relocationImpact === '1') {
+            eventObj.relocationImpact = {
+              category: domRow.dataset.relocationImpactCategory || '',
+              message: domRow.dataset.relocationImpactMessage || '',
+              autoResolvable: domRow.dataset.relocationImpactAuto === '1',
+              mvEventId: domRow.dataset.relocationImpactMvId || undefined
+            };
+          }
+        }
+      } catch (_) { /* never block readEvents on hydration */ }
     }
 
     if (validate) {
@@ -745,6 +810,13 @@ class UIManager {
   }
 
   static getRequiredFields(eventType) {
+    if (eventType && eventType.indexOf('MV-') === 0 && eventType.length > 3) {
+      const pattern = 'rrr-o-'.split('');
+      return Object.fromEntries(UIManager.getFields().map((field, i) => [
+        field,
+        pattern[i] === 'r' ? 'required' : pattern[i] === 'o' ? 'optional' : 'hidden'
+      ]));
+    }
     // r=required, o=optional, -=hidden
     const patterns = {
       'NOP': 'oooooo',

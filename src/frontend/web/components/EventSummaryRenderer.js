@@ -30,12 +30,16 @@ class EventSummaryRenderer {
     }
     const period = this.formatPeriod(event.fromAge, event.toAge);
 
+    const hasImpact = event.relocationImpact;
+    const impactIcon = hasImpact ? '<i class="fa-solid fa-triangle-exclamation"></i>' : '';
+    const impactCategory = hasImpact ? event.relocationImpact.category : '';
+
     return `
       <div class="event-summary">
         <div class="event-summary-header">
           <div class="event-summary-main">
             <div class="event-summary-name">
-              <span class="event-name">${eventTypeInfo.label}</span>
+              ${hasImpact ? `<span class="relocation-impact-badge accordion-impact-badge" data-impact-category="${impactCategory}">${impactIcon}</span>` : ''}<span class="event-name">${eventTypeInfo.label}</span>
             </div>
             <div class="event-summary-badge">
               <span class="event-type-badge">${this.escapeHtml(event.name || '—')}</span>
@@ -148,6 +152,20 @@ class EventSummaryRenderer {
         };
       }
     }
+    // Special-case relocation MV-* to show arrow + country name
+    try {
+      if (typeof eventType === 'string' && eventType.indexOf('MV-') === 0) {
+        const code = eventType.substring(3).toLowerCase();
+        const countries = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance().getAvailableCountries() : [];
+        const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
+        if (match) {
+          return {
+            label: `→ ${match.name}`,
+            description: `Relocation to ${match.name}`
+          };
+        }
+      }
+    } catch (_) {}
     
     // Fallback mapping
     const typeMap = {
@@ -218,9 +236,9 @@ class EventSummaryRenderer {
    * Only salary events WITH pension contributions show this field
    */
   showsEmployerMatchField(eventType) {
-    // Only salary events WITH pension and NOP show employer match field.
-    // SInp and SI2np (salary WITHOUT pension) don't show this field.
-    return ['SI', 'SI2', 'NOP'].includes(eventType);
+    // Only salary events WITH pension show this field. Explicitly hide for MV-* and NOP during debugging.
+    if (typeof eventType === 'string' && eventType.indexOf('MV-') === 0) return false;
+    return ['SI', 'SI2'].includes(eventType);
   }
 
   /**
@@ -243,7 +261,8 @@ class EventSummaryRenderer {
    * Based on actual simulation behavior and event type meanings
    */
   showsToAgeField(eventType, event = null) {
-    // Always show To Age field. For one-off expenses, it will equal From Age.
+    // Hide To Age for relocation MV-*; otherwise show (one-off expenses may equal fromAge)
+    if (typeof eventType === 'string' && eventType.indexOf('MV-') === 0) return false;
     return true;
   }
 

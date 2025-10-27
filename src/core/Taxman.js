@@ -125,8 +125,9 @@ class Taxman {
     return gross - totalTax;
   };
   
-  reset(person1, person2_optional, attributionManager) {
+  reset(person1, person2_optional, attributionManager, currentCountry, year) {
     this.attributionManager = attributionManager;
+    this.currentYear = (typeof year === 'number') ? year : (this.currentYear || null);
     this.gains = {};
     this.income = 0;
     this.nonEuShares = 0;
@@ -155,19 +156,73 @@ class Taxman {
 
     this.people = this.person1Ref ? (this.person2Ref ? 2 : 1) : 0;
 
-    this.married = ((typeof params.marriageYear === 'number') && (params.marriageYear > 0) && (year >= params.marriageYear));
+    this.married = ((typeof params.marriageYear === 'number') && (params.marriageYear > 0) && (typeof this.currentYear === 'number') && (this.currentYear >= params.marriageYear));
     
     if ((typeof params.oldestChildBorn === 'number') || (typeof params.youngestChildBorn === 'number')) {
       let dependentStartYear = (typeof params.oldestChildBorn === 'number' ? params.oldestChildBorn : params.youngestChildBorn);
       let dependentEndYear = (typeof params.youngestChildBorn === 'number' ? params.youngestChildBorn : params.oldestChildBorn) + 18;
-      this.dependentChildren = (isBetween(year, dependentStartYear, dependentEndYear));
+      this.dependentChildren = ((typeof this.currentYear === 'number') && isBetween(this.currentYear, dependentStartYear, dependentEndYear));
     } else {
       this.dependentChildren = false;
     }
     // Load the active ruleset (IE). Tests and WebUI preload it into Config for sync use.
     const cfg = Config.getInstance();
-    this.ruleset = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
+    var countryCode = currentCountry || cfg.getDefaultCountry();
+    this.ruleset = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(countryCode) : null;
+    if (!this.ruleset) {
+      console.error(`TaxRuleSet not found for ${countryCode}`);
+    }
+    // Track country history for cross-border taxation
+    if (!this.countryHistory) this.countryHistory = [];
+    if (currentCountry && (typeof this.currentYear === 'number')) {
+      var lastEntry = this.countryHistory[this.countryHistory.length - 1];
+      if (!lastEntry || lastEntry.country !== currentCountry) {
+        this.countryHistory.push({ country: currentCountry, fromYear: this.currentYear });
+      }
+    }
   };
+
+  /**
+   * Check if any previous countries have active post-emigration tax obligations.
+   * Returns array of countries with active trailing taxation, or empty array.
+   * Future phases will use this to apply multi-country tax rules.
+   */
+  getActiveCrossBorderTaxCountries() {
+    if (!this.countryHistory || this.countryHistory.length <= 1) return [];
+    if (!this.ruleset) return [];
+    
+    var active = [];
+    var currentYear = (typeof this.currentYear === 'number') ? this.currentYear : null;
+    if (currentYear === null) return [];
+    var currentCountry = this.countryHistory[this.countryHistory.length - 1].country;
+    
+    // Check each previous country for trailing tax obligations
+    for (var i = 0; i < this.countryHistory.length - 1; i++) {
+      var entry = this.countryHistory[i];
+      var exitYear = this.countryHistory[i + 1].fromYear;
+      var yearsSinceExit = currentYear - exitYear;
+      // Load the previous country's ruleset to check residency rules
+      var cfg = Config.getInstance();
+      var prevRuleset = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(entry.country) : null;
+      if (!prevRuleset) continue;
+      
+      var residencyRules = prevRuleset.getResidencyRules();
+      var trailingYears = residencyRules.postEmigrationTaxYears || 0;
+      var taxesForeign = residencyRules.taxesForeignIncome || false;
+      
+      if (trailingYears > 0 && yearsSinceExit < trailingYears && taxesForeign) {
+        active.push({
+          country: entry.country,
+          exitYear: exitYear,
+          yearsSinceExit: yearsSinceExit,
+          remainingYears: trailingYears - yearsSinceExit,
+          ruleset: prevRuleset
+        });
+      }
+    }
+    
+    return active;
+  }
 
   resetTaxAttributions() {
     // Reset tax attributions to prevent double-counting when taxes are recomputed multiple times in the same year
@@ -381,6 +436,51 @@ class Taxman {
     } else {
       // Apply credits exactly once as a negative record against band taxes already recorded above
       this._recordTax('incomeTax', 'Tax Credit', -Math.min(tax, credit));
+    }
+
+    // Minimal cross-border trailing income tax application
+    // Apply trailing countries' income tax using their ruleset on non-employment and pension income
+    const trailing = this.getActiveCrossBorderTaxCountries();
+    if (trailing && trailing.length > 0) {
+      const baseMap = {};
+      // Start from the generic income attribution
+      const incAttr = this.attributionManager.getAttribution('income');
+      if (incAttr) {
+        const bd = incAttr.getBreakdown();
+        for (const k in bd) baseMap[k] = (baseMap[k] || 0) + bd[k];
+      }
+      // Include non-EU shares attribution (common non-employment income bucket)
+      const neAttr = this.attributionManager.getAttribution('nonEuShares');
+      if (neAttr) {
+        const bd2 = neAttr.getBreakdown();
+        for (const k in bd2) baseMap[k] = (baseMap[k] || 0) + bd2[k];
+      }
+      // Remove salary sources to focus on non-employment income
+      var removeSalary = function(list) {
+        list.forEach(function(s) {
+          if (s && s.description && baseMap.hasOwnProperty(s.description)) delete baseMap[s.description];
+        });
+      };
+      removeSalary(this.salariesP1);
+      removeSalary(this.salariesP2);
+      // Ensure private pension income is included explicitly
+      if (this.privatePensionP1 > 0) baseMap['Private Pension P1'] = (baseMap['Private Pension P1'] || 0) + this.privatePensionP1;
+      if (this.privatePensionP2 > 0) baseMap['Private Pension P2'] = (baseMap['Private Pension P2'] || 0) + this.privatePensionP2;
+
+      // Convert consolidated map to an Attribution for progressive computation
+      const xAttr = new Attribution('crossBorderIncome');
+      for (const src in baseMap) {
+        var val = baseMap[src];
+        if (val !== 0) xAttr.add(src, val);
+      }
+
+      // Compute tax for each trailing country using its own bands; no credits/currency conversion here
+      var status = this.married ? 'married' : 'single';
+      for (var i = 0; i < trailing.length; i++) {
+        var t = trailing[i];
+        var bands = t.ruleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
+        this.computeProgressiveTax(bands, xAttr, 'incomeTax:' + t.country);
+      }
     }
   };
 
@@ -703,6 +803,10 @@ class Taxman {
 
     copy.married = this.married;
     copy.dependentChildren = this.dependentChildren;
+    
+    // Preserve cross-border tracking and temporal context in clone
+    copy.countryHistory = Array.isArray(this.countryHistory) ? this.countryHistory.slice() : [];
+    copy.currentYear = this.currentYear || null;
     
     copy.attributionManager = {
       record: function() {},

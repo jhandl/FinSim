@@ -112,7 +112,7 @@ class FileManager {
     const fileInput = document.getElementById('loadSimulationDialog');
     try {
       const content = await file.text();
-      this.loadFromString(content, scenarioName);
+      await this.loadFromString(content, scenarioName);
       this.updateLastSavedState(); // Ensure this is here
     } catch (error) {
       console.error(error);
@@ -134,7 +134,7 @@ class FileManager {
     
     try {
       const content = await this.fetchUrl(url); // ensure await here
-      this.loadFromString(content, name);
+      await this.loadFromString(content, name);
       this.updateLastSavedState(); // Update state after successful load and UI update
     } catch (error) {
       // Handle or propagate error, e.g., show a notification via webUI
@@ -144,7 +144,7 @@ class FileManager {
     }
   }
 
-  loadFromString(content, name) {
+  async loadFromString(content, name) {
     this.webUI.clearAllWarnings();
     this.webUI.tableManager.clearContent('Events');
     this.webUI.tableManager.clearExtraDataRows(0);
@@ -202,7 +202,55 @@ class FileManager {
         this.webUI.eventAccordionManager.refresh();
       }
     }
+
+    // Preload tax rulesets for any relocation events in the loaded scenario
+    try {
+      var config = Config.getInstance();
+      // Guard StartCountry access: only read when relocation is enabled; else use default
+      var startCountry;
+      try {
+        if (config && typeof config.isRelocationEnabled === 'function' && config.isRelocationEnabled()) {
+          startCountry = this.webUI.getValue('StartCountry');
+        } else {
+          startCountry = config.getDefaultCountry && config.getDefaultCountry();
+        }
+      } catch (_) {
+        startCountry = config.getDefaultCountry && config.getDefaultCountry();
+      }
+      var loadedEvents = (this.webUI && typeof this.webUI.readEvents === 'function')
+        ? this.webUI.readEvents(false)
+        : (new UIManager(this.webUI)).readEvents(false);
+      await config.syncTaxRuleSetsWithEvents(loadedEvents, startCountry);
+    } catch (err) {
+      console.error('Error preloading tax rulesets:', err);
+    }
+
     this.webUI.setStatus("Ready");
+
+    // Check for relocation impacts and update status accordingly
+    try {
+      const uiManager = new UIManager(this.webUI);
+      const events = uiManager.readEvents(false);
+      // Analyze impacts immediately after load so badges/status reflect current state
+      try {
+        const startCountry = (this.webUI && this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.getStartCountry === 'function')
+          ? this.webUI.eventsTableManager.getStartCountry()
+          : (Config.getInstance && Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
+        if (typeof RelocationImpactDetector !== 'undefined' && Config.getInstance().isRelocationEnabled()) {
+          RelocationImpactDetector.analyzeEvents(events, startCountry);
+          // Refresh badges from analyzed events
+          if (this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.updateRelocationImpactIndicators === 'function') {
+            this.webUI.eventsTableManager.updateRelocationImpactIndicators(events);
+          }
+          // Refresh accordion to reflect impacts on initial load
+          try { if (this.webUI.eventAccordionManager) { this.webUI.eventAccordionManager.refresh(); } } catch (_) {}
+        }
+      } catch (_) { /* non-fatal */ }
+      this.webUI.updateStatusForRelocationImpacts(events);
+    } catch (error) {
+      console.error('Error updating status for relocation impacts after loading:', error);
+      // Scenario loading continues normally even if status update fails
+    }
   }
 
   async fetchUrl(url) {

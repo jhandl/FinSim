@@ -1742,6 +1742,38 @@ footer {
     margin-left: 0.25rem;
 }
 
+/* Status indicator clickable when showing relocation impacts */
+.status-indicator.relocation-impact {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.status-indicator.relocation-impact:hover {
+    background-color: #f0f0f0;
+}
+
+/* Render warning icon for relocation impacts (status only) */
+.status-indicator.relocation-impact::before {
+    content: "\f071"; /* Font Awesome exclamation-triangle */
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    color: #e67e22; /* orange */
+    margin-right: 0.4rem;
+    font-size: 0.9rem;
+    vertical-align: baseline;
+}
+
+/* Mobile menu mirrored status: use same icon and color when synced */
+.mobile-menu-status.relocation-impact::before {
+    content: "\f071";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    color: #e67e22;
+    margin-right: 0.4rem;
+    font-size: 0.9rem;
+    vertical-align: baseline;
+}
+
 /* Mobile responsive modal */
 @media (max-width: 768px) {
     .modal-content {
@@ -2363,9 +2395,8 @@ footer {
         inset 0 -1px 0 0 rgba(0, 0, 0, 0.3) !important; /* Bottom border */
 }
 
-/* Fix border visibility for sticky headers */
-#Data thead tr:last-child th:nth-child(1),
-#Data thead tr:last-child th:nth-child(2) {
+/* Fix border visibility for sticky headers: apply to all second-row headers */
+#Data thead tr:last-child th {
     border-bottom: 3px solid #666;
 }
 
@@ -2473,6 +2504,9 @@ footer {
   position: relative;
   user-select: none;
   color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pseudo-select::after {
@@ -2565,10 +2599,87 @@ footer {
 /* Events Accordion Styles */
 .events-accordion-container {
     display: none; /* Hidden by default, shown when accordion view is active */
-    margin-top: 1rem;
+    margin-top: 0.675rem; /* match table-view spacing under card header */
 }
 
 
+
+.events-accordion-header {
+    /* Match table header block spacing: no side padding, white gap below */
+    padding: 0 0 0.25rem 0; /* create white space under the grey header block */
+}
+
+.accordion-header-row {
+    display: flex;
+    align-items: center; /* vertically center header labels in the grey block */
+    gap: 0.75rem;
+    background-color: #f5f5f5; /* exact same grey as table headers */
+    padding: 0.225rem 0.18rem; /* match #Events th padding */
+}
+
+.accordion-header-left,
+.accordion-header-right {
+    width: 32px; /* matches expand/delete button width for alignment */
+    flex-shrink: 0;
+}
+
+/* Grid mirroring event-summary-main to align columns */
+.accordion-header-main {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, var(--event-type-width, 140px)) 120px 90px 100px; /* align with event-summary-main */
+    align-items: center;
+    gap: 0.5rem;
+    color: #495057;
+    font-weight: 500;
+}
+
+.events-accordion-container.year-mode .accordion-header-main {
+    grid-template-columns: var(--event-type-width, 140px) 120px 90px 120px; /* longer period label */
+}
+
+.accordion-header-main .accordion-col {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.accordion-header-main .sortable {
+    cursor: pointer;
+    position: relative;
+}
+
+.accordion-header-main .sortable .sort-caret {
+    opacity: 0.6;
+    transition: transform 0.2s, opacity 0.2s;
+    margin-left: 2px;
+    font-size: 0.7rem;
+}
+
+.accordion-header-main .sortable:hover .sort-caret {
+    opacity: 0.5;
+}
+
+.accordion-header-main .sorted-asc,
+.accordion-header-main .sorted-desc {
+    background: #f1f6ff;
+}
+
+.accordion-header-main .sorted-asc .sort-caret {
+    transform: rotate(180deg);
+    opacity: 1;
+}
+
+.accordion-header-main .sorted-desc .sort-caret {
+    transform: rotate(0deg);
+    opacity: 1;
+}
+
+/* When wrapping is necessary for items, hide header to avoid misalignment */
+.events-accordion-container.force-wrap .events-accordion-header {
+    display: none;
+}
 
 .accordion-header-content {
     display: flex;
@@ -2707,6 +2818,7 @@ footer {
     font-size: 1rem;
     font-style: normal;
     font-weight: bold;
+    transform-origin: 50% 50%;
 }
 
 .accordion-expand-btn:hover {
@@ -2714,7 +2826,7 @@ footer {
 }
 
 .accordion-expand-btn.expanded {
-    transform: rotate(45deg);
+    transform: rotate(90deg);
 }
 
 .accordion-delete-btn {
@@ -2806,7 +2918,7 @@ footer {
     flex: 1;
     min-width: 0;
     display: grid;
-    grid-template-columns: var(--event-type-width, 140px) 120px 90px 100px;
+    grid-template-columns: minmax(0, var(--event-type-width, 140px)) 120px 90px 100px; /* allow first cell to shrink */
     align-items: center;
     gap: 0.5rem;
 }
@@ -2820,6 +2932,12 @@ footer {
 .event-summary-name {
     justify-self: start;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px; /* space between impact icon and type text */
+    min-width: 0; /* allow truncation within grid cell */
+    overflow: hidden; /* prevent spill into next column */
+    margin-left: -8px; /* nudge type and impact icon closer to + control */
 }
 
 .event-summary-badge {
@@ -2829,6 +2947,7 @@ footer {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 120px; /* Match the grid column width */
+    margin-left: 6px; /* ensure visual separation from event type */
 }
 
 .event-summary-amount {
@@ -2856,6 +2975,16 @@ footer {
     display: inline;
     text-align: left;
     justify-self: auto;
+}
+
+/* Maintain left nudge in force-wrap mode as well */
+.events-accordion-container.force-wrap .event-summary-name {
+    margin-left: -8px;
+}
+
+/* Keep spacing when forced wrap switches layout */
+.events-accordion-container.force-wrap .event-summary-badge {
+    margin-left: 6px;
 }
 
 /* Ensure badge truncation works in force-wrap mode */
@@ -2900,6 +3029,14 @@ footer {
 .event-name {
     color: var(--text-color);
     font-size: 1rem;
+}
+/* Keep name aligned with badge without inline styles */
+.event-summary-name .event-name {
+    display: inline-block;
+    vertical-align: middle;
+    overflow: hidden;            /* clip long type labels */
+    text-overflow: ellipsis;     /* show ellipsis when clipped */
+    white-space: nowrap;         /* keep on one line */
 }
 
 .event-type-badge {
@@ -3385,6 +3522,9 @@ footer {
 .event-type-dd .pseudo-select {
     min-width: 190px;
     max-width: 190px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* When button is shown, dropdown takes remaining width but right edge stays aligned */
@@ -3395,5 +3535,642 @@ footer {
 .event-type-dd.has-wizard-icons .pseudo-select {
     min-width: 158px; /* 190px - 28px button - 4px gap = 158px */
     max-width: 158px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
+/* When impact badge is shown, dropdown takes remaining width */
+.event-type-dd.has-impact-badge {
+    flex: 1;
+}
+
+.event-type-dd.has-impact-badge .pseudo-select {
+    min-width: 158px; /* 190px - 28px badge - 4px gap = 158px */
+    max-width: 158px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* When both wizard icon and impact badge are shown */
+.event-type-dd.has-wizard-icons.has-impact-badge .pseudo-select {
+    min-width: 126px; /* 190px - 64px (two icons) = 126px */
+    max-width: 126px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Relocation impact badge styling - matches wizard icon pattern */
+.relocation-impact-badge {
+    font-size: 0.9rem;
+    line-height: 1;
+    user-select: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    width: 28px; /* Match wizard icon width exactly */
+    height: 24px; /* Match wizard icon height exactly */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    color: inherit;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: all 0.15s ease;
+    padding: 0; /* Override any default button padding */
+}
+
+/* Orange triangle icon for impact badges */
+.relocation-impact-badge i.fa-triangle-exclamation,
+.accordion-impact-badge i.fa-triangle-exclamation {
+    color: #e67e22; /* orange */
+}
+
+.relocation-impact-badge:hover {
+    background: #f5f5f5;
+    border-color: #adb5bd;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+.relocation-impact-badge:active {
+    background: #e8e8e8;
+    border-color: #adb5bd;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1) inset;
+    transform: translateY(0);
+}
+
+/* Accordion-specific badge spacing */
+.accordion-impact-badge {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 6px;
+    font-size: 1rem;
+    line-height: 1;
+    /* Render as a plain badge in accordion headers (not button-like) */
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    cursor: default !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+}
+
+/* --------------------------------------------------------------
+   Start Country dropdown (relocation) – align with form controls
+   -------------------------------------------------------------- */
+/* Ensure the wrapper behaves like other input rows */
+#startingPosition .start-country-dd {
+  display: inline-block;
+  margin-bottom: 0;            /* keep group spacing identical to others */
+}
+
+/* Match native select/input height and width used in parameters */
+#startingPosition #StartCountryToggle.pseudo-select {
+  min-width: 90px;            /* same visual width as numeric inputs in this card */
+  max-width: 90px;
+  height: 1.62rem;            /* lock height to match native select */
+  line-height: 1.62rem;       /* keep text vertically centered */
+  padding: 0 1.2rem 0 6px;    /* side padding only to avoid height drift */
+  display: inline-flex;       /* consistent centering on all platforms */
+  align-items: center;
+  font-weight: 400;           /* prevent height changes due to weight */
+}
+
+/* Ensure empty state has identical height by injecting an invisible character */
+#startingPosition #StartCountryToggle.pseudo-select:empty::before {
+  content: "\00a0"; /* non-breaking space to stabilize height */
+}
+
+/* Keep arrow placement consistent in the tighter control */
+#startingPosition #StartCountryToggle.pseudo-select::after {
+  right: 4px;
+}
+
+/* Country selection modal list styles */
+.country-list { max-height: 60vh; overflow: auto; }
+.country-option { padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #eee; }
+.country-option.hover { background: rgba(0,0,0,0.05); }
+.country-option.selected { outline: 2px solid #4a90e2; }
+.country-option .country-name { font-weight: 600; }
+.country-option .country-details { font-size: 12px; color: #666; }
+
+@media (max-width: 768px) {
+  .relocation-impact-badge {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+  }
+
+  .accordion-impact-badge {
+    display: inline-block; /* Ensure inline-block on mobile too */
+    vertical-align: middle;
+    font-size: 1.2rem;
+    min-width: 0; /* let content size naturally */
+    min-height: 0; /* let content size naturally */
+    margin-right: 8px;
+    line-height: 1;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    cursor: default !important;
+  }
+}
+
+/* ----------------------------------------------
+   Inline Resolution Panels
+   ---------------------------------------------- */
+
+/* Inline resolution panel for table view */
+.resolution-panel-row {
+  background: #f8f9fa;
+}
+
+.resolution-panel-row td {
+  padding: 0;
+  border: none;
+}
+
+/* Expander drives height animation to smoothly shift rows (TABLE view only) */
+.resolution-panel-row .resolution-panel-expander {
+  height: 0;
+  overflow: hidden;
+  transition: height 0.28s ease;
+}
+
+/* Expander drives height animation to smoothly shift content (ACCORDION view) */
+.accordion-item-content .resolution-panel-expander {
+  height: 0;
+  overflow: hidden;
+  transition: height 0.28s ease;
+}
+
+.resolution-panel-container {
+  border: 1px solid #e9ecef;
+  border-radius: 3px;
+  margin: 0.25rem; /* drastically reduced */
+  background: white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* Smooth fade/slide animation for panel content */
+.resolution-panel-container.panel-anim {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.22s ease-out, transform 0.22s ease-out;
+}
+
+.resolution-panel-container.panel-anim.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.resolution-panel-header {
+  padding: 0.35rem 0.5rem; /* drastically reduced */
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.resolution-panel-header h4 {
+  margin: 0;
+  font-size: 0.85rem; /* smaller */
+  color: #333;
+}
+
+.panel-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.2rem; /* smaller */
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 22px; /* smaller */
+  height: 22px; /* smaller */
+  line-height: 1;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.panel-close-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
+}
+
+.resolution-panel-body {
+  padding: 0.35rem 0.4rem;
+}
+
+.resolution-tab-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.35rem;
+  margin: 0.25rem 0 0.35rem;
+}
+
+.resolution-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.2rem;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #2b3035;
+  background: #f1f4f8;
+  border: 1px solid #d0d6dd;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  white-space: normal;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+}
+
+.resolution-tab:hover {
+  background: #e2edf9;
+  border-color: #95bde9;
+  color: #1a6ec1;
+}
+
+.resolution-tab:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(28, 126, 214, 0.25);
+}
+
+.resolution-tab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(28, 126, 214, 0.4);
+}
+
+.resolution-tab.resolution-tab-active {
+  background: #ffffff;
+  border-color: #1c7ed6;
+  color: #1c7ed6;
+  box-shadow: 0 0 0 2px rgba(28, 126, 214, 0.2);
+  cursor: default;
+}
+
+.resolution-details {
+  position: relative;
+}
+
+.resolution-detail {
+  border-top: 1px solid #e9ecef;
+  margin: 0;
+  padding: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.resolution-detail:first-of-type {
+  border-top: none;
+}
+
+.resolution-detail.resolution-detail-active {
+  pointer-events: auto;
+  padding-top: 0.3rem;
+  opacity: 1;
+}
+
+.resolution-detail-content {
+  font-size: 0.76rem;
+}
+
+.resolution-detail-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  margin-top: 0.3rem;
+}
+
+.resolution-detail-footer .event-wizard-button {
+  min-height: 32px;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.78rem;
+}
+
+.resolution-quick-action {
+  padding: 0.15rem 0;
+}
+
+.resolution-quick-action .micro-note {
+  margin-bottom: 0;
+}
+
+.impact-explanation {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.impact-explanation strong {
+  color: #856404;
+}
+
+.resolution-suggestions {
+  margin-bottom: 1rem;
+}
+
+.resolution-suggestions h5 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.resolution-panel-footer {
+  padding: 0.35rem 0.45rem;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+/* Resolution panel injected into accordion content */
+/* Removed accordion-specific visual overrides to unify appearance across views */
+
+@media (max-width: 768px) {
+  .resolution-panel-container {
+    margin: 0.25rem;
+  }
+
+  .resolution-panel-header,
+  .resolution-panel-body,
+  .resolution-panel-footer {
+    padding: 0.6rem;
+  }
+
+  .resolution-panel-footer {
+    flex-direction: column;
+  }
+
+  .resolution-panel-footer .event-wizard-button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .resolution-tab-strip {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.3rem;
+  }
+
+  .resolution-tab {
+    min-height: 2.4rem;
+    font-size: 0.82rem;
+  }
+
+  .resolution-detail-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+  }
+
+  .resolution-detail-footer .event-wizard-button {
+    width: 100%;
+    min-height: 42px;
+    padding: 0.4rem;
+  }
+
+  .panel-close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 1.8rem;
+  }
+}
+
+/* (Reverted previous attempt block intentionally removed) */
+
+/* Economic context in resolution panels */
+.economic-context-panel {
+  margin: 0.4rem 0; /* reduced */
+  padding: 0.4rem; /* reduced */
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+}
+
+/* Ultra-compact variant used in resolution panel */
+.economic-context-panel.compact {
+  margin: 0.25rem 0;
+  padding: 0.25rem;
+}
+
+.economic-context-panel h5 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 600;
+}
+
+.economic-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem; /* slightly smaller */
+  margin-bottom: 0.25rem; /* reduced */
+}
+
+.economic-data-table th,
+.economic-data-table td {
+  padding: 0.25rem; /* reduced */
+  text-align: left;
+  border-bottom: 1px solid #e9ecef;
+}
+
+/* Remove thead spacing and lighten style for compact layout */
+.economic-data-table thead th {
+  font-weight: 600;
+  background: #f9fafb;
+}
+
+.economic-data-table th {
+  font-weight: 600;
+  color: #555;
+  background: #fafafa;
+}
+
+.economic-data-table td {
+  color: #666;
+}
+
+.conversion-preview {
+  padding: 0.5rem;
+  background: white;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.conversion-preview strong {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: #333;
+  font-size: 0.85rem;
+}
+
+.conversion-preview div {
+  margin: 0.25rem 0;
+  color: #555;
+}
+
+/* Split preview in resolution panel */
+.split-preview-inline {
+  margin: 0.5rem 0; /* reduced */
+  padding: 0.4rem; /* reduced */
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  text-align: center; /* center alignment as requested */
+}
+
+.split-preview-inline.compact {
+  margin: 0.35rem 0;
+  padding: 0.3rem;
+}
+
+.split-preview-inline h5 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  color: #856404;
+}
+
+.split-parts-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem; /* tighter */
+  margin-bottom: 0.4rem; /* reduced */
+}
+
+.split-part-info {
+  padding: 0.35rem; /* reduced */
+  background: white;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.split-part-info .part-label {
+  font-weight: 600;
+  color: #856404;
+  margin-bottom: 0.25rem; /* reduced */
+}
+
+.split-part-info .part-detail {
+  margin: 0.15rem 0; /* reduced */
+  color: #666;
+}
+
+/* Unified input styling for split preview across table (inside #Events) and accordion */
+.split-preview-inline .part2-amount-input,
+#Events .split-preview-inline .part2-amount-input {
+  width: 100%;
+  padding: 0.3rem; /* consistent */
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  height: auto;
+  margin-top: 0.15rem; /* tight */
+  background: #fff;
+  box-sizing: border-box;
+  min-width: 0; /* override table defaults */
+  max-width: none; /* override table defaults */
+}
+
+.ppp-hint {
+  font-size: 0.72rem; /* slightly smaller */
+  color: #856404;
+  margin-top: 0.15rem; /* reduced */
+  font-style: italic;
+}
+
+/* Suggestion comparison in resolution panel */
+.suggestion-comparison {
+  margin: 0.5rem 0; /* reduced */
+  padding: 0.4rem; /* reduced */
+  background: #e7f3ff;
+  border: 1px solid #b3d9ff;
+  border-radius: 4px;
+}
+
+.suggestion-comparison .comparison-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.25rem 0; /* reduced */
+  font-size: 0.82rem; /* slightly smaller */
+}
+
+.suggestion-comparison .comparison-label {
+  color: #666;
+  font-weight: 600;
+}
+
+.suggestion-comparison .comparison-value {
+  color: #333;
+}
+
+.suggestion-comparison .difference {
+  margin-top: 0.3rem; /* reduced */
+  padding-top: 0.3rem; /* reduced */
+  border-top: 1px solid #b3d9ff;
+  font-size: 0.8rem;
+  color: #0066cc;
+  font-weight: 600;
+}
+
+/* Small helper note text */
+.micro-note { font-size: 0.78rem; margin: 0.2rem 0 0; color: #555; }
+
+/* Inline country selector in property resolution panel */
+.country-selector-inline {
+  margin: 0.5rem 0; /* reduced */
+}
+
+.country-selector-inline label {
+  display: block;
+  margin-bottom: 0.25rem; /* reduced */
+  font-weight: 600;
+  color: #333;
+  font-size: 0.85rem;
+}
+
+.country-selector-inline select {
+  width: 100%;
+  padding: 0.35rem; /* reduced */
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: white;
+}
+
+@media (max-width: 768px) {
+  .split-parts-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .economic-data-table {
+    font-size: 0.75rem;
+  }
+  
+  .economic-data-table th,
+  .economic-data-table td {
+    padding: 0.3rem;
+  }
+  
+  .suggestion-comparison {
+    font-size: 0.8rem;
+  }
+}

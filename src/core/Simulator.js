@@ -18,6 +18,8 @@ var perRunResults, currentRun;
 var earnedNetIncome, householdPhase;
 // Stable tax ids for consistent Tax__... columns per run
 var stableTaxIds;
+// Country context for multi-country inflation application (currency is separate)
+var currentCountry, countryInflationOverrides;
 
 const Phases = {
   growth: 'growth',
@@ -25,8 +27,8 @@ const Phases = {
 }
 
 
-function run() {
-  if (!initializeSimulator()) {
+async function run() {
+  if (!(await initializeSimulator())) {
     // If initialization fails (validation errors), ensure UI state is reset
     uiManager.ui.flush();
     return;
@@ -74,14 +76,22 @@ function readScenario(validate) {
   return !errors;
 }
 
-function initializeSimulator() {
+async function initializeSimulator() {
   initializeUI();
   uiManager.setStatus("Initializing", STATUS_COLORS.INFO);
   config = Config.getInstance(uiManager.ui);
   revenue = new Taxman();
   attributionManager = new AttributionManager();
   dataSheet = [];
-  return readScenario(true);
+  if (!readScenario(true)) {
+    return false;
+  }
+
+  // Preload tax rulesets for all countries referenced in events (await to ensure readiness)
+  var startCountry = params.StartCountry || config.getDefaultCountry();
+  await config.syncTaxRuleSetsWithEvents(events, startCountry);
+
+  return true;
 }
 
 function saveToFile() {
@@ -102,7 +112,7 @@ function initializeSimulationVariables() {
   shares = new Shares(params.growthRateShares, params.growthDevShares);
   // Also create generic assets array (compat path: map first two to existing ones for IE)
   try {
-    var rs = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })();
+    var rs = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(params.StartCountry || config.getDefaultCountry()); } catch(_) { return null; } })();
     if (rs && typeof InvestmentTypeFactory !== 'undefined') {
       var growthMap = {
         indexFunds: params.growthRateFunds,
@@ -129,7 +139,7 @@ function initializeSimulationVariables() {
 
   // Initialize stable tax ids from ruleset for consistent Tax__ columns
   try {
-    var _rs = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })();
+    var _rs = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(params.StartCountry || config.getDefaultCountry()); } catch(_) { return null; } })();
     stableTaxIds = (_rs && typeof _rs.getTaxOrder === 'function') ? _rs.getTaxOrder() : ['incomeTax', 'capitalGains'];
   } catch (e) {
     stableTaxIds = ['incomeTax', 'capitalGains'];
@@ -179,6 +189,12 @@ function initializeSimulationVariables() {
   success = true;
   stockGrowthOverride = undefined;
 
+  // Initialize country context for multi-country support
+  // Note: event.currency is NOT used for inflation decisions; it's for display/conversion only
+  // Only event.rate (override), event.linkedCountry, and currentCountry determine inflation
+  currentCountry = params.StartCountry || config.getDefaultCountry();
+  countryInflationOverrides = {};
+
   initializeRealEstate();
 
   year = new Date().getFullYear() - 1;
@@ -188,8 +204,12 @@ function initializeSimulationVariables() {
 }
 
 function resetYearlyVariables() {
+  // Increment global year
+  year++;
+
   // Reset attribution manager for the new year
-  attributionManager.reset();
+  var baseCountry = params.StartCountry || config.getDefaultCountry();
+  attributionManager.reset(currentCountry, year, baseCountry);
 
   // Call Person-specific yearly variable resets
   person1.resetYearlyVariables();
@@ -218,11 +238,8 @@ function resetYearlyVariables() {
   person1.addYear();
   if (person2) person2.addYear();
   
-  // Increment global year
-  year++;
-
   // Pass Person objects to revenue reset (now using updated ages and year)
-  revenue.reset(person1, person2, attributionManager);
+  revenue.reset(person1, person2, attributionManager, currentCountry, year);
   
   // Add year to global investment objects
   indexFunds.addYear();
@@ -324,7 +341,28 @@ function processEvents() {
   // Second pass: Process all other events including real estate purchases
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
-    let amount = adjust(event.amount, event.rate);
+    // Determine inflation rate for this event based on country context
+    // IMPORTANT WARNING: Do NOT check event.currency here — currency is for display/conversion only (handled later).
+    // Correct inputs for inflation are ONLY (in priority order):
+    // 1) event.rate (explicit override)
+    // 2) event.linkedCountry (for location-tied events)
+    // 3) currentCountry (active residency country)
+    // Anti-pattern (DO NOT DO): if (event.currency) { inflationRate = 0; }
+    var inflationRate = event.rate; // explicit override takes precedence
+    if (inflationRate === null || inflationRate === undefined || inflationRate === '') {
+      // Choose country for inflation: location-tied events use linkedCountry; otherwise use currentCountry
+      var countryForInflation = event.linkedCountry || currentCountry;
+
+      // If user provided an override for this country's inflation via an MV-* event, use it
+      inflationRate = countryInflationOverrides[countryForInflation];
+
+      if (inflationRate === null || inflationRate === undefined) {
+        // Fallback to the country's ruleset default; final fallback to global params.inflation
+        var ruleset = config.getCachedTaxRuleSet(countryForInflation);
+        inflationRate = ruleset ? ruleset.getInflationRate() : params.inflation;
+      }
+    }
+    let amount = adjust(event.amount, inflationRate);
     // Default toAge to 999 if not required for this event type
     let inScope = (person1.age >= event.fromAge && person1.age <= (event.toAge || 999));
 
@@ -338,7 +376,7 @@ function processEvents() {
           incomeSalaries += amount;
           attributionManager.record('incomesalaries', event.id, amount);
           // Pension contribution age bands: prefer TaxRuleSet when available
-          var _rs1 = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })();
+          var _rs1 = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch(_) { return null; } })();
           var p1Bands = (_rs1 && typeof _rs1.getPensionContributionAgeBands === 'function') ? _rs1.getPensionContributionAgeBands() : {};
           let p1ContribRate = person1.pensionContributionPercentageParam * getRateForKey(person1.age, p1Bands);
 
@@ -378,7 +416,7 @@ function processEvents() {
           incomeSalaries += amount;
           attributionManager.record('incomesalaries', event.id, amount);
           // Pension contribution age bands (P2)
-          var _rs2 = _rs1 || (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })(); // reuse or fetch ruleset
+          var _rs2 = _rs1 || Config.getInstance().getCachedTaxRuleSet(currentCountry) || null;
           var p2Bands = (_rs2 && typeof _rs2.getPensionContributionAgeBands === 'function') ? _rs2.getPensionContributionAgeBands() : {};
           let p2ContribRate = person2.pensionContributionPercentageParam * getRateForKey(person2.age, p2Bands);
           
@@ -443,7 +481,7 @@ function processEvents() {
 
           // Load ruleset and fetch declared DBI treatment spec. There is NO
           // default — the ruleset must declare how DBI is to be treated.
-          var _rs_dbi = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(); } catch(_) { return null; } })();
+          var _rs_dbi = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch(_) { return null; } })();
           var dbiSpec = (_rs_dbi && typeof _rs_dbi.getDefinedBenefitSpec === 'function') ? _rs_dbi.getDefinedBenefitSpec() : null;
 
           if (!dbiSpec || !dbiSpec.treatment) {
@@ -525,6 +563,50 @@ function processEvents() {
         break;
 
       default:
+        // Handle relocation events generically: types like 'MV-xx' where xx is country code
+        if (typeof event.type === 'string' && event.type.indexOf('MV-') === 0) {
+          // Apply move at the starting age of the move window
+          if (person1.age === event.fromAge) {
+            // Determine countries
+            var prevCountry = currentCountry;
+            var destCountry = event.type.substring(3).toLowerCase();
+            var startCountry = (params.StartCountry || config.getDefaultCountry() || '').toLowerCase();
+
+            // Relocation cost inflation logic (SPECIAL CASE):
+            // Use inflation of the country whose currency the cost is expressed in.
+            // Allowed: destination, source (previous), or start country. Fallback to source if unspecified/invalid.
+            var currencyCode = (event.currency || '').toLowerCase();
+            var infCountry = null;
+            if (currencyCode === destCountry) {
+              infCountry = destCountry;
+            } else if (currencyCode === prevCountry || currencyCode === startCountry) {
+              infCountry = currencyCode;
+            } else {
+              // Fallback for unspecified/invalid currency: use source country
+              infCountry = prevCountry || startCountry;
+            }
+
+            // Compute relocation cost with appropriate country's inflation (consider overrides)
+            var reloRate = countryInflationOverrides && (countryInflationOverrides[infCountry] !== undefined)
+              ? countryInflationOverrides[infCountry]
+              : (function(){ var rs = config.getCachedTaxRuleSet(infCountry); return rs ? rs.getInflationRate() : params.inflation; })();
+            var relocationAmount = adjust(event.amount, reloRate);
+
+            if (relocationAmount > 0) {
+              expenses += relocationAmount;
+              attributionManager.record('expenses', 'Relocation (' + event.id + ')', relocationAmount);
+            }
+
+            // Update residency to destination AFTER computing relocation cost
+            currentCountry = destCountry;
+
+            // Store optional inflation override for destination country (if provided via event.rate)
+            if (event.rate !== null && event.rate !== undefined && event.rate !== '') {
+              if (!countryInflationOverrides) countryInflationOverrides = {};
+              countryInflationOverrides[currentCountry] = event.rate;
+            }
+          }
+        }
         break;
     }
   }

@@ -31,13 +31,29 @@ export async function smartClick(locator, { preferProgrammatic = false } = {}) {
   await locator.click({ force: true });
 }
 
-export async function waitForOverlayGone(page, timeout = 5000) {
-  await page.waitForFunction(() => {
-    const iframe=document.querySelector('#app-frame');
-    const doc=iframe&&iframe.contentDocument;
-    const m=doc?.querySelector('.welcome-modal');
-    return !m||m.offsetParent===null;
-  },{timeout});
+export async function waitForOverlayGone(page, timeout = 12000) {
+  // Proactively and repeatedly dismiss the welcome modal if it appears during startup
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    try {
+      // Attempt best-effort dismissal if the visible modal is present (race-safe for Firefox)
+      const frame = page.frameLocator('#app-frame');
+      const visibleCount = await frame.locator('.welcome-modal.visible').count();
+      if (visibleCount > 0) {
+        try { await dismissWelcomeModal(page); } catch { /* best-effort */ }
+      }
+
+      const gone = await page.evaluate(() => {
+        const iframe = document.querySelector('#app-frame');
+        const doc = iframe && iframe.contentDocument;
+        const m = doc?.querySelector('.welcome-modal');
+        return !m || m.offsetParent === null;
+      });
+      if (gone) return;
+    } catch (_) { /* ignore transient frame detach/errors and retry */ }
+    await page.waitForTimeout(200);
+  }
+  throw new Error('Welcome modal did not disappear within timeout');
 }
 
 export async function dismissWelcomeModal(page, frame){

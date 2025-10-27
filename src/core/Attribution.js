@@ -7,10 +7,14 @@
 class Attribution {
   /**
    * @param {string} name The name of the metric this attribution object represents (e.g., "Income Tax").
+   * @param {string} [country] Optional country code (ISO-2 like "ie", "ar") where amounts were recorded.
+   * @param {number} [year] Optional simulation year when amounts were recorded.
    */
-  constructor(name) {
+  constructor(name, country, year) {
     this.name = name;
     this.slices = {}; // { source_description: amount }
+    this.country = country || null;
+    this.year = year || null;
   }
 
   /**
@@ -27,11 +31,76 @@ class Attribution {
   }
 
   /**
+   * Sets the country context if not already set.
+   * @param {string} country The country code (ISO-2 like "ie", "ar").
+   * @param {number} year The simulation year.
+   */
+  setCountryContext(country, year) {
+    if (!this.country && country) this.country = country;
+    if (!this.year && year) this.year = year;
+  }
+
+  /**
    * Returns the total value of all slices.
    * @returns {number} The total value.
    */
   getTotal() {
     return Object.values(this.slices).reduce((sum, amount) => sum + amount, 0);
+  }
+
+  /**
+   * Returns the currency-normalized total.
+   * @param {string} baseCountry The base country code for normalization.
+   * @returns {Object} { amount, currency, fxRate, originalAmount, originalCurrency }
+   */
+  getNormalizedTotal(baseCountry) {
+    var total = this.getTotal();
+    
+    // Early exit if no conversion context
+    if (!baseCountry || !this.country || !this.year) {
+      return { amount: total, currency: null, fxRate: 1 };
+    }
+    
+    // Get currency codes for display purposes
+    var cfg = Config.getInstance();
+    var fromRuleset = cfg.getCachedTaxRuleSet(this.country);
+    var baseRuleset = cfg.getCachedTaxRuleSet(baseCountry);
+    if (!fromRuleset || !baseRuleset) {
+      return { amount: total, currency: null, fxRate: 1 };
+    }
+    
+    var fromCurrency = fromRuleset.getCurrencyCode();
+    var baseCurrency = baseRuleset.getCurrencyCode();
+    
+    // If same country, no conversion needed
+    if (this.country === baseCountry) {
+      return { amount: total, currency: baseCurrency, fxRate: 1 };
+    }
+    
+    // Convert using EconomicData with COUNTRY CODES
+    var economicData = cfg.getEconomicData ? cfg.getEconomicData() : null;
+    if (!economicData) {
+      return { amount: total, currency: fromCurrency, fxRate: 1 };
+    }
+    
+    var converted = economicData.convert(total, this.country, baseCountry, this.year, {
+      fxMode: 'ppp',
+      baseYear: cfg.getSimulationStartYear(),
+      fallback: 'nearest'
+    });
+    
+    if (converted == null) {
+      return { amount: total, currency: fromCurrency, fxRate: 1 };
+    }
+    
+    var fxRate = total !== 0 ? converted / total : 1;
+    return {
+      amount: converted,
+      currency: baseCurrency,
+      fxRate: fxRate,
+      originalAmount: total,
+      originalCurrency: fromCurrency
+    };
   }
 
   /**
@@ -47,7 +116,7 @@ class Attribution {
    * @returns {Attribution} A new Attribution object.
    */
   clone() {
-    const newAttribution = new Attribution(this.name);
+    const newAttribution = new Attribution(this.name, this.country, this.year);
     newAttribution.slices = { ...this.slices };
     return newAttribution;
   }

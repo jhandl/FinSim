@@ -60,6 +60,10 @@ class TaxRuleSet {
     return typeof locale.currencySymbol === 'string' ? locale.currencySymbol : '€';
   }
 
+  getInflationRate() {
+    return typeof this.raw.inflationRate === 'number' ? this.raw.inflationRate : 0.02;
+  }
+
   // ----- Income Tax -----
   getIncomeTaxBracketsFor(status, hasDependentChildren) {
     var it = this.raw.incomeTax || {};
@@ -153,6 +157,12 @@ class TaxRuleSet {
   getIncomeTaxAgeExemptionLimit() {
     var it = this.raw.incomeTax || {};
     return typeof it.ageExemptionLimit === 'number' ? it.ageExemptionLimit : 0;
+  }
+
+  getResidencyRules() {
+    var rules = this.raw.residencyRules;
+    if (rules && typeof rules === 'object' && !Array.isArray(rules)) return rules;
+    return {};
   }
 
   // ------ Generic Getters (Country-Neutral) ------
@@ -332,6 +342,14 @@ class TaxRuleSet {
   getStatePensionIncreaseBands() {
     var pr = this.raw.pensionRules || {};
     return pr.statePensionIncreaseBands || {};
+  }
+
+  getPensionSystemType() {
+    var pr = this.raw.pensionRules || {};
+    var ps = pr.pensionSystem || {};
+    var type = ps.type;
+    if (type === 'state_only' || type === 'mixed') return type;
+    return 'mixed';
   }
 
   // ----- Generic helpers for tax display names -----

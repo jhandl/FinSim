@@ -4,6 +4,11 @@
 
 # Roadmap
 
+- Generalize taxman
+- Add a feedback form
+- Use a build pipeline and close the repo 
+- Add monetisation
+
 ### Improvements
 - Move to WASM
    - Set up build process

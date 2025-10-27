@@ -32,6 +32,8 @@ class TableManager {
     };
 
     for (const row of rows) {
+      // Skip non-data helper rows such as inline resolution panels
+      try { if (row.classList && row.classList.contains('resolution-panel-row')) continue; } catch (_) {}
       const cells = Array.from(row.getElementsByTagName('td'));
       if (cells.length === 0) continue; // Skip header row
       
@@ -45,20 +47,21 @@ class TableManager {
       if (groupId === 'Events') {
         // Get type from select element and name from input
         // Use the original stored event type if specifically requested (for serialization), otherwise use current value
-        const typeInput = cells[0].querySelector('.event-type');
+        const typeInput = (cells[0] && cells[0].querySelector) ? cells[0].querySelector('.event-type') : null;
         const originalType = row.dataset.originalEventType;
         const type = (includeHiddenEventTypes && originalType) ? originalType : (typeInput?.value || '');
-        const name = cells[1].querySelector('input')?.value || '';
+        const name = (cells[1] && cells[1].querySelector) ? (cells[1].querySelector('input')?.value || '') : '';
         rowData.push(`${type}:${name}`);
         
         // Get remaining values starting from the Amount column (index 2)
         for (let i = 2; i < columnCount + 1; i++) {
-          rowData.push(getInputValue(cells[i]?.querySelector('input')));
+          const q = (cells[i] && cells[i].querySelector) ? cells[i].querySelector('input') : null;
+          rowData.push(getInputValue(q));
         }
       } else {
         // Normal table handling
         for (let i = 0; i < columnCount; i++) {
-          const input = cells[i]?.querySelector('input');
+          const input = (cells[i] && cells[i].querySelector) ? cells[i].querySelector('input') : null;
           rowData.push(input ? getInputValue(input) : (cells[i]?.textContent ?? ''));
         }
       }

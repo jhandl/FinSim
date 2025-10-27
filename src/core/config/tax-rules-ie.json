@@ -9,6 +9,7 @@
     "currencyCode": "EUR",
     "currencySymbol": "€"
   },
+  "inflationRate": 0.025,
 
   "incomeTax": {
     "name": "IT",
@@ -102,15 +103,19 @@
     "lumpSumMaxPercent": 0.25,
     "minDrawdownRates": { "61": 0.04, "71": 0.05 },
     "statePensionAge": 66,
-    "statePensionIncreaseBands": { "80": 10 }
-    ,
+    "statePensionIncreaseBands": { "80": 10 },
+    "pensionSystem": {
+      "type": "mixed"
+    },
     "definedBenefit": {
       "treatment": "privatePension"
     }
   },
 
-  "residencyRules": []
-  ,
+  "residencyRules": {
+    "postEmigrationTaxYears": 3,
+    "taxesForeignIncome": true
+  },
   "investmentTypes": [
     {
       "key": "indexFunds",
