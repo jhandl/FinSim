@@ -865,196 +865,14 @@ class EventsTableManager {
   expandResolutionPanel(rowId) {
     const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
     if (!row) return;
-
-    // Check if panel already exists
-    const existingPanel = row.nextElementSibling;
-    if (existingPanel && existingPanel.classList.contains('resolution-panel-row')) {
-      return;
-    }
-
-    // Get event data from events array using row index
     const tableRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
     const rowIndex = tableRows.indexOf(row);
     if (rowIndex === -1) return;
     const events = this.webUI.readEvents(false);
     const event = events[rowIndex];
     if (!event || !event.relocationImpact) return;
-
-    // Collapse any other open panels
-    this.collapseAllResolutionPanels();
-
-    // Create panel row
-    const panelRow = document.createElement('tr');
-    panelRow.className = 'resolution-panel-row';
-
-    // Create panel cell spanning all columns
-    const panelCell = document.createElement('td');
-    // Dynamically match the number of table columns
-    const colCount = (row && row.children && row.children.length) || document.querySelectorAll('#Events thead th').length || 1;
-    panelCell.colSpan = colCount;
-
-    // Generate panel content
-    const panelContent = this.createResolutionPanelContent(event, rowId);
-    panelCell.innerHTML = panelContent;
-
-    panelRow.appendChild(panelCell);
-
-    // Insert panel row after the event row
-    row.insertAdjacentElement('afterend', panelRow);
-
-    // Animate expansion using inner expander for smoother row shifts
-    const expander = panelCell.querySelector('.resolution-panel-expander');
-    const containerEl = panelCell.querySelector('.resolution-panel-container');
-    const interactionRoot = containerEl || panelCell;
-    if (interactionRoot) {
-      interactionRoot.addEventListener('click', (e) => {
-        const tabButton = e.target && e.target.closest && e.target.closest('.resolution-tab');
-        if (tabButton) {
-          e.preventDefault();
-          this.handleResolutionTabSelection(containerEl || interactionRoot, tabButton);
-          return;
-        }
-
-        const button = e.target && e.target.closest && e.target.closest('.resolution-apply');
-        if (!button) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const action = button.getAttribute('data-action');
-        const targetRowId = button.getAttribute('data-row-id') || rowId;
-        if (!action) return;
-
-        switch (action) {
-          case 'keep_property': {
-            const container = (containerEl || interactionRoot);
-            const origin = container ? container.getAttribute('data-from-country') : null;
-            const r = document.querySelector(`tr[data-row-id="${targetRowId}"]`);
-            if (origin && r) {
-              const etm = this;
-              this._applyToRealEstatePair(r, (rowEl) => {
-                etm.getOrCreateHiddenInput(rowEl, 'event-linked-country', origin);
-                const ruleSet = Config.getInstance().getCachedTaxRuleSet(origin);
-                const currency = ruleSet ? ruleSet.getCurrencyCode() : null;
-                if (currency) etm.getOrCreateHiddenInput(rowEl, 'event-currency', currency);
-              });
-            }
-            this._afterResolutionAction(targetRowId);
-            break;
-          }
-          case 'sell_property': {
-            const r = document.querySelector(`tr[data-row-id="${targetRowId}"]`);
-            if (r) {
-              const events = this.webUI.readEvents(false);
-            const visibleRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(rr => rr && rr.style.display !== 'none' && !(rr.classList && rr.classList.contains('resolution-panel-row')));
-              const rowIndex = visibleRows.indexOf(r);
-              const ev = rowIndex >= 0 ? events[rowIndex] : null;
-              const mv = ev && ev.relocationImpact ? events.find(e => e && e.id === ev.relocationImpact.mvEventId) : null;
-              const relocationAge = mv && !isNaN(Number(mv.fromAge)) ? Number(mv.fromAge) : null;
-              if (relocationAge != null) {
-                this._applyToRealEstatePair(r, (rowEl) => {
-                  const toAgeInput = rowEl.querySelector('.event-to-age');
-                  if (!toAgeInput) return;
-                  const existing = Number(toAgeInput.value);
-                  if (isNaN(existing) || existing > relocationAge) {
-                    toAgeInput.value = String(relocationAge);
-                    toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
-                  }
-                });
-              }
-            }
-            this._afterResolutionAction(targetRowId);
-            break;
-          }
-          case 'split': {
-            const detail = button.closest('.resolution-detail');
-            const input = detail ? detail.querySelector('.part2-amount-input') : null;
-            const override = input ? input.value : undefined;
-            this.splitEventAtRelocation(targetRowId, override);
-            break;
-          }
-          case 'peg': {
-            const currency = button.getAttribute('data-currency');
-            this.pegCurrencyToOriginal(targetRowId, currency);
-            break;
-          }
-          case 'accept': {
-            const amount = button.getAttribute('data-suggested-amount');
-            const currency = button.getAttribute('data-suggested-currency');
-            this.acceptSuggestion(targetRowId, amount, currency);
-            break;
-          }
-          case 'link': {
-            const detail = button.closest('.resolution-detail');
-            const select = detail ? detail.querySelector('.country-selector') : null;
-            const selected = select ? select.value : undefined;
-            this.linkPropertyToCountry(targetRowId, selected);
-            break;
-          }
-          case 'convert':
-            this.convertToPensionless(targetRowId);
-            break;
-          case 'review':
-            this.markAsReviewed(targetRowId);
-            break;
-          default:
-            break;
-        }
-      });
-      this.bindResolutionTabAccessibility(containerEl || interactionRoot);
-    }
-    if (expander) {
-      // Ensure starting state
-      expander.style.height = '0px';
-      expander.style.overflow = 'hidden';
-      // Content fade/slide
-      if (containerEl) {
-        try {
-          containerEl.classList.add('panel-anim');
-        } catch (_) {}
-      }
-      // Next frame, expand to content height and fade-in content
-      requestAnimationFrame(() => {
-        const fullHeight = expander.scrollHeight;
-        if (containerEl) {
-          try { containerEl.classList.add('visible'); } catch (_) {}
-        }
-        expander.style.height = fullHeight + 'px';
-        // After transition completes, set to auto for responsiveness
-        const onOpened = (e) => {
-          if (e.target !== expander) return;
-          expander.style.height = 'auto';
-          expander.removeEventListener('transitionend', onOpened);
-        };
-        expander.addEventListener('transitionend', onOpened);
-      });
-    }
-
-    // Auto-scroll newly opened panel into view if off-screen
-    const rect = panelRow.getBoundingClientRect();
-    const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-    if (rect.top < 0 || rect.bottom > viewportHeight) {
-      panelRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
-    // Setup close button handler
-    const closeBtn = panelCell.querySelector('.panel-close-btn');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.collapseResolutionPanel(rowId));
-    }
-
-    // Setup collapse triggers
-    this._setupPanelCollapseTriggers(rowId, panelRow);
-
-    // Store reference
-    row.dataset.hasOpenPanel = '1';
-
-    // Attach tooltip for suggested Part 2 input using unified helper
-    try {
-      const rootEl = containerEl || panelCell;
-      if (rootEl && typeof this.attachSplitTooltip === 'function') {
-        this.attachSplitTooltip(rootEl);
-      }
-    } catch (_) {}
+    const env = { webUI: this.webUI, eventsTableManager: this, config: (typeof Config !== 'undefined' ? Config.getInstance() : null), formatUtils: this.webUI && this.webUI.formatUtils };
+    RelocationImpactAssistant.renderPanelForTableRow(row, event, env);
   }
 
   /**
@@ -1063,58 +881,7 @@ class EventsTableManager {
   collapseResolutionPanel(rowId) {
     const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
     if (!row) return;
-
-    const panelRow = row.nextElementSibling;
-    if (!panelRow || !panelRow.classList.contains('resolution-panel-row')) return;
-
-    // Animate collapse using the inner expander
-    const panelCell = panelRow.querySelector('td');
-    const expander = panelCell && panelCell.querySelector('.resolution-panel-expander');
-    const containerEl = panelCell && panelCell.querySelector('.resolution-panel-container');
-    if (containerEl) {
-      try { containerEl.classList.remove('visible'); } catch (_) {}
-    }
-    if (expander) {
-      // Set explicit current height, then transition to 0
-      const current = expander.scrollHeight;
-      expander.style.height = current + 'px';
-      // Force reflow so the browser acknowledges the current height
-      // eslint-disable-next-line no-unused-expressions
-      expander.offsetHeight;
-      requestAnimationFrame(() => {
-        expander.style.height = '0px';
-      });
-      const onClosed = (e) => {
-        if (e.target !== expander) return;
-        expander.removeEventListener('transitionend', onClosed);
-        if (panelRow.parentNode) {
-          panelRow.remove();
-        }
-      };
-      expander.addEventListener('transitionend', onClosed);
-    } else {
-      // Fallback: remove immediately if no expander
-      if (panelRow.parentNode) panelRow.remove();
-    }
-
-    // Clear reference
-    delete row.dataset.hasOpenPanel;
-
-    // Remove event listeners
-    this._removePanelCollapseTriggers(panelRow);
-  }
-
-  /**
-   * Collapse all open resolution panels
-   */
-  collapseAllResolutionPanels() {
-    const panelRows = document.querySelectorAll('.resolution-panel-row');
-    panelRows.forEach(panelRow => {
-      const eventRow = panelRow.previousElementSibling;
-      if (eventRow && eventRow.dataset.rowId) {
-        this.collapseResolutionPanel(eventRow.dataset.rowId);
-      }
-    });
+    RelocationImpactAssistant.collapsePanelForTableRow(row);
   }
 
   /**
@@ -2939,7 +2706,7 @@ class EventsTableManager {
 
   applySort() {
     // Collapse any open inline resolution panels before reordering rows
-    this.collapseAllResolutionPanels();
+    RelocationImpactAssistant.collapseAllPanels();
     const tbody = document.querySelector('#Events tbody');
     if (!tbody) return;
 

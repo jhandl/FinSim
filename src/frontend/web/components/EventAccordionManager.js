@@ -409,139 +409,18 @@ class EventAccordionManager {
    * Expand inline resolution panel below the accordion item
    */
   expandResolutionPanel(accordionId) {
-    // Select the root accordion item, not just the header
     const item = (document.querySelector(`.events-accordion-item[data-accordion-id="${accordionId}"]`) ||
                  (document.querySelector(`[data-accordion-id="${accordionId}"]`) && document.querySelector(`[data-accordion-id="${accordionId}"]`).closest('.events-accordion-item')));
     if (!item) return;
-
     const event = this.events.find(e => e.accordionId === accordionId);
     if (!event || !event.relocationImpact) return;
-
-    // Check if item is expanded
-    if (!this.expandedItems.has(accordionId)) {
-      this.toggleAccordionItem(accordionId);
-    }
-
+    if (!this.expandedItems.has(accordionId)) { this.toggleAccordionItem(accordionId); }
     const content = item.querySelector('.accordion-item-content');
     if (!content) return;
-
-    // Check if panel already exists (support both wrapped and unwrapped markup)
     const existingPanel = content.querySelector('.resolution-panel-container') || content.querySelector('.resolution-panel-expander');
     if (existingPanel) return;
-
-    // Generate panel content with real table rowId so data-row-id on buttons matches table
-    const panelContent = this.webUI.eventsTableManager.createResolutionPanelContent(event, event.rowId);
-
-    // Inject panel HTML at the start of .accordion-item-content-wrapper
-    const wrapper = content.querySelector('.accordion-item-content-wrapper');
-    if (wrapper) {
-      wrapper.insertAdjacentHTML('afterbegin', panelContent);
-    }
-
-    // Animate expansion using inner expander for smoother layout change
-    const expander = content.querySelector('.resolution-panel-expander');
-    const containerEl = content.querySelector('.resolution-panel-container');
-    if (expander) {
-      // Ensure starting state
-      expander.style.height = '0px';
-      expander.style.overflow = 'hidden';
-      if (containerEl) {
-        try { containerEl.classList.add('panel-anim'); } catch (_) {}
-      }
-      // Next frame, expand to content height and fade-in content
-      requestAnimationFrame(() => {
-        const fullHeight = expander.scrollHeight;
-        if (containerEl) {
-          try { containerEl.classList.add('visible'); } catch (_) {}
-        }
-        expander.style.height = fullHeight + 'px';
-        const onOpened = (e) => {
-          if (e.target !== expander) return;
-          expander.style.height = 'auto';
-          expander.removeEventListener('transitionend', onOpened);
-        };
-        expander.addEventListener('transitionend', onOpened);
-      });
-    }
-
-    // Setup close button handler
-    const closeBtn = content.querySelector('.panel-close-btn');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => this.collapseResolutionPanel(accordionId));
-    }
-
-    // Delegated click handler for resolution actions in accordion view
-    const interactionRoot = containerEl || content;
-    const etm = this.webUI && this.webUI.eventsTableManager;
-    if (interactionRoot && etm) {
-      interactionRoot.addEventListener('click', (ev) => {
-        const tab = ev.target && ev.target.closest && ev.target.closest('.resolution-tab');
-        if (tab) {
-          ev.preventDefault();
-          etm.handleResolutionTabSelection(interactionRoot, tab);
-          return;
-        }
-
-        const btn = ev.target && ev.target.closest && ev.target.closest('.resolution-apply');
-        if (!btn) return;
-        ev.stopPropagation();
-        ev.preventDefault();
-
-        const action = btn.getAttribute('data-action');
-        const rowId = btn.getAttribute('data-row-id') || event.rowId;
-        if (!action) return;
-
-        switch (action) {
-          case 'split': {
-            const detail = btn.closest('.resolution-detail');
-            const input = detail ? detail.querySelector('.part2-amount-input') : null;
-            const part2Amount = input ? input.value : undefined;
-            etm.splitEventAtRelocation(rowId, part2Amount);
-            break;
-          }
-          case 'peg': {
-            const currency = btn.getAttribute('data-currency');
-            etm.pegCurrencyToOriginal(rowId, currency);
-            break;
-          }
-          case 'accept': {
-            const amount = btn.getAttribute('data-suggested-amount');
-            const currency = btn.getAttribute('data-suggested-currency');
-            etm.acceptSuggestion(rowId, amount, currency);
-            break;
-          }
-          case 'link': {
-            const detail = btn.closest('.resolution-detail');
-            const sel = detail ? detail.querySelector('.country-selector') : null;
-            const selectedCountry = sel ? sel.value : undefined;
-            etm.linkPropertyToCountry(rowId, selectedCountry);
-            break;
-          }
-          case 'convert':
-            etm.convertToPensionless(rowId);
-            break;
-          case 'review':
-            etm.markAsReviewed(rowId);
-            break;
-          default:
-            break;
-        }
-      });
-      etm.bindResolutionTabAccessibility(interactionRoot);
-    }
-
-    // Attach tooltip for PPP suggestion input in accordion view as well
-    try {
-      if (this.webUI && this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.attachSplitTooltip === 'function') {
-        this.webUI.eventsTableManager.attachSplitTooltip(containerEl || content);
-      }
-    } catch (_) {}
-
-    // Mark item as having panel
-    item.dataset.hasResolutionPanel = '1';
-
-    // Setup collapse triggers (outside click and ESC)
-    this._setupPanelCollapseTriggers(accordionId, item);
+    const env = { webUI: this.webUI, eventsTableManager: this.webUI.eventsTableManager, config: (typeof Config !== 'undefined' ? Config.getInstance() : null), formatUtils: this.webUI && this.webUI.formatUtils };
+    RelocationImpactAssistant.renderPanelInAccordion(item, event, env);
   }
 
   /**
@@ -552,46 +431,8 @@ class EventAccordionManager {
     const item = (document.querySelector(`.events-accordion-item[data-accordion-id="${accordionId}"]`) ||
                  (document.querySelector(`[data-accordion-id="${accordionId}"]`) && document.querySelector(`[data-accordion-id="${accordionId}"]`).closest('.events-accordion-item')));
     if (!item) return;
-
-    // Support both wrapped and unwrapped markup; prefer expander for smooth height animation
-    const expander = item.querySelector('.resolution-panel-expander');
-    const containerEl = item.querySelector('.resolution-panel-container');
-    if (!expander && !containerEl) return;
-
-    // Fade out content
-    if (containerEl) {
-      try { containerEl.classList.remove('visible'); } catch (_) {}
-    }
-
-    if (expander) {
-      // Set explicit current height, then transition to 0
-      const current = expander.scrollHeight;
-      expander.style.height = current + 'px';
-      // Force reflow
-      // eslint-disable-next-line no-unused-expressions
-      expander.offsetHeight;
-      requestAnimationFrame(() => {
-        expander.style.height = '0px';
-      });
-      const onClosed = (e) => {
-        if (e.target !== expander) return;
-        expander.removeEventListener('transitionend', onClosed);
-        // Remove the entire expander block
-        const wrapperToRemove = expander;
-        if (wrapperToRemove && wrapperToRemove.parentNode) {
-          wrapperToRemove.remove();
-        }
-      };
-      expander.addEventListener('transitionend', onClosed);
-    } else if (containerEl) {
-      // Fallback: no expander; remove after fade
-      setTimeout(() => { if (containerEl.parentNode) containerEl.parentNode.remove(); }, 300);
-    }
-
-    // Clear reference
+    RelocationImpactAssistant.collapsePanelInAccordion(item);
     delete item.dataset.hasResolutionPanel;
-
-    // Remove collapse triggers
     this._removePanelCollapseTriggers(item);
   }
 

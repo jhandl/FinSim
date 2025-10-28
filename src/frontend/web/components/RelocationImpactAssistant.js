@@ -1,268 +1,407 @@
-/* This file is web-only and provides a modal to review relocation impacts before simulation */
-
-/**
- * RelocationImpactAssistant provides a modal interface to review and acknowledge relocation impacts
- * before running a simulation. It reads impact data from events and presents it in a user-friendly way.
- */
+/* RelocationImpactAssistant centralizes inline resolution panel rendering and actions for both table and accordion views. The legacy relocation modal has been removed. */
 var RelocationImpactAssistant = {
 
-  /**
-   * Main entry point: shows the impact modal if there are unresolved impacts.
-   * @param {Array} events - Array of SimEvent objects
-   * @param {Function} onClose - Callback with boolean: true to continue simulation, false to cancel
-   * @returns {boolean} True if modal was shown, false if no impacts
-   */
-  showImpactModal: function(events, onClose) {
+  // Public API
+  renderPanelForTableRow: function(rowEl, event, env) {
+    if (!rowEl || !event || !event.relocationImpact) return;
+    const existingPanel = rowEl.nextElementSibling;
+    if (existingPanel && existingPanel.classList && existingPanel.classList.contains('resolution-panel-row')) return;
+    this.collapseAllPanels();
+    const rowId = rowEl && rowEl.dataset ? rowEl.dataset.rowId : undefined;
+    const panelRow = document.createElement('tr');
+    panelRow.className = 'resolution-panel-row';
+    const panelCell = document.createElement('td');
+    const colCount = (rowEl && rowEl.children && rowEl.children.length) || (document.querySelectorAll('#Events thead th').length) || 1;
+    panelCell.colSpan = colCount;
+    panelCell.innerHTML = this.createPanelHtml(event, rowId, env);
+    panelRow.appendChild(panelCell);
+    rowEl.insertAdjacentElement('afterend', panelRow);
+    this._animateOpen(panelCell);
+    this._bindPanelInteractions(panelCell, { context: 'table', rowId: rowId, event: event, env: env });
+    this._setupCollapseTriggers({ context: 'table', anchorEl: panelRow, rowId: rowId });
+    if (panelCell) this.attachSplitTooltip(panelCell);
+  },
+
+  collapsePanelForTableRow: function(rowEl) {
+    if (!rowEl) return;
+    const panelRow = rowEl.nextElementSibling;
+    if (!panelRow || !panelRow.classList || !panelRow.classList.contains('resolution-panel-row')) return;
+    const expander = panelRow.querySelector('.resolution-panel-expander');
+    const container = panelRow.querySelector('.resolution-panel-container');
+    if (container) { try { container.classList.remove('visible'); } catch(_) {} }
+    if (expander) {
+      const current = expander.scrollHeight; expander.style.height = current + 'px';
+      // eslint-disable-next-line no-unused-expressions
+      expander.offsetHeight; requestAnimationFrame(function(){ expander.style.height = '0px'; });
+      const onClosed = function(e){ if (e.target !== expander) return; expander.removeEventListener('transitionend', onClosed); if (panelRow.parentNode) panelRow.remove(); };
+      expander.addEventListener('transitionend', onClosed);
+    } else {
+      if (panelRow.parentNode) panelRow.remove();
+    }
+    this._teardownCollapseTriggers(panelRow);
+  },
+
+  collapseAllPanels: function() {
+    // Table
     try {
-      if (!Config.getInstance().isRelocationEnabled()) {
-        return false; // Do not invoke onClose when no modal is shown
+      const panelRows = document.querySelectorAll('.resolution-panel-row');
+      panelRows.forEach((panelRow) => { const eventRow = panelRow.previousElementSibling; if (eventRow) this.collapsePanelForTableRow(eventRow); });
+    } catch(_) {}
+    // Accordion
+    try {
+      const items = document.querySelectorAll('.events-accordion-item');
+      items.forEach((item) => { const expander = item.querySelector('.resolution-panel-expander'); if (expander) this._collapseAccordionPanel(item); });
+    } catch(_) {}
+  },
+
+  renderPanelInAccordion: function(itemEl, event, env) {
+    if (!itemEl || !event || !event.relocationImpact) return;
+    const content = itemEl.querySelector('.accordion-item-content');
+    if (!content) return;
+    const existing = content.querySelector('.resolution-panel-container') || content.querySelector('.resolution-panel-expander');
+    if (existing) return;
+    const wrapper = content.querySelector('.accordion-item-content-wrapper') || content;
+    const html = this.createPanelHtml(event, event.rowId, env);
+    wrapper.insertAdjacentHTML('afterbegin', html);
+    const container = content.querySelector('.resolution-panel-container');
+    const expander = content.querySelector('.resolution-panel-expander');
+    this._animateOpen(expander || container);
+    this._bindPanelInteractions(container || content, { context: 'accordion', accordionItem: itemEl, event: event, env: env });
+    this._setupCollapseTriggers({ context: 'accordion', anchorEl: itemEl, accordionId: event.accordionId });
+    if (container) this.attachSplitTooltip(container);
+  },
+
+  // Public API: collapse inline resolution panel within an accordion item
+  // Delegates to the internal implementation to keep animations consistent
+  collapsePanelInAccordion: function(itemEl) {
+    this._collapseAccordionPanel(itemEl);
+  },
+
+  createPanelHtml: function(event, rowId, env) {
+    // Based on table manager implementation
+    const events = (env && env.webUI && typeof env.webUI.readEvents === 'function') ? env.webUI.readEvents(false) : [];
+    const mvEvent = events.find(function(e){ return e && e.id === (event && event.relocationImpact && event.relocationImpact.mvEventId); });
+    if (!mvEvent) return '';
+    const destCountry = mvEvent.type.substring(3).toLowerCase();
+    const startCountry = (env && env.eventsTableManager && typeof env.eventsTableManager.getStartCountry === 'function') ? env.eventsTableManager.getStartCountry() : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
+    const originCountry = (env && env.eventsTableManager && typeof env.eventsTableManager.getOriginCountry === 'function') ? env.eventsTableManager.getOriginCountry(mvEvent, startCountry) : startCountry;
+    const relocationAge = mvEvent.fromAge;
+
+    let content = '';
+    const econ = Config.getInstance().getEconomicData();
+    const baseAmountSanitized = (function(a){ var s = (a == null) ? '' : String(a); s = s.replace(/[^0-9.\-]/g, ''); var n = Number(s); return isNaN(n) ? Number(a) : n; })(event.amount);
+    const fxRate = econ && econ.ready ? econ.getFX(originCountry, destCountry) : null;
+    const pppRatio = econ && econ.ready ? econ.getPPP(originCountry, destCountry) : null;
+    const fxAmount = (fxRate != null && !isNaN(baseAmountSanitized)) ? Math.round(baseAmountSanitized * fxRate) : null;
+    const pppAmount = (pppRatio != null && !isNaN(baseAmountSanitized)) ? Math.round(baseAmountSanitized * pppRatio) : null;
+    let fxDate = null; try { if (econ && econ.data) { var toEntry = econ.data[String(destCountry).toUpperCase()]; fxDate = toEntry && toEntry.fx_date ? toEntry.fx_date : null; } } catch(_) {}
+
+    function getSymbolAndLocaleByCountry(countryCode) {
+      try {
+        const rs = Config.getInstance().getCachedTaxRuleSet(countryCode);
+        const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
+        return { symbol: rs && rs.getCurrencySymbol ? rs.getCurrencySymbol() : (ls.currencySymbol || ''), locale: rs && rs.getNumberLocale ? rs.getNumberLocale() : (ls.numberLocale || 'en-US') };
+      } catch(_) { const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' }; return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' }; }
+    }
+    function fmtWithSymbol(symbol, locale, value) {
+      if (value == null || value === '' || isNaN(Number(value))) return '';
+      const num = Number(value);
+      try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch(_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    }
+
+    const addAction = function(arr, cfg){ if (!cfg || !cfg.action) return; cfg.tabId = 'resolution-tab-' + rowId + '-' + cfg.action; cfg.detailId = 'resolution-detail-' + rowId + '-' + cfg.action; arr.push(cfg); };
+    const actions = [];
+    let containerAttributes = '';
+
+    if (event.relocationImpact.category === 'boundary') {
+      if (event.type === 'R' || event.type === 'M') {
+        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
+        const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
+        const originCountryCode = originCountry ? originCountry.toUpperCase() : '';
+        addAction(actions, { action: 'keep_property', tabLabel: 'Keep Property', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Keep the property and associated mortgage. We will link both to ' + originCountryCode + ' and keep values in ' + originCurrency + '.</p></div>' });
+        addAction(actions, { action: 'sell_property', tabLabel: 'Sell Property', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Sell the property at the relocation boundary and stop the associated mortgage payments from that age.</p></div>' });
+      } else {
+        const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originCountry, destCountry));
+        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
+        const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
+        const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
+        const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
+        const fromMeta = getSymbolAndLocaleByCountry(originCountry);
+        const toMeta = getSymbolAndLocaleByCountry(destCountry);
+        const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
+        const part1AmountFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmountSanitized);
+        const inputFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : '';
+        containerAttributes = ' data-from-country="' + originCountry + '" data-to-country="' + destCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
+        addAction(actions, { action: 'split', tabLabel: 'Split Event', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-label">Part 1: Age ' + event.fromAge + '-' + relocationAge + '</div><div class="part-detail">' + part1AmountFormatted + ' (read-only)</div></div><div class="split-part-info"><div class="part-label">Part 2: Age ' + relocationAge + '-' + event.toAge + '</div><div class="part-detail"><input type="text" class="part2-amount-input" value="' + inputFormatted + '" placeholder="Amount">' + destCurrency + '</div><div class="ppp-hint">PPP suggestion</div></div></div><p class="micro-note">Apply creates a new event starting at age ' + relocationAge + ' in ' + (destCurrencyCode || destCurrency) + '. Adjust the Part 2 amount to what the move will cost in the destination currency.</p></div>' });
+        addAction(actions, { action: 'peg', tabLabel: 'Keep Original Currency', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply keeps this event denominated in ' + originCurrency + ', leaving the current value (' + (part1AmountFormatted || originCurrency) + ') unchanged after the move.</p><p class="micro-note">Choose this when you prefer to convert the amount manually later.</p></div>' });
       }
-      var impactSummary = this.buildImpactSummary(events);
-      if (impactSummary.totalImpacted === 0) {
-        return false; // Do not invoke onClose when no modal is shown
+    } else if (event.relocationImpact.category === 'simple') {
+      if ((event.type === 'R' || event.type === 'M') && !event.linkedCountry) {
+        const countries = Config.getInstance().getAvailableCountries();
+        const detectedCountry = (env && env.eventsTableManager && env.eventsTableManager.detectPropertyCountry) ? env.eventsTableManager.detectPropertyCountry(event.fromAge, startCountry) : startCountry;
+        const detectedCountryObj = countries.find(function(c){ return c.code.toLowerCase() === detectedCountry; });
+        const detectedCountryName = detectedCountryObj ? detectedCountryObj.name : (detectedCountry ? detectedCountry.toUpperCase() : '');
+        const ruleSet = Config.getInstance().getCachedTaxRuleSet(detectedCountry);
+        const currency = ruleSet ? ruleSet.getCurrencyCode() : 'EUR';
+        let optionsHTML = '';
+        countries.forEach(function(country){ const selected = country.code.toLowerCase() === detectedCountry ? 'selected' : ''; optionsHTML += '<option value="' + country.code.toLowerCase() + '" ' + selected + '>' + country.name + '</option>'; });
+        addAction(actions, { action: 'link', tabLabel: 'Link To Country', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<p class="micro-note">Detected country: ' + detectedCountryName + '. Change if the property belongs to a different jurisdiction.</p><div class="country-selector-inline"><label for="country-select-' + rowId + '">Country</label><select class="country-selector" id="country-select-' + rowId + '" data-row-id="' + rowId + '">' + optionsHTML + '</select></div><p class="micro-note">Apply links this property to the selected country and updates its currency to match (default ' + currency + ').</p>' });
+      } else {
+        const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originCountry, destCountry));
+        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
+        const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
+        const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
+        const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
+        const fromMeta = getSymbolAndLocaleByCountry(originCountry);
+        const toMeta = getSymbolAndLocaleByCountry(destCountry);
+        const currentAmountNum = Number(baseAmountSanitized);
+        const percentage = (!isNaN(pppSuggestionNum) && !isNaN(currentAmountNum) && currentAmountNum !== 0) ? (((pppSuggestionNum / currentAmountNum - 1) * 100).toFixed(1)) : '0.0';
+        const currentFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, currentAmountNum);
+        const suggestedFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : '';
+        const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
+        const destCountryLabel = (destCountry ? destCountry.toUpperCase() : '') || 'destination country';
+        containerAttributes = ' data-from-country="' + originCountry + '" data-to-country="' + destCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
+        addAction(actions, { action: 'accept', tabLabel: 'Apply Suggested Amount', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-suggested-amount="' + (isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum)) + '" data-suggested-currency="' + destCurrency + '"', bodyHtml: '<div class="suggestion-comparison compact"><div class="comparison-row"><span class="comparison-label">Current</span><span class="comparison-value">' + currentFormatted + '</span></div><div class="comparison-row"><span class="comparison-label">Suggested</span><span class="comparison-value">' + suggestedFormatted + '</span></div><div class="difference">Δ ' + percentage + '%</div></div><p class="micro-note">Apply updates the amount to ' + suggestedFormatted + ' (' + (destCurrencyCode || destCurrency) + ') so it reflects purchasing power in ' + destCountryLabel + '.</p>' });
+        addAction(actions, { action: 'peg', tabLabel: 'Keep Original Currency', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion to ' + (destCurrencyCode || destCurrency || 'the destination currency') + ' will occur.</p></div>' });
+        addAction(actions, { action: 'review', tabLabel: 'Mark As Reviewed', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply records this relocation impact as reviewed without changing the event’s amount or currency.</p></div>' });
       }
-      this.createModal(impactSummary, onClose);
-      return true;
-    } catch (err) {
-      console.error('Error in showImpactModal:', err);
-      onClose(false);
-      return false;
+    }
+
+    if (!actions.length) return content;
+    const impactCause = (event.relocationImpact.message || '').trim() || 'Relocation impact detected for this event.';
+    const tabsHtml = actions.map(function(ac){ return '<button type="button" class="resolution-tab" id="' + ac.tabId + '" role="tab" aria-selected="false" aria-controls="' + ac.detailId + '" data-action="' + ac.action + '" tabindex="0">' + ac.tabLabel + '</button>'; }).join('');
+    const detailsHtml = actions.map(function(ac){ const btnClass = ac.buttonClass || 'event-wizard-button resolution-apply'; const attrs = ac.buttonAttrs || ''; return '<div class="resolution-detail" id="' + ac.detailId + '" role="tabpanel" aria-labelledby="' + ac.tabId + '" data-action="' + ac.action + '" hidden aria-hidden="true"><div class="resolution-detail-content">' + ac.bodyHtml + '</div><div class="resolution-detail-footer"><button type="button" class="' + btnClass + '" data-action="' + ac.action + '"' + attrs + '>' + ac.buttonLabel + '</button></div></div>'; }).join('');
+    content = '<div class="resolution-panel-expander"><div class="resolution-panel-container"' + containerAttributes + '><div class="resolution-panel-header"><h4>' + impactCause + '</h4><button class="panel-close-btn">×</button></div><div class="resolution-panel-body"><div class="resolution-tab-strip" role="tablist" aria-label="Resolution actions" aria-orientation="horizontal">' + tabsHtml + '</div><div class="resolution-details">' + detailsHtml + '</div></div></div></div>';
+    return content;
+  },
+
+  handlePanelAction: function(event, action, payload, env) {
+    if (!env || !env.eventsTableManager) return;
+    const etm = env.eventsTableManager;
+    const rowId = payload && payload.rowId;
+    switch (action) {
+      case 'split': {
+        const override = payload && payload.part2Amount;
+        if (typeof etm.splitEventAtRelocation === 'function') etm.splitEventAtRelocation(rowId, override);
+        break;
+      }
+      case 'peg': {
+        const currency = payload && payload.currency;
+        if (typeof etm.pegCurrencyToOriginal === 'function') etm.pegCurrencyToOriginal(rowId, currency);
+        break;
+      }
+      case 'accept': {
+        const amount = payload && payload.suggestedAmount;
+        const currency = payload && payload.suggestedCurrency;
+        if (typeof etm.acceptSuggestion === 'function') etm.acceptSuggestion(rowId, amount, currency);
+        break;
+      }
+      case 'link': {
+        const country = payload && payload.country;
+        if (typeof etm.linkPropertyToCountry === 'function') etm.linkPropertyToCountry(rowId, country);
+        break;
+      }
+      case 'convert': {
+        if (typeof etm.convertToPensionless === 'function') etm.convertToPensionless(rowId);
+        break;
+      }
+      case 'review': {
+        if (typeof etm.markAsReviewed === 'function') etm.markAsReviewed(rowId);
+        break;
+      }
+      case 'keep_property': {
+        try { this._keepProperty(event); } catch(_) {}
+        break;
+      }
+      case 'sell_property': {
+        try { this._sellProperty(event); } catch(_) {}
+        break;
+      }
+      default:
+        break;
     }
   },
 
-  /**
-   * Builds a summary of impacts by scanning events.
-   * @param {Array} events - Array of SimEvent objects
-   * @returns {Object} Impact summary
-   */
-  buildImpactSummary: function(events) {
-    var summary = {
-      totalImpacted: 0,
-      byCategory: {
-        boundaryCrossers: [],
-        simpleEvents: []
-      }
-    };
-    for (var i = 0; i < events.length; i++) {
-      var event = events[i];
-      if (event.relocationImpact) {
-        summary.totalImpacted++;
-        var cat = event.relocationImpact.category;
-        if (cat === 'boundary') summary.byCategory.boundaryCrossers.push(event);
-        else if (cat === 'simple') summary.byCategory.simpleEvents.push(event);
-      }
+  calculatePPPSuggestion: function(amount, fromCountry, toCountry) {
+    var raw = (amount == null) ? '' : String(amount);
+    var sanitized = raw.replace(/[^0-9.\-]/g, '');
+    var numeric = Number(sanitized);
+    if (isNaN(numeric)) numeric = Number(amount);
+    const economicData = Config.getInstance().getEconomicData();
+    if (!economicData || !economicData.ready) return numeric;
+    const pppRatio = economicData.getPPP(fromCountry, toCountry);
+    if (pppRatio === null) {
+      const fxRate = economicData.getFX(fromCountry, toCountry);
+      return fxRate !== null ? Math.round(numeric * fxRate) : numeric;
     }
-    return summary;
+    return Math.round(numeric * pppRatio);
   },
 
-  /**
-   * Creates and displays the modal.
-   * @param {Object} impactSummary - Summary from buildImpactSummary
-   * @param {Function} onClose - Callback for modal close
-   */
-  createModal: function(impactSummary, onClose) {
-    var overlay = document.createElement('div');
-    overlay.className = 'wizard-overlay';
-    
-    var modal = document.createElement('div');
-    modal.className = 'event-wizard-modal relocation-impact-modal';
-    // Ensure modal can anchor absolutely positioned close button
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    
-    // Header
-    var header = document.createElement('div');
-    header.className = 'event-wizard-step-header';
-    var title = document.createElement('h3');
-    title.textContent = 'Relocation Impact Review';
-    header.appendChild(title);
-    var subtitle = document.createElement('p');
-    subtitle.textContent = 'Some events need attention due to relocations in your timeline';
-    header.appendChild(subtitle);
-    var closeBtn = document.createElement('button');
-    closeBtn.className = 'modal-close-btn';
-    closeBtn.innerHTML = '&times;';
-    closeBtn.addEventListener('click', () => this.closeModal(overlay, onClose, false));
-    header.appendChild(closeBtn);
-    modal.appendChild(header);
-    
-    // Body
-    var body = document.createElement('div');
-    body.className = 'event-wizard-step-body';
-    
-    // Category sections
-    var categories = ['boundaryCrossers', 'simpleEvents'];
-    for (var cat of categories) {
-      if (impactSummary.byCategory[cat].length > 0) {
-        var section = this.createCategorySection(cat, impactSummary.byCategory[cat]);
-        body.appendChild(section);
+  // Internal helpers
+  attachSplitTooltip: function(rootEl) {
+    try {
+      const container = (rootEl.closest && rootEl.closest('.resolution-panel-container')) || (rootEl.querySelector && rootEl.querySelector('.resolution-panel-container')) || rootEl;
+      if (!container) return;
+      const input = container.querySelector('.part2-amount-input');
+      if (!input || typeof TooltipUtils === 'undefined' || !TooltipUtils.attachTooltip) return;
+      function getSymbolAndLocale(countryCode) {
+        try {
+          const rs = Config.getInstance().getCachedTaxRuleSet(countryCode);
+          const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
+          return { symbol: rs && rs.getCurrencySymbol ? rs.getCurrencySymbol() : (ls.currencySymbol || ''), locale: rs && rs.getNumberLocale ? rs.getNumberLocale() : (ls.numberLocale || 'en-US') };
+        } catch(_) { const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' }; return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' }; }
       }
+      function fmtWithSymbol(symbol, locale, value) {
+        if (value == null || value === '' || isNaN(Number(value))) return '';
+        const num = Number(value);
+        try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch(_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+      }
+      const provider = function(){
+        const baseAmt = container.getAttribute('data-base-amount');
+        const fromCountry = container.getAttribute('data-from-country');
+        const toCountry = container.getAttribute('data-to-country');
+        const toMeta = getSymbolAndLocale(toCountry);
+        const fromMeta = getSymbolAndLocale(fromCountry);
+        const fxAmtStr = container.getAttribute('data-fx-amount');
+        const pppAmtStr = container.getAttribute('data-ppp-amount');
+        const fxDate = container.getAttribute('data-fx-date');
+        const toCur = container.getAttribute('data-to-currency') || '';
+        const fxAmt = fmtWithSymbol(toMeta.symbol, toMeta.locale, fxAmtStr);
+        const pppAmt = fmtWithSymbol(toMeta.symbol, toMeta.locale, pppAmtStr);
+        const amtBase = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmt);
+        const fxD = fxDate ? new Date(fxDate).toISOString().substring(0,10) : 'latest';
+        return amtBase + ' in ' + toCur + ' is ' + fxAmt + ' as of ' + fxD + '.\nAdjusting for purchasing power it\'s ≈ ' + pppAmt + '.';
+      };
+      TooltipUtils.attachTooltip(input, provider, { hoverDelay: 300, touchDelay: 400, showOnFocus: true, persistWhileFocused: true, hideOnWizard: true });
+    } catch(_) {}
+  },
+
+  _animateOpen: function(expanderContainer) {
+    if (!expanderContainer) return;
+    const expander = (expanderContainer.classList && expanderContainer.classList.contains('resolution-panel-expander')) ? expanderContainer : (expanderContainer.querySelector && expanderContainer.querySelector('.resolution-panel-expander'));
+    const containerEl = (expanderContainer.querySelector && expanderContainer.querySelector('.resolution-panel-container')) || (expanderContainer.classList && expanderContainer.classList.contains('resolution-panel-container') ? expanderContainer : null);
+    if (expander) {
+      expander.style.height = '0px'; expander.style.overflow = 'hidden';
+      if (containerEl) { try { containerEl.classList.add('panel-anim'); } catch(_) {} }
+      requestAnimationFrame(function(){
+        const fullHeight = expander.scrollHeight;
+        if (containerEl) { try { containerEl.classList.add('visible'); } catch(_) {} }
+        expander.style.height = fullHeight + 'px';
+        const onOpened = function(e){ if (e.target !== expander) return; expander.style.height = 'auto'; expander.removeEventListener('transitionend', onOpened); };
+        expander.addEventListener('transitionend', onOpened);
+      });
+    } else if (containerEl) {
+      try { containerEl.classList.add('visible'); } catch(_) {}
     }
-    modal.appendChild(body);
-    
-    // Footer
-    var footer = document.createElement('div');
-    footer.className = 'event-wizard-step-footer';
-    var note = document.createElement('p');
-    note.textContent = 'You can run the simulation with unresolved impacts, but results may be inaccurate';
-    footer.appendChild(note);
-    var buttons = document.createElement('div');
-    buttons.className = 'event-wizard-buttons';
-    var reviewBtn = document.createElement('button');
-    reviewBtn.className = 'event-wizard-button primary';
-    reviewBtn.textContent = 'Review Events';
-    reviewBtn.addEventListener('click', () => this.closeModal(overlay, onClose, false));
-    var continueBtn = document.createElement('button');
-    continueBtn.className = 'event-wizard-button secondary';
-    continueBtn.textContent = 'Continue Anyway';
-    continueBtn.addEventListener('click', () => this.closeModal(overlay, onClose, true));
-    buttons.appendChild(reviewBtn);
-    buttons.appendChild(continueBtn);
-    footer.appendChild(buttons);
-    modal.appendChild(footer);
-    
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-    // Prevent background scroll while modal is open
-    try { document.body.classList.add('modal-open'); } catch (_) {}
-    
-    // Event listeners
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) {
-        this.closeModal(overlay, onClose, false);
-      }
+  },
+
+  _bindPanelInteractions: function(root, ctx) {
+    if (!root) return;
+    const closeBtn = root.querySelector('.panel-close-btn');
+    if (closeBtn) {
+      const self = this;
+      closeBtn.addEventListener('click', function(){
+        if (ctx.context === 'table') self.collapsePanelForTableRow(document.querySelector('tr[data-row-id="' + ctx.rowId + '"]'));
+        else if (ctx.context === 'accordion') self._collapseAccordionPanel(ctx.accordionItem);
+      });
+    }
+    const interactionRoot = (root.closest && root.closest('.resolution-panel-container')) || root;
+    const self = this;
+    interactionRoot.addEventListener('click', function(e){
+      const tab = e.target && e.target.closest && e.target.closest('.resolution-tab');
+      if (tab) { e.preventDefault(); self._handleTabSelection(interactionRoot, tab); return; }
+      const btn = e.target && e.target.closest && e.target.closest('.resolution-apply');
+      if (!btn) return; e.preventDefault(); e.stopPropagation();
+      const action = btn.getAttribute('data-action');
+      const payload = { rowId: (btn.getAttribute('data-row-id') || (ctx && ctx.rowId)), currency: btn.getAttribute('data-currency'), suggestedAmount: btn.getAttribute('data-suggested-amount'), suggestedCurrency: btn.getAttribute('data-suggested-currency') };
+      if (action === 'split') { const detail = btn.closest('.resolution-detail'); const input = detail ? detail.querySelector('.part2-amount-input') : null; payload.part2Amount = input ? input.value : undefined; }
+      else if (action === 'link') { const detail = btn.closest('.resolution-detail'); const sel = detail ? detail.querySelector('.country-selector') : null; payload.country = sel ? sel.value : undefined; }
+      self.handlePanelAction(ctx.event, action, payload, ctx.env);
     });
-    var handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        this.closeModal(overlay, onClose, false);
-      }
-    };
-    // store handler reference on overlay to ensure cleanup on all close paths
-    overlay._escHandler = handleKeyDown;
-    document.addEventListener('keydown', handleKeyDown);
+    this._bindTabKeyboard(interactionRoot);
   },
 
-  /**
-   * Creates the overview section.
-   * @param {Object} impactSummary - Summary object
-   * @returns {HTMLElement} Overview element
-   */
-  createOverviewSection: function(impactSummary) {
-    var section = document.createElement('div');
-    section.className = 'impact-overview';
-    
-    var catMappings = {
-      boundaryCrossers: { name: 'Boundary Crossers', icon: '⚠️' },
-      simpleEvents: { name: 'Simple Events', icon: 'ℹ️' }
+  _handleTabSelection: function(rootEl, tabButton) {
+    if (!rootEl || !tabButton) return;
+    const action = tabButton.getAttribute('data-action'); if (!action) return;
+    const tabs = rootEl.querySelectorAll('.resolution-tab');
+    tabs.forEach(function(tab){ const isActive = (tab === tabButton); tab.classList.toggle('resolution-tab-active', isActive); tab.setAttribute('aria-selected', isActive ? 'true' : 'false'); tab.setAttribute('tabindex', isActive ? '0' : '-1'); });
+    const details = rootEl.querySelectorAll('.resolution-detail');
+    let selectedDetail = null; const self = this;
+    details.forEach(function(detail){ const matches = detail.getAttribute('data-action') === action; if (matches) { selectedDetail = detail; if (!detail.classList.contains('resolution-detail-active') || detail.hasAttribute('hidden')) { self._animateOpenResolutionDetail(detail); } else { detail.setAttribute('aria-hidden', 'false'); detail.style.pointerEvents = ''; } } else if (!detail.hasAttribute('hidden') || detail.classList.contains('resolution-detail-active')) { self._animateCloseResolutionDetail(detail); } });
+  },
+
+  _bindTabKeyboard: function(rootEl) {
+    if (!rootEl || rootEl._resolutionTabKeyboardBound) return;
+    const self = this;
+    const keyHandler = function(event){
+      const tab = event.target && event.target.closest && event.target.closest('.resolution-tab'); if (!tab) return; const key = event.key; if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return; const tabs = Array.from(rootEl.querySelectorAll('.resolution-tab')); if (!tabs.length) return; const currentIndex = tabs.indexOf(tab); if (currentIndex === -1) return; let nextIndex = currentIndex; if (key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length; else if (key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length; else if (key === 'Home') nextIndex = 0; else if (key === 'End') nextIndex = tabs.length - 1; if (nextIndex === currentIndex) return; event.preventDefault(); const nextTab = tabs[nextIndex]; if (nextTab) { try { if (typeof nextTab.focus === 'function') nextTab.focus(); } catch(_) {} self._handleTabSelection(rootEl, nextTab); } };
+    rootEl.addEventListener('keydown', keyHandler);
+    rootEl._resolutionTabKeyboardBound = true;
+  },
+
+  _animateOpenResolutionDetail: function(detail) {
+    if (!detail) return; this._clearResolutionDetailTransition(detail); detail.classList.add('resolution-detail-active'); detail.removeAttribute('hidden'); detail.setAttribute('aria-hidden', 'false'); detail.style.pointerEvents = 'auto'; const targetHeight = detail.scrollHeight; detail.style.overflow = 'hidden'; detail.style.transition = 'none'; detail.style.height = '0px'; detail.style.opacity = '0'; // eslint-disable-next-line no-unused-expressions
+    detail.offsetHeight; detail.style.transition = 'height 0.24s ease, opacity 0.18s ease'; detail.style.height = targetHeight + 'px'; detail.style.opacity = '1';
+    const onEnd = function(evt){ if (evt && evt.target !== detail) return; if (detail._resolutionDetailTimer) { clearTimeout(detail._resolutionDetailTimer); detail._resolutionDetailTimer = null; } detail.style.transition = ''; detail.style.height = 'auto'; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; detail.removeEventListener('transitionend', onEnd); };
+    detail._resolutionDetailHandler = onEnd; detail.addEventListener('transitionend', onEnd); detail._resolutionDetailTimer = setTimeout(function(){ if (detail._resolutionDetailHandler) { onEnd({ target: detail }); } }, 320);
+  },
+
+  _animateCloseResolutionDetail: function(detail) {
+    if (!detail) return; this._clearResolutionDetailTransition(detail); detail.style.pointerEvents = 'none'; detail.setAttribute('aria-hidden', 'true'); const startHeight = detail.scrollHeight; if (!startHeight) { detail.classList.remove('resolution-detail-active'); detail.setAttribute('hidden', 'hidden'); detail.style.transition = ''; detail.style.height = ''; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; return; } const computedStyle = (typeof window !== 'undefined' && window.getComputedStyle) ? window.getComputedStyle(detail) : null; detail.style.overflow = 'hidden'; detail.style.transition = 'none'; detail.style.height = startHeight + 'px'; detail.style.opacity = computedStyle ? computedStyle.opacity || '1' : '1'; // eslint-disable-next-line no-unused-expressions
+    detail.offsetHeight; detail.style.transition = 'height 0.24s ease, opacity 0.18s ease'; detail.style.height = '0px'; detail.style.opacity = '0'; const onEnd = function(evt){ if (evt && evt.target !== detail) return; if (detail._resolutionDetailTimer) { clearTimeout(detail._resolutionDetailTimer); detail._resolutionDetailTimer = null; } detail.classList.remove('resolution-detail-active'); detail.setAttribute('hidden', 'hidden'); detail.style.transition = ''; detail.style.height = ''; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; detail.removeEventListener('transitionend', onEnd); }; detail._resolutionDetailHandler = onEnd; detail.addEventListener('transitionend', onEnd); detail._resolutionDetailTimer = setTimeout(function(){ if (detail._resolutionDetailHandler) { onEnd({ target: detail }); } }, 320);
+  },
+
+  _clearResolutionDetailTransition: function(detail) {
+    if (!detail) return; if (detail._resolutionDetailTimer) { try { clearTimeout(detail._resolutionDetailTimer); } catch(_) {} detail._resolutionDetailTimer = null; } if (detail._resolutionDetailHandler) { try { detail.removeEventListener('transitionend', detail._resolutionDetailHandler); } catch(_) {} detail._resolutionDetailHandler = null; }
+  },
+
+  _setupCollapseTriggers: function(opts) {
+    if (!opts || !opts.anchorEl) return;
+    const anchor = opts.anchorEl;
+    const self = this;
+    const clickOutsideHandler = function(e){
+      try {
+        if (opts.context === 'table') {
+          const row = anchor.previousElementSibling;
+          if (row && !anchor.contains(e.target) && !row.contains(e.target)) { self.collapsePanelForTableRow(row); }
+        } else if (opts.context === 'accordion') {
+          if (!anchor.contains(e.target)) self._collapseAccordionPanel(anchor);
+        }
+      } catch(_) {}
     };
-    
-    for (var key in catMappings) {
-      if (impactSummary.byCategory[key].length > 0) {
-        var catDiv = document.createElement('div');
-        catDiv.className = 'impact-category-summary';
-        catDiv.innerHTML = `${catMappings[key].icon} ${catMappings[key].name}: ${impactSummary.byCategory[key].length}`;
-        section.appendChild(catDiv);
-      }
+    document.addEventListener('click', clickOutsideHandler);
+    anchor._panelClickOutsideHandler = clickOutsideHandler;
+    const escHandler = function(e){ if (e && e.key === 'Escape') { if (opts.context === 'table') { const row = anchor.previousElementSibling; if (row) self.collapsePanelForTableRow(row); } else if (opts.context === 'accordion') { self._collapseAccordionPanel(anchor); } } };
+    document.addEventListener('keydown', escHandler);
+    anchor._panelEscHandler = escHandler;
+  },
+
+  _teardownCollapseTriggers: function(anchor) {
+    if (!anchor) return;
+    try { if (anchor._panelClickOutsideHandler) { document.removeEventListener('click', anchor._panelClickOutsideHandler); anchor._panelClickOutsideHandler = null; } } catch(_) {}
+    try { if (anchor._panelEscHandler) { document.removeEventListener('keydown', anchor._panelEscHandler); anchor._panelEscHandler = null; } } catch(_) {}
+  },
+
+  _collapseAccordionPanel: function(item) {
+    if (!item) return;
+    const expander = item.querySelector('.resolution-panel-expander');
+    const container = item.querySelector('.resolution-panel-container');
+    if (!expander && !container) return;
+    if (container) { try { container.classList.remove('visible'); } catch(_) {} }
+    if (expander) {
+      const current = expander.scrollHeight; expander.style.height = current + 'px';
+      // eslint-disable-next-line no-unused-expressions
+      expander.offsetHeight; requestAnimationFrame(function(){ expander.style.height = '0px'; });
+      const onClosed = function(e){ if (e.target !== expander) return; expander.removeEventListener('transitionend', onClosed); const wrapperToRemove = expander; if (wrapperToRemove && wrapperToRemove.parentNode) { wrapperToRemove.remove(); } };
+      expander.addEventListener('transitionend', onClosed);
+    } else if (container) {
+      setTimeout(function(){ if (container.parentNode) container.parentNode.remove(); }, 300);
     }
-    return section;
+    this._teardownCollapseTriggers(item);
   },
 
-  /**
-   * Creates a category section.
-   * @param {string} category - Category key
-   * @param {Array} events - Events in this category
-   * @returns {HTMLElement} Section element
-   */
-  createCategorySection: function(category, events) {
-    var catMappings = {
-      boundaryCrossers: { name: 'Boundary Crossers', guidance: 'boundary' },
-      simpleEvents: { name: 'Simple Events', guidance: 'simple' }
-    };
-    
-    var mapping = catMappings[category];
-    var section = document.createElement('div');
-    section.className = 'impact-category-section';
-
-    // Header acts as toggle control
-    var header = document.createElement('h4');
-    header.textContent = `${mapping.name} (${events.length})`;
-    // Initial state: collapsed for progressive disclosure
-    header.setAttribute('aria-expanded', 'false');
-    header.style.cursor = 'pointer';
-    section.appendChild(header);
-
-    // Collapsible body wrapper (guidance + list)
-    var bodyContainer = document.createElement('div');
-    bodyContainer.className = 'impact-category-body';
-    bodyContainer.style.display = 'none';
-
-    var guidance = document.createElement('p');
-    guidance.className = 'impact-guidance';
-    guidance.textContent = this.getCategoryGuidance(mapping.guidance);
-    bodyContainer.appendChild(guidance);
-
-    var list = document.createElement('ul');
-    list.className = 'impact-event-list';
-    for (var event of events) {
-      var item = document.createElement('li');
-      item.className = 'impact-event-item';
-      var name = event.id || event.name || 'Unnamed Event';
-      var ageRange = `${event.fromAge || '?'} - ${event.toAge || '?'}`;
-      var message = event.relocationImpact.message;
-      var typeLabel = this.getEventTypeLabel(event);
-      var quotedName = name ? '"' + name + '"' : '';
-      var nameAndAge = quotedName && ageRange ? (quotedName + ', ' + ageRange) : (quotedName || ageRange);
-      item.innerHTML = `<strong>${typeLabel}</strong> (${nameAndAge}): ${message}`;
-
-      // For boundary-crossing properties/mortgages, provide explicit Keep/Sell controls
-      if (category === 'boundaryCrossers' && (event.type === 'R' || event.type === 'M')) {
-        var actions = document.createElement('div');
-        actions.className = 'impact-event-actions';
-
-        var keepBtn = document.createElement('button');
-        keepBtn.className = 'event-wizard-button event-wizard-button-secondary';
-        keepBtn.textContent = 'Keep Property';
-        keepBtn.addEventListener('click', (function(ev) {
-          return () => {
-            try { RelocationImpactAssistant._keepProperty(ev); } catch (e) { console.error(e); }
-          };
-        })(event));
-
-        var sellBtn = document.createElement('button');
-        sellBtn.className = 'event-wizard-button primary';
-        sellBtn.textContent = 'Sell Property';
-        sellBtn.addEventListener('click', (function(ev) {
-          return () => {
-            try { RelocationImpactAssistant._sellProperty(ev); } catch (e) { console.error(e); }
-          };
-        })(event));
-
-        actions.appendChild(keepBtn);
-        actions.appendChild(sellBtn);
-        item.appendChild(actions);
-      }
-
-      list.appendChild(item);
-    }
-    bodyContainer.appendChild(list);
-
-    section.appendChild(bodyContainer);
-
-    // Toggle visibility on header click
-    header.addEventListener('click', function() {
-      var isExpanded = header.getAttribute('aria-expanded') === 'true';
-      var nextState = !isExpanded;
-      header.setAttribute('aria-expanded', nextState ? 'true' : 'false');
-      bodyContainer.style.display = nextState ? '' : 'none';
-    });
-
-    return section;
-  },
-
-  /**
-   * Keep property: auto-link to origin country and clear impact without changing currency.
-   * Also links any associated mortgage to the same country.
-   */
+  // Legacy property helpers (used by keep/sell actions)
   _keepProperty: function(event) {
     try {
       var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
@@ -270,81 +409,43 @@ var RelocationImpactAssistant = {
       if (!etm) return;
       var startCountry = typeof etm.getStartCountry === 'function' ? etm.getStartCountry() : Config.getInstance().getDefaultCountry();
       var origin = typeof etm.detectPropertyCountry === 'function' ? etm.detectPropertyCountry(Number(event.fromAge), startCountry) : startCountry;
-
-      // Helper to find table rows by id and type
       function findRowsByIdAndType(id, type) {
         var rows = Array.from(document.querySelectorAll('#Events tbody tr'));
-        return rows.filter(function(r) {
-          var t = r.querySelector('.event-type');
-          var n = r.querySelector('.event-name');
-          return t && n && t.value === type && n.value === id;
-        });
+        return rows.filter(function(r){ var t = r.querySelector('.event-type'); var n = r.querySelector('.event-name'); return t && n && t.value === type && n.value === id; });
       }
-
-      // Link the property row
       var propRows = findRowsByIdAndType(event.id, 'R');
-      for (var i = 0; i < propRows.length; i++) {
-        etm.getOrCreateHiddenInput(propRows[i], 'event-linked-country', origin);
-      }
-      // Link any associated mortgage rows
+      for (var i = 0; i < propRows.length; i++) { etm.getOrCreateHiddenInput(propRows[i], 'event-linked-country', origin); }
       var mortRows = findRowsByIdAndType(event.id, 'M');
-      for (var j = 0; j < mortRows.length; j++) {
-        etm.getOrCreateHiddenInput(mortRows[j], 'event-linked-country', origin);
-      }
-
+      for (var j = 0; j < mortRows.length; j++) { etm.getOrCreateHiddenInput(mortRows[j], 'event-linked-country', origin); }
       RelocationImpactAssistant._refreshImpacts();
-    } catch (e) {
-      console.error('Error in _keepProperty:', e);
-    }
+    } catch(e) { try { console.error('Error in _keepProperty:', e); } catch(_) {} }
   },
 
-  /**
-   * Sell property: set property and associated mortgage to end at relocation age.
-   */
   _sellProperty: function(event) {
     try {
       var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
       var etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
       if (!etm) return;
-
-      // Find the relocation boundary age
       var events = webUI.readEvents(false) || [];
-      var mv = events.find(function(e) { return e && e.id === (event.relocationImpact && event.relocationImpact.mvEventId); });
+      var mv = events.find(function(e){ return e && e.id === (event.relocationImpact && event.relocationImpact.mvEventId); });
       if (!mv) return;
       var relocationAge = Number(mv.fromAge);
-
       function findRowsByIdAndType(id, type) {
         var rows = Array.from(document.querySelectorAll('#Events tbody tr'));
-        return rows.filter(function(r) {
-          var t = r.querySelector('.event-type');
-          var n = r.querySelector('.event-name');
-          return t && n && t.value === type && n.value === id;
-        });
+        return rows.filter(function(r){ var t = r.querySelector('.event-type'); var n = r.querySelector('.event-name'); return t && n && t.value === type && n.value === id; });
       }
-
       function setToAge(row, age) {
         var toAgeInput = row.querySelector('.event-to-age');
-        if (toAgeInput) {
-          toAgeInput.value = String(age);
-          toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+        if (toAgeInput) { toAgeInput.value = String(age); toAgeInput.dispatchEvent(new Event('change', { bubbles: true })); }
       }
-
-      // End property at relocation boundary
       var propRows = findRowsByIdAndType(event.id, 'R');
       for (var i = 0; i < propRows.length; i++) setToAge(propRows[i], relocationAge);
-
-      // End associated mortgage at relocation boundary
       var mortRows = findRowsByIdAndType(event.id, 'M');
       for (var j = 0; j < mortRows.length; j++) setToAge(mortRows[j], relocationAge);
-
       RelocationImpactAssistant._refreshImpacts();
-    } catch (e) {
-      console.error('Error in _sellProperty:', e);
-    }
+    } catch(e) { try { console.error('Error in _sellProperty:', e); } catch(_) {} }
   },
 
-  // Re-analyze impacts and refresh modal content (if open)
   _refreshImpacts: function() {
     try {
       var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
@@ -352,126 +453,12 @@ var RelocationImpactAssistant = {
       if (!etm) return;
       var events = webUI.readEvents(false);
       var startCountry = typeof etm.getStartCountry === 'function' ? etm.getStartCountry() : Config.getInstance().getDefaultCountry();
-      if (typeof RelocationImpactDetector !== 'undefined') {
-        RelocationImpactDetector.analyzeEvents(events, startCountry);
-      }
+      if (typeof RelocationImpactDetector !== 'undefined') { RelocationImpactDetector.analyzeEvents(events, startCountry); }
       etm.updateRelocationImpactIndicators(events);
-      if (typeof webUI.updateStatusForRelocationImpacts === 'function') {
-        webUI.updateStatusForRelocationImpacts(events);
-      }
-      if (webUI.eventAccordionManager && typeof webUI.eventAccordionManager.refresh === 'function') {
-        webUI.eventAccordionManager.refresh();
-      }
-
-      // If a modal is open, rebuild its body content
-      var overlay = document.querySelector('.wizard-overlay');
-      var modal = overlay && overlay.querySelector('.relocation-impact-modal');
-      if (modal) {
-        var body = modal.querySelector('.event-wizard-step-body');
-        if (body) {
-          // Rebuild body with fresh data
-          var summary = RelocationImpactAssistant.buildImpactSummary(events);
-          var newBody = document.createElement('div');
-          newBody.className = 'event-wizard-step-body';
-          var categories = ['boundaryCrossers', 'simpleEvents'];
-          for (var c = 0; c < categories.length; c++) {
-            var key = categories[c];
-            if (summary.byCategory[key].length > 0) {
-              newBody.appendChild(RelocationImpactAssistant.createCategorySection(key, summary.byCategory[key]));
-            }
-          }
-          body.replaceWith(newBody);
-        }
-      }
-    } catch (e) {
-      console.error('Error refreshing relocation impacts:', e);
-    }
-  },
-
-  /**
-   * Returns a human-readable label for the event type, considering sim mode and relocation.
-   * @param {Object} event - SimEvent-like object
-   * @returns {string}
-   */
-  getEventTypeLabel: function(event) {
-    try {
-      var t = event && event.type ? String(event.type) : '';
-      if (!t) return 'Event';
-
-      // Relocation: MV-XX → country name
-      if (t.indexOf('MV-') === 0 && t.length > 3) {
-        var code = t.substring(3).toLowerCase();
-        try {
-          var countries = Config.getInstance().getAvailableCountries();
-          var match = Array.isArray(countries) ? countries.find(function(c) { return String(c.code).toLowerCase() === code; }) : null;
-          if (match && match.name) return 'Relocation to ' + match.name;
-        } catch (_) {}
-        return 'Relocation';
-      }
-
-      // Determine simulation mode
-      var simMode = 'single';
-      try { simMode = WebUI.getInstance().getValue('simulation_mode') || 'single'; } catch (_) {}
-
-      // Salary labels depend on mode
-      if (t === 'SI') return simMode === 'couple' ? 'Your Salary' : 'Salary Income';
-      if (t === 'SInp') return simMode === 'couple' ? 'Your Salary (no pension)' : 'Salary (no pension)';
-      if (t === 'SI2') return 'Their Salary';
-      if (t === 'SI2np') return 'Their Salary (no pension)';
-
-      // Other common types
-      if (t === 'UI') return 'RSU Income';
-      if (t === 'RI') return 'Rental Income';
-      if (t === 'DBI') return 'Defined Benefit Income';
-      if (t === 'FI') return 'Tax-free Income';
-      if (t === 'E') return 'Expense';
-      if (t === 'R') return 'Real Estate';
-      if (t === 'M') return 'Mortgage';
-      if (t === 'SM') return 'Stock Market';
-
-      return t; // Fallback to raw type code
-    } catch (_) {
-      return 'Event';
-    }
-  },
-
-  /**
-   * Gets guidance text for a category.
-   * @param {string} category - Category name
-   * @returns {string} Guidance text
-   */
-  getCategoryGuidance: function(category) {
-    switch (category) {
-      case 'boundary':
-        return 'These events span relocation boundaries. You can split them into separate events or peg their currency to maintain value.';
-      case 'simple':
-        return 'Review these events to ensure amounts reflect the cost of living in the destination country.';
-      case 'property':
-        return 'Property events should be linked to their original country to maintain correct inflation and currency.';
-      case 'pension':
-        return 'The destination country has a state-only pension system. Convert pensionable salary events to non-pensionable (SInp).';
-      default:
-        return '';
-    }
-  },
-
-  /**
-   * Closes the modal and calls the callback.
-   * @param {HTMLElement} overlay - The overlay element
-   * @param {Function} onClose - Callback function
-   * @param {boolean} continueSimulation - Whether to continue
-   */
-  closeModal: function(overlay, onClose, continueSimulation) {
-    // Always remove the ESC key listener if present
-    if (overlay && overlay._escHandler) {
-      try { document.removeEventListener('keydown', overlay._escHandler); } catch (e) {}
-      overlay._escHandler = null;
-    }
-    try { document.body.classList.remove('modal-open'); } catch (_) {}
-    overlay.remove();
-    onClose(continueSimulation);
+      if (typeof webUI.updateStatusForRelocationImpacts === 'function') { webUI.updateStatusForRelocationImpacts(events); }
+      if (webUI.eventAccordionManager && typeof webUI.eventAccordionManager.refresh === 'function') { webUI.eventAccordionManager.refresh(); }
+    } catch(e) { try { console.error('Error refreshing relocation impacts:', e); } catch(_) {} }
   }
 };
 
-// Make RelocationImpactAssistant available globally
 this.RelocationImpactAssistant = RelocationImpactAssistant;
