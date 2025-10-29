@@ -208,7 +208,6 @@ class WebUI extends AbstractUI {
   setVersion(version) {
     const key = 'simulatorVersion';
     try { localStorage.setItem(key, version); } catch (_) {}
-    try { if (typeof console !== 'undefined' && console.log) console.log('[Config] Wrote app version to storage', { key: key, newVersion: String(version) }); } catch (_) {}
     const versionSpan = document.querySelector('.version');
     if (versionSpan) {
       versionSpan.textContent = `Version ${version}`;

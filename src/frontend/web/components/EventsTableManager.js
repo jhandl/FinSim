@@ -1508,10 +1508,18 @@ class EventsTableManager {
       const adjPanelInput = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.part2-amount-input');
       part2AmountRaw = adjPanelInput ? adjPanelInput.value : '';
     }
+    // Identify MV event and destination up-front for robust locale parsing
+    const mvEvent = events.find(e => e.id === event.relocationImpact.mvEventId);
+    if (!mvEvent) return;
+    const relocationAge = mvEvent.fromAge;
+    const destCountry = mvEvent.type.substring(3).toLowerCase();
+
     // Determine locale hints from the inline resolution panel
     const panelContainer = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.resolution-panel-container');
-    const toCountryHint = panelContainer ? panelContainer.getAttribute('data-to-country') : null;
-    const fromCountryHint = panelContainer ? panelContainer.getAttribute('data-from-country') : null;
+    let toCountryHint = panelContainer ? panelContainer.getAttribute('data-to-country') : null;
+    let fromCountryHint = panelContainer ? panelContainer.getAttribute('data-from-country') : null;
+    if (!toCountryHint) toCountryHint = destCountry;
+    if (!fromCountryHint) { try { fromCountryHint = this.getOriginCountry(mvEvent, this.getStartCountry()); } catch(_) {} }
 
     // Locale-aware parser using a specific country's number formatting
     const parseByCountry = (val, countryCode) => {
@@ -1546,10 +1554,6 @@ class EventsTableManager {
 
     const part2AmountNum = parseByCountry(part2AmountRaw, toCountryHint);
     const part2Amount = (typeof part2AmountNum === 'number') ? String(part2AmountNum) : '';
-    const mvEvent = events.find(e => e.id === event.relocationImpact.mvEventId);
-    if (!mvEvent) return;
-    const relocationAge = mvEvent.fromAge;
-    const destCountry = mvEvent.type.substring(3).toLowerCase();
     const destRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
     const destCurrency = destRuleSet ? destRuleSet.getCurrencyCode() : 'EUR';
     const linkedEventId = 'split_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -1582,6 +1586,7 @@ class EventsTableManager {
     this.getOrCreateHiddenInput(part2Row, 'event-linked-event-id', linkedEventId);
     this.getOrCreateHiddenInput(part2Row, 'event-currency', destCurrency);
     if (toCountryHint) this.getOrCreateHiddenInput(part2Row, 'event-country', String(toCountryHint).toLowerCase());
+    
     row.insertAdjacentElement('afterend', part1Row);
     part1Row.insertAdjacentElement('afterend', part2Row);
 

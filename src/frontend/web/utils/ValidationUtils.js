@@ -27,6 +27,18 @@ class ValidationUtils {
     switch (type) {
       case 'money':
       case 'currency': {
+        // First, try locale-aware parsing if available
+        try {
+          if (typeof FormatUtils !== 'undefined' && typeof FormatUtils.parseCurrency === 'function') {
+            const parsedLocale = FormatUtils.parseCurrency(str);
+            if (parsedLocale !== undefined) {
+              return parsedLocale;
+            }
+          }
+        } catch (_) {
+          // Fall back to generic parsing below
+        }
+
         // Preserve an optional leading minus sign (possibly separated by spaces
         // from the currency symbol), then strip formatting characters and symbols.
         let sign = 1;
@@ -37,20 +49,16 @@ class ValidationUtils {
           tmp = tmp.replace(/^\s*-\s*/, '');
         }
 
-        // Remove spaces and thousands separators (commas)
-        let s = tmp.replace(/[\s,]/g, '');
+        // Start with whitespace stripped
+        let s = tmp.replace(/\s+/g, '');
 
-        // Get dynamic currency symbol and create regex pattern
-        const localeSettings = FormatUtils.getLocaleSettings();
-        const currencySymbol = localeSettings.currencySymbol || '';
-        // Escape any regex metacharacters in the currency symbol
-        const esc = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-        // Remove leading/trailing currency symbol tokens (spaces already removed above)
-        const leadingCurrencyRegex = new RegExp(`^${esc}`);
-        s = s.replace(leadingCurrencyRegex, '');
-        const trailingCurrencyRegex = new RegExp(`${esc}$`);
-        s = s.replace(trailingCurrencyRegex, '');
+        // Remove ANY currency symbols present (not just the active locale's)
+        // Prefer Unicode currency class when available; fall back to a common set.
+        try {
+          s = s.replace(/[\p{Sc}]/gu, '');
+        } catch (_) {
+          s = s.replace(/[$€£¥₩₹₽₺₫₦₱₪₴₡₲฿₭₮₸₼₽]/g, '');
+        }
 
         // Detect multiplier suffix (K, M, k, m)
         let multiplier = 1;
@@ -63,6 +71,34 @@ class ValidationUtils {
         } else if (/[Mm]$/.test(s)) {
           multiplier = 1000000;
           s = s.slice(0, -1);
+        }
+
+        // Strip any remaining non-numeric tokens except decimal/group separators
+        s = s.replace(/[^0-9.,]/g, '');
+
+        // Normalise thousands and decimal separators robustly
+        if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
+          // Both present: decide decimal by whichever appears last
+          if (s.lastIndexOf('.') > s.lastIndexOf(',')) {
+            // '.' is decimal; remove all commas (groups)
+            s = s.replace(/,/g, '');
+          } else {
+            // ',' is decimal; remove all dots (groups), then normalise decimal to '.'
+            s = s.replace(/\./g, '');
+            s = s.replace(',', '.');
+          }
+        } else if (s.indexOf(',') !== -1) {
+          // Only comma present: if looks like grouping (3 digits after), drop commas; else treat as decimal
+          if (/,\d{3}(?:,|$)/.test(s)) {
+            s = s.replace(/,/g, '');
+          } else {
+            s = s.replace(',', '.');
+          }
+        } else if (s.indexOf('.') !== -1) {
+          // Only dot present: if looks like grouping, drop group dots
+          if (/\.+\d{3}(?:\.|$)/.test(s) || /\d\.\d{3}(?:\.|$)/.test(s)) {
+            s = s.replace(/\.(?=\d{3}(?:\.|$))/g, '');
+          }
         }
 
         // Allow optional leading minus sign and exactly one decimal point, no other characters

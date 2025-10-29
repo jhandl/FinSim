@@ -365,11 +365,23 @@ class EventSummaryRenderer {
     // Amount (editable currency input) - always generate but hide if not needed
     const showAmount = this.showsAmountField(event.type, event);
     const amountLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'amount');
+    // Fallback: if event.amount is empty (e.g., just after split via accordion), read the table value
+    let initialAmountValue = event.amount || '';
+    if (!initialAmountValue && event && event.rowId) {
+      try {
+        const row = document.querySelector('#Events tbody tr[data-row-id="' + event.rowId + '"]');
+        if (row) {
+          const amtEl = row.querySelector('.event-amount');
+          initialAmountValue = (amtEl && amtEl.value) ? amtEl.value : '';
+        }
+      } catch (_) {}
+    }
+    
     details.push(`
       <div class="detail-row" style="display: ${showAmount ? '' : 'none'}">
         <label>${amountLabel}:</label>
         <div class="editable-field">
-          <input type="text" class="accordion-edit-amount currency" inputmode="numeric" pattern="[0-9]*" value="${event.amount || ''}" data-accordion-id="${event.accordionId}" data-sort-key="event-amount">
+          <input type="text" class="accordion-edit-amount currency" inputmode="numeric" pattern="[0-9]*" value="${initialAmountValue}" data-accordion-id="${event.accordionId}" data-sort-key="event-amount">
         </div>
       </div>
     `);
