@@ -3,7 +3,6 @@ var WebUI_instance = null;
 class WebUI extends AbstractUI {
   
   constructor() {
-    try {
       super();
       
       // Initialize simulation state tracking
@@ -79,10 +78,6 @@ class WebUI extends AbstractUI {
       if (this.eventsTableManager) { // Ensure event table UI is also updated on init
         this.eventsTableManager.updateEventRowsVisibilityAndTypes();
       }
-      
-    } catch (error) {
-      throw error;
-    }
   }
 
   // Singleton
@@ -135,6 +130,41 @@ class WebUI extends AbstractUI {
       statusElement.classList.remove('relocation-impact');
       this.relocationImpactCount = null;
     }
+    // Update run button state based on relocation impacts
+    this.updateRunButtonState();
+  }
+
+  updateRunButtonState() {
+    const runButton = document.getElementById('runSimulation');
+    const mobileRunButton = document.getElementById('runSimulationMobile');
+    const hasImpacts = this.relocationImpactCount && this.relocationImpactCount > 0;
+    
+    // Don't disable if simulation is already running
+    if (this.isSimulationRunning) {
+      return;
+    }
+    
+    if (runButton) {
+      runButton.disabled = hasImpacts;
+      if (hasImpacts) {
+        runButton.classList.add('disabled');
+        runButton.style.pointerEvents = 'none';
+      } else {
+        runButton.classList.remove('disabled');
+        runButton.style.pointerEvents = '';
+      }
+    }
+    
+    if (mobileRunButton) {
+      mobileRunButton.disabled = hasImpacts;
+      if (hasImpacts) {
+        mobileRunButton.classList.add('disabled');
+        mobileRunButton.style.pointerEvents = 'none';
+      } else {
+        mobileRunButton.classList.remove('disabled');
+        mobileRunButton.style.pointerEvents = '';
+      }
+    }
   }
 
   setupStatusClickHandler() {
@@ -142,7 +172,7 @@ class WebUI extends AbstractUI {
     this.statusElement.addEventListener('click', () => {
       if (this.statusElement.classList.contains('relocation-impact') && this.relocationImpactCount) {
         this.showAlert(
-          `Cannot run simulation. ${this.relocationImpactCount} events need attention due to relocations in your timeline. Click the warning badges (⚠️) on affected events to resolve them.`,
+          `${this.relocationImpactCount} events need attention due to relocations in your timeline. Click the warning badges (⚠️) on affected events to resolve them.`,
           "Relocation Impacts Need Review"
         ).then(() => {
           if (this.eventsTableManager && typeof this.eventsTableManager.navigateToFirstImpact === 'function') {
@@ -178,6 +208,15 @@ class WebUI extends AbstractUI {
     this.tableManager.setDataRow(rowIndex, data);
   }
 
+  rerenderData() {
+    if (!window.dataSheet || window.dataSheet.length === 0) return;
+    this.tableManager.conversionCache = {};
+    this.tableManager.storedCountryTimeline = null; // Invalidate stored timeline before rerender
+    for (let i = 1; i < window.dataSheet.length; i++) {
+      this.tableManager.setDataRow(i, window.dataSheet[i]);
+    }
+  }
+
   setDataRowBackgroundColor(rowIndex, backgroundColor) {
     this.tableManager.setDataRowBackgroundColor(rowIndex, backgroundColor);
   }
@@ -191,23 +230,22 @@ class WebUI extends AbstractUI {
   }
 
   getVersion() {
-    try {
-      const key = 'simulatorVersion';
-      let stored = null;
-      try { if (typeof localStorage !== 'undefined') { stored = localStorage.getItem(key); } } catch (_) {}
-      // Record whether a version was actually present in localStorage so callers
-      // (e.g. Config.initialize) can decide whether to show one-time update toasts.
-      try { this._hasStoredVersion = (stored !== null && stored !== undefined); } catch (_) { this._hasStoredVersion = false; }
-      return stored || '1.27'; // TODO: Has to be a better way to get the starting default version
-    } catch (_) {
-      try { this._hasStoredVersion = false; } catch (_) {}
-      return '1.27';
+    const key = 'simulatorVersion';
+    let stored = null;
+    if (typeof localStorage !== 'undefined') { 
+      stored = localStorage.getItem(key); 
     }
+    // Record whether a version was actually present in localStorage so callers
+    // (e.g. Config.initialize) can decide whether to show one-time update toasts.
+    this._hasStoredVersion = (stored !== null && stored !== undefined);
+    return stored || '1.27'; // TODO: Has to be a better way to get the starting default version
   }
 
   setVersion(version) {
     const key = 'simulatorVersion';
-    try { localStorage.setItem(key, version); } catch (_) {}
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, version);
+    }
     const versionSpan = document.querySelector('.version');
     if (versionSpan) {
       versionSpan.textContent = `Version ${version}`;
@@ -312,8 +350,17 @@ class WebUI extends AbstractUI {
     return this.fileManager.saveToFile();
   }
 
-  loadFromFile(file) {
-    return this.fileManager.loadFromFile(file);
+  async loadFromFile(file) {
+    await this.fileManager.loadFromFile(file);
+    RelocationUtils.extractRelocationTransitions(this, this.chartManager);
+    // Rebuild currency selector now that scenario events (and currencies) are available
+    this.chartManager.setupChartCurrencyControls(this);
+    this.chartManager.refreshChartsWithCurrency();
+    // Also refresh table currency controls
+    if (this.tableManager) {
+      RelocationUtils.extractRelocationTransitions(this, this.tableManager);
+      this.tableManager.setupTableCurrencyControls();
+    }
   }
 
   // Lightweight proxy to read events without creating a new UIManager instance
@@ -395,100 +442,91 @@ class WebUI extends AbstractUI {
 
   // Apply investment type labels from the loaded TaxRuleSet to existing UI fields (IE-compatible two-type layout)
   applyInvestmentLabels() {
-    try {
-      const configInstance = Config.getInstance();
-      const ruleset = configInstance.getCachedTaxRuleSet(configInstance.getDefaultCountry());
-      if (!ruleset) return;
+    const configInstance = Config.getInstance();
+    const ruleset = configInstance.getCachedTaxRuleSet(configInstance.getDefaultCountry());
+    if (!ruleset) return;
 
-      const types = ruleset.getInvestmentTypes ? ruleset.getInvestmentTypes() : [];
-      const fundsType = ruleset.findInvestmentTypeByKey ? ruleset.findInvestmentTypeByKey('indexFunds') : null;
-      const sharesType = ruleset.findInvestmentTypeByKey ? ruleset.findInvestmentTypeByKey('shares') : null;
+    const types = ruleset.getInvestmentTypes ? ruleset.getInvestmentTypes() : [];
+    const fundsType = ruleset.findInvestmentTypeByKey ? ruleset.findInvestmentTypeByKey('indexFunds') : null;
+    const sharesType = ruleset.findInvestmentTypeByKey ? ruleset.findInvestmentTypeByKey('shares') : null;
 
-      const fundsLabel = (fundsType && fundsType.label) || (types[0] && types[0].label) || 'Index Funds';
-      const sharesLabel = (sharesType && sharesType.label) || (types[1] && types[1].label) || 'Shares';
+    const fundsLabel = (fundsType && fundsType.label) || (types[0] && types[0].label) || 'Index Funds';
+    const sharesLabel = (sharesType && sharesType.label) || (types[1] && types[1].label) || 'Shares';
 
-      const setLabelFor = (fieldId, text) => {
-        const el = document.querySelector(`label[for="${fieldId}"]`);
-        if (el) el.textContent = text;
-      };
+    const setLabelFor = (fieldId, text) => {
+      const el = document.querySelector(`label[for="${fieldId}"]`);
+      if (el) el.textContent = text;
+    };
 
-      // Initial capitals
-      setLabelFor('InitialFunds', fundsLabel);
-      setLabelFor('InitialShares', sharesLabel);
+    // Initial capitals
+    setLabelFor('InitialFunds', fundsLabel);
+    setLabelFor('InitialShares', sharesLabel);
 
-      // Allocations
-      setLabelFor('FundsAllocation', `${fundsLabel} Allocation`);
-      setLabelFor('SharesAllocation', `${sharesLabel} Allocation`);
+    // Allocations
+    setLabelFor('FundsAllocation', `${fundsLabel} Allocation`);
+    setLabelFor('SharesAllocation', `${sharesLabel} Allocation`);
 
-      // Drawdown priorities (labels only)
-      const prFunds = document.querySelector('[data-priority-id="PriorityFunds"] .priority-label');
-      if (prFunds) prFunds.textContent = fundsLabel;
-      const prShares = document.querySelector('[data-priority-id="PriorityShares"] .priority-label');
-      if (prShares) prShares.textContent = sharesLabel;
+    // Drawdown priorities (labels only)
+    const prFunds = document.querySelector('[data-priority-id="PriorityFunds"] .priority-label');
+    if (prFunds) prFunds.textContent = fundsLabel;
+    const prShares = document.querySelector('[data-priority-id="PriorityShares"] .priority-label');
+    if (prShares) prShares.textContent = sharesLabel;
 
-      // Growth rates table row headings
-      const setRowHeadingForInput = (inputId, label) => {
-        const input = document.getElementById(inputId);
-        if (!input) return;
-        const td = input.closest('td');
-        if (!td) return;
-        const tr = td.parentElement;
-        if (!tr) return;
-        const firstCell = tr.children && tr.children[0];
-        if (firstCell) firstCell.textContent = label;
-      };
-      setRowHeadingForInput('FundsGrowthRate', fundsLabel);
-      setRowHeadingForInput('SharesGrowthRate', sharesLabel);
+    // Growth rates table row headings
+    const setRowHeadingForInput = (inputId, label) => {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const td = input.closest('td');
+      if (!td) return;
+      const tr = td.parentElement;
+      if (!tr) return;
+      const firstCell = tr.children && tr.children[0];
+      if (firstCell) firstCell.textContent = label;
+    };
+    setRowHeadingForInput('FundsGrowthRate', fundsLabel);
+    setRowHeadingForInput('SharesGrowthRate', sharesLabel);
 
-      // Data table headers
-      const thIncomeFunds = document.querySelector('th[data-key="IncomeFundsRent"]');
-      if (thIncomeFunds) {
-        thIncomeFunds.textContent = fundsLabel;
-        thIncomeFunds.title = `Income generated from ${fundsLabel} investments`;
-      }
-      const thIncomeShares = document.querySelector('th[data-key="IncomeSharesRent"]');
-      if (thIncomeShares) {
-        thIncomeShares.textContent = sharesLabel;
-        thIncomeShares.title = `Income generated from ${sharesLabel} investments`;
-      }
-      const thFundsCapital = document.querySelector('th[data-key="FundsCapital"]');
-      if (thFundsCapital) {
-        thFundsCapital.textContent = fundsLabel;
-        thFundsCapital.title = `Total value of your ${fundsLabel} investments`;
-      }
-      const thSharesCapital = document.querySelector('th[data-key="SharesCapital"]');
-      if (thSharesCapital) {
-        thSharesCapital.textContent = sharesLabel;
-        thSharesCapital.title = `Total value of your ${sharesLabel} investments`;
-      }
+    // Data table headers
+    const thIncomeFunds = document.querySelector('th[data-key="IncomeFundsRent"]');
+    if (thIncomeFunds) {
+      thIncomeFunds.textContent = fundsLabel;
+      thIncomeFunds.title = `Income generated from ${fundsLabel} investments`;
+    }
+    const thIncomeShares = document.querySelector('th[data-key="IncomeSharesRent"]');
+    if (thIncomeShares) {
+      thIncomeShares.textContent = sharesLabel;
+      thIncomeShares.title = `Income generated from ${sharesLabel} investments`;
+    }
+    const thFundsCapital = document.querySelector('th[data-key="FundsCapital"]');
+    if (thFundsCapital) {
+      thFundsCapital.textContent = fundsLabel;
+      thFundsCapital.title = `Total value of your ${fundsLabel} investments`;
+    }
+    const thSharesCapital = document.querySelector('th[data-key="SharesCapital"]');
+    if (thSharesCapital) {
+      thSharesCapital.textContent = sharesLabel;
+      thSharesCapital.title = `Total value of your ${sharesLabel} investments`;
+    }
 
-      // Withdrawal rate tooltip (keep short header text)
-      const thWithdraw = document.querySelector('th[data-key="WithdrawalRate"]');
-      if (thWithdraw) {
-        // If we have more than two investment types, build a dynamic label list
-        const labelList = (types && types.length > 0) ? types.map(t => t.label).join(' + ') : `${fundsLabel} + ${sharesLabel}`;
-        thWithdraw.title = `Percentage of your liquid assets (${labelList} + Pension) that you're withdrawing to cover your expenses.`;
-      }
+    // Withdrawal rate tooltip (keep short header text)
+    const thWithdraw = document.querySelector('th[data-key="WithdrawalRate"]');
+    if (thWithdraw) {
+      // If we have more than two investment types, build a dynamic label list
+      const labelList = (types && types.length > 0) ? types.map(t => t.label).join(' + ') : `${fundsLabel} + ${sharesLabel}`;
+      thWithdraw.title = `Percentage of your liquid assets (${labelList} + Pension) that you're withdrawing to cover your expenses.`;
+    }
 
-      // Update charts legend labels via ChartManager
-      try {
-        if (this.chartManager && typeof this.chartManager.applyInvestmentLabels === 'function') {
-          this.chartManager.applyInvestmentLabels(fundsLabel, sharesLabel);
-        }
-        // Also rebuild chart datasets for dynamic investment types
-        if (this.chartManager && typeof this.chartManager.applyInvestmentTypes === 'function') {
-          this.chartManager.applyInvestmentTypes(types);
-        }
-      } catch (_) {}
-      // If there are more than two investment types, dynamically add columns for income and capital per type
-      try {
-        if (types && types.length > 2) {
-          this.applyDynamicColumns(types);
-        }
-      } catch (_) {}
-
-    } catch (_) {
-      // Silently ignore label application issues
+    // Update charts legend labels via ChartManager
+    if (this.chartManager && typeof this.chartManager.applyInvestmentLabels === 'function') {
+      this.chartManager.applyInvestmentLabels(fundsLabel, sharesLabel);
+    }
+    // Also rebuild chart datasets for dynamic investment types
+    if (this.chartManager && typeof this.chartManager.applyInvestmentTypes === 'function') {
+      this.chartManager.applyInvestmentTypes(types);
+    }
+    // If there are more than two investment types, dynamically add columns for income and capital per type
+    if (types && types.length > 2) {
+      this.applyDynamicColumns(types);
     }
   }
 
@@ -556,27 +594,26 @@ class WebUI extends AbstractUI {
       }
     } catch (err) {
       // If anything goes wrong, keep pinned-only to avoid breaking UI
-      try { console.warn('getIncomeColumnVisibility failed', err); } catch (_) {}
+      console.warn('getIncomeColumnVisibility failed', err);
     }
     return visibility;
   }
 
   // Dynamically add per-investment-type income and capital columns when >2 types exist
   applyDynamicColumns(types, incomeVisibility) {
-    try {
-      const thead = document.querySelector('#Data thead');
-      const headerGroupsRow = thead ? thead.querySelector('tr.header-groups') : null;
-      const headerRow = thead ? thead.querySelector('tr:nth-child(2)') : null;
-      if (!thead || !headerGroupsRow || !headerRow) return;
+    const thead = document.querySelector('#Data thead');
+    const headerGroupsRow = thead ? thead.querySelector('tr.header-groups') : null;
+    const headerRow = thead ? thead.querySelector('tr:nth-child(2)') : null;
+    if (!thead || !headerGroupsRow || !headerRow) return;
 
-      // Remove legacy income columns (Funds/Shares) if present
-      const legacyIncomeKeys = ['IncomeFundsRent', 'IncomeSharesRent'];
-      legacyIncomeKeys.forEach(k => {
-        const th = headerRow.querySelector(`th[data-key="${k}"]`);
-        if (th) th.remove();
-      });
-      // Remove any previously added dynamic income columns to avoid duplicates
-      Array.from(headerRow.querySelectorAll('th[data-key^="Income__"]')).forEach(th => th.remove());
+    // Remove legacy income columns (Funds/Shares) if present
+    const legacyIncomeKeys = ['IncomeFundsRent', 'IncomeSharesRent'];
+    legacyIncomeKeys.forEach(k => {
+      const th = headerRow.querySelector(`th[data-key="${k}"]`);
+      if (th) th.remove();
+    });
+    // Remove any previously added dynamic income columns to avoid duplicates
+    Array.from(headerRow.querySelectorAll('th[data-key^="Income__"]')).forEach(th => th.remove());
 
       // Insert dynamic income columns so that IncomeCash remains LAST in Gross Income
       const cashTh = headerRow.querySelector('th[data-key="IncomeCash"]');
@@ -649,16 +686,14 @@ class WebUI extends AbstractUI {
         });
 
         // 3) Rebuild body rows to match new header set
-        try {
-          const uiMgr = (typeof window !== 'undefined' && window.uiManager) ? window.uiManager : (typeof uiManager !== 'undefined' ? uiManager : null);
-          if (uiMgr && typeof uiMgr.updateDataRow === 'function') {
-            const ds = (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) ? dataSheet : null;
-            const total = ds ? Math.max(0, ds.length - 1) : 0;
-            for (let i = 1; i <= total; i++) {
-              uiMgr.updateDataRow(i, i / Math.max(1, total));
-            }
+        const uiMgr = (typeof window !== 'undefined' && window.uiManager) ? window.uiManager : (typeof uiManager !== 'undefined' ? uiManager : null);
+        if (uiMgr && typeof uiMgr.updateDataRow === 'function') {
+          const ds = (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) ? dataSheet : null;
+          const total = ds ? Math.max(0, ds.length - 1) : 0;
+          for (let i = 1; i <= total; i++) {
+            uiMgr.updateDataRow(i, i / Math.max(1, total));
           }
-        } catch (_) {}
+        }
       }
 
       // Adjust header group colspans for Gross Income and Assets
@@ -676,24 +711,20 @@ class WebUI extends AbstractUI {
         assetsGroup.colSpan = 3 + types.length;
       }
 
-      // Update vertical group borders to align with the new dynamic layout
-      try { if (typeof this.updateGroupBorders === 'function') this.updateGroupBorders(); } catch (_) {}
+    // Update vertical group borders to align with the new dynamic layout
+    if (typeof this.updateGroupBorders === 'function') this.updateGroupBorders();
 
-      // Rows rebuilt above; header groups updated below
-    } catch (_) {
-      // swallow errors to avoid breaking UI
-    }
+    // Rows rebuilt above; header groups updated below
   }
 
   // Mark the last column of each top-level group so borders can align dynamically
   updateGroupBorders() {
-    try {
-      const table = document.getElementById('Data');
-      if (!table) return;
-      const thead = table.querySelector('thead');
-      if (!thead) return;
-      const headerRow = thead.querySelector('tr:nth-child(2)');
-      if (!headerRow) return;
+    const table = document.getElementById('Data');
+    if (!table) return;
+    const thead = table.querySelector('thead');
+    if (!thead) return;
+    const headerRow = thead.querySelector('tr:nth-child(2)');
+    if (!headerRow) return;
 
       const allHeaders = Array.from(headerRow.querySelectorAll('th[data-key]'));
       if (allHeaders.length === 0) return;
@@ -756,7 +787,6 @@ class WebUI extends AbstractUI {
         lastTh.setAttribute('data-group-end', '1');
         lastTh.style.borderRight = '3px solid #666';
       }
-    } catch (_) {}
   }
 
   setupRunSimulationButton() {
@@ -776,6 +806,7 @@ class WebUI extends AbstractUI {
       this.clearAllWarnings();
 
       // Check for relocation impacts if feature is enabled
+      // Note: Button should already be disabled if impacts exist, but check as a safety measure
       try {
         if (Config.getInstance().isRelocationEnabled()) {
           // Ensure relocation impacts are freshly analyzed before gating
@@ -790,17 +821,7 @@ class WebUI extends AbstractUI {
           const hasImpacts = summary && summary.totalImpacted > 0;
 
           if (hasImpacts) {
-            // Reset UI state since we're not proceeding yet
-            this.isSimulationRunning = false;
-
-            this.showAlert(
-              `Cannot run simulation. ${summary.totalImpacted} events need attention due to relocations in your timeline. Click the warning badges (⚠️) on affected events to resolve them.`,
-              "Relocation Impacts Need Review"
-            ).then(() => {
-              if (this.eventsTableManager && typeof this.eventsTableManager.navigateToFirstImpact === 'function') {
-                this.eventsTableManager.navigateToFirstImpact();
-              }
-            });
+            // Button should already be disabled, but prevent execution as a safety measure
             return; // Don't proceed with normal flow
           }
         }
@@ -819,6 +840,10 @@ class WebUI extends AbstractUI {
 
   proceedWithSimulation(runButton, mobileRunButton) {
     this.isSimulationRunning = true;
+    // Clear stored country timeline at the start of a new simulation
+    if (this.tableManager) {
+      this.tableManager.storedCountryTimeline = null;
+    }
     runButton.disabled = true;
     runButton.classList.add('disabled');
     runButton.style.pointerEvents = 'none';
@@ -865,7 +890,7 @@ class WebUI extends AbstractUI {
         // Close any open dropdowns before launching the wizard (helps when invoking on dropdown fields)
         if (window.__openDropdowns) {
           window.__openDropdowns.forEach((closer) => {
-            try { if (typeof closer === 'function') closer(); } catch (_) {}
+            if (typeof closer === 'function') closer();
           });
         }
         // Use wizard's built-in logic only if there was a recently focused input field
@@ -883,7 +908,9 @@ class WebUI extends AbstractUI {
         e.stopPropagation();
         // Close any open dropdowns before launching the wizard
         if (window.__openDropdowns) {
-          window.__openDropdowns.forEach((closer) => { try { if (typeof closer === 'function') closer(); } catch (_) {} });
+          window.__openDropdowns.forEach((closer) => { 
+            if (typeof closer === 'function') closer(); 
+          });
         }
         wizard.start({ type: 'help', startAtStep: 0 });
       });
@@ -893,7 +920,9 @@ class WebUI extends AbstractUI {
         event.preventDefault();
         // Close any open dropdowns before launching the wizard
         if (window.__openDropdowns) {
-          window.__openDropdowns.forEach((closer) => { try { if (typeof closer === 'function') closer(); } catch (_) {} });
+          window.__openDropdowns.forEach((closer) => { 
+            if (typeof closer === 'function') closer(); 
+          });
         }
         // For keyboard shortcut, use same logic as Help button
         if (wizard.lastFocusedWasInput && wizard.lastFocusedField) {
@@ -1085,41 +1114,35 @@ class WebUI extends AbstractUI {
     }
   }
 
-  flush() {    
+  flush(rerender = false) {
+    if (rerender) {
+        if (window.dataSheet && window.dataSheet.length > 0) {
+            for (let i = 1; i < window.dataSheet.length; i++) {
+                this.setDataRow(i, window.dataSheet[i]);
+            }
+        }
+        return;
+    }
     // flush() is called at the end of updateStatusCell, which signals simulation completion
     if (this.isSimulationRunning) {
       // End-of-run: rebuild datasets transactionally and re-apply visibility to ensure single-step update
-      try {
-        const cfg = Config.getInstance();
-        const rs = (cfg && typeof cfg.getCachedTaxRuleSet === 'function') ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry && cfg.getDefaultCountry()) : null;
-        const types = (rs && typeof rs.getInvestmentTypes === 'function') ? (rs.getInvestmentTypes() || []) : [];
-        if (this.chartManager && typeof this.chartManager.applyInvestmentTypes === 'function') {
-          this.chartManager.applyInvestmentTypes(types, { preserveData: true, transactional: true });
-        }
-        // Recompute income visibility now that dataSheet is fully updated, then apply to chart
-        if (this.chartManager && typeof this.chartManager.applyIncomeVisibility === 'function') {
-          const incomeVisibility = this.getIncomeColumnVisibility();
-          this.chartManager.applyIncomeVisibility(incomeVisibility);
-        }
-      } catch (_) {}
+      const cfg = Config.getInstance();
+      const rs = (cfg && typeof cfg.getCachedTaxRuleSet === 'function') ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry && cfg.getDefaultCountry()) : null;
+      const types = (rs && typeof rs.getInvestmentTypes === 'function') ? (rs.getInvestmentTypes() || []) : [];
+      if (this.chartManager && typeof this.chartManager.applyInvestmentTypes === 'function') {
+        this.chartManager.applyInvestmentTypes(types, { preserveData: true, transactional: true });
+      }
+      // Recompute income visibility now that dataSheet is fully updated, then apply to chart
+      if (this.chartManager && typeof this.chartManager.applyIncomeVisibility === 'function') {
+        const incomeVisibility = this.getIncomeColumnVisibility();
+        this.chartManager.applyIncomeVisibility(incomeVisibility);
+      }
 
       this.isSimulationRunning = false;
-      const runButton = document.getElementById('runSimulation');
-      if (runButton) {
-        setTimeout(() => {
-          runButton.disabled = false;
-          runButton.classList.remove('disabled');
-          runButton.style.pointerEvents = '';
-          
-          // Also re-enable the mobile run button if it exists
-          const mobileRunButton = document.getElementById('runSimulationMobile');
-          if (mobileRunButton) {
-            mobileRunButton.disabled = false;
-            mobileRunButton.classList.remove('disabled');
-            mobileRunButton.style.pointerEvents = '';
-          }
-        }, 100);
-      }
+      // Update button state (will re-enable if no impacts, or keep disabled if impacts exist)
+      setTimeout(() => {
+        this.updateRunButtonState();
+      }, 100);
     }
   }
 
@@ -1384,26 +1407,19 @@ class WebUI extends AbstractUI {
       const el = document.getElementById(inputId);
       if (!el || typeof TooltipUtils === 'undefined') return;
       TooltipUtils.attachTooltip(el, () => {
-        try {
-          // Determine entered value as a fraction (e.g., 100 -> 1.0)
-          let entered = 1; // default to 100% for clarity when empty
-          try {
-            const raw = (el.value || '').toString().trim();
-            const parsed = FormatUtils.parsePercentage(raw);
-            if (typeof parsed === 'number' && !isNaN(parsed)) entered = parsed;
-          } catch (_) {}
+        // Determine entered value as a fraction (e.g., 100 -> 1.0)
+        let entered = 1; // default to 100% for clarity when empty
+        const raw = (el.value || '').toString().trim();
+        const parsed = FormatUtils.parsePercentage(raw);
+        if (typeof parsed === 'number' && !isNaN(parsed)) entered = parsed;
 
-          // Get age bands from TaxRuleSet (fallback to legacy config if needed)
-          let bands = {};
-          try {
-            const cfg = Config.getInstance();
-            const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
-            bands = (rs && typeof rs.getPensionContributionAgeBands === 'function')
-              ? rs.getPensionContributionAgeBands()
-              : (cfg && cfg.pensionContributionRateBands) ? cfg.pensionContributionRateBands : {};
-          } catch (_) {
-            // Keep bands as empty object
-          }
+        // Get age bands from TaxRuleSet (fallback to legacy config if needed)
+        let bands = {};
+        const cfg = Config.getInstance();
+        const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
+        bands = (rs && typeof rs.getPensionContributionAgeBands === 'function')
+          ? rs.getPensionContributionAgeBands()
+          : (cfg && cfg.pensionContributionRateBands) ? cfg.pensionContributionRateBands : {};
 
           const keys = Object.keys(bands)
             .map(k => parseInt(k, 10))
@@ -1431,10 +1447,6 @@ class WebUI extends AbstractUI {
           }
 
           return lines.join('\n');
-        } catch (err) {
-          // Fallback to an empty table structure
-          return '| Age | Contrib |\n| --- | --- |';
-        }
       }, {
         showOnFocus: true,
         persistWhileFocused: true,
@@ -1624,7 +1636,7 @@ class WebUI extends AbstractUI {
       }
     } catch (err) {
       // Non-fatal: keep native fallback if anything goes wrong
-      try { console.warn('setupPensionCappedDropdown failed', err); } catch (_) {}
+      console.warn('setupPensionCappedDropdown failed', err);
     }
   }
 
@@ -1708,7 +1720,7 @@ class WebUI extends AbstractUI {
       return this.fetchUserCountry();
     } catch (err) {
       // Non-fatal
-      try { console.warn('setupStartCountryDropdown failed', err); } catch (_) {}
+      console.warn('setupStartCountryDropdown failed', err);
     }
   }
 
@@ -1718,10 +1730,15 @@ class WebUI extends AbstractUI {
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       const response = await fetch('https://ipapi.co/country/', { signal: controller.signal });
       clearTimeout(timeoutId);
-      const country = (await response.text()).toLowerCase();
+      const countryRaw = (await response.text());
+      const country = typeof countryRaw === 'string' ? countryRaw.trim().toLowerCase() : '';
+      if (!country) return;
       const config = Config.getInstance();
       const available = config.getAvailableCountries();
-      const match = available.find(c => c.code.toLowerCase() === country);
+      const match = available.find(function(c){
+        var code = (c && c.code != null) ? String(c.code) : '';
+        return code.trim().toLowerCase() === country;
+      });
       if (match) {
         this.setValue('StartCountry', match.code);
         // Also update the visible dropdown label/selected state (avoid re-dispatching change)
@@ -1964,22 +1981,20 @@ class WebUI extends AbstractUI {
           pressedElement = inputEl;
 
           longPressTimer = setTimeout(() => {
-            try {
-              const wizard = (typeof Wizard !== 'undefined' && typeof Wizard.getInstance === 'function') ? Wizard.getInstance() : null;
-              if (!wizard || wizard.wizardActive) { cancelTimer(); return; }
+            const wizard = (typeof Wizard !== 'undefined' && typeof Wizard.getInstance === 'function') ? Wizard.getInstance() : null;
+            if (!wizard || wizard.wizardActive) { cancelTimer(); return; }
 
-              // Close any open dropdowns before launching the wizard
-              if (window.__openDropdowns) {
-                window.__openDropdowns.forEach((closer) => { try { if (typeof closer === 'function') closer(); } catch (_) {} });
-              }
-
-              // Provide context for help
-              wizard.lastFocusedField = pressedElement;
-              wizard.lastFocusedWasInput = true;
-              wizard.start({ type: 'help' });
-            } catch (_) {
-              // no-op
+            // Close any open dropdowns before launching the wizard
+            if (window.__openDropdowns) {
+              window.__openDropdowns.forEach((closer) => { 
+                if (typeof closer === 'function') closer(); 
+              });
             }
+
+            // Provide context for help
+            wizard.lastFocusedField = pressedElement;
+            wizard.lastFocusedWasInput = true;
+            wizard.start({ type: 'help' });
             cancelTimer();
           }, PRESS_DELAY_MS);
         },
@@ -1988,18 +2003,16 @@ class WebUI extends AbstractUI {
 
       // Suppress native context menu on long-press for inputs and custom dropdown controls (mobile only)
       document.addEventListener('contextmenu', (e) => {
-        try {
-          if (!isMobile) return;
-          const t = e.target;
-          if (!t) return;
-          if (t.closest && (
-            t.closest('input, textarea, select') ||
-            t.closest('.dropdown-wrapper') ||
-            t.closest('.visualization-control')
-          )) {
-            e.preventDefault();
-          }
-        } catch (_) {}
+        if (!isMobile) return;
+        const t = e.target;
+        if (!t) return;
+        if (t.closest && (
+          t.closest('input, textarea, select') ||
+          t.closest('.dropdown-wrapper') ||
+          t.closest('.visualization-control')
+        )) {
+          e.preventDefault();
+        }
       }, { capture: true });
 
       document.addEventListener(
@@ -2032,56 +2045,66 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     const webUi = WebUI.getInstance(); // Get WebUI instance
     await Config.initialize(webUi);   // Initialize Config and wait for it
     // Tax ruleset is preloaded by Config.initialize(); no need to preload again here
-      // Apply dynamic investment labels from ruleset (first two investment types)
-      try { webUi.applyInvestmentLabels(); } catch (_) {}
+    // Apply dynamic investment labels from ruleset (first two investment types)
+    webUi.applyInvestmentLabels();
+
+    // Initialize controls that depend on Config/tax rules being available
+    // IMPORTANT: Create StartCountry controls before any code may read it
+    webUi.setupPensionCappedDropdown();
+    await webUi.setupStartCountryDropdown();
 
     // Create the initial empty event row as early as possible post-Config init
     // so tests and UI logic can safely target row_1 without racing later steps
-    try { webUi.eventsTableManager && webUi.eventsTableManager.addEventRow(); } catch (_) {}
+    if (webUi.eventsTableManager) webUi.eventsTableManager.addEventRow();
 
     // Minimal trigger to ensure tax headers exist: build row 0 then remove it
-    try {
-      if (webUi.tableManager && typeof webUi.tableManager.setDataRow === 'function') {
-        webUi.tableManager.setDataRow(0, {});
-        const temp = document.getElementById('data_row_0');
-        if (temp && temp.parentNode) temp.parentNode.removeChild(temp);
-      }
-    } catch (_) {}
+    if (webUi.tableManager && typeof webUi.tableManager.setDataRow === 'function') {
+      webUi.tableManager.setDataRow(0, {});
+      const temp = document.getElementById('data_row_0');
+      if (temp && temp.parentNode) temp.parentNode.removeChild(temp);
+    }
 
     // Attach TooltipUtils to static data table headers (replace native title tooltips)
-    try { document.querySelectorAll('#Data thead th[title]').forEach(th => { const txt = th.getAttribute('title'); if (!txt) return; th.removeAttribute('title'); TooltipUtils.attachTooltip(th, txt, { hoverDelay: 150, touchDelay: 250 }); }); } catch (_) {}
+    document.querySelectorAll('#Data thead th[title]').forEach(th => { 
+      const txt = th.getAttribute('title'); 
+      if (!txt) return; 
+      th.removeAttribute('title'); 
+      TooltipUtils.attachTooltip(th, txt, { hoverDelay: 150, touchDelay: 250 }); 
+    });
 
     // After labels and headers are present, apply pinned-only income visibility
-    try {
-      const cfg = Config.getInstance();
-      const rs = (cfg.getCachedTaxRuleSet ? (cfg.getCachedTaxRuleSet(cfg.getDefaultCountry())) : null) || (cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet() : null);
-      if (rs && typeof rs.getInvestmentTypes === 'function') {
-        const investmentTypes = rs.getInvestmentTypes() || [];
-        const pinned = (typeof rs.getPinnedIncomeTypes === 'function') ? (rs.getPinnedIncomeTypes() || []) : [];
-        const pinnedVisibility = {};
-        for (let i = 0; i < pinned.length; i++) {
-          pinnedVisibility[String(pinned[i]).toLowerCase()] = true;
-        }
-        // Rebuild chart datasets to include dynamic investment income/capital, but preserve any data
-        try { webUi.chartManager.applyInvestmentTypes(investmentTypes, { preserveData: true, transactional: true }); } catch (_) {}
-        // Apply initial pinned-only visibility to both table and chart
-        webUi.applyDynamicColumns(investmentTypes, pinnedVisibility);
-        try { webUi.chartManager.applyIncomeVisibility(pinnedVisibility); } catch (_) {}
+    const cfg = Config.getInstance();
+    const rs = (cfg.getCachedTaxRuleSet ? (cfg.getCachedTaxRuleSet(cfg.getDefaultCountry())) : null) || (cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet() : null);
+    if (rs && typeof rs.getInvestmentTypes === 'function') {
+      const investmentTypes = rs.getInvestmentTypes() || [];
+      const pinned = (typeof rs.getPinnedIncomeTypes === 'function') ? (rs.getPinnedIncomeTypes() || []) : [];
+      const pinnedVisibility = {};
+      for (let i = 0; i < pinned.length; i++) {
+        pinnedVisibility[String(pinned[i]).toLowerCase()] = true;
       }
-    } catch (_) {}
+      // Rebuild chart datasets to include dynamic investment income/capital, but preserve any data
+      webUi.chartManager.applyInvestmentTypes(investmentTypes, { preserveData: true, transactional: true });
+      // Setup chart currency controls after charts are initialized
+      webUi.chartManager.setupChartCurrencyControls(webUi);
+      // Apply initial pinned-only visibility to both table and chart
+      webUi.applyDynamicColumns(investmentTypes, pinnedVisibility);
+      webUi.chartManager.applyIncomeVisibility(pinnedVisibility);
+    }
+    // Guard: If ruleset not yet cached at this point, still setup chart currency controls once
+    else if (webUi.chartManager) {
+      webUi.chartManager.setupChartCurrencyControls(webUi);
+    }
+    if (webUi.tableManager) {
+      webUi.tableManager.setupTableCurrencyControls();
+    }
     
     // Apply saved preferences (view mode + age/year) now that Config is ready
-    try { webUi.eventsTableManager && webUi.eventsTableManager._applySavedPreferences(); } catch (_) {}
-
-    // Initialize controls that depend on Config/tax rules being available
-    try { webUi.setupPensionCappedDropdown(); } catch (_) {}
-    // IMPORTANT: Create StartCountry controls before any code may read it
-    try { await webUi.setupStartCountryDropdown(); } catch (_) {}
+    if (webUi.eventsTableManager) webUi.eventsTableManager._applySavedPreferences();
 
     // (Initial row already added earlier)
 
     // Establish baseline for new scenario now that Config is initialized (avoids extra getVersion call)
-    try { webUi.fileManager.updateLastSavedState(); } catch (_) {}
+    webUi.fileManager.updateLastSavedState();
 
     // Load field labels configuration
     await webUi.fieldLabelsManager.loadLabels();

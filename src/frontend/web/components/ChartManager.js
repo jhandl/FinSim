@@ -4,9 +4,15 @@ class ChartManager {
 
   constructor() {
     this.cachedRowData = {};
+    this.reportingCurrency = null; // Selected currency for display (defaults to StartCountry currency)
+    this.relocationTransitions = []; // Array of {age, fromCountry, toCountry} for visual markers
+    this.originalValues = {}; // Cache of unconverted values for tooltip display
+    this.countryTimeline = []; // Array tracking which country is active at each age
+    this.currencyMode = 'unified'; // Charts always use unified mode (no mode selector in charts)
     try {
       this.setupCharts();
-    } catch (error) {
+    } catch (err) {
+      console.log('[DBG] ChartManager constructor setupCharts failed: ' + (err && err.message ? err.message : err));
       // Continue without charts rather than breaking the whole app
       this.chartsInitialized = false;
     }
@@ -100,25 +106,25 @@ class ChartManager {
       // ------------ Cashflow Chart (inflows/outflows + incomes stacked) ------------
       if (this.cashflowChart) {
         const baseDatasets = [
-          { label: 'Inflows', borderColor: '#4CAF50', backgroundColor: '#4CAF50', fill: false, data: [], stack: 'nostack1', borderDash: [5,5], pointRadius: 0, order: 0 },
-          { label: 'Outflows', borderColor: '#f44336', backgroundColor: '#f44336', fill: false, data: [], stack: 'nostack2', borderDash: [5,5], pointRadius: 0, order: 1 },
-          { label: 'Salaries', borderColor: '#90A4AE', backgroundColor: '#CFD8DC', fill: true, data: [], stack: 'main', pointRadius: 0, order: 2 },
-          { label: 'Rental', borderColor: '#A1887F', backgroundColor: '#D7CCC8', fill: true, data: [], stack: 'main', pointRadius: 0, order: 3 },
-          { label: 'RSUs', borderColor: '#F06292', backgroundColor: '#F8BBD0', fill: true, data: [], stack: 'main', pointRadius: 0, order: 4 },
-          { label: 'P.Pension', borderColor: '#4FC3F7', backgroundColor: '#B3E5FC', fill: true, data: [], stack: 'main', pointRadius: 0, order: 5 },
-          { label: 'S.Pension', borderColor: '#64B5F6', backgroundColor: '#BBDEFB', fill: true, data: [], stack: 'main', pointRadius: 0, order: 6 },
-          { label: 'D.Benefit', borderColor: '#9575CD', backgroundColor: '#E1BEE7', fill: true, data: [], stack: 'main', pointRadius: 0, order: 7 },
-          { label: 'Tax-Free', borderColor: '#26A69A', backgroundColor: '#B2DFDB', fill: true, data: [], stack: 'main', pointRadius: 0, order: 8 },
+          { label: 'Inflows', borderColor: '#4CAF50', backgroundColor: '#4CAF50', fill: false, data: [], stack: 'nostack1', borderDash: [5,5], pointRadius: 0, order: 0, _fieldKey: 'NetIncome' },
+          { label: 'Outflows', borderColor: '#f44336', backgroundColor: '#f44336', fill: false, data: [], stack: 'nostack2', borderDash: [5,5], pointRadius: 0, order: 1, _fieldKey: 'Expenses' },
+          { label: 'Salaries', borderColor: '#90A4AE', backgroundColor: '#CFD8DC', fill: true, data: [], stack: 'main', pointRadius: 0, order: 2, _fieldKey: 'IncomeSalaries' },
+          { label: 'Rental', borderColor: '#A1887F', backgroundColor: '#D7CCC8', fill: true, data: [], stack: 'main', pointRadius: 0, order: 3, _fieldKey: 'IncomeRentals' },
+          { label: 'RSUs', borderColor: '#F06292', backgroundColor: '#F8BBD0', fill: true, data: [], stack: 'main', pointRadius: 0, order: 4, _fieldKey: 'IncomeRSUs' },
+          { label: 'P.Pension', borderColor: '#4FC3F7', backgroundColor: '#B3E5FC', fill: true, data: [], stack: 'main', pointRadius: 0, order: 5, _fieldKey: 'IncomePrivatePension' },
+          { label: 'S.Pension', borderColor: '#64B5F6', backgroundColor: '#BBDEFB', fill: true, data: [], stack: 'main', pointRadius: 0, order: 6, _fieldKey: 'IncomeStatePension' },
+          { label: 'D.Benefit', borderColor: '#9575CD', backgroundColor: '#E1BEE7', fill: true, data: [], stack: 'main', pointRadius: 0, order: 7, _fieldKey: 'IncomeDefinedBenefit' },
+          { label: 'Tax-Free', borderColor: '#26A69A', backgroundColor: '#B2DFDB', fill: true, data: [], stack: 'main', pointRadius: 0, order: 8, _fieldKey: 'IncomeTaxFree' },
         ];
 
         const dynamicIncomeDatasets = invTypes.map((t, idx) => {
           const key = t && t.key ? t.key : `asset${idx}`;
           const label = t && t.label ? t.label : key;
           const { border, background } = getTypeColors(key, idx);
-          return { label, borderColor: border, backgroundColor: background, fill: true, data: [], stack: 'main', pointRadius: 0, order: 9 + idx, _invKey: key };
+          return { label, borderColor: border, backgroundColor: background, fill: true, data: [], stack: 'main', pointRadius: 0, order: 9 + idx, _invKey: key, _fieldKey: 'Income__' + key };
         });
 
-        const cashDataset = { label: 'Cash', borderColor: '#FFB74D', backgroundColor: '#FFE0B2', fill: true, data: [], stack: 'main', pointRadius: 0, order: 9 + dynamicIncomeDatasets.length + 1 };
+        const cashDataset = { label: 'Cash', borderColor: '#FFB74D', backgroundColor: '#FFE0B2', fill: true, data: [], stack: 'main', pointRadius: 0, order: 9 + dynamicIncomeDatasets.length + 1, _fieldKey: 'IncomeCash' };
 
         const newCashflowDatasets = [...baseDatasets, ...dynamicIncomeDatasets, cashDataset];
         if (options.preserveData) {
@@ -130,7 +136,7 @@ class ChartManager {
         }
         // Apply transactional update if requested
         const prevAnimCF = (this.cashflowChart.options && this.cashflowChart.options.animation);
-        if (options.transactional) { try { this.cashflowChart.options.animation = false; } catch (_) {} }
+        if (options.transactional) { this.cashflowChart.options.animation = false; }
         this.cashflowChart.data.datasets = newCashflowDatasets;
         this.cashflowIncomeStartIndex = baseDatasets.length;
         this.cashflowIncomeKeys = invTypes.map(t => t.key);
@@ -142,15 +148,15 @@ class ChartManager {
           this.cashflowIncomeLabelByKey[key] = label;
         });
         this.cashflowCashDatasetIndex = baseDatasets.length + dynamicIncomeDatasets.length;
-        if (options.transactional) { try { this.cashflowChart.options.animation = prevAnimCF; } catch (_) {} }
+        if (options.transactional) { this.cashflowChart.options.animation = prevAnimCF; }
       }
 
       // ------------ Assets Chart (stacked assets) ------------
       if (this.assetsChart) {
         // Fixed bottom part of the stack (datasetIndex ascending == bottom → top)
         const baseFixedWithoutCash = [
-          { label: 'R.Estate', borderColor: '#90A4AE', backgroundColor: '#CFD8DC', fill: true, data: [], pointRadius: 0, order: 0 },
-          { label: 'Pension', borderColor: '#64B5F6', backgroundColor: '#BBDEFB', fill: true, data: [], pointRadius: 0, order: 1 },
+          { label: 'R.Estate', borderColor: '#90A4AE', backgroundColor: '#CFD8DC', fill: true, data: [], pointRadius: 0, order: 0, _fieldKey: 'RealEstateCapital' },
+          { label: 'Pension', borderColor: '#64B5F6', backgroundColor: '#BBDEFB', fill: true, data: [], pointRadius: 0, order: 1, _fieldKey: 'PensionFund' },
         ];
 
         // Dynamic investment types come after Pension
@@ -158,11 +164,11 @@ class ChartManager {
           const key = t && t.key ? t.key : `asset${idx}`;
           const label = t && t.label ? t.label : key;
           const { border, background } = getTypeColors(key, idx);
-          return { label, borderColor: border, backgroundColor: background, fill: true, data: [], pointRadius: 0, order: 2 + idx, _invKey: key };
+          return { label, borderColor: border, backgroundColor: background, fill: true, data: [], pointRadius: 0, order: 2 + idx, _invKey: key, _fieldKey: 'Capital__' + key };
         });
 
         // Cash should be the top-most dataset in the stack and last in the array
-        const cashDataset = { label: 'Cash', borderColor: '#FFB74D', backgroundColor: '#FFE0B2', fill: true, data: [], pointRadius: 0, order: 2 + dynamicCapitalDatasets.length };
+        const cashDataset = { label: 'Cash', borderColor: '#FFB74D', backgroundColor: '#FFE0B2', fill: true, data: [], pointRadius: 0, order: 2 + dynamicCapitalDatasets.length, _fieldKey: 'Cash' };
 
         const newAssetsDatasets = [...baseFixedWithoutCash, ...dynamicCapitalDatasets, cashDataset];
         if (options.preserveData) {
@@ -173,11 +179,11 @@ class ChartManager {
           }
         }
         const prevAnimAS = (this.assetsChart.options && this.assetsChart.options.animation);
-        if (options.transactional) { try { this.assetsChart.options.animation = false; } catch (_) {} }
+        if (options.transactional) { this.assetsChart.options.animation = false; }
         this.assetsChart.data.datasets = newAssetsDatasets;
         this.assetsCapitalStartIndex = baseFixedWithoutCash.length;
         this.assetsCapitalKeys = invTypes.map(t => t.key);
-        if (options.transactional) { try { this.assetsChart.options.animation = prevAnimAS; } catch (_) {} }
+        if (options.transactional) { this.assetsChart.options.animation = prevAnimAS; }
       }
       this.rebuildDatasetIndexMaps();
       if (!this._repopulateFromCache()) {
@@ -221,12 +227,10 @@ class ChartManager {
       const wantsDynamic = (this.cashflowIncomeKeys || []).some(key => vis['income__' + String(key).toLowerCase()]);
       const hasDynamic = currentDatasets.some(ds => ds && ds._invKey);
       if (wantsDynamic && !hasDynamic) {
-        try {
-          const invTypes = (this.cashflowIncomeKeys || []).map((k, i) => ({ key: k, label: (this.cashflowIncomeLabelByKey && this.cashflowIncomeLabelByKey[k]) || k }));
-          if (typeof this.applyInvestmentTypes === 'function') {
-            this.applyInvestmentTypes(invTypes, { preserveData: true, transactional: true });
-          }
-        } catch (_) {}
+        const invTypes = (this.cashflowIncomeKeys || []).map((k, i) => ({ key: k, label: (this.cashflowIncomeLabelByKey && this.cashflowIncomeLabelByKey[k]) || k }));
+        if (typeof this.applyInvestmentTypes === 'function') {
+          this.applyInvestmentTypes(invTypes, { preserveData: true, transactional: true });
+        }
       }
       // Refresh currentDatasets reference after potential rebuild
       const refreshedDatasets = this.cashflowChart.data.datasets || [];
@@ -305,6 +309,7 @@ class ChartManager {
 
   setupCharts() {
     try {
+      
       // Setup Cashflow Chart
       const cashflowCtx = document.getElementById('cashflowGraph');
       if (!cashflowCtx) {
@@ -312,13 +317,9 @@ class ChartManager {
       }
       
       // Make sure we can get a 2D context
-      try {
-        const cashflowCtx2D = cashflowCtx.getContext('2d');
-        if (!cashflowCtx2D) {
-          throw new Error("Failed to get 2D context for cashflowGraph");
-        }
-      } catch (ctxError) {
-        throw ctxError;
+      const cashflowCtx2D = cashflowCtx.getContext('2d');
+      if (!cashflowCtx2D) {
+        throw new Error("Failed to get 2D context for cashflowGraph");
       }
       
       this.commonScaleOptions = {
@@ -368,7 +369,42 @@ class ChartManager {
                   label += ': ';
                 }
                 if (context.parsed.y !== null) {
-                  label += FormatUtils.formatCurrency(context.parsed.y);
+                  // Check if original values exist for this data point
+                  const chartManager = context.chart.chartManager || {};
+                  const originalValues = chartManager.originalValues || {};
+                  const rowIndex = context.dataIndex;
+                  const fieldKey = context.dataset._fieldKey || context.dataset.label;
+                  const original = originalValues[rowIndex] && originalValues[rowIndex][fieldKey];
+                  if (original) {
+                    // Format converted amount with reporting currency
+                    const reportingCurrency = chartManager.reportingCurrency || 'EUR';
+                    const toCountry = chartManager.getRepresentativeCountryForCurrency ? chartManager.getRepresentativeCountryForCurrency(reportingCurrency) : 'ie';
+                    const cfg = Config.getInstance();
+                    const rs = cfg.getCachedTaxRuleSet(toCountry);
+                    const numberLocale = rs ? rs.getNumberLocale() : 'en-IE';
+                    const currencyCode = rs ? rs.getCurrencyCode() : 'EUR';
+                    const converted = context.parsed.y.toLocaleString(numberLocale, {
+                      style: 'currency',
+                      currency: currencyCode,
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0
+                    });
+                    // Format original amount with original currency
+                    const origCountry = chartManager.getCountryForAge ? chartManager.getCountryForAge(context.chart.data.labels[rowIndex]) : 'ie';
+                    const origRs = cfg.getCachedTaxRuleSet(origCountry);
+                    const origNumberLocale = origRs ? origRs.getNumberLocale() : 'en-IE';
+                    const origCurrencyCode = original.currency || 'EUR';
+                    const origFormatted = original.value.toLocaleString(origNumberLocale, {
+                      style: 'currency',
+                      currency: origCurrencyCode,
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0
+                    });
+                    label += converted + ' (Original: ' + origFormatted + ')';
+                  } else {
+                    // Format with default currency if no original value
+                    label += FormatUtils.formatCurrency(context.parsed.y);
+                  }
                 }
                 return label;
               }
@@ -392,7 +428,8 @@ class ChartManager {
               stack: 'nostack1',
               borderDash: [5, 5],
               pointRadius: 0,
-              order: 0
+              order: 0,
+              _fieldKey: 'NetIncome'
             },
             {
               label: 'Outflows',
@@ -403,7 +440,8 @@ class ChartManager {
               stack: 'nostack2',
               borderDash: [5, 5],
               pointRadius: 0,
-              order: 1
+              order: 1,
+              _fieldKey: 'Expenses'
             },
             // Re-ordered stacked datasets so legend order aligns with visual stack (bottom → top)
             {
@@ -414,7 +452,8 @@ class ChartManager {
               data: [],
               stack: 'main',
               pointRadius: 0,
-              order: 2
+              order: 2,
+              _fieldKey: 'IncomeSalaries'
             },
             {
               label: 'Rental',
@@ -424,7 +463,8 @@ class ChartManager {
               data: [],
               stack: 'main',
               pointRadius: 0,
-              order: 3
+              order: 3,
+              _fieldKey: 'IncomeRentals'
             },
             {
               label: 'RSUs',
@@ -434,7 +474,8 @@ class ChartManager {
               data: [],
               stack: 'main',
               pointRadius: 0,
-              order: 4
+              order: 4,
+              _fieldKey: 'IncomeRSUs'
             },
             {
               label: 'P.Pension',
@@ -444,7 +485,8 @@ class ChartManager {
               data: [],
               stack: 'main',
               pointRadius: 0,
-              order: 5
+              order: 5,
+              _fieldKey: 'IncomePrivatePension'
             },
             {
               label: 'S.Pension',
@@ -454,7 +496,8 @@ class ChartManager {
               data: [],
               stack: 'main',
               pointRadius: 0,
-              order: 6
+              order: 6,
+              _fieldKey: 'IncomeStatePension'
             },
             {
               label: 'D.Benefit',
@@ -464,7 +507,8 @@ class ChartManager {
               data: [],
               stack: 'main',
               pointRadius: 0,
-              order: 7
+              order: 7,
+              _fieldKey: 'IncomeDefinedBenefit'
             },
             {
               label: 'Tax-Free',
@@ -474,7 +518,8 @@ class ChartManager {
               data: [],
               stack: 'main',
               pointRadius: 0,
-              order: 8
+              order: 8,
+              _fieldKey: 'IncomeTaxFree'
             },
             {
               label: 'Cash',
@@ -484,7 +529,8 @@ class ChartManager {
               data: [],
               stack: 'main',
               pointRadius: 0,
-              order: 10
+              order: 10,
+              _fieldKey: 'IncomeCash'
             }
           ]
         },
@@ -523,6 +569,7 @@ class ChartManager {
           }
         }
       });
+      this.cashflowChart.chartManager = this;
       // Default dynamic mapping: no investment-type incomes until ruleset applied
       this.cashflowIncomeStartIndex = 9; // After fixed incomes up to Tax-Free
       this.cashflowIncomeKeys = [];
@@ -550,7 +597,8 @@ class ChartManager {
               fill: true,
               data: [],
               pointRadius: 0,
-              order: 0
+              order: 0,
+              _fieldKey: 'RealEstateCapital'
             },
             {
               label: 'Pension',
@@ -559,7 +607,8 @@ class ChartManager {
               fill: true,
               data: [],
               pointRadius: 0,
-              order: 1
+              order: 1,
+              _fieldKey: 'PensionFund'
             },
             {
               label: 'Shares',
@@ -568,7 +617,8 @@ class ChartManager {
               fill: true,
               data: [],
               pointRadius: 0,
-              order: 2
+              order: 2,
+              _fieldKey: 'SharesCapital'
             },
             {
               label: 'Index Funds',
@@ -577,7 +627,8 @@ class ChartManager {
               fill: true,
               data: [],
               pointRadius: 0,
-              order: 3
+              order: 3,
+              _fieldKey: 'FundsCapital'
             },
             {
               label: 'Cash',
@@ -586,7 +637,8 @@ class ChartManager {
               fill: true,
               data: [],
               pointRadius: 0,
-              order: 4
+              order: 4,
+              _fieldKey: 'Cash'
             }
           ]
         },
@@ -614,6 +666,7 @@ class ChartManager {
           }
         }
       });
+      this.assetsChart.chartManager = this;
       // Default dynamic mapping for legacy two-types (shares then index funds)
       this.assetsCapitalStartIndex = 3;
       this.assetsCapitalKeys = ['shares', 'indexFunds'];
@@ -623,6 +676,77 @@ class ChartManager {
     } catch (error) {
       this.chartsInitialized = false;
       throw error;
+    }
+  }
+
+  setupChartCurrencyControls(webUI) {
+    const cfg = Config.getInstance();
+    if (!cfg.isRelocationEnabled()) return;
+
+    const graphContainers = document.querySelectorAll('.graph-container');
+    graphContainers.forEach(container => {
+        const controlsDiv = container.querySelector('.chart-controls') || document.createElement('div');
+        if (!controlsDiv.classList.contains('chart-controls')) {
+            controlsDiv.className = 'chart-controls';
+            container.appendChild(controlsDiv);
+        }
+        RelocationUtils.createCurrencyControls(controlsDiv, this, webUI);
+    });
+
+    RelocationUtils.extractRelocationTransitions(webUI, this);
+    this.refreshChartsWithCurrency();
+  }
+
+  handleCurrencyModeChange(newMode) {
+    if (this.currencyMode === newMode) return;
+    this.currencyMode = newMode;
+    this.updateCurrencyControlVisibility();
+    this.refreshChartsWithCurrency();
+  }
+
+  updateCurrencyControlVisibility() {
+    document.querySelectorAll('.chart-controls').forEach(controlsDiv => {
+        const naturalToggle = controlsDiv.querySelector(`#currencyModeNatural_${this.constructor.name}`);
+        const unifiedToggle = controlsDiv.querySelector(`#currencyModeUnified_${this.constructor.name}`);
+        const dropdownContainer = controlsDiv.querySelector('.currency-dropdown-container');
+
+        // Charts don't have mode toggles, so check currency count to determine visibility
+        if (!naturalToggle && !unifiedToggle) {
+            if (dropdownContainer) {
+                const select = dropdownContainer.querySelector('select');
+                const optionCount = select ? select.options.length : 0;
+                dropdownContainer.style.display = optionCount > 1 ? 'block' : 'none';
+            }
+            return;
+        }
+
+        // Only update toggles if they exist (should not happen for charts, but safe fallback)
+        if (this.currencyMode === 'natural') {
+            if (naturalToggle) naturalToggle.classList.add('mode-toggle-active');
+            if (unifiedToggle) unifiedToggle.classList.remove('mode-toggle-active');
+            if (dropdownContainer) dropdownContainer.style.display = 'none';
+        } else {
+            if (unifiedToggle) unifiedToggle.classList.add('mode-toggle-active');
+            if (naturalToggle) naturalToggle.classList.remove('mode-toggle-active');
+            if (dropdownContainer) {
+                const select = dropdownContainer.querySelector('select');
+                const optionCount = select ? select.options.length : 0;
+                dropdownContainer.style.display = optionCount > 1 ? 'block' : 'none';
+            }
+        }
+    });
+  }
+
+  getCountryForAge(age) {
+    return RelocationUtils.getCountryForAge(age, this);
+  }
+
+  getRepresentativeCountryForCurrency(code) {
+    try {
+      return RelocationUtils.getRepresentativeCountryForCurrency(code);
+    } catch (err) {
+      console.log('[DBG] ChartManager.getRepresentativeCountryForCurrency error: ' + (err && err.message ? err.message : err));
+      return code ? String(code).toLowerCase() : 'ie';
     }
   }
 
@@ -670,6 +794,55 @@ class ChartManager {
       }
       
       const i = rowIndex-1;
+      // Add conversion logic before updating datasets
+      const cfg = Config.getInstance();
+      if (cfg.isRelocationEnabled() && this.currencyMode === 'unified' && this.reportingCurrency) {
+        if (typeof this.getRepresentativeCountryForCurrency !== 'function') {
+          console.log('[DBG] ChartManager.updateChartsRow missing getRepresentativeCountryForCurrency');
+        }
+        const age = data.Age;
+        const sourceCountry = this.getCountryForAge(age);
+        const sourceCurrency = cfg.getCachedTaxRuleSet(sourceCountry) ? cfg.getCachedTaxRuleSet(sourceCountry).getCurrencyCode() : 'EUR';
+        const targetCurrency = this.reportingCurrency;
+        const year = cfg.getSimulationStartYear() + age;
+        const economicData = cfg.getEconomicData();
+        if (!economicData || !economicData.ready) {
+          console.log('[DBG] ChartManager.updateChartsRow economicData unavailable');
+        }
+        const toCountry = this.getRepresentativeCountryForCurrency(targetCurrency);
+        const monetaryFields = ['NetIncome', 'Expenses', 'IncomeSalaries', 'IncomeRentals', 'IncomeRSUs', 'IncomePrivatePension', 'IncomeStatePension', 'IncomeDefinedBenefit', 'IncomeTaxFree', 'IncomeCash', 'RealEstateCapital', 'PensionFund', 'Cash', 'FundsCapital', 'SharesCapital'];
+        monetaryFields.forEach(field => {
+          if (data[field] !== undefined) {
+            if (sourceCurrency !== targetCurrency) {
+              const converted = economicData.convert(data[field], sourceCountry, toCountry, year, { fxMode: 'ppp', baseYear: cfg.getSimulationStartYear() });
+              this.originalValues[i] = this.originalValues[i] || {};
+              this.originalValues[i][field] = { value: data[field], currency: sourceCurrency };
+              data[field] = converted !== null ? converted : data[field];
+            } else {
+              this.originalValues[i] = this.originalValues[i] || {};
+              this.originalValues[i][field] = { value: data[field], currency: sourceCurrency };
+            }
+          }
+        });
+        // Handle dynamic fields
+        Object.keys(data).forEach(key => {
+          if (key.startsWith('Income__') || key.startsWith('Capital__')) {
+            const field = key;
+            if (data[field] !== undefined) {
+              if (sourceCurrency !== targetCurrency) {
+                const converted = economicData.convert(data[field], sourceCountry, toCountry, year, { fxMode: 'ppp', baseYear: cfg.getSimulationStartYear() });
+                this.originalValues[i] = this.originalValues[i] || {};
+                this.originalValues[i][field] = { value: data[field], currency: sourceCurrency };
+                data[field] = converted !== null ? converted : data[field];
+              } else {
+                this.originalValues[i] = this.originalValues[i] || {};
+                this.originalValues[i][field] = { value: data[field], currency: sourceCurrency };
+              }
+            }
+          }
+        });
+      }
+      
       // Update Cashflow Chart
       this.cashflowChart.data.labels[i] = data.Age;
       // Inflows / Outflows by label
@@ -724,42 +897,79 @@ class ChartManager {
         this.assetsChart.update();
       }
     } catch (error) {
+      console.log('[DBG] ChartManager.updateChartsRow error: ' + (error && error.message ? error.message : error));
       // Silently fail as this is not critical
     }
   }
 
-  _repopulateFromCache() {
-    try {
-      if (!this.chartsInitialized) return false;
-      const cached = this.cachedRowData || {};
-      const keys = Object.keys(cached);
-      if (keys.length === 0) return false;
-
-      const numericKeys = keys.map(function(k) { return parseInt(k, 10); }).filter(function(n) { return !isNaN(n); }).sort(function(a, b) { return a - b; });
-      if (numericKeys.length === 0) return false;
-
-      let prevAnimCF, prevAnimAS;
-      try { prevAnimCF = (this.cashflowChart && this.cashflowChart.options) ? this.cashflowChart.options.animation : undefined; } catch (_) {}
-      try { prevAnimAS = (this.assetsChart && this.assetsChart.options) ? this.assetsChart.options.animation : undefined; } catch (_) {}
-      try { if (this.cashflowChart && this.cashflowChart.options) this.cashflowChart.options.animation = false; } catch (_) {}
-      try { if (this.assetsChart && this.assetsChart.options) this.assetsChart.options.animation = false; } catch (_) {}
-
-      for (let idx = 0; idx < numericKeys.length; idx++) {
-        const rowIndex = numericKeys[idx];
-        const rowData = cached[rowIndex];
-        if (!rowData) continue;
-        this.updateChartsRow(rowIndex, rowData, { skipCashflowUpdate: true, skipAssetsUpdate: true, skipCacheStore: true });
+  drawRelocationMarkers() {
+    if (!this.relocationTransitions.length) return;
+    // Use Chart.js annotation plugin if available
+    if (typeof Chart !== 'undefined' && Chart.plugins && Chart.plugins.get('annotation')) {
+      const annotations = {};
+      this.relocationTransitions.forEach((trans, idx) => {
+        const ageIndex = this.cashflowChart.data.labels.indexOf(trans.age);
+        if (ageIndex !== -1) {
+          annotations[`relocation${idx}`] = {
+            type: 'line',
+            xMin: ageIndex,
+            xMax: ageIndex,
+            borderColor: '#ccc',
+            borderWidth: 1,
+            borderDash: [5, 5],
+            label: {
+              content: `Relocated from ${trans.fromCountry.toUpperCase()} to ${trans.toCountry.toUpperCase()}`,
+              enabled: true,
+              position: 'top',
+              opacity: 0.5
+            }
+          };
+        }
+      });
+      if (this.cashflowChart.options.plugins) {
+        this.cashflowChart.options.plugins.annotation = { annotations };
+        this.cashflowChart.update();
       }
-
-      if (this.cashflowChart) this.cashflowChart.update();
-      if (this.assetsChart) this.assetsChart.update();
-
-      try { if (this.cashflowChart && this.cashflowChart.options) this.cashflowChart.options.animation = prevAnimCF; } catch (_) {}
-      try { if (this.assetsChart && this.assetsChart.options) this.assetsChart.options.animation = prevAnimAS; } catch (_) {}
-      return true;
-    } catch (_) {
-      return false;
+      if (this.assetsChart.options.plugins) {
+        this.assetsChart.options.plugins.annotation = { annotations };
+        this.assetsChart.update();
+      }
     }
+  }
+
+  refreshChartsWithCurrency() {
+    this._repopulateFromCache();
+    this.drawRelocationMarkers();
+  }
+
+  _repopulateFromCache() {
+    if (!this.chartsInitialized) return false;
+    const cached = this.cachedRowData || {};
+    const keys = Object.keys(cached);
+    if (keys.length === 0) return false;
+
+    const numericKeys = keys.map(function(k) { return parseInt(k, 10); }).filter(function(n) { return !isNaN(n); }).sort(function(a, b) { return a - b; });
+    if (numericKeys.length === 0) return false;
+
+    let prevAnimCF, prevAnimAS;
+    prevAnimCF = (this.cashflowChart && this.cashflowChart.options) ? this.cashflowChart.options.animation : undefined;
+    prevAnimAS = (this.assetsChart && this.assetsChart.options) ? this.assetsChart.options.animation : undefined;
+    if (this.cashflowChart && this.cashflowChart.options) this.cashflowChart.options.animation = false;
+    if (this.assetsChart && this.assetsChart.options) this.assetsChart.options.animation = false;
+
+    for (let idx = 0; idx < numericKeys.length; idx++) {
+      const rowIndex = numericKeys[idx];
+      const rowData = cached[rowIndex];
+      if (!rowData) continue;
+      this.updateChartsRow(rowIndex, rowData, { skipCashflowUpdate: true, skipAssetsUpdate: true, skipCacheStore: true });
+    }
+
+    if (this.cashflowChart) this.cashflowChart.update();
+    if (this.assetsChart) this.assetsChart.update();
+
+    if (this.cashflowChart && this.cashflowChart.options) this.cashflowChart.options.animation = prevAnimCF;
+    if (this.assetsChart && this.assetsChart.options) this.assetsChart.options.animation = prevAnimAS;
+    return true;
   }
 
   clearExtraChartRows(maxAge) {

@@ -9,7 +9,7 @@
     <title></title>
     <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico?v=2025-08-23-usc">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-    <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=2025-10-29-1">
+    <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20251101-3">
     <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=2025-10-28-1">
     <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-23-usc">
     <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-23-usc"/>
@@ -385,7 +385,10 @@
         </div>
 
         <div class="data-section card">
-            <h2>Simulation Data</h2>
+            <div class="card-header-flex">
+                <h2>Simulation Data</h2>
+                <div id="data-table-controls"></div>
+            </div>
 
             <div class="table-container">
                 <table id="Data">
@@ -455,42 +458,42 @@
     </main>
 
     <!-- SYSTEM UTILITIES SECTION -->
-    <script src="/src/frontend/AbstractUI.js?v=2025-09-04"></script>
-    <script src="/src/frontend/UIManager.js?v=2025-10-22-1"></script>
-    <script src="/src/frontend/web/utils/DOMUtils.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/utils/DeviceUtils.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/utils/FormatUtils.js?v=2025-10-29-3"></script>
-    <script src="/src/frontend/web/utils/TooltipUtils.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/utils/DropdownUtils.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/utils/SortingUtils.js?v=2025-10-26-1"></script>
-    <script src="/src/frontend/web/utils/RowSorter.js?v=2025-10-26-1"></script>
-    <script src="/src/frontend/web/utils/AccordionSorter.js?v=2025-10-26-1"></script>
-    <script src="/src/frontend/web/utils/NotificationUtils.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/utils/ErrorModalUtils.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/utils/FieldLabelsManager.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/utils/ValidationUtils.js?v=2025-10-29-2"></script>
-    <script src="/src/frontend/web/components/TableManager.js?v=2025-10-20-2"></script>
-    <script src="/src/frontend/web/components/EventsTableManager.js?v=2025-10-29-4"></script>
-    <script src="/src/frontend/web/components/RelocationImpactDetector.js?v=2025-10-26-1"></script>
-    <script src="/src/frontend/web/components/RelocationImpactAssistant.js?v=2025-10-28-2"></script>
-    <script src="/src/frontend/web/components/EventSummaryRenderer.js?v=2025-10-29-3"></script>
-    <script src="/src/frontend/web/components/EventAccordionManager.js?v=2025-10-29-2"></script>
-    <script src="/src/frontend/web/components/WizardManager.js?v=2025-10-23-2"></script>
-    <script src="/src/frontend/web/components/WizardRenderer.js?v=2025-10-23-1"></script>
-    <script src="/src/frontend/web/components/EventsWizard.js?v=2025-10-23-2"></script>
-    <script src="/src/frontend/web/components/ChartManager.js?v=2025-10-16"></script>
-    <script src="/src/frontend/web/components/FileManager.js?v=2025-10-20-1"></script>
-    <script src="/src/frontend/web/components/DragAndDrop.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/components/Wizard.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/components/ContentRenderer.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/components/WelcomeModal.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=2025-09-04"></script>
-    <script src="/src/frontend/web/WebUI.js?v=2025-10-23-1"></script>
-    <script src="/src/core/TaxRuleSet.js?v=2025-09-04"></script>
-    <script src="/src/core/Config.js?v=2025-10-24-2"></script>
+    <script src="/src/frontend/AbstractUI.js?v=20251101"></script>
+    <script src="/src/frontend/UIManager.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/DOMUtils.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/DeviceUtils.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/FormatUtils.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/TooltipUtils.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/DropdownUtils.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/SortingUtils.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/RowSorter.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/AccordionSorter.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/NotificationUtils.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/ErrorModalUtils.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/FieldLabelsManager.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/ValidationUtils.js?v=20251101"></script>
+    <script src="/src/frontend/web/utils/RelocationUtils.js?v=20250115"></script>
+    <script src="/src/frontend/web/components/TableManager.js?v=20250117"></script>
+    <script src="/src/frontend/web/components/EventsTableManager.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/RelocationImpactDetector.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/RelocationImpactAssistant.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/EventSummaryRenderer.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/EventAccordionManager.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/WizardManager.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/WizardRenderer.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/EventsWizard.js?v=20251109"></script>
+    <script src="/src/frontend/web/components/ChartManager.js?v=20250115"></script>
+    <script src="/src/frontend/web/components/FileManager.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/DragAndDrop.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/Wizard.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/ContentRenderer.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/WelcomeModal.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
+    <script src="/src/frontend/web/WebUI.js?v=20251101"></script>
+    <script src="/src/core/TaxRuleSet.js?v=2025-11-09-1"></script>
+    <script src="/src/core/Config.js?v=2025-11-09-1"></script>
     <script src="/src/core/Events.js?v=2025-09-04"></script>
-    <script src="/src/core/EconomicData.js?v=2025-10-18-1"></script>
-    <script src="/src/core/config/findata.json?v=2025-10-18-1"></script>
+    <script src="/src/core/EconomicData.js?v=2025-11-09-1"></script>
     <script src="/src/core/Person.js?v=2025-09-04"></script>
     <script src="/src/core/Taxman.js?v=2025-10-10-7"></script>
     <script src="/src/core/Equities.js?v=2025-09-04"></script>
@@ -499,7 +502,7 @@
     <script src="/src/core/Utils.js?v=2025-09-04"></script>
     <script src="/src/core/Attribution.js?v=2025-09-04"></script>
     <script src="/src/core/AttributionManager.js?v=2025-09-04"></script>
-    <script src="/src/core/Simulator.js?v=2025-10-12-2"></script>
+    <script src="/src/core/Simulator.js?v=2025-11-09-1"></script>
     
     <!-- Init app name after Config is initialized -->
     <script>

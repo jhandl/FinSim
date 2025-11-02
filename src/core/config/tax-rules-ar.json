@@ -9,8 +9,20 @@
     "currencyCode": "ARS",
     "currencySymbol": "$"
   },
-
-  "inflationRate": 0.15,
+  "economicData": {
+    "inflation": {
+      "cpi": 219.8839,
+      "year": 2024
+    },
+    "purchasingPowerParity": {
+      "value": 420.076325,
+      "year": 2024
+    },
+    "exchangeRate": {
+      "perEur": 1100.0,
+      "asOf": "2025-10-17"
+    }
+  },
 
   "incomeTax": {
     "name": "Impuesto a las Ganancias",

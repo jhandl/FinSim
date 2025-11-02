@@ -37,7 +37,6 @@ class EventsTableManager {
    * Attach tooltip to Part 2 suggestion input explaining PPP vs FX basis.
    */
   attachSplitTooltip(rootEl) {
-    try {
       const container = rootEl.closest('.resolution-panel-container') || rootEl.querySelector('.resolution-panel-container') || rootEl;
       if (!container) return;
       const input = container.querySelector('.part2-amount-input');
@@ -91,7 +90,6 @@ class EventsTableManager {
       };
 
       TooltipUtils.attachTooltip(input, provider, { hoverDelay: 300, touchDelay: 400, showOnFocus: true, persistWhileFocused: true, hideOnWizard: true });
-    } catch (_) {}
   }
 
   /**
@@ -106,7 +104,7 @@ class EventsTableManager {
   _applySavedPreferences() {
     try {
       // Skip until Config is initialized to avoid early calls into Config-dependent code (e.g., relocation labels)
-      try { Config.getInstance(); } catch (_) { return; }
+      Config.getInstance();
       // Retrieve stored preferences
       const storedView = localStorage.getItem('viewMode');
       const storedAgeYear = localStorage.getItem('ageYearMode');
@@ -143,14 +141,12 @@ class EventsTableManager {
   }
 
   getStartCountry() {
-    try {
-      const cfg = typeof Config !== 'undefined' ? Config.getInstance() : null;
-      const relocationOn = cfg && typeof cfg.isRelocationEnabled === 'function' ? cfg.isRelocationEnabled() : false;
-      if (relocationOn && this.webUI && typeof this.webUI.getValue === 'function') {
-        try { return this.webUI.getValue('StartCountry'); } catch (_) {}
-      }
-      if (cfg && typeof cfg.getDefaultCountry === 'function') return cfg.getDefaultCountry();
-    } catch (_) {}
+    const cfg = typeof Config !== 'undefined' ? Config.getInstance() : null;
+    const relocationOn = cfg && typeof cfg.isRelocationEnabled === 'function' ? cfg.isRelocationEnabled() : false;
+    if (relocationOn && this.webUI && typeof this.webUI.getValue === 'function') {
+      return this.webUI.getValue('StartCountry');
+    }
+    if (cfg && typeof cfg.getDefaultCountry === 'function') return cfg.getDefaultCountry();
     return undefined;
   }
 
@@ -278,6 +274,17 @@ class EventsTableManager {
         if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
           this.webUI.eventAccordionManager.refresh();
         }
+        // Refresh chart relocation transitions
+        if (this.webUI.chartManager) {
+          RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+          this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+          this.webUI.chartManager.refreshChartsWithCurrency();
+        }
+        // Refresh table currency controls
+        if (this.webUI.tableManager) {
+          RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
+          this.webUI.tableManager.setupTableCurrencyControls();
+        }
       }, 400);
     } else {
       // Complex animation with slide-up for multiple rows
@@ -342,6 +349,17 @@ class EventsTableManager {
         if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
           this.webUI.eventAccordionManager.refresh();
         }
+        // Refresh chart relocation transitions
+        if (this.webUI.chartManager) {
+          RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+          this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+          this.webUI.chartManager.refreshChartsWithCurrency();
+        }
+        // Refresh table currency controls
+        if (this.webUI.tableManager) {
+          RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
+          this.webUI.tableManager.setupTableCurrencyControls();
+        }
 
       }, 300); // Wait for slide animation to complete
     }, 200); // Wait for fade to complete
@@ -349,7 +367,6 @@ class EventsTableManager {
 
   // Single recomputation call used post-deletion regardless of row position/animation path
   recomputeRelocationImpacts() {
-    try {
       const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
       if (!cfg || !cfg.isRelocationEnabled || !cfg.isRelocationEnabled()) return;
       const events = this.webUI.readEvents(false);
@@ -360,8 +377,7 @@ class EventsTableManager {
       this.updateRelocationImpactIndicators(events);
       this.webUI.updateStatusForRelocationImpacts(events);
       // Ensure accordion view reflects latest table state
-      try { if (this.webUI.eventAccordionManager) { this.webUI.eventAccordionManager.refresh(); } } catch (_) {}
-    } catch (_) { /* non-fatal */ }
+      if (this.webUI.eventAccordionManager) this.webUI.eventAccordionManager.refresh();
   }
 
   setupEventTypeChangeHandler() {
@@ -375,7 +391,24 @@ class EventsTableManager {
           const row = e.target.closest('tr');
           if (row) {
             // Update the stored original type to the new user selection
-            row.dataset.originalEventType = e.target.value;
+            const oldType = row.dataset.originalEventType || '';
+            const newType = e.target.value || '';
+            row.dataset.originalEventType = newType;
+            // If event type changed to/from MV- relocation, update currency selector
+            const isOldRelocation = oldType && oldType.indexOf('MV-') === 0;
+            const isNewRelocation = newType && newType.indexOf('MV-') === 0;
+            if (isOldRelocation !== isNewRelocation) {
+              if (Config.getInstance().isRelocationEnabled()) {
+                if (this.webUI.chartManager) {
+                  RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+                  this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+                }
+                if (this.webUI.tableManager) {
+                  RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
+                  this.webUI.tableManager.setupTableCurrencyControls();
+                }
+              }
+            }
           }
           this.updateFieldVisibility(e.target);
           this.updateWizardIconsVisibility(row);
@@ -397,7 +430,6 @@ class EventsTableManager {
   }
 
   _scheduleRelocationReanalysis() {
-    try {
       const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
       if (!cfg || !cfg.isRelocationEnabled || !cfg.isRelocationEnabled()) return;
       // Debounce
@@ -411,13 +443,23 @@ class EventsTableManager {
           }
           this.updateRelocationImpactIndicators(events);
           this.webUI.updateStatusForRelocationImpacts(events);
-          // If accordion is visible or present, refresh to reflect changes
-          try { if (this.webUI.eventAccordionManager) { this.webUI.eventAccordionManager.refresh(); } } catch (_) {}
+          // Keep charts in sync with relocation changes (country timeline + markers)
+          if (this.webUI && this.webUI.chartManager) {
+            RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+            this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+            this.webUI.chartManager.refreshChartsWithCurrency();
+          }
+          // Refresh table currency controls
+          if (this.webUI && this.webUI.tableManager) {
+            RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
+            this.webUI.tableManager.setupTableCurrencyControls();
+          }
+          // Intentionally avoid refreshing the accordion here to preserve focus/expansion after edit + outside click.
+          // Accordion will refresh through explicit actions (sorting, deletions, wizard actions) and on initial load.
         } catch (err) {
           console.error('Error analyzing relocation impacts:', err);
         }
       }, 400);
-    } catch (_) { /* ignore */ }
   }
 
   setupSimulationModeChangeHandler() {
@@ -522,9 +564,7 @@ class EventsTableManager {
     this.switchView(newMode);
 
     // NEW: Persist preference
-    try {
-      localStorage.setItem('viewMode', newMode);
-    } catch (_) { }
+    localStorage.setItem('viewMode', newMode);
   }
 
   handleAgeYearToggle(newMode) {
@@ -589,9 +629,7 @@ class EventsTableManager {
     this.webUI.validateEvents();
 
     // Persist preference
-    try {
-      localStorage.setItem('ageYearMode', newMode);
-    } catch (_) { }
+    localStorage.setItem('ageYearMode', newMode);
   }
 
   updateTableHeaders() {
@@ -657,7 +695,9 @@ class EventsTableManager {
       if (this.webUI.eventAccordionManager) {
         this.webUI.eventAccordionManager.refresh();
         // Ensure accordion header sort indicators reflect current state
-        try { if (typeof this.webUI.eventAccordionManager.updateAccordionHeaderIndicators === 'function') { this.webUI.eventAccordionManager.updateAccordionHeaderIndicators(); } } catch (_) {}
+        if (typeof this.webUI.eventAccordionManager.updateAccordionHeaderIndicators === 'function') {
+          this.webUI.eventAccordionManager.updateAccordionHeaderIndicators();
+        }
       }
     }
   }
@@ -819,7 +859,7 @@ class EventsTableManager {
         row.dataset.relocationImpactMessage = event.relocationImpact.message || '';
         row.dataset.relocationImpactAuto = event.relocationImpact.autoResolvable ? '1' : '0';
         // Also persist the associated MV event id to support panel rendering across views
-        try { row.dataset.relocationImpactMvId = event.relocationImpact.mvEventId || ''; } catch (_) {}
+        row.dataset.relocationImpactMvId = event.relocationImpact.mvEventId || '';
 
         // NEW: Create badge and insert before dropdown
         var badge = document.createElement('button');
@@ -1099,12 +1139,10 @@ class EventsTableManager {
     const fxAmount = (fxRate != null && !isNaN(baseAmountSanitized)) ? Math.round(baseAmountSanitized * fxRate) : null;
     const pppAmount = (pppRatio != null && !isNaN(baseAmountSanitized)) ? Math.round(baseAmountSanitized * pppRatio) : null;
     let fxDate = null;
-    try {
-      if (econ && econ.data) {
-        var toEntry = econ.data[String(destCountry).toUpperCase()];
-        fxDate = toEntry && toEntry.fx_date ? toEntry.fx_date : null;
-      }
-    } catch (_) {}
+    if (econ && econ.data) {
+      var toEntry = econ.data[String(destCountry).toUpperCase()];
+      fxDate = toEntry && toEntry.fx_date ? toEntry.fx_date : null;
+    }
 
     function getSymbolAndLocaleByCountry(countryCode) {
       try {
@@ -1519,7 +1557,9 @@ class EventsTableManager {
     let toCountryHint = panelContainer ? panelContainer.getAttribute('data-to-country') : null;
     let fromCountryHint = panelContainer ? panelContainer.getAttribute('data-from-country') : null;
     if (!toCountryHint) toCountryHint = destCountry;
-    if (!fromCountryHint) { try { fromCountryHint = this.getOriginCountry(mvEvent, this.getStartCountry()); } catch(_) {} }
+    if (!fromCountryHint) {
+      fromCountryHint = this.getOriginCountry(mvEvent, this.getStartCountry());
+    }
 
     // Locale-aware parser using a specific country's number formatting
     const parseByCountry = (val, countryCode) => {
@@ -1591,7 +1631,7 @@ class EventsTableManager {
     part1Row.insertAdjacentElement('afterend', part2Row);
 
     // Mark the new (second-half) event row; highlight will be applied after sorting/refresh
-    try { if (part2Row && part2Row.classList) part2Row.classList.add('just-created'); } catch (_) {}
+    if (part2Row && part2Row.classList) part2Row.classList.add('just-created');
 
     // Prepare accordion highlight context for the new (second-half) event
     const newEventId = part2Row && part2Row.dataset ? part2Row.dataset.eventId : null;
@@ -1612,17 +1652,13 @@ class EventsTableManager {
       // Recompute after original row removal so counts and badges align
       this._afterResolutionAction(rowId);
       // After table and accordion refresh/sort, animate the new table row
-      try {
-        if (typeof this.animateNewTableRow === 'function') {
-          setTimeout(() => { try { this.animateNewTableRow(newEventData); } catch (_) {} }, 400);
-        }
-      } catch (_) {}
+      if (typeof this.animateNewTableRow === 'function') {
+        setTimeout(() => { this.animateNewTableRow(newEventData); }, 400);
+      }
       // After base refresh, trigger accordion highlight for the new event
-      try {
-        if (this.viewMode === 'accordion' && this.webUI && this.webUI.eventAccordionManager && newEventId) {
-          this.webUI.eventAccordionManager.refreshWithNewEventAnimation(newEventData, newEventId);
-        }
-      } catch (_) {}
+      if (this.viewMode === 'accordion' && this.webUI && this.webUI.eventAccordionManager && newEventId) {
+        this.webUI.eventAccordionManager.refreshWithNewEventAnimation(newEventData, newEventId);
+      }
     }, 200);
 
     // If splitting a property or mortgage, also end its paired counterpart at the same boundary
@@ -1640,12 +1676,10 @@ class EventsTableManager {
     }
 
     // Reapply currency/percentage input formatting for newly inserted rows
-    try {
-      if (this.webUI && this.webUI.formatUtils) {
-        this.webUI.formatUtils.setupCurrencyInputs();
-        this.webUI.formatUtils.setupPercentageInputs();
-      }
-    } catch(_) {}
+    if (this.webUI && this.webUI.formatUtils) {
+      this.webUI.formatUtils.setupCurrencyInputs();
+      this.webUI.formatUtils.setupPercentageInputs();
+    }
 
     // After inserting part rows and removing the original, ensure sorting is applied
     // Prefer existing sort apply path; otherwise, trigger existing auto-sort via blur
@@ -1684,40 +1718,38 @@ class EventsTableManager {
     this._applyToRealEstatePair(row, (r) => this.getOrCreateHiddenInput(r, 'event-currency', suggestedCurrency));
 
     // If SI/SI2 and destination pension is state_only, auto-convert to non-pensionable
-    try {
-      const typeInput = row.querySelector('.event-type');
-      const currentType = typeInput ? typeInput.value : null;
-      if (currentType === 'SI' || currentType === 'SI2') {
-        // Derive dest country from context container if present
-        const container = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.resolution-panel-container');
-        let dest = null;
-        if (container) {
-          dest = container.getAttribute('data-to-country');
-        } else {
-          // Fallback via MV event referenced on the event if available
-          const events = this.webUI.readEvents(false);
-          const visibleRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(rr => rr && rr.style.display !== 'none' && !(rr.classList && rr.classList.contains('resolution-panel-row')));
-          const idx = visibleRows.indexOf(row);
-          const ev = idx >= 0 ? events[idx] : null;
-          const mv = ev && ev.relocationImpact ? events.find(e => e && e.id === ev.relocationImpact.mvEventId) : null;
-          dest = mv ? mv.type.substring(3).toLowerCase() : null;
-        }
-        if (dest) {
-          const rs = Config.getInstance().getCachedTaxRuleSet(dest);
-          if (rs && typeof rs.getPensionSystemType === 'function' && rs.getPensionSystemType() === 'state_only') {
-            const newType = currentType === 'SI' ? 'SInp' : 'SI2np';
-            typeInput.value = newType;
-            const toggleEl = row.querySelector(`#EventTypeToggle_${rowId}`);
-            if (toggleEl) toggleEl.textContent = newType;
-            if (row._eventTypeDropdown && typeof row._eventTypeDropdown.setValue === 'function') {
-              try { row._eventTypeDropdown.setValue(newType); } catch (_) {}
-            }
-            this.updateFieldVisibility(typeInput);
-            typeInput.dispatchEvent(new Event('change', { bubbles: true }));
+    const typeInput = row.querySelector('.event-type');
+    const currentType = typeInput ? typeInput.value : null;
+    if (currentType === 'SI' || currentType === 'SI2') {
+      // Derive dest country from context container if present
+      const container = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.resolution-panel-container');
+      let dest = null;
+      if (container) {
+        dest = container.getAttribute('data-to-country');
+      } else {
+        // Fallback via MV event referenced on the event if available
+        const events = this.webUI.readEvents(false);
+        const visibleRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(rr => rr && rr.style.display !== 'none' && !(rr.classList && rr.classList.contains('resolution-panel-row')));
+        const idx = visibleRows.indexOf(row);
+        const ev = idx >= 0 ? events[idx] : null;
+        const mv = ev && ev.relocationImpact ? events.find(e => e && e.id === ev.relocationImpact.mvEventId) : null;
+        dest = mv ? mv.type.substring(3).toLowerCase() : null;
+      }
+      if (dest) {
+        const rs = Config.getInstance().getCachedTaxRuleSet(dest);
+        if (rs && typeof rs.getPensionSystemType === 'function' && rs.getPensionSystemType() === 'state_only') {
+          const newType = currentType === 'SI' ? 'SInp' : 'SI2np';
+          typeInput.value = newType;
+          const toggleEl = row.querySelector(`#EventTypeToggle_${rowId}`);
+          if (toggleEl) toggleEl.textContent = newType;
+          if (row._eventTypeDropdown && typeof row._eventTypeDropdown.setValue === 'function') {
+            row._eventTypeDropdown.setValue(newType);
           }
+          this.updateFieldVisibility(typeInput);
+          typeInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
       }
-    } catch (_) {}
+    }
     this._afterResolutionAction(rowId);
   }
 
@@ -1785,7 +1817,9 @@ class EventsTableManager {
   markAsReviewed(rowId) {
     const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
     if (!row) return;
-    // Apply review override to both property and associated mortgage for this id
+    // Always apply review override to the current row
+    this.getOrCreateHiddenInput(row, 'event-resolution-override', '1');
+    // Also apply to paired real-estate rows if applicable (R/M with same id)
     this._applyToRealEstatePair(row, (r) => this.getOrCreateHiddenInput(r, 'event-resolution-override', '1'));
     this._afterResolutionAction(rowId);
   }
@@ -1801,8 +1835,9 @@ class EventsTableManager {
     // Do not auto-expand resolution panels; only show toast if none remain
     const anyImpacts = Array.from(document.querySelectorAll('tr[data-relocation-impact="1"]')).length > 0;
     if (!anyImpacts) {
-      if (typeof NotificationUtils !== 'undefined') {
-        NotificationUtils.showToast('All relocation impacts resolved!', 'Success', 3);
+      const nu = this.webUI && this.webUI.notificationUtils;
+      if (nu && typeof nu.showToast === 'function') {
+        nu.showToast('All relocation impacts resolved!', 'Success', 3);
       }
     }
   }
@@ -1998,11 +2033,12 @@ class EventsTableManager {
     const openDropdownProgrammatically = () => {
       // Prefer programmatic API when available for robustness
       if (row._eventTypeDropdown && typeof row._eventTypeDropdown.open === 'function') {
-        try { row._eventTypeDropdown.open(); return; } catch (_) { /* fallback below */ }
+        row._eventTypeDropdown.open();
+        return;
       }
       const toggle = row.querySelector('.event-type-dd');
       if (toggle) {
-        try { toggle.click(); } catch (_) { /* ignore */ }
+        toggle.click();
       }
     };
 
@@ -2151,6 +2187,17 @@ class EventsTableManager {
         console.error('Error analyzing relocation impacts:', err);
       }
     }
+    // Refresh chart relocation transitions
+    if (this.webUI.chartManager) {
+      RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+      this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+      this.webUI.chartManager.refreshChartsWithCurrency();
+    }
+    // Refresh table currency controls
+    if (this.webUI.tableManager) {
+      RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
+      this.webUI.tableManager.setupTableCurrencyControls();
+    }
   }
 
   /**
@@ -2241,10 +2288,9 @@ class EventsTableManager {
     }
     const selectedObj = direct || optionObjects.find((o) => o.value === 'NOP') || optionObjects[0];
     if (!direct) {
-      try {
-        const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
-        const relocationEnabled = !!(cfg && cfg.isRelocationEnabled && cfg.isRelocationEnabled());
-      } catch (_) {}
+      // Check relocation enabled status (variable unused but kept for potential future use)
+      const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
+      const relocationEnabled = !!(cfg && cfg.isRelocationEnabled && cfg.isRelocationEnabled());
     }
     const selectedLabel = selectedObj.label;
 
@@ -2436,11 +2482,9 @@ class EventsTableManager {
     /* Debug log removed */
 
     // Assign a stable data-row-id like row_1, row_2,...
-    try {
-      const tbodyRows = tbody.querySelectorAll('tr');
-      const index = tbodyRows ? (tbodyRows.length + 1) : 1;
-      row.setAttribute('data-row-id', 'row_' + index);
-    } catch (_) {}
+    const tbodyRows = tbody.querySelectorAll('tr');
+    const index = tbodyRows ? (tbodyRows.length + 1) : 1;
+    row.setAttribute('data-row-id', 'row_' + index);
 
     tbody.appendChild(row);
 
@@ -2474,6 +2518,15 @@ class EventsTableManager {
         var startCountry = this.getStartCountry();
         RelocationImpactDetector.analyzeEvents(events, startCountry);
         this.updateRelocationImpactIndicators(events);
+        // Update currency selector when relocation events are added
+        if (this.webUI.chartManager) {
+          RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+          this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+        }
+        if (this.webUI.tableManager) {
+          RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
+          this.webUI.tableManager.setupTableCurrencyControls();
+        }
       } catch (err) {
         console.error('Error analyzing relocation impacts:', err);
       }
@@ -2761,6 +2814,11 @@ class EventsTableManager {
       const events = this.webUI.readEvents(false);
       this.updateRelocationImpactIndicators(events);
       this.webUI.updateStatusForRelocationImpacts(events);
+      // Recompute relocation transitions and refresh charts so markers/currency mapping stay aligned
+      if (this.webUI && this.webUI.chartManager) {
+        RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+        this.webUI.chartManager.refreshChartsWithCurrency();
+      }
     }
   }
 
@@ -2981,12 +3039,10 @@ class EventsTableManager {
           // Open country selection modal; after selection launch MV wizard with destination context
           this.showCountrySelectionModal(async (code, name) => {
             const full = `MV-${code.toUpperCase()}`;
-            try {
-              const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
-              if (cfg && typeof cfg.getTaxRuleSet === 'function') {
-                await cfg.getTaxRuleSet(code.toLowerCase());
-              }
-            } catch (_) {}
+            const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
+            if (cfg && typeof cfg.getTaxRuleSet === 'function') {
+              await cfg.getTaxRuleSet(code.toLowerCase());
+            }
             this.startWizardForEventType('MV', {
               eventType: full,
               destCountryCode: code,
@@ -3139,26 +3195,24 @@ class EventsTableManager {
     row.dataset.eventId = id;
 
     // Ensure MV-* rows display as "→ Country" in the visible toggle immediately
-    try {
-      const typeVal = eventData && eventData.eventType;
-      if (typeVal && typeof typeVal === 'string' && typeVal.indexOf('MV-') === 0) {
-        const code = typeVal.substring(3).toLowerCase();
-        const countries = Config.getInstance().getAvailableCountries();
-        const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-        const label = match ? `→ ${match.name}` : typeVal;
-        const toggleEl = row.querySelector(`#EventTypeToggle_${row.dataset.rowId}`);
-        if (toggleEl) toggleEl.textContent = label;
-        // Also enrich dropdown options with synthetic MV-* so later refreshes keep the label
-        if (row._eventTypeDropdown) {
-          const baseOpts = this.getEventTypeOptionObjects();
-          const synthetic = match ? { value: typeVal, label, description: `Relocation to ${match.name}` } : { value: typeVal, label: typeVal };
-          const opts = baseOpts.find(o => o.value === typeVal) ? baseOpts : baseOpts.concat([synthetic]);
-          try { row._eventTypeDropdown.setOptions(opts); } catch (_) {}
-        }
-        // Keep original type for logic but show arrow label
-        row.dataset.originalEventType = typeVal;
+    const typeVal = eventData && eventData.eventType;
+    if (typeVal && typeof typeVal === 'string' && typeVal.indexOf('MV-') === 0) {
+      const code = typeVal.substring(3).toLowerCase();
+      const countries = Config.getInstance().getAvailableCountries();
+      const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
+      const label = match ? `→ ${match.name}` : typeVal;
+      const toggleEl = row.querySelector(`#EventTypeToggle_${row.dataset.rowId}`);
+      if (toggleEl) toggleEl.textContent = label;
+      // Also enrich dropdown options with synthetic MV-* so later refreshes keep the label
+      if (row._eventTypeDropdown) {
+        const baseOpts = this.getEventTypeOptionObjects();
+        const synthetic = match ? { value: typeVal, label, description: `Relocation to ${match.name}` } : { value: typeVal, label: typeVal };
+        const opts = baseOpts.find(o => o.value === typeVal) ? baseOpts : baseOpts.concat([synthetic]);
+        if (row._eventTypeDropdown) row._eventTypeDropdown.setOptions(opts);
       }
-    } catch (_) {}
+      // Keep original type for logic but show arrow label
+      row.dataset.originalEventType = typeVal;
+    }
 
     // Add to table
     const tbody = document.querySelector('#Events tbody');
@@ -3200,31 +3254,38 @@ class EventsTableManager {
     tbody.appendChild(newRow);
 
     // Assign stable data-row-id for the new row
-    try {
-      const index = Array.from(tbody.querySelectorAll('tr')).indexOf(newRow) + 1;
-      if (index > 0) newRow.setAttribute('data-row-id', 'row_' + index);
-    } catch (_) {}
+    const index = Array.from(tbody.querySelectorAll('tr')).indexOf(newRow) + 1;
+    if (index > 0) newRow.setAttribute('data-row-id', 'row_' + index);
 
     // Setup formatting for new inputs
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
 
     // Mark as just-created so animateNewTableRow can target it reliably
-    try { newRow.classList.add('just-created'); } catch (_) {}
+    newRow.classList.add('just-created');
 
     // Apply sorting animation
     this.applySort(); // Apply FLIP animation for moved rows
 
     // After sorting completes, animate the new table row highlight smoothly
-    try {
-      if (typeof this.animateNewTableRow === 'function') {
-        setTimeout(() => { try { this.animateNewTableRow(eventData); } catch (_) {} }, 400);
-      }
-    } catch (_) {}
+    if (typeof this.animateNewTableRow === 'function') {
+      setTimeout(() => { this.animateNewTableRow(eventData); }, 400);
+    }
 
     // Refresh accordion if active
     if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
       this.webUI.eventAccordionManager.refreshWithNewEventAnimation(eventData, newEventId);
+    }
+    // Refresh chart relocation transitions
+    if (this.webUI.chartManager) {
+      RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+      this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+      this.webUI.chartManager.refreshChartsWithCurrency();
+    }
+    // Refresh table currency controls
+    if (this.webUI.tableManager) {
+      RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
+      this.webUI.tableManager.setupTableCurrencyControls();
     }
   }
 

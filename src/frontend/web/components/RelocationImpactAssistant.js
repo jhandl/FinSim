@@ -210,11 +210,11 @@ var RelocationImpactAssistant = {
         break;
       }
       case 'keep_property': {
-        try { this._keepProperty(event); } catch(_) {}
+        try { this._keepProperty(event, payload, env); } catch(_) {}
         break;
       }
       case 'sell_property': {
-        try { this._sellProperty(event); } catch(_) {}
+        try { this._sellProperty(event, payload, env); } catch(_) {}
         break;
       }
       default:
@@ -402,26 +402,50 @@ var RelocationImpactAssistant = {
   },
 
   // Legacy property helpers (used by keep/sell actions)
-  _keepProperty: function(event) {
+  _keepProperty: function(event, payload, env) {
     try {
       var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
       var etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
       if (!etm) return;
+      var rowId = payload && payload.rowId;
+      var baseRow = null;
+      try { if (rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]'); } catch(_) {}
       var startCountry = typeof etm.getStartCountry === 'function' ? etm.getStartCountry() : Config.getInstance().getDefaultCountry();
       var origin = typeof etm.detectPropertyCountry === 'function' ? etm.detectPropertyCountry(Number(event.fromAge), startCountry) : startCountry;
+      var rs = null; try { rs = Config.getInstance().getCachedTaxRuleSet(origin); } catch(_) {}
+      var originCurrency = rs && typeof rs.getCurrencyCode === 'function' ? rs.getCurrencyCode() : null;
       function findRowsByIdAndType(id, type) {
         var rows = Array.from(document.querySelectorAll('#Events tbody tr'));
         return rows.filter(function(r){ var t = r.querySelector('.event-type'); var n = r.querySelector('.event-name'); return t && n && t.value === type && n.value === id; });
       }
-      var propRows = findRowsByIdAndType(event.id, 'R');
-      for (var i = 0; i < propRows.length; i++) { etm.getOrCreateHiddenInput(propRows[i], 'event-linked-country', origin); }
-      var mortRows = findRowsByIdAndType(event.id, 'M');
-      for (var j = 0; j < mortRows.length; j++) { etm.getOrCreateHiddenInput(mortRows[j], 'event-linked-country', origin); }
+      var propRows = [];
+      var mortRows = [];
+      if (baseRow && typeof etm._applyToRealEstatePair === 'function') {
+        // Use the row context to update both R and M with the same name/id
+        etm._applyToRealEstatePair(baseRow, function(r){
+          var t = r && r.querySelector ? (r.querySelector('.event-type') && r.querySelector('.event-type').value) : '';
+          if (t === 'R') propRows.push(r); else if (t === 'M') mortRows.push(r);
+          etm.getOrCreateHiddenInput(r, 'event-linked-country', origin);
+          if (originCurrency) etm.getOrCreateHiddenInput(r, 'event-currency', originCurrency);
+        });
+      } else {
+        // Fallback: locate rows by event.id (name)
+        propRows = findRowsByIdAndType(event.id, 'R');
+        for (var i = 0; i < propRows.length; i++) {
+          etm.getOrCreateHiddenInput(propRows[i], 'event-linked-country', origin);
+          if (originCurrency) etm.getOrCreateHiddenInput(propRows[i], 'event-currency', originCurrency);
+        }
+        mortRows = findRowsByIdAndType(event.id, 'M');
+        for (var j = 0; j < mortRows.length; j++) {
+          etm.getOrCreateHiddenInput(mortRows[j], 'event-linked-country', origin);
+          if (originCurrency) etm.getOrCreateHiddenInput(mortRows[j], 'event-currency', originCurrency);
+        }
+      }
       RelocationImpactAssistant._refreshImpacts();
     } catch(e) { try { console.error('Error in _keepProperty:', e); } catch(_) {} }
   },
 
-  _sellProperty: function(event) {
+  _sellProperty: function(event, payload, env) {
     try {
       var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
       var etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
@@ -430,18 +454,32 @@ var RelocationImpactAssistant = {
       var mv = events.find(function(e){ return e && e.id === (event.relocationImpact && event.relocationImpact.mvEventId); });
       if (!mv) return;
       var relocationAge = Number(mv.fromAge);
+      var rowId = payload && payload.rowId;
+      var baseRow = null;
+      try { if (rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]'); } catch(_) {}
+
       function findRowsByIdAndType(id, type) {
         var rows = Array.from(document.querySelectorAll('#Events tbody tr'));
         return rows.filter(function(r){ var t = r.querySelector('.event-type'); var n = r.querySelector('.event-name'); return t && n && t.value === type && n.value === id; });
       }
-      function setToAge(row, age) {
+      function setToAgeGuarded(row, age) {
         var toAgeInput = row.querySelector('.event-to-age');
-        if (toAgeInput) { toAgeInput.value = String(age); toAgeInput.dispatchEvent(new Event('change', { bubbles: true })); }
+        if (!toAgeInput) return;
+        var existing = Number(toAgeInput.value);
+        if (isNaN(existing) || existing > age) {
+          toAgeInput.value = String(age);
+          toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
       }
-      var propRows = findRowsByIdAndType(event.id, 'R');
-      for (var i = 0; i < propRows.length; i++) setToAge(propRows[i], relocationAge);
-      var mortRows = findRowsByIdAndType(event.id, 'M');
-      for (var j = 0; j < mortRows.length; j++) setToAge(mortRows[j], relocationAge);
+
+      if (baseRow && typeof etm._applyToRealEstatePair === 'function') {
+        etm._applyToRealEstatePair(baseRow, function(r){ setToAgeGuarded(r, relocationAge); });
+      } else {
+        var propRows = findRowsByIdAndType(event.id, 'R');
+        for (var i = 0; i < propRows.length; i++) setToAgeGuarded(propRows[i], relocationAge);
+        var mortRows = findRowsByIdAndType(event.id, 'M');
+        for (var j = 0; j < mortRows.length; j++) setToAgeGuarded(mortRows[j], relocationAge);
+      }
       RelocationImpactAssistant._refreshImpacts();
     } catch(e) { try { console.error('Error in _sellProperty:', e); } catch(_) {} }
   },

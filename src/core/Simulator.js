@@ -192,8 +192,11 @@ function initializeSimulationVariables() {
   // Initialize country context for multi-country support
   // Note: event.currency is NOT used for inflation decisions; it's for display/conversion only
   // Only event.rate (override), event.linkedCountry, and currentCountry determine inflation
-  currentCountry = params.StartCountry || config.getDefaultCountry();
+  currentCountry = ((params.StartCountry || config.getDefaultCountry() || '') + '').toLowerCase();
   countryInflationOverrides = {};
+  if (currentCountry && typeof params.inflation === 'number') {
+    countryInflationOverrides[currentCountry] = params.inflation;
+  }
 
   initializeRealEstate();
 
@@ -208,7 +211,7 @@ function resetYearlyVariables() {
   year++;
 
   // Reset attribution manager for the new year
-  var baseCountry = params.StartCountry || config.getDefaultCountry();
+  var baseCountry = ((params.StartCountry || config.getDefaultCountry() || '') + '').toLowerCase();
   attributionManager.reset(currentCountry, year, baseCountry);
 
   // Call Person-specific yearly variable resets
@@ -326,6 +329,44 @@ function calculatePensionIncome() {
 
 function processEvents() {
   expenses = 0;
+  if (!countryInflationOverrides) countryInflationOverrides = {};
+  var economicData = (typeof config.getEconomicData === 'function') ? config.getEconomicData() : null;
+  var baseCountryCode = ((params.StartCountry || config.getDefaultCountry() || '') + '').toLowerCase();
+
+  function normalizeCountry(code) {
+    return (code || '').toString().trim().toLowerCase();
+  }
+
+  function resolveCountryInflation(code) {
+    var key = normalizeCountry(code);
+    if (!key) key = baseCountryCode;
+    if (countryInflationOverrides && countryInflationOverrides.hasOwnProperty(key)) {
+      var override = countryInflationOverrides[key];
+      if (override !== null && override !== undefined && override !== '') {
+        return override;
+      }
+    }
+    if (key === baseCountryCode && typeof params.inflation === 'number') {
+      return params.inflation;
+    }
+    if (economicData && economicData.ready) {
+      var cpi = economicData.getInflation(key);
+      if (cpi != null) {
+        return Number(cpi) / 100;
+      }
+    }
+    var rs = config.getCachedTaxRuleSet ? config.getCachedTaxRuleSet(key) : null;
+    if (rs && typeof rs.getInflationRate === 'function') {
+      var rate = rs.getInflationRate();
+      if (rate !== null && rate !== undefined) {
+        return rate;
+      }
+    }
+    if (typeof params.inflation === 'number') {
+      return params.inflation;
+    }
+    return 0.02;
+  }
   
   // First pass: Process all real estate sales for the current age
   for (let i = 0; i < events.length; i++) {
@@ -341,26 +382,13 @@ function processEvents() {
   // Second pass: Process all other events including real estate purchases
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
-    // Determine inflation rate for this event based on country context
-    // IMPORTANT WARNING: Do NOT check event.currency here — currency is for display/conversion only (handled later).
-    // Correct inputs for inflation are ONLY (in priority order):
-    // 1) event.rate (explicit override)
-    // 2) event.linkedCountry (for location-tied events)
-    // 3) currentCountry (active residency country)
-    // Anti-pattern (DO NOT DO): if (event.currency) { inflationRate = 0; }
-    var inflationRate = event.rate; // explicit override takes precedence
-    if (inflationRate === null || inflationRate === undefined || inflationRate === '') {
-      // Choose country for inflation: location-tied events use linkedCountry; otherwise use currentCountry
-      var countryForInflation = event.linkedCountry || currentCountry;
-
-      // If user provided an override for this country's inflation via an MV-* event, use it
-      inflationRate = countryInflationOverrides[countryForInflation];
-
-      if (inflationRate === null || inflationRate === undefined) {
-        // Fallback to the country's ruleset default; final fallback to global params.inflation
-        var ruleset = config.getCachedTaxRuleSet(countryForInflation);
-        inflationRate = ruleset ? ruleset.getInflationRate() : params.inflation;
-      }
+    // Determine inflation rate for this event based on country context. Currency is irrelevant here.
+    var inflationRate;
+    if (event.rate !== null && event.rate !== undefined && event.rate !== '') {
+      inflationRate = event.rate;
+    } else {
+      var countryForInflation = event.linkedCountry || currentCountry || baseCountryCode;
+      inflationRate = resolveCountryInflation(countryForInflation);
     }
     let amount = adjust(event.amount, inflationRate);
     // Default toAge to 999 if not required for this event type
@@ -587,9 +615,7 @@ function processEvents() {
             }
 
             // Compute relocation cost with appropriate country's inflation (consider overrides)
-            var reloRate = countryInflationOverrides && (countryInflationOverrides[infCountry] !== undefined)
-              ? countryInflationOverrides[infCountry]
-              : (function(){ var rs = config.getCachedTaxRuleSet(infCountry); return rs ? rs.getInflationRate() : params.inflation; })();
+            var reloRate = resolveCountryInflation(infCountry);
             var relocationAmount = adjust(event.amount, reloRate);
 
             if (relocationAmount > 0) {
@@ -1172,5 +1198,3 @@ function updateYearlyData() {
   // At the end of the year, when updating the data sheet
   // dataSheet[row].sharesCapital = shares.capital();
 }
-
-

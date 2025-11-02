@@ -108,7 +108,50 @@ function serializeSimulation(ui) {
     }
    
     csvContent += "\n# Events\n";
-    csvContent += "Type,Name,Amount,FromAge,ToAge,Rate,Extra\n";
+    // Preserve historical header but add a Meta column for hidden fields persistence
+    csvContent += "Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta\n";
+
+    // Collect Meta per-row from DOM when running in web UI (GAS-safe guard)
+    var metaByRow = [];
+    try {
+        // Build a parallel list of event table rows in the same order as getTableData (skip resolution rows)
+        var table = (typeof document !== 'undefined') ? document.getElementById('Events') : null;
+        if (table) {
+            var allRows = Array.prototype.slice.call(table.getElementsByTagName('tr'));
+            for (var ri = 0; ri < allRows.length; ri++) {
+                var rowEl = allRows[ri];
+                try { if (rowEl.classList && rowEl.classList.contains('resolution-panel-row')) continue; } catch (_e) {}
+                var cells = rowEl && rowEl.getElementsByTagName ? rowEl.getElementsByTagName('td') : [];
+                if (!cells || cells.length === 0) continue; // skip header
+                // When includeHiddenEventTypes is true, hidden rows are still included by getTableData
+                // so we do not filter by display here.
+                // Extract hidden inputs
+                var metaPairs = [];
+                try {
+                    var cur = rowEl.querySelector ? rowEl.querySelector('.event-currency') : null;
+                    if (cur && cur.value) metaPairs.push('cur=' + encodeURIComponent(cur.value));
+                } catch (_e1) {}
+                try {
+                    var lc = rowEl.querySelector ? rowEl.querySelector('.event-linked-country') : null;
+                    if (lc && lc.value) metaPairs.push('lc=' + encodeURIComponent(lc.value));
+                } catch (_e2) {}
+                try {
+                    var lei = rowEl.querySelector ? rowEl.querySelector('.event-linked-event-id') : null;
+                    if (lei && lei.value) metaPairs.push('lei=' + encodeURIComponent(lei.value));
+                } catch (_e3) {}
+                try {
+                    var ro = rowEl.querySelector ? rowEl.querySelector('.event-resolution-override') : null;
+                    if (ro && ro.value) metaPairs.push('ro=' + encodeURIComponent(ro.value));
+                } catch (_e4) {}
+                metaByRow.push(metaPairs.join(';'));
+            }
+        }
+    } catch (_err) {
+        // Non-web environments (e.g., GAS) won't have a DOM; leave metaByRow empty
+        metaByRow = [];
+    }
+
+    var metaIndex = 0;
     events.forEach(event => {
         // Split the first field (which contains "type:name") into separate type and name
         const [type, ...nameParts] = event[0].split(':');
@@ -121,7 +164,13 @@ function serializeSimulation(ui) {
         const otherFields = event.slice(1).map(field => 
             (field === undefined || field === null) ? '' : field
         );
-        csvContent += `${type},${encodedName},${otherFields.join(',')}\n`;
+        // Append Meta value (if available for this row). Align by iteration order.
+        var metaVal = '';
+        if (metaByRow && metaIndex < metaByRow.length) {
+            metaVal = metaByRow[metaIndex] || '';
+        }
+        metaIndex++;
+        csvContent += `${type},${encodedName},${otherFields.join(',')},${metaVal}\n`;
     });
 
     return csvContent;

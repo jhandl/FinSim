@@ -524,12 +524,26 @@ class EventsRenderer extends WizardRenderer {
           const rs = cfg && typeof cfg.getCachedTaxRuleSet === 'function' ? cfg.getCachedTaxRuleSet(code) : null;
           if (rs) {
             if (typeof rs.getCurrencyCode === 'function') derived.destCurrency = rs.getCurrencyCode() || code.toUpperCase();
-            if (typeof rs.getInflationRate === 'function') { const inf = rs.getInflationRate(); if (typeof inf === 'number') derived.destInflation = `${(inf * 100).toFixed(1)}%`; }
           }
         } catch (_) {}
         try {
           const cfg = (typeof Config !== 'undefined' && typeof Config.getInstance === 'function') ? Config.getInstance() : null;
           const econ = cfg && typeof cfg.getEconomicData === 'function' ? cfg.getEconomicData() : null;
+          if (!derived.destInflation && econ && typeof econ.getInflation === 'function') {
+            var inflationGuess = econ.getInflation(code);
+            if (inflationGuess != null && isFinite(inflationGuess)) {
+              derived.destInflation = `${Number(inflationGuess).toFixed(1)}%`;
+            }
+          }
+          if (!derived.destInflation) {
+            const rs = cfg && typeof cfg.getCachedTaxRuleSet === 'function' ? cfg.getCachedTaxRuleSet(code) : null;
+            if (rs && typeof rs.getInflationRate === 'function') {
+              const infRate = rs.getInflationRate();
+              if (typeof infRate === 'number') {
+                derived.destInflation = `${(infRate * 100).toFixed(1)}%`;
+              }
+            }
+          }
           let start = null;
           try { if (this.context && typeof this.context.getValue === 'function') start = this.context.getValue('StartCountry'); } catch (_) {}
           if (!start) {
@@ -637,5 +651,4 @@ class EventsRenderer extends WizardRenderer {
     try { return FormatUtils.formatCurrency(value); } catch (err) { const num = parseFloat(value) || 0; return num.toString(); }
   }
 }
-
 

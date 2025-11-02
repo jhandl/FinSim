@@ -1,5 +1,20 @@
 /* This file has to work on both the website and Google Apps Script */
 
+var EconomicDataClass = (typeof EconomicData !== 'undefined') ? EconomicData : null;
+if (!EconomicDataClass) {
+  try {
+    if (typeof require === 'function') {
+      EconomicDataClass = require('./EconomicData.js').EconomicData;
+    }
+  } catch (_) {}
+}
+
+function ensureEconomicDataClass() {
+  if (!EconomicDataClass && typeof EconomicData !== 'undefined') {
+    EconomicDataClass = EconomicData;
+  }
+}
+
 var Config_instance = null;
 
 class Config {
@@ -93,12 +108,15 @@ class Config {
         }
 
         Config_instance._simulationStartYear = new Date().getFullYear();
-        // Cache-bust economic data to ensure latest file is fetched
-        var dataUrl = '/src/core/config/findata.json?v=2025-10-18-1';
-        Config_instance._economicData = new EconomicData(dataUrl);
-
         // Preload default country's tax ruleset so core engine has it synchronously
         await Config_instance.getTaxRuleSet(Config_instance.getDefaultCountry());
+        ensureEconomicDataClass();
+        if (EconomicDataClass) {
+          Config_instance._economicData = new EconomicDataClass();
+          Config_instance._economicData.refreshFromConfig(Config_instance);
+        } else {
+          Config_instance._economicData = null;
+        }
       } catch (error) {
         // Error is already handled and alerted by load()
         // We might want to prevent the app from fully starting if config fails.
@@ -165,6 +183,14 @@ class Config {
   }
 
   getEconomicData() {
+    ensureEconomicDataClass();
+    if (!EconomicDataClass) return null;
+    if (!this._economicData) {
+      this._economicData = new EconomicDataClass();
+    }
+    if (this._economicData && typeof this._economicData.refreshFromConfig === 'function') {
+      this._economicData.refreshFromConfig(this);
+    }
     return this._economicData;
   }
 
@@ -231,6 +257,9 @@ class Config {
         }
         localStorage.setItem(storageKey, currentVersion)
       }
+      if (this._economicData) {
+        this._economicData.refreshFromConfig(this);
+      }
       return ruleset;
     } catch (err) {
       console.error('Error loading tax ruleset:', err);
@@ -290,7 +319,12 @@ class Config {
       }
     }.bind(this));
 
-    return Promise.all(toLoad);
+    return Promise.all(toLoad).then(function(results) {
+      if (this._economicData) {
+        this._economicData.refreshFromConfig(this);
+      }
+      return results;
+    }.bind(this));
   }
 
   newCodeVersion() {

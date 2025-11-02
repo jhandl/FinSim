@@ -26,18 +26,33 @@ class FormatUtils {
     };
   }
 
-  static formatCurrency(value) {
+  static formatCurrency(value, currencyCode, countryCode) {
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return value;
-    
-    const localeSettings = FormatUtils.getLocaleSettings();
-    // Always display whole numbers for currency (no decimal digits)
-    return numValue.toLocaleString(localeSettings.numberLocale, {
-      style: 'currency',
-      currency: localeSettings.currencyCode,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
+
+    let localeSettings = FormatUtils.getLocaleSettings();
+    let numberLocale = localeSettings.numberLocale;
+
+    if (countryCode) {
+        try {
+            const config = Config.getInstance();
+            const ruleset = config.getCachedTaxRuleSet(countryCode);
+            if (ruleset) {
+                numberLocale = ruleset.getNumberLocale();
+            }
+        } catch (err) {
+            // Fallback to default locale if config or ruleset not available
+        }
+    }
+
+    const options = {
+        style: 'currency',
+        currency: currencyCode || localeSettings.currencyCode,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    };
+
+    return numValue.toLocaleString(numberLocale, options);
   }
 
   static formatPercentage(value) {

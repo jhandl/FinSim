@@ -23,7 +23,66 @@ class DOMUtils {
         return undefined;
       }
       if (element.classList.contains('currency')) {
-        const parsed = FormatUtils.parseCurrency(value);
+        // Try to parse using per-row locale hints (event country/currency) first
+        let parsed;
+        try {
+          // Detect if this input is inside an Events table row and derive locale
+          const row = element.closest('tr');
+          const inEventsTable = !!(row && row.closest && row.closest('#Events'));
+          if (inEventsTable) {
+            // Prefer explicit country hint, else infer by currency code
+            const countryHint = row && row.querySelector ? (row.querySelector('.event-country')?.value || '') : '';
+            const currencyCode = row && row.querySelector ? (row.querySelector('.event-currency')?.value || '') : '';
+            let numberLocale = null;
+            let currencySymbol = '';
+            let currencyCodeEff = '';
+            try {
+              const cfg = Config.getInstance();
+              if (countryHint) {
+                const rs = cfg.getCachedTaxRuleSet(countryHint.toLowerCase());
+                if (rs) {
+                  numberLocale = (rs.getNumberLocale && rs.getNumberLocale()) || null;
+                  currencySymbol = (rs.getCurrencySymbol && rs.getCurrencySymbol()) || '';
+                  currencyCodeEff = (rs.getCurrencyCode && rs.getCurrencyCode()) || '';
+                }
+              }
+              if (!numberLocale && currencyCode) {
+                const countries = (typeof cfg.getAvailableCountries === 'function') ? cfg.getAvailableCountries() : [];
+                for (let i = 0; i < countries.length && !numberLocale; i++) {
+                  try {
+                    const c = countries[i];
+                    const rs = cfg.getCachedTaxRuleSet(c.code.toLowerCase());
+                    if (rs && typeof rs.getCurrencyCode === 'function' && rs.getCurrencyCode() === currencyCode) {
+                      numberLocale = (rs.getNumberLocale && rs.getNumberLocale()) || null;
+                      currencySymbol = (rs.getCurrencySymbol && rs.getCurrencySymbol()) || '';
+                      currencyCodeEff = rs.getCurrencyCode();
+                    }
+                  } catch (_) { /* try next */ }
+                }
+              }
+            } catch (_) { /* fall back to global */ }
+
+            if (numberLocale) {
+              // Locale-aware parse: strip symbol, normalise group/decimal
+              const escSym = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              let s = String(value).replace(new RegExp(escSym, 'g'), '').replace(/\s+/g, '');
+              try {
+                const parts = new Intl.NumberFormat(numberLocale).formatToParts(12345.6);
+                const group = parts.find(p => p.type === 'group')?.value || ',';
+                const decimal = parts.find(p => p.type === 'decimal')?.value || '.';
+                s = s.split(group).join('');
+                if (decimal !== '.') s = s.split(decimal).join('.');
+              } catch (_) { /* leave s as-is */ }
+              const num = parseFloat(s);
+              parsed = isNaN(num) ? undefined : num;
+            }
+          }
+        } catch (_) { /* ignore and fall back */ }
+
+        if (parsed === undefined) {
+          // Fall back to global/active-locale parsing
+          parsed = FormatUtils.parseCurrency(value);
+        }
         // Return 0 for parameter section if parsing fails
         return (parsed === undefined && isInParameterSection) ? 0 : parsed;
       }

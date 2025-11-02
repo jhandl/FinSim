@@ -185,14 +185,52 @@ class FileManager {
     if (tbody) {
       tbody.innerHTML = '';
       this.webUI.eventsTableManager.eventRowCounter = 0;
-      eventData.forEach(([type, name, amount, fromAge, toAge, rate, match]) => {
+      eventData.forEach(([type, name, amount, fromAge, toAge, rate, match, meta]) => {
         if (type) {
           const displayRate = (rate !== undefined && rate !== '') ? String(parseFloat((Number(rate) * 100).toFixed(2))) : '';
           const displayMatch = (match !== undefined && match !== '') ? String(parseFloat((Number(match) * 100).toFixed(2))) : '';
           const row = this.webUI.eventsTableManager.createEventRow(type, name, amount, fromAge || '', toAge || '', displayRate, displayMatch);
           tbody.appendChild(row);
+
+          // Parse optional Meta column to restore hidden fields (currency, linkedCountry, linkedEventId, resolutionOverride)
+          try {
+            if (meta && typeof meta === 'string') {
+              // Meta format: key=value;key=value (values URL-encoded)
+              const parts = meta.split(';').filter(Boolean);
+              const kv = {};
+              for (let i = 0; i < parts.length; i++) {
+                const p = parts[i];
+                const eq = p.indexOf('=');
+                if (eq > 0) {
+                  const k = p.substring(0, eq);
+                  const v = decodeURIComponent(p.substring(eq + 1));
+                  kv[k] = v;
+                }
+              }
+              // Apply to hidden inputs when present
+              if (kv.cur) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-currency', kv.cur);
+              if (kv.lc) {
+                this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-country', kv.lc);
+                // Provide direct country hint for per-row formatting
+                this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-country', String(kv.lc).toLowerCase());
+              }
+              if (kv.lei) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-event-id', kv.lei);
+              if (kv.ro) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-resolution-override', kv.ro);
+            }
+          } catch (_) { /* Non-fatal: loading continues without meta */ }
         }
       });
+
+      // Ensure all country rule sets are available before formatting currency inputs
+      try {
+        const cfg = Config.getInstance();
+        const countries = (typeof cfg.getAvailableCountries === 'function') ? cfg.getAvailableCountries() : [];
+        if (Array.isArray(countries) && countries.length > 0) {
+          await Promise.all(countries.map(c => {
+            try { return cfg.getTaxRuleSet(String(c.code).toLowerCase()); } catch (_) { return Promise.resolve(); }
+          }));
+        }
+      } catch (_) { /* harmless; formatting will fall back if not loaded */ }
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();
       this.webUI.eventsTableManager.updateEventRowsVisibilityAndTypes();

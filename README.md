@@ -1,6 +1,12 @@
 # Bugs
 - Real Estate equity is possibly not being computed correctly.
 - PRSI tax credit is not being applied.
+- Net Worth is not really "net".
+- Check: is withdraw% computed on the full "net worth"? Or on the investments & pensions, as it should?
+- Relocation issues:
+  - Missing resolution option: Cut short. "For the income and expense events, an option should be to cut it short. For example, if I move to Argentina at age 40 and there's an income event in EUR from age 30 to 50, an option should be to change the toAge to 40. The phrasing could be tricky with this one, try to make it as neutral as possible."
+  - Creating an event within a relocation period should assume local currency (both when rendering and in the wizard) 
+  - 
 
 # Roadmap
 

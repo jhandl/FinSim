@@ -26,7 +26,7 @@ class EventSummaryRenderer {
     if (this.isStockMarket(event.type)) {
       displayValue = this.formatRate(event.rate);
     } else {
-      displayValue = this.formatCurrency(event.amount);
+      displayValue = this.formatCurrency(event.amount, event);
     }
     const period = this.formatPeriod(event.fromAge, event.toAge);
 
@@ -64,7 +64,7 @@ class EventSummaryRenderer {
 
     // Amount (if present and relevant)
     if (event.amount && event.amount !== '0') {
-      details.push(`<span class="detail-amount">${this.formatCurrency(event.amount)}</span>`);
+      details.push(`<span class="detail-amount">${this.formatCurrency(event.amount, event)}</span>`);
     }
 
     // Period (if present)
@@ -77,15 +77,66 @@ class EventSummaryRenderer {
   }
 
   /**
-   * Format currency amount
+   * Format currency amount using linked country when available
    */
-  formatCurrency(amount) {
+  formatCurrency(amount, event) {
     if (!amount || amount === '0') return '';
 
-    const num = parseFloat(amount.toString().replace(/[€,$]/g, ''));
+    // Robust numeric parsing: strip all non-digits except leading minus
+    let s = amount.toString().trim();
+    // Preserve a single leading minus sign if present
+    const isNegative = /^-/.test(s);
+    s = s.replace(/[^0-9]/g, '');
+    if (s === '') return '';
+    let num = parseFloat(s);
     if (isNaN(num)) return amount;
+    if (isNegative) num = -num;
 
-    return FormatUtils.formatCurrency(num);
+    // Default to active locale settings
+    let numberLocale = FormatUtils.getLocaleSettings().numberLocale;
+    let currencyCode = FormatUtils.getLocaleSettings().currencyCode;
+
+    // If the event has a linked country or explicit currency, prefer those
+    try {
+      const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
+      if (cfg) {
+        let rs = null;
+        if (event && event.linkedCountry) {
+          try { rs = cfg.getCachedTaxRuleSet(String(event.linkedCountry).toLowerCase()); } catch (_) {}
+        }
+        if (!rs && event && event.currency) {
+          try {
+            const countries = (typeof cfg.getAvailableCountries === 'function') ? cfg.getAvailableCountries() : [];
+            for (let i = 0; i < countries.length; i++) {
+              const c = countries[i];
+              try {
+                const crs = cfg.getCachedTaxRuleSet(String(c.code).toLowerCase());
+                if (crs && typeof crs.getCurrencyCode === 'function' && crs.getCurrencyCode() === event.currency) {
+                  rs = crs;
+                  break;
+                }
+              } catch (_) { /* try next */ }
+            }
+          } catch (_) {}
+        }
+        if (rs) {
+          try { numberLocale = (rs.getNumberLocale && rs.getNumberLocale()) || numberLocale; } catch (_) {}
+          try { currencyCode = (rs.getCurrencyCode && rs.getCurrencyCode()) || currencyCode; } catch (_) {}
+        }
+      }
+    } catch (_) { /* fall back to defaults */ }
+
+    try {
+      return num.toLocaleString(numberLocale, {
+        style: 'currency',
+        currency: currencyCode,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+    } catch (_) {
+      // Fallback to generic formatter
+      return FormatUtils.formatCurrency(num);
+    }
   }
 
   /**

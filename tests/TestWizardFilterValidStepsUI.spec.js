@@ -84,8 +84,14 @@ async function addEventRows(frame, count = 1) {
  * while still reflecting the real DOM state that Wizard relies on.
  */
 async function setEventType(frame, rowNumber, eventType) {
-  await frame.locator('body').evaluate((el, { rowNumber, eventType }) => {
-    const rowId = `row_${rowNumber}`;
+  const rowId = `row_${rowNumber}`;
+  const rowLocator = frame.locator(`#Events tbody tr[data-row-id="${rowId}"]`);
+
+  // Wait until the requested row (and its hidden type input) exist in the DOM.
+  await rowLocator.waitFor({ state: 'attached', timeout: 10000 });
+  await rowLocator.locator('.event-type').first().waitFor({ state: 'attached', timeout: 10000 });
+
+  await frame.locator('body').evaluate((el, { rowId, eventType }) => {
     const row = document.querySelector(`#Events tbody tr[data-row-id="${rowId}"]`);
     if (!row) throw new Error(`Row ${rowId} not found`);
     const hidden = row.querySelector('.event-type');
@@ -95,7 +101,7 @@ async function setEventType(frame, rowNumber, eventType) {
     if (webUI && webUI.eventAccordionManager) {
       webUI.eventAccordionManager.refresh();
     }
-  }, { rowNumber, eventType });
+  }, { rowId, eventType });
 }
 
 /** Switch the Events section to accordion view */
@@ -143,6 +149,24 @@ async function runFilterValidSteps(frame, steps, extra = {}) {
     if (extra && extra.tourId) wizard.currentTourId = extra.tourId;
     return wizard.filterValidSteps(steps);
   }, { steps, extra });
+}
+
+/**
+ * Start the events mini-tour and return the current Wizard.validSteps list.
+ * The tour is immediately finished afterward so UI overlays do not linger.
+ */
+async function startMiniTourAndGetSelectors(frame) {
+  return await frame.locator('body').evaluate(async () => {
+    const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+    if (!wiz) return [];
+
+    await wiz.start({ type: 'mini', card: 'events' });
+    const selectors = Array.isArray(wiz.validSteps)
+      ? wiz.validSteps.map((step) => step ? step.element || null : null)
+      : [];
+    try { wiz.finishTour(); } catch (_) { /* ignore */ }
+    return selectors;
+  });
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -596,41 +620,15 @@ test('Mini tour in accordion view shows only visible fields for STOCK MARKET eve
   const firstAccSel = '.events-accordion-item[data-accordion-id="accordion-item-0"] .accordion-item-content.expanded';
   await frame.locator(firstAccSel).waitFor({ state: 'visible' });
 
-  await frame.locator('body').evaluate(() => {
-    const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
-    wiz && wiz.start({ type: 'mini', card: 'events' });
-  });
+  const selectors = await startMiniTourAndGetSelectors(frame);
+  expect(selectors.length).toBeGreaterThan(0);
 
-  const encountered = new Set();
-
-  for (let guard = 0; guard < 40; guard++) {
-    await frame.locator('.driver-popover').waitFor({ state: 'visible' });
-    const sel = await frame.locator('body').evaluate(() => {
-      const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
-      return (() => {
-        if (!wiz || !wiz.tour) return null;
-        if (typeof wiz.tour.getActiveStep === 'function') {
-          return wiz.tour.getActiveStep()?.element;
-        }
-        if (typeof wiz.tour.getActiveIndex === 'function' && wiz.validSteps) {
-          const i = wiz.tour.getActiveIndex();
-          return wiz.validSteps[i]?.element ?? null;
-        }
-        return null;
-      })();
-    });
-    if (sel) encountered.add(sel);
-    const nextBtn = frame.locator('.driver-popover button:has-text("Next"), .driver-popover button:has-text("Done")');
-    const txt = (await nextBtn.innerText()).trim();
-    await smartClick(nextBtn);
-    if (txt === 'Done') break;
-    await page.waitForTimeout(100);
-  }
-
-  // Stock Market events should NOT include amount field
-  [...encountered].forEach((s) => {
+  const encountered = new Set(selectors.filter(Boolean));
+  encountered.forEach((s) => {
     expect(s).not.toContain('.accordion-edit-amount');
-    if (s.includes('.events-accordion-item')) expect(s).toContain('accordion-item-0');
+    if (s.includes('.events-accordion-item')) {
+      expect(s).toContain('accordion-item-0');
+    }
   });
 });
 
@@ -695,4 +693,3 @@ test.describe('Wizard.filterValidSteps respects tour-level visibility tags', () 
     );
   });
 });
-

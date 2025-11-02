@@ -42,7 +42,17 @@ class TaxRuleSet {
   }
 
   getCountryCode() {
-    return this.raw.country || 'IE';
+    var code = null;
+    try {
+      if (typeof this.raw.country === 'string') code = this.raw.country.trim();
+    } catch (_) {}
+    if (!code && typeof this.raw.countryName === 'string') code = this.raw.countryName.trim();
+    if (!code && this.raw.locale) {
+      if (typeof this.raw.locale.countryCode === 'string') code = this.raw.locale.countryCode.trim();
+      if (!code && typeof this.raw.locale.currencyCode === 'string') code = this.raw.locale.currencyCode.trim();
+    }
+    if (!code) return null;
+    return code.toUpperCase();
   }
 
   getNumberLocale() {
@@ -60,8 +70,73 @@ class TaxRuleSet {
     return typeof locale.currencySymbol === 'string' ? locale.currencySymbol : '€';
   }
 
+  getEconomicData() {
+    return this.raw.economicData || {};
+  }
+
+  getEconomicProfile() {
+    var code = this.getCountryCode();
+    if (!code) return null;
+    var locale = this.raw.locale || {};
+    var economic = this.getEconomicData();
+    var inflation = economic.inflation || economic.cpi || {};
+    var ppp = economic.purchasingPowerParity || economic.ppp || {};
+    var fx = economic.exchangeRate || economic.fx || {};
+
+    var cpiValue = null;
+    if (typeof inflation === 'number') cpiValue = inflation;
+    else if (inflation && typeof inflation.cpi === 'number') cpiValue = inflation.cpi;
+    else if (inflation && typeof inflation.value === 'number') cpiValue = inflation.value;
+
+    var cpiYear = (inflation && typeof inflation.year === 'number') ? inflation.year : null;
+
+    var pppValue = null;
+    if (typeof ppp === 'number') pppValue = ppp;
+    else if (ppp && typeof ppp.value === 'number') pppValue = ppp.value;
+
+    var pppYear = (ppp && typeof ppp.year === 'number') ? ppp.year : null;
+
+    var fxValue = null;
+    if (typeof fx === 'number') fxValue = fx;
+    else if (fx && typeof fx.perEur === 'number') fxValue = fx.perEur;
+    else if (fx && typeof fx.value === 'number') fxValue = fx.value;
+
+    var fxDate = (fx && typeof fx.asOf === 'string') ? fx.asOf : null;
+
+    var codeUpper = code;
+    var currency = null;
+    if (typeof locale.currencyCode === 'string' && locale.currencyCode.trim()) {
+      currency = locale.currencyCode.trim();
+    } else if (typeof locale.countryCode === 'string' && locale.countryCode.trim()) {
+      currency = locale.countryCode.trim();
+    }
+
+    return {
+      country: codeUpper,
+      currency: currency,
+      cpi: cpiValue != null ? Number(cpiValue) : null,
+      cpi_year: cpiYear,
+      ppp: pppValue != null ? Number(pppValue) : null,
+      ppp_year: pppYear,
+      fx: fxValue != null ? Number(fxValue) : null,
+      fx_date: fxDate
+    };
+  }
+
   getInflationRate() {
-    return typeof this.raw.inflationRate === 'number' ? this.raw.inflationRate : 0.02;
+    if (typeof this.raw.inflationRate === 'number') {
+      return this.raw.inflationRate;
+    }
+    var economic = this.getEconomicData();
+    var inflation = economic.inflation || economic.cpi || {};
+    var cpiValue = null;
+    if (typeof inflation === 'number') cpiValue = inflation;
+    else if (inflation && typeof inflation.cpi === 'number') cpiValue = inflation.cpi;
+    else if (inflation && typeof inflation.value === 'number') cpiValue = inflation.value;
+    if (cpiValue != null) {
+      return Number(cpiValue) / 100;
+    }
+    return 0.02;
   }
 
   // ----- Income Tax -----
@@ -548,5 +623,3 @@ class TaxRuleSet {
 
 // Make TaxRuleSet available in the context (e.g., for tests)
 this.TaxRuleSet = TaxRuleSet;
-
-

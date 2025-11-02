@@ -420,6 +420,75 @@ header.header-hidden {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* Chart Currency Controls Styles */
+.chart-controls {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10;
+    display: flex;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 4px;
+    padding: 0.5rem;
+}
+
+.chart-controls .age-year-toggle {
+    margin-bottom: 0;
+}
+
+.chart-controls .currency-dropdown-container {
+    display: none;
+}
+
+.chart-currency-selector {
+    font-size: 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 0.25rem 0.5rem;
+    background-color: white;
+    cursor: pointer;
+    min-width: 80px;
+}
+
+.chart-currency-label {
+    font-size: 0.9rem;
+    color: var(--text-color);
+    font-weight: 500;
+    align-self: center;
+}
+
+/* Relocation Transition Marker Styles */
+.relocation-transition-line {
+    position: absolute;
+    width: 1px;
+    background-color: #ccc;
+    opacity: 0.6;
+    border-left: 1px dashed #ccc;
+    pointer-events: none;
+}
+
+/* Mobile Responsive Styles for Chart Controls */
+@media (max-width: 768px) {
+    .chart-controls {
+        top: 0.5rem;
+        right: 0.5rem;
+        padding: 0.25rem;
+        gap: 0.25rem;
+        min-height: 44px; /* Minimum touch target */
+    }
+
+    .chart-currency-selector {
+        font-size: 0.85rem;
+        padding: 0.3rem 0.4rem;
+        min-width: 70px;
+    }
+
+    .chart-currency-label {
+        font-size: 0.85rem;
+    }
+}
+
 /* Welcome Modal Styles */
 .welcome-modal {
     position: fixed;
@@ -4173,4 +4242,11 @@ footer {
   .suggestion-comparison {
     font-size: 0.8rem;
   }
+}
+
+
+#data-table-controls {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
 }

@@ -5,23 +5,20 @@ module.exports = {
   description: 'Validates EconomicData.convert for constant/ppp/reversion and CPI fallback to Config',
   isCustomTest: true,
   runCustomTest: async function() {
-    const path = require('path');
-    const fs = require('fs');
-
     // Load module under test
     const { EconomicData } = require('../src/core/EconomicData.js');
     const { TaxRuleSet } = require('../src/core/TaxRuleSet.js');
 
-    // Shim minimal Config used by _getCPI fallback
+    // Shim minimal Config used by _getCPI fallback and EconomicData refresh
     global.Config = (function() {
-      function C() {}
+      function C() {
+        this._taxRuleSets = {};
+      }
       C.prototype.getCachedTaxRuleSet = function(country) {
-        // Provide simple defaults: IE 2% CPI, AR 50% CPI
-        const rules = (country === 'IE')
-          ? { inflationRate: 0.02 }
-          : (country === 'AR') ? { inflationRate: 0.5 } : { inflationRate: 0.03 };
-        return new TaxRuleSet({ inflationRate: rules.inflationRate, country: country });
+        var code = (country || '').toString().toLowerCase();
+        return (this._taxRuleSets && this._taxRuleSets[code]) ? this._taxRuleSets[code] : null;
       };
+      C.prototype.getDefaultCountry = function() { return 'ie'; };
       var inst = new C();
       return { getInstance: function(){ return inst; } };
     })();
@@ -29,32 +26,40 @@ module.exports = {
     const testResults = { success: true, errors: [] };
 
     try {
-      // Prepare inline economic data JSON (EUR anchor semantics via fx per 1 EUR)
-      const tmpFile = path.join(__dirname, 'tmp-economic.json');
-      const payload = [
-        { country: 'IE', curr: 'EUR', cpi: 2.0, cpi_year: 2025, ppp: 0.80, ppp_year: 2025, fx: 1.0, fx_date: '2025-10-15' },
-        { country: 'AR', curr: 'ARS', cpi: 50.0, cpi_year: 2025, ppp: 1200.0, ppp_year: 2025, fx: 1500.0, fx_date: '2025-10-15' }
-      ];
-      fs.writeFileSync(tmpFile, JSON.stringify(payload), 'utf8');
+      // Prepare in-memory tax rulesets with embedded economicData blocks
+      const makeRuleset = (raw) => new TaxRuleSet(raw);
+      const ieRules = makeRuleset({
+        country: 'IE',
+        countryName: 'Ireland',
+        locale: { currencyCode: 'EUR' },
+        economicData: {
+          inflation: { cpi: 2.0, year: 2025 },
+          purchasingPowerParity: { value: 0.80, year: 2025 },
+          exchangeRate: { perEur: 1.0, asOf: '2025-10-15' }
+        },
+        incomeTax: { brackets: { '0': 0.2 } }
+      });
+      const arRules = makeRuleset({
+        country: 'AR',
+        countryName: 'Argentina',
+        locale: { currencyCode: 'ARS' },
+        economicData: {
+          inflation: { cpi: 50.0, year: 2025 },
+          purchasingPowerParity: { value: 1200.0, year: 2025 },
+          exchangeRate: { perEur: 1500.0, asOf: '2025-10-15' }
+        },
+        incomeTax: { brackets: { '0': 0.05 } }
+      });
 
-      // Polyfill synchronous XMLHttpRequest for Node to let EconomicData load from filesystem
-      global.XMLHttpRequest = function() {
-        this.status = 0;
-        this.responseText = '';
-        this._url = null;
-        this.open = function(method, url, sync) { this._url = url; };
-        this.send = function() {
-          try {
-            this.responseText = fs.readFileSync(this._url, 'utf8');
-            this.status = 200;
-          } catch (e) {
-            this.status = 404;
-            this.responseText = '';
-          }
-        };
+      // Provide these rulesets through the Config shim
+      const cfg = Config.getInstance();
+      cfg._taxRuleSets = {
+        'ie': ieRules,
+        'ar': arRules
       };
 
-      const econ = new EconomicData(tmpFile);
+      const econ = new EconomicData();
+      econ.refreshFromConfig(cfg);
       if (!econ.ready) {
         testResults.success = false; testResults.errors.push('EconomicData not ready');
         return testResults;
@@ -126,5 +131,3 @@ module.exports = {
     }
   }
 };
-
-

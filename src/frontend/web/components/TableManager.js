@@ -8,6 +8,11 @@ class TableManager {
     this._taxHeaderInitialized = false;
     // Flag to track if income visibility has been initialized
     this._incomeVisibilityInitialized = false;
+    this.currencyMode = 'natural'; // 'natural' or 'unified'
+    this.reportingCurrency = null;
+    this.countryTimeline = [];
+    this.conversionCache = {};
+    this.storedCountryTimeline = null; // Persisted timeline from last simulation run
   }
 
   getTableData(groupId, columnCount, includeHiddenEventTypes = false) {
@@ -106,6 +111,12 @@ class TableManager {
     // Reset header init at the start of each simulation (first row)
     if (rowIndex === 0 || rowIndex === 1) {
       this._taxHeaderInitialized = false;
+      this.conversionCache = {}; // Clear cache for new simulation
+      // Always clear stored timeline at start to force recomputation for current dataSheet
+      this.storedCountryTimeline = null;
+      RelocationUtils.extractRelocationTransitions(this.webUI, this);
+      // Store the computed timeline for reuse during display of this dataSheet
+      this.storedCountryTimeline = this.countryTimeline.slice();
     }
 
     // On initial page load, show only pinned income columns
@@ -259,7 +270,44 @@ class TableManager {
     // Create cells and format values in the order of the headers
     headers.forEach((header, headerIndex) => {
       const key = header.dataset.key;
-      const v = (data[key] == null ? 0 : data[key]);
+      let v = (data[key] == null ? 0 : data[key]);
+      let originalValue, originalCurrency, fxMultiplier;
+      let displayCurrencyCode, displayCountryForLocale;
+
+      const isMonetary = !(key === 'Age' || key === 'Year' || key === 'WithdrawalRate');
+
+      if (isMonetary && this.currencyMode === 'unified' && this.reportingCurrency) {
+        const age = data.Age;
+        const year = Config.getInstance().getSimulationStartYear() + age;
+        const fromCountry = RelocationUtils.getCountryForAge(age, this);
+        const toCountry = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
+
+        const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
+        
+        if (fromCurrency !== this.reportingCurrency) {
+            const economicData = Config.getInstance().getEconomicData();
+            if (economicData && economicData.ready) {
+                const cacheKey = `${year}-${fromCountry}-${toCountry}`;
+                let fxMult = this.conversionCache[cacheKey];
+                if (fxMult === undefined) {
+                    fxMult = economicData.convert(1, fromCountry, toCountry, year, {
+                        fxMode: 'ppp',
+                        baseYear: Config.getInstance().getSimulationStartYear()
+                    });
+                    if (fxMult !== null) {
+                        this.conversionCache[cacheKey] = fxMult;
+                    }
+                }
+
+                if (fxMult !== null) {
+                    originalValue = v;
+                    originalCurrency = fromCurrency;
+                    fxMultiplier = fxMult;
+                    v = v * fxMult;
+                }
+            }
+        }
+      }
 
       const td = document.createElement('td');
       
@@ -273,7 +321,28 @@ class TableManager {
       } else if (key === 'WithdrawalRate') {
         contentContainer.textContent = FormatUtils.formatPercentage(v);
       } else {
-        contentContainer.textContent = FormatUtils.formatCurrency(v);
+        const age = data.Age;
+        const fromCountry = RelocationUtils.getCountryForAge(age, this);
+        const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
+
+        if (this.currencyMode === 'unified') {
+            // Only use reporting currency if currencies match or conversion succeeded
+            const currenciesMatch = fromCurrency === this.reportingCurrency;
+            const conversionSucceeded = fxMultiplier !== undefined;
+            
+            if (currenciesMatch || conversionSucceeded) {
+                displayCurrencyCode = this.reportingCurrency;
+                displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
+            } else {
+                // Fall back to natural formatting when conversion isn't available
+                displayCurrencyCode = fromCurrency;
+                displayCountryForLocale = fromCountry;
+            }
+        } else { // natural mode
+            displayCurrencyCode = fromCurrency;
+            displayCountryForLocale = fromCountry;
+        }
+        contentContainer.textContent = FormatUtils.formatCurrency(v, displayCurrencyCode, displayCountryForLocale);
       }
       
       // Add tooltip for attributable values
@@ -351,14 +420,44 @@ class TableManager {
             if (breakdown) {
                 let tooltipText = '';
                 
+                // Determine display currency and locale exactly as used for the cell
+                if (!displayCurrencyCode || !displayCountryForLocale) {
+                    const age = data.Age;
+                    const fromCountry = RelocationUtils.getCountryForAge(age, this);
+                    const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
+                    
+                    if (this.currencyMode === 'unified') {
+                        // Only use reporting currency if currencies match or conversion succeeded
+                        const currenciesMatch = fromCurrency === this.reportingCurrency;
+                        const conversionSucceeded = fxMultiplier !== undefined;
+                        
+                        if (currenciesMatch || conversionSucceeded) {
+                            displayCurrencyCode = this.reportingCurrency;
+                            displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
+                        } else {
+                            // Fall back to natural formatting when conversion isn't available
+                            displayCurrencyCode = fromCurrency;
+                            displayCountryForLocale = fromCountry;
+                        }
+                    } else {
+                        displayCurrencyCode = fromCurrency;
+                        displayCountryForLocale = fromCountry;
+                    }
+                }
+                
                 // Special handling for asset columns (FundsCapital and SharesCapital)
                 if (key === 'FundsCapital' || key === 'SharesCapital') {
                     const orderedKeys = ['Bought', 'Sold', 'Principal', 'P/L'];
                     
                     // Pre-format all amounts and calculate max width
                     const formattedAmounts = orderedKeys.map(source => {
-                        const amount = breakdown[source] || 0;
+                        let amount = breakdown[source] || 0;
                         if (amount === 0) return null;
+                        
+                        // Apply FX conversion if in unified mode and conversion occurred
+                        if (this.currencyMode === 'unified' && originalValue !== undefined && fxMultiplier !== undefined) {
+                            amount = amount * fxMultiplier;
+                        }
                         
                         // Special handling for P/L
                         let displaySource = source;
@@ -368,7 +467,7 @@ class TableManager {
                         
                         return {
                             source: displaySource,
-                            formatted: FormatUtils.formatCurrency(Math.abs(amount))
+                            formatted: FormatUtils.formatCurrency(Math.abs(amount), displayCurrencyCode, displayCountryForLocale)
                         };
                     }).filter(item => item !== null);
                     
@@ -383,7 +482,7 @@ class TableManager {
                             const amountPadding = '&nbsp;'.repeat(Math.max(0, maxAmountWidth - formatted.length));
                             tooltipText += `\n\n<code>${source}${sourcePadding}  ${amountPadding}${formatted}</code>`;
                         }
-                    } 
+                    }
                 } else {
                     // Original logic for other columns
                     const breakdownEntries = Object.entries(breakdown);
@@ -392,11 +491,18 @@ class TableManager {
                     const maxSourceLength = Math.max(...breakdownEntries.map(([source]) => source.length));
                     
                     // Pre-format all amounts and calculate max width
-                    const formattedAmounts = breakdownEntries.map(([source, amount]) => ({
-                        source,
-                        amount,
-                        formatted: FormatUtils.formatCurrency(amount)
-                    }));
+                    const formattedAmounts = breakdownEntries.map(([source, amount]) => {
+                        let adjustedAmount = amount;
+                        // Apply FX conversion if in unified mode and conversion occurred
+                        if (this.currencyMode === 'unified' && originalValue !== undefined && fxMultiplier !== undefined) {
+                            adjustedAmount = amount * fxMultiplier;
+                        }
+                        return {
+                            source,
+                            amount: adjustedAmount,
+                            formatted: FormatUtils.formatCurrency(adjustedAmount, displayCurrencyCode, displayCountryForLocale)
+                        };
+                    });
                     
                     // Calculate max width including potential tax amount
                     let potentialTax = 0;
@@ -405,7 +511,7 @@ class TableManager {
                             potentialTax += (data[dataKey] || 0);
                         }
                     }
-                    const formattedTax = FormatUtils.formatCurrency(potentialTax);
+                    const formattedTax = FormatUtils.formatCurrency(potentialTax, displayCurrencyCode, displayCountryForLocale);
                     const maxAmountWidth = Math.max(
                         ...formattedAmounts.map(item => item.formatted.length),
                         formattedTax.length
@@ -420,9 +526,15 @@ class TableManager {
                     }
                 }
                 
+                if (originalValue !== undefined) {
+                    const age = data.Age;
+                    const originalCountry = RelocationUtils.getCountryForAge(age, this);
+                    tooltipText += `\n\nOriginal: ${FormatUtils.formatCurrency(originalValue, originalCurrency, originalCountry)}`;
+                }
+
                 // Only attach tooltip and show 'i' icon if there's meaningful content to display
-                // Guard with normalized cell value v >= 1 to avoid errors on tiny/zero values
-                if (breakdown && tooltipText.trim() !== '' && v >= 1) {
+                // Guard with non-zero check to allow tooltips for negative and small positive values
+                if ((breakdown || originalValue !== undefined) && tooltipText.trim() !== '' && Math.abs(v) > 0) {
                     TooltipUtils.attachTooltip(td, tooltipText);
                     hasTooltip = true;
                 }
@@ -631,7 +743,41 @@ class TableManager {
       this.webUI.notificationUtils.showAlert(error.message, 'Error');
     }
   }
+  
+  setupTableCurrencyControls() {
+    const cfg = Config.getInstance();
+    if (!cfg.isRelocationEnabled()) return;
 
+    const container = document.getElementById('data-table-controls');
+    if (!container) return;
+
+    RelocationUtils.createCurrencyControls(container, this, this.webUI);
+  }
+
+  handleCurrencyModeChange(newMode) {
+    if (this.currencyMode === newMode) return;
+    this.currencyMode = newMode;
+    this.conversionCache = {}; // Clear cache on mode change
+    this.storedCountryTimeline = null; // Invalidate stored timeline on mode change
+    this.updateCurrencyControlVisibility();
+    this.webUI.rerenderData();
+  }
+
+  updateCurrencyControlVisibility() {
+    const naturalToggle = document.getElementById(`currencyModeNatural_${this.constructor.name}`);
+    const unifiedToggle = document.getElementById(`currencyModeUnified_${this.constructor.name}`);
+    const dropdownContainer = document.querySelector(`#data-table-controls .currency-dropdown-container`);
+
+    if (this.currencyMode === 'natural') {
+        if (naturalToggle) naturalToggle.classList.add('mode-toggle-active');
+        if (unifiedToggle) unifiedToggle.classList.remove('mode-toggle-active');
+        if (dropdownContainer) dropdownContainer.style.display = 'none';
+    } else {
+        if (unifiedToggle) unifiedToggle.classList.add('mode-toggle-active');
+        if (naturalToggle) naturalToggle.classList.remove('mode-toggle-active');
+        if (dropdownContainer) dropdownContainer.style.display = 'block';
+    }
+  }
   applyIncomeVisibilityAfterSimulation() {
     const incomeVisibility = this.webUI.getIncomeColumnVisibility();
     const config = Config.getInstance();

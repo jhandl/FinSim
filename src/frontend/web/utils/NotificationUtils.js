@@ -183,6 +183,85 @@ class NotificationUtils {
       // Set up tooltip event listeners
       this.setupElementWarningListeners(element);
     }
+
+    // Also mirror the warning in the accordion view for the corresponding event/field
+    try {
+      if (tableMatch) {
+        const table = document.getElementById(tableMatch[1]);
+        const tbody = table && table.querySelector('tbody');
+        const allRows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+        const rawRow = allRows[parseInt(tableMatch[2]) - 1];
+        if (!rawRow) return; // no matching table row
+
+        // Compute the visible row index (exclude hidden rows and resolution panel rows)
+        const visibleDataRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
+        const accIndex = visibleDataRows.indexOf(rawRow);
+        if (accIndex === -1) return;
+
+        // Locate matching accordion item
+        const accItem = document.querySelector(`.events-accordion-item[data-accordion-id="accordion-item-${accIndex}"]`);
+        if (!accItem) return;
+
+        const colIndex = parseInt(tableMatch[3]);
+
+        // Map table columns to accordion selectors
+        const headerSelectorsByCol = {
+          0: '.event-summary .event-summary-name .event-name',
+          1: '.event-summary .event-summary-badge .event-type-badge',
+          2: '.event-summary .event-summary-amount .detail-amount',
+          3: '.event-summary .event-summary-period .detail-period',
+          4: '.event-summary .event-summary-period .detail-period',
+          5: '.event-summary .event-summary-amount .detail-amount',
+          6: null
+        };
+
+        const editSelectorsByCol = {
+          0: '[id^="AccordionEventTypeToggle_"]',
+          1: '.accordion-edit-name',
+          2: '.accordion-edit-amount',
+          3: '.accordion-edit-fromage',
+          4: '.accordion-edit-toage',
+          5: '.accordion-edit-rate',
+          6: '.accordion-edit-match'
+        };
+
+        // Apply highlight to header summary element (non-destructive)
+        const headerSel = headerSelectorsByCol[colIndex];
+        if (headerSel) {
+          const headerEl = accItem.querySelector(headerSel);
+          if (headerEl) {
+            headerEl.style.backgroundColor = STATUS_COLORS.WARNING;
+            headerEl.setAttribute('data-tooltip', message);
+            this.clearElementWarningListeners(headerEl);
+            this.setupElementWarningListeners(headerEl);
+          }
+        }
+
+        // Apply highlight to expanded input (if expanded and present)
+        const editSel = editSelectorsByCol[colIndex];
+        if (editSel) {
+          const content = accItem.querySelector('.accordion-item-content.expanded');
+          if (content) {
+            const editEl = content.querySelector(editSel);
+            if (editEl) {
+              if (editEl._dropdownWrapper) {
+                editEl._dropdownWrapper.classList.add('warning');
+                editEl._dropdownWrapper.setAttribute('data-tooltip', message);
+                this.clearElementWarningListeners(editEl._dropdownWrapper);
+                this.setupElementWarningListeners(editEl._dropdownWrapper);
+              } else {
+                editEl.classList.add('validation-warning');
+                editEl.setAttribute('data-tooltip', message);
+                this.clearElementWarningListeners(editEl);
+                this.setupElementWarningListeners(editEl);
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Non-fatal: accordion may not be present or selectors may not match
+    }
   }
 
   setupElementWarningListeners(element) {
@@ -303,6 +382,37 @@ class NotificationUtils {
     warningElements.forEach(element => {
       this.clearElementWarning(element);
     });
+
+    // Clear accordion header highlights (non-destructive)
+    try {
+      const accHeaderHighlighted = document.querySelectorAll('.events-accordion-item .event-summary .event-type-badge[style], .events-accordion-item .event-summary .event-name[style], .events-accordion-item .event-summary .detail-amount[style], .events-accordion-item .event-summary .detail-period[style]');
+      accHeaderHighlighted.forEach(el => {
+        el.style.backgroundColor = 'transparent';
+        el.removeAttribute('data-tooltip');
+        this.clearElementWarningListeners(el);
+      });
+    } catch (_) {}
+
+    // Clear accordion expanded input highlights
+    try {
+      // Inputs flagged via inline background color
+      const accStyledInputs = document.querySelectorAll('.events-accordion-item .accordion-item-content input[style]');
+      accStyledInputs.forEach(el => {
+        const bg = el.style && el.style.backgroundColor;
+        if (bg === warningRGB || bg === STATUS_COLORS.WARNING) {
+          el.style.backgroundColor = '';
+          el.removeAttribute('data-tooltip');
+          this.clearElementWarningListeners(el);
+        }
+      });
+      // Clear any dropdown wrappers marked as warning inside accordion
+      const accDropdownWrappers = document.querySelectorAll('.events-accordion-item .accordion-item-content .visualization-control.warning, .events-accordion-item .accordion-item-content .dd-toggle.warning');
+      accDropdownWrappers.forEach(el => {
+        el.classList.remove('warning');
+        el.removeAttribute('data-tooltip');
+        this.clearElementWarningListeners(el);
+      });
+    } catch (_) {}
   }
 
 } 

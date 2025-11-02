@@ -126,6 +126,8 @@ class EventAccordionManager {
     if (header) this.accordionContainer.appendChild(header);
     this.accordionContainer.appendChild(items);
 
+    // Mirror any existing table warnings into the accordion headers
+    this._applyWarningMirrorsToHeaders();
   }
 
 
@@ -244,15 +246,13 @@ class EventAccordionManager {
         };
       } else {
         // Fallback to reading from events array via matching by eventId when available
-        try {
-          const tableEvents = this.webUI.readEvents(false);
-          const tableRows = document.querySelectorAll('#Events tbody tr');
-          const currentIndex = Array.from(tableRows).indexOf(row);
-          const tableEvent = tableEvents[currentIndex];
-          if (tableEvent && tableEvent.relocationImpact) {
-            event.relocationImpact = tableEvent.relocationImpact;
-          }
-        } catch (_) {}
+        const tableEvents = this.webUI.readEvents(false);
+        const tableRows = document.querySelectorAll('#Events tbody tr');
+        const currentIndex = Array.from(tableRows).indexOf(row);
+        const tableEvent = tableEvents[currentIndex];
+        if (tableEvent && tableEvent.relocationImpact) {
+          event.relocationImpact = tableEvent.relocationImpact;
+        }
       }
 
       return event;
@@ -520,6 +520,10 @@ class EventAccordionManager {
 
       // Update tracking state
       this.expandedItems.delete(accordionId);
+      // Re-apply header warnings now that the item is collapsed
+      const ev = (this.events || []).find(e => e.accordionId === accordionId);
+      const rowRef = ev ? this.findTableRowForEvent(ev) : null;
+      if (rowRef) this._applyHeaderWarningsForItem(item, rowRef);
     } else {
       // First render details if not already rendered
       const event = this.events.find(e => e.accordionId === accordionId);
@@ -642,6 +646,14 @@ class EventAccordionManager {
 
     // Setup editable field handlers for direct editing
     this.setupEditableFieldHandlers(contentContainer, event);
+
+    // Apply warning highlights to expanded inputs based on table state
+    const tableRow = this.findTableRowForEvent(event);
+    if (tableRow) this._applyExpandedFieldWarnings(contentContainer, tableRow);
+
+    // When expanded, remove header highlight (moved to the actual field)
+    const accItem = item.closest('.events-accordion-item') || item;
+    this._clearHeaderWarningsForItem(accItem);
   }
 
 
@@ -650,28 +662,54 @@ class EventAccordionManager {
    * Refresh the accordion view with current table data
    */
   refresh() {
-    // Before re-render, collapse any open resolution panels to avoid leaking listeners
+    // Capture which events are expanded using stable event ids to preserve state across re-render
+    let previouslyExpandedEventIds = new Set();
     try {
-      const items = document.querySelectorAll('.events-accordion-item');
-      items.forEach((item) => {
-        const hasPanelFlag = item && item.dataset && item.dataset.hasResolutionPanel === '1';
-        const hasPanelDom = item && (item.querySelector('.resolution-panel-container') || item.querySelector('.resolution-panel-expander'));
-        if (hasPanelFlag || hasPanelDom) {
-          const id = item.dataset && item.dataset.accordionId;
-          if (id) {
-            this.collapseResolutionPanel(id);
-          } else {
-            // Fallback: ensure any collapse triggers are removed
-            this._removePanelCollapseTriggers(item);
-          }
+      if (this.events && this.events.length && this.expandedItems && this.expandedItems.size) {
+        previouslyExpandedEventIds = new Set(
+          [...this.expandedItems]
+            .map((accId) => {
+              const ev = this.events.find(e => e.accordionId === accId);
+              return ev && ev.id ? ev.id : null;
+            })
+            .filter(Boolean)
+        );
+      }
+    } catch(_) { /* non-fatal */ }
+
+    // Before re-render, collapse any open resolution panels to avoid leaking listeners
+    const items = document.querySelectorAll('.events-accordion-item');
+    items.forEach((item) => {
+      const hasPanelFlag = item && item.dataset && item.dataset.hasResolutionPanel === '1';
+      const hasPanelDom = item && (item.querySelector('.resolution-panel-container') || item.querySelector('.resolution-panel-expander'));
+      if (hasPanelFlag || hasPanelDom) {
+        const id = item.dataset && item.dataset.accordionId;
+        if (id) {
+          this.collapseResolutionPanel(id);
+        } else {
+          // Fallback: ensure any collapse triggers are removed
+          this._removePanelCollapseTriggers(item);
         }
-      });
-    } catch (_) {}
+      }
+    });
 
     // Re-render the accordion
     this.renderAccordion();
     this.applySortingWithAnimation();
     
+    // Rebuild expandedItems based on stable event ids captured earlier
+    try {
+      if (previouslyExpandedEventIds && previouslyExpandedEventIds.size) {
+        const rebuilt = new Set();
+        this.events.forEach(ev => {
+          if (ev && ev.id && previouslyExpandedEventIds.has(ev.id)) {
+            rebuilt.add(ev.accordionId);
+          }
+        });
+        this.expandedItems = rebuilt;
+      }
+    } catch(_) { /* non-fatal */ }
+
     // Update grid columns and check for wrapping after rendering
     setTimeout(() => {
       this.updateGridColumns();
@@ -726,7 +764,7 @@ class EventAccordionManager {
     const tbody = document.querySelector('#Events tbody');
     if (tbody && window.RowSorter) {
       // Close any open inline resolution panels in the table before DOM reorder
-      try { tableManager && tableManager.collapseAllResolutionPanels && tableManager.collapseAllResolutionPanels(); } catch (_) {}
+      if (tableManager && tableManager.collapseAllResolutionPanels) tableManager.collapseAllResolutionPanels();
       window.RowSorter.sortRows(tbody, tableManager.sortKeys);
     }
 
@@ -844,13 +882,11 @@ class EventAccordionManager {
           if (val === 'MV' && this.webUI && this.webUI.eventsTableManager) {
             const etm = this.webUI.eventsTableManager;
             // If underlying table row for this accordion event is empty NOP, mark for replacement
-            try {
-              const rowRef = this.findTableRowForEvent(event);
-              const wasEmpty = rowRef && typeof etm.isEventEmpty === 'function' ? etm.isEventEmpty(rowRef) : false;
-              if (wasEmpty) {
-                etm.pendingEmptyRowForReplacement = rowRef;
-              }
-            } catch (_) {}
+            const rowRef = this.findTableRowForEvent(event);
+            const wasEmpty = rowRef && typeof etm.isEventEmpty === 'function' ? etm.isEventEmpty(rowRef) : false;
+            if (wasEmpty) {
+              etm.pendingEmptyRowForReplacement = rowRef;
+            }
 
             // Open country selection using centralized modal
             etm.showCountrySelectionModal((code, name) => {
@@ -866,22 +902,20 @@ class EventAccordionManager {
               }
 
               // Preload destination ruleset so currency/inflation are available immediately
-              try {
-                const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
-                if (cfg && typeof cfg.getTaxRuleSet === 'function') {
-                  Promise.resolve(cfg.getTaxRuleSet(code.toLowerCase()))
-                    .catch(() => {})
-                    .finally(() => {
-                      // Launch MV wizard with destination context; name remains optional
-                      etm.startWizardForEventType('MV', {
-                        eventType: full,
-                        destCountryCode: code,
-                        destCountryName: name
-                      });
+              const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
+              if (cfg && typeof cfg.getTaxRuleSet === 'function') {
+                Promise.resolve(cfg.getTaxRuleSet(code.toLowerCase()))
+                  .catch(() => {})
+                  .finally(() => {
+                    // Launch MV wizard with destination context; name remains optional
+                    etm.startWizardForEventType('MV', {
+                      eventType: full,
+                      destCountryCode: code,
+                      destCountryName: name
                     });
-                  return;
-                }
-              } catch (_) {}
+                  });
+                return;
+              }
               // Fallback: start wizard without preloading if cfg not ready
               etm.startWizardForEventType('MV', {
                 eventType: full,
@@ -1312,24 +1346,22 @@ class EventAccordionManager {
     tableRow.dataset.originalEventType = wizardData.eventType || '';
 
     // For MV-* ensure visible label shows as arrow + country in table dropdown
-    try {
-      const tVal = wizardData && wizardData.eventType;
-      if (tVal && typeof tVal === 'string' && tVal.indexOf('MV-') === 0) {
-        const code = tVal.substring(3).toLowerCase();
-        const countries = Config.getInstance().getAvailableCountries();
-        const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-        const label = match ? `→ ${match.name}` : tVal;
-        const toggleEl = tableRow.querySelector(`#EventTypeToggle_${tableRow.dataset.rowId}`);
-        if (toggleEl) toggleEl.textContent = label;
-        const dropdown = tableRow._eventTypeDropdown;
-        if (dropdown) {
-          const baseOpts = this.webUI.eventsTableManager.getEventTypeOptionObjects();
-          const synthetic = match ? { value: tVal, label, description: `Relocation to ${match.name}` } : { value: tVal, label: tVal };
-          const opts = baseOpts.find(o => o.value === tVal) ? baseOpts : baseOpts.concat([synthetic]);
-          try { dropdown.setOptions(opts); } catch (_) {}
-        }
+    const tVal = wizardData && wizardData.eventType;
+    if (tVal && typeof tVal === 'string' && tVal.indexOf('MV-') === 0) {
+      const code = tVal.substring(3).toLowerCase();
+      const countries = Config.getInstance().getAvailableCountries();
+      const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
+      const label = match ? `→ ${match.name}` : tVal;
+      const toggleEl = tableRow.querySelector(`#EventTypeToggle_${tableRow.dataset.rowId}`);
+      if (toggleEl) toggleEl.textContent = label;
+      const dropdown = tableRow._eventTypeDropdown;
+      if (dropdown) {
+        const baseOpts = this.webUI.eventsTableManager.getEventTypeOptionObjects();
+        const synthetic = match ? { value: tVal, label, description: `Relocation to ${match.name}` } : { value: tVal, label: tVal };
+        const opts = baseOpts.find(o => o.value === tVal) ? baseOpts : baseOpts.concat([synthetic]);
+        dropdown.setOptions(opts);
       }
-    } catch (_) {}
+    }
 
     // Refresh accordion to show updated data
     this.refresh();
@@ -1371,6 +1403,16 @@ class EventAccordionManager {
     if (summaryContainer) {
       const summaryRenderer = new EventSummaryRenderer(this.webUI);
       summaryContainer.innerHTML = summaryRenderer.generateSummary(updatedEvent);
+      // Re-apply header warning mirror only if not expanded; otherwise clear header
+      const accItem = accordionItem.closest('.events-accordion-item');
+      const rowRef = this.findTableRowForEvent(updatedEvent);
+      if (accItem) {
+        if (accItem.classList.contains('expanded')) {
+          this._clearHeaderWarningsForItem(accItem);
+        } else if (rowRef) {
+          this._applyHeaderWarningsForItem(accItem, rowRef);
+        }
+      }
     }
   }
 
@@ -1420,6 +1462,15 @@ class EventAccordionManager {
                 this.webUI.eventsTableManager.updateRelocationImpactIndicators(events);
               }
               this.webUI.updateStatusForRelocationImpacts(events);
+              // Update currency selector when relocation events are deleted
+              if (this.webUI.chartManager) {
+                RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+                this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+              }
+              if (this.webUI.tableManager) {
+                RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
+                this.webUI.tableManager.setupTableCurrencyControls();
+              }
             // Ensure accordion view reflects latest table state
             this.refresh();
             }
@@ -1439,6 +1490,163 @@ class EventAccordionManager {
         this.refresh();
       }
     }
+  }
+
+  /**
+   * Apply warning highlights from table cells to accordion headers for all items
+   */
+  _applyWarningMirrorsToHeaders() {
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
+    rows.forEach((row, index) => {
+      const accItem = document.querySelector(`.events-accordion-item[data-accordion-id="accordion-item-${index}"]`);
+      if (accItem) this._applyHeaderWarningsForItem(accItem, row);
+    });
+  }
+
+  /**
+   * Apply warning highlight to a single accordion item header from a table row state
+   */
+  _applyHeaderWarningsForItem(accItem, tableRow) {
+    const warningRGB = `rgb(${parseInt(STATUS_COLORS.WARNING.slice(1,3), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(3,5), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(5,7), 16)})`;
+
+    const getMsg = (el) => (el && el.getAttribute && el.getAttribute('data-tooltip')) || '';
+    const mark = (el, msg) => {
+      if (!el) return;
+      el.style.backgroundColor = STATUS_COLORS.WARNING;
+      if (msg) el.setAttribute('data-tooltip', msg);
+      if (this.webUI && this.webUI.notificationUtils && typeof this.webUI.notificationUtils.setupElementWarningListeners === 'function') {
+        this.webUI.notificationUtils.clearElementWarningListeners(el);
+        this.webUI.notificationUtils.setupElementWarningListeners(el);
+      }
+    };
+
+    // Column -> selectors mapping (header)
+    const headerSelectorsByCol = {
+      0: '.event-summary .event-summary-name .event-name',
+      1: '.event-summary .event-summary-badge .event-type-badge',
+      2: '.event-summary .event-summary-amount .detail-amount',
+      3: '.event-summary .event-summary-period .detail-period',
+      4: '.event-summary .event-summary-period .detail-period',
+      5: '.event-summary .event-summary-amount .detail-amount',
+      6: null
+    };
+
+    // Detect warnings in table row by column
+    const checks = [
+      // 0 type (dropdown wrapper may have .warning)
+      () => {
+        const typeInput = tableRow.querySelector('.event-type');
+        const wrapper = typeInput && typeInput._dropdownWrapper;
+        if (wrapper && wrapper.classList && wrapper.classList.contains('warning')) return { warned: true, message: getMsg(wrapper), col: 0 };
+        const anyWarn = tableRow.querySelector('.event-type-container .warning');
+        if (anyWarn) return { warned: true, message: getMsg(anyWarn), col: 0 };
+        return { warned: false };
+      },
+      // 1 name
+      () => this._isWarnedInput(tableRow.querySelector('.event-name'), warningRGB, 1),
+      // 2 amount
+      () => this._isWarnedInput(tableRow.querySelector('.event-amount'), warningRGB, 2),
+      // 3 fromAge
+      () => this._isWarnedInput(tableRow.querySelector('.event-from-age'), warningRGB, 3),
+      // 4 toAge
+      () => this._isWarnedInput(tableRow.querySelector('.event-to-age'), warningRGB, 4),
+      // 5 rate
+      () => this._isWarnedInput(tableRow.querySelector('.event-rate'), warningRGB, 5),
+      // 6 match
+      () => this._isWarnedInput(tableRow.querySelector('.event-match'), warningRGB, 6)
+    ];
+
+    checks.forEach(check => {
+      const res = check();
+      if (res && res.warned) {
+        const sel = headerSelectorsByCol[res.col];
+        if (sel) mark(accItem.querySelector(sel), res.message || '');
+      }
+    });
+  }
+
+  _isWarnedInput(inputEl, warningRGB, col) {
+    if (!inputEl) return { warned: false };
+    const bg = inputEl.style && inputEl.style.backgroundColor;
+    if (bg === warningRGB) return { warned: true, message: inputEl.getAttribute('data-tooltip') || '', col };
+    return { warned: false };
+  }
+
+  /**
+   * Apply warning highlight to expanded accordion inputs based on table row warnings
+   */
+  _applyExpandedFieldWarnings(container, tableRow) {
+    const warningRGB = `rgb(${parseInt(STATUS_COLORS.WARNING.slice(1,3), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(3,5), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(5,7), 16)})`;
+
+    const markInput = (el, msg) => {
+      if (!el) return;
+      el.style.backgroundColor = STATUS_COLORS.WARNING;
+      if (msg) el.setAttribute('data-tooltip', msg);
+      if (this.webUI && this.webUI.notificationUtils && typeof this.webUI.notificationUtils.setupElementWarningListeners === 'function') {
+        this.webUI.notificationUtils.clearElementWarningListeners(el);
+        this.webUI.notificationUtils.setupElementWarningListeners(el);
+      }
+    };
+
+    // Type (dropdown wrapper)
+    const typeHidden = container.querySelector('.accordion-edit-type');
+    const typeWrapper = typeHidden && typeHidden._dropdownWrapper;
+    const tableTypeInput = tableRow.querySelector('.event-type');
+    const tableWrapper = tableTypeInput && tableTypeInput._dropdownWrapper;
+    const tableWrapperWarn = tableWrapper && tableWrapper.classList && tableWrapper.classList.contains('warning');
+    if (typeWrapper && tableWrapperWarn) {
+      typeWrapper.classList.add('warning');
+      const msg = (tableWrapper && tableWrapper.getAttribute && tableWrapper.getAttribute('data-tooltip')) || '';
+      if (msg) typeWrapper.setAttribute('data-tooltip', msg);
+      if (this.webUI && this.webUI.notificationUtils && typeof this.webUI.notificationUtils.setupElementWarningListeners === 'function') {
+        this.webUI.notificationUtils.clearElementWarningListeners(typeWrapper);
+        this.webUI.notificationUtils.setupElementWarningListeners(typeWrapper);
+      }
+    }
+
+    const pairs = [
+      { tableSel: '.event-name', accSel: '.accordion-edit-name' },
+      { tableSel: '.event-amount', accSel: '.accordion-edit-amount' },
+      { tableSel: '.event-from-age', accSel: '.accordion-edit-fromage' },
+      { tableSel: '.event-to-age', accSel: '.accordion-edit-toage' },
+      { tableSel: '.event-rate', accSel: '.accordion-edit-rate' },
+      { tableSel: '.event-match', accSel: '.accordion-edit-match' }
+    ];
+
+    pairs.forEach(({ tableSel, accSel }) => {
+      const t = tableRow.querySelector(tableSel);
+      if (!t) return;
+      const bg = t.style && t.style.backgroundColor;
+      if (bg === warningRGB || bg === STATUS_COLORS.WARNING) {
+        const msg = t.getAttribute('data-tooltip') || '';
+        const a = container.querySelector(accSel);
+        if (a) markInput(a, msg);
+      }
+    });
+  }
+
+  /**
+   * Clear header highlight styles/tooltips for a single accordion item header
+   */
+  _clearHeaderWarningsForItem(accItem) {
+    const sels = [
+      '.event-summary .event-summary-name .event-name',
+      '.event-summary .event-summary-badge .event-type-badge',
+      '.event-summary .event-summary-amount .detail-amount',
+      '.event-summary .event-summary-period .detail-period'
+    ];
+    sels.forEach(sel => {
+      const el = accItem.querySelector(sel);
+      if (el) {
+        el.style.backgroundColor = 'transparent';
+        el.removeAttribute('data-tooltip');
+        if (this.webUI && this.webUI.notificationUtils) {
+          this.webUI.notificationUtils.clearElementWarningListeners(el);
+        }
+      }
+    });
   }
 
   /**
@@ -1763,14 +1971,12 @@ class EventAccordionManager {
           let selectedOption = optionObjects.find(opt => opt.value === value);
           // If MV-* and not present in options, synthesize arrow label for display
           if (!selectedOption && value && typeof value === 'string' && value.indexOf('MV-') === 0) {
-            try {
-              const code = value.substring(3).toLowerCase();
-              const countries = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance().getAvailableCountries() : [];
-              const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-              if (match) {
-                selectedOption = { value: value, label: `→ ${match.name}`, description: `Relocation to ${match.name}` };
-              }
-            } catch (_) {}
+            const code = value.substring(3).toLowerCase();
+            const countries = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance().getAvailableCountries() : [];
+            const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
+            if (match) {
+              selectedOption = { value: value, label: `→ ${match.name}`, description: `Relocation to ${match.name}` };
+            }
           }
 
           if (selectedOption) {
@@ -1925,14 +2131,12 @@ class EventAccordionManager {
       let selectedOption = optionObjects.find(opt => opt.value === event.type);
       // If MV-* and not present in options, synthesize arrow label for display
       if (!selectedOption && event.type && typeof event.type === 'string' && event.type.indexOf('MV-') === 0) {
-        try {
-          const code = event.type.substring(3).toLowerCase();
-          const countries = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance().getAvailableCountries() : [];
-          const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-          if (match) {
-            selectedOption = { value: event.type, label: `→ ${match.name}`, description: `Relocation to ${match.name}` };
-          }
-        } catch (_) {}
+        const code = event.type.substring(3).toLowerCase();
+        const countries = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance().getAvailableCountries() : [];
+        const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
+        if (match) {
+          selectedOption = { value: event.type, label: `→ ${match.name}`, description: `Relocation to ${match.name}` };
+        }
       }
 
       if (selectedOption) {

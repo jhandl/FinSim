@@ -72,6 +72,11 @@ var RelocationImpactDetector = {
         }
       }
 
+      // Final pass: remove impacts for events that are already resolved
+      for (var k = 0; k < events.length; k++) {
+        this.clearResolvedImpacts(events[k]);
+      }
+
       // Build summary
       var summary = { totalImpacted: 0 };
       for (var i = 0; i < events.length; i++) {
@@ -167,7 +172,9 @@ var RelocationImpactDetector = {
     if (event.resolutionOverride) { delete event.relocationImpact; return; }
     var resolved = false;
     if (event.relocationImpact.category === 'boundary') {
-      resolved = !!(event.linkedEventId || event.currency);
+      // Consider boundary resolved if the event was explicitly split/linked, pegged to a currency,
+      // or for real-estate events if a linked country has been set (indicating jurisdiction is tied).
+      resolved = !!(event.linkedEventId || event.currency || ((event.type === 'R' || event.type === 'M') && event.linkedCountry));
     } else if (event.relocationImpact.category === 'simple') {
       // Consider simple resolved if currency or linked country is set or converted type acknowledged
       resolved = !!(event.currency || event.linkedCountry || event.type === 'SInp' || event.type === 'SI2np');

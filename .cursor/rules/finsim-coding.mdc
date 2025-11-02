@@ -24,6 +24,8 @@ Hard rules:
 - No new initializers that replicate existing logic.
 - No speculative abstractions; only extract after two concrete uses.
 - New code must be shorter than the combined diff it replaces.
+- No try / catch blocks unless they actually catch something significant and likely.
+- No empty catch blocks. If you're about to write one, that try / catch is unnecessary.
 
 ### Updating documentation ###
 

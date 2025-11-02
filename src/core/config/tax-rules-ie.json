@@ -9,7 +9,20 @@
     "currencyCode": "EUR",
     "currencySymbol": "€"
   },
-  "inflationRate": 0.025,
+  "economicData": {
+    "inflation": {
+      "cpi": 2.1134,
+      "year": 2024
+    },
+    "purchasingPowerParity": {
+      "value": 0.755848,
+      "year": 2024
+    },
+    "exchangeRate": {
+      "perEur": 1.0,
+      "asOf": "2025-10-17"
+    }
+  },
 
   "incomeTax": {
     "name": "IT",
