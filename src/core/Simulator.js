@@ -20,6 +20,8 @@ var earnedNetIncome, householdPhase;
 var stableTaxIds;
 // Country context for multi-country inflation application (currency is separate)
 var currentCountry, countryInflationOverrides;
+// Active residence currency (upper-cased ISO code) and cache for currency-country lookups
+var residenceCurrency, currencyCountryCache;
 
 const Phases = {
   growth: 'growth',
@@ -55,6 +57,175 @@ async function run() {
   }
   uiManager.updateDataSheet(runs, perRunResults);
   uiManager.updateStatusCell(successes, runs);
+}
+
+function normalizeCountry(code) {
+  if (code === null || code === undefined) return '';
+  return String(code).trim().toLowerCase();
+}
+
+function normalizeCurrency(code) {
+  if (code === null || code === undefined) return '';
+  return String(code).trim().toUpperCase();
+}
+
+function getCurrencyForCountry(code) {
+  var normalized = normalizeCountry(code);
+  if (!normalized) return null;
+  try {
+    var cfg = Config.getInstance();
+    if (cfg && typeof cfg.getCachedTaxRuleSet === 'function') {
+      var rs = cfg.getCachedTaxRuleSet(normalized);
+      if (rs && typeof rs.getCurrencyCode === 'function') {
+        var cur = rs.getCurrencyCode();
+        if (cur) return normalizeCurrency(cur);
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+function ensureCurrencyCountryCache() {
+  if (!currencyCountryCache) currencyCountryCache = {};
+  return currencyCountryCache;
+}
+
+function findCountryForCurrency(currencyCode, preferredCountry) {
+  var currency = normalizeCurrency(currencyCode);
+  var preferred = normalizeCountry(preferredCountry);
+  if (!currency) return preferred || normalizeCountry((Config.getInstance() || {}).getDefaultCountry && Config.getInstance().getDefaultCountry());
+  var cache = ensureCurrencyCountryCache();
+  if (cache[currency]) return cache[currency];
+
+  if (preferred) {
+    var prefCurrency = getCurrencyForCountry(preferred);
+    if (normalizeCurrency(prefCurrency) === currency) {
+      cache[currency] = preferred;
+      return preferred;
+    }
+  }
+
+  try {
+    var cfg = Config.getInstance();
+    if (cfg && typeof cfg.listCachedRuleSets === 'function') {
+      var cachedSets = cfg.listCachedRuleSets();
+      for (var key in cachedSets) {
+        if (!Object.prototype.hasOwnProperty.call(cachedSets, key)) continue;
+        var rs = cachedSets[key];
+        if (!rs || typeof rs.getCurrencyCode !== 'function') continue;
+        var rsCurrency = normalizeCurrency(rs.getCurrencyCode());
+        if (rsCurrency === currency) {
+          var countryCode = null;
+          if (typeof rs.getCountryCode === 'function') {
+            countryCode = rs.getCountryCode();
+          }
+          if (!countryCode) {
+            countryCode = key;
+          }
+          cache[currency] = normalizeCountry(countryCode);
+          return cache[currency];
+        }
+      }
+    }
+  } catch (_) {}
+
+  if (preferred) {
+    cache[currency] = preferred;
+    return preferred;
+  }
+
+  try {
+    var cfg2 = Config.getInstance();
+    if (cfg2 && typeof cfg2.getDefaultCountry === 'function') {
+      var fallback = normalizeCountry(cfg2.getDefaultCountry());
+      cache[currency] = fallback;
+      return fallback;
+    }
+  } catch (_) {}
+
+  cache[currency] = '';
+  return cache[currency];
+}
+
+function getEventCurrencyInfo(event, fallbackCountry) {
+  var info = { currency: null, country: null };
+  if (!event) {
+    info.currency = normalizeCurrency(residenceCurrency) || 'EUR';
+    info.country = normalizeCountry(fallbackCountry || currentCountry);
+    return info;
+  }
+  var linkedCountry = event.linkedCountry ? normalizeCountry(event.linkedCountry) : null;
+  if (event.currency) {
+    info.currency = normalizeCurrency(event.currency);
+    info.country = findCountryForCurrency(info.currency, linkedCountry || fallbackCountry || currentCountry);
+  } else if (linkedCountry) {
+    info.country = linkedCountry;
+    info.currency = getCurrencyForCountry(linkedCountry) || normalizeCurrency(residenceCurrency) || 'EUR';
+  } else {
+    var fallback = normalizeCountry(fallbackCountry || currentCountry);
+    info.country = fallback;
+    info.currency = getCurrencyForCountry(fallback) || normalizeCurrency(residenceCurrency) || 'EUR';
+  }
+  if (!info.currency) {
+    info.currency = normalizeCurrency(residenceCurrency) || 'EUR';
+  }
+  if (!info.country) {
+    info.country = findCountryForCurrency(info.currency, fallbackCountry || currentCountry);
+  }
+  return info;
+}
+
+function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toCountry, year) {
+  if (!value) return 0;
+  var sourceCurrency = normalizeCurrency(fromCurrency);
+  var targetCurrency = normalizeCurrency(toCurrency);
+  if (!sourceCurrency || !targetCurrency || sourceCurrency === targetCurrency) {
+    return value;
+  }
+  var sourceCountry = findCountryForCurrency(sourceCurrency, fromCountry);
+  var targetCountry = findCountryForCurrency(targetCurrency, toCountry);
+  var econ = null;
+  try {
+    if (typeof config !== 'undefined' && config && typeof config.getEconomicData === 'function') {
+      econ = config.getEconomicData();
+    } else {
+      var cfg = Config.getInstance();
+      if (cfg && typeof cfg.getEconomicData === 'function') {
+        econ = cfg.getEconomicData();
+      }
+    }
+  } catch (_) { econ = null; }
+  if (!econ || !econ.ready || typeof econ.convert !== 'function') {
+    return value;
+  }
+  var baseYear = null;
+  try {
+    if (config && typeof config.getSimulationStartYear === 'function') {
+      baseYear = config.getSimulationStartYear();
+    }
+  } catch (_) { baseYear = null; }
+  var options = {
+    fxMode: 'ppp',
+    baseYear: (baseYear != null) ? baseYear : new Date().getFullYear()
+  };
+  var converted = econ.convert(value, sourceCountry ? sourceCountry.toUpperCase() : null, targetCountry ? targetCountry.toUpperCase() : null, year, options);
+  if (converted === null || typeof converted !== 'number' || isNaN(converted)) {
+    try { console.warn("Currency conversion failed:", value, sourceCurrency, targetCurrency, year); } catch (_) {}
+    if (typeof errors !== 'undefined') {
+      errors = true;
+    }
+    try {
+      if (uiManager && typeof uiManager.setStatus === 'function') {
+        uiManager.setStatus("Currency conversion failed - check economic data", STATUS_COLORS.WARNING);
+      }
+    } catch (_) {}
+    return value;
+  }
+  return converted;
+}
+
+function convertToResidenceCurrency(amount, currency, country, year) {
+  return convertCurrencyAmount(amount, currency, country, residenceCurrency, currentCountry, year);
 }
 
 function initializeUI() {
@@ -145,12 +316,17 @@ function initializeSimulationVariables() {
     stableTaxIds = ['incomeTax', 'capitalGains'];
   }
 
+  var baseStateCountry = (params.StartCountry || config.getDefaultCountry() || '').toLowerCase();
+  var baseStateCurrency = getCurrencyForCountry(baseStateCountry) || 'EUR';
+
   // Initialize Person 1 (P1)
   const p1SpecificParams = {
     startingAge: params.startingAge,
     retirementAge: params.retirementAge,
     statePensionWeekly: params.statePensionWeekly,
-    pensionContributionPercentage: params.pensionPercentage
+    pensionContributionPercentage: params.pensionPercentage,
+    statePensionCurrency: baseStateCurrency,
+    statePensionCountry: baseStateCountry
   };
   person1 = new Person('P1', p1SpecificParams, params, { 
     growthRatePension: params.growthRatePension, 
@@ -174,7 +350,9 @@ function initializeSimulationVariables() {
       startingAge: params.p2StartingAge, // Will be 0 or undefined if not set
       retirementAge: params.p2RetirementAge,
       statePensionWeekly: params.p2StatePensionWeekly,
-      pensionContributionPercentage: params.pensionPercentageP2
+      pensionContributionPercentage: params.pensionPercentageP2,
+      statePensionCurrency: baseStateCurrency,
+      statePensionCountry: baseStateCountry
     };
     person2 = new Person('P2', p2SpecificParams, params, { 
       growthRatePension: params.growthRatePension, 
@@ -197,6 +375,10 @@ function initializeSimulationVariables() {
   if (currentCountry && typeof params.inflation === 'number') {
     countryInflationOverrides[currentCountry] = params.inflation;
   }
+  residenceCurrency = getCurrencyForCountry(currentCountry) 
+    || getCurrencyForCountry(params.StartCountry || config.getDefaultCountry()) 
+    || normalizeCurrency(residenceCurrency) 
+    || 'EUR';
 
   initializeRealEstate();
 
@@ -269,6 +451,7 @@ function resetYearlyVariables() {
       assetObj.resetYearlyStats();
     }
   }
+  residenceCurrency = getCurrencyForCountry(currentCountry) || residenceCurrency || 'EUR';
 }
 
 function runSimulation() {
@@ -292,7 +475,7 @@ function runSimulation() {
 
 function calculatePensionIncome() {
   // Calculate pension income for Person 1
-  const p1CalcResults = person1.calculateYearlyPensionIncome(config);
+  const p1CalcResults = person1.calculateYearlyPensionIncome(config, currentCountry, residenceCurrency, year);
   if (p1CalcResults.lumpSumAmount > 0) {
     cash += p1CalcResults.lumpSumAmount;
     // Note: Lump sum tax is already declared in Pension.declareRevenue() when getLumpsum() calls sell()
@@ -308,7 +491,7 @@ function calculatePensionIncome() {
 
   // Calculate pension income for Person 2 (if exists)
   if (person2) {
-    const p2CalcResults = person2.calculateYearlyPensionIncome(config);
+    const p2CalcResults = person2.calculateYearlyPensionIncome(config, currentCountry, residenceCurrency, year);
     if (p2CalcResults.lumpSumAmount > 0) {
       cash += p2CalcResults.lumpSumAmount;
       // Note: Lump sum tax is already declared in Pension.declareRevenue() when getLumpsum() calls sell()
@@ -367,22 +550,396 @@ function processEvents() {
     }
     return 0.02;
   }
-  
-  // First pass: Process all real estate sales for the current age
+
+  function createFlowState() {
+    return {
+      incomeBuckets: {},
+      expenseBuckets: {},
+      orderedEntries: []
+    };
+  }
+
+  function getEffectiveCurrency(info) {
+    var currency = normalizeCurrency((info && info.currency) ? info.currency : (residenceCurrency || 'EUR'));
+    var country = normalizeCountry((info && info.country) ? info.country : findCountryForCurrency(currency, currentCountry));
+    return {
+      currency: currency || 'EUR',
+      country: country
+    };
+  }
+
+  function ensureBucket(map, info) {
+    var eff = getEffectiveCurrency(info);
+    var key = eff.currency + '::' + eff.country;
+    if (!map[key]) {
+      map[key] = { currency: eff.currency, country: eff.country, total: 0, categories: {} };
+    }
+    return key;
+  }
+
+  function recordIncomeEntry(state, info, amount, payload) {
+    if (!state || !amount) return;
+    var key = ensureBucket(state.incomeBuckets, info);
+    state.incomeBuckets[key].total += amount;
+    var entry = payload || {};
+    var eff = getEffectiveCurrency(info);
+    entry.info = eff;
+    entry.bucketKey = key;
+    entry.kind = 'income';
+    entry.amount = amount;
+    var bucket = state.incomeBuckets[key];
+    var catKey = entry.type || 'unknown';
+    if (!bucket.categories[catKey]) bucket.categories[catKey] = 0;
+    bucket.categories[catKey] += amount;
+    state.orderedEntries.push(entry);
+  }
+
+  function recordExpenseEntry(state, info, amount, payload) {
+    if (!state || !amount) return;
+    var key = ensureBucket(state.expenseBuckets, info);
+    state.expenseBuckets[key].total += amount;
+    var entry = payload || {};
+    var eff = getEffectiveCurrency(info);
+    entry.info = eff;
+    entry.bucketKey = key;
+    entry.kind = 'expense';
+    entry.amount = amount;
+    var bucket = state.expenseBuckets[key];
+    var catKey = entry.type || 'unknown';
+    if (!bucket.categories[catKey]) bucket.categories[catKey] = 0;
+    bucket.categories[catKey] += amount;
+    state.orderedEntries.push(entry);
+  }
+
+  var incomeByCurrency = {};
+  var expensesByCurrency = {};
+  var conversionFactorCache = {};
+
+  function getConversionFactor(currency, country) {
+    var normalizedCurrency = normalizeCurrency(currency || residenceCurrency || 'EUR');
+    var normalizedCountry = normalizeCountry(country || currentCountry);
+    var cacheKey = normalizedCurrency + '::' + normalizedCountry;
+    if (conversionFactorCache.hasOwnProperty(cacheKey)) {
+      return conversionFactorCache[cacheKey];
+    }
+    if (!normalizedCurrency || normalizedCurrency === normalizeCurrency(residenceCurrency)) {
+      conversionFactorCache[cacheKey] = 1;
+      return 1;
+    }
+    var factor = convertCurrencyAmount(1, normalizedCurrency, normalizedCountry, residenceCurrency, currentCountry, year);
+    conversionFactorCache[cacheKey] = factor;
+    return factor;
+  }
+
+
+  function flushFlowState(state) {
+    if (!state || state.orderedEntries.length === 0) return;
+
+    // Consolidation step: compute net flows per currency before any conversion
+    var netByCurrency = {};
+    var allCurrencies = {};
+    for (var key in state.incomeBuckets) {
+      if (!Object.prototype.hasOwnProperty.call(state.incomeBuckets, key)) continue;
+      allCurrencies[key] = true;
+      var incomeTotal = state.incomeBuckets[key].total || 0;
+      var expenseTotal = (state.expenseBuckets[key] && state.expenseBuckets[key].total) || 0;
+      netByCurrency[key] = incomeTotal - expenseTotal;
+      if (incomeByCurrency) {
+        var cur = state.incomeBuckets[key].currency;
+        incomeByCurrency[cur] = (incomeByCurrency[cur] || 0) + incomeTotal;
+      }
+      if (expensesByCurrency && state.expenseBuckets[key]) {
+        var curExp = state.expenseBuckets[key].currency;
+        expensesByCurrency[curExp] = (expensesByCurrency[curExp] || 0) + expenseTotal;
+      }
+    }
+    for (var keyExp in state.expenseBuckets) {
+      if (!Object.prototype.hasOwnProperty.call(state.expenseBuckets, keyExp)) continue;
+      if (!allCurrencies[keyExp]) {
+        allCurrencies[keyExp] = true;
+        var expTotal = state.expenseBuckets[keyExp].total || 0;
+        netByCurrency[keyExp] = -expTotal;
+        if (expensesByCurrency) {
+          var curExpOnly = state.expenseBuckets[keyExp].currency;
+          expensesByCurrency[curExpOnly] = (expensesByCurrency[curExpOnly] || 0) + expTotal;
+        }
+      }
+    }
+
+    // Convert only the net for each non-residence currency
+    var categoryTotalsByType = {}; // Track consolidated amounts by entry type
+    var resCurrencyNorm = normalizeCurrency(residenceCurrency);
+
+    for (var curKey in netByCurrency) {
+      if (!Object.prototype.hasOwnProperty.call(netByCurrency, curKey)) continue;
+      var netAmount = netByCurrency[curKey];
+
+      var bucket = state.incomeBuckets[curKey] || state.expenseBuckets[curKey];
+      if (!bucket) continue;
+      var bucketCurrency = normalizeCurrency(bucket.currency);
+      var bucketCountry = normalizeCountry(bucket.country);
+
+      // Derive a single forward conversion factor per bucket (foreign→residence) for arithmetic consistency
+      var categoryConversionFactor = 1;
+      if (bucketCurrency !== resCurrencyNorm) {
+        categoryConversionFactor = getConversionFactor(bucketCurrency, bucketCountry);
+      }
+      
+      var incomeBucket = state.incomeBuckets[curKey];
+      var expenseBucket = state.expenseBuckets[curKey];
+      
+      if (incomeBucket && incomeBucket.categories) {
+        for (var cat in incomeBucket.categories) {
+          if (!Object.prototype.hasOwnProperty.call(incomeBucket.categories, cat)) continue;
+          var catAmount = incomeBucket.categories[cat];
+          var convertedCat = (bucketCurrency === resCurrencyNorm) ? catAmount : (catAmount * categoryConversionFactor);
+          if (!categoryTotalsByType[cat]) categoryTotalsByType[cat] = 0;
+          categoryTotalsByType[cat] += convertedCat;
+        }
+      }
+      
+      if (expenseBucket && expenseBucket.categories) {
+        for (var catExp in expenseBucket.categories) {
+          if (!Object.prototype.hasOwnProperty.call(expenseBucket.categories, catExp)) continue;
+          var catExpAmount = expenseBucket.categories[catExp];
+          var convertedCatExp = (bucketCurrency === resCurrencyNorm) ? catExpAmount : (catExpAmount * categoryConversionFactor);
+          if (!categoryTotalsByType[catExp]) categoryTotalsByType[catExp] = 0;
+          categoryTotalsByType[catExp] += convertedCatExp;
+        }
+      }
+    }
+
+    // Track which categories have been counted/declared (aggregate across all currencies)
+    var countedCategories = {};
+    var declaredEntries = {};
+
+    // Post entries for attribution and declarations using consolidated amounts
+    for (var i = 0; i < state.orderedEntries.length; i++) {
+      var entry = state.orderedEntries[i];
+      var bucket = (entry.kind === 'income') ? state.incomeBuckets[entry.bucketKey] : state.expenseBuckets[entry.bucketKey];
+      if (!bucket) continue;
+
+      var bucketCurrency = normalizeCurrency(bucket.currency);
+      var bucketCountry = normalizeCountry(bucket.country);
+      var isResidenceCurrency = bucketCurrency === resCurrencyNorm;
+
+      // Compute conversion factor for this currency (always forward: foreign → residence)
+      // For attribution, we always convert entries from their currency to residence currency
+      var entryConversionFactor = 1;
+      if (!isResidenceCurrency) {
+        // Always use forward conversion (foreign → residence) for attribution
+        entryConversionFactor = getConversionFactor(bucketCurrency, bucketCountry);
+      }
+
+      // For attribution, convert entry amount using the forward conversion factor
+      var entryConvertedAmount = entry.amount * entryConversionFactor;
+      
+      // Use entry type for category tracking (aggregate across all currencies)
+      var entryCategory = entry.type || 'unknown';
+      var entryKey = entry.eventId ? String(entry.eventId) : (entryCategory + '_' + i);
+
+      switch (entry.type) {
+        case 'sale':
+          cash += entryConvertedAmount;
+          attributionManager.record('realestatecapital', entry.label || ('Sale (' + entry.eventId + ')'), -entryConvertedAmount);
+          break;
+
+        case 'salary': {
+          var salaryPerson = entry.personRef || person1;
+          var isPensionable = entry.pensionable && salaryPerson && salaryPerson.pension;
+          var declaredRate = 0;
+
+          // Use consolidated total for incomeSalaries accumulation (only once per currency bucket)
+          var consolidatedSalary = categoryTotalsByType['salary'] || 0;
+          if (!countedCategories[entryCategory] && consolidatedSalary > 0) {
+            incomeSalaries += consolidatedSalary;
+            countedCategories[entryCategory] = true;
+          }
+
+          attributionManager.record('incomesalaries', entry.eventId, entryConvertedAmount);
+
+          if (isPensionable && entryConvertedAmount > 0) {
+            var rsSalary = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch(_) { return null; } })();
+            var bands = (rsSalary && typeof rsSalary.getPensionContributionAgeBands === 'function') ? rsSalary.getPensionContributionAgeBands() : {};
+            var baseRate = (salaryPerson.pensionContributionPercentageParam || 0) * getRateForKey(salaryPerson.age, bands);
+            if (params.pensionCapped === "Yes") {
+              var cap = (rsSalary && typeof rsSalary.getPensionContributionAnnualCap === 'function') ? rsSalary.getPensionContributionAnnualCap() : 0;
+              var capValue = adjust(cap);
+              if (capValue > 0 && entryConvertedAmount > capValue) {
+                baseRate = baseRate * capValue / entryConvertedAmount;
+              }
+            } else if (params.pensionCapped === "Match") {
+              baseRate = Math.min(entry.match || 0, baseRate);
+            }
+            var employerRate = Math.min(entry.match || 0, baseRate);
+            var personalAmount = baseRate * entryConvertedAmount;
+            var employerAmount = employerRate * entryConvertedAmount;
+            var totalContrib = personalAmount + employerAmount;
+            if (totalContrib > 0) {
+              pensionContribution += totalContrib;
+              personalPensionContribution += personalAmount;
+              if (personalAmount > 0) {
+                attributionManager.record('pensioncontribution', entry.eventId, personalAmount);
+              }
+              salaryPerson.pension.buy(totalContrib);
+            }
+            declaredRate = baseRate;
+          }
+
+          if (!declaredEntries[entryKey]) {
+            revenue.declareSalaryIncome(entryConvertedAmount, declaredRate, salaryPerson, entry.eventId);
+            declaredEntries[entryKey] = true;
+          }
+          break;
+        }
+
+        case 'rsu':
+          var rsuTotal = categoryTotalsByType['rsu'] || 0;
+          if (!countedCategories[entryCategory] && rsuTotal > 0) {
+            incomeShares += rsuTotal;
+            countedCategories[entryCategory] = true;
+          }
+          attributionManager.record('incomersus', entry.eventId, entryConvertedAmount);
+          if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
+            revenue.declareNonEuSharesIncome(entryConvertedAmount, entry.eventId);
+            declaredEntries[entryKey] = true;
+          }
+          break;
+
+        case 'rental':
+          var rentalTotal = categoryTotalsByType['rental'] || 0;
+          if (!countedCategories[entryCategory] && rentalTotal > 0) {
+            incomeRentals += rentalTotal;
+            countedCategories[entryCategory] = true;
+          }
+          attributionManager.record('incomerentals', entry.eventId, entryConvertedAmount);
+          if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
+            revenue.declareOtherIncome(entryConvertedAmount, entry.eventId);
+            declaredEntries[entryKey] = true;
+          }
+          break;
+
+        case 'dbi': {
+          var dbiTotal = categoryTotalsByType['dbi'] || 0;
+          if (!countedCategories[entryCategory] && dbiTotal > 0) {
+            incomeDefinedBenefit += dbiTotal;
+            countedCategories[entryCategory] = true;
+          }
+          attributionManager.record('incomedefinedbenefit', entry.eventId, entryConvertedAmount);
+          if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
+            var rsDbi = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch(_) { return null; } })();
+            var dbiSpec = (rsDbi && typeof rsDbi.getDefinedBenefitSpec === 'function') ? rsDbi.getDefinedBenefitSpec() : null;
+            if (!dbiSpec || !dbiSpec.treatment) {
+              errors = true;
+              try { uiManager.setStatus("Tax rules error: Defined Benefit behaviour is not defined in the active ruleset.", STATUS_COLORS.ERROR); } catch (_) {}
+            } else {
+              switch (dbiSpec.treatment) {
+                case 'privatePension':
+                  revenue.declarePrivatePensionIncome(entryConvertedAmount, person1, entry.eventId);
+                  break;
+                case 'salary':
+                  var contrib = (dbiSpec.salary && typeof dbiSpec.salary.contribRate === 'number') ? dbiSpec.salary.contribRate : 0;
+                  revenue.declareSalaryIncome(entryConvertedAmount, contrib, person1, entry.eventId);
+                  break;
+                default:
+                  errors = true;
+                  try { uiManager.setStatus("Tax rules error: Unknown DBI treatment '" + String(dbiSpec.treatment) + "'.", STATUS_COLORS.ERROR); } catch (_) {}
+                  break;
+              }
+            }
+            declaredEntries[entryKey] = true;
+          }
+          break;
+        }
+
+        case 'taxFree':
+          var taxFreeTotal = categoryTotalsByType['taxFree'] || 0;
+          if (!countedCategories[entryCategory] && taxFreeTotal > 0) {
+            incomeTaxFree += taxFreeTotal;
+            countedCategories[entryCategory] = true;
+          }
+          attributionManager.record('incometaxfree', entry.eventId, entryConvertedAmount);
+          break;
+
+        case 'expense':
+          var expenseTotal = categoryTotalsByType['expense'] || 0;
+          if (!countedCategories[entryCategory] && expenseTotal > 0) {
+            expenses += expenseTotal;
+            countedCategories[entryCategory] = true;
+          }
+          attributionManager.record('expenses', entry.label || entry.eventId, entryConvertedAmount);
+          break;
+
+        case 'mortgage':
+          var mortgageTotal = categoryTotalsByType['mortgage'] || 0;
+          if (!countedCategories[entryCategory] && mortgageTotal > 0) {
+            expenses += mortgageTotal;
+            countedCategories[entryCategory] = true;
+          }
+          attributionManager.record('expenses', entry.label || entry.eventId, entryConvertedAmount);
+          break;
+
+        case 'purchase': {
+          var purchaseTotal = categoryTotalsByType['purchase'] || entryConvertedAmount;
+          var cashUsed = Math.min(cash, purchaseTotal);
+          cash -= cashUsed;
+          var shortfall = purchaseTotal - cashUsed;
+          if (shortfall > 0) {
+            expenses += shortfall;
+            attributionManager.record('expenses', 'Purchase shortfall (' + entry.eventId + ')', shortfall);
+          }
+          attributionManager.record('realestatecapital', 'Purchase (' + entry.eventId + ')', purchaseTotal);
+          break;
+        }
+
+        default:
+          break;
+      }
+    }
+
+    state.incomeBuckets = {};
+    state.expenseBuckets = {};
+    state.orderedEntries = [];
+  }
+
+  // First pass: process property sales so proceeds are consolidated before purchases
+  var saleState = createFlowState();
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
     if (event.type === 'R' && event.toAge && person1.age === event.toAge) {
-      // console.log("Sell property ["+event.id+"] for "+Math.round(realEstate.getValue(event.id)));            
-      let saleProceeds = realEstate.sell(event.id);
-      cash += saleProceeds;
-      attributionManager.record('realestatecapital', `Sale (${event.id})`, -saleProceeds);
+      var propertyCurrency = null;
+      var propertyCountry = null;
+      try {
+        if (realEstate && typeof realEstate.getCurrency === 'function') {
+          propertyCurrency = realEstate.getCurrency(event.id);
+        }
+      } catch (_) {}
+      try {
+        if (realEstate && typeof realEstate.getLinkedCountry === 'function') {
+          propertyCountry = realEstate.getLinkedCountry(event.id);
+        }
+      } catch (_) {}
+      var saleInfo = getEventCurrencyInfo(event, propertyCountry || currentCountry);
+      var saleEntryInfo = {
+        currency: propertyCurrency || saleInfo.currency,
+        country: propertyCountry || saleInfo.country
+      };
+      var saleProceeds = realEstate.sell(event.id);
+      recordIncomeEntry(saleState, saleEntryInfo, saleProceeds, {
+        type: 'sale',
+        eventId: event.id,
+        label: 'Sale (' + event.id + ')'
+      });
     }
   }
-  
-  // Second pass: Process all other events including real estate purchases
+  flushFlowState(saleState);
+
+  // Second pass: aggregate all other flows
+  var flowState = createFlowState();
+  var allowCashConversion = (params && params.convertCashOnRelocation === true);
+
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
-    // Determine inflation rate for this event based on country context. Currency is irrelevant here.
     var inflationRate;
     if (event.rate !== null && event.rate !== undefined && event.rate !== '') {
       inflationRate = event.rate;
@@ -391,197 +948,161 @@ function processEvents() {
       inflationRate = resolveCountryInflation(countryForInflation);
     }
     let amount = adjust(event.amount, inflationRate);
-    // Default toAge to 999 if not required for this event type
     let inScope = (person1.age >= event.fromAge && person1.age <= (event.toAge || 999));
 
     switch (event.type) {
-
-      case "NOP": // No Operation
+      case 'NOP':
         break;
 
-      case 'SI': // Salary income (Person 1, Pensionable)
+      case 'SI':
         if (inScope) {
-          incomeSalaries += amount;
-          attributionManager.record('incomesalaries', event.id, amount);
-          // Pension contribution age bands: prefer TaxRuleSet when available
-          var _rs1 = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch(_) { return null; } })();
-          var p1Bands = (_rs1 && typeof _rs1.getPensionContributionAgeBands === 'function') ? _rs1.getPensionContributionAgeBands() : {};
-          let p1ContribRate = person1.pensionContributionPercentageParam * getRateForKey(person1.age, p1Bands);
-
-          // Handle pension capping options
-          if (params.pensionCapped === "Yes") {
-            var p1Cap = (_rs1 && typeof _rs1.getPensionContributionAnnualCap === 'function') ? _rs1.getPensionContributionAnnualCap() : 0;
-            if (amount > adjust(p1Cap)) {
-              p1ContribRate = p1ContribRate * adjust(p1Cap) / amount;
-            }
-          } else if (params.pensionCapped === "Match") {
-            p1ContribRate = Math.min(event.match || 0, p1ContribRate);
-          }
-
-          let p1CompanyMatchRate = Math.min(event.match || 0, p1ContribRate); // Assuming event.match is a rate
-          let p1PersonalContribAmount = p1ContribRate * amount;
-          let p1CompanyContribAmount = p1CompanyMatchRate * amount;
-          let p1TotalContrib = p1PersonalContribAmount + p1CompanyContribAmount;
-          
-          pensionContribution += p1TotalContrib;
-          personalPensionContribution += p1PersonalContribAmount;
-          attributionManager.record('pensioncontribution', `${event.id}`, p1PersonalContribAmount);
-          person1.pension.buy(p1TotalContrib);
-          revenue.declareSalaryIncome(amount, p1ContribRate, person1, event.id); // Pass P1's personal contrib rate
+          var salaryInfo = getEventCurrencyInfo(event, currentCountry);
+          recordIncomeEntry(flowState, salaryInfo, amount, {
+            type: 'salary',
+            eventId: event.id,
+            match: event.match || 0,
+            personRef: person1,
+            pensionable: true
+          });
         }
         break;
 
-      case 'SInp': // Salary income (Person 1, Non-Pensionable)
+      case 'SInp':
         if (inScope) {
-          incomeSalaries += amount;
-          attributionManager.record('incomesalaries', event.id, amount);
-          revenue.declareSalaryIncome(amount, 0, person1, event.id); // No pension contribution for P1
+          var salaryNpInfo = getEventCurrencyInfo(event, currentCountry);
+          recordIncomeEntry(flowState, salaryNpInfo, amount, {
+            type: 'salary',
+            eventId: event.id,
+            match: 0,
+            personRef: person1,
+            pensionable: false
+          });
         }
         break;
 
-      case 'SI2': // Salary income (Person 2, Pensionable)
+      case 'SI2':
         if (inScope && person2) {
-          incomeSalaries += amount;
-          attributionManager.record('incomesalaries', event.id, amount);
-          // Pension contribution age bands (P2)
-          var _rs2 = _rs1 || Config.getInstance().getCachedTaxRuleSet(currentCountry) || null;
-          var p2Bands = (_rs2 && typeof _rs2.getPensionContributionAgeBands === 'function') ? _rs2.getPensionContributionAgeBands() : {};
-          let p2ContribRate = person2.pensionContributionPercentageParam * getRateForKey(person2.age, p2Bands);
-          
-          // Handle pension capping options
-          if (params.pensionCapped === "Yes") {
-            var p2Cap = (_rs2 && typeof _rs2.getPensionContributionAnnualCap === 'function') ? _rs2.getPensionContributionAnnualCap() : 0;
-            if (amount > adjust(p2Cap)) {
-              p2ContribRate = p2ContribRate * adjust(p2Cap) / amount;
-            }
-          } else if (params.pensionCapped === "Match") {
-            // Set personal contribution rate to match employer match rate
-            p2ContribRate = Math.min(event.match || 0, p2ContribRate);
-          }
-          
-          let p2CompanyMatchRate = Math.min(event.match || 0, p2ContribRate); // Assuming event.match is a rate
-          let p2PersonalContribAmount = p2ContribRate * amount;
-          let p2CompanyContribAmount = p2CompanyMatchRate * amount;
-          let p2TotalContrib = p2PersonalContribAmount + p2CompanyContribAmount;
-
-          pensionContribution += p2TotalContrib;
-          personalPensionContribution += p2PersonalContribAmount;
-          attributionManager.record('pensioncontribution', `${event.id}`, p2PersonalContribAmount);
-          person2.pension.buy(p2TotalContrib);
-          revenue.declareSalaryIncome(amount, p2ContribRate, person2, event.id); // Pass P2's personal contrib rate
-        } else if (inScope && !person2) {
-          // Fallback: SI2 event but no Person 2 defined. Treat as P1 non-pensionable salary.
-          incomeSalaries += amount;
-          attributionManager.record('incomesalaries', event.id, amount);
-          revenue.declareSalaryIncome(amount, 0, person1, event.id);
-          // console.warn("SI2 event encountered but Person 2 is not defined. Treated as P1 non-pensionable salary.");
+          var salary2Info = getEventCurrencyInfo(event, currentCountry);
+          recordIncomeEntry(flowState, salary2Info, amount, {
+            type: 'salary',
+            eventId: event.id,
+            match: event.match || 0,
+            personRef: person2,
+            pensionable: true
+          });
+        } else if (inScope) {
+          var salaryFallbackInfo = getEventCurrencyInfo(event, currentCountry);
+          recordIncomeEntry(flowState, salaryFallbackInfo, amount, {
+            type: 'salary',
+            eventId: event.id,
+            match: 0,
+            personRef: person1,
+            pensionable: false
+          });
         }
         break;
 
-      case 'SI2np': // Salary income (Person 2, Non-Pensionable)
+      case 'SI2np':
         if (inScope && person2) {
-          incomeSalaries += amount;
-          attributionManager.record('incomesalaries', event.id, amount);
-          revenue.declareSalaryIncome(amount, 0, person2, event.id); // No pension contribution for P2
+          var salary2npInfo = getEventCurrencyInfo(event, currentCountry);
+          recordIncomeEntry(flowState, salary2npInfo, amount, {
+            type: 'salary',
+            eventId: event.id,
+            match: 0,
+            personRef: person2,
+            pensionable: false
+          });
         }
         break;
 
-      case 'UI': // RSU income
+      case 'UI':
         if (inScope) {
-          incomeShares += amount;
-          attributionManager.record('incomersus', event.id, amount);
-          revenue.declareNonEuSharesIncome(amount, event.id);
+          var rsuInfo = getEventCurrencyInfo(event, currentCountry);
+          recordIncomeEntry(flowState, rsuInfo, amount, {
+            type: 'rsu',
+            eventId: event.id
+          });
         }
         break;
 
-      case 'RI': // Rental income
+      case 'RI':
         if (inScope) {
-          incomeRentals += amount;
-          attributionManager.record('incomerentals', event.id, amount);
-          revenue.declareOtherIncome(amount, event.id);
+          var rentalInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
+          recordIncomeEntry(flowState, rentalInfo, amount, {
+            type: 'rental',
+            eventId: event.id
+          });
         }
         break;
 
-      case 'DBI': // Defined Benefit Pension Income
+      case 'DBI':
         if (inScope) {
-          incomeDefinedBenefit += amount;
-          attributionManager.record('incomedefinedbenefit', event.id, amount);
-
-          // Load ruleset and fetch declared DBI treatment spec. There is NO
-          // default — the ruleset must declare how DBI is to be treated.
-          var _rs_dbi = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch(_) { return null; } })();
-          var dbiSpec = (_rs_dbi && typeof _rs_dbi.getDefinedBenefitSpec === 'function') ? _rs_dbi.getDefinedBenefitSpec() : null;
-
-          if (!dbiSpec || !dbiSpec.treatment) {
-            // Fail-fast: require explicit declaration in ruleset. Surface an error via UI status.
-            errors = true;
-            try { uiManager.setStatus("Tax rules error: Defined Benefit behaviour is not defined in the active ruleset.", STATUS_COLORS.ERROR); } catch (_) {}
-            break;
-          }
-
-          switch (dbiSpec.treatment) {
-            case 'privatePension':
-              // Route to private pension pipeline so lump-sum and drawdown logic apply
-              revenue.declarePrivatePensionIncome(amount, person1, event.id);
-              break;
-            case 'salary':
-              // Use declared contribRate if present; require explicit numeric when present
-              var contrib = (dbiSpec.salary && typeof dbiSpec.salary.contribRate === 'number') ? dbiSpec.salary.contribRate : 0;
-              revenue.declareSalaryIncome(amount, contrib, person1, event.id);
-              break;
-            default:
-              errors = true;
-              try { uiManager.setStatus("Tax rules error: Unknown DBI treatment '" + String(dbiSpec.treatment) + "'.", STATUS_COLORS.ERROR); } catch (_) {}
-              break;
-          }
+          var dbInfo = getEventCurrencyInfo(event, currentCountry);
+          recordIncomeEntry(flowState, dbInfo, amount, {
+            type: 'dbi',
+            eventId: event.id
+          });
         }
         break;
 
-      case 'FI': // Tax-free income
+      case 'FI':
         if (inScope) {
-          incomeTaxFree += amount;
-          attributionManager.record('incometaxfree', event.id, amount);
+          var taxFreeInfo = getEventCurrencyInfo(event, currentCountry);
+          recordIncomeEntry(flowState, taxFreeInfo, amount, {
+            type: 'taxFree',
+            eventId: event.id
+          });
         }
         break;
 
-      case 'E': // Expenses
+      case 'E':
         if (inScope) {
-          expenses += amount;
-          attributionManager.record('expenses', event.id, amount);
+          var expenseInfo = getEventCurrencyInfo(event, currentCountry);
+          recordExpenseEntry(flowState, expenseInfo, amount, {
+            type: 'expense',
+            eventId: event.id
+          });
         }
         break;
 
-      case 'M': // Mortgage
+      case 'M': {
+        var mortgageInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
         if (person1.age == event.fromAge) {
-          realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount);
-          //            console.log("Borrowed "+Math.round(realEstate.properties[event.id].borrowed)+" on a "+(event.toAge - event.fromAge)+"-year "+(event.rate*100)+"% mortgage for property ["+event.id+"] paying "+Math.round(amount)+"/year");
+          realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount, mortgageInfo.currency, mortgageInfo.country);
         }
         if (inScope) {
-          const payment = realEstate.getPayment(event.id);
-          expenses += payment; // not adjusted once mortgage starts, assuming fixed rate
-          attributionManager.record('expenses', `Mortgage (${event.id})`, payment);
-          //            console.log("Mortgage payment "+realEstate.getPayment(event.id)+" for property ["+event.id+"] ("+(realEstate.properties[event.id].paymentsMade)+" of "+realEstate.properties[event.id].terms+")");
+          var payment = realEstate.getPayment(event.id);
+          var mortgageCurrency = mortgageInfo.currency;
+          var mortgageCountry = mortgageInfo.country;
+          try {
+            var storedCurrency = realEstate.getCurrency(event.id);
+            if (storedCurrency) mortgageCurrency = storedCurrency;
+          } catch (_) {}
+          try {
+            var storedCountry = realEstate.getLinkedCountry(event.id);
+            if (storedCountry) mortgageCountry = storedCountry;
+          } catch (_) {}
+          recordExpenseEntry(flowState, { currency: mortgageCurrency, country: mortgageCountry }, payment, {
+            type: 'mortgage',
+            eventId: event.id,
+            label: 'Mortgage (' + event.id + ')'
+          });
         }
         break;
+      }
 
-      case 'R': // Real estate
-        // purchase only (sales were handled in first pass)
+      case 'R':
         if (person1.age === event.fromAge) {
-          realEstate.buy(event.id, amount, event.rate);
-          // Use available cash first, only add remainder to expenses
-          let cashUsed = Math.min(cash, amount);
-          cash -= cashUsed;
-          expenses += amount - cashUsed;
-          if (amount - cashUsed > 0) {
-            attributionManager.record('expenses', `Purchase shortfall (${event.id})`, amount - cashUsed);
-          }
-          attributionManager.record('realestatecapital', `Purchase (${event.id})`, amount);
-          //            console.log("Buy property ["+event.id+"] with "+Math.round(amount)+" downpayment (used "+Math.round(cashUsed)+" cash, "+Math.round(amount - cashUsed)+" added to expenses) (valued "+Math.round(realEstate.getValue(event.id))+")");
+          var purchaseInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
+          realEstate.buy(event.id, amount, event.rate, purchaseInfo.currency, purchaseInfo.country);
+          recordExpenseEntry(flowState, purchaseInfo, amount, {
+            type: 'purchase',
+            eventId: event.id
+          });
         }
-        // Note: sales are now handled in the first pass above to ensure sale proceeds are available before purchases
         break;
 
-      case 'SM': // Stock Market Growth override to simulate bull or bear markets
+      case 'SM':
         if (person1.age == event.fromAge) {
           stockGrowthOverride = Math.pow(1 + event.rate, 1 / (event.toAge - event.fromAge + 1)) - 1;
         }
@@ -591,50 +1112,56 @@ function processEvents() {
         break;
 
       default:
-        // Handle relocation events generically: types like 'MV-xx' where xx is country code
         if (typeof event.type === 'string' && event.type.indexOf('MV-') === 0) {
-          // Apply move at the starting age of the move window
           if (person1.age === event.fromAge) {
-            // Determine countries
             var prevCountry = currentCountry;
             var destCountry = event.type.substring(3).toLowerCase();
             var startCountry = (params.StartCountry || config.getDefaultCountry() || '').toLowerCase();
-
-            // Relocation cost inflation logic (SPECIAL CASE):
-            // Use inflation of the country whose currency the cost is expressed in.
-            // Allowed: destination, source (previous), or start country. Fallback to source if unspecified/invalid.
-            var currencyCode = (event.currency || '').toLowerCase();
             var infCountry = null;
-            if (currencyCode === destCountry) {
-              infCountry = destCountry;
-            } else if (currencyCode === prevCountry || currencyCode === startCountry) {
-              infCountry = currencyCode;
-            } else {
-              // Fallback for unspecified/invalid currency: use source country
+            if (event.currency) {
+              infCountry = findCountryForCurrency(event.currency, prevCountry);
+            }
+            if (!infCountry && event.linkedCountry) {
+              infCountry = normalizeCountry(event.linkedCountry);
+            }
+            if (!infCountry) {
               infCountry = prevCountry || startCountry;
             }
-
-            // Compute relocation cost with appropriate country's inflation (consider overrides)
             var reloRate = resolveCountryInflation(infCountry);
             var relocationAmount = adjust(event.amount, reloRate);
-
+            var relocationInfo = getEventCurrencyInfo(event, prevCountry || startCountry || currentCountry);
             if (relocationAmount > 0) {
-              expenses += relocationAmount;
-              attributionManager.record('expenses', 'Relocation (' + event.id + ')', relocationAmount);
+              var relocationConverted = convertCurrencyAmount(relocationAmount, relocationInfo.currency, relocationInfo.country, residenceCurrency, prevCountry, year);
+              expenses += relocationConverted;
+              attributionManager.record('expenses', 'Relocation (' + event.id + ')', relocationConverted);
             }
-
-            // Update residency to destination AFTER computing relocation cost
+            flushFlowState(flowState);
+            var prevCurrency = residenceCurrency;
+            var prevCountryNormalized = prevCountry;
+            var newResidenceCurrency = getCurrencyForCountry(destCountry) || prevCurrency || 'EUR';
+            if (allowCashConversion && prevCurrency && newResidenceCurrency && prevCurrency !== newResidenceCurrency) {
+              // TODO(financial-engine): convert pooled cash once multi-currency cash tracking lands.
+              cash = convertCurrencyAmount(cash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year);
+            }
             currentCountry = destCountry;
-
-            // Store optional inflation override for destination country (if provided via event.rate)
+            residenceCurrency = newResidenceCurrency;
+            conversionFactorCache = {};
             if (event.rate !== null && event.rate !== undefined && event.rate !== '') {
               if (!countryInflationOverrides) countryInflationOverrides = {};
               countryInflationOverrides[currentCountry] = event.rate;
             }
+            flowState = createFlowState();
           }
         }
         break;
     }
+  }
+
+  flushFlowState(flowState);
+
+  if (revenue) {
+    revenue.incomeByCurrency = incomeByCurrency;
+    revenue.expensesByCurrency = expensesByCurrency;
   }
 }
 
@@ -1016,7 +1543,8 @@ function initializeRealEstate() {
           } else {
             props.get(event.id).fromAge = event.fromAge;
           }
-          props.get(event.id).property = realEstate.buy(event.id, event.amount, event.rate);
+          var prePurchaseInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry || params.StartCountry);
+          props.get(event.id).property = realEstate.buy(event.id, event.amount, event.rate, prePurchaseInfo.currency, prePurchaseInfo.country);
         }
         break;
       case 'M':
@@ -1029,7 +1557,8 @@ function initializeRealEstate() {
           } else {
             props.get(event.id).fromAge = event.fromAge;
           }
-          props.get(event.id).property = realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount);
+          var preMortgageInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry || params.StartCountry);
+          props.get(event.id).property = realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount, preMortgageInfo.currency, preMortgageInfo.country);
         }
         break;
       default:
@@ -1083,6 +1612,20 @@ function updateYearlyData() {
   }
   dataSheet[row].age += person1.age;
   dataSheet[row].year += year;
+  var realEstateConverted = 0;
+  try {
+    if (realEstate && typeof realEstate.getTotalValueConverted === 'function') {
+      realEstateConverted = realEstate.getTotalValueConverted(residenceCurrency, currentCountry, year);
+    } else if (realEstate && typeof realEstate.getTotalValue === 'function') {
+      realEstateConverted = realEstate.getTotalValue();
+    }
+  } catch (_) {
+    try {
+      realEstateConverted = realEstate.getTotalValue();
+    } catch (__) {
+      realEstateConverted = 0;
+    }
+  }
   dataSheet[row].incomeSalaries += incomeSalaries;
   dataSheet[row].incomeRSUs += incomeShares;
   dataSheet[row].incomeRentals += incomeRentals;
@@ -1093,7 +1636,7 @@ function updateYearlyData() {
   dataSheet[row].incomeCash += Math.max(cashWithdraw, 0);
   dataSheet[row].incomeDefinedBenefit += incomeDefinedBenefit;
   dataSheet[row].incomeTaxFree += incomeTaxFree;
-  dataSheet[row].realEstateCapital += realEstate.getTotalValue();
+  dataSheet[row].realEstateCapital += realEstateConverted;
   dataSheet[row].netIncome += netIncome;
   dataSheet[row].expenses += expenses;
   dataSheet[row].pensionFund += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
@@ -1141,7 +1684,7 @@ function updateYearlyData() {
     }
   }
   
-  dataSheet[row].worth += realEstate.getTotalValue() + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFunds.capital() + shares.capital() + cash;
+  dataSheet[row].worth += realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFunds.capital() + shares.capital() + cash;
 
   // Record portfolio statistics for tooltip attribution
   const indexFundsStats = indexFunds.getPortfolioStats();

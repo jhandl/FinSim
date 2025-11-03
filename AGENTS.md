@@ -139,6 +139,16 @@ User scenarios are persisted as CSV files, handled by the `serializeSimulation()
 
 Tax rules and application configuration are loaded at startup by `Config.initialize(ui)`, which preloads the IE ruleset for synchronous access.
 
+### 3.6. Relocation System
+
+The premium relocation system (see [`docs/relocation-system.md`](docs/relocation-system.md)) lets users model multi-country lives with runtime residency changes, natural currency handling, and cross-border tax rules while staying invisible when disabled. Core logic extends `SimEvent` with optional `currency`, `linkedCountry`, and `linkedEventId` fields so the simulator can peg amounts, link inflation sources, and track split events without breaking backward compatibility.
+
+- **Economic data pipeline:** `EconomicData.js` exposes CPI/FX/PPP profiles embedded in tax rules to convert and inflate values across currencies and years.
+- **Impact detection + resolution:** `RelocationImpactDetector.js` flags relocation-sensitive events, driving inline resolution panels in both table and accordion views for guided fixes (split, peg, link, convert) instead of a modal-first workflow.
+- **Cross-border taxation:** `Taxman` derives the active country from relocation events, handles trailing residency rules (e.g., IE’s three-year tail), and loads the matching `TaxRuleSet` on demand.
+- **UI affordances:** Currency selectors appear inline across editors and charts, warning badges surface outstanding issues, and the starting country picker is required only when the feature is enabled.
+- **Persistence:** A CSV meta column records currency/country metadata so relocation-enhanced scenarios round-trip cleanly while older files remain compatible.
+
 ## 4. Test Framework
 
 The project uses a custom Node.js testing framework for core simulation logic, plus Jest for UI/unit tests and Playwright e2e tests. All are orchestrated by the top‑level `run-tests.sh` script.

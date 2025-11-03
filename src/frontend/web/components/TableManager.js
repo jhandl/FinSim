@@ -690,6 +690,8 @@ class TableManager {
         } else {
           try { text = FormatUtils.formatCurrency(raw); } catch (_) { text = String(raw); }
         }
+        // Ensure text is a string before calling indexOf
+        if (typeof text !== 'string') text = String(text || '');
         // Quote if contains comma
         if (text.indexOf(',') !== -1) text = '"' + text + '"';
         return text;

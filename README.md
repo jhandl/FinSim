@@ -6,7 +6,10 @@
 - Relocation issues:
   - Missing resolution option: Cut short. "For the income and expense events, an option should be to cut it short. For example, if I move to Argentina at age 40 and there's an income event in EUR from age 30 to 50, an option should be to change the toAge to 40. The phrasing could be tricky with this one, try to make it as neutral as possible."
   - Creating an event within a relocation period should assume local currency (both when rendering and in the wizard) 
-  - 
+  - State pension parameter is for one country only. What about other countries?
+  - No tests for the currency selectors in charts and table and the unified/natural selector.
+  - No tests for relocation impact assistant.
+  - No validation that there's no two relocations the same year.
 
 # Roadmap
 

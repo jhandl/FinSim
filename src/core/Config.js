@@ -276,6 +276,21 @@ class Config {
   }
 
   /**
+   * Return a shallow copy of the cached TaxRuleSet map keyed by country code.
+   * Exposed so other modules no longer need to read the private _taxRuleSets field.
+   */
+  listCachedRuleSets() {
+    var source = this._taxRuleSets || {};
+    var copy = {};
+    for (var key in source) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) {
+        copy[key] = source[key];
+      }
+    }
+    return copy;
+  }
+
+  /**
    * Synchronize cached tax rulesets with the events in the scenario.
    * Loads rulesets for countries referenced by MV-* events and startCountry.
    * Discards cached rulesets for countries not referenced.
@@ -285,7 +300,6 @@ class Config {
    * @returns {Promise} Resolves when all required rulesets are loaded
    */
   async syncTaxRuleSetsWithEvents(events, startCountry) {
-    // Early exit when relocation feature is disabled
     if (!this.isRelocationEnabled()) return Promise.resolve([]);
     var required = new Set();
     required.add(this.getDefaultCountry());
@@ -300,6 +314,12 @@ class Config {
           var code = evt.type.substring(3).toLowerCase();
           if (code) {
             required.add(code);
+          }
+        }
+        if (evt && evt.linkedCountry && typeof evt.linkedCountry === 'string') {
+          var linked = evt.linkedCountry.toLowerCase();
+          if (linked) {
+            required.add(linked);
           }
         }
       }

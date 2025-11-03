@@ -905,12 +905,69 @@ class EventsTableManager {
   expandResolutionPanel(rowId) {
     const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
     if (!row) return;
+    
+    // Check if row has impact dataset - if not, no panel needed
+    if (row.dataset.relocationImpact !== '1') return;
+    
     const tableRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
     const rowIndex = tableRows.indexOf(row);
     if (rowIndex === -1) return;
+    
+    // Try to get event from readEvents, but reconstruct from row if needed
+    let event = null;
     const events = this.webUI.readEvents(false);
-    const event = events[rowIndex];
-    if (!event || !event.relocationImpact) return;
+    if (events && events.length > rowIndex) {
+      event = events[rowIndex];
+    }
+    
+    // If readEvents didn't return the event, reconstruct it from the row DOM
+    if (!event) {
+      try {
+        const typeInput = row.querySelector('.event-type');
+        const nameInput = row.querySelector('.event-name');
+        const amountInput = row.querySelector('.event-amount');
+        const fromAgeInput = row.querySelector('.event-from-age');
+        const toAgeInput = row.querySelector('.event-to-age');
+        const rateInput = row.querySelector('.event-rate');
+        const matchInput = row.querySelector('.event-match');
+        
+        if (typeInput && nameInput) {
+          // Create a plain object (SimEvent-like) with required properties
+          event = {
+            type: typeInput.value || '',
+            id: nameInput.value || '',
+            amount: amountInput ? amountInput.value : '',
+            fromAge: fromAgeInput ? fromAgeInput.value : '',
+            toAge: toAgeInput ? toAgeInput.value : '',
+            rate: rateInput ? rateInput.value : undefined,
+            match: matchInput ? matchInput.value : undefined
+          };
+          
+          // Read hidden fields
+          const currencyInput = row.querySelector('.event-currency');
+          if (currencyInput && currencyInput.value) event.currency = currencyInput.value;
+          const linkedCountryInput = row.querySelector('.event-linked-country');
+          if (linkedCountryInput && linkedCountryInput.value) event.linkedCountry = linkedCountryInput.value;
+        }
+      } catch (e) {
+        // If reconstruction fails, can't proceed
+        return;
+      }
+    }
+    
+    if (!event) return;
+    
+    // Reconstruct relocationImpact from row dataset if readEvents didn't preserve it
+    if (!event.relocationImpact && row.dataset.relocationImpact === '1') {
+      event.relocationImpact = {
+        category: row.dataset.relocationImpactCategory || '',
+        message: row.dataset.relocationImpactMessage || '',
+        mvEventId: row.dataset.relocationImpactMvId || '',
+        autoResolvable: row.dataset.relocationImpactAuto === '1'
+      };
+    }
+    
+    if (!event.relocationImpact) return;
     const env = { webUI: this.webUI, eventsTableManager: this, config: (typeof Config !== 'undefined' ? Config.getInstance() : null), formatUtils: this.webUI && this.webUI.formatUtils };
     RelocationImpactAssistant.renderPanelForTableRow(row, event, env);
   }

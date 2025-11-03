@@ -185,6 +185,69 @@ class FileManager {
     if (tbody) {
       tbody.innerHTML = '';
       this.webUI.eventsTableManager.eventRowCounter = 0;
+
+      function registerCurrencyCode(code, map) {
+        if (code === undefined || code === null) return;
+        var normalized = String(code).trim().toUpperCase();
+        if (!normalized) return;
+        map[normalized] = true;
+      }
+
+      let configForMetaValidation = null;
+      let shouldValidateCurrencyMeta = false;
+      let cachedRuleSetsForValidation = {};
+      const knownCurrencyCodes = {};
+      const warnedCurrencyCodes = {};
+      try {
+        configForMetaValidation = Config.getInstance();
+        if (configForMetaValidation && typeof configForMetaValidation.isRelocationEnabled === 'function' && configForMetaValidation.isRelocationEnabled()) {
+          shouldValidateCurrencyMeta = true;
+          // Preload all available country rule sets to ensure currencies are recognized during validation
+          if (typeof configForMetaValidation.getAvailableCountries === 'function') {
+            try {
+              const availableCountries = configForMetaValidation.getAvailableCountries() || [];
+              const preloadPromises = availableCountries.map(async (ac) => {
+                if (!ac || !ac.code) return;
+                const acCode = String(ac.code).trim().toLowerCase();
+                try {
+                  await configForMetaValidation.getTaxRuleSet(acCode);
+                } catch (_) {}
+              });
+              await Promise.all(preloadPromises);
+            } catch (_) {}
+          }
+          // Refresh cached rule sets after preloading (they may have been loaded)
+          if (typeof configForMetaValidation.listCachedRuleSets === 'function') {
+            const cachedSets = configForMetaValidation.listCachedRuleSets() || {};
+            cachedRuleSetsForValidation = cachedSets;
+            for (const code in cachedSets) {
+              if (!Object.prototype.hasOwnProperty.call(cachedSets, code)) continue;
+              const ruleset = cachedSets[code];
+              try {
+                if (ruleset && typeof ruleset.getCurrencyCode === 'function') {
+                  registerCurrencyCode(ruleset.getCurrencyCode(), knownCurrencyCodes);
+                }
+              } catch (_) {}
+            }
+          }
+          if (typeof configForMetaValidation.getDefaultCountry === 'function' &&
+              typeof configForMetaValidation.getCachedTaxRuleSet === 'function') {
+            const defaultCode = configForMetaValidation.getDefaultCountry();
+            const defaultRuleset = configForMetaValidation.getCachedTaxRuleSet(defaultCode);
+            try {
+              if (defaultRuleset && typeof defaultRuleset.getCurrencyCode === 'function') {
+                registerCurrencyCode(defaultRuleset.getCurrencyCode(), knownCurrencyCodes);
+                if (!cachedRuleSetsForValidation[defaultCode]) {
+                  cachedRuleSetsForValidation[defaultCode] = defaultRuleset;
+                }
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (_) {
+        shouldValidateCurrencyMeta = false;
+      }
+
       eventData.forEach(([type, name, amount, fromAge, toAge, rate, match, meta]) => {
         if (type) {
           const displayRate = (rate !== undefined && rate !== '') ? String(parseFloat((Number(rate) * 100).toFixed(2))) : '';
@@ -208,11 +271,93 @@ class FileManager {
                 }
               }
               // Apply to hidden inputs when present
-              if (kv.cur) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-currency', kv.cur);
               if (kv.lc) {
                 this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-country', kv.lc);
                 // Provide direct country hint for per-row formatting
                 this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-country', String(kv.lc).toLowerCase());
+                if (shouldValidateCurrencyMeta && configForMetaValidation) {
+                  try {
+                    const normalizedLc = String(kv.lc).trim().toLowerCase();
+                    if (normalizedLc) {
+                      let lcRuleset = cachedRuleSetsForValidation[normalizedLc];
+                      if (!lcRuleset && typeof configForMetaValidation.getCachedTaxRuleSet === 'function') {
+                        lcRuleset = configForMetaValidation.getCachedTaxRuleSet(normalizedLc);
+                        if (lcRuleset) {
+                          cachedRuleSetsForValidation[normalizedLc] = lcRuleset;
+                        }
+                      }
+                      if (lcRuleset && typeof lcRuleset.getCurrencyCode === 'function') {
+                        registerCurrencyCode(lcRuleset.getCurrencyCode(), knownCurrencyCodes);
+                      }
+                    }
+                  } catch (_) {}
+                }
+              }
+              if (kv.cur) {
+                this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-currency', kv.cur);
+                if (shouldValidateCurrencyMeta) {
+                  try {
+                    let hasKnownCurrency = false;
+                    for (const code in knownCurrencyCodes) {
+                      if (Object.prototype.hasOwnProperty.call(knownCurrencyCodes, code)) {
+                        hasKnownCurrency = true;
+                        break;
+                      }
+                    }
+                    if (hasKnownCurrency) {
+                      const currencyCode = String(kv.cur).trim().toUpperCase();
+                      if (currencyCode) {
+                        if (!knownCurrencyCodes[currencyCode]) {
+                          let matched = false;
+                          for (const ruleKey in cachedRuleSetsForValidation) {
+                            if (!Object.prototype.hasOwnProperty.call(cachedRuleSetsForValidation, ruleKey)) continue;
+                            const rs = cachedRuleSetsForValidation[ruleKey];
+                            if (!rs || typeof rs.getCurrencyCode !== 'function') continue;
+                            const rsCurrency = String(rs.getCurrencyCode()).trim().toUpperCase();
+                            if (rsCurrency && rsCurrency === currencyCode) {
+                              matched = true;
+                              registerCurrencyCode(rsCurrency, knownCurrencyCodes);
+                              break;
+                            }
+                          }
+                          if (!matched && !warnedCurrencyCodes[currencyCode]) {
+                            // Try to find the currency by checking available countries
+                            let foundInAvailable = false;
+                            if (configForMetaValidation && typeof configForMetaValidation.getAvailableCountries === 'function') {
+                              try {
+                                const availableCountries = configForMetaValidation.getAvailableCountries() || [];
+                                for (let acIdx = 0; acIdx < availableCountries.length; acIdx++) {
+                                  const ac = availableCountries[acIdx];
+                                  if (!ac || !ac.code) continue;
+                                  const acCode = String(ac.code).trim().toLowerCase();
+                                  let acRuleset = cachedRuleSetsForValidation[acCode];
+                                  if (!acRuleset && typeof configForMetaValidation.getCachedTaxRuleSet === 'function') {
+                                    acRuleset = configForMetaValidation.getCachedTaxRuleSet(acCode);
+                                    if (acRuleset) {
+                                      cachedRuleSetsForValidation[acCode] = acRuleset;
+                                    }
+                                  }
+                                  if (acRuleset && typeof acRuleset.getCurrencyCode === 'function') {
+                                    const acCurrency = String(acRuleset.getCurrencyCode()).trim().toUpperCase();
+                                    if (acCurrency === currencyCode) {
+                                      registerCurrencyCode(acCurrency, knownCurrencyCodes);
+                                      foundInAvailable = true;
+                                      break;
+                                    }
+                                  }
+                                }
+                              } catch (_) {}
+                            }
+                            if (!foundInAvailable && !warnedCurrencyCodes[currencyCode]) {
+                              console.warn('Unknown currency code in Meta:', kv.cur, '- Event may not display correctly');
+                              warnedCurrencyCodes[currencyCode] = true;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } catch (_) {}
+                }
               }
               if (kv.lei) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-event-id', kv.lei);
               if (kv.ro) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-resolution-override', kv.ro);

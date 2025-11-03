@@ -80,7 +80,35 @@ var RelocationImpactAssistant = {
   createPanelHtml: function(event, rowId, env) {
     // Based on table manager implementation
     const events = (env && env.webUI && typeof env.webUI.readEvents === 'function') ? env.webUI.readEvents(false) : [];
-    const mvEvent = events.find(function(e){ return e && e.id === (event && event.relocationImpact && event.relocationImpact.mvEventId); });
+    const mvEventId = event && event.relocationImpact ? event.relocationImpact.mvEventId : null;
+    // If readEvents returns 0 events, try to find mvEvent from DOM directly
+    let mvEvent = events.find(function(e){ return e && e.id === mvEventId; });
+    if (!mvEvent && mvEventId) {
+      // Fallback: find mvEvent from DOM by looking for the row with matching event name/id
+      try {
+        const nameInputs = document.querySelectorAll('#Events tbody tr .event-name');
+        for (let i = 0; i < nameInputs.length; i++) {
+          const nameInput = nameInputs[i];
+          if (nameInput.value === mvEventId) {
+            const mvRow = nameInput.closest('tr');
+            if (mvRow) {
+              const typeInput = mvRow.querySelector('.event-type');
+              const fromAgeInput = mvRow.querySelector('.event-from-age');
+              if (typeInput && typeInput.value && typeInput.value.startsWith('MV-')) {
+                mvEvent = {
+                  id: mvEventId,
+                  type: typeInput.value,
+                  fromAge: fromAgeInput ? fromAgeInput.value : null
+                };
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Fallback failed, continue with null mvEvent
+      }
+    }
     if (!mvEvent) return '';
     const destCountry = mvEvent.type.substring(3).toLowerCase();
     const startCountry = (env && env.eventsTableManager && typeof env.eventsTableManager.getStartCountry === 'function') ? env.eventsTableManager.getStartCountry() : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());

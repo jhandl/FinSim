@@ -6,11 +6,11 @@ class RealEstate {
     this.properties = {}
   }
   
-  buy(id, downpayment, appreciation) {
+  buy(id, downpayment, appreciation, currency, linkedCountry) {
     if (!(id in this.properties)) {
       this.properties[id] = new Property();
     }
-    this.properties[id].buy(downpayment, appreciation);
+    this.properties[id].buy(downpayment, appreciation, currency, linkedCountry);
     return this.properties[id];
   }
   
@@ -23,11 +23,11 @@ class RealEstate {
     return 0;
   }
   
-  mortgage(id, years, rate, payment) {
+  mortgage(id, years, rate, payment, currency, linkedCountry) {
     if (!(id in this.properties)) {
       this.properties[id] = new Property();
     }
-    this.properties[id].mortgage(years, rate, payment);
+    this.properties[id].mortgage(years, rate, payment, currency, linkedCountry);
     return this.properties[id];
   }
   
@@ -44,11 +44,42 @@ class RealEstate {
     }
     return 0;
   }
+
+  getCurrency(id) {
+    if (id in this.properties) {
+      return this.properties[id].getCurrency();
+    }
+    return null;
+  }
+
+  getLinkedCountry(id) {
+    if (id in this.properties) {
+      return this.properties[id].getLinkedCountry();
+    }
+    return null;
+  }
   
   getTotalValue() {
     let sum = 0;
+   for (let id of Object.keys(this.properties)) {
+     sum += this.properties[id].getValue();
+   }
+   return sum;
+ }
+
+  getTotalValueConverted(targetCurrency, currentCountry, currentYear) {
+    if (typeof convertCurrencyAmount !== 'function') {
+      return this.getTotalValue();
+    }
+    let sum = 0;
+    const currency = (typeof normalizeCurrency === 'function') ? normalizeCurrency : function(code){ return (code || '').toString().trim().toUpperCase(); };
+    const country = (typeof normalizeCountry === 'function') ? normalizeCountry : function(code){ return (code || '').toString().trim().toLowerCase(); };
     for (let id of Object.keys(this.properties)) {
-      sum += this.properties[id].getValue();
+      const property = this.properties[id];
+      const value = property.getValue();
+      const fromCurrency = currency(property.getCurrency());
+      const fromCountry = country(property.getLinkedCountry());
+      sum += convertCurrencyAmount(value, fromCurrency, fromCountry, targetCurrency, currentCountry, currentYear);
     }
     return sum;
   }
@@ -73,14 +104,22 @@ class Property {
     this.payment = 0;
     this.paymentsMade = 0;
     this.fractionRepaid = 0;
+    this.currency = null;
+    this.linkedCountry = null;
   }
   
-  buy(paid, appreciation) {
+  buy(paid, appreciation, currency, linkedCountry) {
     this.paid = paid;
     this.appreciation = appreciation;
+    if (currency !== undefined && currency !== null && currency !== '') {
+      this.currency = String(currency).toUpperCase();
+    }
+    if (linkedCountry !== undefined && linkedCountry !== null && linkedCountry !== '') {
+      this.linkedCountry = String(linkedCountry).toLowerCase();
+    }
   }
   
-  mortgage(years, rate, payment) {
+  mortgage(years, rate, payment, currency, linkedCountry) {
     const n = years * 12;
     const r = rate / 12;
     const c = Math.pow(1 + r, n);
@@ -88,6 +127,12 @@ class Property {
     this.terms = years;
     this.payment = payment;
     this.paymentsMade = 0;
+    if (currency !== undefined && currency !== null && currency !== '') {
+      this.currency = String(currency).toUpperCase();
+    }
+    if (linkedCountry !== undefined && linkedCountry !== null && linkedCountry !== '') {
+      this.linkedCountry = String(linkedCountry).toLowerCase();
+    }
   }
   
   addYear() {
@@ -104,6 +149,14 @@ class Property {
   
   getValue() {
     return adjust(this.paid + this.borrowed * this.fractionRepaid, this.appreciation, this.periods);
+  }
+
+  getCurrency() {
+    return this.currency;
+  }
+
+  getLinkedCountry() {
+    return this.linkedCountry;
   }
   
 }

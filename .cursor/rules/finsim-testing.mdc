@@ -8,7 +8,7 @@ When asked to create a test of something, there's two possibilities:
 
 ### Blackbox testing ### 
 
-To do unit tests and integration tests, you can use the existing testing framework. Read the @AGENTS.md doc, use the @TestUtils.js and use @TestBasicSalaryTax.js as a template.
+To do unit tests and integration tests, you can use the existing testing framework. Read the @AGENTS.md doc, use the @TestUtils.js and use @TestBasicSalaryTax.js as a template. Include positive test cases, negative ones, and also edge cases. Be creative.
 
 ### Frontend testing ###
 

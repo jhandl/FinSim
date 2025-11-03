@@ -29,6 +29,8 @@ class Person {
     this.retirementAgeParam = personSpecificUIParams.retirementAge;
     this.statePensionWeeklyParam = personSpecificUIParams.statePensionWeekly;
     this.pensionContributionPercentageParam = personSpecificUIParams.pensionContributionPercentage;
+    this.statePensionCurrencyParam = personSpecificUIParams.statePensionCurrency || null;
+    this.statePensionCountryParam = personSpecificUIParams.statePensionCountry || null;
     
     // Reset yearly variables
     this.resetYearlyVariables();
@@ -55,7 +57,7 @@ class Person {
    * @param {Object} config - Global configuration object
    * @returns {Object} Object with lumpSumAmount property
    */
-  calculateYearlyPensionIncome(config) {
+  calculateYearlyPensionIncome(config, currentCountry, targetCurrencyParam, currentYear) {
     let lumpSumAmount = 0;
     
     // Reset yearly income accumulators
@@ -75,7 +77,14 @@ class Person {
     
     // State Pension: Check if age qualifies for state pension
     var _cfg = null, _rs = null;
-    try { _cfg = Config.getInstance(); _rs = _cfg && _cfg.getCachedTaxRuleSet ? _cfg.getCachedTaxRuleSet(_cfg.getDefaultCountry()) : null; } catch (_) {}
+    var activeCountry = null;
+    try {
+      _cfg = Config.getInstance();
+      activeCountry = (currentCountry || (_cfg && typeof _cfg.getDefaultCountry === 'function' && _cfg.getDefaultCountry())) || null;
+      if (_cfg && typeof _cfg.getCachedTaxRuleSet === 'function') {
+        _rs = _cfg.getCachedTaxRuleSet((activeCountry || '').toLowerCase());
+      }
+    } catch (_) { _rs = null; }
     var statePensionAge = (_rs && typeof _rs.getPensionMinRetirementAgeState === 'function') ? _rs.getPensionMinRetirementAgeState() : 0;
     var spIncreases = (_rs && typeof _rs.getStatePensionIncreaseBands === 'function') ? _rs.getStatePensionIncreaseBands() : null;
     if (this.statePensionWeeklyParam && this.statePensionWeeklyParam > 0 && 
@@ -91,6 +100,33 @@ class Person {
           if (this.age >= t) {
             this.yearlyIncomeStatePension += 52 * adjust(spIncreases[String(t)]);
           }
+        }
+      }
+    }
+    
+    if (this.yearlyIncomeStatePension > 0 && typeof convertCurrencyAmount === 'function') {
+      var baseCurrency = this.statePensionCurrencyParam || null;
+      if (typeof normalizeCurrency === 'function') {
+        baseCurrency = baseCurrency ? normalizeCurrency(baseCurrency) : baseCurrency;
+      }
+      if (!baseCurrency && typeof getCurrencyForCountry === 'function') {
+        baseCurrency = getCurrencyForCountry(this.statePensionCountryParam || currentCountry);
+        if (typeof normalizeCurrency === 'function') {
+          baseCurrency = baseCurrency ? normalizeCurrency(baseCurrency) : baseCurrency;
+        }
+      }
+      var targetCurrency = targetCurrencyParam || null;
+      if (typeof normalizeCurrency === 'function') {
+        targetCurrency = targetCurrency ? normalizeCurrency(targetCurrency) : targetCurrency;
+      }
+      if (baseCurrency && targetCurrency && baseCurrency !== targetCurrency) {
+        var baseCountry = this.statePensionCountryParam ? String(this.statePensionCountryParam).toLowerCase() : null;
+        if (!baseCountry && typeof findCountryForCurrency === 'function') {
+          baseCountry = findCountryForCurrency(baseCurrency, currentCountry);
+        }
+        var convertedStatePension = convertCurrencyAmount(this.yearlyIncomeStatePension, baseCurrency, baseCountry, targetCurrency, currentCountry, currentYear);
+        if (typeof convertedStatePension === 'number' && !isNaN(convertedStatePension)) {
+          this.yearlyIncomeStatePension = convertedStatePension;
         }
       }
     }

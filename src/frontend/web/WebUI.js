@@ -2144,3 +2144,8 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     }
   }
 });
+
+// Explicitly expose WebUI on window for reliable access in test contexts
+if (typeof window !== 'undefined') {
+  window.WebUI = WebUI;
+}

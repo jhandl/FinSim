@@ -628,7 +628,7 @@ class TestFramework {
         testParams = __seededParams;
       }
       if (__seededEvents) {
-        testEvents = __seededEvents.map(function(e) { return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match); });
+        testEvents = __seededEvents.map(function(e) { return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match, e.currency, e.linkedEventId, e.linkedCountry); });
       }
 
       // Create a proper UIManager mock that matches the real UIManager interface
@@ -682,7 +682,7 @@ class TestFramework {
           var params = (parsed && parsed.scenario && parsed.scenario.parameters) ? parsed.scenario.parameters : (parsed.params || parsed.testParams || {});
           var eventsArr = (parsed && parsed.scenario && parsed.scenario.events) ? parsed.scenario.events : (parsed.events || parsed.testEvents || []);
           testParams = params;
-          testEvents = eventsArr.map(function(e) { return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match); });
+          testEvents = eventsArr.map(function(e) { return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match, e.currency, e.linkedEventId, e.linkedCountry); });
         } catch (e) { throw new Error('Failed to load scenario file: ' + (e && e.message ? e.message : e)); }
       };
       MockUIManager.prototype.updateDataRow = function(row, progress) {};

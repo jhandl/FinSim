@@ -137,7 +137,7 @@ run_test() {
 # Function to find all test files
 find_test_files() {
     # Exclude Jest tests (*.test.js) and Playwright tests (*.spec.js)
-    find "$TESTS_DIR" -name "*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort
+    find "$TESTS_DIR" -maxdepth 1 -name "*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort
 }
 
 # Function to list available tests
@@ -146,9 +146,9 @@ list_tests() {
     echo -e "${BLUE}======================${NC}"
     echo ""
 
-    local custom_tests=( $(find "$TESTS_DIR" -name "*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort) )
-    local jest_tests=( $(find "$TESTS_DIR" -name "*.test.js" -type f | sort) )
-    local pw_tests=( $(find "$TESTS_DIR" -name "*.spec.js" -type f | sort) )
+    local custom_tests=( $(find "$TESTS_DIR" -maxdepth 1 -name "*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort) )
+    local jest_tests=( $(find "$TESTS_DIR" -maxdepth 1 -name "*.test.js" -type f | sort) )
+    local pw_tests=( $(find "$TESTS_DIR" -maxdepth 1 -name "*.spec.js" -type f | sort) )
 
     if [ ${#custom_tests[@]} -eq 0 ] && [ ${#jest_tests[@]} -eq 0 ] && [ ${#pw_tests[@]} -eq 0 ]; then
         echo -e "${YELLOW}No test files found in $TESTS_DIR${NC}"
@@ -257,7 +257,7 @@ main() {
         # Run Playwright end-to-end tests
         # -----------------------------
 
-        for test_file in `find "$TESTS_DIR" -name "*.spec.js" -type f`; do
+        for test_file in `find "$TESTS_DIR" -maxdepth 1 -name "*.spec.js" -type f`; do
 
             TEST_NAME=$(basename "$test_file" .spec.js)
             PLAYWRIGHT_OUTPUT=`npx playwright test "$test_file"`
