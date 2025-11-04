@@ -55,9 +55,19 @@ def wb_country_info(iso2: str) -> Tuple[Optional[str], Optional[str], Optional[s
     d = http_get_json(url)
     if isinstance(d, list) and len(d) == 2 and d[1]:
         info = d[1][0]
+        currency = info.get("currencyIso3Code")
+        iso3 = info.get("iso3Code")
+        # Fallback: some responses omit iso3Code; use country id if present
+        if not iso3:
+            iso3 = info.get("id")
+        if iso3:
+            try:
+                iso3 = iso3.upper()
+            except Exception:
+                pass
         return (
-            info.get("currencyIso3Code"),
-            info.get("iso3Code"),
+            currency,
+            iso3,
             info.get("name")
         )
     return None, None, None
@@ -97,18 +107,56 @@ def imf_fetch_series(country_iso3: str, indicator: str) -> Dict[int, float]:
     data = http_get_json(url)
     if not isinstance(data, dict):
         return {}
-    try:
-        indicator_blob = data[indicator]
-        country_blob = indicator_blob[country_iso3]
-        observations = country_blob.get("observations", {})
-    except Exception:
+
+    indicator_blob = None
+    # Newer schema: values -> indicator -> country
+    values_section = data.get("values")
+    if isinstance(values_section, dict):
+        candidate = values_section.get(indicator)
+        if isinstance(candidate, dict):
+            indicator_blob = candidate
+    # Legacy/direct schema: indicator -> country
+    if indicator_blob is None:
+        direct = data.get(indicator)
+        if isinstance(direct, dict):
+            indicator_blob = direct
+    if not isinstance(indicator_blob, dict):
         return {}
+
+    country_key_candidates = [country_iso3, country_iso3.upper(), country_iso3.lower()]
+    country_blob = None
+    for k in country_key_candidates:
+        v = indicator_blob.get(k)
+        if isinstance(v, dict):
+            country_blob = v
+            break
+    if not isinstance(country_blob, dict):
+        return {}
+
+    observations = None
+    for nested_key in ("observations", "data", "series", "values"):
+        nested = country_blob.get(nested_key)
+        if isinstance(nested, dict):
+            observations = nested
+            break
+    if observations is None and isinstance(country_blob, dict):
+        observations = country_blob
+
+    if not isinstance(observations, dict):
+        return {}
+
     out: Dict[int, float] = {}
     for year, value in observations.items():
         if value is None:
             continue
+        extracted = value
+        if isinstance(value, dict):
+            for key in ("value", "OBS_VALUE", "obs_value"):
+                if key in value and value[key] is not None:
+                    extracted = value[key]
+                    break
         try:
-            out[int(year)] = float(value)
+            out[int(year)] = float(extracted)
         except Exception:
             continue
     return out

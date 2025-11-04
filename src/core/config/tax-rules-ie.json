@@ -3,7 +3,6 @@
   "countryName": "Ireland",
   "version": "26.4",
   "updateMessage": "Incorporates Budget 2026 changes and PRSI increased to 4.2%",
-
   "locale": {
     "numberLocale": "en-IE",
     "currencyCode": "EUR",
@@ -20,34 +19,196 @@
       "year": 2024
     },
     "exchangeRate": {
-      "perEur": 1.0,
-      "asOf": "2025-10-17"
+      "asOf": "2025-11-04"
     },
     "timeSeries": {
       "inflation": {
         "unit": "percent",
         "source": "IMF-PCPIPCH",
         "series": {
-          "2024": 2.1134
+          "1980": 18.3,
+          "1981": 20.2,
+          "1982": 17.2,
+          "1983": 10.4,
+          "1984": 8.6,
+          "1985": 5.5,
+          "1986": 3.0,
+          "1987": 3.2,
+          "1988": 2.2,
+          "1989": 4.0,
+          "1990": 3.4,
+          "1991": 3.1,
+          "1992": 3.1,
+          "1993": 1.4,
+          "1994": 2.4,
+          "1995": 2.5,
+          "1996": 2.2,
+          "1997": 1.3,
+          "1998": 2.1,
+          "1999": 2.4,
+          "2000": 5.3,
+          "2001": 4.0,
+          "2002": 4.7,
+          "2003": 4.0,
+          "2004": 2.3,
+          "2005": 2.2,
+          "2006": 2.7,
+          "2007": 2.9,
+          "2008": 3.1,
+          "2009": -1.7,
+          "2010": -1.6,
+          "2011": 1.2,
+          "2012": 1.9,
+          "2013": 0.5,
+          "2014": 0.3,
+          "2015": 0.0,
+          "2016": -0.2,
+          "2017": 0.3,
+          "2018": 0.7,
+          "2019": 0.9,
+          "2020": -0.5,
+          "2021": 2.4,
+          "2022": 8.1,
+          "2023": 5.2,
+          "2024": 1.3,
+          "2025": 1.7,
+          "2026": 1.7,
+          "2027": 1.8,
+          "2028": 2.0,
+          "2029": 2.0,
+          "2030": 2.0
         }
       },
       "ppp": {
         "unit": "LCU_per_IntlDollar",
         "source": "IMF-PPPEX",
         "series": {
-          "2024": 0.755848
+          "1980": 0.473,
+          "1981": 0.511,
+          "1982": 0.563,
+          "1983": 0.602,
+          "1984": 0.623,
+          "1985": 0.644,
+          "1986": 0.669,
+          "1987": 0.673,
+          "1988": 0.674,
+          "1989": 0.682,
+          "1990": 0.661,
+          "1991": 0.655,
+          "1992": 0.658,
+          "1993": 0.677,
+          "1994": 0.673,
+          "1995": 0.697,
+          "1996": 0.689,
+          "1997": 0.704,
+          "1998": 0.742,
+          "1999": 0.764,
+          "2000": 0.798,
+          "2001": 0.834,
+          "2002": 0.864,
+          "2003": 0.881,
+          "2004": 0.862,
+          "2005": 0.861,
+          "2006": 0.864,
+          "2007": 0.852,
+          "2008": 0.831,
+          "2009": 0.788,
+          "2010": 0.755,
+          "2011": 0.754,
+          "2012": 0.758,
+          "2013": 0.755,
+          "2014": 0.744,
+          "2015": 0.803,
+          "2016": 0.797,
+          "2017": 0.794,
+          "2018": 0.792,
+          "2019": 0.794,
+          "2020": 0.775,
+          "2021": 0.756,
+          "2022": 0.762,
+          "2023": 0.76,
+          "2024": 0.775,
+          "2025": 0.773,
+          "2026": 0.768,
+          "2027": 0.767,
+          "2028": 0.769,
+          "2029": 0.77,
+          "2030": 0.771
         }
       },
       "fx": {
         "unit": "LCU_per_USD",
         "source": "WB-PA.NUS.FCRF",
         "series": {
-          "2024": 0.93
+          "1960": 0.357143,
+          "1961": 0.357143,
+          "1962": 0.357143,
+          "1963": 0.357143,
+          "1964": 0.357143,
+          "1965": 0.357143,
+          "1966": 0.357143,
+          "1967": 0.362103,
+          "1968": 0.416667,
+          "1969": 0.416667,
+          "1970": 0.416667,
+          "1971": 0.41092,
+          "1972": 0.40039,
+          "1973": 0.408171,
+          "1974": 0.427756,
+          "1975": 0.452041,
+          "1976": 0.55651,
+          "1977": 0.573272,
+          "1978": 0.521505,
+          "1979": 0.488595,
+          "1980": 0.486645,
+          "1981": 0.621298,
+          "1982": 0.704562,
+          "1983": 0.804678,
+          "1984": 0.922553,
+          "1985": 0.945615,
+          "1986": 0.743128,
+          "1987": 0.672917,
+          "1988": 0.656467,
+          "1989": 0.705543,
+          "1990": 0.604588,
+          "1991": 0.621297,
+          "1992": 0.587721,
+          "1993": 0.677249,
+          "1994": 0.668628,
+          "1995": 0.623733,
+          "1996": 0.625028,
+          "1997": 0.659643,
+          "1998": 0.702271,
+          "1999": 0.938283,
+          "2000": 1.082705,
+          "2001": 1.116533,
+          "2002": 1.057559,
+          "2003": 0.884048,
+          "2004": 0.803922,
+          "2005": 0.8038,
+          "2006": 0.796433,
+          "2007": 0.729672,
+          "2008": 0.679923,
+          "2009": 0.716958,
+          "2010": 0.754309,
+          "2011": 0.718414,
+          "2012": 0.778338,
+          "2013": 0.752945,
+          "2014": 0.752728,
+          "2015": 0.901296,
+          "2016": 0.903421,
+          "2017": 0.885206,
+          "2018": 0.846773,
+          "2019": 0.893276,
+          "2020": 0.875506,
+          "2021": 0.845494,
+          "2022": 0.949624,
+          "2023": 0.92484,
+          "2024": 0.92389
         }
       }
     }
   },
-
   "incomeTax": {
     "name": "IT",
     "tooltip": "Income Tax paid on taxable income",
@@ -56,48 +217,71 @@
       "employee": {
         "min": {
           "amount": 2000,
-          "rate": 0.20
+          "rate": 0.2
         }
       },
-      "age": { "0": 0, "65": 245 }
+      "age": {
+        "0": 0,
+        "65": 245
+      }
     },
     "ageExemptionAge": 65,
     "ageExemptionLimit": 18000,
     "jointFilingAllowed": true,
     "jointBandIncreaseMax": 35000,
     "bracketsByStatus": {
-      "single": { "0": 0.2, "44000": 0.4 },
-      "singleWithDependents": { "0": 0.2, "48000": 0.4 },
-      "married": { "0": 0.2, "53000": 0.4 }
+      "single": {
+        "0": 0.2,
+        "44000": 0.4
+      },
+      "singleWithDependents": {
+        "0": 0.2,
+        "48000": 0.4
+      },
+      "married": {
+        "0": 0.2,
+        "53000": 0.4
+      }
     }
   },
-
   "socialContributions": [
     {
       "name": "PRSI",
       "tooltip": "Pay Related Social Insurance contributions",
       "rate": 0.042,
       "incomeCap": null,
-      "ageAdjustments": { "70": 0 },
-      "applicableIncomeTypes": ["employment", "self"]
+      "ageAdjustments": {
+        "70": 0
+      },
+      "applicableIncomeTypes": [
+        "employment",
+        "self"
+      ]
     }
   ],
-
   "additionalTaxes": [
     {
       "name": "USC",
       "tooltip": "Universal Social Charge paid",
-      "brackets": { "0": 0.005, "12012": 0.02, "28700": 0.03, "70044": 0.08, "100000": 0.11 },
+      "brackets": {
+        "0": 0.005,
+        "12012": 0.02,
+        "28700": 0.03,
+        "70044": 0.08,
+        "100000": 0.11
+      },
       "incomeExemptionThreshold": 13000,
       "reducedRateAge": 70,
       "reducedRateMaxIncome": 60000,
       "ageBasedBrackets": {
-        "70": { "0": 0.005, "12012": 0.02 }
+        "70": {
+          "0": 0.005,
+          "12012": 0.02
+        }
       },
       "base": "income"
     }
   ],
-
   "capitalGainsTax": {
     "name": "CGT",
     "tooltip": "Capital Gains Tax (and Exit Tax) paid on investment gains.",
@@ -106,41 +290,52 @@
     "allowLossOffset": true,
     "deemedDisposalYears": 8
   },
-
   "dividendTax": {
     "rate": 0.33,
     "annualExemption": 0,
     "withholding": false
   },
-
   "interestTax": {
     "rate": 0.33,
     "withholding": false
   },
-
   "wealthTax": {
     "brackets": {},
     "exemptions": []
   },
-
   "inheritanceTax": {
     "threshold": 0,
     "rate": 0
   },
-
   "pensionRules": {
     "minRetirementAgePrivate": 60,
     "minRetirementAgeOccupational": 60,
     "minRetirementAgeState": 66,
     "contributionLimits": {
-      "ageBandsPercent": { "0": 0.15, "30": 0.20, "40": 0.25, "50": 0.30, "55": 0.35, "60": 0.40 },
+      "ageBandsPercent": {
+        "0": 0.15,
+        "30": 0.2,
+        "40": 0.25,
+        "50": 0.3,
+        "55": 0.35,
+        "60": 0.4
+      },
       "annualCap": 115000
     },
-    "lumpSumTaxBands": { "0": 0, "200000": 0.2, "500000": 0.4 },
+    "lumpSumTaxBands": {
+      "0": 0,
+      "200000": 0.2,
+      "500000": 0.4
+    },
     "lumpSumMaxPercent": 0.25,
-    "minDrawdownRates": { "61": 0.04, "71": 0.05 },
+    "minDrawdownRates": {
+      "61": 0.04,
+      "71": 0.05
+    },
     "statePensionAge": 66,
-    "statePensionIncreaseBands": { "80": 10 },
+    "statePensionIncreaseBands": {
+      "80": 10
+    },
     "pensionSystem": {
       "type": "mixed"
     },
@@ -148,7 +343,6 @@
       "treatment": "privatePension"
     }
   },
-
   "residencyRules": {
     "postEmigrationTaxYears": 3,
     "taxesForeignIncome": true
@@ -158,18 +352,29 @@
       "key": "indexFunds",
       "label": "Index Funds",
       "taxation": {
-        "exitTax": { "rate": 0.38, "deemedDisposalYears": 8, "allowLossOffset": false, "eligibleForAnnualExemption": false }
+        "exitTax": {
+          "rate": 0.38,
+          "deemedDisposalYears": 8,
+          "allowLossOffset": false,
+          "eligibleForAnnualExemption": false
+        }
       }
     },
     {
       "key": "shares",
       "label": "Shares",
       "taxation": {
-        "capitalGains": { "rateRef": "capitalGainsTax.rate", "annualExemptionRef": "capitalGainsTax.annualExemption", "allowLossOffset": true }
+        "capitalGains": {
+          "rateRef": "capitalGainsTax.rate",
+          "annualExemptionRef": "capitalGainsTax.annualExemption",
+          "allowLossOffset": true
+        }
       }
     }
   ],
-
-  "pinnedIncomeTypes": ["incomeSalaries", "incomeStatePension", "incomeCash"]
-
+  "pinnedIncomeTypes": [
+    "incomeSalaries",
+    "incomeStatePension",
+    "incomeCash"
+  ]
 }
