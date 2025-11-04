@@ -4,46 +4,28 @@
   "version": "1.0",
   "updateMessage": "",
 
-  "locale": {
-    "numberLocale": "es-AR",
-    "currencyCode": "ARS",
-    "currencySymbol": "$"
-  },
+  "locale": { "numberLocale": "es-AR", "currencyCode": "ARS", "currencySymbol": "$" },
+
   "economicData": {
     "projectionWindowYears": 5,
-    "inflation": {
-      "cpi": 219.8839,
-      "year": 2024
-    },
-    "purchasingPowerParity": {
-      "value": 420.076325,
-      "year": 2024
-    },
-    "exchangeRate": {
-      "perEur": 1100.0,
-      "asOf": "2025-10-17"
-    },
+    "inflation": { "cpi": 219.8839, "year": 2024 },
+    "purchasingPowerParity": { "value": 420.076325, "year": 2024 },
+    "exchangeRate": { "asOf": "2025-11-04" },
     "timeSeries": {
       "inflation": {
         "unit": "percent",
         "source": "IMF-PCPIPCH",
-        "series": {
-          "2024": 219.8839
-        }
+        "series": { "1998": 0.9, "1999": -1.2, "2000": -0.9, "2001": -1.1, "2002": 25.9, "2003": 13.4, "2004": 4.4, "2005": 9.6, "2006": 10.9, "2007": 8.8, "2008": 8.6, "2009": 6.3, "2010": 10.5, "2011": 9.8, "2012": 10.0, "2013": 10.6, "2017": 25.7, "2018": 34.3, "2019": 53.5, "2020": 42.0, "2021": 48.4, "2022": 72.4, "2023": 133.5, "2024": 219.9, "2025": 41.3, "2026": 16.4, "2027": 8.5, "2028": 7.5, "2029": 7.5, "2030": 7.5 }
       },
       "ppp": {
         "unit": "LCU_per_IntlDollar",
         "source": "IMF-PPPEX",
-        "series": {
-          "2024": 420.076325
-        }
+        "series": { "1980": 0.0, "1981": 0.0, "1982": 0.0, "1983": 0.0, "1984": 0.0, "1985": 0.0, "1986": 0.0, "1987": 0.0, "1988": 0.0, "1989": 0.014, "1990": 0.287, "1991": 0.66, "1992": 0.733, "1993": 0.703, "1994": 0.708, "1995": 0.715, "1996": 0.702, "1997": 0.687, "1998": 0.668, "1999": 0.646, "2000": 0.639, "2001": 0.618, "2002": 0.794, "2003": 0.859, "2004": 0.887, "2005": 0.949, "2006": 1.047, "2007": 1.171, "2008": 1.416, "2009": 1.623, "2010": 1.939, "2011": 2.35, "2012": 2.822, "2013": 3.44, "2014": 4.743, "2015": 5.948, "2016": 8.315, "2017": 10.293, "2018": 13.527, "2019": 20.384, "2020": 26.887, "2021": 38.783, "2022": 61.189, "2023": 139.693, "2024": 419.292, "2025": 574.457, "2026": 653.857, "2027": 697.747, "2028": 737.958, "2029": 779.584, "2030": 822.597 }
       },
       "fx": {
         "unit": "LCU_per_USD",
         "source": "WB-PA.NUS.FCRF",
-        "series": {
-          "2024": 1000.0
-        }
+        "series": { "1963": 0.0, "1964": 0.0, "1965": 0.0, "1966": 0.0, "1967": 0.0, "1968": 0.0, "1969": 0.0, "1970": 0.0, "1971": 0.0, "1972": 0.0, "1973": 0.0, "1974": 0.0, "1975": 0.0, "1976": 0.0, "1977": 0.0, "1978": 0.0, "1979": 0.0, "1980": 0.0, "1981": 0.0, "1982": 0.0, "1983": 1e-06, "1984": 7e-06, "1985": 6e-05, "1986": 9.4e-05, "1987": 0.000214, "1988": 0.000875, "1989": 0.042334, "1990": 0.487589, "1991": 0.953554, "1992": 0.990642, "1993": 0.998946, "1994": 0.999008, "1995": 0.99975, "1996": 0.999663, "1997": 0.9995, "1998": 0.9995, "1999": 0.9995, "2000": 0.9995, "2001": 0.9995, "2002": 3.063257, "2003": 2.900629, "2004": 2.923301, "2005": 2.903658, "2006": 3.054313, "2007": 3.095649, "2008": 3.144165, "2009": 3.710107, "2010": 3.896295, "2011": 4.11014, "2012": 4.536934, "2013": 5.459353, "2014": 8.075276, "2015": 9.233186, "2016": 14.758175, "2017": 16.562707, "2018": 28.094992, "2019": 48.147892, "2020": 70.539167, "2021": 94.990742, "2022": 130.61655, "2023": 296.258042, "2024": 914.694883 }
       }
     }
   },
@@ -51,30 +33,10 @@
   "incomeTax": {
     "name": "Impuesto a las Ganancias",
     "personalAllowance": 0,
-    "taxCredits": {},
+    "taxCredits": {  },
     "bracketsByStatus": {
-      "single": {
-        "0": 0.05,
-        "500000": 0.09,
-        "1000000": 0.12,
-        "1500000": 0.15,
-        "2000000": 0.19,
-        "2500000": 0.23,
-        "3000000": 0.27,
-        "3500000": 0.31,
-        "4000000": 0.35
-      },
-      "married": {
-        "0": 0.05,
-        "750000": 0.09,
-        "1500000": 0.12,
-        "2250000": 0.15,
-        "3000000": 0.19,
-        "3750000": 0.23,
-        "4500000": 0.27,
-        "5250000": 0.31,
-        "6000000": 0.35
-      }
+      "single": { "0": 0.05, "500000": 0.09, "1000000": 0.12, "1500000": 0.15, "2000000": 0.19, "2500000": 0.23, "3000000": 0.27, "3500000": 0.31, "4000000": 0.35 },
+      "married": { "0": 0.05, "750000": 0.09, "1500000": 0.12, "2250000": 0.15, "3000000": 0.19, "3750000": 0.23, "4500000": 0.27, "5250000": 0.31, "6000000": 0.35 }
     }
   },
 
@@ -82,59 +44,44 @@
     {
       "name": "ANSES",
       "rate": 0.11,
-      "applicableIncomeTypes": ["employment"]
+      "applicableIncomeTypes": [ "employment" ]
     },
     {
       "name": "Obra Social",
       "rate": 0.03,
-      "applicableIncomeTypes": ["employment"]
+      "applicableIncomeTypes": [ "employment" ]
     }
   ],
 
-  "capitalGainsTax": {
-    "rate": 0.15,
-    "annualExemption": 0,
-    "allowLossOffset": true
-  },
+  "capitalGainsTax": { "rate": 0.15, "annualExemption": 0, "allowLossOffset": true },
 
   "pensionRules": {
     "minRetirementAgeState": 65,
     "statePensionAge": 65,
-    "pensionSystem": {
-      "type": "state_only"
-    },
-    "contributionLimits": {},
-    "lumpSumTaxBands": {},
-    "minDrawdownRates": {}
+    "pensionSystem": { "type": "state_only" },
+    "contributionLimits": {  },
+    "lumpSumTaxBands": {  },
+    "minDrawdownRates": {  }
   },
 
-  "residencyRules": {
-    "postEmigrationTaxYears": 0,
-    "taxesForeignIncome": false
-  },
+  "residencyRules": { "postEmigrationTaxYears": 0, "taxesForeignIncome": false },
 
   "investmentTypes": [
     {
       "key": "indexFunds",
       "label": "Index Funds",
       "taxation": {
-        "capitalGains": {
-          "rateRef": "capitalGainsTax.rate",
-          "allowLossOffset": true
-        }
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
       }
     },
     {
       "key": "shares",
       "label": "Shares",
       "taxation": {
-        "capitalGains": {
-          "rateRef": "capitalGainsTax.rate",
-          "allowLossOffset": true
-        }
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
       }
     }
   ],
 
-  "pinnedIncomeTypes": ["incomeSalaries", "incomeStatePension", "incomeCash"]
+  "pinnedIncomeTypes": [ "incomeSalaries", "incomeStatePension", "incomeCash" ]
 }

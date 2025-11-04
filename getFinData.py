@@ -233,9 +233,81 @@ def load_tax_rules(path: Path) -> OrderedDict:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f, object_pairs_hook=OrderedDict)
 
+def _is_leaf_dict(obj: Any) -> bool:
+    if not isinstance(obj, dict):
+        return False
+    for v in obj.values():
+        if isinstance(v, (dict, list)):
+            return False
+    return True
+
+def _dump_json_leaf_inline(obj: Any, indent: int = 2, level: int = 0) -> str:
+    space = " " * (indent * level)
+    next_space = " " * (indent * (level + 1))
+
+    # Dict handling
+    if isinstance(obj, dict):
+        if _is_leaf_dict(obj):
+            # Inline one-line map
+            parts = []
+            for k, v in obj.items():
+                key_str = json.dumps(k, ensure_ascii=False)
+                val_str = json.dumps(v, ensure_ascii=False)
+                parts.append(f"{key_str}: {val_str}")
+            return "{ " + ", ".join(parts) + " }"
+        # Pretty multi-line map
+        if not obj:
+            return "{}"
+        lines = ["{"]
+        items = list(obj.items())
+        rendered = []
+        is_container_flags = []
+        for _, v in items:
+            is_container_flags.append(isinstance(v, (dict, list)))
+            rendered.append(_dump_json_leaf_inline(v, indent, level + 1))
+        for idx, (k, _v) in enumerate(items):
+            # Spacing rules for top-level: add a blank line before entries that
+            # are containers, and also before entries that follow a container.
+            if level == 0:
+                if idx == 0 and is_container_flags[idx]:
+                    lines.append("")
+                elif idx > 0 and (is_container_flags[idx] or is_container_flags[idx - 1]):
+                    lines.append("")
+            key_str = json.dumps(k, ensure_ascii=False)
+            val_str = rendered[idx]
+            comma = "," if idx != (len(items) - 1) else ""
+            lines.append(f"{next_space}{key_str}: {val_str}{comma}")
+        lines.append(f"{space}}}")
+        return "\n".join(lines)
+
+    # List handling
+    if isinstance(obj, list):
+        if not obj:
+            return "[]"
+        # Inline one-line array if all elements are scalars
+        is_leaf_array = True
+        for v in obj:
+            if isinstance(v, (dict, list)):
+                is_leaf_array = False
+                break
+        if is_leaf_array:
+            parts = [json.dumps(v, ensure_ascii=False) for v in obj]
+            return "[ " + ", ".join(parts) + " ]"
+        # Pretty multi-line array otherwise
+        lines = ["["]
+        for idx, item in enumerate(obj):
+            val_str = _dump_json_leaf_inline(item, indent, level + 1)
+            comma = "," if idx < (len(obj) - 1) else ""
+            lines.append(f"{next_space}{val_str}{comma}")
+        lines.append(f"{space}]")
+        return "\n".join(lines)
+
+    # Scalars
+    return json.dumps(obj, ensure_ascii=False)
+
 def write_tax_rules(path: Path, data: OrderedDict):
     with path.open("w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write(_dump_json_leaf_inline(data, indent=2))
         f.write("\n")
 
 def round_if(value: Optional[float], digits: int) -> Optional[float]:
