@@ -10,6 +10,7 @@
     "currencySymbol": "€"
   },
   "economicData": {
+    "projectionWindowYears": 5,
     "inflation": {
       "cpi": 2.1134,
       "year": 2024
@@ -21,6 +22,29 @@
     "exchangeRate": {
       "perEur": 1.0,
       "asOf": "2025-10-17"
+    },
+    "timeSeries": {
+      "inflation": {
+        "unit": "percent",
+        "source": "IMF-PCPIPCH",
+        "series": {
+          "2024": 2.1134
+        }
+      },
+      "ppp": {
+        "unit": "LCU_per_IntlDollar",
+        "source": "IMF-PPPEX",
+        "series": {
+          "2024": 0.755848
+        }
+      },
+      "fx": {
+        "unit": "LCU_per_USD",
+        "source": "WB-PA.NUS.FCRF",
+        "series": {
+          "2024": 0.93
+        }
+      }
     }
   },
 

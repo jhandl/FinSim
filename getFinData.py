@@ -29,6 +29,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 WB_BASE = "https://api.worldbank.org/v2"
+IMF_BASE = "https://www.imf.org/external/datamapper/api/v1"
 ECB_XML_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
 
 def http_get_json(url: str):
@@ -49,12 +50,17 @@ def http_get_bytes(url: str):
             time.sleep(0.5)
     return b""
 
-def wb_country_currency(iso2: str) -> Optional[str]:
+def wb_country_info(iso2: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     url = f"{WB_BASE}/country/{urllib.parse.quote(iso2)}?format=json"
     d = http_get_json(url)
     if isinstance(d, list) and len(d) == 2 and d[1]:
-        return d[1][0].get("currencyIso3Code")
-    return None
+        info = d[1][0]
+        return (
+            info.get("currencyIso3Code"),
+            info.get("iso3Code"),
+            info.get("name")
+        )
+    return None, None, None
 
 def wb_latest(iso2: str, ind: str) -> Tuple[Optional[float], Optional[int]]:
     url = f"{WB_BASE}/country/{iso2}/indicator/{ind}?format=json&per_page=200"
@@ -85,23 +91,93 @@ def ecb_fx() -> Tuple[Dict[str, float], Optional[str]]:
         break
     return rates, date
 
+
+def imf_fetch_series(country_iso3: str, indicator: str) -> Dict[int, float]:
+    url = f"{IMF_BASE}/{indicator}/{country_iso3}"
+    data = http_get_json(url)
+    if not isinstance(data, dict):
+        return {}
+    try:
+        indicator_blob = data[indicator]
+        country_blob = indicator_blob[country_iso3]
+        observations = country_blob.get("observations", {})
+    except Exception:
+        return {}
+    out: Dict[int, float] = {}
+    for year, value in observations.items():
+        if value is None:
+            continue
+        try:
+            out[int(year)] = float(value)
+        except Exception:
+            continue
+    return out
+
+
+def imf_fetch_cpi_series(country_iso3: str) -> Dict[int, float]:
+    # IMF WEO CPI (annual % change) - indicator PCPIPCH
+    return imf_fetch_series(country_iso3, "PCPIPCH")
+
+
+def imf_fetch_ppp_series(country_iso3: str) -> Dict[int, float]:
+    # IMF WEO PPP implied conversion rate (LCU per international $) - indicator PPPEX
+    return imf_fetch_series(country_iso3, "PPPEX")
+
+
+def wb_fetch_fx_series(country_code: str, start_year: int = 1960, end_year: int = 2025) -> Dict[int, float]:
+    # World Bank official FX rate (LCU per USD)
+    url = (
+        f"{WB_BASE}/country/{urllib.parse.quote(country_code)}/indicator/PA.NUS.FCRF"
+        f"?format=json&per_page=2000&date={start_year}:{end_year}"
+    )
+    data = http_get_json(url)
+    if not (isinstance(data, list) and len(data) > 1 and isinstance(data[1], list)):
+        return {}
+    out: Dict[int, float] = {}
+    for row in data[1]:
+        value = row.get("value")
+        if value is None:
+            continue
+        try:
+            out[int(row.get("date"))] = float(value)
+        except Exception:
+            continue
+    return out
+
+
+def _ordered_series(series: Dict[int, float]) -> OrderedDict:
+    ordered = OrderedDict()
+    for year in sorted(series.keys()):
+        ordered[str(year)] = series[year]
+    return ordered
+
 def fetch(codes: List[str]) -> List[Dict[str, Any]]:
     fx_map, fx_date = ecb_fx()
     out = []
     for c in [x.upper() for x in codes]:
-        curr = wb_country_currency(c)
+        curr, iso3, _ = wb_country_info(c)
+        if iso3 is None:
+            iso3 = c
         infl, infl_y = wb_latest(c, "FP.CPI.TOTL.ZG")
         ppp, ppp_y = wb_latest(c, "PA.NUS.PPP")
         fx = 1.0 if curr == "EUR" else fx_map.get(curr)
+        cpi_series = imf_fetch_cpi_series(iso3)
+        ppp_series = imf_fetch_ppp_series(iso3)
+        fx_series = wb_fetch_fx_series(iso3)
         out.append({
             "country": c,
             "curr": curr,
-            "infl": round(infl,4) if infl is not None else None,
+            "infl": round(infl, 4) if infl is not None else None,
             "infl_year": infl_y,
-            "ppp": round(ppp,6) if ppp is not None else None,
+            "ppp": round(ppp, 6) if ppp is not None else None,
             "ppp_year": ppp_y,
-            "fx": round(fx,6) if fx is not None else None,
-            "fx_date": fx_date
+            "fx": round(fx, 6) if fx is not None else None,
+            "fx_date": fx_date,
+            "series": {
+                "inflation": _ordered_series(cpi_series),
+                "ppp": _ordered_series(ppp_series),
+                "fx": _ordered_series(fx_series)
+            }
         })
     return out
 
@@ -149,6 +225,36 @@ def update_economic_block(entry: Dict[str, Any]) -> OrderedDict:
             econ["exchangeRate"]["asOf"] = entry["fx_date"]
         if not econ["exchangeRate"]:
             econ.pop("exchangeRate")
+
+    series = entry.get("series") or {}
+    if series:
+        ts = OrderedDict()
+        for key in ("inflation", "ppp", "fx"):
+            data = series.get(key)
+            if not data:
+                continue
+            cleaned = OrderedDict()
+            for year, value in data.items():
+                try:
+                    cleaned[str(year)] = round(float(value), 6)
+                except Exception:
+                    continue
+            if not cleaned:
+                continue
+            meta = OrderedDict()
+            if key == "inflation":
+                meta["unit"] = "percent"
+                meta["source"] = "IMF-PCPIPCH"
+            elif key == "ppp":
+                meta["unit"] = "LCU_per_IntlDollar"
+                meta["source"] = "IMF-PPPEX"
+            else:
+                meta["unit"] = "LCU_per_USD"
+                meta["source"] = "WB-PA.NUS.FCRF"
+            meta["series"] = cleaned
+            ts[key] = meta
+        if ts:
+            econ["timeSeries"] = ts
     return econ
 
 def insert_economic_block(data: OrderedDict, econ: OrderedDict):

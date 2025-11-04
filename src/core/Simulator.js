@@ -533,6 +533,12 @@ function processEvents() {
       return params.inflation;
     }
     if (economicData && economicData.ready) {
+      if (typeof economicData.getInflationForYear === 'function') {
+        var cpiYear = economicData.getInflationForYear(key, year);
+        if (cpiYear != null) {
+          return Number(cpiYear) / 100;
+        }
+      }
       var cpi = economicData.getInflation(key);
       if (cpi != null) {
         return Number(cpi) / 100;

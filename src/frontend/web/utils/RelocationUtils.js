@@ -131,11 +131,7 @@ class RelocationUtils {
         
         // For ChartManager, only show the dropdown if there's more than one currency option
         if (isChartManager) {
-            if (options.length > 1) {
-                dropdownContainer.style.display = 'block';
-            } else {
-                dropdownContainer.style.display = 'none';
-            }
+            dropdownContainer.style.display = 'block';
         }
         
         const select = document.createElement('select');
@@ -163,6 +159,12 @@ class RelocationUtils {
                 }
             }
         });
+
+        if (isChartManager && options.length <= 1) {
+            try {
+                select.disabled = true;
+            } catch (_) {}
+        }
 
         dropdownContainer.appendChild(select);
         container.appendChild(dropdownContainer);

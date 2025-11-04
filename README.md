@@ -10,6 +10,7 @@
   - No tests for the currency selectors in charts and table and the unified/natural selector.
   - No tests for relocation impact assistant.
   - No validation that there's no two relocations the same year.
+  - Start country detector needs to use proper geolocation services.
 
 # Roadmap
 

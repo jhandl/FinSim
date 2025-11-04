@@ -103,6 +103,15 @@ class TaxRuleSet {
 
     var fxDate = (fx && typeof fx.asOf === 'string') ? fx.asOf : null;
 
+    var projectionWindowYears = null;
+    if (economic && economic.projectionWindowYears !== undefined && economic.projectionWindowYears !== null) {
+      var windowRaw = economic.projectionWindowYears;
+      var parsed = Number(windowRaw);
+      if (!isNaN(parsed) && parsed > 0) {
+        projectionWindowYears = parsed;
+      }
+    }
+
     var codeUpper = code;
     var currency = null;
     if (typeof locale.currencyCode === 'string' && locale.currencyCode.trim()) {
@@ -111,7 +120,7 @@ class TaxRuleSet {
       currency = locale.countryCode.trim();
     }
 
-    return {
+    var profile = {
       country: codeUpper,
       currency: currency,
       cpi: cpiValue != null ? Number(cpiValue) : null,
@@ -119,8 +128,46 @@ class TaxRuleSet {
       ppp: pppValue != null ? Number(pppValue) : null,
       ppp_year: pppYear,
       fx: fxValue != null ? Number(fxValue) : null,
-      fx_date: fxDate
+      fx_date: fxDate,
+      projectionWindowYears: projectionWindowYears
     };
+
+    var timeSeries = null;
+    if (economic && typeof economic === 'object') {
+      var ts = economic.timeSeries;
+      if (ts && typeof ts === 'object') {
+        timeSeries = {};
+        for (var key in ts) {
+          if (!Object.prototype.hasOwnProperty.call(ts, key)) continue;
+          var entry = ts[key];
+          if (!entry || typeof entry !== 'object') continue;
+          var normalizedEntry = {};
+          if (entry.unit !== undefined) normalizedEntry.unit = entry.unit;
+          if (entry.source !== undefined) normalizedEntry.source = entry.source;
+          if (entry.series && typeof entry.series === 'object') {
+            normalizedEntry.series = entry.series;
+          }
+          if (!normalizedEntry.series && entry.data && typeof entry.data === 'object') {
+            normalizedEntry.series = entry.data;
+          }
+          if (!normalizedEntry.series && entry.values && typeof entry.values === 'object') {
+            normalizedEntry.series = entry.values;
+          }
+          if (normalizedEntry.series) {
+            timeSeries[key] = normalizedEntry;
+          }
+        }
+        if (timeSeries && Object.keys(timeSeries).length === 0) {
+          timeSeries = null;
+        }
+      }
+    }
+
+    if (timeSeries) {
+      profile.timeSeries = timeSeries;
+    }
+
+    return profile;
   }
 
   getInflationRate() {

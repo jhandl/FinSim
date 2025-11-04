@@ -9,7 +9,7 @@ test.use({ actionTimeout: 20000 });
 test('chart currency selector converts datasets and shows original tooltip details', async ({ page }) => {
   const frame = await loadSimulator(page);
   await seedEvents(frame, [
-    { type: 'MV-US', alias: 'MoveUS', fromAge: 40, toAge: 40 },
+    { type: 'MV-AR', alias: 'MoveAR', fromAge: 40, toAge: 40 },
     { type: 'SI', alias: 'IE Salary', amount: '50000', fromAge: 25, toAge: 39 },
     { type: 'SI', alias: 'US Salary', amount: '75000', fromAge: 40, toAge: 65 }
   ]);
@@ -36,7 +36,7 @@ test('chart currency selector converts datasets and shows original tooltip detai
   await dropdown.waitFor({ state: 'visible' });
   const optionValues = await dropdown.evaluate((select) => Array.from(select.options).map(opt => opt.value));
   expect(optionValues).toContain('EUR');
-  expect(optionValues).toContain('USD');
+  expect(optionValues).toContain('ARS');
 
   const baseline = await frame.locator('body').evaluate(() => {
     const cm = window.WebUI.getInstance().chartManager;
@@ -48,8 +48,8 @@ test('chart currency selector converts datasets and shows original tooltip detai
   });
   expect(baseline.originalCurrency).toBe('EUR');
 
-  await dropdown.selectOption('USD');
-  await frame.waitForTimeout(200);
+  await dropdown.selectOption('ARS');
+  await page.waitForTimeout(200);
 
   const analysis = await frame.locator('body').evaluate(() => {
     const webUI = window.WebUI.getInstance();
@@ -75,13 +75,15 @@ test('chart currency selector converts datasets and shows original tooltip detai
       dataIndex: 0,
       chart: cm.cashflowChart
     });
-    const annotations = cm.cashflowChart.options.plugins?.annotation?.annotations || {};
+    const rawAnnotations = (cm.cashflowChart.options.plugins && cm.cashflowChart.options.plugins.relocationMarkers && cm.cashflowChart.options.plugins.relocationMarkers.annotations)
+      || cm.latestRelocationAnnotations
+      || {};
     return {
       converted,
       expected,
       tooltipLabel,
       transitions: cm.relocationTransitions.length,
-      annotationCount: Object.keys(annotations).length
+      annotationCount: Object.keys(rawAnnotations).length
     };
   });
 
@@ -92,4 +94,3 @@ test('chart currency selector converts datasets and shows original tooltip detai
   expect(analysis.transitions).toBeGreaterThan(0);
   expect(analysis.annotationCount).toBeGreaterThan(0);
 });
-

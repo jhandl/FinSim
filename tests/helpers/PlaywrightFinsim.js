@@ -81,7 +81,7 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
 
   const evaluateArgs = { eventsData: events, startCountry: startCountry };
   
-  await frame.locator('body').evaluate((el, { eventsData: evts, startCountry: sc }) => {
+  await frame.locator('body').evaluate(async (el, { eventsData: evts, startCountry: sc }) => {
     const events = evts || [];
     const startCountry = sc || 'ie';
     
@@ -210,6 +210,15 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
     // Also refresh accordion view if it exists
     if (webUI.eventAccordionManager && typeof webUI.eventAccordionManager.refresh === 'function') {
       webUI.eventAccordionManager.refresh();
+    }
+
+    const cfg = window.Config && window.Config.getInstance ? window.Config.getInstance() : null;
+    if (cfg && typeof cfg.syncTaxRuleSetsWithEvents === 'function') {
+      try {
+        await cfg.syncTaxRuleSetsWithEvents(eventsData, etm.getStartCountry ? etm.getStartCountry() : startCountry);
+      } catch (syncError) {
+        console.error('syncTaxRuleSetsWithEvents failed', syncError);
+      }
     }
   }, evaluateArgs);
 }

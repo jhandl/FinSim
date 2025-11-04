@@ -64,6 +64,14 @@ class EconomicData {
     else if (keyHint) code = keyHint;
     if (!code) return;
     code = String(code).toUpperCase();
+    var normalizedSeries = this._normalizeTimeSeries(entry.timeSeries);
+    var projectionWindowYears = null;
+    if (entry && entry.projectionWindowYears !== undefined && entry.projectionWindowYears !== null) {
+      var parsedWindow = Number(entry.projectionWindowYears);
+      if (!isNaN(parsedWindow) && parsedWindow > 0) {
+        projectionWindowYears = parsedWindow;
+      }
+    }
     this.data[code] = {
       country: code,
       currency: entry.currency || null,
@@ -72,7 +80,9 @@ class EconomicData {
       ppp: entry.ppp != null ? Number(entry.ppp) : null,
       ppp_year: entry.ppp_year != null ? entry.ppp_year : null,
       fx: entry.fx != null ? Number(entry.fx) : null,
-      fx_date: entry.fx_date != null ? entry.fx_date : null
+      fx_date: entry.fx_date != null ? entry.fx_date : null,
+      series: normalizedSeries,
+      projectionWindowYears: projectionWindowYears
     };
   }
 
@@ -103,6 +113,30 @@ class EconomicData {
     return ppp2 / ppp1;
   }
 
+  getInflationForYear(countryCode, year) {
+    const entry = this.data[this._key(countryCode)];
+    if (!entry) return null;
+    const val = this._seriesValueForYear(entry, 'inflation', year, true);
+    if (val != null) return val;
+    return entry && entry.cpi != null ? entry.cpi : null;
+  }
+
+  getPPPValueForYear(countryCode, year) {
+    const entry = this.data[this._key(countryCode)];
+    if (!entry) return null;
+    const val = this._seriesValueForYear(entry, 'ppp', year, true);
+    if (val != null) return val;
+    return entry && entry.ppp != null ? entry.ppp : null;
+  }
+
+  getFXValueForYear(countryCode, year) {
+    const entry = this.data[this._key(countryCode)];
+    if (!entry) return null;
+    const val = this._seriesValueForYear(entry, 'fx', year, true);
+    if (val != null) return val;
+    return entry && entry.fx != null ? entry.fx : null;
+  }
+
   convert(value, fromCountry, toCountry, year, options) {
     var opts = options || {};
     var fxMode = opts.fxMode || 'ppp'; // 'constant' | 'ppp' | 'reversion'
@@ -126,14 +160,23 @@ class EconomicData {
     var fxY = null;
 
     if (fxMode === 'constant') {
-      fxY = baseFx;
+      fxY = this._fxCrossRateForYear(fromCountry, toCountry, year);
+      if (fxY == null) fxY = baseFx;
     } else if (fxMode === 'ppp') {
-      var anchor = selectAnchor(basePPP, baseFx);
-      if (anchor == null) return null;
-      var gFrom = (cpiFrom != null) ? this._growthFactor(cpiFrom, nYears) : null;
-      var gTo = (cpiTo != null) ? this._growthFactor(cpiTo, nYears) : null;
-      if (gFrom == null || gTo == null) return null;
-      fxY = anchor * (gTo / gFrom);
+      var pppRate = this._pppCrossRateForYear(fromCountry, toCountry, year);
+      if (pppRate == null && baseYear != null && baseYear !== year) {
+        pppRate = this._pppCrossRateForYear(fromCountry, toCountry, baseYear);
+      }
+      if (pppRate != null) {
+        fxY = pppRate;
+      } else {
+        var anchor = selectAnchor(basePPP, baseFx);
+        if (anchor == null) return null;
+        var gFrom = (cpiFrom != null) ? this._growthFactor(cpiFrom, nYears) : null;
+        var gTo = (cpiTo != null) ? this._growthFactor(cpiTo, nYears) : null;
+        if (gFrom == null || gTo == null) return null;
+        fxY = anchor * (gTo / gFrom);
+      }
     } else if (fxMode === 'reversion') {
       var anchorReversion = selectAnchor(basePPP, baseFx);
       if (anchorReversion == null) return null;
@@ -142,10 +185,14 @@ class EconomicData {
       } else {
         var fxLevel = (baseFx != null) ? baseFx : anchorReversion;
         for (var t = 1; t <= nYears; t++) {
-          var gFrom = (cpiFrom != null) ? this._growthFactor(cpiFrom, t) : null;
-          var gTo = (cpiTo != null) ? this._growthFactor(cpiTo, t) : null;
-          if (gFrom == null || gTo == null) return null;
-          var pppTarget = anchorReversion * (gTo / gFrom);
+          var lookupYear = baseYear + t;
+          var pppTarget = this._pppCrossRateForYear(fromCountry, toCountry, lookupYear);
+          if (pppTarget == null) {
+            var gFrom = (cpiFrom != null) ? this._growthFactor(cpiFrom, t) : null;
+            var gTo = (cpiTo != null) ? this._growthFactor(cpiTo, t) : null;
+            if (gFrom == null || gTo == null) return null;
+            pppTarget = anchorReversion * (gTo / gFrom);
+          }
           fxLevel = fxLevel + reversionSpeed * (pppTarget - fxLevel);
         }
         fxY = fxLevel;
@@ -178,6 +225,123 @@ class EconomicData {
 
   _growthFactor(cpi, nYears) {
     return Math.pow(1 + Number(cpi) / 100, Number(nYears));
+  }
+
+  _pppCrossRateForYear(fromCountry, toCountry, year) {
+    var fromVal = this.getPPPValueForYear(fromCountry, year);
+    var toVal = this.getPPPValueForYear(toCountry, year);
+    if (fromVal == null || toVal == null) return null;
+    if (fromVal === 0) return null;
+    return toVal / fromVal;
+  }
+
+  _normalizeTimeSeries(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var result = {};
+    for (var key in raw) {
+      if (!Object.prototype.hasOwnProperty.call(raw, key)) continue;
+      var entry = raw[key];
+      if (!entry || typeof entry !== 'object') continue;
+      var seriesData = entry.series || entry.data || entry.values;
+      if (!seriesData || typeof seriesData !== 'object') continue;
+      var values = [];
+      for (var yr in seriesData) {
+        if (!Object.prototype.hasOwnProperty.call(seriesData, yr)) continue;
+        var numYear = Number(yr);
+        var numVal = Number(seriesData[yr]);
+        if (isNaN(numYear) || isNaN(numVal)) continue;
+        values.push({ year: numYear, value: numVal });
+      }
+      if (!values.length) continue;
+      values.sort(function(a, b) { return a.year - b.year; });
+      result[key] = {
+        unit: entry.unit !== undefined ? entry.unit : null,
+        source: entry.source !== undefined ? entry.source : null,
+        values: values,
+        minYear: values[0].year,
+        maxYear: values[values.length - 1].year
+      };
+    }
+    return Object.keys(result).length > 0 ? result : null;
+  }
+
+  _fxCrossRateForYear(fromCountry, toCountry, year) {
+    var fromVal = this.getFXValueForYear(fromCountry, year);
+    var toVal = this.getFXValueForYear(toCountry, year);
+    if (fromVal == null || toVal == null) return null;
+    if (fromVal === 0) return null;
+    return toVal / fromVal;
+  }
+
+  _getProjectionWindow(entry) {
+    if (!entry) return null;
+    var window = entry.projectionWindowYears;
+    if (window != null) {
+      return window;
+    }
+    return 5;
+  }
+
+  _seriesValueForYear(entry, key, year, allowProjection) {
+    if (!entry || !entry.series || !entry.series[key]) return null;
+    var info = entry.series[key];
+    if (!info || !info.values || !info.values.length) return null;
+    var values = info.values;
+    var targetYear = Number(year);
+    if (isNaN(targetYear)) return null;
+    if (targetYear <= info.minYear) {
+      return values[0].value;
+    }
+    if (targetYear >= info.maxYear) {
+      if (allowProjection) {
+        var projected = this._weightedSeriesAverage(entry, key);
+        if (projected != null) {
+          return projected;
+        }
+      }
+      return values[values.length - 1].value;
+    }
+    var prevValue = values[0].value;
+    for (var i = 1; i < values.length; i++) {
+      var item = values[i];
+      if (targetYear === item.year) {
+        return item.value;
+      }
+      if (targetYear < item.year) {
+        return prevValue;
+      }
+      prevValue = item.value;
+    }
+    return prevValue;
+  }
+
+  _weightedSeriesAverage(entry, key) {
+    if (!entry || !entry.series || !entry.series[key]) return null;
+    var info = entry.series[key];
+    if (!info || !info.values || !info.values.length) return null;
+    var window = this._getProjectionWindow(entry);
+    if (!window || window <= 0) window = 5;
+    var values = info.values;
+    var latest = info.maxYear;
+    var weightedSum = 0;
+    var totalWeight = 0;
+    for (var i = values.length - 1; i >= 0; i--) {
+      var item = values[i];
+      var age = latest - item.year;
+      if (age >= window) {
+        continue;
+      }
+      var weight = (window - age) / window;
+      if (weight <= 0) {
+        continue;
+      }
+      weightedSum += item.value * weight;
+      totalWeight += weight;
+    }
+    if (totalWeight > 0) {
+      return weightedSum / totalWeight;
+    }
+    return values[values.length - 1].value;
   }
 
   _key(code) {

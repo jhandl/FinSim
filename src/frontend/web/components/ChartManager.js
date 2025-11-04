@@ -9,6 +9,7 @@ class ChartManager {
     this.originalValues = {}; // Cache of unconverted values for tooltip display
     this.countryTimeline = []; // Array tracking which country is active at each age
     this.currencyMode = 'unified'; // Charts always use unified mode (no mode selector in charts)
+    this.latestRelocationAnnotations = {};
     try {
       this.setupCharts();
     } catch (err) {
@@ -683,15 +684,26 @@ class ChartManager {
     const cfg = Config.getInstance();
     if (!cfg.isRelocationEnabled()) return;
 
-    const graphContainers = document.querySelectorAll('.graph-container');
-    graphContainers.forEach(container => {
-        const controlsDiv = container.querySelector('.chart-controls') || document.createElement('div');
-        if (!controlsDiv.classList.contains('chart-controls')) {
-            controlsDiv.className = 'chart-controls';
-            container.appendChild(controlsDiv);
-        }
-        RelocationUtils.createCurrencyControls(controlsDiv, this, webUI);
-    });
+    const graphContainers = Array.prototype.slice.call(document.querySelectorAll('.graph-container'));
+    if (!graphContainers.length) return;
+
+    const primaryContainer = graphContainers[0];
+    let controlsDiv = primaryContainer.querySelector('.chart-controls');
+    if (!controlsDiv) {
+      controlsDiv = document.createElement('div');
+      controlsDiv.className = 'chart-controls';
+      primaryContainer.appendChild(controlsDiv);
+    }
+    RelocationUtils.createCurrencyControls(controlsDiv, this, webUI);
+
+    // Ensure secondary graph containers don't keep stale duplicates (IDs must remain unique)
+    for (var i = 1; i < graphContainers.length; i++) {
+      var container = graphContainers[i];
+      var duplicate = container.querySelector('.chart-controls');
+      if (duplicate && duplicate !== controlsDiv) {
+        duplicate.parentNode.removeChild(duplicate);
+      }
+    }
 
     RelocationUtils.extractRelocationTransitions(webUI, this);
     this.refreshChartsWithCurrency();
@@ -713,9 +725,13 @@ class ChartManager {
         // Charts don't have mode toggles, so check currency count to determine visibility
         if (!naturalToggle && !unifiedToggle) {
             if (dropdownContainer) {
+                dropdownContainer.style.display = 'block';
                 const select = dropdownContainer.querySelector('select');
-                const optionCount = select ? select.options.length : 0;
-                dropdownContainer.style.display = optionCount > 1 ? 'block' : 'none';
+                if (select && select.options.length <= 1) {
+                  try { select.disabled = true; } catch (_) {}
+                } else if (select) {
+                  try { select.disabled = false; } catch (_) {}
+                }
             }
             return;
         }
@@ -826,7 +842,7 @@ class ChartManager {
         });
         // Handle dynamic fields
         Object.keys(data).forEach(key => {
-          if (key.startsWith('Income__') || key.startsWith('Capital__')) {
+          if (typeof key === 'string' && (key.indexOf('Income__') === 0 || key.indexOf('Capital__') === 0)) {
             const field = key;
             if (data[field] !== undefined) {
               if (sourceCurrency !== targetCurrency) {
@@ -903,39 +919,81 @@ class ChartManager {
   }
 
   drawRelocationMarkers() {
-    if (!this.relocationTransitions.length) return;
-    // Use Chart.js annotation plugin if available
-    if (typeof Chart !== 'undefined' && Chart.plugins && Chart.plugins.get('annotation')) {
-      const annotations = {};
-      this.relocationTransitions.forEach((trans, idx) => {
-        const ageIndex = this.cashflowChart.data.labels.indexOf(trans.age);
-        if (ageIndex !== -1) {
-          annotations[`relocation${idx}`] = {
-            type: 'line',
-            xMin: ageIndex,
-            xMax: ageIndex,
-            borderColor: '#ccc',
-            borderWidth: 1,
-            borderDash: [5, 5],
-            label: {
-              content: `Relocated from ${trans.fromCountry.toUpperCase()} to ${trans.toCountry.toUpperCase()}`,
-              enabled: true,
-              position: 'top',
-              opacity: 0.5
+    if (!this.relocationTransitions.length) {
+      this._clearRelocationAnnotations();
+      return;
+    }
+
+    const annotations = {};
+    const transitions = this.relocationTransitions || [];
+    let foundMarker = false;
+    for (let idx = 0; idx < transitions.length; idx++) {
+      const trans = transitions[idx];
+      let ageIndex = -1;
+      if (this.cashflowChart && this.cashflowChart.data && Array.isArray(this.cashflowChart.data.labels)) {
+        const labels = this.cashflowChart.data.labels;
+        ageIndex = labels.indexOf(trans.age);
+        if (ageIndex === -1 && labels.length > 0) {
+          for (let li = 0; li < labels.length; li++) {
+            if (labels[li] >= trans.age) {
+              ageIndex = li;
+              break;
             }
-          };
+          }
+          if (ageIndex === -1) {
+            ageIndex = labels.length - 1;
+          }
         }
-      });
-      if (this.cashflowChart.options.plugins) {
-        this.cashflowChart.options.plugins.annotation = { annotations };
-        this.cashflowChart.update();
       }
-      if (this.assetsChart.options.plugins) {
-        this.assetsChart.options.plugins.annotation = { annotations };
-        this.assetsChart.update();
+      if (ageIndex !== -1) {
+        annotations['relocation' + idx] = {
+          type: 'line',
+          index: ageIndex,
+          xMin: ageIndex,
+          xMax: ageIndex,
+          borderColor: '#ccc',
+          borderWidth: 1,
+          borderDash: [5, 5],
+          label: {
+            content: 'Relocated from ' + trans.fromCountry.toUpperCase() + ' to ' + trans.toCountry.toUpperCase(),
+            enabled: true,
+            position: 'top',
+            opacity: 0.5
+          }
+        };
+        foundMarker = true;
       }
     }
+
+    this.latestRelocationAnnotations = foundMarker ? annotations : {};
+    this._applyRelocationAnnotations(foundMarker ? annotations : {});
   }
+
+  _clearRelocationAnnotations() {
+    this.latestRelocationAnnotations = {};
+    if (this.cashflowChart) {
+      this.cashflowChart.$relocationAnnotations = null;
+      if (typeof this.cashflowChart.update === 'function') this.cashflowChart.update();
+    }
+    if (this.assetsChart) {
+      this.assetsChart.$relocationAnnotations = null;
+      if (typeof this.assetsChart.update === 'function') this.assetsChart.update();
+    }
+  }
+
+  _applyRelocationAnnotations(annotations) {
+    const hasAnnotations = annotations && Object.keys(annotations).length > 0;
+    this.latestRelocationAnnotations = hasAnnotations ? annotations : {};
+    const applyToChart = (chart) => {
+      if (!chart) return;
+      chart.$relocationAnnotations = hasAnnotations ? annotations : null;
+      if (typeof chart.update === 'function') chart.update();
+    };
+
+    applyToChart(this.cashflowChart);
+    applyToChart(this.assetsChart);
+  }
+
 
   refreshChartsWithCurrency() {
     this._repopulateFromCache();
