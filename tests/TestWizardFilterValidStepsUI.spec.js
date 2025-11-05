@@ -39,6 +39,16 @@ async function waitForSimulatorReady(page) {
     const wizardReady = win.Wizard && win.Wizard.getInstance && win.Wizard.getInstance();
     return !!(webUIReady && wizardReady && webUIReady.eventsTableManager);
   }, null, { timeout: 20000 });
+
+  // Preload wizard YAML/config once to avoid fetch latency flakiness when starting tours later
+  await frame.locator('body').evaluate(async () => {
+    try {
+      const wiz = (window.Wizard && window.Wizard.getInstance) ? window.Wizard.getInstance() : null;
+      if (wiz && !wiz.config) {
+        await wiz.loadConfig();
+      }
+    } catch (_) { /* ignore */ }
+  });
 }
 
 async function loadSimulator(page, { wizardOn = false } = {}) {

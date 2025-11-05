@@ -209,11 +209,15 @@ class WebUI extends AbstractUI {
   }
 
   rerenderData() {
-    if (!window.dataSheet || window.dataSheet.length === 0) return;
-    this.tableManager.conversionCache = {};
-    this.tableManager.storedCountryTimeline = null; // Invalidate stored timeline before rerender
-    for (let i = 1; i < window.dataSheet.length; i++) {
-      this.tableManager.setDataRow(i, window.dataSheet[i]);
+    if (window.dataSheet && window.dataSheet.length > 0) {
+      this.tableManager.conversionCache = {};
+      this.tableManager.storedCountryTimeline = null; // Invalidate stored timeline before rerender
+      for (let i = 1; i < window.dataSheet.length; i++) {
+        this.tableManager.setDataRow(i, window.dataSheet[i]);
+      }
+    } else if (this.tableManager && typeof this.tableManager.refreshDisplayedCurrencies === 'function') {
+      // Fallback path for test/preview contexts where dataSheet isn't populated
+      this.tableManager.refreshDisplayedCurrencies();
     }
   }
 

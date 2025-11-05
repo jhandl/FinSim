@@ -326,18 +326,9 @@ class TableManager {
         const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
 
         if (this.currencyMode === 'unified') {
-            // Only use reporting currency if currencies match or conversion succeeded
-            const currenciesMatch = fromCurrency === this.reportingCurrency;
-            const conversionSucceeded = fxMultiplier !== undefined;
-            
-            if (currenciesMatch || conversionSucceeded) {
-                displayCurrencyCode = this.reportingCurrency;
-                displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
-            } else {
-                // Fall back to natural formatting when conversion isn't available
-                displayCurrencyCode = fromCurrency;
-                displayCountryForLocale = fromCountry;
-            }
+            // Always format using the selected reporting currency in unified mode
+            displayCurrencyCode = this.reportingCurrency;
+            displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
         } else { // natural mode
             displayCurrencyCode = fromCurrency;
             displayCountryForLocale = fromCountry;
@@ -427,18 +418,9 @@ class TableManager {
                     const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
                     
                     if (this.currencyMode === 'unified') {
-                        // Only use reporting currency if currencies match or conversion succeeded
-                        const currenciesMatch = fromCurrency === this.reportingCurrency;
-                        const conversionSucceeded = fxMultiplier !== undefined;
-                        
-                        if (currenciesMatch || conversionSucceeded) {
-                            displayCurrencyCode = this.reportingCurrency;
-                            displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
-                        } else {
-                            // Fall back to natural formatting when conversion isn't available
-                            displayCurrencyCode = fromCurrency;
-                            displayCountryForLocale = fromCountry;
-                        }
+                        // Always format using the selected reporting currency in unified mode
+                        displayCurrencyCode = this.reportingCurrency;
+                        displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
                     } else {
                         displayCurrencyCode = fromCurrency;
                         displayCountryForLocale = fromCountry;
@@ -778,6 +760,66 @@ class TableManager {
         if (unifiedToggle) unifiedToggle.classList.add('mode-toggle-active');
         if (naturalToggle) naturalToggle.classList.remove('mode-toggle-active');
         if (dropdownContainer) dropdownContainer.style.display = 'block';
+    }
+  }
+
+  // Reformat existing table cells to reflect current currency mode/reportingCurrency
+  refreshDisplayedCurrencies() {
+    const table = document.getElementById('Data');
+    if (!table) return;
+    const headerRow = table.querySelector('thead tr:nth-child(2)');
+    if (!headerRow) return;
+    const headerCells = Array.from(headerRow.querySelectorAll('th[data-key]')).filter(h => h.style.display !== 'none');
+    const isMonetaryKey = (key) => !(key === 'Age' || key === 'Year' || key === 'WithdrawalRate');
+
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    if (rows.length === 0) return;
+
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      const cells = Array.from(row.querySelectorAll('td'));
+      // Derive age from the first column (assumed Age) if present
+      let age = undefined;
+      try {
+        const ageIdx = headerCells.findIndex(h => h.getAttribute('data-key') === 'Age');
+        if (ageIdx >= 0 && cells[ageIdx]) {
+          const t = cells[ageIdx].querySelector('.cell-content')?.textContent || cells[ageIdx].textContent || '';
+          age = parseInt(t, 10);
+        }
+      } catch (_) {}
+
+      for (let c = 0; c < headerCells.length && c < cells.length; c++) {
+        const key = headerCells[c].getAttribute('data-key');
+        if (!isMonetaryKey(key)) continue;
+        const contentEl = cells[c].querySelector('.cell-content') || cells[c];
+        const rawText = (contentEl.textContent || '').trim();
+        if (!rawText) continue;
+
+        // Parse numeric portion and reformat using current display currency rules
+        let numeric = FormatUtils.parseCurrency(rawText);
+        if (numeric === undefined) {
+          // Fallback: strip non-numeric except . , -
+          const stripped = rawText.replace(/[^0-9,.-]/g, '');
+          numeric = parseFloat(stripped.replace(/,/g, ''));
+        }
+        if (isNaN(numeric)) continue;
+
+        // Determine display currency and locale exactly like setDataRow
+        let displayCurrencyCode, displayCountryForLocale;
+        if (this.currencyMode === 'unified') {
+          displayCurrencyCode = this.reportingCurrency;
+          displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
+        } else {
+          const fromCountry = age != null ? RelocationUtils.getCountryForAge(age, this) : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
+          const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
+          displayCurrencyCode = fromCurrency;
+          displayCountryForLocale = fromCountry;
+        }
+
+        contentEl.textContent = FormatUtils.formatCurrency(numeric, displayCurrencyCode, displayCountryForLocale);
+      }
     }
   }
   applyIncomeVisibilityAfterSimulation() {

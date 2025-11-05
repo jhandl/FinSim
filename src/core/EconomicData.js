@@ -126,7 +126,12 @@ class EconomicData {
     if (!entry) return null;
     const val = this._seriesValueForYear(entry, 'ppp', year, true);
     if (val != null) return val;
-    return entry && entry.ppp != null ? entry.ppp : null;
+    // Only return the base PPP when the requested year matches the declared PPP year;
+    // for other years, signal missing so callers can synthesize via CPI differentials.
+    if (entry && entry.ppp != null && entry.ppp_year != null && Number(year) === Number(entry.ppp_year)) {
+      return entry.ppp;
+    }
+    return null;
   }
 
   getFXValueForYear(countryCode, year) {
@@ -164,9 +169,6 @@ class EconomicData {
       if (fxY == null) fxY = baseFx;
     } else if (fxMode === 'ppp') {
       var pppRate = this._pppCrossRateForYear(fromCountry, toCountry, year);
-      if (pppRate == null && baseYear != null && baseYear !== year) {
-        pppRate = this._pppCrossRateForYear(fromCountry, toCountry, baseYear);
-      }
       if (pppRate != null) {
         fxY = pppRate;
       } else {
