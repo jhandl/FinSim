@@ -84,7 +84,7 @@ class Attribution {
     }
     
     var converted = economicData.convert(total, this.country, baseCountry, this.year, {
-      fxMode: 'ppp',
+      fxMode: 'constant',
       baseYear: cfg.getSimulationStartYear(),
       fallback: 'nearest'
     });

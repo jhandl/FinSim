@@ -1,5 +1,11 @@
 const assert = require('assert');
 
+/*
+  PPP vs FX: PPP is used for user-facing suggestions (split amounts, suggestions),
+  while nominal FX is used for ledger/accounting. PPP ratios come from
+  EconomicData.getPPP() and are independent of EconomicData.convert() fxMode.
+*/
+
 module.exports = {
   name: 'RelocationImpactDetection',
   description: 'Validates RelocationImpactDetector classification, resolution, and guard rails.',
@@ -9,6 +15,7 @@ module.exports = {
 
     // Shim minimal Config expected by the detector.
     const pensionSystems = {};
+    let econ = null;
     const configStub = {
       relocationEnabled: true,
       availableCountries: {
@@ -21,17 +28,31 @@ module.exports = {
         const normalized = (code || '').toString().toLowerCase();
         return this.availableCountries[normalized] || normalized.toUpperCase();
       },
+      getDefaultCountry() { return 'aa'; },
+      getAvailableCountries() {
+        return [
+          { code: 'AA', name: 'Country A' },
+          { code: 'BB', name: 'Country B' },
+          { code: 'CC', name: 'Country C' }
+        ];
+      },
       getCachedTaxRuleSet(code) {
         const normalized = (code || '').toString().toLowerCase();
         const system = pensionSystems[normalized] || 'mixed';
         return {
-          getPensionSystemType() { return system; }
+          getPensionSystemType() { return system; },
+          getCurrencyCode() { return normalized === 'aa' ? 'AAA' : (normalized === 'bb' ? 'BBB' : 'CCC'); },
+          getInflationRate() { return 0.025; }
         };
-      }
+      },
+      getEconomicData() { return econ; }
     };
     global.Config = { getInstance: () => configStub };
 
     const { RelocationImpactDetector } = require('../src/frontend/web/components/RelocationImpactDetector.js');
+    const { EconomicData } = require('../src/core/EconomicData.js');
+    const { RelocationImpactAssistant } = require('../src/frontend/web/components/RelocationImpactAssistant.js');
+    const { EventsTableManager } = require('../src/frontend/web/components/EventsTableManager.js');
 
     function makeEvent(overrides) {
       return Object.assign({
@@ -227,6 +248,107 @@ module.exports = {
         const result = runDetector([salary, mv], 'aa');
         const impact = result.find(e => e.id === 'salary_start').relocationImpact;
         assert(impact && impact.category === 'simple', 'Event starting at relocation age should be simple impact');
+      })();
+
+      // ===== PPP Preservation & UI Suggestion Tests =====
+      // Install economic data for AA->BB with FX=1.5, PPP=2.0 (cross-rates).
+      (function setupEconomicData() {
+        econ = new EconomicData({
+          AA: { country: 'AA', currency: 'AAA', cpi: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', cpi: 3.0, ppp: 2.0, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
+        });
+      })();
+
+      // Test 12: PPP calculation independence from FX.
+      (function() {
+        const base = 50000;
+        const pppRatio = econ.getPPP('aa', 'bb'); // 2.0
+        const fxRate = econ.getFX('aa', 'bb');    // 1.5
+        assert.strictEqual(pppRatio, 2.0, 'Expected PPP cross-rate 2.0');
+        assert.strictEqual(fxRate, 1.5, 'Expected FX cross-rate 1.5');
+        const suggested = RelocationImpactAssistant.calculatePPPSuggestion(base, 'aa', 'bb');
+        assert.strictEqual(suggested, Math.round(base * pppRatio), 'PPP suggestion should use PPP ratio, not FX');
+      })();
+
+      // Test 12b: Direct unit test for EventsTableManager.calculatePPPSuggestion() uses PPP.
+      (function() {
+        const amount = 50000;
+        // Minimal stubbed instance with no-op webUI.readEvents
+        const etm = Object.create((EventsTableManager || function(){}).prototype);
+        etm.webUI = { readEvents: () => [] };
+        const result = etm.calculatePPPSuggestion(amount, 'aa', 'bb');
+        assert.strictEqual(result, Math.round(amount * 2.0), 'EventsTableManager PPP suggestion should use PPP ratio');
+      })();
+
+      // Test 13: PPP vs FX divergence appears in panel data attributes (boundary split).
+      (function() {
+        const mv = makeEvent({ id: 'mv1', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const evt = makeEvent({
+          id: 'salary_ppp_fx', type: 'SI', amount: 10000, fromAge: 30, toAge: 40,
+          relocationImpact: { category: 'boundary', message: 'x', mvEventId: 'mv1', autoResolvable: false }
+        });
+        const env = {
+          webUI: { readEvents: () => [mv, evt] },
+          eventsTableManager: {
+            getStartCountry: () => 'aa',
+            getOriginCountry: () => 'aa'
+          }
+        };
+        const html = RelocationImpactAssistant.createPanelHtml(evt, 'row1', env);
+        assert(html && html.indexOf('resolution-panel-container') !== -1, 'Panel HTML should be generated');
+        const fxMatch = html.match(/data-fx-amount="([0-9]+)"/);
+        const pppMatch = html.match(/data-ppp-amount="([0-9]+)"/);
+        assert(fxMatch && fxMatch[1], 'FX amount data attribute missing');
+        assert(pppMatch && pppMatch[1], 'PPP amount data attribute missing');
+        const fxAmt = Number(fxMatch[1]);
+        const pppAmt = Number(pppMatch[1]);
+        assert.strictEqual(fxAmt, Math.round(10000 * 1.5), 'FX amount should reflect nominal FX');
+        assert.strictEqual(pppAmt, Math.round(10000 * 2.0), 'PPP amount should reflect PPP ratio');
+        assert.notStrictEqual(pppAmt, fxAmt, 'PPP and FX suggestions should differ when PPP ≠ FX');
+      })();
+
+      // Test 14: PPP fallback to FX when PPP unavailable.
+      (function() {
+        // Rebuild economic data where BB PPP is missing
+        econ = new EconomicData({
+          AA: { country: 'AA', currency: 'AAA', cpi: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', cpi: 3.0, ppp: null, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
+        });
+        const base = 10000;
+        const suggested = RelocationImpactAssistant.calculatePPPSuggestion(base, 'aa', 'bb');
+        assert.strictEqual(suggested, Math.round(base * 1.5), 'When PPP missing, suggestion must fall back to FX');
+      })();
+
+      // Test 14b: EventsTableManager.calculatePPPSuggestion() falls back to FX when PPP is missing.
+      (function() {
+        const amount = 10000;
+        const etm = Object.create((EventsTableManager || function(){}).prototype);
+        etm.webUI = { readEvents: () => [] };
+        const result = etm.calculatePPPSuggestion(amount, 'aa', 'bb');
+        assert.strictEqual(result, Math.round(amount * 1.5), 'EventsTableManager should fall back to FX when PPP missing');
+      })();
+
+      // Test 15: Economic context numbers (FX, PPP, COL) are correct from EconomicData.
+      (function() {
+        // Restore full economic data
+        econ = new EconomicData({
+          AA: { country: 'AA', currency: 'AAA', cpi: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', cpi: 3.0, ppp: 2.0, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
+        });
+        const fxRate = econ.getFX('aa', 'bb');
+        const pppRatio = econ.getPPP('aa', 'bb');
+        const col = (pppRatio != null && fxRate != null && fxRate > 0) ? (pppRatio / fxRate) : null;
+        assert.strictEqual(Number(fxRate.toFixed(3)), 1.500, 'FX cross-rate should be 1.500');
+        assert.strictEqual(Number(pppRatio.toFixed(3)), 2.000, 'PPP cross-rate should be 2.000');
+        assert.strictEqual(Number(col.toFixed(2)), 1.33, 'Cost of living ratio should be 1.33');
+      })();
+
+      // Test 16: Regression guard – PPP suggestion remains stable irrespective of FX mode changes.
+      (function() {
+        const base = 12345;
+        const expected = Math.round(base * 2.0);
+        const v = RelocationImpactAssistant.calculatePPPSuggestion(base, 'aa', 'bb');
+        assert.strictEqual(v, expected, 'PPP suggestion must remain based on getPPP() cross-rate');
       })();
 
     } catch (err) {

@@ -1,0 +1,117 @@
+Technical Review of FinSim’s Economic Time-Series and Currency/Inflation Logic
+
+Audience: software engineers building a lifelong personal-finance simulator
+Scope: correctness, modelling soundness, and alignment with industry norms for CPI, PPP, FX, inflation projections, and currency conversion in a multi-country lifetime simulation.
+
+Summary
+
+The system has a clear structure for CPI, PPP, and FX handling, with well-defined precedence rules and defensive fallbacks. This is good engineering discipline. However, some modelling choices differ from what is typically done in financial planning, accounting, and taxation systems. The most important issues are:
+
+Using PPP (purchasing power parity) as the default method for monetary conversion. PPP is a cost-of-living adjustment measure. Financial accounting, taxation, and investment flows should use nominal foreign exchange (FX) rates. PPP should remain available, but only as a “real purchasing power view,” not as the basis for tax-relevant calculations.
+
+Using a single compounded inflation rate between the base year and a future year, instead of chaining year-by-year CPI values. This creates drift over long time horizons and makes it harder to reconcile numbers against published inflation tables.
+
+Performing currency conversion after netting income and expenses instead of converting each flow in the period. In progressive tax systems or in years with large FX swings, this can produce incorrect results.
+
+Forward projection uses a simple five-year weighted average. This is easy to implement but not consistent with standard practices in long-run financial modelling.
+
+The reference or “base year” is determined at application start, meaning two identical runs in different months can produce different results. This breaks reproducibility.
+
+With small structural adjustments, the model can align with standard practice while keeping its current flexibility.
+
+What is already strong
+
+• Clear definitions and units for CPI, PPP, and FX
+• Explicit precedence rules when picking inflation sources, countries, and time periods
+• Safe behaviour when data is missing, logging warnings rather than failing silently
+• A clean relocation lifecycle and well-documented event inflation flow
+
+These design elements are solid and should be retained.
+
+Where the model differs from industry standards
+
+PPP as the default conversion method
+Financial cash flows and taxes are always based on nominal FX, not PPP. PPP is used for comparing purchasing power across countries, not for converting salaries, capital gains, or investment balances. Defaulting to PPP will create mismatches between the simulator outputs and what users see on tax forms, bank statements, or brokerage reports.
+
+Suggested fix:
+• Make nominal FX the default for the “ledger” layer (the values used for tax and account balances)
+• Keep PPP for optional “real value” or “equivalent purchasing power” displays
+
+Single-rate inflation instead of chained CPI
+Financial software normally applies inflation year by year. A single compound rate over long periods makes results diverge from official CPI tables and can produce visible errors in long runs (for example 40+ year retirement scenarios).
+
+Suggested fix:
+• Precompute cumulative CPI indices per country: a running product of each year’s inflation
+• Use these indices to inflate amounts from base year to any target year
+
+Net-then-convert vs convert-then-net
+If a user earns USD income but also has USD expenses, netting them first and converting after the fact hides FX effects and can distort taxable income in progressive systems.
+
+Suggested fix:
+• Convert each flow using the period’s FX, then aggregate and tax in the destination currency
+
+Projection method
+A trailing average assumes the future resembles the past few years. This fails after regime shifts (for example high-inflation periods, wars, monetary policy shocks). Real-world planning tools typically use a baseline deterministic curve plus stochastic scenarios.
+
+Suggested fix:
+• CPI baseline: converge toward central bank target after a finite number of years
+• FX baseline: random walk with no drift for nominal FX; PPP reversion only for optional “real” analytics
+• Add uncertainty bands or Monte Carlo later if desired
+
+Base year varies per session
+This makes it impossible to reproduce a result exactly across time.
+
+Suggested fix:
+• Store the base year inside the saved scenario and use it until the user explicitly changes it
+
+Additional clarifications worth adding to the spec
+
+• Specify the PPP common base currency and year, so ratios are always comparable
+• Clarify whether FX is annual average, year-end, or monthly aggregated
+• Document the interpolation method for missing years (current behaviour is stepwise carry-forward)
+• Add metadata storage for each dataset (source name, retrieval date, license, transformation)
+• Provide numerical-stability notes for long-horizon compounding
+
+Practical tax and accounting alignment
+
+The simplest compliant design is to separate two layers:
+
+Ledger layer (authoritative): nominal FX, per-flow conversion, drives all taxable and legal calculations
+
+Analytics layer (optional): PPP-adjusted charts and “real value” storytelling, clearly labeled so users know these are not tax figures
+
+Suggested testing strategy
+
+• Golden test fixtures with constant CPI/FX to verify algebra
+• Stress tests with multi-year inflation spikes and deflation to confirm chained CPI works
+• Equivalence tests ensuring PPP mode and FX mode match only when CPI paths are identical
+• Reproducibility test: identical scenario re-run in different months produces same numbers
+• Fallback tests where final years are missing from the dataset
+
+Priority recommendations
+
+Switch default currency conversion to nominal FX for the core ledger
+
+Replace single-rate inflation with chained CPI index
+
+Convert flows individually before netting
+
+Store base year at scenario level
+
+Improve projection logic for CPI, FX, and PPP
+
+Add explicit documentation and toggles for data frequency and interpolation
+
+Build unit tests that enforce mathematical invariants and missing-data behaviour
+
+Minimal implementation outline
+
+• Build a cumulative CPI index array per country at load time
+• On each event: apply chained CPI → convert using FX of that year → add to ledger
+• Optionally compute a PPP-based “real value” in parallel, but never feed that into tax logic
+• Persist base year into the saved scenario
+• Keep existing fallback behaviour and warnings exactly as they are
+
+Closing note
+
+The current design is already modular and defensively coded. By moving PPP out of the accounting layer, chaining inflation properly, and enforcing per-flow FX conversion, the simulator becomes aligned with how accountants, tax authorities, and financial planners treat money, without losing any of the analytical flexibility that makes the tool attractive.

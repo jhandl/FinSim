@@ -276,7 +276,7 @@ class TableManager {
 
       const isMonetary = !(key === 'Age' || key === 'Year' || key === 'WithdrawalRate');
 
-      if (isMonetary && this.currencyMode === 'unified' && this.reportingCurrency) {
+      if (isMonetary && Config.getInstance().isRelocationEnabled() && this.currencyMode === 'unified' && this.reportingCurrency) {
         const age = data.Age;
         const year = Config.getInstance().getSimulationStartYear() + age;
         const fromCountry = RelocationUtils.getCountryForAge(age, this);
@@ -291,7 +291,7 @@ class TableManager {
                 let fxMult = this.conversionCache[cacheKey];
                 if (fxMult === undefined) {
                     fxMult = economicData.convert(1, fromCountry, toCountry, year, {
-                        fxMode: 'ppp',
+                        fxMode: 'constant',
                         baseYear: Config.getInstance().getSimulationStartYear()
                     });
                     if (fxMult !== null) {
@@ -325,7 +325,7 @@ class TableManager {
         const fromCountry = RelocationUtils.getCountryForAge(age, this);
         const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
 
-        if (this.currencyMode === 'unified') {
+        if (this.currencyMode === 'unified' && Config.getInstance().isRelocationEnabled()) {
             // Always format using the selected reporting currency in unified mode
             displayCurrencyCode = this.reportingCurrency;
             displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
@@ -798,11 +798,15 @@ class TableManager {
         if (!rawText) continue;
 
         // Parse numeric portion and reformat using current display currency rules
-        let numeric = FormatUtils.parseCurrency(rawText);
+        // Prefer app parser; fallback to locale-agnostic integer parsing that drops group separators
+        let numeric = undefined;
+        try { if (typeof FormatUtils !== 'undefined' && typeof FormatUtils.parseCurrency === 'function') { numeric = FormatUtils.parseCurrency(rawText); } } catch (_) {}
         if (numeric === undefined) {
-          // Fallback: strip non-numeric except . , -
-          const stripped = rawText.replace(/[^0-9,.-]/g, '');
-          numeric = parseFloat(stripped.replace(/,/g, ''));
+          let stripped = String(rawText || '').replace(/[^0-9,.-]/g, '');
+          // Remove both common grouping separators regardless of locale; displayed amounts are integers
+          stripped = stripped.replace(/[,.]/g, '');
+          const n = parseFloat(stripped);
+          numeric = isNaN(n) ? undefined : n;
         }
         if (isNaN(numeric)) continue;
 

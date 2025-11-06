@@ -163,7 +163,7 @@ module.exports = {
     const arRules = new TaxRuleSet(require('../src/core/config/tax-rules-ar.json'));
     const ieRules = new TaxRuleSet(require('../src/core/config/tax-rules-ie.json'));
     const econ = new EconomicData([ieRules.getEconomicProfile(), arRules.getEconomicProfile()]);
-    const conversionOptions = { fxMode: 'ppp', baseYear: baseYear };
+    const conversionOptions = { fxMode: 'constant', baseYear: baseYear };
 
     // Pre-move sanity checks (all EUR values)
     if (!withinTolerance(rowAge34.incomeSalaries, 50000, 1e-6, 0.5)) {

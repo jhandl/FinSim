@@ -3620,3 +3620,6 @@ class EventsTableManager {
   }
 
 }
+
+// Make EventsTableManager available to CommonJS consumers and browser global
+this.EventsTableManager = EventsTableManager;

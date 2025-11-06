@@ -44,7 +44,10 @@ module.exports = {
         economicData: {
           inflation: { cpi: 3.0, year: 2025 },
           purchasingPowerParity: { value: 1.0, year: 2025 },
-          exchangeRate: { perEur: 1.0, asOf: '2025-01-01' }
+          exchangeRate: { perEur: 1.0, asOf: '2025-01-01' },
+          timeSeries: {
+            fx: { series: { '2025': 1.0, '2035': 1.0 } }
+          }
         },
         incomeTax: { brackets: { '0': 0.15 } }
       });
@@ -56,7 +59,10 @@ module.exports = {
         economicData: {
           inflation: { cpi: 10.0, year: 2025 },
           purchasingPowerParity: { value: 2.5, year: 2025 },
-          exchangeRate: { perEur: 3.0, asOf: '2025-01-01' }
+          exchangeRate: { perEur: 3.0, asOf: '2025-01-01' },
+          timeSeries: {
+            fx: { series: { '2025': 3.0, '2035': 4.0 } }
+          }
         },
         incomeTax: { brackets: { '0': 0.2 } }
       });
@@ -98,6 +104,49 @@ module.exports = {
         if (!withinTolerance(converted, expected, 1e-12, 1e-9)) {
           errors.push(`Constant mode mismatch: expected ${expected}, got ${converted}`);
         }
+      }
+
+      // Test Case 1b: constant mode uses year-specific series (MM->NN, 2035: 4.0/1.0)
+      {
+        const amount = 250;
+        const converted = econ.convert(amount, 'MM', 'NN', 2035, { fxMode: 'constant', baseYear: 2025 });
+        const expected = amount * (4.0 / 1.0);
+        if (!withinTolerance(converted, expected, 1e-12, 1e-9)) {
+          errors.push(`Constant mode with series mismatch: expected ${expected}, got ${converted}`);
+        }
+      }
+
+      // Test Case 1c: constant mode fallback when series missing (2031 -> base 3.0/1.0)
+      {
+        const amount = 70;
+        const converted = econ.convert(amount, 'MM', 'NN', 2031, { fxMode: 'constant', baseYear: 2025 });
+        const expected = amount * (nnProfile.fx / mmProfile.fx);
+        if (!withinTolerance(converted, expected, 1e-12, 1e-9)) {
+          errors.push(`Constant mode fallback mismatch: expected ${expected}, got ${converted}`);
+        }
+      }
+
+      // Test Case 13: PPP vs Constant divergence in future year
+      {
+        const amount = 100;
+        const constOut = econ.convert(amount, 'MM', 'NN', 2035, { fxMode: 'constant', baseYear: 2025 });
+        const pppOut = econ.convert(amount, 'MM', 'NN', 2035, { fxMode: 'ppp', baseYear: 2025 });
+        if (withinTolerance(constOut, pppOut, 1e-12, 1e-9)) {
+          errors.push('PPP and constant should differ in 2035');
+        }
+      }
+
+      // Negative Test: Ensure PPP not used by constant even with extreme CPI
+      {
+        econ.data.NN.cpi = 100.0; // extreme inflation
+        const amount = 10;
+        const outConst = econ.convert(amount, 'MM', 'NN', 2032, { fxMode: 'constant', baseYear: 2025 });
+        const expected = amount * (nnProfile.fx / mmProfile.fx);
+        if (!withinTolerance(outConst, expected, 1e-12, 1e-9)) {
+          errors.push('Constant mode should ignore PPP drift');
+        }
+        // restore
+        econ.data.NN.cpi = 10.0;
       }
 
       // Test Case 2: PPP mode with inflation adjustment.

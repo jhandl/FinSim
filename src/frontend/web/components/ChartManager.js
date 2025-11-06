@@ -830,7 +830,7 @@ class ChartManager {
         monetaryFields.forEach(field => {
           if (data[field] !== undefined) {
             if (sourceCurrency !== targetCurrency) {
-              const converted = economicData.convert(data[field], sourceCountry, toCountry, year, { fxMode: 'ppp', baseYear: cfg.getSimulationStartYear() });
+              const converted = economicData.convert(data[field], sourceCountry, toCountry, year, { fxMode: 'constant', baseYear: cfg.getSimulationStartYear() });
               this.originalValues[i] = this.originalValues[i] || {};
               this.originalValues[i][field] = { value: data[field], currency: sourceCurrency };
               data[field] = converted !== null ? converted : data[field];
@@ -846,7 +846,7 @@ class ChartManager {
             const field = key;
             if (data[field] !== undefined) {
               if (sourceCurrency !== targetCurrency) {
-                const converted = economicData.convert(data[field], sourceCountry, toCountry, year, { fxMode: 'ppp', baseYear: cfg.getSimulationStartYear() });
+                const converted = economicData.convert(data[field], sourceCountry, toCountry, year, { fxMode: 'constant', baseYear: cfg.getSimulationStartYear() });
                 this.originalValues[i] = this.originalValues[i] || {};
                 this.originalValues[i][field] = { value: data[field], currency: sourceCurrency };
                 data[field] = converted !== null ? converted : data[field];
@@ -1019,7 +1019,9 @@ class ChartManager {
       const rowIndex = numericKeys[idx];
       const rowData = cached[rowIndex];
       if (!rowData) continue;
-      this.updateChartsRow(rowIndex, rowData, { skipCashflowUpdate: true, skipAssetsUpdate: true, skipCacheStore: true });
+      // IMPORTANT: pass a clone to avoid mutating cached originals during conversions
+      const clone = Object.assign({}, rowData);
+      this.updateChartsRow(rowIndex, clone, { skipCashflowUpdate: true, skipAssetsUpdate: true, skipCacheStore: true });
     }
 
     if (this.cashflowChart) this.cashflowChart.update();

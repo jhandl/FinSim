@@ -43,6 +43,9 @@ test('data table toggles natural/unified currency modes and shows converted valu
     });
   });
 
+  // Note: FormatUtils is declared as a global class (not window property) in the iframe.
+  // We will prefer global FormatUtils inside evaluate callbacks and fallback to a simple parser.
+
   // Wait for currency controls to be created and visible (skip visibility check on mobile)
   const naturalToggle = frame.locator('#currencyModeNatural_TableManager');
   const unifiedToggle = frame.locator('#currencyModeUnified_TableManager');
@@ -75,6 +78,13 @@ test('data table toggles natural/unified currency modes and shows converted valu
 
   const naturalCell = await frame.locator(`#data_row_1 td:nth-of-type(${netIncomeIndex}) .cell-content`).innerText();
   expect(naturalCell).toMatch(/€|EUR/);
+
+  // Same-currency identity check in unified mode (EUR → EUR should be unchanged)
+  const naturalDigits = await frame.locator('body').evaluate((_, idx) => {
+    const cell = document.querySelector(`#data_row_1 td:nth-of-type(${idx}) .cell-content`);
+    const txt = cell ? (cell.textContent || '') : '';
+    return txt.replace(/[^0-9\-]/g, '');
+  }, netIncomeIndex);
 
   // Click unified toggle - use evaluate on mobile to ensure handler fires
   const viewportSize = page.viewportSize();
@@ -109,6 +119,26 @@ test('data table toggles natural/unified currency modes and shows converted valu
   const availableOptions = await dropdown.evaluate((select) => 
     Array.from(select.options).map(opt => opt.value)
   );
+
+  // First select EUR explicitly (if available) to verify identity conversion in unified mode
+  if (availableOptions.includes('EUR')) {
+    const viewportSizeI = page.viewportSize();
+    if (viewportSizeI && viewportSizeI.width < 768) {
+      await dropdown.evaluate((select) => {
+        select.value = 'EUR';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    } else {
+      await dropdown.selectOption('EUR');
+    }
+    await page.waitForTimeout(200);
+    const unifiedEurDigits = await frame.locator('body').evaluate((_, idx) => {
+      const cell = document.querySelector(`#data_row_1 td:nth-of-type(${idx}) .cell-content`);
+      const txt = cell ? (cell.textContent || '') : '';
+      return txt.replace(/[^0-9\-]/g, '');
+    }, netIncomeIndex);
+    expect(unifiedEurDigits).toBe(naturalDigits);
+  }
   
   // Use ARS if available, otherwise use EUR (start country currency)
   const targetCurrency = availableOptions.includes('ARS') ? 'ARS' : 'EUR';
@@ -131,6 +161,147 @@ test('data table toggles natural/unified currency modes and shows converted valu
   } else {
     expect(unifiedCell).toMatch(/€|EUR/);
   }
+
+  // Validate nominal FX (constant) conversion for a known value
+  const convCheck = await frame.locator('body').evaluate((_, netIncomeIndex) => {
+    try {
+      const webUI = window.WebUI.getInstance();
+      const tm = webUI.tableManager;
+      const cfg = window.Config.getInstance();
+      const econ = cfg.getEconomicData();
+      const age = 30;
+      const year = cfg.getSimulationStartYear() + age;
+      const fromCountry = (tm && typeof tm.getStartCountry === 'function') ? tm.getStartCountry() : (cfg.getDefaultCountry ? cfg.getDefaultCountry() : 'ie');
+      const toCountry = (tm && tm.reportingCurrency === 'ARS') ? 'ar' : 'ie';
+      const expected = econ.convert(52000, fromCountry, toCountry, year, { fxMode: 'constant', baseYear: cfg.getSimulationStartYear() });
+      const cell = document.querySelector(`#data_row_1 td:nth-of-type(${netIncomeIndex}) .cell-content`);
+      const actualText = cell ? (cell.textContent || '') : '';
+      const parseCurrency = (txt) => {
+        try {
+          const webUI = window.WebUI && window.WebUI.getInstance ? window.WebUI.getInstance() : null;
+          if (webUI && webUI.formatUtils && webUI.formatUtils.constructor && typeof webUI.formatUtils.constructor.parseCurrency === 'function') {
+            return webUI.formatUtils.constructor.parseCurrency(txt);
+          }
+          if (typeof FormatUtils !== 'undefined' && typeof FormatUtils.parseCurrency === 'function') return FormatUtils.parseCurrency(txt);
+          if (window && window.FormatUtils && typeof window.FormatUtils.parseCurrency === 'function') return window.FormatUtils.parseCurrency(txt);
+          let stripped = String(txt || '').replace(/[^0-9,.-]/g, '');
+          stripped = stripped.replace(/[,.]/g, '');
+          const n = parseFloat(stripped);
+          return isNaN(n) ? null : n;
+        } catch (_) { return null; }
+      };
+      const actual = parseCurrency(actualText);
+      return { expected, actual };
+    } catch (e) {
+      return { expected: null, actual: null, error: String(e && e.message ? e.message : e) };
+    }
+  }, netIncomeIndex);
+
+  if (convCheck.expected != null && convCheck.actual != null) {
+    expect(convCheck.actual).toBeCloseTo(convCheck.expected, 2);
+  }
+
+  // Explicit FX series vs base-rate fallback: temporarily drop series to force base FX
+  if (targetCurrency !== 'EUR') {
+    const baseFallback = await frame.locator('body').evaluate((_, idx) => {
+      const webUI = window.WebUI.getInstance();
+      const tm = webUI.tableManager;
+      const cfg = window.Config.getInstance();
+      const econ = cfg.getEconomicData();
+      const age = 30;
+      const year = cfg.getSimulationStartYear() + age;
+      const fromCountry = (tm && typeof tm.getStartCountry === 'function') ? tm.getStartCountry() : (cfg.getDefaultCountry ? cfg.getDefaultCountry() : 'ie');
+      const toCountry = (tm && tm.reportingCurrency === 'ARS') ? 'ar' : 'ie';
+      // Save and clear FX series to trigger base-rate path
+      const entry = econ && econ.data ? econ.data[String(toCountry).toUpperCase()] : null;
+      window.$__savedFxSeries = entry ? entry.series : null;
+      if (entry) entry.series = null;
+      const expected = econ.convert(52000, fromCountry, toCountry, year, { fxMode: 'constant', baseYear: cfg.getSimulationStartYear() });
+      return { expected };
+    }, netIncomeIndex);
+
+    // Re-select current currency to trigger re-render with base FX
+    const viewportSizeR = page.viewportSize();
+    if (viewportSizeR && viewportSizeR.width < 768) {
+      await dropdown.evaluate((select, value) => {
+        select.value = value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }, targetCurrency);
+    } else {
+      await dropdown.selectOption(targetCurrency);
+    }
+    await page.waitForTimeout(250);
+
+    const unifiedBaseNumeric = await frame.locator('body').evaluate((_, idx) => {
+      const cell = document.querySelector(`#data_row_1 td:nth-of-type(${idx}) .cell-content`);
+      const parseCurrency = (txt) => {
+        try { return (window.FormatUtils && window.FormatUtils.parseCurrency) ? window.FormatUtils.parseCurrency(txt) : Number(String(txt || '').replace(/[^0-9.\-]/g, '')); } catch (_) { return null; }
+      };
+      return cell ? parseCurrency(cell.textContent || '') : null;
+    }, netIncomeIndex);
+    if (baseFallback.expected != null && unifiedBaseNumeric != null) {
+      expect(unifiedBaseNumeric).toBeCloseTo(baseFallback.expected, 2);
+    }
+
+    // Restore FX series
+    await frame.locator('body').evaluate(() => {
+      try {
+        const cfg = window.Config.getInstance();
+        const econ = cfg.getEconomicData();
+        const webUI = window.WebUI.getInstance();
+        const tm = webUI.tableManager;
+        const toCountry = (tm && tm.reportingCurrency === 'ARS') ? 'ar' : 'ie';
+        const entry = econ && econ.data ? econ.data[String(toCountry).toUpperCase()] : null;
+        if (entry) entry.series = window.$__savedFxSeries || entry.series;
+      } catch (_) {}
+    });
+  }
+
+  // Toggle back to natural and ensure values revert, then unify again to re-convert correctly
+  const naturalToggleAfter = frame.locator('#currencyModeNatural_TableManager');
+  const unifiedToggleAfter = frame.locator('#currencyModeUnified_TableManager');
+  const viewportSize4 = page.viewportSize();
+  if (viewportSize4 && viewportSize4.width < 768) {
+    await frame.locator('body').evaluate(() => {
+      const webUI = window.WebUI.getInstance();
+      if (webUI && webUI.tableManager) {
+        webUI.tableManager.handleCurrencyModeChange('natural');
+      }
+    });
+  } else {
+    await naturalToggleAfter.click();
+  }
+  await page.waitForTimeout(250);
+  const revertedDigits = await frame.locator('body').evaluate((_, idx) => {
+    const cell = document.querySelector(`#data_row_1 td:nth-of-type(${idx}) .cell-content`);
+    const txt = cell ? (cell.textContent || '') : '';
+    return txt.replace(/[^0-9\-]/g, '');
+  }, netIncomeIndex);
+  expect(revertedDigits).toBe(naturalDigits);
+
+  // Switch back to unified and re-select targetCurrency to confirm correct reconversion
+  if (viewportSize4 && viewportSize4.width < 768) {
+    await frame.locator('body').evaluate(() => {
+      const webUI = window.WebUI.getInstance();
+      if (webUI && webUI.tableManager) {
+        webUI.tableManager.handleCurrencyModeChange('unified');
+      }
+    });
+  } else {
+    await unifiedToggleAfter.click();
+  }
+  await page.waitForTimeout(200);
+  const viewportSize5 = page.viewportSize();
+  if (viewportSize5 && viewportSize5.width < 768) {
+    await dropdown.evaluate((select, value) => {
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }, targetCurrency);
+  } else {
+    await dropdown.selectOption(targetCurrency);
+  }
+  await page.waitForTimeout(250);
+
 
   // Info icon only appears when there's currency conversion or attribution breakdown
   // It's conditional, so we check if it exists but don't fail if it doesn't

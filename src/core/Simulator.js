@@ -205,7 +205,7 @@ function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toC
     }
   } catch (_) { baseYear = null; }
   var options = {
-    fxMode: 'ppp',
+    fxMode: 'constant',
     baseYear: (baseYear != null) ? baseYear : new Date().getFullYear()
   };
   var converted = econ.convert(value, sourceCountry ? sourceCountry.toUpperCase() : null, targetCountry ? targetCountry.toUpperCase() : null, year, options);
