@@ -2096,3 +2096,8 @@ class Wizard {
 
 }
 
+// Explicitly expose Wizard on window for reliable access in test contexts
+if (typeof window !== 'undefined') {
+  window.Wizard = Wizard;
+}
+

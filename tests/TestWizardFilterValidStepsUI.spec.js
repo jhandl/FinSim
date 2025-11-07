@@ -21,7 +21,7 @@ async function waitForSimulatorReady(page) {
   const frame = page.frameLocator('#app-frame');
   // Wait for the Add Event button to appear (initial markup)
   await frame.locator('#addEventRow').first().waitFor({ state: 'visible', timeout: 15000 });
-  // Log initial script presence after Add Event button becomes visible
+  // Ensure Wizard and WebUI are exposed to window (they should be, but ensure for Safari compatibility)
   await frame.locator('body').evaluate(() => {
     if (typeof Wizard !== 'undefined' && !window.Wizard) {
       window.Wizard = Wizard;
@@ -31,13 +31,25 @@ async function waitForSimulatorReady(page) {
     }
   });
   // Additional readiness check: ensure WebUI + Wizard are fully instantiated
+  // Use a more robust check that handles Safari timing issues
   await page.waitForFunction(() => {
     const iframe = document.querySelector('#app-frame');
     if (!iframe || !iframe.contentWindow) return false;
-    const win = iframe.contentWindow;
-    const webUIReady = win.WebUI && win.WebUI.getInstance && win.WebUI.getInstance();
-    const wizardReady = win.Wizard && win.Wizard.getInstance && win.Wizard.getInstance();
-    return !!(webUIReady && wizardReady && webUIReady.eventsTableManager);
+    try {
+      const win = iframe.contentWindow;
+      // Check WebUI availability
+      if (!win.WebUI || typeof win.WebUI.getInstance !== 'function') return false;
+      const webUIInstance = win.WebUI.getInstance();
+      if (!webUIInstance || !webUIInstance.eventsTableManager) return false;
+      // Check Wizard availability
+      if (!win.Wizard || typeof win.Wizard.getInstance !== 'function') return false;
+      const wizardInstance = win.Wizard.getInstance();
+      if (!wizardInstance) return false;
+      return true;
+    } catch (e) {
+      // Safari may throw errors accessing contentWindow if scripts aren't fully loaded
+      return false;
+    }
   }, null, { timeout: 20000 });
 
   // Preload wizard YAML/config once to avoid fetch latency flakiness when starting tours later

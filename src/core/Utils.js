@@ -11,6 +11,88 @@ function adjust(value, rate = null, n = periods) {
   return value * Math.pow(1 + rate, n);
 }
 
+/**
+ * Deflate a nominal future value back to present-value terms by reversing inflation.
+ *
+ * This is the inverse of adjust(), dividing by the compound growth factor instead
+ * of multiplying. It is used by the present-value display system to express
+ * simulated future amounts in today's money.
+ *
+ * @param {number} value - Nominal future value to convert to present-value.
+ * @param {number|null} rate - Inflation rate to use (e.g., 0.02 for 2%). If null/undefined/empty,
+ *                             defaults to params.inflation.
+ * @param {number} n - Number of periods (years) to deflate. Defaults to global periods.
+ * @returns {number} Present-value amount in today's terms.
+ *
+ * @example
+ * // A value of 110 in one year at 10% inflation deflates to 100 today
+ * // deflate(110, 0.10, 1) -> 100
+ */
+function deflate(value, rate = null, n = periods) {
+  if ((rate === null) || (rate === undefined) || (rate === "")) {
+    rate = params.inflation;
+  }
+  var base = 1 + rate;
+  if (base <= 0) {
+    return value;
+  }
+  return value / Math.pow(base, n);
+}
+
+/**
+ * Compute a multiplicative deflation factor for a given simulation age/year.
+ *
+ * This helper returns the factor that converts nominal values at a specific
+ * simulation point back to present-value. It derives the number of periods (n)
+ * since the start of the simulation and returns deflate(1, inflationRate, n).
+ *
+ * Period calculation:
+ * - Preferred: use age - params.startingAge when both are available.
+ * - Fallback:  use (year - startYear) when age represents a calendar year.
+ *   If startYear is not provided, attempts Config.getInstance().getSimulationStartYear().
+ *
+ * @param {number} age - Simulation age (preferred) or calendar year for the row.
+ * @param {number|null} startYear - Simulation start year (calendar), e.g., Config.getSimulationStartYear().
+ * @param {number|null} inflationRate - Inflation rate to use; if null/undefined/empty, defaults to params.inflation.
+ * @returns {number} The deflation factor (multiply a nominal value by this to get present-value).
+ *
+ * @example
+ * // With params.startingAge = 30, age 35 and inflation 2%, n = 5
+ * // getDeflationFactor(35, null, 0.02) ~ 1 / (1.02^5)
+ */
+function getDeflationFactor(age, startYear, inflationRate) {
+  var n = 0;
+
+  var ageNum = (age === null || age === undefined || age === "") ? null : parseFloat(age);
+  var startingAge = (typeof params !== 'undefined' && params && params.startingAge !== undefined && params.startingAge !== null && params.startingAge !== "")
+    ? parseFloat(params.startingAge)
+    : null;
+
+  if (ageNum !== null && !isNaN(ageNum) && startingAge !== null && !isNaN(startingAge)) {
+    n = ageNum - startingAge;
+  } else {
+    var sy = (startYear === null || startYear === undefined || startYear === "") ? null : parseInt(startYear, 10);
+    if ((sy === null || isNaN(sy)) && typeof Config !== 'undefined' && Config && typeof Config.getInstance === 'function') {
+      try {
+        sy = parseInt(Config.getInstance().getSimulationStartYear(), 10);
+      } catch (_e) {}
+    }
+    if (ageNum !== null && !isNaN(ageNum) && sy !== null && !isNaN(sy)) {
+      n = ageNum - sy;
+    } else {
+      n = 0;
+    }
+  }
+
+  if (n < 0) { n = 0; }
+
+  if ((inflationRate === null) || (inflationRate === undefined) || (inflationRate === "")) {
+    inflationRate = params.inflation;
+  }
+
+  return deflate(1, inflationRate, n);
+}
+
 function gaussian(mean, stdev, withOverride = true) {
   let u1 = 1 - Math.random();
   let u2 = 1 - Math.random();

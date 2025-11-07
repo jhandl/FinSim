@@ -13,6 +13,19 @@ class TableManager {
     this.countryTimeline = [];
     this.conversionCache = {};
     this.storedCountryTimeline = null; // Persisted timeline from last simulation run
+    this.presentValueMode = false; // Display monetary values in today's terms when enabled
+  }
+
+  setPresentValueMode(enabled) {
+    const flag = !!enabled;
+    if (this.presentValueMode === flag) return;
+    this.presentValueMode = flag;
+    this.conversionCache = {}; // safe to clear; FX cache keys remain valid but amounts will be recomputed on rerender
+    this.refreshDisplayedCurrencies();
+  }
+
+  getPresentValueMode() {
+    return !!this.presentValueMode;
   }
 
   getTableData(groupId, columnCount, includeHiddenEventTypes = false) {
@@ -276,6 +289,49 @@ class TableManager {
 
       const isMonetary = !(key === 'Age' || key === 'Year' || key === 'WithdrawalRate');
 
+      /*
+       * Present-value deflation (country-based):
+       * - Principle: Deflate each nominal amount using the inflation rate of the residency country
+       *   for that age/year, not the display currency's country. This preserves real purchasing power.
+       * - Why: An amount earned in IE at age 30 must be deflated with IE CPI even if later displayed
+       *   in another currency (e.g., ARS). This ensures accurate cross-country, multi-currency scenarios.
+       * - Shared currencies: For EUR, country-specific CPI profiles (IE/FR/DE) can differ. We always use
+       *   the residency country's profile via EconomicData.getInflation(fromCountry) for accuracy.
+       * - Order of operations: Nominal → deflate via getDeflationFactor(age, startYear, rate) →
+       *   currency conversion (if unified). Deflation must happen in source currency before FX.
+       * - Currency Conversion Mode: After deflation in the source currency, any cross-currency conversion
+       *   (unified mode) uses nominal FX rates (fxMode: 'constant'), NOT PPP. This ensures display values
+       *   reflect actual exchange-rate realities; PPP is reserved exclusively for user-facing suggestions
+       *   in event management (e.g., split/link/peg recommendations on relocation). See the conversion
+       *   block below (EconomicData.convert(..., { fxMode: 'constant', baseYear: startYear })) for details.
+       * - Graceful degradation: If economic data is unavailable, fall back to nominal values.
+       * - Key APIs:
+       *   - RelocationUtils.getCountryForAge(age, this)
+       *   - EconomicData.getInflation(countryCode)
+       *   - getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate)
+       */
+      let deflationFactor = 1;
+      if (isMonetary && this.presentValueMode) {
+        try {
+          const age = data.Age;
+          const fromCountry = RelocationUtils.getCountryForAge(age, this);
+          const econ = Config.getInstance().getEconomicData();
+          if (econ && econ.ready) {
+            const cpiPct = econ.getInflation(fromCountry);
+            if (cpiPct == null || !isFinite(Number(cpiPct))) {
+              deflationFactor = 1;
+            } else {
+              const rate = Number(cpiPct) / 100;
+              deflationFactor = getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate);
+              v = v * deflationFactor;
+            }
+          }
+        } catch (_) { /* graceful: keep nominal */ }
+      }
+
+      // Currency conversion (unified mode): Uses nominal FX ('constant' mode) to convert
+      // deflated values to reporting currency. This preserves exchange-rate realities for
+      // display purposes. PPP mode is NOT used here (reserved for event suggestions only).
       if (isMonetary && Config.getInstance().isRelocationEnabled() && this.currencyMode === 'unified' && this.reportingCurrency) {
         const age = data.Age;
         const year = Config.getInstance().getSimulationStartYear() + age;
@@ -290,6 +346,7 @@ class TableManager {
                 const cacheKey = `${year}-${fromCountry}-${toCountry}`;
                 let fxMult = this.conversionCache[cacheKey];
                 if (fxMult === undefined) {
+                    // Nominal FX conversion (constant mode) - not PPP
                     fxMult = economicData.convert(1, fromCountry, toCountry, year, {
                         fxMode: 'constant',
                         baseYear: Config.getInstance().getSimulationStartYear()
@@ -440,6 +497,12 @@ class TableManager {
                         if (this.currencyMode === 'unified' && originalValue !== undefined && fxMultiplier !== undefined) {
                             amount = amount * fxMultiplier;
                         }
+
+                        // Apply deflation for present-value display using the same deflationFactor
+                        // as the main cell value so tooltip amounts sum to the displayed total
+                        if (this.presentValueMode && deflationFactor !== 1) {
+                            amount = amount * deflationFactor;
+                        }
                         
                         // Special handling for P/L
                         let displaySource = source;
@@ -478,6 +541,11 @@ class TableManager {
                         // Apply FX conversion if in unified mode and conversion occurred
                         if (this.currencyMode === 'unified' && originalValue !== undefined && fxMultiplier !== undefined) {
                             adjustedAmount = amount * fxMultiplier;
+                        }
+                        // Apply deflation for present-value display using the same deflationFactor
+                        // as the main cell value so tooltip amounts remain consistent
+                        if (this.presentValueMode && deflationFactor !== 1) {
+                            adjustedAmount = adjustedAmount * deflationFactor;
                         }
                         return {
                             source,
@@ -525,6 +593,14 @@ class TableManager {
 
       // Add the content container to the cell
       td.appendChild(contentContainer);
+
+      // Store nominal (pre-deflation, pre-conversion) value on monetary cells for future refresh without re-simulating
+      try {
+        if (isMonetary) {
+          const nominalValue = (data[key] == null ? 0 : data[key]);
+          td.setAttribute('data-nominal-value', String(nominalValue));
+        }
+      } catch (_) {}
       
       // Add 'i' icon if the cell has a tooltip
       if (hasTooltip) {
@@ -777,6 +853,23 @@ class TableManager {
     const rows = Array.from(tbody.querySelectorAll('tr'));
     if (rows.length === 0) return;
 
+    // Pre-scan: if any monetary cell is missing its nominal value, trigger a single full rerender
+    // to ensure we never double-deflate by attempting to parse already-deflated display text.
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      const cells = Array.from(row.querySelectorAll('td'));
+      for (let c = 0; c < headerCells.length && c < cells.length; c++) {
+        const key = headerCells[c].getAttribute('data-key');
+        if (!isMonetaryKey(key)) continue;
+        const nominalStr = cells[c].getAttribute('data-nominal-value');
+        const nominal = (nominalStr == null) ? null : Number(nominalStr);
+        if (nominal == null || isNaN(nominal)) {
+          try { if (this.webUI && typeof this.webUI.rerenderData === 'function') { this.webUI.rerenderData(); } } catch (_) {}
+          return;
+        }
+      }
+    }
+
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r];
       const cells = Array.from(row.querySelectorAll('td'));
@@ -794,35 +887,76 @@ class TableManager {
         const key = headerCells[c].getAttribute('data-key');
         if (!isMonetaryKey(key)) continue;
         const contentEl = cells[c].querySelector('.cell-content') || cells[c];
-        const rawText = (contentEl.textContent || '').trim();
-        if (!rawText) continue;
+        // Use the stored nominal value; pre-scan above guarantees presence here
+        const nominalStr = cells[c].getAttribute('data-nominal-value');
+        let nominal = Number(nominalStr);
 
-        // Parse numeric portion and reformat using current display currency rules
-        // Prefer app parser; fallback to locale-agnostic integer parsing that drops group separators
-        let numeric = undefined;
-        try { if (typeof FormatUtils !== 'undefined' && typeof FormatUtils.parseCurrency === 'function') { numeric = FormatUtils.parseCurrency(rawText); } } catch (_) {}
-        if (numeric === undefined) {
-          let stripped = String(rawText || '').replace(/[^0-9,.-]/g, '');
-          // Remove both common grouping separators regardless of locale; displayed amounts are integers
-          stripped = stripped.replace(/[,.]/g, '');
-          const n = parseFloat(stripped);
-          numeric = isNaN(n) ? undefined : n;
-        }
-        if (isNaN(numeric)) continue;
-
-        // Determine display currency and locale exactly like setDataRow
+        /*
+         * Reformatting without re-simulation:
+         * - This method recomputes cell display when currency mode or present-value mode changes.
+         *   It mirrors setDataRow()'s country-based deflation logic.
+         * - Nominal source: Uses data-nominal-value set by setDataRow() to avoid double-deflation.
+         * - Country resolution: fromCountry is determined via RelocationUtils.getCountryForAge(age, this),
+         *   then CPI is fetched via EconomicData.getInflation(fromCountry).
+         * - Order: Deflate in the source currency via getDeflationFactor(...) before any FX conversion
+         *   to the reporting currency (unified mode).
+         * - Currency Conversion Mode: After deflation, unified-mode conversion uses nominal FX rates
+         *   (fxMode: 'constant'), NOT PPP. This matches setDataRow() and preserves exchange-rate realities
+         *   for display. PPP remains reserved for event-management suggestions only.
+         * - Fallbacks: If economic data is unavailable, keep nominal values.
+         */
+        // Compute present-value in source currency when enabled
+        let value = nominal;
+        let fromCountry = age != null ? RelocationUtils.getCountryForAge(age, this) : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
         let displayCurrencyCode, displayCountryForLocale;
+        if (this.presentValueMode) {
+          try {
+            const econ = Config.getInstance().getEconomicData();
+            if (econ && econ.ready) {
+              const cpiPct = econ.getInflation(fromCountry);
+              let df = 1;
+              if (cpiPct != null && isFinite(Number(cpiPct))) {
+                const rate = Number(cpiPct) / 100;
+                df = getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate);
+              }
+              value = value * df;
+            }
+          } catch (_) { /* keep nominal */ }
+        }
+
+        // Unified mode: convert deflated source value to reporting currency using nominal FX
+        // ('constant' mode, not PPP) to preserve exchange-rate realities for display.
         if (this.currencyMode === 'unified') {
           displayCurrencyCode = this.reportingCurrency;
           displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
+          try {
+            const toCountry = displayCountryForLocale;
+            const year = Config.getInstance().getSimulationStartYear() + (age || 0);
+            const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
+            if (fromCurrency && fromCurrency !== this.reportingCurrency) {
+              const economicData = Config.getInstance().getEconomicData();
+              if (economicData && economicData.ready) {
+                const cacheKey = `${year}-${fromCountry}-${toCountry}`;
+                let fxMult = this.conversionCache[cacheKey];
+                if (fxMult === undefined) {
+                  // Nominal FX conversion (constant mode) - not PPP
+                  fxMult = economicData.convert(1, fromCountry, toCountry, year, { fxMode: 'constant', baseYear: Config.getInstance().getSimulationStartYear() });
+                  if (fxMult !== null) this.conversionCache[cacheKey] = fxMult;
+                }
+                if (fxMult !== null) {
+                  value = value * fxMult;
+                }
+              }
+            }
+          } catch (_) { /* keep as is */ }
         } else {
-          const fromCountry = age != null ? RelocationUtils.getCountryForAge(age, this) : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
+          // natural mode formatting: use local currency
           const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
           displayCurrencyCode = fromCurrency;
           displayCountryForLocale = fromCountry;
         }
 
-        contentEl.textContent = FormatUtils.formatCurrency(numeric, displayCurrencyCode, displayCountryForLocale);
+        contentEl.textContent = FormatUtils.formatCurrency(value, displayCurrencyCode, displayCountryForLocale);
       }
     }
   }

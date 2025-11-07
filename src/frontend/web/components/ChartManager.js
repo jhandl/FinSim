@@ -9,6 +9,7 @@ class ChartManager {
     this.originalValues = {}; // Cache of unconverted values for tooltip display
     this.countryTimeline = []; // Array tracking which country is active at each age
     this.currencyMode = 'unified'; // Charts always use unified mode (no mode selector in charts)
+    this.presentValueMode = false; // Display monetary values in today's terms when enabled
     this.latestRelocationAnnotations = {};
     try {
       this.setupCharts();
@@ -17,6 +18,21 @@ class ChartManager {
       // Continue without charts rather than breaking the whole app
       this.chartsInitialized = false;
     }
+  }
+
+  setPresentValueMode(enabled) {
+    try {
+      const flag = !!enabled;
+      if (this.presentValueMode === flag) return;
+      this.presentValueMode = flag;
+      this.refreshChartsWithCurrency(); // Recompute from cached nominal rows
+    } catch (_) {
+      // no-op
+    }
+  }
+
+  getPresentValueMode() {
+    return !!this.presentValueMode;
   }
 
   // Update chart dataset labels for funds and shares based on ruleset-provided labels
@@ -810,6 +826,65 @@ class ChartManager {
       }
       
       const i = rowIndex-1;
+      /*
+       * Present-value deflation (country-based) for charts:
+       * - Principle: Deflate each nominal amount using the CPI of the residency country
+       *   for that age/year, not the display currency's country. This preserves real purchasing power.
+       * - Order of operations: Nominal (source currency) → deflate using getDeflationFactor(age, startYear, rate) →
+       *   convert to reporting currency (if unified mode).
+       * - Integration: This block runs BEFORE the currency conversion below so that FX operates on deflated values.
+       * - Currency Conversion Mode: After deflation, currency conversion (if unified mode) uses nominal FX
+       *   rates (fxMode: 'constant'), NOT purchasing power parity (PPP). This ensures display values reflect
+       *   actual exchange rates rather than cost-of-living adjustments. PPP is reserved exclusively for
+       *   user-facing suggestions in event management (e.g., split amount recommendations after relocation).
+       *   The conversion happens in the currency conversion block below via EconomicData.convert(..., {
+       *   fxMode: 'constant', baseYear: startYear }).
+       * - Graceful degradation: If economic data is unavailable, values remain nominal.
+       *
+       * Key APIs:
+       *   - this.getCountryForAge(age)
+       *   - Config.getInstance().getEconomicData().getInflation(country)
+       *   - getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), inflationRate)
+       */
+      if (this.presentValueMode) {
+        try {
+          const age = data.Age;
+          const cfg0 = Config.getInstance();
+          const startYear = cfg0.getSimulationStartYear();
+          const fromCountry = this.getCountryForAge(age);
+          const econ = cfg0.getEconomicData();
+          if (econ && econ.ready) {
+            const cpiPct = econ.getInflation(fromCountry);
+            if (cpiPct != null && isFinite(Number(cpiPct))) {
+              const inflationRate = Number(cpiPct) / 100;
+              const deflationFactor = getDeflationFactor(age, startYear, inflationRate);
+              // Fixed monetary fields
+              const monetaryFields = [
+                'NetIncome','Expenses','IncomeSalaries','IncomeRentals','IncomeRSUs','IncomePrivatePension',
+                'IncomeStatePension','IncomeDefinedBenefit','IncomeTaxFree','IncomeCash','RealEstateCapital',
+                'PensionFund','Cash','FundsCapital','SharesCapital'
+              ];
+              for (let mf = 0; mf < monetaryFields.length; mf++) {
+                const field = monetaryFields[mf];
+                if (data[field] !== undefined) {
+                  data[field] = data[field] * deflationFactor;
+                }
+              }
+              // Dynamic investment fields (Income__*, Capital__*)
+              Object.keys(data).forEach((key) => {
+                if (typeof key === 'string' && (key.indexOf('Income__') === 0 || key.indexOf('Capital__') === 0)) {
+                  if (data[key] !== undefined) {
+                    data[key] = data[key] * deflationFactor;
+                  }
+                }
+              });
+            }
+          }
+        } catch (_) { /* keep nominal on any failure */ }
+      }
+      // Currency conversion (unified mode): Uses nominal FX ('constant' mode) to convert
+      // deflated values to reporting currency. This preserves exchange rate realities for
+      // display purposes. PPP mode is NOT used here (reserved for event suggestions only).
       // Add conversion logic before updating datasets
       const cfg = Config.getInstance();
       if (cfg.isRelocationEnabled() && this.currencyMode === 'unified' && this.reportingCurrency) {
@@ -830,6 +905,7 @@ class ChartManager {
         monetaryFields.forEach(field => {
           if (data[field] !== undefined) {
             if (sourceCurrency !== targetCurrency) {
+              // Nominal FX conversion (constant mode) - not PPP
               const converted = economicData.convert(data[field], sourceCountry, toCountry, year, { fxMode: 'constant', baseYear: cfg.getSimulationStartYear() });
               this.originalValues[i] = this.originalValues[i] || {};
               this.originalValues[i][field] = { value: data[field], currency: sourceCurrency };
@@ -846,6 +922,7 @@ class ChartManager {
             const field = key;
             if (data[field] !== undefined) {
               if (sourceCurrency !== targetCurrency) {
+                // Nominal FX conversion (constant mode) - not PPP
                 const converted = economicData.convert(data[field], sourceCountry, toCountry, year, { fxMode: 'constant', baseYear: cfg.getSimulationStartYear() });
                 this.originalValues[i] = this.originalValues[i] || {};
                 this.originalValues[i][field] = { value: data[field], currency: sourceCurrency };

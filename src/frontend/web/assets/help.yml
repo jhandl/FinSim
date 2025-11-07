@@ -46,10 +46,17 @@ WelcomeTabs:
           answer:
             - "Unless you specify 0 inflation, the numbers will grow year after year at the rate of inflation."
             - "The values you enter into the different fields have to be in terms of present value though. For example, for a property that you expect to purchase 10 years from now, you should enter the current value of the property, not the value you expect it to be worth in 10 years time."
+            - "If you prefer to see all values in today's terms without the inflation growth, enable the Present Value toggle in the menu (☰). This will automatically adjust all displayed amounts for inflation, making them easier to understand and compare."
         - question: "Why are tax credits and limits also inflation adjusted?"
           answer:
             - "Even though some of the budget numbers don't change every year (cough, cgt credit, cough), many generally do, for example the income tax brackets."
             - "I have to assume some periodic adjustment, and inflation is the best proxy I can think of. I'm open to suggestions on how to do this better."
+        - question: "What is Present Value display and how do I use it?"
+          answer:
+            - "Present Value display shows all projected amounts (income, expenses, investments, taxes, etc.) in today's currency terms by adjusting for inflation. This makes it easier to understand what future amounts will actually be worth in real purchasing power."
+            - "Instead of seeing inflated nominal amounts (e.g., €500,000 salary in 30 years), you see what that amount is worth in today's euros (e.g., €200,000 in real terms). This helps you compare values across different years and understand the true impact of your financial decisions."
+            - "You can enable Present Value display using the toggle in the menu (☰). When enabled, all values in the data table and charts are automatically deflated to show their present-value equivalents. Toggle it off to see the original nominal (inflated) values."
+            - "Note that the simulation calculations remain the same - only the display changes. Your CSV exports will always contain nominal values for accuracy."
         - question: "Why do I see this unexpected number in the simulation data table?"
           answer:
             - "Many of the table cells have a little 'i' on the lower right corner. That means that the cell has a tooltip attached to it." 
@@ -471,7 +478,7 @@ WizardSteps:
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>The expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of 2% to 3%. However, deviations due to shocks (e.g., pandemics, wars, etc) are skewed towards higher numbers. For example, [in 2019 inflation in Ireland was 1.3%](https://www.cso.ie/en/releasesandpublications/er/cpi/consumerpriceindexdecember2019/){inflation,consumer price index,CPI,2019,annual}, lower than its [30-year average of 2.3%](https://www.officialdata.org/ireland/inflation/1993?endYear=2024&amount=100){inflation,Ireland,average,annual,rate}. In contrast, [in 2022 it rose to 8.2%](https://www.cso.ie/en/releasesandpublications/ep/p-cpi/consumerpriceindexdecember2022/){inflation,consumer price index,CPI,2022,annual}, the highest since 1984.</p>"
+      description: "<p>The expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of 2% to 3%. However, deviations due to shocks (e.g., pandemics, wars, etc) are skewed towards higher numbers. For example, [in 2019 inflation in Ireland was 1.3%](https://www.cso.ie/en/releasesandpublications/er/cpi/consumerpriceindexdecember2019/){inflation,consumer price index,CPI,2019,annual}, lower than its [30-year average of 2.3%](https://www.officialdata.org/ireland/inflation/1993?endYear=2024&amount=100){inflation,Ireland,average,annual,rate}. In contrast, [in 2022 it rose to 8.2%](https://www.cso.ie/en/releasesandpublications/ep/p-cpi/consumerpriceindexdecember2022/){inflation,consumer price index,CPI,2022,annual}, the highest since 1984. Tip: Enable the Present Value toggle in the menu (☰) to see all projected values adjusted back to today's currency terms, making it easier to understand real purchasing power across years.</p>"
       side: "right"
       align: "start"
 

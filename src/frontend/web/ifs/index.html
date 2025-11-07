@@ -104,6 +104,13 @@
                     </div>
                 </button>
                 
+                <button id="presentValueToggleMobile" class="mobile-menu-button secondary-button toggle-button" data-toggle-state="off">
+                    <span>Present Value</span>
+                    <div class="toggle-switch">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </button>
+                
                 <div class="mobile-menu-divider"></div>
                 
                 <a href="https://www.buymeacoffee.com/jhandl" target="_blank" class="coffee-button">
@@ -474,7 +481,7 @@
     <script src="/src/frontend/web/utils/FieldLabelsManager.js?v=20251101"></script>
     <script src="/src/frontend/web/utils/ValidationUtils.js?v=20251101"></script>
     <script src="/src/frontend/web/utils/RelocationUtils.js?v=20251104a"></script>
-    <script src="/src/frontend/web/components/TableManager.js?v=20251106-2"></script>
+    <script src="/src/frontend/web/components/TableManager.js?v=20251107-2"></script>
     <script src="/src/frontend/web/components/EventsTableManager.js?v=20251106-1"></script>
     <script src="/src/frontend/web/components/RelocationImpactDetector.js?v=20251101"></script>
     <script src="/src/frontend/web/components/RelocationImpactAssistant.js?v=20251101"></script>
@@ -483,10 +490,10 @@
     <script src="/src/frontend/web/components/WizardManager.js?v=20251101"></script>
     <script src="/src/frontend/web/components/WizardRenderer.js?v=20251101"></script>
     <script src="/src/frontend/web/components/EventsWizard.js?v=20251109"></script>
-    <script src="/src/frontend/web/components/ChartManager.js?v=20251106-2"></script>
+    <script src="/src/frontend/web/components/ChartManager.js?v=20251106-4"></script>
     <script src="/src/frontend/web/components/FileManager.js?v=2025-11-02-2"></script>
     <script src="/src/frontend/web/components/DragAndDrop.js?v=20251101"></script>
-    <script src="/src/frontend/web/components/Wizard.js?v=20251101"></script>
+    <script src="/src/frontend/web/components/Wizard.js?v=20251220"></script>
     <script src="/src/frontend/web/components/ContentRenderer.js?v=20251101"></script>
     <script src="/src/frontend/web/components/WelcomeModal.js?v=20251101"></script>
     <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
@@ -500,7 +507,7 @@
     <script src="/src/core/Equities.js?v=2025-09-04"></script>
     <script src="/src/core/InvestmentTypeFactory.js?v=2025-09-04"></script>
     <script src="/src/core/RealEstate.js?v=2025-11-02-2"></script>
-    <script src="/src/core/Utils.js?v=2025-11-02-1"></script>
+    <script src="/src/core/Utils.js?v=2025-11-06-2"></script>
     <script src="/src/core/Attribution.js?v=2025-11-05-1"></script>
     <script src="/src/core/AttributionManager.js?v=2025-09-04"></script>
     <script src="/src/core/Simulator.js?v=2025-11-05-1"></script>
@@ -666,6 +673,7 @@
             const helpButton = document.getElementById('startWizardMobile');
             const toggleButton = document.getElementById('experimentalToggleMobile');
             const eventsWizardToggleButton = document.getElementById('eventsWizardToggleMobile');
+            const presentValueToggleButton = document.getElementById('presentValueToggleMobile');
             const firstDivider = document.querySelector('.mobile-menu-divider');
             const secondDivider = document.querySelectorAll('.mobile-menu-divider')[1];
             const thirdDivider = document.querySelectorAll('.mobile-menu-divider')[2];
@@ -674,12 +682,14 @@
             const SHOW_TOGGLE_BUTTON = false;
             // Always show the Events Wizard toggle
             const SHOW_EVENTS_WIZARD_TOGGLE = true;
+            // Always show the Present Value toggle
+            const SHOW_PRESENT_VALUE_TOGGLE = true;
             
             // Track which sections have visible content
             let hasRunSection = false;
             let hasSaveLoadSection = false;
             let hasDemoHelpSection = false;
-            let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE;
+            let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE;
             
             if (currentWidth > breakpoints.tablet) {
                 // Desktop mode: Only show Demo/Help/Coffee buttons that are visible in header but burger menu is always available
@@ -737,6 +747,9 @@
 
             if (eventsWizardToggleButton) {
                 eventsWizardToggleButton.style.display = SHOW_EVENTS_WIZARD_TOGGLE ? 'flex' : 'none';
+            }
+            if (presentValueToggleButton) {
+                presentValueToggleButton.style.display = SHOW_PRESENT_VALUE_TOGGLE ? 'flex' : 'none';
             }
             
             // Third divider: between Demo/Help/Toggle and Coffee (Coffee is always visible)
@@ -809,6 +822,14 @@
             if (eventsWizardToggleMobile) {
                 eventsWizardToggleMobile.addEventListener('click', () => {
                     this.handleEventsWizardToggle(eventsWizardToggleMobile);
+                });
+            }
+            
+            // Present Value Toggle
+            const presentValueToggleMobile = document.getElementById('presentValueToggleMobile');
+            if (presentValueToggleMobile) {
+                presentValueToggleMobile.addEventListener('click', () => {
+                    this.handlePresentValueToggle(presentValueToggleMobile);
                 });
             }
         }
@@ -896,6 +917,43 @@
             }));
         }
 
+        handlePresentValueToggle(toggleButton) {
+            const currentState = toggleButton.getAttribute('data-toggle-state');
+            const newState = currentState === 'off' ? 'on' : 'off';
+            const toggleSwitch = toggleButton.querySelector('.toggle-switch');
+
+            // Update the button state
+            toggleButton.setAttribute('data-toggle-state', newState);
+
+            // Update the toggle switch visual state
+            if (newState === 'on') {
+                toggleSwitch.classList.add('active');
+            } else {
+                toggleSwitch.classList.remove('active');
+            }
+
+            // Store the state in localStorage for persistence
+            localStorage.setItem('presentValueMode', newState);
+
+            // Trigger custom event that other parts of the app can listen to
+            window.dispatchEvent(new CustomEvent('presentValueToggle', {
+                detail: { state: newState, enabled: newState === 'on' }
+            }));
+
+            // Apply to managers via WebUI singleton
+            try {
+                if (typeof WebUI !== 'undefined') {
+                    const webUI = WebUI.getInstance();
+                    if (webUI && webUI.tableManager && typeof webUI.tableManager.setPresentValueMode === 'function') {
+                        webUI.tableManager.setPresentValueMode(newState === 'on');
+                    }
+                    if (webUI && webUI.chartManager && typeof webUI.chartManager.setPresentValueMode === 'function') {
+                        webUI.chartManager.setPresentValueMode(newState === 'on');
+                    }
+                }
+            } catch (_) { /* no-op */ }
+        }
+
         initializeToggleState() {
             // Initialize experimental toggle
             const toggleButton = document.getElementById('experimentalToggleMobile');
@@ -946,6 +1004,43 @@
                 window.dispatchEvent(new CustomEvent('eventsWizardToggle', {
                     detail: { state: savedState, enabled: savedState === 'on' }
                 }));
+            }
+
+            // Initialize Present Value toggle
+            const presentValueToggleButton = document.getElementById('presentValueToggleMobile');
+            if (presentValueToggleButton) {
+                // Get saved state from localStorage (default to 'off')
+                const savedState = localStorage.getItem('presentValueMode') || 'off';
+                const toggleSwitch = presentValueToggleButton.querySelector('.toggle-switch');
+
+                // Set the initial state
+                presentValueToggleButton.setAttribute('data-toggle-state', savedState);
+
+                // Update the toggle switch visual state based on saved state
+                if (savedState === 'on') {
+                    toggleSwitch.classList.add('active');
+                } else {
+                    toggleSwitch.classList.remove('active');
+                }
+
+                // Dispatch initial event for any listeners
+                window.dispatchEvent(new CustomEvent('presentValueToggle', {
+                    detail: { state: savedState, enabled: savedState === 'on' }
+                }));
+
+                // Apply initial state to managers
+                try {
+                    if (typeof WebUI !== 'undefined') {
+                        const webUI = WebUI.getInstance();
+                        const enabled = (savedState === 'on');
+                        if (webUI && webUI.tableManager && typeof webUI.tableManager.setPresentValueMode === 'function') {
+                            webUI.tableManager.setPresentValueMode(enabled);
+                        }
+                        if (webUI && webUI.chartManager && typeof webUI.chartManager.setPresentValueMode === 'function') {
+                            webUI.chartManager.setPresentValueMode(enabled);
+                        }
+                    }
+                } catch (_) { /* no-op */ }
             }
         }
     }
@@ -1430,14 +1525,20 @@
             }
 
             // Attach tooltips to toggles for all layouts
-            function attachToggleTooltip(el, text) {
+            function attachToggleTooltip(el, textOrProvider) {
                 if (!el || typeof TooltipUtils === 'undefined') return;
-                // Use reusable TooltipUtils hover/long-press behaviour
-                TooltipUtils.attachTooltip(el, text);
+                // Use reusable TooltipUtils hover/long-press behaviour; supports function providers
+                TooltipUtils.attachTooltip(el, textOrProvider);
                 // Additionally, on mobile tap show a brief tooltip without long-press
                 el.addEventListener('click', function(ev) {
                     if (window.innerWidth <= 768) {
-                        const tt = TooltipUtils.showTooltip(text, el, { isMobile: true });
+                        let tooltipText;
+                        try {
+                            tooltipText = (typeof textOrProvider === 'function') ? textOrProvider() : textOrProvider;
+                        } catch (_) {
+                            tooltipText = (typeof textOrProvider === 'string') ? textOrProvider : "Show all values in today's currency (adjusted for inflation)";
+                        }
+                        const tt = TooltipUtils.showTooltip(tooltipText, el, { isMobile: true });
                         setTimeout(() => TooltipUtils.hideTooltip(tt), 2000);
                     }
                 }, { passive: true });
@@ -1445,9 +1546,52 @@
 
             // Attach tooltips to toggles (mobile & desktop will reuse same logic)
             const eventsToggle = document.getElementById('eventsWizardToggleMobile');
+            const presentValueToggle = document.getElementById('presentValueToggleMobile');
             if (typeof TooltipUtils !== 'undefined') {
                 if (eventsToggle) {
                     attachToggleTooltip(eventsToggle, 'Toggle the Event Wizard for creating events.');
+                }
+                if (presentValueToggle) {
+                    attachToggleTooltip(presentValueToggle, function() {
+                        try {
+                            // Derive reporting currency without creating WebUI early
+                            let country = null;
+                            let currencyCode = null;
+
+                            // 1) Prefer reading directly from DOM (hidden input created by Start Country dropdown)
+                            const hidden = document.getElementById('StartCountry');
+                            if (hidden && hidden.value) {
+                                country = String(hidden.value).toLowerCase();
+                            } else {
+                                // 2) If a WebUI instance already exists, read via it (do NOT instantiate)
+                                const existingWebUI = (typeof window !== 'undefined' && window.WebUI_instance) ? window.WebUI_instance : null;
+                                if (existingWebUI && typeof existingWebUI.getValue === 'function') {
+                                    const v = existingWebUI.getValue('StartCountry');
+                                    if (v) country = String(v).toLowerCase();
+                                }
+                            }
+
+                            // 3) Fallback to Config default country
+                            if (!country && typeof Config !== 'undefined' && typeof Config.getInstance === 'function') {
+                                try { country = String(Config.getInstance().getDefaultCountry() || '').toLowerCase(); } catch (_) {}
+                            }
+
+                            // 4) Resolve currency via cached tax rule set
+                            if (country && typeof Config !== 'undefined' && typeof Config.getInstance === 'function') {
+                                try {
+                                    const rs = Config.getInstance().getCachedTaxRuleSet(country);
+                                    if (rs && typeof rs.getCurrencyCode === 'function') {
+                                        currencyCode = rs.getCurrencyCode();
+                                    }
+                                } catch (_) {}
+                            }
+
+                            const cc = currencyCode || 'currency';
+                            return "Show all values in today's " + cc + " (adjusted for inflation)";
+                        } catch (_) {
+                            return "Show all values in today's currency (adjusted for inflation)";
+                        }
+                    });
                 }
                 attachToggleTooltip(toggle, 'Toggle to always show the intro window on start-up or only through the Help button.');
             }
