@@ -147,7 +147,7 @@ class EconomicData {
 
   convert(value, fromCountry, toCountry, year, options) {
     var opts = options || {};
-    var fxMode = opts.fxMode || 'ppp'; // 'constant' | 'ppp' | 'reversion'
+    var fxMode = opts.fxMode || 'constant'; // 'constant' | 'ppp' | 'reversion'
     var baseYear = (opts.baseYear != null) ? opts.baseYear : this._currentYear();
     var reversionSpeed = (opts.reversionSpeed != null) ? opts.reversionSpeed : 0.33;
     var fallback = opts.fallback || 'nearest'; // 'nearest' | 'error'
