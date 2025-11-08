@@ -1810,7 +1810,7 @@ class EventsTableManager {
     this._afterResolutionAction(rowId);
   }
 
-  linkPropertyToCountry(rowId, selectedCountryOverride) {
+  linkPropertyToCountry(rowId, selectedCountryOverride, convertedAmountOverride) {
     const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
     if (!row) return;
     // Prefer override (accordion) else read from adjacent table panel select
@@ -1818,6 +1818,12 @@ class EventsTableManager {
     if (!selectedCountry) {
       const adjPanelSelect = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.country-selector');
       selectedCountry = adjPanelSelect ? adjPanelSelect.value : '';
+    }
+    // Get converted amount from override or panel input
+    let convertedAmountRaw = convertedAmountOverride;
+    if (convertedAmountRaw === undefined || convertedAmountRaw === null) {
+      const adjPanelInput = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.link-amount-input');
+      convertedAmountRaw = adjPanelInput ? adjPanelInput.value : '';
     }
     // Apply to both the property (R) and its associated mortgage (M) with the same id
     const idVal = row.querySelector('.event-name')?.value;
@@ -1833,9 +1839,54 @@ class EventsTableManager {
     const targetRows = [...rowsBy(idVal, 'R'), ...rowsBy(idVal, 'M')];
     const ruleSet = Config.getInstance().getCachedTaxRuleSet(selectedCountry);
     const currency = ruleSet ? ruleSet.getCurrencyCode() : null;
+    
+    // Parse converted amount using locale-aware parser (similar to splitEventAtRelocation)
+    const parseByCountry = (val, countryCode) => {
+      if (val == null) return undefined;
+      let s = String(val);
+      try {
+        const cfg = Config.getInstance();
+        const rs = countryCode ? cfg.getCachedTaxRuleSet(countryCode) : null;
+        const locale = rs && rs.getNumberLocale ? rs.getNumberLocale() : (FormatUtils.getLocaleSettings ? FormatUtils.getLocaleSettings().numberLocale : 'en-US');
+        const symbol = rs && rs.getCurrencySymbol ? rs.getCurrencySymbol() : (FormatUtils.getLocaleSettings ? FormatUtils.getLocaleSettings().currencySymbol : '');
+        if (symbol) {
+          const escSym = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          s = s.replace(new RegExp(escSym, 'g'), '');
+        }
+        s = s.replace(/\s+/g, '');
+        const parts = new Intl.NumberFormat(locale).formatToParts(12345.6);
+        const group = (parts.find(p => p.type === 'group') || {}).value || ',';
+        const decimal = (parts.find(p => p.type === 'decimal') || {}).value || '.';
+        s = s.split(group).join('');
+        if (decimal !== '.') s = s.split(decimal).join('.');
+        const n = parseFloat(s);
+        return isNaN(n) ? undefined : n;
+      } catch (_) {
+        try {
+          const n = FormatUtils.parseCurrency(s);
+          return (typeof n === 'number' && !isNaN(n)) ? n : undefined;
+        } catch(__) { return undefined; }
+      }
+    };
+    
+    const convertedAmountNum = parseByCountry(convertedAmountRaw, selectedCountry);
+    
     for (let i = 0; i < targetRows.length; i++) {
       this.getOrCreateHiddenInput(targetRows[i], 'event-linked-country', selectedCountry);
       if (currency) this.getOrCreateHiddenInput(targetRows[i], 'event-currency', currency);
+      // Update amount if conversion was provided
+      if (typeof convertedAmountNum === 'number' && !isNaN(convertedAmountNum)) {
+        const amountInput = targetRows[i].querySelector('.event-amount');
+        if (amountInput) {
+          amountInput.value = String(convertedAmountNum);
+          amountInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+    }
+    // Reapply currency/percentage input formatting to ensure proper formatting
+    if (this.webUI && this.webUI.formatUtils) {
+      this.webUI.formatUtils.setupCurrencyInputs();
+      this.webUI.formatUtils.setupPercentageInputs();
     }
     this._afterResolutionAction(rowId);
   }

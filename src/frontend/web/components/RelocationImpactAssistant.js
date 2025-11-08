@@ -169,11 +169,39 @@ var RelocationImpactAssistant = {
         const detectedCountry = (env && env.eventsTableManager && env.eventsTableManager.detectPropertyCountry) ? env.eventsTableManager.detectPropertyCountry(event.fromAge, startCountry) : startCountry;
         const detectedCountryObj = countries.find(function(c){ return c.code.toLowerCase() === detectedCountry; });
         const detectedCountryName = detectedCountryObj ? detectedCountryObj.name : (detectedCountry ? detectedCountry.toUpperCase() : '');
-        const ruleSet = Config.getInstance().getCachedTaxRuleSet(detectedCountry);
-        const currency = ruleSet ? ruleSet.getCurrencyCode() : 'EUR';
+        
+        // Find the original country from the event's currency
+        const eventCurrency = event.currency ? String(event.currency).toUpperCase().trim() : null;
+        let originalCountry = null;
+        if (eventCurrency) {
+          for (let i = 0; i < countries.length; i++) {
+            const rs = Config.getInstance().getCachedTaxRuleSet(countries[i].code.toLowerCase());
+            if (rs && rs.getCurrencyCode && String(rs.getCurrencyCode()).toUpperCase().trim() === eventCurrency) {
+              originalCountry = countries[i].code.toLowerCase();
+              break;
+            }
+          }
+        }
+        // Fallback: if no currency or country found, use startCountry
+        if (!originalCountry) originalCountry = startCountry;
+        
+        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originalCountry);
+        const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
+        const fromMeta = getSymbolAndLocaleByCountry(originalCountry);
+        const currentAmountNum = Number(baseAmountSanitized);
+        const currentFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, currentAmountNum);
+        
+        // Calculate conversion from original country to detected country (initially selected)
+        const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originalCountry, detectedCountry));
+        const toRuleSet = Config.getInstance().getCachedTaxRuleSet(detectedCountry);
+        const toCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
+        const toMeta = getSymbolAndLocaleByCountry(detectedCountry);
+        const suggestedFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : '';
+        
         let optionsHTML = '';
         countries.forEach(function(country){ const selected = country.code.toLowerCase() === detectedCountry ? 'selected' : ''; optionsHTML += '<option value="' + country.code.toLowerCase() + '" ' + selected + '>' + country.name + '</option>'; });
-        addAction(actions, { action: 'link', tabLabel: 'Link To Country', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<p class="micro-note">Detected country: ' + detectedCountryName + '. Change if the property belongs to a different jurisdiction.</p><div class="country-selector-inline"><label for="country-select-' + rowId + '">Country</label><select class="country-selector" id="country-select-' + rowId + '" data-row-id="' + rowId + '">' + optionsHTML + '</select></div><p class="micro-note">Apply links this property to the selected country and updates its currency to match (default ' + currency + ').</p>' });
+        containerAttributes = ' data-from-country="' + originalCountry + '" data-to-country="' + detectedCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + toCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
+        addAction(actions, { action: 'link', tabLabel: 'Link To Country', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<p class="micro-note">Detected country: ' + detectedCountryName + '. Change if the property belongs to a different jurisdiction.</p><div class="country-selector-inline"><label for="country-select-' + rowId + '">Country</label><select class="country-selector link-country-selector" id="country-select-' + rowId + '" data-row-id="' + rowId + '" data-from-country="' + originalCountry + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '">' + optionsHTML + '</select></div><div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-label">Current</div><div class="part-detail">' + currentFormatted + ' (read-only)</div></div><div class="split-part-info"><div class="part-label">Converted Amount</div><div class="part-detail"><input type="text" class="link-amount-input" value="' + suggestedFormatted + '" placeholder="Amount"></div><div class="ppp-hint">PPP suggestion</div></div></div><p class="micro-note">Apply links this property to the selected country, converts the amount using purchasing power parity, and updates the currency to match.</p>' });
       } else {
         const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originCountry, destCountry));
         const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
@@ -226,7 +254,8 @@ var RelocationImpactAssistant = {
       }
       case 'link': {
         const country = payload && payload.country;
-        if (typeof etm.linkPropertyToCountry === 'function') etm.linkPropertyToCountry(rowId, country);
+        const convertedAmount = payload && payload.convertedAmount;
+        if (typeof etm.linkPropertyToCountry === 'function') etm.linkPropertyToCountry(rowId, country, convertedAmount);
         break;
       }
       case 'convert': {
@@ -361,6 +390,35 @@ var RelocationImpactAssistant = {
     }
     const interactionRoot = (root.closest && root.closest('.resolution-panel-container')) || root;
     const self = this;
+    
+    // Handle country selector changes for link action to update conversion preview
+    const linkCountrySelector = interactionRoot.querySelector('.link-country-selector');
+    if (linkCountrySelector) {
+      linkCountrySelector.addEventListener('change', function(){
+        const fromCountry = linkCountrySelector.getAttribute('data-from-country');
+        const toCountry = linkCountrySelector.value;
+        const baseAmount = linkCountrySelector.getAttribute('data-base-amount');
+        if (!fromCountry || !toCountry || !baseAmount) return;
+        const pppSuggestion = self.calculatePPPSuggestion(baseAmount, fromCountry, toCountry);
+        function getSymbolAndLocale(countryCode) {
+          try {
+            const rs = Config.getInstance().getCachedTaxRuleSet(countryCode);
+            const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
+            return { symbol: rs && rs.getCurrencySymbol ? rs.getCurrencySymbol() : (ls.currencySymbol || ''), locale: rs && rs.getNumberLocale ? rs.getNumberLocale() : (ls.numberLocale || 'en-US') };
+          } catch(_) { const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' }; return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' }; }
+        }
+        function fmtWithSymbol(symbol, locale, value) {
+          if (value == null || value === '' || isNaN(Number(value))) return '';
+          const num = Number(value);
+          try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch(_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+        }
+        const toMeta = getSymbolAndLocale(toCountry);
+        const suggestedFormatted = !isNaN(pppSuggestion) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestion) : '';
+        const amountInput = interactionRoot.querySelector('.link-amount-input');
+        if (amountInput) amountInput.value = suggestedFormatted;
+      });
+    }
+    
     interactionRoot.addEventListener('click', function(e){
       const tab = e.target && e.target.closest && e.target.closest('.resolution-tab');
       if (tab) { e.preventDefault(); self._handleTabSelection(interactionRoot, tab); return; }
@@ -369,7 +427,7 @@ var RelocationImpactAssistant = {
       const action = btn.getAttribute('data-action');
       const payload = { rowId: (btn.getAttribute('data-row-id') || (ctx && ctx.rowId)), currency: btn.getAttribute('data-currency'), suggestedAmount: btn.getAttribute('data-suggested-amount'), suggestedCurrency: btn.getAttribute('data-suggested-currency') };
       if (action === 'split') { const detail = btn.closest('.resolution-detail'); const input = detail ? detail.querySelector('.part2-amount-input') : null; payload.part2Amount = input ? input.value : undefined; }
-      else if (action === 'link') { const detail = btn.closest('.resolution-detail'); const sel = detail ? detail.querySelector('.country-selector') : null; payload.country = sel ? sel.value : undefined; }
+      else if (action === 'link') { const detail = btn.closest('.resolution-detail'); const sel = detail ? detail.querySelector('.country-selector') : null; const amountInput = detail ? detail.querySelector('.link-amount-input') : null; payload.country = sel ? sel.value : undefined; payload.convertedAmount = amountInput ? amountInput.value : undefined; }
       self.handlePanelAction(ctx.event, action, payload, ctx.env);
     });
     this._bindTabKeyboard(interactionRoot);
