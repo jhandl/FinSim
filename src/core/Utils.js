@@ -526,6 +526,10 @@ function deserializeSimulation(content, ui) {
 }
 
 function getRateForKey(key, rateBands) {
+  if (!rateBands || typeof rateBands !== 'object' || Object.keys(rateBands).length === 0) {
+    // Return 1.0 (100%) as default when no bands are defined
+    return 1.0;
+  }
   const bandKeys = Object.keys(rateBands).map(Number);
   for (let i = bandKeys.length - 1; i >= 0; i--) {
     const bandKey = bandKeys[i];
@@ -533,5 +537,7 @@ function getRateForKey(key, rateBands) {
         return rateBands[bandKey];
     }
   }
-  return rateBands[bandKeys[0]];
+  var defaultRate = rateBands[bandKeys[0]];
+  // Ensure we return a valid number, default to 1.0 if undefined
+  return (typeof defaultRate === 'number' && !isNaN(defaultRate)) ? defaultRate : 1.0;
 }

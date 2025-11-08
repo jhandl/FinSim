@@ -677,9 +677,9 @@ class TableManager {
     const headerKeys = headerThs.map(th => th.getAttribute('data-key'));
     const headerLabels = headerThs.map(th => (th.textContent || '').trim());
 
-    // Determine number of data rows from dataSheet (authoritative), fallback to DOM if unavailable
-    const ds = (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) ? dataSheet : null;
-    const totalRows = ds ? Math.max(0, ds.length - 1) : Array.from(table.querySelectorAll('tbody tr')).length;
+    // Get data rows from the table
+    const dataRows = Array.from(table.querySelectorAll('tbody tr'));
+    const totalRows = dataRows.length;
     if (totalRows === 0) {
       throw new Error('No data to export. Please run a simulation first.');
     }
@@ -691,68 +691,143 @@ class TableManager {
       if (typeof runs === 'number' && runs > 0) scale = runs;
     } catch (_) {}
 
-    // Helper to fetch a numeric value from a dataSheet row by header key
-    const getValueForKey = (rowObj, key) => {
-      if (!rowObj) return 0;
-      try {
-        if (key === 'Age') return rowObj.age / scale;
-        if (key === 'Year') return rowObj.year / scale;
-        if (key === 'WithdrawalRate') return rowObj.withdrawalRate / scale;
-
-        // Dynamic income per investment type
-        if (key.indexOf('Income__') === 0) {
-          const k = key.substring('Income__'.length);
-          const map = rowObj.investmentIncomeByKey || {};
-          return (map[k] || 0) / scale;
+    // Helper to get age from a row (used for PV and currency calculations)
+    const getAgeFromRow = (row) => {
+      const cells = Array.from(row.querySelectorAll('td'));
+      const ageKeyIndex = headerKeys.indexOf('Age');
+      if (ageKeyIndex >= 0 && ageKeyIndex < cells.length) {
+        const ageCell = cells[ageKeyIndex];
+        if (ageCell) {
+          const contentContainer = ageCell.querySelector('.cell-content');
+          const ageText = contentContainer ? contentContainer.textContent.trim() : ageCell.textContent.trim();
+          const age = parseInt(ageText, 10);
+          if (!isNaN(age)) return age;
         }
+      }
+      return null;
+    };
 
-        // Dynamic capital per investment type
-        if (key.indexOf('Capital__') === 0) {
-          const k = key.substring('Capital__'.length);
-          const map = rowObj.investmentCapitalByKey || {};
-          return (map[k] || 0) / scale;
+    // Helper to get cell value from displayed table cell
+    // This respects present-value mode and currency mode by reading what's actually displayed
+    const getCellValue = (row, keyIndex) => {
+      const cells = Array.from(row.querySelectorAll('td'));
+      if (keyIndex >= cells.length) return '';
+      
+      const cell = cells[keyIndex];
+      if (!cell) return '';
+      
+      const key = headerKeys[keyIndex];
+      if (!key) return '';
+      
+      // Get the displayed text from the cell (already formatted with correct currency and PV mode)
+      // The .cell-content div contains the formatted value
+      const contentContainer = cell.querySelector('.cell-content');
+      let displayedText = contentContainer ? contentContainer.textContent.trim() : cell.textContent.trim();
+      
+      // Remove the 'i' icon text if present (tooltip indicator)
+      displayedText = displayedText.replace(/i\s*$/, '').trim();
+      
+      // If no displayed text, try to compute from data-nominal-value
+      if (!displayedText || displayedText === '') {
+        const nominalStr = cell.getAttribute('data-nominal-value');
+        if (nominalStr) {
+          let value = parseFloat(nominalStr);
+          if (isNaN(value)) return '';
+          
+          // Get age for PV and currency calculations
+          const age = getAgeFromRow(row);
+          
+          // Apply present-value deflation if enabled
+          if (this.presentValueMode && key !== 'Age' && key !== 'Year' && key !== 'WithdrawalRate' && age !== null) {
+            try {
+              const fromCountry = RelocationUtils.getCountryForAge(age, this);
+              const econ = Config.getInstance().getEconomicData();
+              if (econ && econ.ready) {
+                const cpiPct = econ.getInflation(fromCountry);
+                if (cpiPct != null && isFinite(Number(cpiPct))) {
+                  const rate = Number(cpiPct) / 100;
+                  const df = getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate);
+                  value = value * df;
+                }
+              }
+            } catch (_) { /* keep nominal */ }
+          }
+          
+          // Apply currency conversion if in unified mode
+          if (Config.getInstance().isRelocationEnabled() && this.currencyMode === 'unified' && this.reportingCurrency && key !== 'Age' && key !== 'Year' && key !== 'WithdrawalRate' && age !== null) {
+            try {
+              const year = Config.getInstance().getSimulationStartYear() + age;
+              const fromCountry = RelocationUtils.getCountryForAge(age, this);
+              const toCountry = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
+              const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
+              
+              if (fromCurrency !== this.reportingCurrency) {
+                const economicData = Config.getInstance().getEconomicData();
+                if (economicData && economicData.ready) {
+                  const cacheKey = `${year}-${fromCountry}-${toCountry}`;
+                  let fxMult = this.conversionCache[cacheKey];
+                  if (fxMult === undefined) {
+                    fxMult = economicData.convert(1, fromCountry, toCountry, year, {
+                      fxMode: 'constant',
+                      baseYear: Config.getInstance().getSimulationStartYear()
+                    });
+                    if (fxMult !== null) this.conversionCache[cacheKey] = fxMult;
+                  }
+                  if (fxMult !== null) {
+                    value = value * fxMult;
+                  }
+                }
+              }
+            } catch (_) { /* keep as is */ }
+          }
+          
+          // Format the value with the correct currency
+          if (key === 'WithdrawalRate' || /rate$/i.test(key)) {
+            return FormatUtils.formatPercentage(value);
+          } else if (key === 'Age' || key === 'Year') {
+            return String(Math.round(value));
+          } else {
+            // Determine display currency
+            let displayCurrencyCode, displayCountryForLocale;
+            try {
+              const fromCountry = age != null ? RelocationUtils.getCountryForAge(age, this) : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
+              
+              if (this.currencyMode === 'unified' && Config.getInstance().isRelocationEnabled()) {
+                displayCurrencyCode = this.reportingCurrency;
+                displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
+              } else {
+                const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
+                displayCurrencyCode = fromCurrency;
+                displayCountryForLocale = fromCountry;
+              }
+            } catch (_) {
+              // Fallback to default
+              displayCurrencyCode = null;
+              displayCountryForLocale = null;
+            }
+            return FormatUtils.formatCurrency(value, displayCurrencyCode, displayCountryForLocale);
+          }
         }
-
-        // Dynamic tax totals
-        if (key.indexOf('Tax__') === 0) {
-          // Prefer flattened key if present, else use taxByKey map
-          if (typeof rowObj[key] === 'number') return rowObj[key] / scale;
-          const taxId = key.substring('Tax__'.length);
-          const tmap = rowObj.taxByKey || {};
-          return (tmap[taxId] || 0) / scale;
-        }
-
-        // Standard fields: derive row key by lowercasing first letter
-        // Special-case legacy FundsCapital → indexFundsCapital
-        let dsKey = key.charAt(0).toLowerCase() + key.slice(1);
-        if (key === 'FundsCapital') dsKey = 'indexFundsCapital';
-        if (typeof rowObj[dsKey] === 'number') return rowObj[dsKey] / scale;
-      } catch (_) { /* fall through to zero */ }
-      return 0;
+        return '';
+      }
+      
+      // Use the displayed text directly (it's already formatted correctly)
+      return displayedText;
     };
 
     // Build CSV header
     let csvContent = headerLabels.join(',') + '\n';
 
-    // Build CSV rows directly from dataSheet to include hidden columns as zeros
-    for (let i = 1; i <= totalRows; i++) {
-      const rowObj = ds ? ds[i] : null;
-      const rowValues = headerKeys.map(key => {
-        let raw = getValueForKey(rowObj, key);
-        // Format based on key semantics
-        let text = '';
-        if (key === 'Age' || key === 'Year') {
-          text = (typeof raw === 'number') ? String(Math.round(raw)) : '';
-        } else if (key === 'WithdrawalRate' || /rate$/i.test(key)) {
-          try { text = FormatUtils.formatPercentage(raw); } catch (_) { text = String(raw); }
-        } else {
-          try { text = FormatUtils.formatCurrency(raw); } catch (_) { text = String(raw); }
-        }
-        // Ensure text is a string before calling indexOf
-        if (typeof text !== 'string') text = String(text || '');
+    // Build CSV rows from displayed table cells
+    for (let i = 0; i < totalRows; i++) {
+      const row = dataRows[i];
+      const rowValues = headerKeys.map((key, keyIndex) => {
+        const text = getCellValue(row, keyIndex);
+        // Ensure text is a string
+        const textStr = String(text || '');
         // Quote if contains comma
-        if (text.indexOf(',') !== -1) text = '"' + text + '"';
-        return text;
+        if (textStr.indexOf(',') !== -1) return '"' + textStr + '"';
+        return textStr;
       });
       csvContent += rowValues.join(',') + '\n';
     }
@@ -818,9 +893,12 @@ class TableManager {
     if (this.currencyMode === newMode) return;
     this.currencyMode = newMode;
     this.conversionCache = {}; // Clear cache on mode change
-    this.storedCountryTimeline = null; // Invalidate stored timeline on mode change
+    // Ensure reportingCurrency is set when switching to unified mode
+    if (newMode === 'unified' && !this.reportingCurrency) {
+      this.reportingCurrency = RelocationUtils.getDefaultReportingCurrency(this.webUI);
+    }
     this.updateCurrencyControlVisibility();
-    this.webUI.rerenderData();
+    this.refreshDisplayedCurrencies();
   }
 
   updateCurrencyControlVisibility() {
@@ -862,8 +940,13 @@ class TableManager {
         const key = headerCells[c].getAttribute('data-key');
         if (!isMonetaryKey(key)) continue;
         const nominalStr = cells[c].getAttribute('data-nominal-value');
-        const nominal = (nominalStr == null) ? null : Number(nominalStr);
-        if (nominal == null || isNaN(nominal)) {
+        // Check for missing, null, or empty string values - these indicate the cell wasn't properly initialized
+        if (nominalStr == null || nominalStr === '') {
+          try { if (this.webUI && typeof this.webUI.rerenderData === 'function') { this.webUI.rerenderData(); } } catch (_) {}
+          return;
+        }
+        const nominal = Number(nominalStr);
+        if (isNaN(nominal)) {
           try { if (this.webUI && typeof this.webUI.rerenderData === 'function') { this.webUI.rerenderData(); } } catch (_) {}
           return;
         }
@@ -879,7 +962,11 @@ class TableManager {
         const ageIdx = headerCells.findIndex(h => h.getAttribute('data-key') === 'Age');
         if (ageIdx >= 0 && cells[ageIdx]) {
           const t = cells[ageIdx].querySelector('.cell-content')?.textContent || cells[ageIdx].textContent || '';
-          age = parseInt(t, 10);
+          const parsedAge = parseInt(t, 10);
+          // Only use age if it's a valid number
+          if (!isNaN(parsedAge) && isFinite(parsedAge)) {
+            age = parsedAge;
+          }
         }
       } catch (_) {}
 
@@ -890,6 +977,11 @@ class TableManager {
         // Use the stored nominal value; pre-scan above guarantees presence here
         const nominalStr = cells[c].getAttribute('data-nominal-value');
         let nominal = Number(nominalStr);
+        
+        // Guard: if nominal is invalid, skip this cell (shouldn't happen after pre-scan, but be safe)
+        if (isNaN(nominal) || !isFinite(nominal)) {
+          continue;
+        }
 
         /*
          * Reformatting without re-simulation:
@@ -907,53 +999,68 @@ class TableManager {
          */
         // Compute present-value in source currency when enabled
         let value = nominal;
-        let fromCountry = age != null ? RelocationUtils.getCountryForAge(age, this) : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
+        let fromCountry = age != null && isFinite(age) ? RelocationUtils.getCountryForAge(age, this) : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
         let displayCurrencyCode, displayCountryForLocale;
         if (this.presentValueMode) {
           try {
-            const econ = Config.getInstance().getEconomicData();
-            if (econ && econ.ready) {
-              const cpiPct = econ.getInflation(fromCountry);
-              let df = 1;
-              if (cpiPct != null && isFinite(Number(cpiPct))) {
-                const rate = Number(cpiPct) / 100;
-                df = getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate);
+            // Only apply deflation if we have a valid age
+            if (age != null && isFinite(age)) {
+              const econ = Config.getInstance().getEconomicData();
+              if (econ && econ.ready) {
+                const cpiPct = econ.getInflation(fromCountry);
+                let df = 1;
+                if (cpiPct != null && isFinite(Number(cpiPct))) {
+                  const rate = Number(cpiPct) / 100;
+                  df = getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate);
+                  // Guard: if deflation factor is invalid, skip deflation
+                  if (isNaN(df) || !isFinite(df)) {
+                    df = 1;
+                  }
+                }
+                value = value * df;
               }
-              value = value * df;
             }
           } catch (_) { /* keep nominal */ }
         }
 
         // Unified mode: convert deflated source value to reporting currency using nominal FX
         // ('constant' mode, not PPP) to preserve exchange-rate realities for display.
-        if (this.currencyMode === 'unified') {
+        if (this.currencyMode === 'unified' && this.reportingCurrency) {
           displayCurrencyCode = this.reportingCurrency;
           displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
           try {
-            const toCountry = displayCountryForLocale;
-            const year = Config.getInstance().getSimulationStartYear() + (age || 0);
-            const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
-            if (fromCurrency && fromCurrency !== this.reportingCurrency) {
-              const economicData = Config.getInstance().getEconomicData();
-              if (economicData && economicData.ready) {
-                const cacheKey = `${year}-${fromCountry}-${toCountry}`;
-                let fxMult = this.conversionCache[cacheKey];
-                if (fxMult === undefined) {
-                  // Nominal FX conversion (constant mode) - not PPP
-                  fxMult = economicData.convert(1, fromCountry, toCountry, year, { fxMode: 'constant', baseYear: Config.getInstance().getSimulationStartYear() });
-                  if (fxMult !== null) this.conversionCache[cacheKey] = fxMult;
-                }
-                if (fxMult !== null) {
-                  value = value * fxMult;
+            // Only convert if we have a valid age for year calculation
+            if (age != null && isFinite(age)) {
+              const toCountry = displayCountryForLocale;
+              const year = Config.getInstance().getSimulationStartYear() + age;
+              const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
+              if (fromCurrency && fromCurrency !== this.reportingCurrency) {
+                const economicData = Config.getInstance().getEconomicData();
+                if (economicData && economicData.ready) {
+                  const cacheKey = `${year}-${fromCountry}-${toCountry}`;
+                  let fxMult = this.conversionCache[cacheKey];
+                  if (fxMult === undefined) {
+                    // Nominal FX conversion (constant mode) - not PPP
+                    fxMult = economicData.convert(1, fromCountry, toCountry, year, { fxMode: 'constant', baseYear: Config.getInstance().getSimulationStartYear() });
+                    if (fxMult !== null && isFinite(fxMult)) this.conversionCache[cacheKey] = fxMult;
+                  }
+                  if (fxMult !== null && isFinite(fxMult)) {
+                    value = value * fxMult;
+                  }
                 }
               }
             }
           } catch (_) { /* keep as is */ }
         } else {
-          // natural mode formatting: use local currency
+          // natural mode formatting: use local currency (or fallback if unified mode but no reportingCurrency)
           const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
           displayCurrencyCode = fromCurrency;
           displayCountryForLocale = fromCountry;
+        }
+
+        // Final guard: ensure value is valid before formatting
+        if (isNaN(value) || !isFinite(value)) {
+          value = nominal; // Fall back to nominal value if calculation failed
         }
 
         contentEl.textContent = FormatUtils.formatCurrency(value, displayCurrencyCode, displayCountryForLocale);

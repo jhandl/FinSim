@@ -888,8 +888,14 @@ function processEvents() {
 
           if (isPensionable && entryConvertedAmount > 0) {
             var rsSalary = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch(_) { return null; } })();
+            if (!rsSalary) {
+              console.error("[DBG] Pension contribution: ruleset not found for country " + currentCountry + ", using empty bands");
+            }
             var bands = (rsSalary && typeof rsSalary.getPensionContributionAgeBands === 'function') ? rsSalary.getPensionContributionAgeBands() : {};
             var baseRate = (salaryPerson.pensionContributionPercentageParam || 0) * getRateForKey(salaryPerson.age, bands);
+            if (isNaN(baseRate)) {
+              console.error("[DBG] Pension contribution: baseRate is NaN for person age " + salaryPerson.age + ", country " + currentCountry + ", percentage " + salaryPerson.pensionContributionPercentageParam);
+            }
             if (params.pensionCapped === "Yes") {
               var cap = (rsSalary && typeof rsSalary.getPensionContributionAnnualCap === 'function') ? rsSalary.getPensionContributionAnnualCap() : 0;
               var capValue = adjust(cap);
@@ -903,6 +909,9 @@ function processEvents() {
             var personalAmount = baseRate * entryConvertedAmount;
             var employerAmount = employerRate * entryConvertedAmount;
             var totalContrib = personalAmount + employerAmount;
+            if (isNaN(personalAmount) || isNaN(totalContrib)) {
+              console.error("[DBG] Pension contribution: NaN detected - personalAmount=" + personalAmount + ", totalContrib=" + totalContrib + ", baseRate=" + baseRate + ", entryConvertedAmount=" + entryConvertedAmount);
+            }
             if (totalContrib > 0) {
               pensionContribution += totalContrib;
               personalPensionContribution += personalAmount;
@@ -1289,6 +1298,8 @@ function processEvents() {
               if (!countryInflationOverrides) countryInflationOverrides = {};
               countryInflationOverrides[currentCountry] = event.rate;
             }
+            // Reset Taxman with the new country to ensure correct ruleset is loaded
+            revenue.reset(person1, person2, attributionManager, currentCountry, year);
             flowState = createFlowState();
           }
         }
@@ -1788,8 +1799,16 @@ function updateYearlyData() {
   dataSheet[row].expenses += expenses;
   dataSheet[row].pensionFund += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
   dataSheet[row].cash += cash;
-  dataSheet[row].indexFundsCapital += indexFunds.capital();
-  dataSheet[row].sharesCapital += shares.capital();
+  var indexFundsCap = indexFunds.capital();
+  var sharesCap = shares.capital();
+  if (isNaN(indexFundsCap)) {
+    console.error("[DBG] updateYearlyData: indexFunds.capital() returned NaN at age " + person1.age + ", year " + year);
+  }
+  if (isNaN(sharesCap)) {
+    console.error("[DBG] updateYearlyData: shares.capital() returned NaN at age " + person1.age + ", year " + year);
+  }
+  dataSheet[row].indexFundsCapital += indexFundsCap;
+  dataSheet[row].sharesCapital += sharesCap;
   // Accumulate per-type income and capital for dynamic UI columns
   try {
     if (investmentIncomeByKey) {
@@ -1817,6 +1836,9 @@ function updateYearlyData() {
       dataSheet[row].investmentCapitalByKey[key] += capsByKey[key];
     }
   } catch (_) {}
+  if (isNaN(personalPensionContribution)) {
+    console.error("[DBG] updateYearlyData: personalPensionContribution is NaN at age " + person1.age + ", year " + year);
+  }
   dataSheet[row].pensionContribution += personalPensionContribution;
   dataSheet[row].withdrawalRate += withdrawalRate;
   

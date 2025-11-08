@@ -52,7 +52,7 @@ class FormatUtils {
         maximumFractionDigits: 0
     };
 
-    return numValue.toLocaleString(numberLocale, options);
+    return numValue.toLocaleString(numberLocale, options).replace(/\s/g, '');
   }
 
   static formatPercentage(value) {

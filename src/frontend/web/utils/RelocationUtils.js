@@ -153,7 +153,7 @@ class RelocationUtils {
             }
             if (manager.currencyMode === 'unified') {
                 if (manager.constructor.name === 'TableManager') {
-                    webUI.rerenderData();
+                    manager.refreshDisplayedCurrencies();
                 } else {
                     manager.refreshChartsWithCurrency();
                 }

@@ -132,7 +132,7 @@ class EventSummaryRenderer {
         currency: currencyCode,
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
-      });
+      }).replace(/\s/g, '');
     } catch (_) {
       // Fallback to generic formatter
       return FormatUtils.formatCurrency(num);

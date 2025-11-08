@@ -14,7 +14,7 @@ class ChartManager {
     try {
       this.setupCharts();
     } catch (err) {
-      console.log('[DBG] ChartManager constructor setupCharts failed: ' + (err && err.message ? err.message : err));
+      console.log('ChartManager constructor setupCharts failed: ' + (err && err.message ? err.message : err));
       // Continue without charts rather than breaking the whole app
       this.chartsInitialized = false;
     }
@@ -781,7 +781,7 @@ class ChartManager {
     try {
       return RelocationUtils.getRepresentativeCountryForCurrency(code);
     } catch (err) {
-      console.log('[DBG] ChartManager.getRepresentativeCountryForCurrency error: ' + (err && err.message ? err.message : err));
+      console.log('ChartManager.getRepresentativeCountryForCurrency error: ' + (err && err.message ? err.message : err));
       return code ? String(code).toLowerCase() : 'ie';
     }
   }
@@ -898,7 +898,7 @@ class ChartManager {
       const cfg = Config.getInstance();
       if (cfg.isRelocationEnabled() && this.currencyMode === 'unified' && this.reportingCurrency) {
         if (typeof this.getRepresentativeCountryForCurrency !== 'function') {
-          console.log('[DBG] ChartManager.updateChartsRow missing getRepresentativeCountryForCurrency');
+          console.log('ChartManager.updateChartsRow missing getRepresentativeCountryForCurrency');
         }
         const age = data.Age;
         const sourceCountry = this.getCountryForAge(age);
@@ -907,7 +907,7 @@ class ChartManager {
         const year = cfg.getSimulationStartYear() + age;
         const economicData = cfg.getEconomicData();
         if (!economicData || !economicData.ready) {
-          console.log('[DBG] ChartManager.updateChartsRow economicData unavailable');
+          console.log('ChartManager.updateChartsRow economicData unavailable');
         }
         const toCountry = this.getRepresentativeCountryForCurrency(targetCurrency);
         const monetaryFields = ['NetIncome', 'Expenses', 'IncomeSalaries', 'IncomeRentals', 'IncomeRSUs', 'IncomePrivatePension', 'IncomeStatePension', 'IncomeDefinedBenefit', 'IncomeTaxFree', 'IncomeCash', 'RealEstateCapital', 'PensionFund', 'Cash', 'FundsCapital', 'SharesCapital'];
@@ -999,7 +999,7 @@ class ChartManager {
         this.assetsChart.update();
       }
     } catch (error) {
-      console.log('[DBG] ChartManager.updateChartsRow error: ' + (error && error.message ? error.message : error));
+      console.log('ChartManager.updateChartsRow error: ' + (error && error.message ? error.message : error));
       // Silently fail as this is not critical
     }
   }

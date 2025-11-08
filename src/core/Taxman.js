@@ -333,6 +333,10 @@ class Taxman {
     taxableIncomeAttribution.add('Their Pension Relief', -this.pensionContribReliefP2);
 
     // Determine brackets and married band increase using ruleset if available
+    if (!this.ruleset) {
+      console.error("Taxman.computeIT: ruleset is null, cannot compute income tax");
+      return;
+    }
     var itBands;
     var marriedBandIncrease = 0;
     var status = this.married ? 'married' : 'single';
@@ -682,6 +686,10 @@ class Taxman {
   }
 
   computeCGT() {
+    if (!this.ruleset) {
+      console.error("Taxman.computeCGT: ruleset is null, cannot compute capital gains tax");
+      return;
+    }
     // Separate handling for Exit Tax vs CGT, and respect per-gain flags
     let totalTax = 0;
     const annualExemption = adjust(this.ruleset.getCapitalGainsAnnualExemption());
