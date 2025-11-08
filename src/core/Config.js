@@ -227,44 +227,40 @@ class Config {
 
   /**
    * Lazily load and cache a TaxRuleSet for a given country code (e.g., 'ie').
-   * Returns the loaded TaxRuleSet instance, or null if loading fails.
+   * Returns the loaded TaxRuleSet instance.
+   * Throws an error if loading or parsing fails.
    * NOTE: Keep async to avoid blocking UI; callers that need sync access should
    *       use getCachedTaxRuleSet() after preloading.
    */
   async getTaxRuleSet(countryCode) {
-    try {
-      const code = (countryCode || this.getDefaultCountry()).toLowerCase();
-      if (this._taxRuleSets[code]) {
-        return this._taxRuleSets[code];
-      }
-      const url = "/src/core/config/tax-rules-" + code + ".json";
-      const jsonString = await this.ui.fetchUrl(url);
-      const rawRules = JSON.parse(jsonString);
-      // TaxRuleSet is defined globally by src/core/TaxRuleSet.js
-      const ruleset = new TaxRuleSet(rawRules);
-      this._taxRuleSets[code] = ruleset;
-
-      // Persist and notify about tax rules updates per country (non-blocking)
-      var storageKey = 'taxRules:' + code;
-      var storedVersion = localStorage.getItem(storageKey);
-      var currentVersion = String(ruleset.raw.version);
-      if (!storedVersion || storedVersion !== currentVersion) {
-        var raw = ruleset.raw || {};
-        var message = (typeof raw.updateMessage === 'string') ? raw.updateMessage.trim() : '';
-        var country = (typeof raw.countryName === 'string') ? raw.countryName.trim() : code.toUpperCase();
-        if (message.length > 0) {
-          this.ui.showToast('\n' + message, 'Tax rules updated for ' + country + ':', 10);
-        }
-        localStorage.setItem(storageKey, currentVersion)
-      }
-      if (this._economicData) {
-        this._economicData.refreshFromConfig(this);
-      }
-      return ruleset;
-    } catch (err) {
-      console.error('Error loading tax ruleset:', err);
-      return null;
+    const code = (countryCode || this.getDefaultCountry()).toLowerCase();
+    if (this._taxRuleSets[code]) {
+      return this._taxRuleSets[code];
     }
+    const url = "/src/core/config/tax-rules-" + code + ".json";
+    const jsonString = await this.ui.fetchUrl(url);
+    const rawRules = JSON.parse(jsonString);
+    // TaxRuleSet is defined globally by src/core/TaxRuleSet.js
+    const ruleset = new TaxRuleSet(rawRules);
+    this._taxRuleSets[code] = ruleset;
+
+    // Persist and notify about tax rules updates per country (non-blocking)
+    var storageKey = 'taxRules:' + code;
+    var storedVersion = localStorage.getItem(storageKey);
+    var currentVersion = String(ruleset.raw.version);
+    if (!storedVersion || storedVersion !== currentVersion) {
+      var raw = ruleset.raw || {};
+      var message = (typeof raw.updateMessage === 'string') ? raw.updateMessage.trim() : '';
+      var country = (typeof raw.countryName === 'string') ? raw.countryName.trim() : code.toUpperCase();
+      if (message.length > 0) {
+        this.ui.showToast('\n' + message, 'Tax rules updated for ' + country + ':', 10);
+      }
+      localStorage.setItem(storageKey, currentVersion)
+    }
+    if (this._economicData) {
+      this._economicData.refreshFromConfig(this);
+    }
+    return ruleset;
   }
 
   /**
@@ -297,10 +293,10 @@ class Config {
    * Always keeps the default country ruleset loaded.
    * @param {Array} events - Array of SimEvent objects
    * @param {string} startCountry - The starting country code from scenario parameters
-   * @returns {Promise} Resolves when all required rulesets are loaded
+   * @returns {Promise} Resolves with { failed: Array<string> } containing country codes that failed to load
    */
   async syncTaxRuleSetsWithEvents(events, startCountry) {
-    if (!this.isRelocationEnabled()) return Promise.resolve([]);
+    if (!this.isRelocationEnabled()) return Promise.resolve({ failed: [] });
     var required = new Set();
     required.add(this.getDefaultCountry());
     if (startCountry && typeof startCountry === 'string') {
@@ -333,18 +329,31 @@ class Config {
     }
 
     var toLoad = [];
+    var countryCodes = [];
     required.forEach(function (code) {
       if (!this._taxRuleSets[code]) {
-        toLoad.push(this.getTaxRuleSet(code));
+        toLoad.push(this.getTaxRuleSet(code).catch(function(err) {
+          return { error: err, countryCode: code };
+        }));
+        countryCodes.push(code);
       }
     }.bind(this));
 
-    return Promise.all(toLoad).then(function(results) {
-      if (this._economicData) {
-        this._economicData.refreshFromConfig(this);
+    var results = await Promise.all(toLoad);
+    var failed = [];
+    for (var k = 0; k < results.length; k++) {
+      var result = results[k];
+      if (result && result.error) {
+        failed.push(result.countryCode);
+      } else if (!result || !(result instanceof TaxRuleSet)) {
+        failed.push(countryCodes[k]);
       }
-      return results;
-    }.bind(this));
+    }
+
+    if (this._economicData) {
+      this._economicData.refreshFromConfig(this);
+    }
+    return { failed: failed };
   }
 
   newCodeVersion() {

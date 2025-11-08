@@ -107,8 +107,9 @@ module.exports = {
     const baseRow = findRowByAge(rows, 30) || rows[0];
     const baseYear = baseRow ? baseRow.year : row34.year;
 
-    const expectedRentalPre = economicData.convert(25000, 'SS', 'SS', row34.year, { fxMode: 'ppp', baseYear });
-    const expectedMortgagePre = economicData.convert(20000, 'SS', 'SS', row34.year, { fxMode: 'ppp', baseYear });
+    // Use nominal FX (constant mode) for ledger value expectations
+    const expectedRentalPre = economicData.convert(25000, 'SS', 'SS', row34.year, { fxMode: 'constant', baseYear });
+    const expectedMortgagePre = economicData.convert(20000, 'SS', 'SS', row34.year, { fxMode: 'constant', baseYear });
 
     if (!withinTolerance(row34.incomeRentals, expectedRentalPre)) {
       return { success: false, errors: ['Pre-relocation rental conversion mismatch'] };
@@ -117,8 +118,9 @@ module.exports = {
       return { success: false, errors: ['Pre-relocation mortgage conversion mismatch'] };
     }
 
-    const expectedRentalPost = economicData.convert(25000, 'SS', 'TT', row36.year, { fxMode: 'ppp', baseYear });
-    const expectedMortgagePost = economicData.convert(20000, 'SS', 'TT', row36.year, { fxMode: 'ppp', baseYear });
+    // Use nominal FX (constant mode) for ledger value expectations
+    const expectedRentalPost = economicData.convert(25000, 'SS', 'TT', row36.year, { fxMode: 'constant', baseYear });
+    const expectedMortgagePost = economicData.convert(20000, 'SS', 'TT', row36.year, { fxMode: 'constant', baseYear });
     if (!withinTolerance(row36.incomeRentals, expectedRentalPost)) {
       return { success: false, errors: ['Post-relocation rental conversion mismatch'] };
     }

@@ -78,8 +78,16 @@ class RealEstate {
       const property = this.properties[id];
       const value = property.getValue();
       const fromCurrency = currency(property.getCurrency());
-      const fromCountry = country(property.getLinkedCountry());
-      sum += convertCurrencyAmount(value, fromCurrency, fromCountry, targetCurrency, currentCountry, currentYear);
+      let fromCountry = country(property.getLinkedCountry());
+      if (!fromCountry) {
+        fromCountry = country(currentCountry);
+      }
+      var converted = convertCurrencyAmount(value, fromCurrency, fromCountry, targetCurrency, currentCountry, currentYear, true);
+      if (converted === null) {
+        // Strict mode failure: return null to signal error
+        return null;
+      }
+      sum += converted;
     }
     return sum;
   }

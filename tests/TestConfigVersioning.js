@@ -59,18 +59,30 @@ module.exports = {
                 setVersion: (v) => { currentVersion = v; versionUpdated = true; },
                 showAlert: (m) => { alertShown = m; return alertResponse; },
                 fetchUrl: async (url) => {
-                    // Extract version from URL: /src/core/config/finsim-1.26.json
+                    // Handle config files: /src/core/config/finsim-1.26.json
                     const versionMatch = url.match(/finsim-(\d+\.\d+)\.json$/);
-                    if (!versionMatch) {
-                        throw new Error('Invalid config URL format');
+                    if (versionMatch) {
+                        const requestedVersion = versionMatch[1];
+                        if (!configFiles[requestedVersion]) {
+                            throw new Error(`Config file not found for version ${requestedVersion}`);
+                        }
+                        return JSON.stringify(configFiles[requestedVersion]);
                     }
-                    const requestedVersion = versionMatch[1];
                     
-                    if (!configFiles[requestedVersion]) {
-                        throw new Error(`Config file not found for version ${requestedVersion}`);
+                    // Handle tax rules files: /src/core/config/tax-rules-ie.json
+                    const taxRulesMatch = url.match(/tax-rules-(\w+)\.json$/);
+                    if (taxRulesMatch) {
+                        // Return a minimal valid tax rules structure
+                        return JSON.stringify({
+                            country: taxRulesMatch[1].toUpperCase(),
+                            countryName: taxRulesMatch[1].toUpperCase(),
+                            version: "1.0",
+                            updateMessage: "",
+                            locale: { numberLocale: "en-US", currencyCode: "USD", currencySymbol: "$" }
+                        });
                     }
                     
-                    return JSON.stringify(configFiles[requestedVersion]);
+                    throw new Error('Invalid config URL format: ' + url);
                 },
                 newDataVersion: (v, m) => { if(mockUi.showAlert(m)) { mockUi.setVersion(v); }},
                 newCodeVersion: () => {},
@@ -157,7 +169,21 @@ module.exports = {
                 getVersion: () => '1.26',
                 setVersion: (v) => { currentVersion = v; versionUpdated = true; },
                 showAlert: (m) => true,
-                fetchUrl: async (url) => JSON.stringify(configFiles['1.26']),
+                fetchUrl: async (url) => {
+                    if (url.match(/finsim-(\d+\.\d+)\.json$/)) {
+                        return JSON.stringify(configFiles['1.26']);
+                    }
+                    if (url.match(/tax-rules-(\w+)\.json$/)) {
+                        return JSON.stringify({
+                            country: 'IE',
+                            countryName: 'Ireland',
+                            version: "1.0",
+                            updateMessage: "",
+                            locale: { numberLocale: "en-US", currencyCode: "USD", currencySymbol: "$" }
+                        });
+                    }
+                    throw new Error('Invalid config URL format: ' + url);
+                },
                 newDataVersion: (v, m) => { mockUi1.setVersion(v); },
                 newCodeVersion: () => {},
                 clearVersionNote: () => {},
@@ -170,7 +196,21 @@ module.exports = {
                 getVersion: () => '1.27',
                 setVersion: () => {},
                 showAlert: () => false,
-                fetchUrl: async () => JSON.stringify(configFiles['1.27']),
+                fetchUrl: async (url) => {
+                    if (url.match(/finsim-(\d+\.\d+)\.json$/)) {
+                        return JSON.stringify(configFiles['1.27']);
+                    }
+                    if (url.match(/tax-rules-(\w+)\.json$/)) {
+                        return JSON.stringify({
+                            country: 'IE',
+                            countryName: 'Ireland',
+                            version: "1.0",
+                            updateMessage: "",
+                            locale: { numberLocale: "en-US", currencyCode: "USD", currencySymbol: "$" }
+                        });
+                    }
+                    throw new Error('Invalid config URL format: ' + url);
+                },
                 newDataVersion: () => {},
                 newCodeVersion: () => {},
                 clearVersionNote: () => {},
@@ -213,7 +253,14 @@ module.exports = {
             // Test 8: Network error during config fetch
             await assertThrows(
                 () => runTest('1.26', mockUi => {
-                    mockUi.fetchUrl = async () => { throw new Error("Network timeout"); };
+                    const originalFetchUrl = mockUi.fetchUrl;
+                    mockUi.fetchUrl = async (url) => {
+                        // Allow tax rules to load successfully, but throw on config files
+                        if (url.match(/tax-rules-(\w+)\.json$/)) {
+                            return originalFetchUrl(url);
+                        }
+                        throw new Error("Network timeout");
+                    };
                 }),
                 "Network timeout",
                 "Test 8 Failed: Did not throw on network error."
@@ -222,7 +269,14 @@ module.exports = {
             // Test 9: Malformed JSON in config file
             await assertThrows(
                 () => runTest('1.26', mockUi => {
-                    mockUi.fetchUrl = async () => "invalid json content";
+                    const originalFetchUrl = mockUi.fetchUrl;
+                    mockUi.fetchUrl = async (url) => {
+                        // Allow tax rules to load successfully, but return invalid JSON for config files
+                        if (url.match(/tax-rules-(\w+)\.json$/)) {
+                            return originalFetchUrl(url);
+                        }
+                        return "invalid json content";
+                    };
                 }),
                 "Unexpected token",
                 "Test 9 Failed: Did not throw on malformed JSON."

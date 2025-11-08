@@ -438,6 +438,36 @@ class TestFramework {
       const p = vm.runInContext('Config.initialize(WebUI.getInstance())', this.simulationContext);
       await p;
 
+      // After Config is initialized, enforce relocation enablement from test params (opt-in).
+      // Default to disabled unless the test explicitly sets relocationEnabled === true.
+      vm.runInContext(`
+        (function(){
+          try {
+            var cfg = Config.getInstance();
+            var enabled = !!(typeof testParams !== 'undefined' && testParams && testParams.relocationEnabled === true);
+            cfg.relocationFeatureEnabled = enabled;
+          } catch (_) {}
+        })();
+      `, this.simulationContext);
+
+      // Hydrate test tax rules into the Config cache if provided by tests
+      vm.runInContext(`
+        (function(){
+          try {
+            if (typeof __testTaxRules !== 'undefined' && __testTaxRules && typeof Config_instance !== 'undefined' && Config_instance) {
+              if (!Config_instance._taxRuleSets) Config_instance._taxRuleSets = {};
+              for (var key in __testTaxRules) {
+                if (!Object.prototype.hasOwnProperty.call(__testTaxRules, key)) continue;
+                Config_instance._taxRuleSets[key] = new TaxRuleSet(__testTaxRules[key]);
+              }
+              if (Config_instance._economicData && typeof Config_instance._economicData.refreshFromConfig === 'function') {
+                Config_instance._economicData.refreshFromConfig(Config_instance);
+              }
+            }
+          } catch (_) {}
+        })();
+      `, this.simulationContext);
+
       // Debug logging: Show config object properties after initialization
       if (this.verbose) {
         try {
@@ -626,6 +656,12 @@ class TestFramework {
       // Note: median computation intentionally omitted in VM mock
       if (__seededParams) {
         testParams = __seededParams;
+        // Normalize StartCountry alias if tests provide 'startingCountry'
+        try {
+          if (testParams && !testParams.StartCountry && testParams.startingCountry) {
+            testParams.StartCountry = testParams.startingCountry;
+          }
+        } catch (_) {}
       }
       if (__seededEvents) {
         testEvents = __seededEvents.map(function(e) { return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match, e.currency, e.linkedEventId, e.linkedCountry); });

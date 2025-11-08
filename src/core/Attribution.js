@@ -77,17 +77,22 @@ class Attribution {
       return { amount: total, currency: baseCurrency, fxRate: 1 };
     }
     
-    // Convert using EconomicData with COUNTRY CODES
-    var economicData = cfg.getEconomicData ? cfg.getEconomicData() : null;
-    if (!economicData) {
-      return { amount: total, currency: fromCurrency, fxRate: 1 };
+    // Convert using nominal FX rates (ledger conversion helper)
+    // Prefer convertNominal() from Simulator.js when available for consistency
+    var converted = null;
+    if (typeof convertNominal === 'function') {
+      converted = convertNominal(total, this.country, baseCountry, this.year);
+    } else {
+      // Fallback: EconomicData.convert defaults to 'constant' fxMode, but be explicit for ledger safety
+      var economicData = cfg.getEconomicData ? cfg.getEconomicData() : null;
+      if (economicData && economicData.ready) {
+        converted = economicData.convert(total, this.country, baseCountry, this.year, {
+          fxMode: 'constant',
+          baseYear: cfg.getSimulationStartYear ? cfg.getSimulationStartYear() : null,
+          fallback: 'nearest'
+        });
+      }
     }
-    
-    var converted = economicData.convert(total, this.country, baseCountry, this.year, {
-      fxMode: 'constant',
-      baseYear: cfg.getSimulationStartYear(),
-      fallback: 'nearest'
-    });
     
     if (converted == null) {
       return { amount: total, currency: fromCurrency, fxRate: 1 };

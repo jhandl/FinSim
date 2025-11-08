@@ -92,6 +92,13 @@ WelcomeTabs:
           answer:
             - "Yes, all your financial data stays on your computer or phone. It's not sent to any server or stored online."
             - "If you don't save it before closing this browser tab, it will be lost."
+        - question: "How does currency conversion work in charts and tables?"
+          answer:
+            - "When viewing multi-currency scenarios, the simulator converts amounts using year-specific exchange rates (FX) when available."
+            - "FX rates use a step function: if exact year data exists, it's used; otherwise the most recent prior value applies. If no year-specific data is available, the base FX rate (from tax rules) is used."
+            - "Purchasing Power Parity (PPP) suggestions for relocation events use year-specific PPP values when available, otherwise they extrapolate from the base PPP using CPI differentials between countries."
+            - "For years beyond available economic data, forward projections use a weighted average of recent years (default: 5-year window, configurable per country)."
+            - "Chart tooltips show both converted and original currency values. Hover over converted amounts to see conversion details."
 
   - id: notes
     title: Notes
@@ -1475,7 +1482,7 @@ WizardSteps:
     tours: [mini]
     card: cashflowGraph
     popover:
-      description: "<p>This graph shows your projected cashflow over time.</p>"
+      description: "<p>This graph shows your projected cashflow over time.</p><p>In multi-currency scenarios, amounts are converted using year-specific FX rates (step function) when available, falling back to base FX rates. Hover over data points to see original currency values and conversion details.</p>"
       side: "top"
       align: "center"
 
@@ -1483,7 +1490,7 @@ WizardSteps:
     tours: [mini]
     card: assetsGraph
     popover:
-      description: "<p>This graph shows your projected assets over time.</p>"
+      description: "<p>This graph shows your projected assets over time.</p><p>In multi-currency scenarios, amounts are converted using year-specific FX rates (step function) when available, falling back to base FX rates. Forward projections beyond available data use a weighted average (default: 5-year window). Hover over data points to see original currency values.</p>"
       side: "top"
       align: "center"
 
@@ -1491,7 +1498,7 @@ WizardSteps:
     tours: [quick, full, mini]
     card: data
     popover:
-      description: "<p>The actual year-by-year numbers as they are computed by the simulator, from your current age to the final age.</p><p>On smaller screens the table is hidden but you can tap 'Show anyway' to see it.</p><p>You can hover or long-press any cell with a small i to get a tooltip with more detailed information.</p>"
+      description: "<p>The actual year-by-year numbers as they are computed by the simulator, from your current age to the final age.</p><p>On smaller screens the table is hidden but you can tap 'Show anyway' to see it.</p><p>You can hover or long-press any cell with a small i to get a tooltip with more detailed information.</p><p>In multi-currency scenarios, currency conversion uses year-specific FX rates (step function) when available, otherwise base FX rates. Forward projections use a weighted average of recent years (default: 5-year window).</p>"
       side: "top"
       align: "left"
 

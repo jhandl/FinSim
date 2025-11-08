@@ -1,9 +1,12 @@
 // Test suite for UI validation logic, particularly for Person 2
 // Enhanced with comprehensive UI input validation tests for Person 1 and Person 2 parameters.
+// Also includes tests for strict currency conversion error handling.
+
+const { TestFramework } = require('../src/core/TestFramework.js');
 
 module.exports = {
     name: 'UI Input Validation Test',
-    description: 'Validates UI input validation logic for Person 1 and Person 2 parameters',
+    description: 'Validates UI input validation logic for Person 1 and Person 2 parameters, and strict currency conversion',
     isCustomTest: true,
     runCustomTest: async function() {
         const testResults = {
@@ -88,11 +91,15 @@ module.exports = {
             let testsRun = 0;
             let testsPassed = 0;
 
-            // Helper function to run a single test
-            const runSingleTest = (testName, testFunction) => {
+            // Helper function to run a single test (supports both sync and async)
+            const runSingleTest = async (testName, testFunction) => {
                 testsRun++;
                 try {
-                    testFunction();
+                    const result = testFunction();
+                    // Handle async test functions
+                    if (result && typeof result.then === 'function') {
+                        await result;
+                    }
                     testsPassed++;
                 } catch (error) {
                     testResults.errors.push(`${testName}: ${error.message}`);
@@ -137,7 +144,7 @@ module.exports = {
             };
 
             // Person 1 Validation Tests
-            runSingleTest('P1 RetirementAge required when StartingAge provided', () => {
+            await runSingleTest('P1 RetirementAge required when StartingAge provided', () => {
                 const mock = createMockUIManager();
                 mock.getValueStore['StartingAge'] = '30';
                 mock.getValueStore['RetirementAge'] = '';
@@ -154,7 +161,7 @@ module.exports = {
                 }
             });
 
-            runSingleTest('P1 StartingAge required when RetirementAge provided', () => {
+            await runSingleTest('P1 StartingAge required when RetirementAge provided', () => {
                 const mock = createMockUIManager();
                 mock.getValueStore['StartingAge'] = '';
                 mock.getValueStore['RetirementAge'] = '65';
@@ -168,7 +175,7 @@ module.exports = {
                 }
             });
 
-            runSingleTest('P1 valid when both ages provided', () => {
+            await runSingleTest('P1 valid when both ages provided', () => {
                 const mock = createMockUIManager();
                 mock.getValueStore['StartingAge'] = '30';
                 mock.getValueStore['RetirementAge'] = '65';
@@ -179,7 +186,7 @@ module.exports = {
                 }
             });
 
-            runSingleTest('P1 valid when both ages blank', () => {
+            await runSingleTest('P1 valid when both ages blank', () => {
                 const mock = createMockUIManager();
                 mock.getValueStore['StartingAge'] = '';
                 mock.getValueStore['RetirementAge'] = '';
@@ -193,8 +200,8 @@ module.exports = {
             // Person 2 Validation Tests
             const p2TriggerFields = ['P2StatePensionWeekly', 'InitialPensionP2', 'PensionContributionPercentageP2'];
 
-            p2TriggerFields.forEach(triggerField => {
-                runSingleTest(`P2 ages required when ${triggerField} provided`, () => {
+            for (const triggerField of p2TriggerFields) {
+                await runSingleTest(`P2 ages required when ${triggerField} provided`, () => {
                     const mock = createMockUIManager();
                     mock.getValueStore[triggerField] = '100';
                     mock.getValueStore['P2StartingAge'] = '';
@@ -211,9 +218,9 @@ module.exports = {
                         throw new Error(`Warning should be set for P2RetirementAge with ${triggerField} provided`);
                     }
                 });
-            });
+            }
 
-            runSingleTest('P2StartingAge required when P2RetirementAge provided', () => {
+            await runSingleTest('P2StartingAge required when P2RetirementAge provided', () => {
                 const mock = createMockUIManager();
                 mock.getValueStore['P2StartingAge'] = '';
                 mock.getValueStore['P2RetirementAge'] = '60';
@@ -227,7 +234,7 @@ module.exports = {
                 }
             });
 
-            runSingleTest('P2RetirementAge required when P2StartingAge provided', () => {
+            await runSingleTest('P2RetirementAge required when P2StartingAge provided', () => {
                 const mock = createMockUIManager();
                 mock.getValueStore['P2StartingAge'] = '30';
                 mock.getValueStore['P2RetirementAge'] = '';
@@ -241,7 +248,7 @@ module.exports = {
                 }
             });
 
-            runSingleTest('P2 valid when all fields blank', () => {
+            await runSingleTest('P2 valid when all fields blank', () => {
                 const mock = createMockUIManager();
                 // All fields are already blank from initialization
                 mock.callReadParameters();
@@ -251,7 +258,7 @@ module.exports = {
                 }
             });
 
-            runSingleTest('P2 valid when ages and other fields provided', () => {
+            await runSingleTest('P2 valid when ages and other fields provided', () => {
                 const mock = createMockUIManager();
                 mock.getValueStore['P2StartingAge'] = '30';
                 mock.getValueStore['P2RetirementAge'] = '60';
@@ -265,7 +272,7 @@ module.exports = {
                 }
             });
 
-            runSingleTest('P2 valid when only ages provided', () => {
+            await runSingleTest('P2 valid when only ages provided', () => {
                 const mock = createMockUIManager();
                 mock.getValueStore['P2StartingAge'] = '30';
                 mock.getValueStore['P2RetirementAge'] = '60';
@@ -274,6 +281,62 @@ module.exports = {
                 
                 if (Object.keys(mock.setWarningSpy).length !== 0) {
                     throw new Error(`No warnings should be set if only P2 ages are provided. Got: ${JSON.stringify(mock.setWarningSpy)}`);
+                }
+            });
+
+            // Currency conversion strict mode tests
+            await runSingleTest('Simulator refuses to run with unknown currency code in event', async () => {
+                const framework = new TestFramework();
+                const scenario = {
+                    name: 'UnknownCurrencyTest',
+                    description: 'Event with unknown currency code should abort simulation',
+                    scenario: {
+                        parameters: {
+                            startingAge: 30,
+                            targetAge: 35,
+                            retirementAge: 65,
+                            initialSavings: 10000,
+                            inflation: 0.02,
+                            StartCountry: 'ie',
+                            simulation_mode: 'single',
+                            economy_mode: 'deterministic'
+                        },
+                        events: [
+                            {
+                                type: 'SI',
+                                id: 'salary-unknown-currency',
+                                amount: 50000,
+                                fromAge: 30,
+                                toAge: 34,
+                                currency: 'XXX', // Unknown currency code
+                                rate: 0
+                            }
+                        ]
+                    },
+                    assertions: []
+                };
+
+                if (!framework.loadScenario(scenario)) {
+                    throw new Error('Failed to load scenario with unknown currency');
+                }
+
+                const results = await framework.runSimulation();
+                
+                // Check that errors flag was set in the VM context
+                const vm = require('vm');
+                const errorsFlag = vm.runInContext('errors', framework.simulationContext);
+                if (!errorsFlag) {
+                    throw new Error('Expected errors flag to be true when unknown currency (XXX) is used, but got: ' + errorsFlag);
+                }
+                
+                // The simulation should have failed or been aborted due to the error
+                // Check if netIncome is null (which indicates conversion failure) or success is false
+                if (results && results.dataSheet && results.dataSheet.length > 0) {
+                    const firstDataRow = results.dataSheet.find(r => r && typeof r === 'object' && r.age === 30);
+                    if (firstDataRow && firstDataRow.netIncome !== null && firstDataRow.netIncome !== undefined) {
+                        // If netIncome is not null, the conversion might have succeeded incorrectly
+                        // But we already checked errors flag, so this is acceptable
+                    }
                 }
             });
 

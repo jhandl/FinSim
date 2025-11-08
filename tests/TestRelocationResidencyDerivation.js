@@ -138,6 +138,7 @@ module.exports = {
           growthDevShares: 0,
           growthDevPension: 0,
           inflation: 0,
+          relocationEnabled: true,
           StartCountry: 'aa',
           simulation_mode: 'single',
           economy_mode: 'deterministic'
@@ -223,11 +224,11 @@ module.exports = {
       }
     }
 
-    // --- Negative Scenario: Missing StartCountry defaults gracefully -------
+    // --- Negative Scenario: Missing StartCountry should fail when relocation is enabled -------
     const missingStartFramework = new TestFramework();
     const missingStartScenario = {
       name: 'MissingStartCountry',
-      description: 'StartCountry omitted',
+      description: 'StartCountry omitted (should fail)',
       scenario: {
         parameters: {
           startingAge: 25,
@@ -235,6 +236,7 @@ module.exports = {
           retirementAge: 65,
           initialSavings: 1000,
           inflation: 0,
+          relocationEnabled: true,
           simulation_mode: 'single',
           economy_mode: 'deterministic'
         },
@@ -248,9 +250,9 @@ module.exports = {
     if (missingStartFramework.loadScenario(missingStartScenario)) {
       installTestTaxRules(missingStartFramework, deepClone(BASE_RULES));
       const missingStartResults = await missingStartFramework.runSimulation();
-      if (!missingStartResults || !missingStartResults.success) {
-        errors.push('Scenario without explicit StartCountry should succeed using default');
-      }
+      if (!missingStartResults || missingStartResults.success !== false) {
+        errors.push('Scenario without explicit StartCountry should fail when relocation is enabled');
+      } 
     } else {
       errors.push('Failed to load missing StartCountry scenario');
     }
@@ -264,7 +266,7 @@ module.exports = {
       const invalidMoveFramework = new TestFramework();
       const invalidMoveScenario = {
         name: 'InvalidRelocationCode',
-        description: 'Relocation to unknown country should be tolerated',
+        description: 'Relocation to unknown country should abort simulation',
         scenario: {
           parameters: {
             startingAge: 30,
@@ -272,6 +274,7 @@ module.exports = {
             retirementAge: 65,
             initialSavings: 5000,
             inflation: 0,
+          relocationEnabled: true,
             StartCountry: 'aa',
             simulation_mode: 'single',
             economy_mode: 'deterministic'
@@ -288,8 +291,8 @@ module.exports = {
         const customRules = deepClone(BASE_RULES);
         installTestTaxRules(invalidMoveFramework, customRules);
         const invalidMoveResults = await invalidMoveFramework.runSimulation();
-        if (invalidMoveResults && invalidMoveResults.success) {
-          errors.push('Simulator should flag unknown relocation codes instead of succeeding silently');
+        if (!invalidMoveResults || invalidMoveResults.success !== false) {
+          errors.push('Simulator should refuse to run with unknown relocation country code (MV-zz)');
         }
       } else {
         errors.push('Failed to load invalid relocation scenario');

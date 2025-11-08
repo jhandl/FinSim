@@ -14,6 +14,7 @@ class EconomicData {
   constructor(initialData) {
     this.data = {};
     this.ready = false;
+    this._seriesCache = {};
     if (initialData) {
       this._ingest(initialData, /*replace=*/true);
     }
@@ -23,6 +24,7 @@ class EconomicData {
     if (!config || !config._taxRuleSets) {
       this.data = {};
       this.ready = false;
+      this._seriesCache = {};
       return;
     }
     var entries = [];
@@ -41,6 +43,7 @@ class EconomicData {
     if (replace) {
       this.data = {};
       this.ready = false;
+      this._seriesCache = {};
     }
     if (!source) return;
 
@@ -288,39 +291,59 @@ class EconomicData {
     if (!entry || !entry.series || !entry.series[key]) return null;
     var info = entry.series[key];
     if (!info || !info.values || !info.values.length) return null;
+    
+    var cacheKey = entry.country + '|' + key + '|' + year + '|' + (allowProjection ? '1' : '0');
+    if (Object.prototype.hasOwnProperty.call(this._seriesCache, cacheKey)) {
+      return this._seriesCache[cacheKey];
+    }
+    
     var values = info.values;
     var targetYear = Number(year);
     if (isNaN(targetYear)) return null;
+    
+    var result = null;
     if (targetYear <= info.minYear) {
-      return values[0].value;
-    }
-    if (targetYear >= info.maxYear) {
+      result = values[0].value;
+    } else if (targetYear >= info.maxYear) {
       if (allowProjection) {
         var projected = this._weightedSeriesAverage(entry, key);
         if (projected != null) {
-          return projected;
+          result = projected;
+        } else {
+          result = values[values.length - 1].value;
         }
+      } else {
+        result = values[values.length - 1].value;
       }
-      return values[values.length - 1].value;
+    } else {
+      var prevValue = values[0].value;
+      for (var i = 1; i < values.length; i++) {
+        var item = values[i];
+        if (targetYear === item.year) {
+          result = item.value;
+          break;
+        }
+        if (targetYear < item.year) {
+          result = prevValue;
+          break;
+        }
+        prevValue = item.value;
+      }
+      if (result === null) {
+        result = prevValue;
+      }
     }
-    var prevValue = values[0].value;
-    for (var i = 1; i < values.length; i++) {
-      var item = values[i];
-      if (targetYear === item.year) {
-        return item.value;
-      }
-      if (targetYear < item.year) {
-        return prevValue;
-      }
-      prevValue = item.value;
+    
+    if (result !== null) {
+      this._seriesCache[cacheKey] = result;
     }
-    return prevValue;
+    return result;
   }
 
   _weightedSeriesAverage(entry, key) {
     if (!entry || !entry.series || !entry.series[key]) return null;
     var info = entry.series[key];
-    if (!info || !info.values || !info.values.length) return null;
+    if (!info.values || !info.values.length) return null;
     var window = this._getProjectionWindow(entry);
     if (!window || window <= 0) window = 5;
     var values = info.values;

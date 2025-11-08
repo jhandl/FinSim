@@ -298,7 +298,33 @@ var RelocationImpactAssistant = {
         const pppAmt = fmtWithSymbol(toMeta.symbol, toMeta.locale, pppAmtStr);
         const amtBase = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmt);
         const fxD = fxDate ? new Date(fxDate).toISOString().substring(0,10) : 'latest';
-        return amtBase + ' in ' + toCur + ' is ' + fxAmt + ' as of ' + fxD + '.\nAdjusting for purchasing power it\'s ≈ ' + pppAmt + '.';
+        try {
+          const cfg = Config.getInstance();
+          const econ = cfg && cfg.getEconomicData ? cfg.getEconomicData() : null;
+          const fromEntry = econ && econ.data ? econ.data[String(fromCountry).toUpperCase()] : null;
+          const toEntry = econ && econ.data ? econ.data[String(toCountry).toUpperCase()] : null;
+          const projectionWindow = (fromEntry && fromEntry.projectionWindowYears) || (toEntry && toEntry.projectionWindowYears) || 5;
+          const hasFxSeries = (fromEntry && fromEntry.series && fromEntry.series.fx) || (toEntry && toEntry.series && toEntry.series.fx);
+          const hasPppSeries = (fromEntry && fromEntry.series && fromEntry.series.ppp) || (toEntry && toEntry.series && toEntry.series.ppp);
+          let details = '';
+          if (hasFxSeries || hasPppSeries) {
+            details = '\n\nConversion details:\n';
+            if (hasFxSeries) {
+              details += '• FX uses year-specific rates (step function). Falls back to base FX (' + fxD + ') when year data unavailable.\n';
+            } else {
+              details += '• FX uses base rate (' + fxD + ') as no year-specific series available.\n';
+            }
+            if (hasPppSeries) {
+              details += '• PPP uses year-specific values when available, otherwise extrapolates from base PPP using CPI differentials.\n';
+            } else {
+              details += '• PPP uses base value adjusted by CPI differentials.\n';
+            }
+            details += '• Forward projections beyond available data use a ' + projectionWindow + '-year weighted average.';
+          }
+          return amtBase + ' in ' + toCur + ' is ' + fxAmt + ' as of ' + fxD + '.\nAdjusting for purchasing power it\'s ≈ ' + pppAmt + '.' + details;
+        } catch(_) {
+          return amtBase + ' in ' + toCur + ' is ' + fxAmt + ' as of ' + fxD + '.\nAdjusting for purchasing power it\'s ≈ ' + pppAmt + '.';
+        }
       };
       TooltipUtils.attachTooltip(input, provider, { hoverDelay: 300, touchDelay: 400, showOnFocus: true, persistWhileFocused: true, hideOnWizard: true });
     } catch(_) {}

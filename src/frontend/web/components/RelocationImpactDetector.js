@@ -39,6 +39,13 @@ var RelocationImpactDetector = {
         var mvFromAge = Number(mvEvent.fromAge);
         var nextMvFromAge = nextMvEvent ? Number(nextMvEvent.fromAge) : NaN;
 
+        // Check if destination country ruleset is missing
+        var destinationRuleset = Config.getInstance().getCachedTaxRuleSet(destinationCountry);
+        if (!destinationRuleset) {
+          var message = 'Tax rules for ' + Config.getInstance().getCountryNameByCode(destinationCountry) + ' are not available. Please remove or change this relocation event.';
+          this.addImpact(mvEvent, 'missing_ruleset', message, mvEvent.id, false);
+        }
+
         // Boundary crossers: events that span THIS MV's boundary only
         for (var j = 0; j < events.length; j++) {
           var event = events[j];

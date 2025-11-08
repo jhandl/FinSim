@@ -124,8 +124,11 @@ class Person {
         if (!baseCountry && typeof findCountryForCurrency === 'function') {
           baseCountry = findCountryForCurrency(baseCurrency, currentCountry);
         }
-        var convertedStatePension = convertCurrencyAmount(this.yearlyIncomeStatePension, baseCurrency, baseCountry, targetCurrency, currentCountry, currentYear);
-        if (typeof convertedStatePension === 'number' && !isNaN(convertedStatePension)) {
+        var convertedStatePension = convertCurrencyAmount(this.yearlyIncomeStatePension, baseCurrency, baseCountry, targetCurrency, currentCountry, currentYear, true);
+        if (convertedStatePension === null) {
+          // Strict mode failure: set to 0 and let errors flag abort simulation
+          this.yearlyIncomeStatePension = 0;
+        } else if (typeof convertedStatePension === 'number' && !isNaN(convertedStatePension)) {
           this.yearlyIncomeStatePension = convertedStatePension;
         }
       }

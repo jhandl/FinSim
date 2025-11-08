@@ -117,8 +117,8 @@ module.exports = {
 
       // Compute expected net in foreign currency (PPP) before conversion
       const netInPPP = 12000 - 10000; // rental income - mortgage expense
-      // Convert the net to residence currency (QQQ)
-      const expectedNet = econ.convert(netInPPP, 'PP', 'QQ', row.year, { fxMode: 'ppp', baseYear: row.year });
+      // Convert the net to residence currency (QQQ) using nominal FX (constant mode) for ledger values
+      const expectedNet = econ.convert(netInPPP, 'PP', 'QQ', row.year, { fxMode: 'constant', baseYear: row.year });
       // Assert that the post-consolidation net impact matches the converted net
       const actualNet = row.incomeRentals - row.expenses;
       if (!withinTolerance(actualNet, expectedNet)) {
@@ -165,8 +165,9 @@ module.exports = {
         return { success: false, errors: ['Scenario 2 missing age 30 row'] };
       }
 
-      const expectedIncome = econ.convert(15000, 'PP', 'QQ', row.year, { fxMode: 'ppp', baseYear: row.year });
-      const expectedExpense = econ.convert(8000, 'RR', 'QQ', row.year, { fxMode: 'ppp', baseYear: row.year });
+      // Use nominal FX (constant mode) for ledger value expectations
+      const expectedIncome = econ.convert(15000, 'PP', 'QQ', row.year, { fxMode: 'constant', baseYear: row.year });
+      const expectedExpense = econ.convert(8000, 'RR', 'QQ', row.year, { fxMode: 'constant', baseYear: row.year });
 
       if (!withinTolerance(row.incomeRentals, expectedIncome)) {
         errors.push(`Scenario 2: incomeRentals mismatch (${row.incomeRentals} vs ${expectedIncome})`);
@@ -221,8 +222,9 @@ module.exports = {
         return { success: false, errors: ['Scenario 3 missing required ages (30-33)'] };
       }
 
-      const incomePYear30 = econ.convert(10000, 'PP', 'QQ', row30.year, { fxMode: 'ppp', baseYear: row30.year });
-      const expensePYear30 = econ.convert(7000, 'PP', 'QQ', row30.year, { fxMode: 'ppp', baseYear: row30.year });
+      // Use nominal FX (constant mode) for ledger value expectations
+      const incomePYear30 = econ.convert(10000, 'PP', 'QQ', row30.year, { fxMode: 'constant', baseYear: row30.year });
+      const expensePYear30 = econ.convert(7000, 'PP', 'QQ', row30.year, { fxMode: 'constant', baseYear: row30.year });
       if (!withinTolerance(row30.incomeRentals, incomePYear30)) {
         errors.push('Scenario 3: Year 30 rental conversion mismatch');
       }
@@ -230,7 +232,8 @@ module.exports = {
         errors.push('Scenario 3: Year 30 expense conversion mismatch');
       }
 
-      const incomeRYear33 = econ.convert(40000, 'RR', 'RR', row33.year, { fxMode: 'ppp', baseYear: row33.year });
+      // Use nominal FX (constant mode) for ledger value expectations
+      const incomeRYear33 = econ.convert(40000, 'RR', 'RR', row33.year, { fxMode: 'constant', baseYear: row33.year });
       if (!withinTolerance(row33.incomeSalaries, incomeRYear33)) {
         errors.push('Scenario 3: Year 33 salary should remain in residence currency');
       }

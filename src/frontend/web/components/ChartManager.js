@@ -25,7 +25,11 @@ class ChartManager {
       const flag = !!enabled;
       if (this.presentValueMode === flag) return;
       this.presentValueMode = flag;
-      this.refreshChartsWithCurrency(); // Recompute from cached nominal rows
+      // Guard: When PV mode changes, ensure we rebuild from cached nominal values
+      // This ensures stability when toggling PV on/off multiple times
+      if (this.cachedRowData && Object.keys(this.cachedRowData).length > 0) {
+        this.refreshChartsWithCurrency(); // Recompute from cached nominal rows
+      }
     } catch (_) {
       // no-op
     }
@@ -818,10 +822,13 @@ class ChartManager {
         return;
       }
       const opts = options || {};
+      // CRITICAL: Always store nominal values in cache before any transformations
+      // This ensures cachedRowData preserves original nominal values regardless of PV mode
       if (!opts.skipCacheStore) {
         if (rowIndex === 1) {
           this.cachedRowData = {};
         }
+        // Store a deep clone of nominal data (before PV transformation)
         this.cachedRowData[rowIndex] = Object.assign({}, data);
       }
       
@@ -840,6 +847,8 @@ class ChartManager {
        *   The conversion happens in the currency conversion block below via EconomicData.convert(..., {
        *   fxMode: 'constant', baseYear: startYear }).
        * - Graceful degradation: If economic data is unavailable, values remain nominal.
+       * - IMPORTANT: PV transformation is applied as a view-layer transform only. The cachedRowData
+       *   always contains nominal values, ensuring toggling PV mode works correctly.
        *
        * Key APIs:
        *   - this.getCountryForAge(age)
@@ -1096,7 +1105,9 @@ class ChartManager {
       const rowIndex = numericKeys[idx];
       const rowData = cached[rowIndex];
       if (!rowData) continue;
-      // IMPORTANT: pass a clone to avoid mutating cached originals during conversions
+      // CRITICAL: Always clone cached nominal data before applying transformations
+      // cachedRowData contains nominal values; PV transformation is applied in updateChartsRow
+      // when presentValueMode is enabled. This ensures toggling PV mode works correctly.
       const clone = Object.assign({}, rowData);
       this.updateChartsRow(rowIndex, clone, { skipCashflowUpdate: true, skipAssetsUpdate: true, skipCacheStore: true });
     }

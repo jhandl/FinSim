@@ -53,6 +53,7 @@ module.exports = {
           growthRateShares: 0,
           growthDevShares: 0,
           inflation: 0,
+          relocationEnabled: true,
           StartCountry: 'ie',
           economyMode: 'deterministic',
           simulation_mode: 'single'

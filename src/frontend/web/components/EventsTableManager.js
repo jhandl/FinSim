@@ -3098,7 +3098,11 @@ class EventsTableManager {
             const full = `MV-${code.toUpperCase()}`;
             const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
             if (cfg && typeof cfg.getTaxRuleSet === 'function') {
-              await cfg.getTaxRuleSet(code.toLowerCase());
+              try {
+                await cfg.getTaxRuleSet(code.toLowerCase());
+              } catch (_) {
+                // Ruleset loading failed; wizard will still launch but may show warnings
+              }
             }
             this.startWizardForEventType('MV', {
               eventType: full,
