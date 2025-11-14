@@ -26,7 +26,7 @@ class WebUI extends AbstractUI {
       this.notificationUtils = new NotificationUtils();
       this.errorModalUtils = new ErrorModalUtils();
       this.fieldLabelsManager = FieldLabelsManager.getInstance();
-      this.chartManager = new ChartManager();
+      this.chartManager = new ChartManager(this);
       this.tableManager = new TableManager(this);
       this.fileManager = new FileManager(this);
       this.eventsTableManager = new EventsTableManager(this);

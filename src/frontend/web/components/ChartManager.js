@@ -2,10 +2,12 @@
 
 class ChartManager {
 
-  constructor() {
+  constructor(webUI) {
+    this.webUI = webUI; // Store reference to WebUI for accessing scenario parameters
     this.cachedRowData = {};
     this.reportingCurrency = null; // Selected currency for display (defaults to StartCountry currency)
     this.relocationTransitions = []; // Array of {age, fromCountry, toCountry} for visual markers
+    this.countryInflationOverrides = {}; // MV event rate overrides: country -> inflation rate (decimal)
     this.originalValues = {}; // Cache of unconverted values for tooltip display
     this.countryTimeline = []; // Array tracking which country is active at each age
     this.currencyMode = 'unified'; // Charts always use unified mode (no mode selector in charts)
@@ -861,33 +863,87 @@ class ChartManager {
           const cfg0 = Config.getInstance();
           const startYear = cfg0.getSimulationStartYear();
           const fromCountry = this.getCountryForAge(age);
-          const econ = cfg0.getEconomicData();
-          if (econ && econ.ready) {
-            const cpiPct = econ.getInflation(fromCountry);
-            if (cpiPct != null && isFinite(Number(cpiPct))) {
-              const inflationRate = Number(cpiPct) / 100;
-              const deflationFactor = getDeflationFactor(age, startYear, inflationRate);
-              // Fixed monetary fields
-              const monetaryFields = [
-                'NetIncome','Expenses','IncomeSalaries','IncomeRentals','IncomeRSUs','IncomePrivatePension',
-                'IncomeStatePension','IncomeDefinedBenefit','IncomeTaxFree','IncomeCash','RealEstateCapital',
-                'PensionFund','Cash','FundsCapital','SharesCapital'
-              ];
-              for (let mf = 0; mf < monetaryFields.length; mf++) {
-                const field = monetaryFields[mf];
-                if (data[field] !== undefined) {
-                  data[field] = data[field] * deflationFactor;
+          const baseCountryCode = (cfg0.getDefaultCountry() || '').toLowerCase();
+          const fromCountryNormalized = (fromCountry || '').toLowerCase();
+          
+          // Resolve inflation rate with same precedence as Simulator.resolveCountryInflation
+          // Logic: Start country uses scenario inflation; relocated countries use MV event rate
+          let inflationRate = null;
+          
+          if (fromCountryNormalized === baseCountryCode) {
+            // START COUNTRY: Use scenario inflation parameter (if provided), else EconomicData
+            if (this.webUI) {
+              const scenarioInflation = this.webUI.getValue("Inflation");
+              // Check if inflation was actually provided (not empty/zero from empty field)
+              const inflationElement = document.getElementById("Inflation");
+              const hasInflationValue = inflationElement && inflationElement.value && inflationElement.value.trim() !== '';
+              if (hasInflationValue && scenarioInflation !== null && scenarioInflation !== undefined) {
+                // getValue("Inflation") already returns a decimal (parsePercentage divides by 100)
+                const parsed = parseFloat(scenarioInflation);
+                if (!isNaN(parsed) && isFinite(parsed)) {
+                  inflationRate = parsed;
                 }
               }
-              // Dynamic investment fields (Income__*, Capital__*)
-              Object.keys(data).forEach((key) => {
-                if (typeof key === 'string' && (key.indexOf('Income__') === 0 || key.indexOf('Capital__') === 0)) {
-                  if (data[key] !== undefined) {
-                    data[key] = data[key] * deflationFactor;
-                  }
-                }
-              });
             }
+          } else {
+            // RELOCATED COUNTRY: Use MV event rate override (if provided), else EconomicData
+            if (this.countryInflationOverrides && Object.prototype.hasOwnProperty.call(this.countryInflationOverrides, fromCountryNormalized)) {
+              const override = this.countryInflationOverrides[fromCountryNormalized];
+              if (override !== null && override !== undefined && override !== '') {
+                inflationRate = override;
+              }
+            }
+          }
+          
+          // Fallback: EconomicData CPI for the country (if not set above)
+          if (inflationRate === null) {
+            const econ = cfg0.getEconomicData();
+            if (econ && econ.ready) {
+              const cpiPct = econ.getInflation(fromCountry);
+              if (cpiPct != null && isFinite(Number(cpiPct))) {
+                inflationRate = Number(cpiPct) / 100;
+              }
+            }
+          }
+          
+          // Fallback: TaxRuleSet inflation rate
+          if (inflationRate === null) {
+            const rs = cfg0.getCachedTaxRuleSet ? cfg0.getCachedTaxRuleSet(fromCountry) : null;
+            if (rs && typeof rs.getInflationRate === 'function') {
+              const rate = rs.getInflationRate();
+              if (rate !== null && rate !== undefined) {
+                inflationRate = rate;
+              }
+            }
+          }
+          
+          // Final fallback: Default 2%
+          if (inflationRate === null) {
+            inflationRate = 0.02;
+          }
+          
+          if (inflationRate !== null) {
+            const deflationFactor = getDeflationFactor(age, startYear, inflationRate);
+            // Fixed monetary fields
+            const monetaryFields = [
+              'NetIncome','Expenses','IncomeSalaries','IncomeRentals','IncomeRSUs','IncomePrivatePension',
+              'IncomeStatePension','IncomeDefinedBenefit','IncomeTaxFree','IncomeCash','RealEstateCapital',
+              'PensionFund','Cash','FundsCapital','SharesCapital'
+            ];
+            for (let mf = 0; mf < monetaryFields.length; mf++) {
+              const field = monetaryFields[mf];
+              if (data[field] !== undefined) {
+                data[field] = data[field] * deflationFactor;
+              }
+            }
+            // Dynamic investment fields (Income__*, Capital__*)
+            Object.keys(data).forEach((key) => {
+              if (typeof key === 'string' && (key.indexOf('Income__') === 0 || key.indexOf('Capital__') === 0)) {
+                if (data[key] !== undefined) {
+                  data[key] = data[key] * deflationFactor;
+                }
+              }
+            });
           }
         } catch (_) { /* keep nominal on any failure */ }
       }

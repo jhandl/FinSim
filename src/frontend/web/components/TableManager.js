@@ -11,6 +11,7 @@ class TableManager {
     this.currencyMode = 'natural'; // 'natural' or 'unified'
     this.reportingCurrency = null;
     this.countryTimeline = [];
+    this.countryInflationOverrides = {}; // MV event rate overrides: country -> inflation rate (decimal)
     this.conversionCache = {};
     this.storedCountryTimeline = null; // Persisted timeline from last simulation run
     this.presentValueMode = false; // Display monetary values in today's terms when enabled
@@ -295,8 +296,13 @@ class TableManager {
        *   for that age/year, not the display currency's country. This preserves real purchasing power.
        * - Why: An amount earned in IE at age 30 must be deflated with IE CPI even if later displayed
        *   in another currency (e.g., ARS). This ensures accurate cross-country, multi-currency scenarios.
-       * - Shared currencies: For EUR, country-specific CPI profiles (IE/FR/DE) can differ. We always use
-       *   the residency country's profile via EconomicData.getInflation(fromCountry) for accuracy.
+       * - Inflation rate precedence (matches Simulator.resolveCountryInflation):
+       *   1. User-provided scenario inflation parameter (params.inflation) for the base/start country
+       *   2. EconomicData.getInflation(countryCode) - country-specific CPI from tax rules
+       *   3. TaxRuleSet.getInflationRate() - fallback from tax rules
+       *   4. Default 2% if none available
+       * - Shared currencies: For EUR, country-specific CPI profiles (IE/FR/DE) can differ. We use
+       *   the user-provided inflation for the base country, otherwise the residency country's profile.
        * - Order of operations: Nominal → deflate via getDeflationFactor(age, startYear, rate) →
        *   currency conversion (if unified). Deflation must happen in source currency before FX.
        * - Currency Conversion Mode: After deflation in the source currency, any cross-currency conversion
@@ -307,6 +313,8 @@ class TableManager {
        * - Graceful degradation: If economic data is unavailable, fall back to nominal values.
        * - Key APIs:
        *   - RelocationUtils.getCountryForAge(age, this)
+       *   - this.webUI.getValue("Inflation") - user-provided scenario inflation
+       *   - Config.getInstance().getDefaultCountry() - base country code
        *   - EconomicData.getInflation(countryCode)
        *   - getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate)
        */
@@ -315,16 +323,69 @@ class TableManager {
         try {
           const age = data.Age;
           const fromCountry = RelocationUtils.getCountryForAge(age, this);
-          const econ = Config.getInstance().getEconomicData();
-          if (econ && econ.ready) {
-            const cpiPct = econ.getInflation(fromCountry);
-            if (cpiPct == null || !isFinite(Number(cpiPct))) {
-              deflationFactor = 1;
-            } else {
-              const rate = Number(cpiPct) / 100;
-              deflationFactor = getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate);
-              v = v * deflationFactor;
+          const cfg = Config.getInstance();
+          const baseCountryCode = (cfg.getDefaultCountry() || '').toLowerCase();
+          const fromCountryNormalized = (fromCountry || '').toLowerCase();
+          
+          // Resolve inflation rate with same precedence as Simulator.resolveCountryInflation
+          // Logic: Start country uses scenario inflation; relocated countries use MV event rate
+          let inflationRate = null;
+          
+          if (fromCountryNormalized === baseCountryCode) {
+            // START COUNTRY: Use scenario inflation parameter (if provided), else EconomicData
+            if (this.webUI) {
+              const scenarioInflation = this.webUI.getValue("Inflation");
+              // Check if inflation was actually provided (not empty/zero from empty field)
+              const inflationElement = document.getElementById("Inflation");
+              const hasInflationValue = inflationElement && inflationElement.value && inflationElement.value.trim() !== '';
+              if (hasInflationValue && scenarioInflation !== null && scenarioInflation !== undefined) {
+                // getValue("Inflation") already returns a decimal (parsePercentage divides by 100)
+                const parsed = parseFloat(scenarioInflation);
+                if (!isNaN(parsed) && isFinite(parsed)) {
+                  inflationRate = parsed;
+                }
+              }
             }
+          } else {
+            // RELOCATED COUNTRY: Use MV event rate override (if provided), else EconomicData
+            if (this.countryInflationOverrides && Object.prototype.hasOwnProperty.call(this.countryInflationOverrides, fromCountryNormalized)) {
+              const override = this.countryInflationOverrides[fromCountryNormalized];
+              if (override !== null && override !== undefined && override !== '') {
+                inflationRate = override;
+              }
+            }
+          }
+          
+          // Fallback: EconomicData CPI for the country (if not set above)
+          if (inflationRate === null) {
+            const econ = cfg.getEconomicData();
+            if (econ && econ.ready) {
+              const cpiPct = econ.getInflation(fromCountry);
+              if (cpiPct != null && isFinite(Number(cpiPct))) {
+                inflationRate = Number(cpiPct) / 100;
+              }
+            }
+          }
+          
+          // Fallback: TaxRuleSet inflation rate
+          if (inflationRate === null) {
+            const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(fromCountry) : null;
+            if (rs && typeof rs.getInflationRate === 'function') {
+              const rate = rs.getInflationRate();
+              if (rate !== null && rate !== undefined) {
+                inflationRate = rate;
+              }
+            }
+          }
+          
+          // Final fallback: Default 2%
+          if (inflationRate === null) {
+            inflationRate = 0.02;
+          }
+          
+          if (inflationRate !== null) {
+            deflationFactor = getDeflationFactor(age, cfg.getSimulationStartYear(), inflationRate);
+            v = v * deflationFactor;
           }
         } catch (_) { /* graceful: keep nominal */ }
       }
@@ -737,18 +798,73 @@ class TableManager {
           // Get age for PV and currency calculations
           const age = getAgeFromRow(row);
           
-          // Apply present-value deflation if enabled
+          // Apply present-value deflation if enabled (using same precedence as display logic)
           if (this.presentValueMode && key !== 'Age' && key !== 'Year' && key !== 'WithdrawalRate' && age !== null) {
             try {
               const fromCountry = RelocationUtils.getCountryForAge(age, this);
-              const econ = Config.getInstance().getEconomicData();
-              if (econ && econ.ready) {
-                const cpiPct = econ.getInflation(fromCountry);
-                if (cpiPct != null && isFinite(Number(cpiPct))) {
-                  const rate = Number(cpiPct) / 100;
-                  const df = getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate);
-                  value = value * df;
+              const cfg = Config.getInstance();
+              const baseCountryCode = (cfg.getDefaultCountry() || '').toLowerCase();
+              const fromCountryNormalized = (fromCountry || '').toLowerCase();
+              
+              // Resolve inflation rate with same precedence as Simulator.resolveCountryInflation
+              // Logic: Start country uses scenario inflation; relocated countries use MV event rate
+              let inflationRate = null;
+              
+              if (fromCountryNormalized === baseCountryCode) {
+                // START COUNTRY: Use scenario inflation parameter (if provided), else EconomicData
+                if (this.webUI) {
+                  const scenarioInflation = this.webUI.getValue("Inflation");
+                  // Check if inflation was actually provided (not empty/zero from empty field)
+                  const inflationElement = document.getElementById("Inflation");
+                  const hasInflationValue = inflationElement && inflationElement.value && inflationElement.value.trim() !== '';
+                  if (hasInflationValue && scenarioInflation !== null && scenarioInflation !== undefined) {
+                    // getValue("Inflation") already returns a decimal (parsePercentage divides by 100)
+                    const parsed = parseFloat(scenarioInflation);
+                    if (!isNaN(parsed) && isFinite(parsed)) {
+                      inflationRate = parsed;
+                    }
+                  }
                 }
+              } else {
+                // RELOCATED COUNTRY: Use MV event rate override (if provided), else EconomicData
+                if (this.countryInflationOverrides && Object.prototype.hasOwnProperty.call(this.countryInflationOverrides, fromCountryNormalized)) {
+                  const override = this.countryInflationOverrides[fromCountryNormalized];
+                  if (override !== null && override !== undefined && override !== '') {
+                    inflationRate = override;
+                  }
+                }
+              }
+              
+              // Fallback: EconomicData CPI for the country (if not set above)
+              if (inflationRate === null) {
+                const econ = cfg.getEconomicData();
+                if (econ && econ.ready) {
+                  const cpiPct = econ.getInflation(fromCountry);
+                  if (cpiPct != null && isFinite(Number(cpiPct))) {
+                    inflationRate = Number(cpiPct) / 100;
+                  }
+                }
+              }
+              
+              // Fallback: TaxRuleSet inflation rate
+              if (inflationRate === null) {
+                const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(fromCountry) : null;
+                if (rs && typeof rs.getInflationRate === 'function') {
+                  const rate = rs.getInflationRate();
+                  if (rate !== null && rate !== undefined) {
+                    inflationRate = rate;
+                  }
+                }
+              }
+              
+              // Final fallback: Default 2%
+              if (inflationRate === null) {
+                inflationRate = 0.02;
+              }
+              
+              if (inflationRate !== null) {
+                const df = getDeflationFactor(age, cfg.getSimulationStartYear(), inflationRate);
+                value = value * df;
               }
             } catch (_) { /* keep nominal */ }
           }

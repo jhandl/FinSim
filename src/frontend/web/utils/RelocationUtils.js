@@ -10,6 +10,8 @@ class RelocationUtils {
     
         instance.countryTimeline = [{ fromAge: 0, country: startCountry.toLowerCase() }];
         instance.relocationTransitions = [];
+        // Store MV event rate overrides: country -> inflation rate (decimal)
+        instance.countryInflationOverrides = {};
     
         const mvEvents = events.filter(e => e.type && e.type.indexOf('MV-') === 0).sort((a, b) => a.fromAge - b.fromAge);
         mvEvents.forEach(ev => {
@@ -17,6 +19,15 @@ class RelocationUtils {
             const prevCountry = instance.countryTimeline[instance.countryTimeline.length - 1].country;
             instance.relocationTransitions.push({ age: ev.fromAge, fromCountry: prevCountry, toCountry: destCountry });
             instance.countryTimeline.push({ fromAge: ev.fromAge, country: destCountry });
+            
+            // Store MV event rate as inflation override for destination country (if provided)
+            // event.rate is already a decimal (parsePercentage divides by 100)
+            if (ev.rate !== null && ev.rate !== undefined && ev.rate !== '') {
+                const parsed = parseFloat(ev.rate);
+                if (!isNaN(parsed) && isFinite(parsed)) {
+                    instance.countryInflationOverrides[destCountry] = parsed;
+                }
+            }
         });
     }
 
