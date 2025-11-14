@@ -29,6 +29,7 @@ beforeAll(() => {
   global.Config = {
     getInstance: jest.fn(() => ({
       getSimulationStartYear: jest.fn(() => 2020),
+      getDefaultCountry: jest.fn(() => 'ie'),
       isRelocationEnabled: jest.fn(() => false),
       getEconomicData: jest.fn(() => ({
         ready: true,

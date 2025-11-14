@@ -210,12 +210,15 @@ class Taxman {
       var trailingYears = residencyRules.postEmigrationTaxYears || 0;
       var taxesForeign = residencyRules.taxesForeignIncome || false;
       
-      if (trailingYears > 0 && yearsSinceExit < trailingYears && taxesForeign) {
+      // Include trailing taxation for full calendar years AFTER exit, inclusive of the final year.
+      // Example: postEmigrationTaxYears = 3, exit at Y:
+      // active in Y+1, Y+2, Y+3 (yearsSinceExit = 1..3); not active at Y (0) or Y+4 (4).
+      if (trailingYears > 0 && yearsSinceExit >= 1 && yearsSinceExit <= trailingYears && taxesForeign) {
         active.push({
           country: entry.country,
           exitYear: exitYear,
           yearsSinceExit: yearsSinceExit,
-          remainingYears: trailingYears - yearsSinceExit,
+          remainingYears: (trailingYears - yearsSinceExit + 1),
           ruleset: prevRuleset
         });
       }

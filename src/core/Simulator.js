@@ -305,6 +305,33 @@ function readScenario(validate) {
   errors = false;
   uiManager.clearWarnings();
   params = uiManager.readParameters(validate);
+  // Normalize parameter aliases to prevent NaN propagation from undefined keys (root-cause fix)
+  // Tests may provide 'fundsAllocation'/'sharesAllocation' (lower camelCase); engine expects 'FundsAllocation'/'SharesAllocation'
+  if (params) {
+    // Ensure growth rates/devs are numeric defaults (0) when omitted by tests
+    var toNumOrZero = function(v) {
+      var n = (typeof v === 'string') ? parseFloat(v) : v;
+      return (typeof n === 'number' && isFinite(n)) ? n : 0;
+    };
+    params.growthRateFunds = toNumOrZero(params.growthRateFunds);
+    params.growthDevFunds = toNumOrZero(params.growthDevFunds);
+    params.growthRateShares = toNumOrZero(params.growthRateShares);
+    params.growthDevShares = toNumOrZero(params.growthDevShares);
+    params.growthRatePension = toNumOrZero(params.growthRatePension);
+    params.growthDevPension = toNumOrZero(params.growthDevPension);
+
+    if (params.FundsAllocation === undefined && params.fundsAllocation !== undefined) {
+      var fa = (typeof params.fundsAllocation === 'string') ? parseFloat(params.fundsAllocation) : params.fundsAllocation;
+      params.FundsAllocation = (typeof fa === 'number' && isFinite(fa)) ? fa : 0;
+    }
+    if (params.SharesAllocation === undefined && params.sharesAllocation !== undefined) {
+      var sa = (typeof params.sharesAllocation === 'string') ? parseFloat(params.sharesAllocation) : params.sharesAllocation;
+      params.SharesAllocation = (typeof sa === 'number' && isFinite(sa)) ? sa : 0;
+    }
+    // Ensure numeric defaults if still missing
+    if (typeof params.FundsAllocation !== 'number' || !isFinite(params.FundsAllocation)) params.FundsAllocation = 0;
+    if (typeof params.SharesAllocation !== 'number' || !isFinite(params.SharesAllocation)) params.SharesAllocation = 0;
+  }
   events = uiManager.readEvents(validate);
   if (errors) {
     uiManager.setStatus("Check errors", STATUS_COLORS.WARNING);
