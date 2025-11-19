@@ -628,12 +628,25 @@ function processEvents() {
   if (!countryInflationOverrides) countryInflationOverrides = {};
   var economicData = (typeof config.getEconomicData === 'function') ? config.getEconomicData() : null;
   var baseCountryCode = ((params.StartCountry || config.getDefaultCountry() || '') + '').toLowerCase();
-
   function normalizeCountry(code) {
     return (code || '').toString().trim().toLowerCase();
   }
 
+  // Centralised inflation resolution (thin wrapper over InflationService).
   function resolveCountryInflation(code) {
+    // Prefer InflationService when available to keep logic in one place.
+    if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function') {
+      return InflationService.resolveInflationRate(code, year, {
+        params: params,
+        config: config,
+        economicData: economicData,
+        countryInflationOverrides: countryInflationOverrides,
+        baseCountry: baseCountryCode,
+        defaultRate: 0.02
+      });
+    }
+
+    // Fallback: legacy inline logic (kept for safety in non-browser test contexts).
     var key = normalizeCountry(code);
     if (!key) key = baseCountryCode;
     if (countryInflationOverrides && countryInflationOverrides.hasOwnProperty(key)) {
@@ -1770,7 +1783,57 @@ function updateYearlyData() {
   });
   
   if (!(row in dataSheet)) {
-    dataSheet[row] = { "age": 0, "year": 0, "incomeSalaries": 0, "incomeRSUs": 0, "incomeRentals": 0, "incomePrivatePension": 0, "incomeStatePension": 0, "incomeFundsRent": 0, "incomeSharesRent": 0, "incomeCash": 0, "incomeDefinedBenefit": 0, "incomeTaxFree": 0, "realEstateCapital": 0, "netIncome": 0, "expenses": 0, "pensionFund": 0, "cash": 0, "indexFundsCapital": 0, "sharesCapital": 0, "pensionContribution": 0, "withdrawalRate": 0, "worth": 0, "attributions": {}, "investmentIncomeByKey": {}, "investmentCapitalByKey": {}, "taxByKey": {} };
+    dataSheet[row] = {
+      "age": 0,
+      "year": 0,
+      // Nominal aggregates
+      "incomeSalaries": 0,
+      "incomeRSUs": 0,
+      "incomeRentals": 0,
+      "incomePrivatePension": 0,
+      "incomeStatePension": 0,
+      "incomeFundsRent": 0,
+      "incomeSharesRent": 0,
+      "incomeCash": 0,
+      "incomeDefinedBenefit": 0,
+      "incomeTaxFree": 0,
+      "realEstateCapital": 0,
+      "netIncome": 0,
+      "expenses": 0,
+      "pensionFund": 0,
+      "cash": 0,
+      "indexFundsCapital": 0,
+      "sharesCapital": 0,
+      "pensionContribution": 0,
+      "withdrawalRate": 0,
+      "worth": 0,
+      // Present-value (PV) aggregates – expressed in simulation-start year terms
+      "incomeSalariesPV": 0,
+      "incomeRSUsPV": 0,
+      "incomeRentalsPV": 0,
+      "incomePrivatePensionPV": 0,
+      "incomeStatePensionPV": 0,
+      "incomeFundsRentPV": 0,
+      "incomeSharesRentPV": 0,
+      "incomeCashPV": 0,
+      "incomeDefinedBenefitPV": 0,
+      "incomeTaxFreePV": 0,
+      "realEstateCapitalPV": 0,
+      "netIncomePV": 0,
+      "expensesPV": 0,
+      "pensionFundPV": 0,
+      "cashPV": 0,
+      "indexFundsCapitalPV": 0,
+      "sharesCapitalPV": 0,
+      "worthPV": 0,
+      // Attribution and dynamic per-key maps (nominal and PV)
+      "attributions": {},
+      "investmentIncomeByKey": {},
+      "investmentCapitalByKey": {},
+      "investmentIncomeByKeyPV": {},
+      "investmentCapitalByKeyPV": {},
+      "taxByKey": {}
+    };
     // Pre-initialize stable tax columns for consistency across rows
     if (stableTaxIds && stableTaxIds.length > 0) {
       for (var ti = 0; ti < stableTaxIds.length; ti++) {
@@ -1880,7 +1943,109 @@ function updateYearlyData() {
     }
   }
   
-  dataSheet[row].worth += realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFunds.capital() + shares.capital() + cash;
+  // Compute present-value aggregates using a single deflation factor per row.
+  // This preserves existing nominal behaviour while exposing a PV layer that
+  // expresses amounts in simulation-start-year purchasing power for the
+  // residency country at this age.
+  (function computePresentValueAggregates() {
+    var cfg, startYear, ageNum, pvCountry, inflationRate, deflationFactor;
+    try {
+      ageNum = person1.age;
+      cfg = (typeof Config !== 'undefined' && Config && typeof Config.getInstance === 'function') ? Config.getInstance() : null;
+      startYear = (cfg && typeof cfg.getSimulationStartYear === 'function') ? cfg.getSimulationStartYear() : null;
+      pvCountry = currentCountry || ((params.StartCountry || (cfg && cfg.getDefaultCountry && cfg.getDefaultCountry()) || '') + '').toLowerCase();
+      inflationRate = null;
+      if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function' && startYear !== null) {
+        var currentYearPv = startYear + ageNum;
+        inflationRate = InflationService.resolveInflationRate(pvCountry, currentYearPv, {
+          params: (typeof params !== 'undefined') ? params : null,
+          config: cfg,
+          countryInflationOverrides: (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null
+        });
+      }
+      if (inflationRate === null || inflationRate === undefined) {
+        // Fallback to scenario/global inflation to preserve behaviour
+        inflationRate = (params && typeof params.inflation === 'number') ? params.inflation : 0;
+      }
+      // Use getDeflationFactor(age, startYear, rate) so PV is consistent with UI helpers
+      deflationFactor = (typeof getDeflationFactor === 'function') ? getDeflationFactor(ageNum, startYear, inflationRate) : 1;
+      if (deflationFactor === null || deflationFactor === undefined || !isFinite(deflationFactor) || deflationFactor <= 0) {
+        deflationFactor = 1;
+      }
+    } catch (_e) {
+      deflationFactor = 1;
+    }
+
+    if (deflationFactor === 1) {
+      // Still initialise PV fields so downstream consumers can assume presence.
+      dataSheet[row].incomeSalariesPV += incomeSalaries;
+      dataSheet[row].incomeRSUsPV += incomeShares;
+      dataSheet[row].incomeRentalsPV += incomeRentals;
+      dataSheet[row].incomePrivatePensionPV += incomePrivatePension;
+      dataSheet[row].incomeStatePensionPV += incomeStatePension;
+      dataSheet[row].incomeFundsRentPV += incomeFundsRent;
+      dataSheet[row].incomeSharesRentPV += incomeSharesRent;
+      dataSheet[row].incomeCashPV += Math.max(cashWithdraw, 0);
+      dataSheet[row].incomeDefinedBenefitPV += incomeDefinedBenefit;
+      dataSheet[row].incomeTaxFreePV += incomeTaxFree;
+      dataSheet[row].realEstateCapitalPV += realEstateConverted;
+      dataSheet[row].netIncomePV += netIncome;
+      dataSheet[row].expensesPV += expenses;
+      dataSheet[row].pensionFundPV += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+      dataSheet[row].cashPV += cash;
+      dataSheet[row].indexFundsCapitalPV += indexFundsCap;
+      dataSheet[row].sharesCapitalPV += sharesCap;
+      dataSheet[row].worthPV += realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFundsCap + sharesCap + cash;
+    } else {
+      dataSheet[row].incomeSalariesPV += incomeSalaries * deflationFactor;
+      dataSheet[row].incomeRSUsPV += incomeShares * deflationFactor;
+      dataSheet[row].incomeRentalsPV += incomeRentals * deflationFactor;
+      dataSheet[row].incomePrivatePensionPV += incomePrivatePension * deflationFactor;
+      dataSheet[row].incomeStatePensionPV += incomeStatePension * deflationFactor;
+      dataSheet[row].incomeFundsRentPV += incomeFundsRent * deflationFactor;
+      dataSheet[row].incomeSharesRentPV += incomeSharesRent * deflationFactor;
+      dataSheet[row].incomeCashPV += Math.max(cashWithdraw, 0) * deflationFactor;
+      dataSheet[row].incomeDefinedBenefitPV += incomeDefinedBenefit * deflationFactor;
+      dataSheet[row].incomeTaxFreePV += incomeTaxFree * deflationFactor;
+      dataSheet[row].realEstateCapitalPV += realEstateConverted * deflationFactor;
+      dataSheet[row].netIncomePV += netIncome * deflationFactor;
+      dataSheet[row].expensesPV += expenses * deflationFactor;
+      dataSheet[row].pensionFundPV += (person1.pension.capital() + (person2 ? person2.pension.capital() : 0)) * deflationFactor;
+      dataSheet[row].cashPV += cash * deflationFactor;
+      dataSheet[row].indexFundsCapitalPV += indexFundsCap * deflationFactor;
+      dataSheet[row].sharesCapitalPV += sharesCap * deflationFactor;
+      dataSheet[row].worthPV += (realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFundsCap + sharesCap + cash) * deflationFactor;
+    }
+
+    // Dynamic PV maps for per-investment-type income and capital. These mirror
+    // the nominal investmentIncomeByKey / investmentCapitalByKey maps so that
+    // dynamic Income__/Capital__ columns in the UI can also be “exact by
+    // construction” rather than deflated in the browser.
+    try {
+      if (investmentIncomeByKey) {
+        for (var ik in investmentIncomeByKey) {
+          if (!dataSheet[row].investmentIncomeByKeyPV[ik]) dataSheet[row].investmentIncomeByKeyPV[ik] = 0;
+          if (deflationFactor === 1) {
+            dataSheet[row].investmentIncomeByKeyPV[ik] += investmentIncomeByKey[ik];
+          } else {
+            dataSheet[row].investmentIncomeByKeyPV[ik] += investmentIncomeByKey[ik] * deflationFactor;
+          }
+        }
+      }
+      if (typeof capsByKey !== 'undefined' && capsByKey) {
+        for (var ck in capsByKey) {
+          if (!dataSheet[row].investmentCapitalByKeyPV[ck]) dataSheet[row].investmentCapitalByKeyPV[ck] = 0;
+          if (deflationFactor === 1) {
+            dataSheet[row].investmentCapitalByKeyPV[ck] += capsByKey[ck];
+          } else {
+            dataSheet[row].investmentCapitalByKeyPV[ck] += capsByKey[ck] * deflationFactor;
+          }
+        }
+      }
+    } catch (_e2) {}
+  })();
+
+  dataSheet[row].worth += realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFundsCap + sharesCap + cash;
 
   // Record portfolio statistics for tooltip attribution
   const indexFundsStats = indexFunds.getPortfolioStats();

@@ -23,7 +23,9 @@
 - Move to WASM
    - Set up build process
    - Move code to new private repo (or rename repo and create new finsim repo for prod)
-   - Compile
+   - Rewrite in AssemblyScript
+   - Compile to WASM
+   - Add to the public repo
 - Feedback form: @feedback-form-plan.md
 - Monetization: @monetization-plan.md
    - Pay what you want subscription 

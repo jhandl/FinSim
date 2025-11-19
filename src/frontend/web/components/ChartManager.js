@@ -836,115 +836,43 @@ class ChartManager {
       
       const i = rowIndex-1;
       /*
-       * Present-value deflation (country-based) for charts:
-       * - Principle: Deflate each nominal amount using the CPI of the residency country
-       *   for that age/year, not the display currency's country. This preserves real purchasing power.
-       * - Order of operations: Nominal (source currency) → deflate using getDeflationFactor(age, startYear, rate) →
-       *   convert to reporting currency (if unified mode).
-       * - Integration: This block runs BEFORE the currency conversion below so that FX operates on deflated values.
-       * - Currency Conversion Mode: After deflation, currency conversion (if unified mode) uses nominal FX
-       *   rates (fxMode: 'constant'), NOT purchasing power parity (PPP). This ensures display values reflect
-       *   actual exchange rates rather than cost-of-living adjustments. PPP is reserved exclusively for
-       *   user-facing suggestions in event management (e.g., split amount recommendations after relocation).
-       *   The conversion happens in the currency conversion block below via EconomicData.convert(..., {
-       *   fxMode: 'constant', baseYear: startYear }).
-       * - Graceful degradation: If economic data is unavailable, values remain nominal.
-       * - IMPORTANT: PV transformation is applied as a view-layer transform only. The cachedRowData
-       *   always contains nominal values, ensuring toggling PV mode works correctly.
-       *
-       * Key APIs:
-       *   - this.getCountryForAge(age)
-       *   - Config.getInstance().getEconomicData().getInflation(country)
-       *   - getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), inflationRate)
+       * Present-value handling for charts:
+       * - When PV mode is enabled, charts simply consume the core PV fields that
+       *   were computed in the simulator (`*PV` aggregates and dynamic maps),
+       *   rather than recomputing any deflation in the UI.
+       * - Cached nominal rows in `cachedRowData` remain untouched; toggling PV
+       *   on/off just switches which fields are read for plotting.
        */
       if (this.presentValueMode) {
         try {
-          const age = data.Age;
-          const cfg0 = Config.getInstance();
-          const startYear = cfg0.getSimulationStartYear();
-          const fromCountry = this.getCountryForAge(age);
-          const baseCountryCode = (cfg0.getDefaultCountry() || '').toLowerCase();
-          const fromCountryNormalized = (fromCountry || '').toLowerCase();
-          
-          // Resolve inflation rate with same precedence as Simulator.resolveCountryInflation
-          // Logic: Start country uses scenario inflation; relocated countries use MV event rate
-          let inflationRate = null;
-          
-          if (fromCountryNormalized === baseCountryCode) {
-            // START COUNTRY: Use scenario inflation parameter (if provided), else EconomicData
-            if (this.webUI) {
-              const scenarioInflation = this.webUI.getValue("Inflation");
-              // Check if inflation was actually provided (not empty/zero from empty field)
-              const inflationElement = document.getElementById("Inflation");
-              const hasInflationValue = inflationElement && inflationElement.value && inflationElement.value.trim() !== '';
-              if (hasInflationValue && scenarioInflation !== null && scenarioInflation !== undefined) {
-                // getValue("Inflation") already returns a decimal (parsePercentage divides by 100)
-                const parsed = parseFloat(scenarioInflation);
-                if (!isNaN(parsed) && isFinite(parsed)) {
-                  inflationRate = parsed;
-                }
-              }
-            }
-          } else {
-            // RELOCATED COUNTRY: Use MV event rate override (if provided), else EconomicData
-            if (this.countryInflationOverrides && Object.prototype.hasOwnProperty.call(this.countryInflationOverrides, fromCountryNormalized)) {
-              const override = this.countryInflationOverrides[fromCountryNormalized];
-              if (override !== null && override !== undefined && override !== '') {
-                inflationRate = override;
-              }
+          // Fixed monetary fields – prefer core *PV fields when present
+          const monetaryFields = [
+            'NetIncome','Expenses','IncomeSalaries','IncomeRentals','IncomeRSUs','IncomePrivatePension',
+            'IncomeStatePension','IncomeDefinedBenefit','IncomeTaxFree','IncomeCash','RealEstateCapital',
+            'PensionFund','Cash','FundsCapital','SharesCapital'
+          ];
+          for (let mf = 0; mf < monetaryFields.length; mf++) {
+            const field = monetaryFields[mf];
+            if (data[field] === undefined) continue;
+            const pvKey = field + 'PV';
+            if (Object.prototype.hasOwnProperty.call(data, pvKey) &&
+                typeof data[pvKey] === 'number' && isFinite(data[pvKey])) {
+              data[field] = data[pvKey];
             }
           }
-          
-          // Fallback: EconomicData CPI for the country (if not set above)
-          if (inflationRate === null) {
-            const econ = cfg0.getEconomicData();
-            if (econ && econ.ready) {
-              const cpiPct = econ.getInflation(fromCountry);
-              if (cpiPct != null && isFinite(Number(cpiPct))) {
-                inflationRate = Number(cpiPct) / 100;
+
+          // Dynamic investment fields (Income__*, Capital__*):
+          // Prefer core PV mirrors (e.g. Income__indexFundsPV) when present.
+          Object.keys(data).forEach(function(key) {
+            if (typeof key === 'string' && (key.indexOf('Income__') === 0 || key.indexOf('Capital__') === 0)) {
+              if (data[key] === undefined) return;
+              var dynPvKey = key + 'PV';
+              if (Object.prototype.hasOwnProperty.call(data, dynPvKey) &&
+                  typeof data[dynPvKey] === 'number' && isFinite(data[dynPvKey])) {
+                data[key] = data[dynPvKey];
               }
             }
-          }
-          
-          // Fallback: TaxRuleSet inflation rate
-          if (inflationRate === null) {
-            const rs = cfg0.getCachedTaxRuleSet ? cfg0.getCachedTaxRuleSet(fromCountry) : null;
-            if (rs && typeof rs.getInflationRate === 'function') {
-              const rate = rs.getInflationRate();
-              if (rate !== null && rate !== undefined) {
-                inflationRate = rate;
-              }
-            }
-          }
-          
-          // Final fallback: Default 2%
-          if (inflationRate === null) {
-            inflationRate = 0.02;
-          }
-          
-          if (inflationRate !== null) {
-            const deflationFactor = getDeflationFactor(age, startYear, inflationRate);
-            // Fixed monetary fields
-            const monetaryFields = [
-              'NetIncome','Expenses','IncomeSalaries','IncomeRentals','IncomeRSUs','IncomePrivatePension',
-              'IncomeStatePension','IncomeDefinedBenefit','IncomeTaxFree','IncomeCash','RealEstateCapital',
-              'PensionFund','Cash','FundsCapital','SharesCapital'
-            ];
-            for (let mf = 0; mf < monetaryFields.length; mf++) {
-              const field = monetaryFields[mf];
-              if (data[field] !== undefined) {
-                data[field] = data[field] * deflationFactor;
-              }
-            }
-            // Dynamic investment fields (Income__*, Capital__*)
-            Object.keys(data).forEach((key) => {
-              if (typeof key === 'string' && (key.indexOf('Income__') === 0 || key.indexOf('Capital__') === 0)) {
-                if (data[key] !== undefined) {
-                  data[key] = data[key] * deflationFactor;
-                }
-              }
-            });
-          }
+          });
         } catch (_) { /* keep nominal on any failure */ }
       }
       // Currency conversion (unified mode): Uses nominal FX ('constant' mode) to convert

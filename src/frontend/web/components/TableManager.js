@@ -284,110 +284,29 @@ class TableManager {
     // Create cells and format values in the order of the headers
     headers.forEach((header, headerIndex) => {
       const key = header.dataset.key;
-      let v = (data[key] == null ? 0 : data[key]);
+      // Nominal and (optional) PV values from the core data sheet
+      const nominalValue = (data[key] == null ? 0 : data[key]);
+      const pvKey = key + 'PV';
+      const pvValue = Object.prototype.hasOwnProperty.call(data, pvKey) ? data[pvKey] : null;
+      let v = nominalValue;
       let originalValue, originalCurrency, fxMultiplier;
       let displayCurrencyCode, displayCountryForLocale;
 
       const isMonetary = !(key === 'Age' || key === 'Year' || key === 'WithdrawalRate');
 
-      /*
-       * Present-value deflation (country-based):
-       * - Principle: Deflate each nominal amount using the inflation rate of the residency country
-       *   for that age/year, not the display currency's country. This preserves real purchasing power.
-       * - Why: An amount earned in IE at age 30 must be deflated with IE CPI even if later displayed
-       *   in another currency (e.g., ARS). This ensures accurate cross-country, multi-currency scenarios.
-       * - Inflation rate precedence (matches Simulator.resolveCountryInflation):
-       *   1. User-provided scenario inflation parameter (params.inflation) for the base/start country
-       *   2. EconomicData.getInflation(countryCode) - country-specific CPI from tax rules
-       *   3. TaxRuleSet.getInflationRate() - fallback from tax rules
-       *   4. Default 2% if none available
-       * - Shared currencies: For EUR, country-specific CPI profiles (IE/FR/DE) can differ. We use
-       *   the user-provided inflation for the base country, otherwise the residency country's profile.
-       * - Order of operations: Nominal → deflate via getDeflationFactor(age, startYear, rate) →
-       *   currency conversion (if unified). Deflation must happen in source currency before FX.
-       * - Currency Conversion Mode: After deflation in the source currency, any cross-currency conversion
-       *   (unified mode) uses nominal FX rates (fxMode: 'constant'), NOT PPP. This ensures display values
-       *   reflect actual exchange-rate realities; PPP is reserved exclusively for user-facing suggestions
-       *   in event management (e.g., split/link/peg recommendations on relocation). See the conversion
-       *   block below (EconomicData.convert(..., { fxMode: 'constant', baseYear: startYear })) for details.
-       * - Graceful degradation: If economic data is unavailable, fall back to nominal values.
-       * - Key APIs:
-       *   - RelocationUtils.getCountryForAge(age, this)
-       *   - this.webUI.getValue("Inflation") - user-provided scenario inflation
-       *   - Config.getInstance().getDefaultCountry() - base country code
-       *   - EconomicData.getInflation(countryCode)
-       *   - getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate)
-       */
       let deflationFactor = 1;
       if (isMonetary && this.presentValueMode) {
-        try {
-          const age = data.Age;
-          const fromCountry = RelocationUtils.getCountryForAge(age, this);
-          const cfg = Config.getInstance();
-          const baseCountryCode = (cfg.getDefaultCountry() || '').toLowerCase();
-          const fromCountryNormalized = (fromCountry || '').toLowerCase();
-          
-          // Resolve inflation rate with same precedence as Simulator.resolveCountryInflation
-          // Logic: Start country uses scenario inflation; relocated countries use MV event rate
-          let inflationRate = null;
-          
-          if (fromCountryNormalized === baseCountryCode) {
-            // START COUNTRY: Use scenario inflation parameter (if provided), else EconomicData
-            if (this.webUI) {
-              const scenarioInflation = this.webUI.getValue("Inflation");
-              // Check if inflation was actually provided (not empty/zero from empty field)
-              const inflationElement = document.getElementById("Inflation");
-              const hasInflationValue = inflationElement && inflationElement.value && inflationElement.value.trim() !== '';
-              if (hasInflationValue && scenarioInflation !== null && scenarioInflation !== undefined) {
-                // getValue("Inflation") already returns a decimal (parsePercentage divides by 100)
-                const parsed = parseFloat(scenarioInflation);
-                if (!isNaN(parsed) && isFinite(parsed)) {
-                  inflationRate = parsed;
-                }
-              }
-            }
+        // Prefer core-computed PV aggregates when available; otherwise stay in nominal terms.
+        if (pvValue !== null && pvValue !== undefined && isFinite(pvValue)) {
+          v = pvValue;
+          if (isFinite(nominalValue) && nominalValue !== 0) {
+            deflationFactor = pvValue / nominalValue;
           } else {
-            // RELOCATED COUNTRY: Use MV event rate override (if provided), else EconomicData
-            if (this.countryInflationOverrides && Object.prototype.hasOwnProperty.call(this.countryInflationOverrides, fromCountryNormalized)) {
-              const override = this.countryInflationOverrides[fromCountryNormalized];
-              if (override !== null && override !== undefined && override !== '') {
-                inflationRate = override;
-              }
-            }
+            deflationFactor = 1;
           }
-          
-          // Fallback: EconomicData CPI for the country (if not set above)
-          if (inflationRate === null) {
-            const econ = cfg.getEconomicData();
-            if (econ && econ.ready) {
-              const cpiPct = econ.getInflation(fromCountry);
-              if (cpiPct != null && isFinite(Number(cpiPct))) {
-                inflationRate = Number(cpiPct) / 100;
-              }
-            }
-          }
-          
-          // Fallback: TaxRuleSet inflation rate
-          if (inflationRate === null) {
-            const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(fromCountry) : null;
-            if (rs && typeof rs.getInflationRate === 'function') {
-              const rate = rs.getInflationRate();
-              if (rate !== null && rate !== undefined) {
-                inflationRate = rate;
-              }
-            }
-          }
-          
-          // Final fallback: Default 2%
-          if (inflationRate === null) {
-            inflationRate = 0.02;
-          }
-          
-          if (inflationRate !== null) {
-            deflationFactor = getDeflationFactor(age, cfg.getSimulationStartYear(), inflationRate);
-            v = v * deflationFactor;
-          }
-        } catch (_) { /* graceful: keep nominal */ }
+        } else {
+          deflationFactor = 1;
+        }
       }
 
       // Currency conversion (unified mode): Uses nominal FX ('constant' mode) to convert
@@ -658,8 +577,10 @@ class TableManager {
       // Store nominal (pre-deflation, pre-conversion) value on monetary cells for future refresh without re-simulating
       try {
         if (isMonetary) {
-          const nominalValue = (data[key] == null ? 0 : data[key]);
           td.setAttribute('data-nominal-value', String(nominalValue));
+          if (pvValue !== null && pvValue !== undefined && isFinite(pvValue)) {
+            td.setAttribute('data-pv-value', String(pvValue));
+          }
         }
       } catch (_) {}
       
@@ -768,8 +689,8 @@ class TableManager {
       return null;
     };
 
-    // Helper to get cell value from displayed table cell
-    // This respects present-value mode and currency mode by reading what's actually displayed
+      // Helper to get cell value from displayed table cell
+      // This respects present-value mode and currency mode by reading what's actually displayed
     const getCellValue = (row, keyIndex) => {
       const cells = Array.from(row.querySelectorAll('td'));
       if (keyIndex >= cells.length) return '';
@@ -788,9 +709,10 @@ class TableManager {
       // Remove the 'i' icon text if present (tooltip indicator)
       displayedText = displayedText.replace(/i\s*$/, '').trim();
       
-      // If no displayed text, try to compute from data-nominal-value
+      // If no displayed text, try to compute from stored nominal/PV values
       if (!displayedText || displayedText === '') {
         const nominalStr = cell.getAttribute('data-nominal-value');
+        const pvStr = cell.getAttribute('data-pv-value');
         if (nominalStr) {
           let value = parseFloat(nominalStr);
           if (isNaN(value)) return '';
@@ -798,75 +720,11 @@ class TableManager {
           // Get age for PV and currency calculations
           const age = getAgeFromRow(row);
           
-          // Apply present-value deflation if enabled (using same precedence as display logic)
+          // Apply present-value mode by preferring core-computed PV values when available.
           if (this.presentValueMode && key !== 'Age' && key !== 'Year' && key !== 'WithdrawalRate' && age !== null) {
-            try {
-              const fromCountry = RelocationUtils.getCountryForAge(age, this);
-              const cfg = Config.getInstance();
-              const baseCountryCode = (cfg.getDefaultCountry() || '').toLowerCase();
-              const fromCountryNormalized = (fromCountry || '').toLowerCase();
-              
-              // Resolve inflation rate with same precedence as Simulator.resolveCountryInflation
-              // Logic: Start country uses scenario inflation; relocated countries use MV event rate
-              let inflationRate = null;
-              
-              if (fromCountryNormalized === baseCountryCode) {
-                // START COUNTRY: Use scenario inflation parameter (if provided), else EconomicData
-                if (this.webUI) {
-                  const scenarioInflation = this.webUI.getValue("Inflation");
-                  // Check if inflation was actually provided (not empty/zero from empty field)
-                  const inflationElement = document.getElementById("Inflation");
-                  const hasInflationValue = inflationElement && inflationElement.value && inflationElement.value.trim() !== '';
-                  if (hasInflationValue && scenarioInflation !== null && scenarioInflation !== undefined) {
-                    // getValue("Inflation") already returns a decimal (parsePercentage divides by 100)
-                    const parsed = parseFloat(scenarioInflation);
-                    if (!isNaN(parsed) && isFinite(parsed)) {
-                      inflationRate = parsed;
-                    }
-                  }
-                }
-              } else {
-                // RELOCATED COUNTRY: Use MV event rate override (if provided), else EconomicData
-                if (this.countryInflationOverrides && Object.prototype.hasOwnProperty.call(this.countryInflationOverrides, fromCountryNormalized)) {
-                  const override = this.countryInflationOverrides[fromCountryNormalized];
-                  if (override !== null && override !== undefined && override !== '') {
-                    inflationRate = override;
-                  }
-                }
-              }
-              
-              // Fallback: EconomicData CPI for the country (if not set above)
-              if (inflationRate === null) {
-                const econ = cfg.getEconomicData();
-                if (econ && econ.ready) {
-                  const cpiPct = econ.getInflation(fromCountry);
-                  if (cpiPct != null && isFinite(Number(cpiPct))) {
-                    inflationRate = Number(cpiPct) / 100;
-                  }
-                }
-              }
-              
-              // Fallback: TaxRuleSet inflation rate
-              if (inflationRate === null) {
-                const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(fromCountry) : null;
-                if (rs && typeof rs.getInflationRate === 'function') {
-                  const rate = rs.getInflationRate();
-                  if (rate !== null && rate !== undefined) {
-                    inflationRate = rate;
-                  }
-                }
-              }
-              
-              // Final fallback: Default 2%
-              if (inflationRate === null) {
-                inflationRate = 0.02;
-              }
-              
-              if (inflationRate !== null) {
-                const df = getDeflationFactor(age, cfg.getSimulationStartYear(), inflationRate);
-                value = value * df;
-              }
-            } catch (_) { /* keep nominal */ }
+            if (pvStr != null && pvStr !== '' && isFinite(Number(pvStr))) {
+              value = Number(pvStr);
+            }
           }
           
           // Apply currency conversion if in unified mode
@@ -1092,6 +950,7 @@ class TableManager {
         const contentEl = cells[c].querySelector('.cell-content') || cells[c];
         // Use the stored nominal value; pre-scan above guarantees presence here
         const nominalStr = cells[c].getAttribute('data-nominal-value');
+        const pvStr = cells[c].getAttribute('data-pv-value');
         let nominal = Number(nominalStr);
         
         // Guard: if nominal is invalid, skip this cell (shouldn't happen after pre-scan, but be safe)
@@ -1102,41 +961,22 @@ class TableManager {
         /*
          * Reformatting without re-simulation:
          * - This method recomputes cell display when currency mode or present-value mode changes.
-         *   It mirrors setDataRow()'s country-based deflation logic.
          * - Nominal source: Uses data-nominal-value set by setDataRow() to avoid double-deflation.
-         * - Country resolution: fromCountry is determined via RelocationUtils.getCountryForAge(age, this),
-         *   then CPI is fetched via EconomicData.getInflation(fromCountry).
-         * - Order: Deflate in the source currency via getDeflationFactor(...) before any FX conversion
-         *   to the reporting currency (unified mode).
-         * - Currency Conversion Mode: After deflation, unified-mode conversion uses nominal FX rates
-         *   (fxMode: 'constant'), NOT PPP. This matches setDataRow() and preserves exchange-rate realities
-         *   for display. PPP remains reserved for event-management suggestions only.
-         * - Fallbacks: If economic data is unavailable, keep nominal values.
+         * - PV source: Uses data-pv-value when present so PV mode is driven entirely by the core
+         *   PV layer rather than recomputing deflation in the UI.
+         * - Currency Conversion Mode: After selecting nominal vs PV, unified-mode conversion uses
+         *   nominal FX rates (fxMode: 'constant'), NOT PPP. This matches setDataRow() and preserves
+         *   exchange-rate realities for display. PPP remains reserved for event-management suggestions.
          */
-        // Compute present-value in source currency when enabled
+        // Compute present-value in source currency when enabled:
+        // prefer core-computed PV stored on the cell; otherwise stay nominal.
         let value = nominal;
         let fromCountry = age != null && isFinite(age) ? RelocationUtils.getCountryForAge(age, this) : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
         let displayCurrencyCode, displayCountryForLocale;
         if (this.presentValueMode) {
-          try {
-            // Only apply deflation if we have a valid age
-            if (age != null && isFinite(age)) {
-              const econ = Config.getInstance().getEconomicData();
-              if (econ && econ.ready) {
-                const cpiPct = econ.getInflation(fromCountry);
-                let df = 1;
-                if (cpiPct != null && isFinite(Number(cpiPct))) {
-                  const rate = Number(cpiPct) / 100;
-                  df = getDeflationFactor(age, Config.getInstance().getSimulationStartYear(), rate);
-                  // Guard: if deflation factor is invalid, skip deflation
-                  if (isNaN(df) || !isFinite(df)) {
-                    df = 1;
-                  }
-                }
-                value = value * df;
-              }
-            }
-          } catch (_) { /* keep nominal */ }
+          if (pvStr != null && pvStr !== '' && isFinite(Number(pvStr))) {
+            value = Number(pvStr);
+          }
         }
 
         // Unified mode: convert deflated source value to reporting currency using nominal FX

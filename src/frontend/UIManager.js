@@ -171,6 +171,25 @@ class UIManager {
       PensionContribution: dataSheet[row].pensionContribution / scale,
       WithdrawalRate: dataSheet[row].withdrawalRate / scale,
       Worth: dataSheet[row].worth / scale,
+      // Core PV aggregates: exposed so table/chart PV paths can be exact by construction
+      IncomeSalariesPV: dataSheet[row].incomeSalariesPV / scale,
+      IncomeRSUsPV: dataSheet[row].incomeRSUsPV / scale,
+      IncomeRentalsPV: dataSheet[row].incomeRentalsPV / scale,
+      IncomePrivatePensionPV: dataSheet[row].incomePrivatePensionPV / scale,
+      IncomeStatePensionPV: dataSheet[row].incomeStatePensionPV / scale,
+      IncomeFundsRentPV: dataSheet[row].incomeFundsRentPV / scale,
+      IncomeSharesRentPV: dataSheet[row].incomeSharesRentPV / scale,
+      IncomeCashPV: dataSheet[row].incomeCashPV / scale,
+      IncomeDefinedBenefitPV: dataSheet[row].incomeDefinedBenefitPV / scale,
+      IncomeTaxFreePV: dataSheet[row].incomeTaxFreePV / scale,
+      RealEstateCapitalPV: dataSheet[row].realEstateCapitalPV / scale,
+      NetIncomePV: dataSheet[row].netIncomePV / scale,
+      ExpensesPV: dataSheet[row].expensesPV / scale,
+      PensionFundPV: dataSheet[row].pensionFundPV / scale,
+      CashPV: dataSheet[row].cashPV / scale,
+      FundsCapitalPV: dataSheet[row].indexFundsCapitalPV / scale,
+      SharesCapitalPV: dataSheet[row].sharesCapitalPV / scale,
+      WorthPV: dataSheet[row].worthPV / scale,
       Attributions: dataSheet[row].attributions
     };
 
@@ -184,6 +203,17 @@ class UIManager {
       for (const key in capMap) {
         data['Capital__' + key] = capMap[key] / scale;
       }
+      // Add dynamic PV mirrors for per-investment income/capital so PV mode can
+      // be exact-by-construction for dynamic columns as well.
+      const incMapPV = dataSheet[row].investmentIncomeByKeyPV || {};
+      for (const key in incMapPV) {
+        data['Income__' + key + 'PV'] = incMapPV[key] / scale;
+      }
+      const capMapPV = dataSheet[row].investmentCapitalByKeyPV || {};
+      for (const key in capMapPV) {
+        data['Capital__' + key + 'PV'] = capMapPV[key] / scale;
+      }
+
       // Add dynamic tax totals with display names from tax ruleset
       const taxMap = dataSheet[row].taxByKey || {};
       for (const tId in taxMap) {

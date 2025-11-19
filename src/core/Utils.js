@@ -1,14 +1,46 @@
 /* This file has to work on both the website and Google Sheets */
 
-// This function assumes fixed rate. If the rate varies each year, the adjustment needs to take into account
-// the history of variation, or it needs to take the previous value (not the start value) and apply the latest 
-// rate once. Either case would require a rewrite of several parts of the simulator. 
-// Since it's used mainly to adjust for inflation, inflation has to remain fixed for now.
+// This function assumes fixed rate when an explicit rate is provided. When
+// rate is omitted it will resolve an inflation rate using the current
+// simulation context (country/year) via InflationService where available,
+// falling back to params.inflation to preserve legacy behaviour.
 function adjust(value, rate = null, n = periods) {
-  if ((rate === null) || (rate === undefined) || (rate === "")) {
-    rate = params.inflation;
+  // Explicit rate: keep legacy behaviour (no country logic).
+  if ((rate !== null) && (rate !== undefined) && (rate !== "")) {
+    return value * Math.pow(1 + rate, (typeof n === 'number') ? n : periods);
   }
-  return value * Math.pow(1 + rate, n);
+
+  // Context-aware path: try to derive an inflation rate for the active country/year.
+  var effectiveRate = null;
+  var hasContext = false;
+  try {
+    hasContext = (typeof currentCountry !== 'undefined' && currentCountry) &&
+                 (typeof year === 'number');
+  } catch (_) {
+    hasContext = false;
+  }
+
+  if (hasContext && typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function') {
+    try {
+      // Use the simulator's active country/year so tax thresholds and other
+      // implicit adjust() calls move with the same CPI as flows.
+      effectiveRate = InflationService.resolveInflationRate(currentCountry, year, {
+        // Provide optional context but let the service fall back to globals when missing.
+        params: (typeof params !== 'undefined') ? params : null,
+        countryInflationOverrides: (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null
+      });
+    } catch (_) {
+      effectiveRate = null;
+    }
+  }
+
+  if (effectiveRate === null || effectiveRate === undefined) {
+    // Legacy fallback: single global scalar inflation.
+    effectiveRate = (params && typeof params.inflation === 'number') ? params.inflation : 0;
+  }
+
+  var periodsToUse = (typeof n === 'number') ? n : periods;
+  return value * Math.pow(1 + effectiveRate, periodsToUse);
 }
 
 /**
@@ -29,14 +61,46 @@ function adjust(value, rate = null, n = periods) {
  * // deflate(110, 0.10, 1) -> 100
  */
 function deflate(value, rate = null, n = periods) {
-  if ((rate === null) || (rate === undefined) || (rate === "")) {
-    rate = params.inflation;
+  // Explicit rate: legacy fixed-rate behaviour.
+  if ((rate !== null) && (rate !== undefined) && (rate !== "")) {
+    var baseFixed = 1 + rate;
+    if (baseFixed <= 0) {
+      return value;
+    }
+    return value / Math.pow(baseFixed, (typeof n === 'number') ? n : periods);
   }
-  var base = 1 + rate;
+
+  // Context-aware path: mirror adjust() logic to preserve inverse semantics.
+  var effectiveRate = null;
+  var hasContext = false;
+  try {
+    hasContext = (typeof currentCountry !== 'undefined' && currentCountry) &&
+                 (typeof year === 'number');
+  } catch (_) {
+    hasContext = false;
+  }
+
+  if (hasContext && typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function') {
+    try {
+      effectiveRate = InflationService.resolveInflationRate(currentCountry, year, {
+        params: (typeof params !== 'undefined') ? params : null,
+        countryInflationOverrides: (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null
+      });
+    } catch (_) {
+      effectiveRate = null;
+    }
+  }
+
+  if (effectiveRate === null || effectiveRate === undefined) {
+    effectiveRate = (params && typeof params.inflation === 'number') ? params.inflation : 0;
+  }
+
+  var base = 1 + effectiveRate;
   if (base <= 0) {
     return value;
   }
-  return value / Math.pow(base, n);
+  var periodsToUse = (typeof n === 'number') ? n : periods;
+  return value / Math.pow(base, periodsToUse);
 }
 
 /**
