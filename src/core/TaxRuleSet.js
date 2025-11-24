@@ -100,6 +100,41 @@ class TaxRuleSet {
     if (typeof fx === 'number') fxValue = fx;
     else if (fx && typeof fx.perEur === 'number') fxValue = fx.perEur;
     else if (fx && typeof fx.value === 'number') fxValue = fx.value;
+    
+    // Fallback: extract FX from timeSeries if exchangeRate.perEur is missing
+    if (fxValue == null && economic && economic.timeSeries && economic.timeSeries.fx && economic.timeSeries.fx.series) {
+      var fxSeries = economic.timeSeries.fx.series;
+      var years = Object.keys(fxSeries).map(function(y) { return parseInt(y, 10); }).filter(function(y) { return !isNaN(y); });
+      if (years.length > 0) {
+        var latestYear = Math.max.apply(Math, years);
+        var lcuPerUsd = fxSeries[latestYear];
+        if (lcuPerUsd != null && typeof lcuPerUsd === 'number' && lcuPerUsd > 0) {
+          // Convert from LCU/USD to LCU/EUR using IE's FX rate (EUR is always 1.0, but IE's series gives EUR/USD)
+          // Try to get USD/EUR rate from IE's tax rules
+          try {
+            var cfg = Config.getInstance();
+            var ieRules = cfg && cfg.getCachedTaxRuleSet && cfg.getCachedTaxRuleSet('ie');
+            if (ieRules) {
+              var ieEconomic = ieRules.getEconomicData();
+              var ieFxSeries = ieEconomic && ieEconomic.timeSeries && ieEconomic.timeSeries.fx && ieEconomic.timeSeries.fx.series;
+              if (ieFxSeries) {
+                var ieYears = Object.keys(ieFxSeries).map(function(y) { return parseInt(y, 10); }).filter(function(y) { return !isNaN(y); });
+                if (ieYears.length > 0) {
+                  var ieLatestYear = Math.max.apply(Math, ieYears);
+                  var eurPerUsd = ieFxSeries[ieLatestYear]; // IE's FX is EUR per USD
+                  if (eurPerUsd != null && typeof eurPerUsd === 'number' && eurPerUsd > 0) {
+                    // Convert: LCU/EUR = (LCU/USD) * (USD/EUR) = (LCU/USD) / (EUR/USD)
+                    fxValue = lcuPerUsd / eurPerUsd;
+                  }
+                }
+              }
+            }
+          } catch (_) {
+            // Fallback failed, keep fxValue as null
+          }
+        }
+      }
+    }
 
     var fxDate = (fx && typeof fx.asOf === 'string') ? fx.asOf : null;
 
@@ -120,6 +155,7 @@ class TaxRuleSet {
       currency = locale.countryCode.trim();
     }
 
+    // Scalar-only profile; timeSeries omitted (processed upstream by getFinData.py).
     var profile = {
       country: codeUpper,
       currency: currency,
@@ -131,41 +167,6 @@ class TaxRuleSet {
       fx_date: fxDate,
       projectionWindowYears: projectionWindowYears
     };
-
-    var timeSeries = null;
-    if (economic && typeof economic === 'object') {
-      var ts = economic.timeSeries;
-      if (ts && typeof ts === 'object') {
-        timeSeries = {};
-        for (var key in ts) {
-          if (!Object.prototype.hasOwnProperty.call(ts, key)) continue;
-          var entry = ts[key];
-          if (!entry || typeof entry !== 'object') continue;
-          var normalizedEntry = {};
-          if (entry.unit !== undefined) normalizedEntry.unit = entry.unit;
-          if (entry.source !== undefined) normalizedEntry.source = entry.source;
-          if (entry.series && typeof entry.series === 'object') {
-            normalizedEntry.series = entry.series;
-          }
-          if (!normalizedEntry.series && entry.data && typeof entry.data === 'object') {
-            normalizedEntry.series = entry.data;
-          }
-          if (!normalizedEntry.series && entry.values && typeof entry.values === 'object') {
-            normalizedEntry.series = entry.values;
-          }
-          if (normalizedEntry.series) {
-            timeSeries[key] = normalizedEntry;
-          }
-        }
-        if (timeSeries && Object.keys(timeSeries).length === 0) {
-          timeSeries = null;
-        }
-      }
-    }
-
-    if (timeSeries) {
-      profile.timeSeries = timeSeries;
-    }
 
     return profile;
   }

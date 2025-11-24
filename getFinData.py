@@ -31,6 +31,8 @@ from pathlib import Path
 WB_BASE = "https://api.worldbank.org/v2"
 IMF_BASE = "https://www.imf.org/external/datamapper/api/v1"
 ECB_XML_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+EXCHANGERATE_API_BASE = "https://api.exchangerate-api.com/v4/latest/EUR"
+EXCHANGERATE_HOST_BASE = "https://api.exchangerate.host/latest"
 
 def http_get_json(url: str):
     for _ in range(3):
@@ -85,6 +87,50 @@ def wb_latest(iso2: str, ind: str) -> Tuple[Optional[float], Optional[int]]:
             except Exception:
                 return None, None
     return None, None
+
+def exchangerate_api_fx() -> Tuple[Dict[str, float], Optional[str]]:
+    """
+    Fetch current FX rates from exchangerate-api.com (free tier, no API key required).
+    Returns rates as currency per EUR and the date.
+    """
+    try:
+        data = http_get_json(EXCHANGERATE_API_BASE)
+        if not isinstance(data, dict):
+            return {}, None
+        rates = data.get("rates", {})
+        date = data.get("date")
+        # Rates are already per EUR, so we can use them directly
+        result = {}
+        for curr, rate in rates.items():
+            try:
+                result[curr.upper()] = float(rate)
+            except (ValueError, TypeError):
+                continue
+        return result, date
+    except Exception:
+        return {}, None
+
+def exchangerate_host_fx() -> Tuple[Dict[str, float], Optional[str]]:
+    """
+    Fetch current FX rates from exchangerate.host (free public API).
+    Returns rates as currency per EUR and the date.
+    """
+    try:
+        url = f"{EXCHANGERATE_HOST_BASE}?base=EUR"
+        data = http_get_json(url)
+        if not isinstance(data, dict) or not data.get("success"):
+            return {}, None
+        rates = data.get("rates", {})
+        date = data.get("date")
+        result = {}
+        for curr, rate in rates.items():
+            try:
+                result[curr.upper()] = float(rate)
+            except (ValueError, TypeError):
+                continue
+        return result, date
+    except Exception:
+        return {}, None
 
 def ecb_fx() -> Tuple[Dict[str, float], Optional[str]]:
     xml = http_get_bytes(ECB_XML_URL)
@@ -199,8 +245,16 @@ def _ordered_series(series: Dict[int, float]) -> OrderedDict:
         ordered[str(year)] = series[year]
     return ordered
 
-def fetch(codes: List[str]) -> List[Dict[str, Any]]:
-    fx_map, fx_date = ecb_fx()
+def fetch(codes: List[str]) -> Tuple[List[Dict[str, Any]], Dict[str, float], Optional[str]]:
+    # Try free FX APIs first for current rates, then fall back to ECB
+    fx_map, fx_date = exchangerate_api_fx()
+    if not fx_map:
+        fx_map, fx_date = exchangerate_host_fx()
+    if not fx_map:
+        fx_map, fx_date = ecb_fx()
+    
+    # Get USD/EUR rate for fallback conversions (from whichever source we got)
+    usd_per_eur = fx_map.get("USD") if fx_map else None
     out = []
     for c in [x.upper() for x in codes]:
         curr, iso3, _ = wb_country_info(c)
@@ -208,10 +262,39 @@ def fetch(codes: List[str]) -> List[Dict[str, Any]]:
             iso3 = c
         infl, infl_y = wb_latest(c, "FP.CPI.TOTL.ZG")
         ppp, ppp_y = wb_latest(c, "PA.NUS.PPP")
-        fx = 1.0 if curr == "EUR" else fx_map.get(curr)
+        # Get latest FX rate from World Bank (LCU per USD) for fallback
+        fx_latest_usd, _ = wb_latest(c, "PA.NUS.FCRF")
+        
+        # Fetch FX series for historical data
+        fx_series = wb_fetch_fx_series(iso3)
+        
+        # Determine FX rate: EUR is always 1.0, otherwise try free APIs/ECB, then World Bank fallbacks
+        fx = None
+        curr_upper = curr.upper() if curr else ""
+        if curr_upper == "EUR":
+            fx = 1.0
+        else:
+            # Try free FX APIs or ECB (rates are currency per EUR)
+            fx = fx_map.get(curr_upper) if fx_map else None
+            
+            # Fallback 1: use latest World Bank FX rate (LCU per USD) and convert to LCU per EUR
+            # NOTE: World Bank FX data may be outdated (often only updated annually), especially for
+            # volatile currencies. For more current rates, consider using a real-time FX API or
+            # manually updating the exchangeRate.perEur value in the tax rules JSON file.
+            if fx is None and fx_latest_usd is not None and usd_per_eur:
+                # Convert: LCU/EUR = (LCU/USD) * (USD/EUR)
+                fx = fx_latest_usd * usd_per_eur
+            
+            # Fallback 2: if latest not available, use most recent from historical series
+            if fx is None and fx_series and usd_per_eur:
+                if fx_series:
+                    latest_year = max(fx_series.keys())
+                    lcu_per_usd = fx_series[latest_year]
+                    # Convert: LCU/EUR = (LCU/USD) * (USD/EUR)
+                    fx = lcu_per_usd * usd_per_eur
+        
         cpi_series = imf_fetch_cpi_series(iso3)
         ppp_series = imf_fetch_ppp_series(iso3)
-        fx_series = wb_fetch_fx_series(iso3)
         out.append({
             "country": c,
             "curr": curr,
@@ -227,7 +310,7 @@ def fetch(codes: List[str]) -> List[Dict[str, Any]]:
                 "fx": _ordered_series(fx_series)
             }
         })
-    return out
+    return out, fx_map, fx_date
 
 def load_tax_rules(path: Path) -> OrderedDict:
     with path.open("r", encoding="utf-8") as f:
@@ -315,21 +398,94 @@ def round_if(value: Optional[float], digits: int) -> Optional[float]:
         return None
     return round(value, digits)
 
-def update_economic_block(entry: Dict[str, Any]) -> OrderedDict:
+def calculate_median_log_cpi(cpi_series: Dict[Any, float], window_years: int = 20) -> Tuple[Optional[float], Optional[int]]:
+    """
+    Calculates CPI using the median of annual log-changes over historical data only (excludes forecasts).
+    This is robust to outliers while respecting the multiplicative nature of inflation.
+    Returns (median_log_cpi, most_recent_historical_year).
+    """
+    import math
+    
+    if not cpi_series:
+        return None, None
+
+    try:
+        # Ensure keys are integers
+        series_int = {int(k): float(v) for k, v in cpi_series.items() if v is not None}
+    except (ValueError, TypeError):
+        return None, None
+
+    current_year = time.localtime().tm_year
+    
+    # Filter to historical years only (exclude IMF forecasts)
+    historical = {year: cpi for year, cpi in series_int.items() if year <= current_year}
+    
+    if not historical:
+        return None, None
+
+    years = sorted(historical.keys())
+    most_recent_historical_year = years[-1]
+    
+    # Optionally limit to a window of recent years
+    if window_years > 0:
+        cutoff_year = most_recent_historical_year - window_years + 1
+        historical = {year: cpi for year, cpi in historical.items() if year >= cutoff_year}
+        if not historical:
+            return None, None
+        years = sorted(historical.keys())
+    
+    # Convert each CPI percentage to log-growth: ln(1 + cpi/100)
+    log_growths = []
+    for year in years:
+        cpi_pct = historical[year]
+        # Handle edge case: if CPI is exactly -100%, log-growth would be undefined
+        # In practice, CPI is almost never negative and never that extreme
+        if cpi_pct <= -100:
+            continue
+        log_growth = math.log(1 + cpi_pct / 100.0)
+        log_growths.append(log_growth)
+    
+    if not log_growths:
+        return None, None
+
+    # Take median of log-growths
+    log_growths_sorted = sorted(log_growths)
+    n = len(log_growths_sorted)
+    if n % 2 == 0:
+        median_log_growth = (log_growths_sorted[n // 2 - 1] + log_growths_sorted[n // 2]) / 2.0
+    else:
+        median_log_growth = log_growths_sorted[n // 2]
+    
+    # Convert back to CPI percentage: (exp(median_log_growth) - 1) * 100
+    cpi_val = (math.exp(median_log_growth) - 1.0) * 100.0
+    
+    return cpi_val, most_recent_historical_year
+
+def update_economic_block(entry: Dict[str, Any], currency_code_from_locale: Optional[str] = None) -> OrderedDict:
     econ = OrderedDict()
-    if entry.get("infl") is not None or entry.get("cpi") is not None:
-        econ["inflation"] = OrderedDict()
+    
+    # Calculate CPI using median of log-changes over historical data
+    cpi_series = entry.get("series", {}).get("inflation", {})
+    median_log_cpi, median_year = calculate_median_log_cpi(cpi_series)
+    
+    # Determine CPI value and year (prefer median log-CPI, fallback to scalar)
+    cpi_val = median_log_cpi
+    cpi_year = median_year
+    
+    if cpi_val is None:
         cpi_val = entry.get("infl")
         if cpi_val is None:
             cpi_val = entry.get("cpi")
-        if cpi_val is not None:
-            econ["inflation"]["cpi"] = round_if(cpi_val, 4)
-        if entry.get("infl_year") is not None:
-            econ["inflation"]["year"] = entry["infl_year"]
-        elif entry.get("cpi_year") is not None:
-            econ["inflation"]["year"] = entry["cpi_year"]
-        if not econ["inflation"]:
-            econ.pop("inflation")
+        cpi_year = entry.get("infl_year")
+        if cpi_year is None:
+            cpi_year = entry.get("cpi_year")
+
+    if cpi_val is not None:
+        econ["inflation"] = OrderedDict()
+        econ["inflation"]["cpi"] = round_if(cpi_val, 4) # median of log-changes over historical data
+        if cpi_year is not None:
+            econ["inflation"]["year"] = cpi_year
+            
     if entry.get("ppp") is not None:
         econ["purchasingPowerParity"] = OrderedDict()
         econ["purchasingPowerParity"]["value"] = round_if(entry["ppp"], 6)
@@ -337,44 +493,31 @@ def update_economic_block(entry: Dict[str, Any]) -> OrderedDict:
             econ["purchasingPowerParity"]["year"] = entry["ppp_year"]
         if not econ["purchasingPowerParity"]:
             econ.pop("purchasingPowerParity")
-    if entry.get("fx") is not None or entry.get("fx_date") is not None:
+    # Always include exchangeRate if we have FX value or date
+    fx_val = entry.get("fx")
+    fx_date_val = entry.get("fx_date")
+    
+    # Determine currency code: prefer locale, then entry
+    curr_code = None
+    if currency_code_from_locale:
+        curr_code = currency_code_from_locale.upper()
+    else:
+        curr_code = (entry.get("curr") or "").upper()
+    
+    # For EUR, ensure we always have 1.0
+    if curr_code == "EUR":
+        fx_val = 1.0
+    
+    if fx_val is not None or fx_date_val is not None:
         econ["exchangeRate"] = OrderedDict()
-        if entry.get("fx") is not None:
-            econ["exchangeRate"]["perEur"] = round_if(entry["fx"], 6)
-        if entry.get("fx_date"):
-            econ["exchangeRate"]["asOf"] = entry["fx_date"]
+        if fx_val is not None:
+            econ["exchangeRate"]["perEur"] = round_if(fx_val, 6)
+        if fx_date_val:
+            econ["exchangeRate"]["asOf"] = fx_date_val
+        # Only remove if both fx_val and fx_date_val are missing
         if not econ["exchangeRate"]:
             econ.pop("exchangeRate")
 
-    series = entry.get("series") or {}
-    if series:
-        ts = OrderedDict()
-        for key in ("inflation", "ppp", "fx"):
-            data = series.get(key)
-            if not data:
-                continue
-            cleaned = OrderedDict()
-            for year, value in data.items():
-                try:
-                    cleaned[str(year)] = round(float(value), 6)
-                except Exception:
-                    continue
-            if not cleaned:
-                continue
-            meta = OrderedDict()
-            if key == "inflation":
-                meta["unit"] = "percent"
-                meta["source"] = "IMF-PCPIPCH"
-            elif key == "ppp":
-                meta["unit"] = "LCU_per_IntlDollar"
-                meta["source"] = "IMF-PPPEX"
-            else:
-                meta["unit"] = "LCU_per_USD"
-                meta["source"] = "WB-PA.NUS.FCRF"
-            meta["series"] = cleaned
-            ts[key] = meta
-        if ts:
-            econ["timeSeries"] = ts
     return econ
 
 def insert_economic_block(data: OrderedDict, econ: OrderedDict):
@@ -388,6 +531,10 @@ def insert_economic_block(data: OrderedDict, econ: OrderedDict):
         merged = OrderedDict()
         merged.update(existing)
         merged.update(econ)
+        # Explicitly remove timeSeries as we don't want it anymore
+        merged.pop("timeSeries", None)
+        # Remove projectionWindowYears as it is now baked into the Python script (30y)
+        merged.pop("projectionWindowYears", None)
         econ = merged
     # Rebuild ordered dict placing economicData after locale when possible
     new_items = []
@@ -403,13 +550,26 @@ def insert_economic_block(data: OrderedDict, econ: OrderedDict):
       new_items.append(("economicData", econ))
     return OrderedDict(new_items)
 
+def get_fx_rate_from_apis(currency_code: str, fx_map: Dict[str, float]) -> Optional[float]:
+    """
+    Get FX rate (currency per EUR) from the free FX APIs using the currency code.
+    Returns None if not found.
+    """
+    if not currency_code:
+        return None
+    curr_upper = currency_code.upper()
+    if curr_upper == "EUR":
+        return 1.0
+    return fx_map.get(curr_upper) if fx_map else None
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python getFinData.py <ISO2> [<ISO2> ...]")
         sys.exit(1)
     codes = sys.argv[1:]
-    data = fetch(codes)
+    data, fx_map_free, fx_date_free = fetch(codes)
     base_path = Path(__file__).parent / "src" / "core" / "config"
+    
     for entry in data:
         country = entry["country"].lower()
         tax_file = base_path / f"tax-rules-{country}.json"
@@ -417,7 +577,19 @@ def main():
             print(f"[WARN] Tax rules file {tax_file} not found; skipping.", file=sys.stderr)
             continue
         rules = load_tax_rules(tax_file)
-        econ_block = update_economic_block(entry)
+        # Extract currency code from locale for accurate EUR detection and FX lookup
+        locale = rules.get("locale", {})
+        currency_code = locale.get("currencyCode", "") if isinstance(locale, dict) else ""
+        
+        # If entry's FX is missing or we have better free API data, use the locale currency code to look it up
+        if currency_code and fx_map_free:
+            fx_from_locale = get_fx_rate_from_apis(currency_code, fx_map_free)
+            if fx_from_locale is not None:
+                entry["fx"] = fx_from_locale
+                if fx_date_free:
+                    entry["fx_date"] = fx_date_free
+        
+        econ_block = update_economic_block(entry, currency_code_from_locale=currency_code)
         updated = insert_economic_block(rules, econ_block)
         write_tax_rules(tax_file, updated)
         print(f"[OK] Updated economic data for {entry['country']} -> {tax_file}")

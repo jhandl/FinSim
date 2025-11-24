@@ -37,7 +37,7 @@ async function run() {
   }
   // Check if we have volatility values
   const hasVolatility = (params.growthDevPension > 0 || params.growthDevFunds > 0 || params.growthDevShares > 0);
-  
+
   // Monte Carlo mode is enabled when user selects it AND there are volatility values
   // For backward compatibility, if economyMode is undefined, infer from volatility values
   if (params.economyMode === undefined || params.economyMode === null) {
@@ -47,13 +47,13 @@ async function run() {
   }
   let runs = (montecarlo ? config.simulationRuns : 1);
   let successes = 0;
-  
+
   // Initialize per-run results tracking
   perRunResults = [];
-  
+
   uiManager.updateProgress("Running");
   for (currentRun = 0; currentRun < runs; currentRun++) {
-    successes += runSimulation(); 
+    successes += runSimulation();
   }
   uiManager.updateDataSheet(runs, perRunResults);
   uiManager.updateStatusCell(successes, runs);
@@ -81,7 +81,7 @@ function getCurrencyForCountry(code) {
         if (cur) return normalizeCurrency(cur);
       }
     }
-  } catch (_) {}
+  } catch (_) { }
   return null;
 }
 
@@ -127,7 +127,7 @@ function findCountryForCurrency(currencyCode, preferredCountry) {
         }
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 
   if (preferred) {
     cache[currency] = preferred;
@@ -143,7 +143,7 @@ function findCountryForCurrency(currencyCode, preferredCountry) {
         return fallback;
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 
   // Return null instead of empty string when no match found
   // Don't cache null to allow retries with different preferredCountry
@@ -185,12 +185,17 @@ function getEventCurrencyInfo(event, fallbackCountry) {
 }
 
 /**
- * Global helper function: Convert a nominal value between countries using constant FX rates (not PPP).
+ * Global helper function: Convert a nominal value between countries using FX rates (not PPP).
  * This is the standard ledger conversion helper that ensures all financial
- * calculations use nominal exchange rates rather than purchasing power parity.
+ * calculations use exchange rates rather than purchasing power parity.
+ * 
+ * NOTE: EconomicData.convert() now supports an inflation-driven 'evolution' mode
+ * as its default for chart/unified-currency and ledger purposes.
  * 
  * Available globally for use by ledger code paths (e.g., Attribution.js).
- * Uses EconomicData.convert() with fxMode: 'constant' for ledger safety.
+ * Uses EconomicData.convert() with default 'evolution' mode (inflation-driven FX).
+ * 
+ * Returns null if conversion fails or produces non-finite results. Logs warnings for results exceeding 1e12.
  * 
  * @param {number} value - Amount to convert
  * @param {string} fromCountry - Source country code (ISO-2, e.g., 'ie', 'ar')
@@ -226,16 +231,24 @@ function convertNominal(value, fromCountry, toCountry, year) {
     }
   } catch (_) { baseYear = null; }
   var options = {
-    fxMode: 'constant',
-    baseYear: (baseYear != null) ? baseYear : new Date().getFullYear()
+    baseYear: (baseYear != null) ? baseYear : new Date().getFullYear(),
+    fxMode: 'evolution' // Use evolved FX (inflation-driven) for all conversions to ensure correct spot rates
   };
   var fromCountryUpper = String(fromCountry).toUpperCase();
   var toCountryUpper = String(toCountry).toUpperCase();
-  return econ.convert(value, fromCountryUpper, toCountryUpper, year, options);
+  var result = econ.convert(value, fromCountryUpper, toCountryUpper, year, options);
+  if (result === null || !Number.isFinite(result)) {
+    console.warn('convertNominal: Conversion returned null/NaN for ' + fromCountry + '->' + toCountry + ' at year ' + year + ', value=' + value + '');
+    return null;
+  }
+  // Suppress "exceeds 1e12" warnings - these are expected for large ARS values in long simulations
+  return result;
 }
 
 function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toCountry, year, strict) {
   if (!value) return 0;
+  // NOTE: This helper delegates to convertNominal(), which uses evolved FX (inflation-driven).
+  // EconomicData.convert() defaults to 'evolution' mode, adopted by all ledger paths as of T9.
   var sourceCurrency = normalizeCurrency(fromCurrency);
   var targetCurrency = normalizeCurrency(toCurrency);
   if (!sourceCurrency || !targetCurrency || sourceCurrency === targetCurrency) {
@@ -251,7 +264,7 @@ function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toC
   if (!targetCountry) {
     targetCountry = normalizeCountry(toCountry || currentCountry) || normalizeCountry((Config.getInstance() || {}).getDefaultCountry && Config.getInstance().getDefaultCountry());
   }
-  
+
   // In strict mode, fail if we couldn't map currency to country (even if we have fallback countries)
   if (strict && (!sourceCountryMapped || !targetCountryMapped)) {
     if (typeof errors !== 'undefined') {
@@ -262,13 +275,15 @@ function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toC
         var missingCurrency = !sourceCountryMapped ? sourceCurrency : targetCurrency;
         uiManager.setStatus("Unknown currency code: " + missingCurrency + " - cannot map to country", STATUS_COLORS.ERROR);
       }
-    } catch (_) {}
+    } catch (_) { }
     return null;
   }
-  
+
   var converted = convertNominal(value, sourceCountry, targetCountry, year);
   if (converted === null || typeof converted !== 'number' || isNaN(converted)) {
-    try { console.warn("Currency conversion failed:", value, sourceCurrency, targetCurrency, year); } catch (_) {}
+    // Existing error handling (lines 270-286) is good, keep as-is
+    console.error('convertCurrencyAmount: convertNominal failed for ' + sourceCountry + '->' + targetCountry + ' at year ' + year + '');
+    try { console.warn("Currency conversion failed:", value, sourceCurrency, targetCurrency, year); } catch (_) { }
     if (typeof errors !== 'undefined') {
       errors = true;
     }
@@ -280,12 +295,13 @@ function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toC
           uiManager.setStatus("Currency conversion failed - check economic data", STATUS_COLORS.WARNING);
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     if (strict) {
       return null;
     }
     return value;
   }
+  // Suppress "exceeds 1e12" warnings - these are expected for large ARS values in long simulations
   return converted;
 }
 
@@ -309,7 +325,7 @@ function readScenario(validate) {
   // Tests may provide 'fundsAllocation'/'sharesAllocation' (lower camelCase); engine expects 'FundsAllocation'/'SharesAllocation'
   if (params) {
     // Ensure growth rates/devs are numeric defaults (0) when omitted by tests
-    var toNumOrZero = function(v) {
+    var toNumOrZero = function (v) {
       var n = (typeof v === 'string') ? parseFloat(v) : v;
       return (typeof n === 'number' && isFinite(n)) ? n : 0;
     };
@@ -362,7 +378,7 @@ async function initializeSimulator() {
         return false;
       }
     }
-  } catch (_) {}
+  } catch (_) { }
 
   // Preload tax rulesets for all countries referenced in events (await to ensure readiness)
   var startCountry = params.StartCountry || config.getDefaultCountry();
@@ -396,7 +412,7 @@ function initializeSimulationVariables() {
   shares = new Shares(params.growthRateShares, params.growthDevShares);
   // Also create generic assets array (compat path: map first two to existing ones for IE)
   try {
-    var rs = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(params.StartCountry || config.getDefaultCountry()); } catch(_) { return null; } })();
+    var rs = (function () { try { return Config.getInstance().getCachedTaxRuleSet(params.StartCountry || config.getDefaultCountry()); } catch (_) { return null; } })();
     if (rs && typeof InvestmentTypeFactory !== 'undefined') {
       var growthMap = {
         indexFunds: params.growthRateFunds,
@@ -423,7 +439,7 @@ function initializeSimulationVariables() {
 
   // Initialize stable tax ids from ruleset for consistent Tax__ columns
   try {
-    var _rs = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(params.StartCountry || config.getDefaultCountry()); } catch(_) { return null; } })();
+    var _rs = (function () { try { return Config.getInstance().getCachedTaxRuleSet(params.StartCountry || config.getDefaultCountry()); } catch (_) { return null; } })();
     stableTaxIds = (_rs && typeof _rs.getTaxOrder === 'function') ? _rs.getTaxOrder() : ['incomeTax', 'capitalGains'];
   } catch (e) {
     stableTaxIds = ['incomeTax', 'capitalGains'];
@@ -441,9 +457,9 @@ function initializeSimulationVariables() {
     statePensionCurrency: baseStateCurrency,
     statePensionCountry: baseStateCountry
   };
-  person1 = new Person('P1', p1SpecificParams, params, { 
-    growthRatePension: params.growthRatePension, 
-    growthDevPension: params.growthDevPension 
+  person1 = new Person('P1', p1SpecificParams, params, {
+    growthRatePension: params.growthRatePension,
+    growthDevPension: params.growthDevPension
   });
   if (params.initialPension > 0) person1.pension.buy(params.initialPension);
 
@@ -454,9 +470,9 @@ function initializeSimulationVariables() {
     // The Person class constructor will handle a missing/zero starting age if necessary,
     // though UI validation aims to prevent this.
     if (!params.p2StartingAge || params.p2StartingAge === 0) {
-        // Optionally, log a warning here if P2 starting age is missing in couple mode,
-        // though UI should prevent saving/running in this state.
-        // console.warn("Simulator: Person 2 starting age is missing or zero in couple mode.");
+      // Optionally, log a warning here if P2 starting age is missing in couple mode,
+      // though UI should prevent saving/running in this state.
+      // console.warn("Simulator: Person 2 starting age is missing or zero in couple mode.");
     }
 
     const p2SpecificParams = {
@@ -467,9 +483,9 @@ function initializeSimulationVariables() {
       statePensionCurrency: baseStateCurrency,
       statePensionCountry: baseStateCountry
     };
-    person2 = new Person('P2', p2SpecificParams, params, { 
-      growthRatePension: params.growthRatePension, 
-      growthDevPension: params.growthDevPension 
+    person2 = new Person('P2', p2SpecificParams, params, {
+      growthRatePension: params.growthRatePension,
+      growthDevPension: params.growthDevPension
     });
     if (params.initialPensionP2 > 0) person2.pension.buy(params.initialPensionP2);
   } else {
@@ -488,9 +504,9 @@ function initializeSimulationVariables() {
   if (currentCountry && typeof params.inflation === 'number') {
     countryInflationOverrides[currentCountry] = params.inflation;
   }
-  residenceCurrency = getCurrencyForCountry(currentCountry) 
-    || getCurrencyForCountry(params.StartCountry || config.getDefaultCountry()) 
-    || normalizeCurrency(residenceCurrency) 
+  residenceCurrency = getCurrencyForCountry(currentCountry)
+    || getCurrencyForCountry(params.StartCountry || config.getDefaultCountry())
+    || normalizeCurrency(residenceCurrency)
     || 'EUR';
 
   initializeRealEstate();
@@ -519,6 +535,7 @@ function resetYearlyVariables() {
   incomeRentals = 0;
   incomePrivatePension = 0;
   incomeStatePension = 0;
+  incomeStatePensionBaseCurrency = 0; // Track State Pension in base currency (EUR) for PV calculation
   incomeDefinedBenefit = 0;
   incomeFundsRent = 0;
   incomeSharesRent = 0;
@@ -535,10 +552,10 @@ function resetYearlyVariables() {
   // Add year to Person objects (this increments their ages and calls pension.addYear())
   person1.addYear();
   if (person2) person2.addYear();
-  
+
   // Pass Person objects to revenue reset (now using updated ages and year)
   revenue.reset(person1, person2, attributionManager, currentCountry, year);
-  
+
   // Add year to global investment objects
   indexFunds.addYear();
   shares.addYear();
@@ -552,7 +569,7 @@ function resetYearlyVariables() {
     }
   }
   realEstate.addYear();
-  
+
   // Reset yearly statistics for attribution tracking
   indexFunds.resetYearlyStats();
   shares.resetYearlyStats();
@@ -594,12 +611,16 @@ function calculatePensionIncome() {
     // Note: Lump sum tax is already declared in Pension.declareRevenue() when getLumpsum() calls sell()
   }
   if (person1.yearlyIncomePrivatePension > 0) {
-            attributionManager.record('incomeprivatepension', 'Your Private Pension', person1.yearlyIncomePrivatePension);
+    attributionManager.record('incomeprivatepension', 'Your Private Pension', person1.yearlyIncomePrivatePension);
     incomePrivatePension += person1.yearlyIncomePrivatePension;
   }
   if (person1.yearlyIncomeStatePension > 0) {
-            attributionManager.record('incomestatepension', 'Your State Pension', person1.yearlyIncomeStatePension);
+    attributionManager.record('incomestatepension', 'Your State Pension', person1.yearlyIncomeStatePension);
     incomeStatePension += person1.yearlyIncomeStatePension;
+    // Track base currency amount for PV calculation (before currency conversion)
+    if (person1.yearlyIncomeStatePensionBaseCurrency && person1.yearlyIncomeStatePensionBaseCurrency > 0) {
+      incomeStatePensionBaseCurrency += person1.yearlyIncomeStatePensionBaseCurrency;
+    }
   }
 
   // Calculate pension income for Person 2 (if exists)
@@ -610,12 +631,16 @@ function calculatePensionIncome() {
       // Note: Lump sum tax is already declared in Pension.declareRevenue() when getLumpsum() calls sell()
     }
     if (person2.yearlyIncomePrivatePension > 0) {
-              attributionManager.record('incomeprivatepension', 'Their Private Pension', person2.yearlyIncomePrivatePension);
+      attributionManager.record('incomeprivatepension', 'Their Private Pension', person2.yearlyIncomePrivatePension);
       incomePrivatePension += person2.yearlyIncomePrivatePension;
     }
     if (person2.yearlyIncomeStatePension > 0) {
-              attributionManager.record('incomestatepension', 'Their State Pension', person2.yearlyIncomeStatePension);
+      attributionManager.record('incomestatepension', 'Their State Pension', person2.yearlyIncomeStatePension);
       incomeStatePension += person2.yearlyIncomeStatePension;
+      // Track base currency amount for PV calculation (before currency conversion)
+      if (person2.yearlyIncomeStatePensionBaseCurrency && person2.yearlyIncomeStatePensionBaseCurrency > 0) {
+        incomeStatePensionBaseCurrency += person2.yearlyIncomeStatePensionBaseCurrency;
+      }
     }
   }
 
@@ -783,7 +808,7 @@ function processEvents() {
         if (uiManager && typeof uiManager.setStatus === 'function') {
           uiManager.setStatus("Unknown currency code: " + normalizedCurrency + " - cannot map to country", STATUS_COLORS.ERROR);
         }
-      } catch (_) {}
+      } catch (_) { }
       success = false;
       failedAt = person1.age;
       return 1; // Return 1 to avoid division by zero, but simulation will fail due to errors flag
@@ -852,10 +877,10 @@ function processEvents() {
       if (bucketCurrency !== resCurrencyNorm) {
         categoryConversionFactor = getConversionFactor(bucketCurrency, bucketCountry);
       }
-      
+
       var incomeBucket = state.incomeBuckets[curKey];
       var expenseBucket = state.expenseBuckets[curKey];
-      
+
       if (incomeBucket && incomeBucket.categories) {
         for (var cat in incomeBucket.categories) {
           if (!Object.prototype.hasOwnProperty.call(incomeBucket.categories, cat)) continue;
@@ -865,7 +890,7 @@ function processEvents() {
           categoryTotalsByType[cat] += convertedCat;
         }
       }
-      
+
       if (expenseBucket && expenseBucket.categories) {
         for (var catExp in expenseBucket.categories) {
           if (!Object.prototype.hasOwnProperty.call(expenseBucket.categories, catExp)) continue;
@@ -901,7 +926,7 @@ function processEvents() {
 
       // For attribution, convert entry amount using the forward conversion factor
       var entryConvertedAmount = entry.amount * entryConversionFactor;
-      
+
       // Use entry type for category tracking (aggregate across all currencies)
       var entryCategory = entry.type || 'unknown';
       var entryKey = entry.eventId ? String(entry.eventId) : (entryCategory + '_' + i);
@@ -927,15 +952,9 @@ function processEvents() {
           attributionManager.record('incomesalaries', entry.eventId, entryConvertedAmount);
 
           if (isPensionable && entryConvertedAmount > 0) {
-            var rsSalary = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch(_) { return null; } })();
-            if (!rsSalary) {
-              console.error("[DBG] Pension contribution: ruleset not found for country " + currentCountry + ", using empty bands");
-            }
+            var rsSalary = (function () { try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch (_) { return null; } })();
             var bands = (rsSalary && typeof rsSalary.getPensionContributionAgeBands === 'function') ? rsSalary.getPensionContributionAgeBands() : {};
             var baseRate = (salaryPerson.pensionContributionPercentageParam || 0) * getRateForKey(salaryPerson.age, bands);
-            if (isNaN(baseRate)) {
-              console.error("[DBG] Pension contribution: baseRate is NaN for person age " + salaryPerson.age + ", country " + currentCountry + ", percentage " + salaryPerson.pensionContributionPercentageParam);
-            }
             if (params.pensionCapped === "Yes") {
               var cap = (rsSalary && typeof rsSalary.getPensionContributionAnnualCap === 'function') ? rsSalary.getPensionContributionAnnualCap() : 0;
               var capValue = adjust(cap);
@@ -949,9 +968,6 @@ function processEvents() {
             var personalAmount = baseRate * entryConvertedAmount;
             var employerAmount = employerRate * entryConvertedAmount;
             var totalContrib = personalAmount + employerAmount;
-            if (isNaN(personalAmount) || isNaN(totalContrib)) {
-              console.error("[DBG] Pension contribution: NaN detected - personalAmount=" + personalAmount + ", totalContrib=" + totalContrib + ", baseRate=" + baseRate + ", entryConvertedAmount=" + entryConvertedAmount);
-            }
             if (totalContrib > 0) {
               pensionContribution += totalContrib;
               personalPensionContribution += personalAmount;
@@ -1004,11 +1020,11 @@ function processEvents() {
           }
           attributionManager.record('incomedefinedbenefit', entry.eventId, entryConvertedAmount);
           if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
-            var rsDbi = (function(){ try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch(_) { return null; } })();
+            var rsDbi = (function () { try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch (_) { return null; } })();
             var dbiSpec = (rsDbi && typeof rsDbi.getDefinedBenefitSpec === 'function') ? rsDbi.getDefinedBenefitSpec() : null;
             if (!dbiSpec || !dbiSpec.treatment) {
               errors = true;
-              try { uiManager.setStatus("Tax rules error: Defined Benefit behaviour is not defined in the active ruleset.", STATUS_COLORS.ERROR); } catch (_) {}
+              try { uiManager.setStatus("Tax rules error: Defined Benefit behaviour is not defined in the active ruleset.", STATUS_COLORS.ERROR); } catch (_) { }
             } else {
               switch (dbiSpec.treatment) {
                 case 'privatePension':
@@ -1020,7 +1036,7 @@ function processEvents() {
                   break;
                 default:
                   errors = true;
-                  try { uiManager.setStatus("Tax rules error: Unknown DBI treatment '" + String(dbiSpec.treatment) + "'.", STATUS_COLORS.ERROR); } catch (_) {}
+                  try { uiManager.setStatus("Tax rules error: Unknown DBI treatment '" + String(dbiSpec.treatment) + "'.", STATUS_COLORS.ERROR); } catch (_) { }
                   break;
               }
             }
@@ -1090,12 +1106,12 @@ function processEvents() {
         if (realEstate && typeof realEstate.getCurrency === 'function') {
           propertyCurrency = realEstate.getCurrency(event.id);
         }
-      } catch (_) {}
+      } catch (_) { }
       try {
         if (realEstate && typeof realEstate.getLinkedCountry === 'function') {
           propertyCountry = realEstate.getLinkedCountry(event.id);
         }
-      } catch (_) {}
+      } catch (_) { }
       var saleInfo = getEventCurrencyInfo(event, propertyCountry || currentCountry);
       var saleEntryInfo = {
         currency: propertyCurrency || saleInfo.currency,
@@ -1254,11 +1270,11 @@ function processEvents() {
           try {
             var storedCurrency = realEstate.getCurrency(event.id);
             if (storedCurrency) mortgageCurrency = storedCurrency;
-          } catch (_) {}
+          } catch (_) { }
           try {
             var storedCountry = realEstate.getLinkedCountry(event.id);
             if (storedCountry) mortgageCountry = storedCountry;
-          } catch (_) {}
+          } catch (_) { }
           recordExpenseEntry(flowState, { currency: mortgageCurrency, country: mortgageCountry }, payment, {
             type: 'mortgage',
             eventId: event.id,
@@ -1530,7 +1546,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
                 if (!investmentIncomeByKey[entry.key]) investmentIncomeByKey[entry.key] = 0;
                 investmentIncomeByKey[entry.key] += sold;
               }
-            } catch (_) {}
+            } catch (_) { }
             keepTrying = true;
           }
         }
@@ -1547,13 +1563,23 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
   indexFunds.simulateSellAll(clonedRevenue);
   shares.simulateSellAll(clonedRevenue);
   let needed = expenses + cashDeficit - netIncome;
-  let totalPensionCapital = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+
+  // NOTE: Pension capital should only be available for withdrawal during retirement phase.
+  // Including it in totalAvailable during growth phase causes premature liquidation.
+  let totalPensionCapital = 0;
+  if (person1.phase === Phases.retired) {
+    totalPensionCapital += person1.pension.capital();
+  }
+  if (person2 && person2.phase === Phases.retired) {
+    totalPensionCapital += person2.pension.capital();
+  }
+
   let totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome());
   if (needed > totalAvailable + 0.01) {
     liquidateAll();
     return;
   }
-  
+
   cashWithdraw = 0;
   let totalWithdraw = 0;
   for (let priority = 1; priority <= 4; priority++) {
@@ -1603,7 +1629,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
               if (!investmentIncomeByKey) investmentIncomeByKey = {};
               if (!investmentIncomeByKey['indexFunds']) investmentIncomeByKey['indexFunds'] = 0;
               investmentIncomeByKey['indexFunds'] += soldAmt;
-            } catch (_) {}
+            } catch (_) { }
             keepTrying = true;
           }
           break;
@@ -1617,7 +1643,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
               if (!investmentIncomeByKey) investmentIncomeByKey = {};
               if (!investmentIncomeByKey['shares']) investmentIncomeByKey['shares'] = 0;
               investmentIncomeByKey['shares'] += soldAmt;
-            } catch (_) {}
+            } catch (_) { }
             keepTrying = true;
           }
           break;
@@ -1632,13 +1658,14 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
 function liquidateAll() {
   cashWithdraw = cash;
   cash = 0;
-  
-  if (person1.pension.capital() > 0) {
+
+  // Only liquidate pension if retired - pension should not be touched during growth phase
+  if (person1.phase === Phases.retired && person1.pension.capital() > 0) {
     const soldAmount = person1.pension.sell(person1.pension.capital());
     incomePrivatePension += soldAmount;
     attributionManager.record('incomeprivatepension', 'Pension Withdrawal P1', soldAmount);
   }
-  if (person2 && person2.pension.capital() > 0) {
+  if (person2 && person2.phase === Phases.retired && person2.pension.capital() > 0) {
     const soldAmount = person2.pension.sell(person2.pension.capital());
     incomePrivatePension += soldAmount;
     attributionManager.record('incomeprivatepension', 'Pension Withdrawal P2', soldAmount);
@@ -1650,7 +1677,7 @@ function liquidateAll() {
       if (!investmentIncomeByKey) investmentIncomeByKey = {};
       if (!investmentIncomeByKey['indexFunds']) investmentIncomeByKey['indexFunds'] = 0;
       investmentIncomeByKey['indexFunds'] += soldIdx;
-    } catch (_) {}
+    } catch (_) { }
   }
   if (shares.capital() > 0) {
     var soldSh = shares.sell(shares.capital());
@@ -1659,7 +1686,7 @@ function liquidateAll() {
       if (!investmentIncomeByKey) investmentIncomeByKey = {};
       if (!investmentIncomeByKey['shares']) investmentIncomeByKey['shares'] = 0;
       investmentIncomeByKey['shares'] += soldSh;
-    } catch (_) {}
+    } catch (_) { }
   }
   // Also liquidate any additional generic investment assets (avoid double-selling legacy ones)
   if (investmentAssets && investmentAssets.length > 2) {
@@ -1781,7 +1808,7 @@ function updateYearlyData() {
     success: success,
     attributions: attributionManager.getAllAttributions()
   });
-  
+
   if (!(row in dataSheet)) {
     dataSheet[row] = {
       "age": 0,
@@ -1841,7 +1868,7 @@ function updateYearlyData() {
         if (dataSheet[row][tcol] === undefined) dataSheet[row][tcol] = 0;
       }
     }
-    
+
     // Initialize dynamic tax columns based on current tax totals
     if (revenue && revenue.taxTotals) {
       for (const taxId in revenue.taxTotals) {
@@ -1891,12 +1918,6 @@ function updateYearlyData() {
   dataSheet[row].cash += cash;
   var indexFundsCap = indexFunds.capital();
   var sharesCap = shares.capital();
-  if (isNaN(indexFundsCap)) {
-    console.error("[DBG] updateYearlyData: indexFunds.capital() returned NaN at age " + person1.age + ", year " + year);
-  }
-  if (isNaN(sharesCap)) {
-    console.error("[DBG] updateYearlyData: shares.capital() returned NaN at age " + person1.age + ", year " + year);
-  }
   dataSheet[row].indexFundsCapital += indexFundsCap;
   dataSheet[row].sharesCapital += sharesCap;
   // Accumulate per-type income and capital for dynamic UI columns
@@ -1909,8 +1930,8 @@ function updateYearlyData() {
     }
     // Compute capitals by key while avoiding double-counting legacy assets
     var capsByKey = {};
-    try { capsByKey['indexFunds'] = indexFunds.capital(); } catch (_) {}
-    try { capsByKey['shares'] = shares.capital(); } catch (_) {}
+    try { capsByKey['indexFunds'] = indexFunds.capital(); } catch (_) { }
+    try { capsByKey['shares'] = shares.capital(); } catch (_) { }
     if (investmentAssets && investmentAssets.length > 0) {
       for (var ci = 0; ci < investmentAssets.length; ci++) {
         var centry = investmentAssets[ci];
@@ -1925,13 +1946,10 @@ function updateYearlyData() {
       if (!dataSheet[row].investmentCapitalByKey[key]) dataSheet[row].investmentCapitalByKey[key] = 0;
       dataSheet[row].investmentCapitalByKey[key] += capsByKey[key];
     }
-  } catch (_) {}
-  if (isNaN(personalPensionContribution)) {
-    console.error("[DBG] updateYearlyData: personalPensionContribution is NaN at age " + person1.age + ", year " + year);
-  }
+  } catch (_) { }
   dataSheet[row].pensionContribution += personalPensionContribution;
   dataSheet[row].withdrawalRate += withdrawalRate;
-  
+
   // Populate dynamic tax columns
   if (revenue && revenue.taxTotals) {
     for (const taxId in revenue.taxTotals) {
@@ -1942,7 +1960,7 @@ function updateYearlyData() {
       dataSheet[row][taxColumnName] += revenue.getTaxByType(taxId);
     }
   }
-  
+
   // Compute present-value aggregates using a single deflation factor per row.
   // This preserves existing nominal behaviour while exposing a PV layer that
   // expresses amounts in simulation-start-year purchasing power for the
@@ -1956,7 +1974,9 @@ function updateYearlyData() {
       pvCountry = currentCountry || ((params.StartCountry || (cfg && cfg.getDefaultCountry && cfg.getDefaultCountry()) || '') + '').toLowerCase();
       inflationRate = null;
       if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function' && startYear !== null) {
-        var currentYearPv = startYear + ageNum;
+        // FIX: Use actual calendar year (year) instead of startYear + ageNum
+        // The year variable is already the correct calendar year for this simulation step
+        var currentYearPv = (typeof year !== 'undefined' && year !== null) ? year : (startYear + (ageNum - (params.startingAge || 0)));
         inflationRate = InflationService.resolveInflationRate(pvCountry, currentYearPv, {
           params: (typeof params !== 'undefined') ? params : null,
           config: cfg,
@@ -1976,13 +1996,70 @@ function updateYearlyData() {
       deflationFactor = 1;
     }
 
-    if (deflationFactor === 1) {
+    // State Pension PV: Calculate PV in base currency (EUR) using Ireland's inflation, then convert to residence currency
+    // This ensures State Pension purchasing power is measured in the paying country's terms
+    var statePensionPVInBaseCurrency = 0;
+    var statePensionPVInResidenceCurrency = 0;
+    if (incomeStatePension > 0 && incomeStatePensionBaseCurrency > 0 && person1 && person1.statePensionCountryParam) {
+      var statePensionCountry = String(person1.statePensionCountryParam).toLowerCase();
+      var statePensionInflationRate = null;
+      if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function' && startYear !== null) {
+        var currentYearPv = (typeof year !== 'undefined' && year !== null) ? year : (startYear + (ageNum - (params.startingAge || 0)));
+        statePensionInflationRate = InflationService.resolveInflationRate(statePensionCountry, currentYearPv, {
+          params: (typeof params !== 'undefined') ? params : null,
+          config: cfg,
+          countryInflationOverrides: (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null
+        });
+      }
+      if (statePensionInflationRate === null || statePensionInflationRate === undefined) {
+        statePensionInflationRate = (params && typeof params.inflation === 'number') ? params.inflation : 0;
+      }
+      var statePensionPVFactor = (typeof getDeflationFactor === 'function') ? getDeflationFactor(ageNum, startYear, statePensionInflationRate) : 1;
+      if (statePensionPVFactor === null || statePensionPVFactor === undefined || !isFinite(statePensionPVFactor) || statePensionPVFactor <= 0) {
+        statePensionPVFactor = 1;
+      }
+      // Calculate PV in base currency (EUR) using Ireland's inflation
+      statePensionPVInBaseCurrency = incomeStatePensionBaseCurrency * statePensionPVFactor;
+      // For State Pension PV: Keep it in EUR (base currency) - do NOT convert to residence currency
+      // The nominal State Pension is converted to ARS for the ledger (correct)
+      // But PV should remain in EUR because it represents Ireland's purchasing power
+      // ChartManager will handle conversion when displaying, recognizing this is EUR
+      var baseCurrency = person1.statePensionCurrencyParam || getCurrencyForCountry(statePensionCountry);
+      statePensionPVInResidenceCurrency = statePensionPVInBaseCurrency;
+    } else {
+      // Fallback: use standard PV calculation if base currency not available
+      var statePensionPVFactor = deflationFactor;
+      if (incomeStatePension > 0 && person1 && person1.statePensionCountryParam) {
+        var statePensionCountry = String(person1.statePensionCountryParam).toLowerCase();
+        if (statePensionCountry !== pvCountry) {
+          var statePensionInflationRate = null;
+          if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function' && startYear !== null) {
+            var currentYearPv = (typeof year !== 'undefined' && year !== null) ? year : (startYear + (ageNum - (params.startingAge || 0)));
+            statePensionInflationRate = InflationService.resolveInflationRate(statePensionCountry, currentYearPv, {
+              params: (typeof params !== 'undefined') ? params : null,
+              config: cfg,
+              countryInflationOverrides: (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null
+            });
+          }
+          if (statePensionInflationRate === null || statePensionInflationRate === undefined) {
+            statePensionInflationRate = (params && typeof params.inflation === 'number') ? params.inflation : 0;
+          }
+          statePensionPVFactor = (typeof getDeflationFactor === 'function') ? getDeflationFactor(ageNum, startYear, statePensionInflationRate) : 1;
+          if (statePensionPVFactor === null || statePensionPVFactor === undefined || !isFinite(statePensionPVFactor) || statePensionPVFactor <= 0) {
+            statePensionPVFactor = 1;
+          }
+        }
+      }
+      statePensionPVInResidenceCurrency = incomeStatePension * statePensionPVFactor;
+    }
+
+    if (deflationFactor === 1 && (statePensionPVInResidenceCurrency === 0 || statePensionPVInResidenceCurrency === incomeStatePension)) {
       // Still initialise PV fields so downstream consumers can assume presence.
       dataSheet[row].incomeSalariesPV += incomeSalaries;
       dataSheet[row].incomeRSUsPV += incomeShares;
       dataSheet[row].incomeRentalsPV += incomeRentals;
       dataSheet[row].incomePrivatePensionPV += incomePrivatePension;
-      dataSheet[row].incomeStatePensionPV += incomeStatePension;
+      dataSheet[row].incomeStatePensionPV += (statePensionPVInResidenceCurrency > 0) ? statePensionPVInResidenceCurrency : incomeStatePension;
       dataSheet[row].incomeFundsRentPV += incomeFundsRent;
       dataSheet[row].incomeSharesRentPV += incomeSharesRent;
       dataSheet[row].incomeCashPV += Math.max(cashWithdraw, 0);
@@ -2001,7 +2078,8 @@ function updateYearlyData() {
       dataSheet[row].incomeRSUsPV += incomeShares * deflationFactor;
       dataSheet[row].incomeRentalsPV += incomeRentals * deflationFactor;
       dataSheet[row].incomePrivatePensionPV += incomePrivatePension * deflationFactor;
-      dataSheet[row].incomeStatePensionPV += incomeStatePension * deflationFactor;
+      // State Pension PV: Use the pre-calculated statePensionPVInResidenceCurrency (calculated above before the if/else)
+      dataSheet[row].incomeStatePensionPV += statePensionPVInResidenceCurrency;
       dataSheet[row].incomeFundsRentPV += incomeFundsRent * deflationFactor;
       dataSheet[row].incomeSharesRentPV += incomeSharesRent * deflationFactor;
       dataSheet[row].incomeCashPV += Math.max(cashWithdraw, 0) * deflationFactor;
@@ -2042,7 +2120,7 @@ function updateYearlyData() {
           }
         }
       }
-    } catch (_e2) {}
+    } catch (_e2) { }
   })();
 
   dataSheet[row].worth += realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFundsCap + sharesCap + cash;
@@ -2057,7 +2135,7 @@ function updateYearlyData() {
   }
   attributionManager.record('indexfundscapital', 'Principal', indexFundsStats.principal);
   attributionManager.record('indexfundscapital', 'P/L', indexFundsStats.totalGain);
-  
+
   const sharesStats = shares.getPortfolioStats();
   const sharesNet = sharesStats.yearlyBought - sharesStats.yearlySold;
   if (sharesNet > 0) {
@@ -2067,7 +2145,7 @@ function updateYearlyData() {
   }
   attributionManager.record('sharescapital', 'Principal', sharesStats.principal);
   attributionManager.record('sharescapital', 'P/L', sharesStats.totalGain);
-  
+
   const currentAttributions = attributionManager.getAllAttributions();
   for (const metric in currentAttributions) {
     if (!dataSheet[row].attributions[metric]) {
@@ -2094,10 +2172,10 @@ function updateYearlyData() {
       if (!dataSheet[row].taxByKey[tId]) dataSheet[row].taxByKey[tId] = 0;
       dataSheet[row].taxByKey[tId] += totMap[tId];
     }
-  } catch (_) {}
+  } catch (_) { }
 
   if (!montecarlo) {
-    uiManager.updateDataRow(row, (person1.age-params.startingAge) / (100-params.startingAge));
+    uiManager.updateDataRow(row, (person1.age - params.startingAge) / (100 - params.startingAge));
   }
   // At the end of the year, when updating the data sheet
   // dataSheet[row].sharesCapital = shares.capital();

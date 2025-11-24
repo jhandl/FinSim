@@ -203,25 +203,30 @@ describe('ChartManager Present-Value Toggle Stability', () => {
       IncomeSalaries: 60000,
       Cash: 15000,
       RealEstateCapital: 250000,
-      PensionFund: 75000
+      PensionFund: 75000,
+      // Core simulator provides *PV mirrors; ChartManager should prefer these
+      // when presentValueMode is enabled while keeping cached nominal values.
+      NetIncomePV: 45000
     };
 
     chartManager.updateChartsRow(1, Object.assign({}, testData));
     
-    // Verify cache contains nominal value
+    // Verify cache and chart contain nominal value before PV mode
     expect(chartManager.cachedRowData[1].NetIncome).toBe(60000);
+    expect(chartManager.cashflowChart.data.datasets[0].data[0]).toBe(60000); // Inflows dataset
 
     // Enable PV mode
     chartManager.setPresentValueMode(true);
     
-    // Repopulate from cache - should apply PV transformation
+    // Repopulate from cache - should apply PV transformation by
+    // reading *PV mirrors from cached rows while leaving the cache nominal.
     chartManager._repopulateFromCache();
     
-    // Verify that getDeflationFactor was called (indicating PV transformation was applied)
-    expect(global.getDeflationFactor).toHaveBeenCalled();
-    
-    // Verify cache still contains nominal value
+    // Verify cache still contains nominal value (PV mode must not mutate cache)
     expect(chartManager.cachedRowData[1].NetIncome).toBe(60000);
+
+    // Verify that chart now reflects PV value from NetIncomePV
+    expect(chartManager.cashflowChart.data.datasets[0].data[0]).toBe(45000);
   });
 
   test('should not mutate cached data when skipCacheStore is true', () => {

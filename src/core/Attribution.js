@@ -83,11 +83,10 @@ class Attribution {
     if (typeof convertNominal === 'function') {
       converted = convertNominal(total, this.country, baseCountry, this.year);
     } else {
-      // Fallback: EconomicData.convert defaults to 'constant' fxMode, but be explicit for ledger safety
+      // Fallback: EconomicData.convert now defaults to 'evolution' (inflation-driven FX)
       var economicData = cfg.getEconomicData ? cfg.getEconomicData() : null;
       if (economicData && economicData.ready) {
         converted = economicData.convert(total, this.country, baseCountry, this.year, {
-          fxMode: 'constant',
           baseYear: cfg.getSimulationStartYear ? cfg.getSimulationStartYear() : null,
           fallback: 'nearest'
         });

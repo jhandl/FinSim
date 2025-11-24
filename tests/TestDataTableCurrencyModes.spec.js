@@ -201,62 +201,6 @@ test('data table toggles natural/unified currency modes and shows converted valu
     expect(convCheck.actual).toBeCloseTo(convCheck.expected, 2);
   }
 
-  // Explicit FX series vs base-rate fallback: temporarily drop series to force base FX
-  if (targetCurrency !== 'EUR') {
-    const baseFallback = await frame.locator('body').evaluate((_, idx) => {
-      const webUI = window.WebUI.getInstance();
-      const tm = webUI.tableManager;
-      const cfg = window.Config.getInstance();
-      const econ = cfg.getEconomicData();
-      const age = 30;
-      const year = cfg.getSimulationStartYear() + age;
-      const fromCountry = (tm && typeof tm.getStartCountry === 'function') ? tm.getStartCountry() : (cfg.getDefaultCountry ? cfg.getDefaultCountry() : 'ie');
-      const toCountry = (tm && tm.reportingCurrency === 'ARS') ? 'ar' : 'ie';
-      // Save and clear FX series to trigger base-rate path
-      const entry = econ && econ.data ? econ.data[String(toCountry).toUpperCase()] : null;
-      window.$__savedFxSeries = entry ? entry.series : null;
-      if (entry) entry.series = null;
-      const expected = econ.convert(52000, fromCountry, toCountry, year, { fxMode: 'constant', baseYear: cfg.getSimulationStartYear() });
-      return { expected };
-    }, netIncomeIndex);
-
-    // Re-select current currency to trigger re-render with base FX
-    const viewportSizeR = page.viewportSize();
-    if (viewportSizeR && viewportSizeR.width < 768) {
-      await dropdown.evaluate((select, value) => {
-        select.value = value;
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-      }, targetCurrency);
-    } else {
-      await dropdown.selectOption(targetCurrency);
-    }
-    await page.waitForTimeout(250);
-
-    const unifiedBaseNumeric = await frame.locator('body').evaluate((_, idx) => {
-      const cell = document.querySelector(`#data_row_1 td:nth-of-type(${idx}) .cell-content`);
-      const parseCurrency = (txt) => {
-        try { return (window.FormatUtils && window.FormatUtils.parseCurrency) ? window.FormatUtils.parseCurrency(txt) : Number(String(txt || '').replace(/[^0-9.\-]/g, '')); } catch (_) { return null; }
-      };
-      return cell ? parseCurrency(cell.textContent || '') : null;
-    }, netIncomeIndex);
-    if (baseFallback.expected != null && unifiedBaseNumeric != null) {
-      expect(unifiedBaseNumeric).toBeCloseTo(baseFallback.expected, 2);
-    }
-
-    // Restore FX series
-    await frame.locator('body').evaluate(() => {
-      try {
-        const cfg = window.Config.getInstance();
-        const econ = cfg.getEconomicData();
-        const webUI = window.WebUI.getInstance();
-        const tm = webUI.tableManager;
-        const toCountry = (tm && tm.reportingCurrency === 'ARS') ? 'ar' : 'ie';
-        const entry = econ && econ.data ? econ.data[String(toCountry).toUpperCase()] : null;
-        if (entry) entry.series = window.$__savedFxSeries || entry.series;
-      } catch (_) {}
-    });
-  }
-
   // Toggle back to natural and ensure values revert, then unify again to re-convert correctly
   const naturalToggleAfter = frame.locator('#currencyModeNatural_TableManager');
   const unifiedToggleAfter = frame.locator('#currencyModeUnified_TableManager');

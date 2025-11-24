@@ -654,8 +654,14 @@ class TableManager {
       throw new Error('Data table headers not found');
     }
 
-    // Build a complete list of header keys (include hidden ones as well)
-    const headerThs = Array.from(headerRow.querySelectorAll('th[data-key]'));
+    // Build a list of visible header keys only (exclude hidden columns)
+    // Note: Cells are created only for visible headers in setDataRow, so cells match visible header order
+    const allHeaderThs = Array.from(headerRow.querySelectorAll('th[data-key]'));
+    const headerThs = allHeaderThs.filter(th => {
+      // Include only visible headers (exclude those with display: none)
+      const style = window.getComputedStyle(th);
+      return style.display !== 'none';
+    });
     const headerKeys = headerThs.map(th => th.getAttribute('data-key'));
     const headerLabels = headerThs.map(th => (th.textContent || '').trim());
 
@@ -676,6 +682,7 @@ class TableManager {
     // Helper to get age from a row (used for PV and currency calculations)
     const getAgeFromRow = (row) => {
       const cells = Array.from(row.querySelectorAll('td'));
+      // Cells are in the same order as visible headers, so we can use index directly
       const ageKeyIndex = headerKeys.indexOf('Age');
       if (ageKeyIndex >= 0 && ageKeyIndex < cells.length) {
         const ageCell = cells[ageKeyIndex];
@@ -691,14 +698,16 @@ class TableManager {
 
       // Helper to get cell value from displayed table cell
       // This respects present-value mode and currency mode by reading what's actually displayed
-    const getCellValue = (row, keyIndex) => {
+      // Note: Cells are created only for visible headers, so cell index matches visible header index
+    const getCellValue = (row, visibleKeyIndex) => {
       const cells = Array.from(row.querySelectorAll('td'));
-      if (keyIndex >= cells.length) return '';
+      // Cells are in the same order as visible headers, so we can use index directly
+      if (visibleKeyIndex >= cells.length) return '';
       
-      const cell = cells[keyIndex];
+      const cell = cells[visibleKeyIndex];
       if (!cell) return '';
       
-      const key = headerKeys[keyIndex];
+      const key = headerKeys[visibleKeyIndex];
       if (!key) return '';
       
       // Get the displayed text from the cell (already formatted with correct currency and PV mode)

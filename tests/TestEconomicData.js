@@ -77,32 +77,31 @@ module.exports = {
         testResults.success = false; testResults.errors.push('Base FX IE->AR mismatch');
       }
 
-      // 1) constant mode uses nearest-year series when available (step function)
+      // 1) constant mode uses base FX cross-rate (no time-series)
       {
         const amount = 100; // 100 IE units
         const out = econ.convert(amount, 'IE', 'AR', 2028, { fxMode: 'constant', baseYear: 2025 });
-        // Series has 2023:1200 and 2030:2000 → for 2028 use last known (2023) = 1200
-        const exp = amount * 1200;
+        const exp = amount * 1500;
         if (Math.abs(out - exp) > 1e-6) {
-          testResults.success = false; testResults.errors.push('constant mode nearest series step incorrect');
+          testResults.success = false; testResults.errors.push('constant mode base FX incorrect for 2028');
         }
       }
 
-      // 1b) constant mode uses year-specific FX when available (2030 series AR=2000, IE=1)
+      // 1b) constant mode uses the same base FX for 2030
       {
         const amount = 100;
         const out = econ.convert(amount, 'IE', 'AR', 2030, { fxMode: 'constant', baseYear: 2025 });
-        const exp = amount * 2000;
+        const exp = amount * 1500;
         if (Math.abs(out - exp) > 1e-6) {
           testResults.success = false; testResults.errors.push('constant mode year-specific FX incorrect');
         }
       }
 
-      // 1c) constant mode step behaviour prior to next data point (2027 -> uses 2023 series 1200)
+      // 1c) constant mode behaviour prior to any future data point (2027 uses base FX 1500)
       {
         const amount = 50;
         const out = econ.convert(amount, 'IE', 'AR', 2027, { fxMode: 'constant', baseYear: 2025 });
-        const exp = amount * 1200;
+        const exp = amount * 1500;
         if (Math.abs(out - exp) > 1e-6) {
           testResults.success = false; testResults.errors.push('constant mode step behaviour (pre-2030) incorrect');
         }
@@ -150,8 +149,8 @@ module.exports = {
         const anchor = 1500.0; // relative PPP at base
         const pppRate = anchor * (gTo / gFrom);
         const outPPP = econ.convert(amount, 'IE', 'AR', 2030, { fxMode: 'ppp', baseYear: 2025 });
-        if (Math.abs(outConst - (amount * 2000)) > 1e-6) {
-          testResults.success = false; testResults.errors.push('ledger constant mode expected 2000 cross-rate in 2030');
+        if (Math.abs(outConst - (amount * 1500)) > 1e-6) {
+          testResults.success = false; testResults.errors.push('ledger constant mode expected 1500 cross-rate in 2030');
         }
         if (Math.abs(outPPP - (amount * pppRate)) / (amount * pppRate) > 1e-10) {
           testResults.success = false; testResults.errors.push('PPP mode expected divergence not observed');
@@ -161,14 +160,14 @@ module.exports = {
         }
       }
 
-      // 6) Multi-year consistency across series values
+      // 6) Multi-year consistency across constant values
       {
         const out2023 = econ.convert(1, 'IE', 'AR', 2023, { fxMode: 'constant', baseYear: 2025 });
         const out2030 = econ.convert(1, 'IE', 'AR', 2030, { fxMode: 'constant', baseYear: 2025 });
-        if (Math.abs(out2023 - 1200) > 1e-9) {
+        if (Math.abs(out2023 - 1500) > 1e-9) {
           testResults.success = false; testResults.errors.push('Year-specific FX (2023) incorrect');
         }
-        if (Math.abs(out2030 - 2000) > 1e-9) {
+        if (Math.abs(out2030 - 1500) > 1e-9) {
           testResults.success = false; testResults.errors.push('Year-specific FX (2030) incorrect');
         }
       }

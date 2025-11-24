@@ -146,48 +146,6 @@ test('chart currency selector converts datasets and shows original tooltip detai
   expect(analysis.transitions).toBeGreaterThan(0);
   expect(analysis.annotationCount).toBeGreaterThan(0);
 
-  // Explicit FX series vs base fallback: drop series temporarily and expect base FX to apply
-  const baseFallback = await frame.locator('body').evaluate(() => {
-    const webUI = window.WebUI.getInstance();
-    const cm = webUI.chartManager;
-    const cfg = window.Config.getInstance();
-    const econ = cfg.getEconomicData();
-    const age = 30;
-    const year = cfg.getSimulationStartYear() + age;
-    const from = cm.getCountryForAge(age);
-    const to = cm.getRepresentativeCountryForCurrency(cm.reportingCurrency);
-    const entry = econ && econ.data ? econ.data[String(to).toUpperCase()] : null;
-    window.$__savedChartFxSeries = entry ? entry.series : null;
-    if (entry) entry.series = null;
-    const original = cm.originalValues[0]?.NetIncome;
-    const expected = original ? econ.convert(original.value, from, to, year, { fxMode: 'constant', baseYear: cfg.getSimulationStartYear() }) : null;
-    return { expected };
-  });
-  // Trigger refresh to apply base rate
-  await frame.locator('body').evaluate(() => {
-    const cm = window.WebUI.getInstance().chartManager;
-    cm.refreshChartsWithCurrency();
-  });
-  const baseConverted = await frame.locator('body').evaluate(() => {
-    const cm = window.WebUI.getInstance().chartManager;
-    const inflowsIdx = cm.cashflowIndexByLabel['Inflows'];
-    return cm.cashflowChart.data.datasets[inflowsIdx].data[0];
-  });
-  if (baseFallback.expected != null) {
-    expect(baseConverted).toBeCloseTo(baseFallback.expected, 2);
-  }
-  // Restore FX series
-  await frame.locator('body').evaluate(() => {
-    try {
-      const cfg = window.Config.getInstance();
-      const econ = cfg.getEconomicData();
-      const cm = window.WebUI.getInstance().chartManager;
-      const to = cm.getRepresentativeCountryForCurrency(cm.reportingCurrency);
-      const entry = econ && econ.data ? econ.data[String(to).toUpperCase()] : null;
-      if (entry) entry.series = window.$__savedChartFxSeries || entry.series;
-    } catch (_) {}
-  });
-
   // Toggle back to EUR (programmatic) and verify values revert to original
   await frame.locator('body').evaluate(() => {
     const cm = window.WebUI.getInstance().chartManager;

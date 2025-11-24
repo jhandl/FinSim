@@ -44,10 +44,7 @@ module.exports = {
         economicData: {
           inflation: { cpi: 3.0, year: 2025 },
           purchasingPowerParity: { value: 1.0, year: 2025 },
-          exchangeRate: { perEur: 1.0, asOf: '2025-01-01' },
-          timeSeries: {
-            fx: { series: { '2025': 1.0, '2035': 1.0 } }
-          }
+          exchangeRate: { perEur: 1.0, asOf: '2025-01-01' }
         },
         incomeTax: { brackets: { '0': 0.15 } }
       });
@@ -59,10 +56,7 @@ module.exports = {
         economicData: {
           inflation: { cpi: 10.0, year: 2025 },
           purchasingPowerParity: { value: 2.5, year: 2025 },
-          exchangeRate: { perEur: 3.0, asOf: '2025-01-01' },
-          timeSeries: {
-            fx: { series: { '2025': 3.0, '2035': 4.0 } }
-          }
+          exchangeRate: { perEur: 3.0, asOf: '2025-01-01' }
         },
         incomeTax: { brackets: { '0': 0.2 } }
       });
@@ -106,17 +100,17 @@ module.exports = {
         }
       }
 
-      // Test Case 1b: constant mode uses year-specific series (MM->NN, 2035: 4.0/1.0)
+      // Test Case 1b: constant mode uses base FX cross-rate for future years as well.
       {
         const amount = 250;
         const converted = econ.convert(amount, 'MM', 'NN', 2035, { fxMode: 'constant', baseYear: 2025 });
-        const expected = amount * (4.0 / 1.0);
+        const expected = amount * (nnProfile.fx / mmProfile.fx);
         if (!withinTolerance(converted, expected, 1e-12, 1e-9)) {
-          errors.push(`Constant mode with series mismatch: expected ${expected}, got ${converted}`);
+          errors.push(`Constant mode future-year mismatch: expected ${expected}, got ${converted}`);
         }
       }
 
-      // Test Case 1c: constant mode fallback when series missing (2031 -> base 3.0/1.0)
+      // Test Case 1c: constant mode fallback when no explicit series is present still uses base FX.
       {
         const amount = 70;
         const converted = econ.convert(amount, 'MM', 'NN', 2031, { fxMode: 'constant', baseYear: 2025 });

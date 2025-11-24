@@ -2,7 +2,7 @@
 
 class Equity {
 
-  constructor(taxRate, growth, stdev=0) {
+  constructor(taxRate, growth, stdev = 0) {
     this.taxRate = taxRate;
     this.growth = growth;
     this.stdev = stdev;
@@ -15,17 +15,17 @@ class Equity {
   }
 
   buy(amountToBuy) {
-    this.portfolio.push({amount: amountToBuy, interest: 0, age: 0});
+    this.portfolio.push({ amount: amountToBuy, interest: 0, age: 0 });
     this.yearlyBought += amountToBuy;
   }
-  
+
   declareRevenue(income, gains) {
     revenue.declareInvestmentIncome(income);
     if (gains > 0 || this.canOffsetLosses) {
       revenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name + " Sale");
     }
   }
-  
+
   sell(amountToSell) {
     let sold = 0;
     let gains = 0;
@@ -53,7 +53,7 @@ class Equity {
     this.declareRevenue(sold, gains);
     return sold;
   }
-  
+
   capital() {
     let sum = 0;
     for (let i = 0; i < this.portfolio.length; i++) {
@@ -66,12 +66,12 @@ class Equity {
   getPortfolioStats() {
     let principal = 0;
     let totalGain = 0;
-    
+
     for (let holding of this.portfolio) {
       principal += holding.amount;
       totalGain += holding.interest;
     }
-    
+
     return {
       principal: principal,
       totalGain: totalGain,
@@ -87,7 +87,7 @@ class Equity {
     this.yearlySold = 0;
     this.yearlyGrowth = 0;
   }
-    
+
   addYear() {
     // Accumulate interests
     for (let i = 0; i < this.portfolio.length; i++) {
@@ -109,12 +109,12 @@ class Equity {
   simulateSellAll(testRevenue) {
     let totalCapital = this.capital();
     let totalGains = 0;
-    
+
     // Calculate total gains without modifying portfolio
     for (let holding of this.portfolio) {
       totalGains += holding.interest;
     }
-    
+
     // Use simulation method instead of real one
     this.simulateDeclareRevenue(totalCapital, totalGains, testRevenue);
     return totalCapital;
@@ -123,7 +123,7 @@ class Equity {
   simulateDeclareRevenue(income, gains, testRevenue) {
     testRevenue.declareInvestmentIncome(income);
     if (gains > 0 || this.canOffsetLosses) {
-      testRevenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name+" Sim");
+      testRevenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name + " Sim");
     }
   }
 
@@ -131,8 +131,8 @@ class Equity {
 
 
 class IndexFunds extends Equity {
-  
-  constructor(growth, stdev=0) {
+
+  constructor(growth, stdev = 0) {
     // Prefer ruleset when available to source exit tax settings
     var ruleset = null;
     try {
@@ -148,7 +148,7 @@ class IndexFunds extends Equity {
       }
     } catch (_) { indexFundsTypeDef = null; }
 
-    const resolveExitTaxRate = function() {
+    const resolveExitTaxRate = function () {
       if (ruleset && typeof ruleset.findInvestmentTypeByKey === 'function') {
         var t = indexFundsTypeDef || ruleset.findInvestmentTypeByKey('indexFunds');
         if (t && t.taxation && t.taxation.exitTax && typeof t.taxation.exitTax.rate === 'number') {
@@ -161,7 +161,7 @@ class IndexFunds extends Equity {
     super(resolveExitTaxRate(), growth, stdev);
 
     // Loss offset
-    this.canOffsetLosses = (function(){
+    this.canOffsetLosses = (function () {
       if (ruleset && typeof ruleset.findInvestmentTypeByKey === 'function') {
         var t = indexFundsTypeDef || ruleset.findInvestmentTypeByKey('indexFunds');
         if (t && t.taxation && t.taxation.exitTax && typeof t.taxation.exitTax.allowLossOffset === 'boolean') {
@@ -172,15 +172,15 @@ class IndexFunds extends Equity {
     })();
 
     // Annual exemption eligibility for exit tax (IE legacy behavior allowed it for ETF disposals)
-    this._exitTaxEligibleForAnnualExemption = (function(){
+    this._exitTaxEligibleForAnnualExemption = (function () {
       if (indexFundsTypeDef && indexFundsTypeDef.taxation && indexFundsTypeDef.taxation.exitTax && typeof indexFundsTypeDef.taxation.exitTax.eligibleForAnnualExemption === 'boolean') {
         return indexFundsTypeDef.taxation.exitTax.eligibleForAnnualExemption;
       }
       return true; // legacy IE behavior: treat as eligible for the annual exemption
     })();
 
-    // Deemed disposal years
-    this._deemedDisposalYears = (function(){
+    // Deemed disposal years - INITIAL value (from default country)
+    this._deemedDisposalYears = (function () {
       if (ruleset && typeof ruleset.findInvestmentTypeByKey === 'function') {
         var t = indexFundsTypeDef || ruleset.findInvestmentTypeByKey('indexFunds');
         if (t && t.taxation && t.taxation.exitTax && typeof t.taxation.exitTax.deemedDisposalYears === 'number') {
@@ -206,19 +206,40 @@ class IndexFunds extends Equity {
   simulateDeclareRevenue(income, gains, testRevenue) {
     testRevenue.declareInvestmentIncome(income);
     if (gains > 0 || this.canOffsetLosses) {
-      testRevenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name+" Sim", {
+      testRevenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name + " Sim", {
         category: 'exitTax',
         eligibleForAnnualExemption: !!this._exitTaxEligibleForAnnualExemption,
         allowLossOffset: !!this.canOffsetLosses
       });
     }
   }
-  
+
   addYear() {
     super.addYear();
-    // pay deemed disposal taxes for Index Funds aged multiple of 8 years
+
+    // Resolve Deemed Disposal rules for the CURRENT country
+    // Access currentCountry from global scope (set by Simulator.js)
+    var activeDeemedDisposalYears = 0;
+    try {
+      var cfg = Config.getInstance();
+      // Use global currentCountry variable if available, otherwise fall back to default
+      var targetCountry = (typeof currentCountry !== 'undefined') ? currentCountry : cfg.getDefaultCountry();
+      var ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(targetCountry) : null;
+
+      if (ruleset && typeof ruleset.findInvestmentTypeByKey === 'function') {
+        var t = ruleset.findInvestmentTypeByKey('indexFunds');
+        if (t && t.taxation && t.taxation.exitTax && typeof t.taxation.exitTax.deemedDisposalYears === 'number') {
+          activeDeemedDisposalYears = t.taxation.exitTax.deemedDisposalYears;
+        }
+      }
+    } catch (_) {
+      // Fallback to initial value if resolution fails (e.g. in simple tests)
+      activeDeemedDisposalYears = this._deemedDisposalYears;
+    }
+
+    // pay deemed disposal taxes for Index Funds aged multiple of N years
     for (let i = 0; i < this.portfolio.length; i++) {
-      const dd = this._deemedDisposalYears;
+      const dd = activeDeemedDisposalYears;
       if ((dd > 0) && (this.portfolio[i].age % dd === 0)) {
         let gains = this.portfolio[i].interest;
         this.portfolio[i].amount += gains;
@@ -240,7 +261,7 @@ class IndexFunds extends Equity {
 
 class Shares extends Equity {
 
-  constructor(growth, stdev=0) {
+  constructor(growth, stdev = 0) {
     var ruleset = null;
     try {
       var cfg = Config.getInstance();
@@ -265,7 +286,7 @@ class Shares extends Equity {
   simulateDeclareRevenue(income, gains, testRevenue) {
     testRevenue.declareInvestmentIncome(income);
     if (gains > 0 || this.canOffsetLosses) {
-      testRevenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name+" Sim", {
+      testRevenue.declareInvestmentGains(gains, this.taxRate, this.constructor.name + " Sim", {
         category: 'cgt',
         eligibleForAnnualExemption: true,
         allowLossOffset: true
@@ -278,7 +299,7 @@ class Shares extends Equity {
 
 class Pension extends Equity {
 
-  constructor(growth, stdev=0, person) {
+  constructor(growth, stdev = 0, person) {
     super(0, growth, stdev);
     this.lumpSum = false;
     this.person = person;
@@ -295,7 +316,7 @@ class Pension extends Equity {
       revenue.declarePrivatePensionIncome(income, this.person);
     }
   }
-  
+
   getLumpsum() {
     this.lumpSum = true;
     var rsValue = (this._ruleset && typeof this._ruleset.getPensionLumpSumMaxPercent === 'function') ? this._ruleset.getPensionLumpSumMaxPercent() : null;
@@ -304,13 +325,13 @@ class Pension extends Equity {
     this.lumpSum = false;
     return amount;
   }
-  
+
   drawdown(currentAge) {
     var bands = (this._ruleset && typeof this._ruleset.getPensionMinDrawdownRates === 'function') ? this._ruleset.getPensionMinDrawdownRates() : { '0': 0 };
     let ageLimits = Object.keys(bands);
     let minimumDrawdown = ageLimits.reduce(
-        function(acc, limit){ return (currentAge >= limit ? bands[limit] : acc); }, 
-        bands[ageLimits[0]]
+      function (acc, limit) { return (currentAge >= limit ? bands[limit] : acc); },
+      bands[ageLimits[0]]
     );
     return this.sell(this.capital() * minimumDrawdown);
   }

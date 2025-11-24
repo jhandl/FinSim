@@ -25,11 +25,12 @@ show_usage() {
     echo -e "${BLUE}=================${NC}"
     echo ""
     echo "USAGE:"
-    echo "  ./run-tests.sh [test-name] [--runAll]"
+    echo "  ./run-tests.sh [test-name ...] [--runAll]"
     echo ""
     echo "EXAMPLES:"
     echo -e "  ${GREEN}./run-tests.sh${NC}                    # Run all tests"
     echo -e "  ${GREEN}./run-tests.sh TestBasicTax${NC}       # Run specific test"
+    echo -e "  ${GREEN}./run-tests.sh TestFXConversions TestRelocationCurrency${NC}  # Run multiple tests"
     echo -e "  ${GREEN}./run-tests.sh --list${NC}             # List available tests"
     echo -e "  ${GREEN}./run-tests.sh --help${NC}             # Show this help"
     echo -e "  ${GREEN}./run-tests.sh TestEventsAutoscroll --runAll${NC}  # Force-run Safari/iOS-skipped specs"
@@ -73,12 +74,12 @@ run_test() {
         try {
             testDefinition = require('$test_file');
         } catch (error) {
-            console.error('❌ FAILED: $test_name');
             if (error && (error.stack || error.message)) {
                 console.error(error.stack || ('  Error: ' + error.message));
             } else {
                 console.error('  Error: Failed to load test file');
             }
+            console.error('❌ FAILED: $test_name');
             process.exit(1);
         }
         
@@ -91,18 +92,18 @@ run_test() {
                         console.log('✅ PASSED: $test_name');
                         process.exit(0);
                     } else {
-                        console.log('❌ FAILED: $test_name');
                         if (result.errors && result.errors.length > 0) {
                             result.errors.forEach(error => console.log('  Error: ' + error));
                         }
+                        console.log('❌ FAILED: $test_name');
                         process.exit(1);
                     }
                 })
                 .catch(error => {
-                    console.error('❌ FAILED: $test_name');
                     if (error && (error.stack || error.message)) {
                         console.error(error.stack || ('  Error: ' + error.message));
                     }
+                    console.error('❌ FAILED: $test_name');
                     process.exit(1);
                 });
         } else {
@@ -116,18 +117,18 @@ run_test() {
                         console.log('✅ PASSED: $test_name');
                         process.exit(0);
                     } else {
-                        console.log('❌ FAILED: $test_name');
                         if (result.report) {
                             console.log(result.report);
                         }
+                        console.log('❌ FAILED: $test_name');
                         process.exit(1);
                     }
                 })
                 .catch(error => {
-                    console.error('❌ FAILED: $test_name');
                     if (error && (error.stack || error.message)) {
                         console.error(error.stack || ('  Error: ' + error.message));
                     }
+                    console.error('❌ FAILED: $test_name');
                     process.exit(1);
                 });
         }
@@ -230,12 +231,15 @@ main() {
         fi
         local passed=0
         local failed=0
+        local failed_tests=()
         
         for test_file in "${test_files[@]}"; do
+            local test_name=$(basename "$test_file" .js)
             if run_test "$test_file"; then
                 ((passed++))
             else
                 ((failed++))
+                failed_tests+=("$test_name")
             fi
         done
         
@@ -251,6 +255,7 @@ main() {
             echo "$JEST_OUTPUT"
             echo -e "❌ FAILED: JestUITests"
             ((failed++))
+            failed_tests+=("JestUITests")
         fi
 
         # -----------------------------
@@ -268,6 +273,7 @@ main() {
                 echo "$PLAYWRIGHT_OUTPUT"
                 echo -e "❌ FAILED: $TEST_NAME"
                 ((failed++))
+                failed_tests+=("$TEST_NAME")
             fi
 
     done
@@ -288,6 +294,15 @@ main() {
 
         echo
         echo -e " Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
+        
+        # List failed tests if any
+        if [ ${#failed_tests[@]} -gt 0 ]; then
+            echo
+            echo -e "${RED}Failed tests:${NC}"
+            for failed_test in "${failed_tests[@]}"; do
+                echo -e "  ${RED}❌ $failed_test${NC}"
+            done
+        fi
         echo
 
         if [ $failed -eq 0 ]; then
@@ -297,19 +312,96 @@ main() {
         fi
         
     else
-        # Run specific test or group of tests with the same base name
-        local input_name="$1"
-        shift  # Move past the test name
-
-        # Capture any extra arguments following the optional --args flag
+        # If more than one test name is provided before an optional --args,
+        # run each test name sequentially and aggregate pass/fail status.
+        # Example:
+        #   ./run-tests.sh TestA TestB --args --runInBand
+        #
+        # Here, TestA and TestB are treated as separate test requests that
+        # will both receive the same extra Jest/Playwright args.
+        local names=()
         local extra_args=()
-        if [ "$1" == "--args" ]; then
-            shift  # Remove the --args flag
-            # Collect all remaining parameters as individual array elements
-            while [ $# -gt 0 ]; do
-                extra_args+=("$1")
-                shift
+        local seen_args_flag=false
+
+        for arg in "$@"; do
+            if [ "$arg" == "--args" ]; then
+                seen_args_flag=true
+                continue
+            fi
+
+            if [ "$seen_args_flag" = true ]; then
+                extra_args+=("$arg")
+            else
+                names+=("$arg")
+            fi
+        done
+
+        # When more than one base test name is supplied, run them all in turn
+        # by recursively invoking this script with a single name plus shared
+        # extra args. This reuses all existing single-test logic.
+        if [ ${#names[@]} -gt 1 ]; then
+            local total_passed=0
+            local total_failed=0
+
+            for name in "${names[@]}"; do
+                if [ ${#extra_args[@]} -gt 0 ]; then
+                    if FINSIM_SUPPRESS_SUMMARY=1 "$0" "$name" --args "${extra_args[@]}"; then
+                        ((total_passed++))
+                    else
+                        ((total_failed++))
+                    fi
+                else
+                    if FINSIM_SUPPRESS_SUMMARY=1 "$0" "$name"; then
+                        ((total_passed++))
+                    else
+                        ((total_failed++))
+                    fi
+                fi
             done
+
+            echo
+            echo -e " Results (requested): ${GREEN}$total_passed passed${NC}, ${RED}$total_failed failed${NC}"
+            echo
+
+            if [ $total_failed -eq 0 ]; then
+                exit 0
+            else
+                exit 1
+            fi
+        fi
+
+        # Run specific test or group of tests with the same base name
+        local input_name="${names[0]}"
+
+        # ------------------------------------------------------------------
+        # Umbrella aliases (e.g. JestUITests) so users can re-run summary labels
+        # reported by the "run all" mode.
+        # ------------------------------------------------------------------
+        if [ "$input_name" == "JestUITests" ]; then
+            cd "$ROOT_DIR"
+            echo -e "${BLUE}Running Jest UI test suite (alias: JestUITests)${NC}"
+            local passed=0
+            local failed=0
+
+            if npx jest --runInBand "${extra_args[@]}"; then
+                echo -e "${GREEN}✅ PASSED: JestUITests${NC}"
+                passed=1
+            else
+                echo -e "${RED}❌ FAILED: JestUITests${NC}"
+                failed=1
+            fi
+
+            if [ -z "$FINSIM_SUPPRESS_SUMMARY" ]; then
+                echo
+                echo -e " Results (requested): ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
+                echo
+            fi
+
+            if [ $failed -eq 0 ]; then
+                exit 0
+            else
+                exit 1
+            fi
         fi
 
         local test_files=()
@@ -378,10 +470,12 @@ main() {
             esac
         done
 
-        # Summary for the requested tests
-        echo
-        echo -e " Results (requested): ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
-        echo
+        # Summary for the requested tests (unless suppressed by parent wrapper)
+        if [ -z "$FINSIM_SUPPRESS_SUMMARY" ]; then
+            echo
+            echo -e " Results (requested): ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
+            echo
+        fi
 
         if [ $failed -eq 0 ]; then
             exit 0
