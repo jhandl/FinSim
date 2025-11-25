@@ -19,7 +19,7 @@ module.exports = {
   name: "Boundary Conditions Test Suite",
   description: "Comprehensive validation of edge cases, limits, and boundary conditions",
   category: "boundary",
-  
+
   scenario: {
     parameters: {
       startingAge: 25,
@@ -51,7 +51,7 @@ module.exports = {
       oldestChildBorn: null,
       personalTaxCredit: 2000
     },
-    
+
     events: [
       // Boundary Test 1: Zero income scenario
       {
@@ -63,7 +63,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       // Boundary Test 2: Minimum taxable income (just above USC exemption)
       {
         type: 'SI',
@@ -74,7 +74,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       // Boundary Test 3: Income tax standard rate band boundary
       {
         type: 'SI',
@@ -85,7 +85,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       // Boundary Test 4: Income just above higher rate threshold
       {
         type: 'SI',
@@ -96,7 +96,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       // Boundary Test 5: Maximum pensionable earnings
       {
         type: 'SI',
@@ -107,7 +107,7 @@ module.exports = {
         rate: 0.4,                      // Maximum pension contribution rate
         match: 0.06
       },
-      
+
       // Boundary Test 6: Income above pensionable earnings limit
       {
         type: 'SI',
@@ -118,7 +118,7 @@ module.exports = {
         rate: 0.4,                      // Maximum pension contribution rate
         match: 0.06
       },
-      
+
       // Boundary Test 7: USC band boundaries
       {
         type: 'SI',
@@ -129,7 +129,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       {
         type: 'SI',
         id: 'usc-band-2-boundary',
@@ -139,7 +139,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       {
         type: 'SI',
         id: 'usc-band-3-boundary',
@@ -149,7 +149,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       {
         type: 'SI',
         id: 'usc-surcharge-boundary',
@@ -159,7 +159,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       // Boundary Test 8: Large one-time expense (tests withdrawal priorities)
       {
         type: 'E',
@@ -169,7 +169,7 @@ module.exports = {
         toAge: 50,
         rate: 0
       },
-      
+
       // Boundary Test 9: Real estate at minimum retirement age for pension access
       {
         type: 'SM',
@@ -179,7 +179,7 @@ module.exports = {
         toAge: 60,
         rate: 0.03
       },
-      
+
       // Boundary Test 10: State pension qualification age
       {
         type: 'SI',
@@ -190,7 +190,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       // Boundary Test 11: PRSI exemption age
       {
         type: 'SI',
@@ -201,7 +201,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       // Boundary Test 12: State pension increase age
       {
         type: 'SI',
@@ -212,7 +212,7 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       // Boundary Test 13: Very large asset base (tests calculation limits)
       {
         type: 'FI',
@@ -227,7 +227,7 @@ module.exports = {
 
   assertions: [
     // === ZERO VALUE BOUNDARY TESTS ===
-    
+
     // Test 1: Zero income should result in zero taxes
     {
       type: 'exact_value',
@@ -237,7 +237,7 @@ module.exports = {
       expected: 0,
       tolerance: 0.01
     },
-    
+
     {
       type: 'exact_value',
       target: 'age',
@@ -246,7 +246,7 @@ module.exports = {
       expected: 0,
       tolerance: 0.01
     },
-    
+
     {
       type: 'exact_value',
       target: 'age',
@@ -255,7 +255,7 @@ module.exports = {
       expected: 0,
       tolerance: 0.01
     },
-    
+
     // Test 2: Zero income should not affect cash if no expenses
     {
       type: 'exact_value',
@@ -265,9 +265,9 @@ module.exports = {
       expected: 0,
       tolerance: 1
     },
-    
+
     // === USC EXEMPTION BOUNDARY ===
-    
+
     // Test 3: Income just above USC exemption (€13,001) should trigger USC
     {
       type: 'comparison',
@@ -279,7 +279,7 @@ module.exports = {
         value: 0
       }
     },
-    
+
     // Test 4: USC at minimum taxable income should be very small
     {
       type: 'range',
@@ -291,9 +291,9 @@ module.exports = {
         max: 10                         // Should be very small amount
       }
     },
-    
+
     // === INCOME TAX BOUNDARY TESTS ===
-    
+
     // Test 5: At €44,000 boundary, all income should be taxed at 20%
     {
       type: 'range',
@@ -305,7 +305,7 @@ module.exports = {
         max: 4000
       }
     },
-    
+
     // Test 6: At €44,001, should see higher rate tax on €1 (adjusted for actual calculation)
     {
       type: 'comparison',
@@ -317,9 +317,9 @@ module.exports = {
         value: 3600                     // Adjusted based on actual calculation
       }
     },
-    
+
     // === PENSION CONTRIBUTION LIMITS ===
-    
+
     // Test 7: Maximum pension contributions at €115,000 salary (Note: rate was 0 in scenario)
     {
       type: 'exact_value',
@@ -329,7 +329,7 @@ module.exports = {
       expected: 0,                      // No pension contributions when rate=0
       tolerance: 1
     },
-    
+
     // Test 8: Pension contributions capped at €115,000 even with higher salary (Note: rate was 0 in scenario)
     {
       type: 'exact_value',
@@ -339,9 +339,9 @@ module.exports = {
       expected: 0,                      // No pension contributions when rate=0
       tolerance: 1
     },
-    
+
     // === USC BAND BOUNDARY TESTS ===
-    
+
     // Test 9: USC at band 1 boundary (€12,012) - Check if zero due to exemption
     {
       type: 'comparison',
@@ -353,7 +353,7 @@ module.exports = {
         value: 0
       }
     },
-    
+
     // Test 10: USC at band 2 boundary (€27,382)
     {
       type: 'range',
@@ -365,7 +365,7 @@ module.exports = {
         max: 280
       }
     },
-    
+
     // Test 11: USC at band 3 boundary (€70,044)
     {
       type: 'range',
@@ -377,7 +377,7 @@ module.exports = {
         max: 1400
       }
     },
-    
+
     // Test 12: USC surcharge threshold (€100,000)
     {
       type: 'range',
@@ -389,9 +389,9 @@ module.exports = {
         max: 2300
       }
     },
-    
+
     // === WITHDRAWAL PRIORITY TESTS ===
-    
+
     // Test 13: Large expense should trigger withdrawal priorities correctly
     {
       type: 'comparison',
@@ -403,9 +403,9 @@ module.exports = {
         value: 50000                    // Cash should be depleted first
       }
     },
-    
+
     // === PENSION AGE BOUNDARIES ===
-    
+
     // Test 14: At minimum pension retirement age (60), pension fund should be accessible
     {
       type: 'comparison',
@@ -417,9 +417,9 @@ module.exports = {
         value: 0                        // Should have non-negative pension value
       }
     },
-    
+
     // === STATE PENSION TESTS ===
-    
+
     // Test 15: State pension should begin at qualifying age (66)
     {
       type: 'comparison',
@@ -431,7 +431,7 @@ module.exports = {
         value: 0                        // Should start receiving state pension
       }
     },
-    
+
     // Test 16: State pension weekly rate should be reasonable (adjusted for actual calculation)
     {
       type: 'range',
@@ -439,13 +439,13 @@ module.exports = {
       age: 67,
       field: 'incomeStatePension',
       expected: {
-        min: 40000,                     // Adjusted based on actual calculation
-        max: 45000
+        min: 42000,                     // Adjusted based on actual calculation with evolution FX (2.5% inflation)
+        max: 43000
       }
     },
-    
+
     // === PRSI EXEMPTION AGE ===
-    
+
     // Test 17: PRSI at age 70 - check if exemption applies or reduced rate
     {
       type: 'comparison',
@@ -457,9 +457,9 @@ module.exports = {
         value: 0                        // PRSI should be non-negative
       }
     },
-    
+
     // === STATE PENSION INCREASE ===
-    
+
     // Test 18: State pension should increase at age 80
     {
       type: 'comparison',
@@ -471,9 +471,9 @@ module.exports = {
         value: 42000                    // Should be higher than basic rate (adjusted)
       }
     },
-    
+
     // === LARGE ASSET HANDLING ===
-    
+
     // Test 19: Large lump sum should be handled without calculation errors
     {
       type: 'comparison',
@@ -485,9 +485,9 @@ module.exports = {
         value: 1000000                  // Should include the large investment
       }
     },
-    
+
     // === SIMULATION INTEGRITY ===
-    
+
     // Test 20: Simulation should complete successfully despite boundary conditions
     {
       type: 'comparison',
@@ -498,7 +498,7 @@ module.exports = {
         value: 85                       // Should reach close to target age
       }
     },
-    
+
     // Test 21: Final net worth should be reasonable given the scenario
     {
       type: 'comparison',
@@ -509,9 +509,9 @@ module.exports = {
         value: 500000                   // Should have accumulated significant wealth
       }
     },
-    
+
     // === EDGE CASE VALIDATIONS ===
-    
+
     // Test 22: No negative tax values should occur
     {
       type: 'comparison',
@@ -523,7 +523,7 @@ module.exports = {
         value: 0
       }
     },
-    
+
     {
       type: 'comparison',
       target: 'age',
@@ -534,7 +534,7 @@ module.exports = {
         value: 0
       }
     },
-    
+
     {
       type: 'comparison',
       target: 'age',

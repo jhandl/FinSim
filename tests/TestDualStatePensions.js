@@ -61,7 +61,7 @@ module.exports = {
       age: 66,
       field: 'incomeStatePension',
       expected: 13000,           // P1: 250 * 52 = 13,000 yearly (P2 not eligible yet)
-      tolerance: 10
+      tolerance: 0             // Increased tolerance for calculation variations
     },
 
     // Test that only P1's pension is counted when P2 is not yet eligible
@@ -71,7 +71,7 @@ module.exports = {
       age: 67,                   // P1=67, P2=65 (still not eligible)
       field: 'incomeStatePension',
       expected: 13000,           // Still only P1's pension
-      tolerance: 10
+      tolerance: 0             // Increased tolerance for calculation variations
     },
 
     // Test that P1's pension continues (may not have P2 pension yet due to age calculation)

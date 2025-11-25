@@ -13,19 +13,19 @@ const TestRetirementPhaseTransition = {
       startingAge: 60,
       targetAge: 68,
       retirementAge: 65,
-      
+
       // Initial assets
       initialSavings: 50000,
       initialPension: 500000,
       initialFunds: 0,
       initialShares: 0,
-      
+
       // Asset priorities
       priorityCash: 1,
       priorityFunds: 2,
       priorityShares: 3,
       priorityPension: 4,
-      
+
       // Growth and inflation settings
       growthRatePension: 0.0,
       growthDevPension: 0.0,
@@ -34,19 +34,19 @@ const TestRetirementPhaseTransition = {
       growthRateShares: 0.0,
       growthDevShares: 0.0,
       inflation: 0.0,
-      
+
       // Investment allocation
       FundsAllocation: 0,
       SharesAllocation: 0,
-      
+
       // Pension settings
       pensionPercentage: 0,
       pensionCapped: "No",
       statePensionWeekly: 289,
-      
+
       // Tax settings
       personalTaxCredit: 1875,
-      
+
       // Other settings
       emergencyStash: 0,
       marriageYear: null,
@@ -88,8 +88,8 @@ const TestRetirementPhaseTransition = {
       type: "exact_value",
       target: "age",
       age: 64,
-      field: "incomePrivatePension", 
-      expected: 0, 
+      field: "incomePrivatePension",
+      expected: 0,
       tolerance: 1
     },
     {
@@ -97,7 +97,7 @@ const TestRetirementPhaseTransition = {
       target: "age",
       age: 64,
       field: "incomeStatePension",
-      expected: 0, 
+      expected: 0,
       tolerance: 1
     },
     {
@@ -145,7 +145,7 @@ const TestRetirementPhaseTransition = {
       age: 65,
       field: "pensionFund",
       // Initial 500k - 125k lump sum - 15k drawdown = 360k. (0% growth)
-      expected: 360000, 
+      expected: 360000,
       tolerance: 1
     },
 
@@ -163,7 +163,7 @@ const TestRetirementPhaseTransition = {
       target: "age",
       age: 66,
       field: "incomeStatePension",
-      expected: 15028, // As per parameters.statePensionAmount
+      expected: 15028, // 289 * 52 with 0% inflation
       tolerance: 1
     },
     {

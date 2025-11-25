@@ -31,6 +31,7 @@ class Person {
     this.pensionContributionPercentageParam = personSpecificUIParams.pensionContributionPercentage;
     this.statePensionCurrencyParam = personSpecificUIParams.statePensionCurrency || null;
     this.statePensionCountryParam = personSpecificUIParams.statePensionCountry || null;
+    this.params = commonSimParams;
 
     // Reset yearly variables
     this.resetYearlyVariables();
@@ -96,7 +97,7 @@ class Person {
       if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function') {
         try {
           spInflationRate = InflationService.resolveInflationRate(spCountry, currentYear, {
-            params: config.params || config,
+            params: this.params || config.params || config,
             config: config,
             countryInflationOverrides: null // Do not apply residence overrides to source country pension
           });
@@ -104,8 +105,9 @@ class Person {
       }
       // Fallback to params.inflation if resolution failed
       if (spInflationRate === null || spInflationRate === undefined) {
-        spInflationRate = (config.params && typeof config.params.inflation === 'number') ? config.params.inflation :
-          (config.inflation !== undefined ? config.inflation : 0.02);
+        spInflationRate = (this.params && typeof this.params.inflation === 'number') ? this.params.inflation :
+          ((config.params && typeof config.params.inflation === 'number') ? config.params.inflation :
+            (config.inflation !== undefined ? config.inflation : 0.02));
       }
 
       // Calculate yearly state pension (52 weeks) using the specific inflation rate
