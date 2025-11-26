@@ -895,10 +895,13 @@ class ChartManager {
         const sourceCurrency = cfg.getCachedTaxRuleSet(sourceCountry) ? cfg.getCachedTaxRuleSet(sourceCountry).getCurrencyCode() : 'EUR';
         const targetCurrency = this.reportingCurrency;
         // Derive calendar year for FX evolution:
-        // - Use the explicit Year field from the data row.
-        // - In PV mode, always use simulation-start-year FX.
+        // - Use the explicit Year field from the data row when available.
+        // - In PV mode, or when Year is missing, fall back to simulation-start-year FX.
         var simStartYear = cfg.getSimulationStartYear();
-        var yearForFX = this.presentValueMode ? simStartYear : data.Year;
+        var yearForFX = data.Year != null ? data.Year : simStartYear;
+        if (this.presentValueMode) {
+          yearForFX = simStartYear;
+        }
         const economicData = cfg.getEconomicData();
         if (!economicData || !economicData.ready) {
           console.error('ChartManager.updateChartsRow: economicData unavailable at age ' + age + ', skipping currency conversion');
@@ -921,12 +924,10 @@ class ChartManager {
               actualSourceCurrency = 'EUR';
             }
             if (actualSourceCurrency !== targetCurrency) {
-              // FX conversion using evolved mode (inflation-driven) - not PPP
-              // For PV mode, use constant FX mode to avoid double-applying inflation
+              // FX conversion using evolution mode (inflation-driven, default mode) - not PPP.
+              // We always call EconomicData.convert with baseYear = simulation start; the
+              // conversion engine derives year-specific cross-rates from inflation profiles.
               var fxOptions = { baseYear: simStartYear };
-              if (this.presentValueMode && isStatePension) {
-                fxOptions.fxMode = 'constant';
-              }
               const converted = economicData.convert(originalVal, actualSourceCountry, toCountry, yearForFX, fxOptions);
               // Conversion result safeguards
               if (converted === null || !Number.isFinite(converted)) {

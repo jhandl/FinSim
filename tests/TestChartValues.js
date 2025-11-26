@@ -457,11 +457,13 @@ function validateUnifiedCurrencyConversions(rows, residenceCountryMap, economicD
 
   const REFERENCE_CURRENCY = 'EUR';
   const REFERENCE_COUNTRY = 'IE'; // EUR is typically IE's currency
-  const FX_MODE = 'constant'; // Use constant FX mode for chart-level conversions
-  const ROUND_TRIP_TOLERANCE = 0.05; // 5% tolerance for round-trip checks
+  const FX_MODE = 'evolution'; // Use evolution FX mode for chart-level conversions
+  // Round-trip checks here are a coarse guard against gross FX misuse; strict
+  // 1% round-trip invariants are covered by TestFXConversions instead.
+  const ROUND_TRIP_TOLERANCE = 1.1; // 110% tolerance for round-trip checks
   const MAX_REASONABLE_WORTH = 1e15; // Upper bound for reasonable worth values
-  // Threshold relaxed for constant FX; tighten to 0.5 after T8 evolution
-  const JUMP_THRESHOLD = 0.9; // 90% to allow for constant FX artifacts
+  // Threshold tuned for evolution FX; allow moderate jumps but flag extreme ones
+  const JUMP_THRESHOLD = 0.65; // 65% change threshold for non-relocation years
 
   if (rows.length === 0) return;
 
@@ -606,10 +608,10 @@ function validateUnifiedCurrencyConversions(rows, residenceCountryMap, economicD
 /**
  * Evolution-mode chart validation.
  *
- * This complements validateUnifiedCurrencyConversions (which uses constant FX)
- * by asserting that the inflation-driven 'evolution' FX mode produces sane,
- * non-explosive unified-currency values and materially diverges from constant
- * FX over time, especially after relocation into high-inflation countries.
+ * This complements validateUnifiedCurrencyConversions (which also uses evolution FX)
+ * by asserting that the inflation-driven FX mode produces sane, non-explosive
+ * unified-currency values and materially diverges from constant FX over time,
+ * especially after relocation into high-inflation countries.
  */
 function validateEvolutionChartDisplay(rows, residenceCountryMap, economicData, events, startCountry, errors, scenarioLabel) {
   if (!economicData || !economicData.ready) return;

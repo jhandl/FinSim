@@ -27,9 +27,11 @@ test('chart currency selector converts datasets and shows original tooltip detai
       { key: 'shares', label: 'Shares' }
     ], { preserveData: false, transactional: true });
 
+    const cfg = window.Config.getInstance();
+    const simStartYear = cfg.getSimulationStartYear();
     const sampleRows = [
-      { Age: 30, NetIncome: 52000, Expenses: 21000, IncomeSalaries: 52000, Cash: 12000, RealEstateCapital: 85000, PensionFund: 18000, Income__indexFunds: 1400, Capital__shares: 25000 },
-      { Age: 41, NetIncome: 66000, Expenses: 28000, IncomeSalaries: 66000, Cash: 15000, RealEstateCapital: 125000, PensionFund: 26000, Income__indexFunds: 1800, Capital__shares: 50000 }
+      { Age: 30, Year: simStartYear, NetIncome: 52000, Expenses: 21000, IncomeSalaries: 52000, Cash: 12000, RealEstateCapital: 85000, PensionFund: 18000, Income__indexFunds: 1400, Capital__shares: 25000 },
+      { Age: 41, Year: simStartYear + 11, NetIncome: 66000, Expenses: 28000, IncomeSalaries: 66000, Cash: 15000, RealEstateCapital: 125000, PensionFund: 26000, Income__indexFunds: 1800, Capital__shares: 50000 }
     ];
 
     sampleRows.forEach((row, idx) => {
@@ -67,7 +69,7 @@ test('chart currency selector converts datasets and shows original tooltip detai
   await dropdown.selectOption('ARS');
   await page.waitForTimeout(200);
 
-  const analysis = await frame.locator('body').evaluate(() => {
+    const analysis = await frame.locator('body').evaluate(() => {
     const webUI = window.WebUI.getInstance();
     const cm = webUI.chartManager;
     const cfg = window.Config.getInstance();
@@ -76,13 +78,16 @@ test('chart currency selector converts datasets and shows original tooltip detai
     const converted = cm.cashflowChart.data.datasets[inflowsIdx].data[0];
     const original = cm.originalValues[0]?.NetIncome;
     const startYear = cfg.getSimulationStartYear();
+    const yearForFX = cm.cachedRowData && cm.cachedRowData[1] && cm.cachedRowData[1].Year != null
+      ? cm.cachedRowData[1].Year
+      : startYear;
     const expected = original
       ? econ.convert(
           original.value,
           cm.getCountryForAge(30),
           cm.getRepresentativeCountryForCurrency(cm.reportingCurrency),
-          startYear + 30,
-          { fxMode: 'constant', baseYear: startYear }
+          yearForFX,
+          { baseYear: startYear }
         )
       : null;
     // Dynamic income (indexFunds) conversion check
@@ -94,8 +99,8 @@ test('chart currency selector converts datasets and shows original tooltip detai
           dynIncomeOrig.value,
           cm.getCountryForAge(30),
           cm.getRepresentativeCountryForCurrency(cm.reportingCurrency),
-          startYear + 30,
-          { fxMode: 'constant', baseYear: startYear }
+          yearForFX,
+          { baseYear: startYear }
         )
       : null;
     // Dynamic capital (shares) conversion check on assets chart
@@ -107,8 +112,8 @@ test('chart currency selector converts datasets and shows original tooltip detai
           dynCapOrig.value,
           cm.getCountryForAge(30),
           cm.getRepresentativeCountryForCurrency(cm.reportingCurrency),
-          startYear + 30,
-          { fxMode: 'constant', baseYear: startYear }
+          yearForFX,
+          { baseYear: startYear }
         )
       : null;
     const tooltipLabel = cm.cashflowChart.options.plugins.tooltip.callbacks.label({
@@ -184,12 +189,15 @@ test('chart currency selector converts datasets and shows original tooltip detai
     const converted = cm.cashflowChart.data.datasets[inflowsIdx].data[0];
     const original = cm.originalValues[0]?.NetIncome;
     const startYear = cfg.getSimulationStartYear();
+    const yearForFX = cm.cachedRowData && cm.cachedRowData[1] && cm.cachedRowData[1].Year != null
+      ? cm.cachedRowData[1].Year
+      : startYear;
     const expected = original ? econ.convert(
       original.value,
       cm.getCountryForAge(30),
       cm.getRepresentativeCountryForCurrency(cm.reportingCurrency),
-      startYear + 30,
-      { fxMode: 'constant', baseYear: startYear }
+      yearForFX,
+      { baseYear: startYear }
     ) : null;
     // Dynamic checks on reconversion after cache repopulation
     const dynIncomeIdx = cm.cashflowIncomeIndexByKey['indexFunds'];
@@ -199,8 +207,8 @@ test('chart currency selector converts datasets and shows original tooltip detai
       dynIncomeOrig.value,
       cm.getCountryForAge(30),
       cm.getRepresentativeCountryForCurrency(cm.reportingCurrency),
-      startYear + 30,
-      { fxMode: 'constant', baseYear: startYear }
+      yearForFX,
+      { baseYear: startYear }
     ) : null;
     const dynCapIdx = cm.assetsCapitalIndexByKey['shares'];
     const dynCapConverted = dynCapIdx != null ? cm.assetsChart.data.datasets[dynCapIdx].data[0] : null;
@@ -209,8 +217,8 @@ test('chart currency selector converts datasets and shows original tooltip detai
       dynCapOrig.value,
       cm.getCountryForAge(30),
       cm.getRepresentativeCountryForCurrency(cm.reportingCurrency),
-      startYear + 30,
-      { fxMode: 'constant', baseYear: startYear }
+      yearForFX,
+      { baseYear: startYear }
     ) : null;
     return { converted, expected, dynIncomeConverted, dynIncomeExpected, dynCapConverted, dynCapExpected };
   });

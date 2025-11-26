@@ -173,7 +173,7 @@ test('data table toggles natural/unified currency modes and shows converted valu
       const year = cfg.getSimulationStartYear() + age;
       const fromCountry = (tm && typeof tm.getStartCountry === 'function') ? tm.getStartCountry() : (cfg.getDefaultCountry ? cfg.getDefaultCountry() : 'ie');
       const toCountry = (tm && tm.reportingCurrency === 'ARS') ? 'ar' : 'ie';
-      const expected = econ.convert(52000, fromCountry, toCountry, year, { fxMode: 'constant', baseYear: cfg.getSimulationStartYear() });
+      const expected = econ.convert(52000, fromCountry, toCountry, year, { baseYear: cfg.getSimulationStartYear() });
       const cell = document.querySelector(`#data_row_1 td:nth-of-type(${netIncomeIndex}) .cell-content`);
       const actualText = cell ? (cell.textContent || '') : '';
       const parseCurrency = (txt) => {

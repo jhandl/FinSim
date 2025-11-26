@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Align the simulator’s authoritative ledger (tax- and accounting-relevant numbers) with standard industry practice while preserving FinSim’s educational analytics. This document specifies changes to use nominal FX for the ledger and use PPP only to suggest values when splitting relocation-impacted events.
+Align the simulator’s authoritative ledger (tax- and accounting-relevant numbers) with standard industry practice while preserving FinSim’s educational analytics. This document now tracks the evolution‑FX rollout: the ledger uses a single inflation‑driven FX engine, and PPP/constant modes are reserved for explicit analytics (e.g., relocation split suggestions).
 
 ## Scope
 
-- Switch ledger conversion to nominal FX (year-specific cross rates) across core tax/accounting flows.
-- Use PPP only for suggestions in relocation event split workflows (pre-fills), not for ledger math.
+- Switch ledger conversion to **evolution FX** (inflation‑driven FX evolution anchored at the simulation start year) across core tax/accounting flows.
+- Use PPP only for suggestions in relocation event split workflows (pre-fills) and analytic helpers, not for ledger math.
 - Keep current yearly net-then-convert flow consolidation behavior.
 
 ## Definitions
@@ -18,9 +18,9 @@ Align the simulator’s authoritative ledger (tax- and accounting-relevant numbe
 
 ## Functional Requirements
 
-1) Ledger conversions use nominal FX
-   - R1.1 The simulator must convert monetary amounts for taxation and ledger totals using nominal FX cross-rates for the specific year (i.e., `fxMode = "constant"` which already pulls year FX when available, falls back to base FX).
-   - R1.2 Existing PPP and reversion modes remain available but must not be used in ledger paths.
+1) Ledger conversions use evolution FX
+   - R1.1 The simulator must convert monetary amounts for taxation and ledger totals using the inflation‑driven evolution engine (i.e., `fxMode = "evolution"` or no explicit `fxMode` so the default applies), anchored at the simulation start year.
+   - R1.2 Existing PPP, constant, and reversion modes remain available but must not be used in ledger paths.
    - R1.3 Yearly consolidation (net‑then‑convert per currency) is retained.
 
 2) PPP only for relocation split suggestions

@@ -43,15 +43,16 @@ Implications and edge cases:
 
 ### Currency Conversion of Yearly Flows
 Each year’s monetary flows are first aggregated by currency. For non‑residence currencies, the simulator converts the net amount into the active residence currency using the economic time series:
-- Default conversion mode is PPP‑based.
-- The simulation start year is used as the base year to anchor conversions.
-- For the target year, if a PPP cross‑rate is available, it is used directly. If it is not available, the system falls back to an anchor (base‑year PPP or FX) and scales it by the relative CPI growth between source and target countries over the elapsed years.
+- **Default conversion mode is evolution FX**: an inflation‑driven FX engine that derives year‑specific cross‑rates from base FX and per‑country inflation (via `InflationService`/CPI), anchored at the simulation start year.
+- The simulation start year is used as the base year to anchor conversions and cache FX evolution paths for reproducibility within a run.
+- For any target year, the evolution engine independently evolves each country’s “per‑EUR” FX path and then forms cross‑rates as `FX_to(year) / FX_from(year)`.
 
-Alternative supported modes include:
-- Constant: use the FX cross‑rate for the specific year (falling back to the base FX when missing).
-- Reversion: start from the base‑year anchor and move toward each year’s PPP target at a configured reversion speed; when PPP targets are missing for future years, they are synthesized from CPI differentials.
+Alternative supported modes (used only when explicitly requested by tests or analytics helpers) include:
+- **Constant**: use the FX cross‑rate at the anchor year (or an explicit time‑series value when provided) without applying inflation‑driven evolution.
+- **PPP**: evolve a PPP‑anchored cross‑rate using relative inflation between countries.
+- **Reversion**: start from the base‑year FX level and move gradually toward the PPP path at a configured reversion speed.
 
-This approach provides coherent per‑year conversions that still behave well when parts of the series are missing or only partially populated.
+The ledger and standard chart paths now use the evolution mode exclusively; PPP/reversion and constant remain available for explicit, opt‑in analytics and regression tests.
 
 #### Order of operations (per simulation year)
 1. Select the inflation country for each event (precedence above), pick that year’s CPI (or fallback), and compute the inflated amount using constant‑rate compounding from base to current year.
@@ -106,5 +107,4 @@ When relocation events change the residence country:
 - PPP (base) for A→B: 0.80; year‑2030 PPP missing.
 - PPP mode conversion factor for 2030: \( 0.80 \times \frac{1.03^5}{1.02^5} \approx 0.80 \times 1.0499 \approx 0.84 \).
 - Converted net flow (after netting in currency A): value × 0.84.
-
 

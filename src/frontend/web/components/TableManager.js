@@ -309,9 +309,9 @@ class TableManager {
         }
       }
 
-      // Currency conversion (unified mode): Uses nominal FX ('constant' mode) to convert
-      // deflated values to reporting currency. This preserves exchange-rate realities for
-      // display purposes. PPP mode is NOT used here (reserved for event suggestions only).
+      // Currency conversion (unified mode): Uses evolution FX (inflation-driven cross-rates)
+      // to convert deflated values to reporting currency. PPP mode is NOT used here (reserved
+      // for event suggestions only).
       if (isMonetary && Config.getInstance().isRelocationEnabled() && this.currencyMode === 'unified' && this.reportingCurrency) {
         const age = data.Age;
         const year = Config.getInstance().getSimulationStartYear() + age;
@@ -321,28 +321,27 @@ class TableManager {
         const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
         
         if (fromCurrency !== this.reportingCurrency) {
-            const economicData = Config.getInstance().getEconomicData();
-            if (economicData && economicData.ready) {
-                const cacheKey = `${year}-${fromCountry}-${toCountry}`;
-                let fxMult = this.conversionCache[cacheKey];
-                if (fxMult === undefined) {
-                    // Nominal FX conversion (constant mode) - not PPP
-                    fxMult = economicData.convert(1, fromCountry, toCountry, year, {
-                        fxMode: 'constant',
-                        baseYear: Config.getInstance().getSimulationStartYear()
-                    });
-                    if (fxMult !== null) {
-                        this.conversionCache[cacheKey] = fxMult;
-                    }
-                }
-
-                if (fxMult !== null) {
-                    originalValue = v;
-                    originalCurrency = fromCurrency;
-                    fxMultiplier = fxMult;
-                    v = v * fxMult;
-                }
+          const economicData = Config.getInstance().getEconomicData();
+          if (economicData && economicData.ready) {
+            const cacheKey = `${year}-${fromCountry}-${toCountry}`;
+            let fxMult = this.conversionCache[cacheKey];
+            if (fxMult === undefined) {
+              // Evolution FX conversion (default mode) - not PPP.
+              fxMult = economicData.convert(1, fromCountry, toCountry, year, {
+                baseYear: Config.getInstance().getSimulationStartYear()
+              });
+              if (fxMult !== null) {
+                this.conversionCache[cacheKey] = fxMult;
+              }
             }
+
+            if (fxMult !== null) {
+              originalValue = v;
+              originalCurrency = fromCurrency;
+              fxMultiplier = fxMult;
+              v = v * fxMult;
+            }
+          }
         }
       }
 
@@ -751,7 +750,6 @@ class TableManager {
                   let fxMult = this.conversionCache[cacheKey];
                   if (fxMult === undefined) {
                     fxMult = economicData.convert(1, fromCountry, toCountry, year, {
-                      fxMode: 'constant',
                       baseYear: Config.getInstance().getSimulationStartYear()
                     });
                     if (fxMult !== null) this.conversionCache[cacheKey] = fxMult;
@@ -974,8 +972,9 @@ class TableManager {
          * - PV source: Uses data-pv-value when present so PV mode is driven entirely by the core
          *   PV layer rather than recomputing deflation in the UI.
          * - Currency Conversion Mode: After selecting nominal vs PV, unified-mode conversion uses
-         *   nominal FX rates (fxMode: 'constant'), NOT PPP. This matches setDataRow() and preserves
-         *   exchange-rate realities for display. PPP remains reserved for event-management suggestions.
+         *   evolution FX cross-rates (default inflation-driven mode), NOT PPP. This matches setDataRow()
+         *   and preserves exchange-rate realities for display. PPP remains reserved for event-management
+         *   suggestions.
          */
         // Compute present-value in source currency when enabled:
         // prefer core-computed PV stored on the cell; otherwise stay nominal.
@@ -988,8 +987,8 @@ class TableManager {
           }
         }
 
-        // Unified mode: convert deflated source value to reporting currency using nominal FX
-        // ('constant' mode, not PPP) to preserve exchange-rate realities for display.
+        // Unified mode: convert deflated source value to reporting currency using evolution FX
+        // (inflation-driven cross-rates, not PPP) to preserve exchange-rate realities for display.
         if (this.currencyMode === 'unified' && this.reportingCurrency) {
           displayCurrencyCode = this.reportingCurrency;
           displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
@@ -1005,8 +1004,8 @@ class TableManager {
                   const cacheKey = `${year}-${fromCountry}-${toCountry}`;
                   let fxMult = this.conversionCache[cacheKey];
                   if (fxMult === undefined) {
-                    // Nominal FX conversion (constant mode) - not PPP
-                    fxMult = economicData.convert(1, fromCountry, toCountry, year, { fxMode: 'constant', baseYear: Config.getInstance().getSimulationStartYear() });
+                    // Evolution FX conversion (default mode) - not PPP.
+                    fxMult = economicData.convert(1, fromCountry, toCountry, year, { baseYear: Config.getInstance().getSimulationStartYear() });
                     if (fxMult !== null && isFinite(fxMult)) this.conversionCache[cacheKey] = fxMult;
                   }
                   if (fxMult !== null && isFinite(fxMult)) {
