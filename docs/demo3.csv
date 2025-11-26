@@ -54,12 +54,12 @@ SI,You,40000,30,40,0.035,0.03,lei=split_1762624764068_cmuo82pdo
 SI2np,Your Partner,30000,30,40,0.02,0,lei=split_1762624772055_tlitwyl80
 E,Life,40000,30,40,,,lei=split_1762624789954_fgc7fmqve
 E,Kid,6000,32,40,,,lei=split_1762624796604_1zr4xkn8q
-R,Family House,40000,35,65,,,cur=EUR;lc=ie
+R,Family House,40000,35,70,,,cur=EUR;lc=ie
 M,Family House,18000,35,60,0.035,,cur=EUR;lc=ie
 MV-AR,hola,0,40,,,,
 E,Kid,3334610,40,52,,,cur=ARS;lei=split_1762624796604_1zr4xkn8q
 E,Life,22230730,40,100,,,cur=ARS;lei=split_1762624789954_fgc7fmqve
-SI2np,Your Partner,16673048,40,64,,0,cur=ARS;lei=split_1762624772055_tlitwyl80
-SI,You,22230730,40,64,,0.03,cur=ARS;lei=split_1762624764068_cmuo82pdo
-R,Downsize,155615112,65,100,,,cur=ARS;lc=ar
+SI2np,Your Partner,20673048,40,64,,0,cur=ARS;lei=split_1762624772055_tlitwyl80
+SI,You,30230730,40,64,,0.03,cur=ARS;lei=split_1762624764068_cmuo82pdo
+R,Downsize,80155615112,70,100,,,cur=ARS;lc=ar
 SM,Crash,,70,72,-0.25,,
