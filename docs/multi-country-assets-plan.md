@@ -23,6 +23,20 @@
 - Charts then convert that PV to the selected reporting currency using **nominal FX** (`EconomicData.convert(..., fxMode: 'constant')`), same as current unified mode.
 - PPP remains reserved for relocation suggestions and analytics, not ledger or chart aggregation.
 
+### Nominal real-estate growth correction
+
+- **Current bug:** `Property.getValue()` calls `adjust(this.paid + ..., this.appreciation, this.periods)`. When `appreciation` is not set on the `R` event, `adjust()` falls back to the **current residence country’s** inflation (`currentCountry`). After a relocation, an Irish property (`linkedCountry = ie`) starts growing under AR CPI, which is wrong and interacts badly with evolution FX.
+- **Intended nominal behaviour:**
+  - Keep the existing “event-to-purchase” inflation step: the `R` event `Amount` is still treated as “today’s money” and inflated from simulation start to the purchase age using the **event’s country** inflation (via `resolveCountryInflation`), as it is today.
+  - After purchase, the property’s nominal value should grow using an **asset-country rate**, not the residence country:
+    - If the event specifies an explicit `Rate`, use it unchanged as the annual appreciation rate.
+    - Otherwise, resolve an implicit appreciation rate from `InflationService.resolveInflationRate(linkedCountry, year, ...)`, falling back to `StartCountry` (or default ruleset) when `linkedCountry` is missing.
+  - `Property.getValue()` should pass this asset-country rate explicitly into `adjust(...)` so that post‑purchase growth no longer depends on `currentCountry`.
+- **Scope of the fix:**
+  - Real estate (and any helper that derives its value via `Property.getValue()`) must adopt this asset-country nominal growth rule.
+  - Mortgages should continue to use their explicit payment/amortization schedule; they do not need an implicit inflation rate, but they should follow the same property country for any future PV work.
+  - Pensions and investment assets (index funds/shares) keep their existing nominal growth logic (configured growth rates, Gaussian sampling, etc.); they are only affected in the **PV layer**, not in nominal.
+
 ## Implementation Steps
 
 ### 1. Document intended PV semantics
