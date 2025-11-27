@@ -1966,10 +1966,11 @@ function updateYearlyData() {
   // expresses amounts in simulation-start-year purchasing power for the
   // residency country at this age.
   (function computePresentValueAggregates() {
-    var cfg, startYear, ageNum, pvCountry, inflationRate, deflationFactor;
+    var cfg, startYear, ageNum, pvCountry, inflationRate, deflationFactor, countryOverrides;
     try {
       ageNum = person1.age;
       cfg = (typeof Config !== 'undefined' && Config && typeof Config.getInstance === 'function') ? Config.getInstance() : null;
+      countryOverrides = (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null;
       startYear = (cfg && typeof cfg.getSimulationStartYear === 'function') ? cfg.getSimulationStartYear() : null;
       pvCountry = currentCountry || ((params.StartCountry || (cfg && cfg.getDefaultCountry && cfg.getDefaultCountry()) || '') + '').toLowerCase();
       inflationRate = null;
@@ -1994,6 +1995,128 @@ function updateYearlyData() {
       }
     } catch (_e) {
       deflationFactor = 1;
+    }
+
+    var realEstateCapitalPV = 0;
+    var usedPerPropertyRealEstatePV = false;
+    try {
+      var realEstateCollection = (realEstate && realEstate.properties && typeof realEstate.properties === 'object') ? realEstate.properties : null;
+      if (realEstateCollection) {
+        var propertyKeys = [];
+        try {
+          propertyKeys = Object.keys(realEstateCollection);
+        } catch (_) {
+          propertyKeys = [];
+        }
+        if (propertyKeys.length > 0) {
+          var normalizedResidenceCurrency = residenceCurrency || '';
+          try {
+            if (typeof normalizeCurrency === 'function') {
+              normalizedResidenceCurrency = normalizeCurrency(normalizedResidenceCurrency);
+            } else if (normalizedResidenceCurrency && typeof normalizedResidenceCurrency === 'string') {
+              normalizedResidenceCurrency = normalizedResidenceCurrency.trim().toUpperCase();
+            }
+          } catch (_) { }
+          for (var rk = 0; rk < propertyKeys.length; rk++) {
+            var propKey = propertyKeys[rk];
+            if (!Object.prototype.hasOwnProperty.call(realEstateCollection, propKey)) continue;
+            var prop = realEstateCollection[propKey];
+            if (!prop || typeof prop.getValue !== 'function') continue;
+            var propertyNominalValue = 0;
+            try {
+              propertyNominalValue = prop.getValue();
+              if (propertyNominalValue === null || propertyNominalValue === undefined || !isFinite(propertyNominalValue)) {
+                propertyNominalValue = 0;
+              }
+            } catch (_) {
+              propertyNominalValue = 0;
+            }
+            var assetCountryForPV = '';
+            try {
+              if (typeof prop.getLinkedCountry === 'function') {
+                assetCountryForPV = prop.getLinkedCountry() || '';
+              }
+            } catch (_) {
+              assetCountryForPV = '';
+            }
+            if (!assetCountryForPV && params && params.StartCountry) {
+              assetCountryForPV = params.StartCountry;
+            }
+            assetCountryForPV = (assetCountryForPV || '');
+            if (assetCountryForPV && typeof assetCountryForPV === 'string') {
+              assetCountryForPV = assetCountryForPV.toLowerCase();
+            } else {
+              assetCountryForPV = '';
+            }
+            var propertyDeflationFactor = 1;
+            if (typeof getDeflationFactorForCountry === 'function') {
+              try {
+                propertyDeflationFactor = getDeflationFactorForCountry(assetCountryForPV, ageNum, startYear, {
+                  params: (typeof params !== 'undefined') ? params : null,
+                  config: cfg,
+                  countryInflationOverrides: countryOverrides,
+                  year: (typeof year !== 'undefined') ? year : null
+                });
+              } catch (_) {
+                propertyDeflationFactor = 1;
+              }
+            }
+            if (propertyDeflationFactor === null || propertyDeflationFactor === undefined || !isFinite(propertyDeflationFactor) || propertyDeflationFactor <= 0) {
+              propertyDeflationFactor = 1;
+            }
+
+            var propertyPVInAssetCurrency = propertyNominalValue * propertyDeflationFactor;
+
+            var propertyPVInResidenceCurrency = propertyPVInAssetCurrency;
+            var conversionFailed = false;
+            try {
+              var propertyCurrencyCode = (typeof prop.getCurrency === 'function') ? prop.getCurrency() : null;
+              var propertyCurrencyNormalized = propertyCurrencyCode || '';
+              if (typeof normalizeCurrency === 'function') {
+                propertyCurrencyNormalized = normalizeCurrency(propertyCurrencyNormalized);
+              } else if (propertyCurrencyNormalized && typeof propertyCurrencyNormalized === 'string') {
+                propertyCurrencyNormalized = propertyCurrencyNormalized.trim().toUpperCase();
+              }
+              var propertyCountryForConversion = assetCountryForPV || currentCountry || (params && params.StartCountry) || '';
+              if (typeof normalizeCountry === 'function') {
+                propertyCountryForConversion = normalizeCountry(propertyCountryForConversion);
+              } else if (propertyCountryForConversion && typeof propertyCountryForConversion === 'string') {
+                propertyCountryForConversion = propertyCountryForConversion.trim().toLowerCase();
+              }
+              var conversionYear = (startYear !== null && startYear !== undefined) ? startYear : year;
+              if (!propertyCurrencyNormalized || propertyCurrencyNormalized === normalizedResidenceCurrency || typeof convertCurrencyAmount !== 'function') {
+                propertyPVInResidenceCurrency = propertyPVInAssetCurrency;
+                if (propertyCurrencyNormalized && normalizedResidenceCurrency && propertyCurrencyNormalized !== normalizedResidenceCurrency && typeof convertCurrencyAmount !== 'function') {
+                  conversionFailed = true;
+                }
+              } else {
+                var convertedPV = convertCurrencyAmount(propertyPVInAssetCurrency, propertyCurrencyNormalized, propertyCountryForConversion, normalizedResidenceCurrency, currentCountry, conversionYear, true);
+                if (convertedPV === null) {
+                  conversionFailed = true;
+                } else {
+                  propertyPVInResidenceCurrency = convertedPV;
+                }
+              }
+            } catch (_) {
+              conversionFailed = true;
+            }
+            if (conversionFailed) {
+              usedPerPropertyRealEstatePV = false;
+              realEstateCapitalPV = 0;
+              break;
+            }
+
+            realEstateCapitalPV += propertyPVInResidenceCurrency;
+            usedPerPropertyRealEstatePV = true;
+          }
+        }
+      }
+    } catch (_errProp) {
+      usedPerPropertyRealEstatePV = false;
+      realEstateCapitalPV = 0;
+    }
+    if (!usedPerPropertyRealEstatePV) {
+      realEstateCapitalPV = realEstateConverted * deflationFactor;
     }
 
     // State Pension PV: Calculate PV in base currency (EUR) using Ireland's inflation, then convert to residence currency
@@ -2065,14 +2188,14 @@ function updateYearlyData() {
       dataSheet[row].incomeCashPV += Math.max(cashWithdraw, 0);
       dataSheet[row].incomeDefinedBenefitPV += incomeDefinedBenefit;
       dataSheet[row].incomeTaxFreePV += incomeTaxFree;
-      dataSheet[row].realEstateCapitalPV += realEstateConverted;
+      dataSheet[row].realEstateCapitalPV += realEstateCapitalPV;
       dataSheet[row].netIncomePV += netIncome;
       dataSheet[row].expensesPV += expenses;
       dataSheet[row].pensionFundPV += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
       dataSheet[row].cashPV += cash;
       dataSheet[row].indexFundsCapitalPV += indexFundsCap;
       dataSheet[row].sharesCapitalPV += sharesCap;
-      dataSheet[row].worthPV += realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFundsCap + sharesCap + cash;
+      dataSheet[row].worthPV += realEstateCapitalPV + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFundsCap + sharesCap + cash;
     } else {
       dataSheet[row].incomeSalariesPV += incomeSalaries * deflationFactor;
       dataSheet[row].incomeRSUsPV += incomeShares * deflationFactor;
@@ -2085,14 +2208,14 @@ function updateYearlyData() {
       dataSheet[row].incomeCashPV += Math.max(cashWithdraw, 0) * deflationFactor;
       dataSheet[row].incomeDefinedBenefitPV += incomeDefinedBenefit * deflationFactor;
       dataSheet[row].incomeTaxFreePV += incomeTaxFree * deflationFactor;
-      dataSheet[row].realEstateCapitalPV += realEstateConverted * deflationFactor;
+      dataSheet[row].realEstateCapitalPV += realEstateCapitalPV;
       dataSheet[row].netIncomePV += netIncome * deflationFactor;
       dataSheet[row].expensesPV += expenses * deflationFactor;
       dataSheet[row].pensionFundPV += (person1.pension.capital() + (person2 ? person2.pension.capital() : 0)) * deflationFactor;
       dataSheet[row].cashPV += cash * deflationFactor;
       dataSheet[row].indexFundsCapitalPV += indexFundsCap * deflationFactor;
       dataSheet[row].sharesCapitalPV += sharesCap * deflationFactor;
-      dataSheet[row].worthPV += (realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFundsCap + sharesCap + cash) * deflationFactor;
+      dataSheet[row].worthPV += realEstateCapitalPV + (person1.pension.capital() + (person2 ? person2.pension.capital() : 0)) * deflationFactor + indexFundsCap * deflationFactor + sharesCap * deflationFactor + cash * deflationFactor;
     }
 
     // Dynamic PV maps for per-investment-type income and capital. These mirror
