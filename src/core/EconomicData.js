@@ -131,7 +131,7 @@ class EconomicData {
    * The 'ppp' and 'reversion' modes follow PPP-anchored inflation paths.
    * 
    * Returns null if conversion fails validation (e.g., invalid FX rate, non-finite
-   * result). Caps FX rates at 1e6 to prevent blowups.
+   * result).
    * 
    * @param {number} value - Amount to convert
    * @param {string} fromCountry - Source country code
@@ -258,9 +258,6 @@ class EconomicData {
       if (fxY <= 0) {
         console.error('EconomicData.convert: Invalid FX rate (<= 0) for ' + fromCountry + '->' + toCountry + ' at year ' + year + ': fxY=' + fxY);
         return null;
-      }
-      if (Math.abs(fxY) > 1e6) {
-        fxY = fxY > 0 ? 1e6 : -1e6;
       }
       // Direction validation vs base FX, when available.
       var baseFxCheck = this.getFX(fromCountry, toCountry);

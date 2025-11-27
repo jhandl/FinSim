@@ -157,6 +157,155 @@ function getDeflationFactor(age, startYear, inflationRate) {
   return deflate(1, inflationRate, n);
 }
 
+/**
+ * Compute a present-value deflation factor for a specific country.
+ *
+ * This helper mirrors the present-value logic used in the simulator but
+ * allows callers to target an arbitrary country (asset country, pension
+ * country, etc.) instead of only the active residency country. It is
+ * designed for multi-country asset present-value calculations where, for
+ * example, an Irish property should continue to use IE inflation even
+ * after relocating to another country.
+ *
+ * The function:
+ *  - Normalizes the provided country code.
+ *  - Derives an effective calendar year using either options.year or
+ *    (startYear + (ageNum - params.startingAge)) when available.
+ *  - Resolves an inflation rate via InflationService.resolveInflationRate().
+ *  - Falls back to params.inflation (or 0) when resolution fails.
+ *  - Delegates to getDeflationFactor(ageNum, startYear, inflationRate).
+ *
+ * Inputs are defensive: missing/invalid age or startYear return 1, and the
+ * final factor is clamped to 1 when it is invalid, NaN, or non-positive.
+ *
+ * @param {string} countryCode - ISO-2 country code (e.g., 'ie', 'ar') for which to compute the deflation factor.
+ * @param {number} ageNum - Current simulation age (e.g., person1.age).
+ * @param {number} startYear - Simulation start year (e.g., Config.getSimulationStartYear()).
+ * @param {Object=} options - Optional context:
+ *   - params: scenario parameters (must include startingAge/inflation for best results)
+ *   - config: Config instance
+ *   - economicData: EconomicData instance
+ *   - countryInflationOverrides: per-country inflation overrides
+ *   - year: explicit effective calendar year for CPI lookup
+ *
+ * @returns {number} Multiplicative factor to convert nominal future values
+ *                   to present-value for the given country.
+ *
+ * @example
+ * // With params.startingAge = 30, inflation = 0.02, startYear = 2020:
+ * // getDeflationFactorForCountry('ie', 35, 2020, { params }) ~ 1 / (1.02^5)
+ *
+ * @note This helper is intended for multi-country asset PV and does not
+ *       change existing residency-based PV behaviour.
+ */
+function getDeflationFactorForCountry(countryCode, ageNum, startYear, options) {
+  // Guard against missing core inputs: without age/startYear we cannot
+  // meaningfully compute periods, so return neutral factor 1.
+  var ageVal = (ageNum === null || ageNum === undefined || ageNum === "") ? null : parseFloat(ageNum);
+  var startYearVal = (startYear === null || startYear === undefined || startYear === "") ? null : parseInt(startYear, 10);
+
+  if (ageVal === null || isNaN(ageVal) || startYearVal === null || isNaN(startYearVal)) {
+    return 1;
+  }
+
+  var opts = options || {};
+
+  // Resolve params/config/economicData/overrides from options or globals.
+  var paramsObj = opts.params || null;
+  try {
+    if (!paramsObj && typeof params !== 'undefined') {
+      paramsObj = params;
+    }
+  } catch (_e0) {}
+
+  var cfg = opts.config || null;
+  try {
+    if (!cfg && typeof Config !== 'undefined' && Config && typeof Config.getInstance === 'function') {
+      cfg = Config.getInstance();
+    }
+  } catch (_e1) {}
+
+  var economicData = opts.economicData || null;
+  if (!economicData && cfg && typeof cfg.getEconomicData === 'function') {
+    try {
+      economicData = cfg.getEconomicData();
+    } catch (_e2) {}
+  }
+
+  var overrides = opts.countryInflationOverrides || null;
+  if (!overrides) {
+    try {
+      if (typeof countryInflationOverrides !== 'undefined') {
+        overrides = countryInflationOverrides;
+      }
+    } catch (_e3) {}
+  }
+
+  // Normalize country code using shared InflationService helper when available
+  // to avoid drift from the central implementation. Fall back to a local,
+  // minimal normalizer when the service is not present (e.g. in legacy tests).
+  var key = '';
+  if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.normalizeCountry === 'function') {
+    try {
+      key = InflationService.normalizeCountry(countryCode) || '';
+    } catch (_eNorm) {
+      key = '';
+    }
+  } else if (countryCode !== null && countryCode !== undefined) {
+    key = String(countryCode).trim().toLowerCase();
+  }
+
+  // Derive effective calendar year for CPI lookup.
+  var effectiveYear = null;
+  if (opts && typeof opts.year === 'number' && isFinite(opts.year)) {
+    effectiveYear = opts.year;
+  } else {
+    var startingAge = null;
+    if (paramsObj && paramsObj.startingAge !== undefined && paramsObj.startingAge !== null && paramsObj.startingAge !== "") {
+      startingAge = parseFloat(paramsObj.startingAge);
+    }
+    if (startingAge !== null && !isNaN(startingAge)) {
+      var nYears = ageVal - startingAge;
+      if (!isNaN(nYears)) {
+        effectiveYear = startYearVal + nYears;
+      }
+    }
+  }
+
+  var inflationRate = null;
+
+  // Resolve inflation using InflationService when available.
+  if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function') {
+    try {
+      inflationRate = InflationService.resolveInflationRate(key, effectiveYear, {
+        params: paramsObj,
+        config: cfg,
+        economicData: economicData,
+        countryInflationOverrides: overrides
+      });
+    } catch (_e4) {
+      inflationRate = null;
+    }
+  }
+
+  // Fallback: scenario scalar inflation, then 0.
+  if (inflationRate === null || inflationRate === undefined || inflationRate === "") {
+    if (paramsObj && typeof paramsObj.inflation === 'number') {
+      inflationRate = paramsObj.inflation;
+    } else {
+      inflationRate = 0;
+    }
+  }
+
+  var factor = getDeflationFactor(ageVal, startYearVal, inflationRate);
+
+  if (typeof factor !== 'number' || !isFinite(factor) || factor <= 0) {
+    return 1;
+  }
+
+  return factor;
+}
+
 function gaussian(mean, stdev, withOverride = true) {
   let u1 = 1 - Math.random();
   let u2 = 1 - Math.random();

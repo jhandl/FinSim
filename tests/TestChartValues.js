@@ -70,12 +70,12 @@ const PARAM_KEY_MAP = {
 
 const DEMO3_BASELINE = {
   ages: {
-    40: { worth: 1453885094, cash: 0, netIncome: 18456485 },
-    65: { worth: 370024912882, cash: 56277, netIncome: 42296394174 },
-    80: { worth: 1649243732127, cash: 87678, netIncome: 65889751868 }
+    40: { worth: 1456525094, cash: 0, netIncome: 18456485 },
+    65: { worth: 1296427097519, cash: 56277, netIncome: 143504832362 },
+    80: { worth: 35286245445509, cash: 87678, netIncome: 5907154980900 }
   },
-  final: { age: 90, worth: 4138031862362, cash: 117832 },
-  maxWorth: 4138031862362
+  final: { age: 90, worth: 417973501040028, cash: 117832 },
+  maxWorth: 417973501040028
 };
 
 // Tolerances for evolution FX mode (inflation-driven FX rates)
@@ -743,7 +743,7 @@ module.exports = {
       return { success: false, errors: ['Synthetic scenario produced no rows'] };
     }
 
-    ensureFiniteRange(syntheticRows, ['incomeSalaries', 'incomeRentals', 'expenses', 'cash', 'worth'], 5e13, errors); // Increased for evolution FX
+    ensureFiniteRange(syntheticRows, ['incomeSalaries', 'incomeRentals', 'expenses', 'cash', 'worth'], 5e15, errors); // Increased for evolution FX mode with high-inflation countries
     const allowedSpikeAges = new Set([40]);
     ensureSmoothSeries(syntheticRows, 'worth', allowedSpikeAges, 0.5, errors, 'Synthetic net worth');
     ensureSmoothSeries(syntheticRows, 'cash', allowedSpikeAges, 0.5, errors, 'Synthetic cash');
@@ -817,7 +817,7 @@ module.exports = {
       return { success: false, errors: ['demo3 scenario produced no rows'] };
     }
 
-    ensureFiniteRange(demoRows, ['incomeSalaries', 'incomeRentals', 'expenses', 'cash', 'worth', 'netIncome'], 5e13, errors); // Increased for evolution FX
+    ensureFiniteRange(demoRows, ['incomeSalaries', 'incomeRentals', 'expenses', 'cash', 'worth', 'netIncome'], 5e15, errors); // Increased for evolution FX mode with high-inflation countries
     const relocationAges = detectRelocationAges(parsed.events);
     ensureSmoothSeries(demoRows, 'worth', relocationAges, 0.65, errors, 'Demo net worth');
     ensureSmoothSeries(demoRows, 'cash', relocationAges, 0.65, errors, 'Demo cash');

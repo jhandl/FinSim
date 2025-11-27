@@ -22,6 +22,11 @@
 
   function InflationService() {}
 
+  // Expose shared country normalisation helper so other modules
+  // (e.g. Utils.getDeflationFactorForCountry) can reuse the same
+  // logic instead of duplicating it.
+  InflationService.normalizeCountry = normalizeCountry;
+
   /**
    * Resolve the inflation rate (decimal, e.g. 0.02 for 2%) for a given
    * country/year using the same priority order as the simulator:
@@ -202,5 +207,4 @@
     root.InflationService = InflationService;
   }
 })(typeof this !== 'undefined' ? this : (typeof self !== 'undefined' ? self : (typeof globalThis !== 'undefined' ? globalThis : null)));
-
 

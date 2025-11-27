@@ -156,7 +156,75 @@ class Property {
   }
   
   getValue() {
-    return adjust(this.paid + this.borrowed * this.fractionRepaid, this.appreciation, this.periods);
+    var baseValue = this.paid + this.borrowed * this.fractionRepaid;
+
+    // Preserve legacy behaviour when an explicit appreciation rate is set.
+    if (this.appreciation !== null && this.appreciation !== undefined && this.appreciation !== '') {
+      return adjust(baseValue, this.appreciation, this.periods);
+    }
+
+    // When no explicit rate is provided, resolve an inflation rate for the
+    // asset's country so that nominal growth is pegged to the property's
+    // own country, not the simulator's current residency.
+    var resolvedRate = null;
+
+    try {
+      if (typeof InflationService !== 'undefined' &&
+          InflationService &&
+          typeof InflationService.resolveInflationRate === 'function') {
+
+        // Determine the asset country: linkedCountry -> params.StartCountry -> '' (let service decide).
+        var assetCountry = '';
+        if (this.linkedCountry !== null && this.linkedCountry !== undefined && this.linkedCountry !== '') {
+          assetCountry = this.linkedCountry;
+        } else {
+          try {
+            if (typeof params !== 'undefined' && params && params.StartCountry) {
+              assetCountry = params.StartCountry;
+            }
+          } catch (_) {
+            assetCountry = '';
+          }
+        }
+
+        // Prefer the current simulation year when available; otherwise let the
+        // service fall back to its own defaults.
+        var currentYear = null;
+        try {
+          if (typeof year === 'number') {
+            currentYear = year;
+          }
+        } catch (_) {
+          currentYear = null;
+        }
+
+        resolvedRate = InflationService.resolveInflationRate(assetCountry, currentYear, {
+          params: (function () {
+            try { return (typeof params !== 'undefined') ? params : null; } catch (_) { return null; }
+          })(),
+          countryInflationOverrides: (function () {
+            try { return (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null; } catch (_) { return null; }
+          })()
+        });
+      }
+    } catch (_) {
+      resolvedRate = null;
+    }
+
+    // Fallback for environments without InflationService (legacy tests/GAS).
+    if (resolvedRate === null || resolvedRate === undefined) {
+      var fallbackRate = 0;
+      try {
+        if (typeof params !== 'undefined' && params && typeof params.inflation === 'number') {
+          fallbackRate = params.inflation;
+        }
+      } catch (_) {
+        fallbackRate = 0;
+      }
+      resolvedRate = fallbackRate;
+    }
+
+    return adjust(baseValue, resolvedRate, this.periods);
   }
 
   getCurrency() {
