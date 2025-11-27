@@ -12,6 +12,8 @@
   - No validation that there's no two relocations the same year.
   - Start country detector needs to use proper geolocation services.
   - Events that were split have amounts calculated with certain assumptions. Whenever the economic data changes (when running the getFinData.py script), the amounts need to be flagged as outdated.
+- Present value issues:
+  - The tax deductions are not being PVd.
 
 # Roadmap
 
