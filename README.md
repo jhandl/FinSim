@@ -4,6 +4,7 @@
 - Net Worth is not really "net".
 - Check: is withdraw% computed on the full "net worth"? Or on the investments & pensions, as it should?
 - Relocation issues:
+  - Pensions need to be tracked by country. Currently it's all one pension fund, even if the person contributes to different pension schemes in different countries.
   - Missing resolution option: Cut short. "For the income and expense events, an option should be to cut it short. For example, if I move to Argentina at age 40 and there's an income event in EUR from age 30 to 50, an option should be to change the toAge to 40. The phrasing could be tricky with this one, try to make it as neutral as possible."
   - Creating an event within a relocation period should assume local currency (both when rendering and in the wizard) 
   - State pension parameter is for one country only. What about other countries?

@@ -955,18 +955,43 @@ function processEvents() {
             var rsSalary = (function () { try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch (_) { return null; } })();
             var bands = (rsSalary && typeof rsSalary.getPensionContributionAgeBands === 'function') ? rsSalary.getPensionContributionAgeBands() : {};
             var baseRate = (salaryPerson.pensionContributionPercentageParam || 0) * getRateForKey(salaryPerson.age, bands);
+            // Pensions should always use StartCountry currency (EUR), not residence currency
+            // Convert salary amount to StartCountry currency for pension contributions
+            var startCountry = (params && params.StartCountry) ? String(params.StartCountry).toLowerCase() : null;
+            var startCountryCurrency = 'EUR';
+            if (startCountry && typeof getCurrencyForCountry === 'function') {
+              var scCurrency = getCurrencyForCountry(startCountry);
+              if (scCurrency) {
+                startCountryCurrency = normalizeCurrency(scCurrency);
+              }
+            }
+            var pensionBaseAmount = entry.amount;
+            // Convert to StartCountry currency if bucket currency differs
+            if (bucketCurrency !== startCountryCurrency && typeof convertCurrencyAmount === 'function') {
+              var convertedToStartCurrency = convertCurrencyAmount(entry.amount, bucketCurrency, bucketCountry, startCountryCurrency, startCountry, year, false);
+              if (convertedToStartCurrency !== null && isFinite(convertedToStartCurrency) && convertedToStartCurrency > 0) {
+                pensionBaseAmount = convertedToStartCurrency;
+              }
+            }
             if (params.pensionCapped === "Yes") {
               var cap = (rsSalary && typeof rsSalary.getPensionContributionAnnualCap === 'function') ? rsSalary.getPensionContributionAnnualCap() : 0;
               var capValue = adjust(cap);
-              if (capValue > 0 && entryConvertedAmount > capValue) {
-                baseRate = baseRate * capValue / entryConvertedAmount;
+              // Convert cap to StartCountry currency for comparison
+              if (capValue > 0 && typeof convertCurrencyAmount === 'function') {
+                var capInStartCurrency = convertCurrencyAmount(capValue, resCurrencyNorm, currentCountry, startCountryCurrency, startCountry, year, false);
+                if (capInStartCurrency !== null && isFinite(capInStartCurrency) && capInStartCurrency > 0) {
+                  capValue = capInStartCurrency;
+                }
+              }
+              if (capValue > 0 && pensionBaseAmount > capValue) {
+                baseRate = baseRate * capValue / pensionBaseAmount;
               }
             } else if (params.pensionCapped === "Match") {
               baseRate = Math.min(entry.match || 0, baseRate);
             }
             var employerRate = Math.min(entry.match || 0, baseRate);
-            var personalAmount = baseRate * entryConvertedAmount;
-            var employerAmount = employerRate * entryConvertedAmount;
+            var personalAmount = baseRate * pensionBaseAmount;
+            var employerAmount = employerRate * pensionBaseAmount;
             var totalContrib = personalAmount + employerAmount;
             if (totalContrib > 0) {
               pensionContribution += totalContrib;
@@ -2119,6 +2144,27 @@ function updateYearlyData() {
       realEstateCapitalPV = realEstateConverted * deflationFactor;
     }
 
+    // Pension PV: Use origin-country (StartCountry) deflation, not residency deflation
+    // Pensions should be deflated using the country where contributions were made
+    var pensionOriginCountry = (params && params.StartCountry) ? String(params.StartCountry).toLowerCase() : '';
+    var pensionDeflator = 1;
+    if (pensionOriginCountry && typeof getDeflationFactorForCountry === 'function') {
+      try {
+        pensionDeflator = getDeflationFactorForCountry(pensionOriginCountry, ageNum, startYear, {
+          params: (typeof params !== 'undefined') ? params : null,
+          config: cfg,
+          countryInflationOverrides: countryOverrides,
+          year: (typeof year !== 'undefined') ? year : null
+        });
+      } catch (_) {
+        pensionDeflator = 1;
+      }
+    }
+    if (pensionDeflator === null || pensionDeflator === undefined || !isFinite(pensionDeflator) || pensionDeflator <= 0) {
+      pensionDeflator = 1;
+    }
+    var pensionFundNominal = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+
     // State Pension PV: Calculate PV in base currency (EUR) using Ireland's inflation, then convert to residence currency
     // This ensures State Pension purchasing power is measured in the paying country's terms
     var statePensionPVInBaseCurrency = 0;
@@ -2191,11 +2237,11 @@ function updateYearlyData() {
       dataSheet[row].realEstateCapitalPV += realEstateCapitalPV;
       dataSheet[row].netIncomePV += netIncome;
       dataSheet[row].expensesPV += expenses;
-      dataSheet[row].pensionFundPV += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+      dataSheet[row].pensionFundPV += pensionFundNominal * pensionDeflator;
       dataSheet[row].cashPV += cash;
       dataSheet[row].indexFundsCapitalPV += indexFundsCap;
       dataSheet[row].sharesCapitalPV += sharesCap;
-      dataSheet[row].worthPV += realEstateCapitalPV + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFundsCap + sharesCap + cash;
+      dataSheet[row].worthPV += realEstateCapitalPV + (pensionFundNominal * pensionDeflator) + indexFundsCap + sharesCap + cash;
     } else {
       dataSheet[row].incomeSalariesPV += incomeSalaries * deflationFactor;
       dataSheet[row].incomeRSUsPV += incomeShares * deflationFactor;
@@ -2211,11 +2257,11 @@ function updateYearlyData() {
       dataSheet[row].realEstateCapitalPV += realEstateCapitalPV;
       dataSheet[row].netIncomePV += netIncome * deflationFactor;
       dataSheet[row].expensesPV += expenses * deflationFactor;
-      dataSheet[row].pensionFundPV += (person1.pension.capital() + (person2 ? person2.pension.capital() : 0)) * deflationFactor;
+      dataSheet[row].pensionFundPV += pensionFundNominal * pensionDeflator;
       dataSheet[row].cashPV += cash * deflationFactor;
       dataSheet[row].indexFundsCapitalPV += indexFundsCap * deflationFactor;
       dataSheet[row].sharesCapitalPV += sharesCap * deflationFactor;
-      dataSheet[row].worthPV += realEstateCapitalPV + (person1.pension.capital() + (person2 ? person2.pension.capital() : 0)) * deflationFactor + indexFundsCap * deflationFactor + sharesCap * deflationFactor + cash * deflationFactor;
+      dataSheet[row].worthPV += realEstateCapitalPV + (pensionFundNominal * pensionDeflator) + indexFundsCap * deflationFactor + sharesCap * deflationFactor + cash * deflationFactor;
     }
 
     // Dynamic PV maps for per-investment-type income and capital. These mirror
