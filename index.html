@@ -2,11 +2,23 @@
 <html>
 <head>
     <title>Ireland Financial Simulator</title>
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <script>
+        // Force a fresh fetch of the root HTML each session by giving it a unique query token
+        (function enforceFreshHtml() {
+            const sessionToken = sessionStorage.getItem('htmlCacheBust') || Date.now().toString(36);
+            sessionStorage.setItem('htmlCacheBust', sessionToken);
+            const url = new URL(window.location.href);
+            if (url.searchParams.get('cb') !== sessionToken) {
+                url.searchParams.set('cb', sessionToken);
+                window.location.replace(url.toString());
+            }
+        })();
+    </script>
     <!-- SPA base configuration -->
     <base href="/">
     <style>
@@ -73,7 +85,7 @@
     </script>
     
     <!-- SPA router script -->
-    <script src="/src/frontend/web/spa-router.js" onerror="handleScriptError(event)"></script>
+    <script src="/src/frontend/web/spa-router.js?v=20251203-1" onerror="handleScriptError(event)"></script>
     
     <script>
         function handleScriptError(event) {
@@ -90,4 +102,3 @@
     </script>
 </body>
 </html>
-
