@@ -149,8 +149,9 @@ class UIManager {
 
   updateDataRow(row, progress, scale = 1, backgroundColor = null) {
     const data = {
-      Age: dataSheet[row].age / scale,
-      Year: dataSheet[row].year / scale,
+      // Age and year are state values, not accumulated - don't divide by scale
+      Age: dataSheet[row].age,
+      Year: dataSheet[row].year,
       IncomeSalaries: dataSheet[row].incomeSalaries / scale,
       IncomeRSUs: dataSheet[row].incomeRSUs / scale,
       IncomeRentals: dataSheet[row].incomeRentals / scale,
@@ -282,18 +283,8 @@ class UIManager {
       economyMode: this.ui.getValue("economy_mode")
     };
 
-    // Guard StartCountry access: only read from DOM when relocation is enabled; otherwise rely on default
-    try {
-      const cfg = Config.getInstance();
-      if (cfg && typeof cfg.isRelocationEnabled === 'function' && cfg.isRelocationEnabled()) {
-        params.StartCountry = this.ui.getValue('StartCountry');
-      } else {
-        params.StartCountry = undefined; // Simulator will fall back to cfg.getDefaultCountry()
-      }
-    } catch (_) {
-      // If Config isn't ready, leave StartCountry undefined and allow downstream fallbacks
-      params.StartCountry = undefined;
-    }
+    // StartCountry is always required
+    params.StartCountry = this.ui.getValue('StartCountry');
 
     // In deterministic mode, override volatility parameters to 0 to ensure fixed growth rates
     // This ensures equity classes receive 0 standard deviation and use only the mean growth rate
@@ -456,9 +447,8 @@ class UIManager {
       errors = true;
     }
 
-    // StartCountry is mandatory if relocation is enabled
-    const config = Config.getInstance();
-    if (config.isRelocationEnabled() && !this.hasValue(params.StartCountry)) {
+    // StartCountry is mandatory
+    if (!this.hasValue(params.StartCountry)) {
       this.ui.setWarning('StartCountry', UIManager.REQUIRED_FIELD_MESSAGE);
       errors = true;
     }

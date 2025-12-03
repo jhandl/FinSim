@@ -1,7 +1,7 @@
 # Bugs
 - Real Estate equity is possibly not being computed correctly.
 - PRSI tax credit is not being applied.
-- Net Worth is not really "net".
+- The tax deductions are not being PVd.
 - Check: is withdraw% computed on the full "net worth"? Or on the investments & pensions, as it should?
 - Relocation issues:
   - Pensions need to be tracked by country. Currently it's all one pension fund, even if the person contributes to different pension schemes in different countries.
@@ -13,8 +13,6 @@
   - No validation that there's no two relocations the same year.
   - Start country detector needs to use proper geolocation services.
   - Events that were split have amounts calculated with certain assumptions. Whenever the economic data changes (when running the getFinData.py script), the amounts need to be flagged as outdated.
-- Present value issues:
-  - The tax deductions are not being PVd.
 
 # Roadmap
 

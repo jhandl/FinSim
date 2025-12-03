@@ -168,7 +168,8 @@ module.exports = {
           priorityCash: 1,
           priorityPension: 4,
           priorityFunds: 2,
-          priorityShares: 3
+          priorityShares: 3,
+          StartCountry: 'ie'
         },
         events: []  // No events for clean volatility testing
       };

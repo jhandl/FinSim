@@ -20,7 +20,7 @@
     return String(code).trim().toLowerCase();
   }
 
-  function InflationService() {}
+  function InflationService() { }
 
   // Expose shared country normalisation helper so other modules
   // (e.g. Utils.getDeflationFactorForCountry) can reuse the same
@@ -52,34 +52,28 @@
     var opts = options || {};
 
     // Resolve config / params / overrides / economicData from options or globals
-    var cfg = opts.config || null;
-    try {
-      if (!cfg && typeof Config !== 'undefined' && Config && typeof Config.getInstance === 'function') {
-        cfg = Config.getInstance();
-      }
-    } catch (_) {}
+    // Resolve config / params / overrides / economicData from options or globals
+    // Prefer explicit options, fall back to globals only if necessary for legacy support
+    var cfg = opts.config;
+    if (!cfg && typeof Config !== 'undefined' && Config && typeof Config.getInstance === 'function') {
+      try { cfg = Config.getInstance(); } catch (_) { }
+    }
 
-    var paramsObj = opts.params || null;
-    try {
-      if (!paramsObj && typeof params !== 'undefined') {
-        paramsObj = params;
-      }
-    } catch (_) {}
+    var paramsObj = opts.params;
+    if (!paramsObj && typeof params !== 'undefined') {
+      paramsObj = params;
+    }
 
-    var overrides = opts.countryInflationOverrides || null;
-    if (!overrides) {
-      try {
-        if (typeof countryInflationOverrides !== 'undefined') {
-          overrides = countryInflationOverrides;
-        }
-      } catch (_) {}
+    var overrides = opts.countryInflationOverrides;
+    if (!overrides && typeof countryInflationOverrides !== 'undefined') {
+      overrides = countryInflationOverrides;
     }
 
     var economicData = opts.economicData || null;
     if (!economicData && cfg && typeof cfg.getEconomicData === 'function') {
       try {
         economicData = cfg.getEconomicData();
-      } catch (_) {}
+      } catch (_) { }
     }
 
     var defaultRate = (typeof opts.defaultRate === 'number') ? opts.defaultRate : 0.02;
@@ -90,7 +84,7 @@
       baseCountryCode = paramsObj.StartCountry;
     }
     if (!baseCountryCode && cfg && typeof cfg.getDefaultCountry === 'function') {
-      try { baseCountryCode = cfg.getDefaultCountry(); } catch (_) {}
+      try { baseCountryCode = cfg.getDefaultCountry(); } catch (_) { }
     }
     var baseCountryNorm = normalizeCountry(baseCountryCode);
 
@@ -120,7 +114,7 @@
             if (typeof startYear === 'number') {
               effectiveYear = startYear;
             }
-          } catch (_) {}
+          } catch (_) { }
         }
         if (effectiveYear !== null && typeof economicData.getInflationForYear === 'function') {
           var cpiYear = economicData.getInflationForYear(key, effectiveYear);
@@ -134,7 +128,7 @@
             return Number(cpi) / 100;
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // 4) TaxRuleSet inflationRate (already a decimal)
@@ -147,7 +141,7 @@
             return Number(rate);
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // 5) Fallback to scenario scalar or default

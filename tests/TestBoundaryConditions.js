@@ -49,7 +49,8 @@ module.exports = {
       marriageYear: null,
       youngestChildBorn: null,
       oldestChildBorn: null,
-      personalTaxCredit: 2000
+      personalTaxCredit: 2000,
+      StartCountry: 'ie'
     },
 
     events: [

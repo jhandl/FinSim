@@ -263,6 +263,10 @@ class TestFramework {
         'Equities.js', 
         'RealEstate.js',
         'Person.js',
+        'InflationService.js',
+        'PresentValueCalculator.js',
+        'AttributionPopulator.js',
+        'DataAggregatesCalculator.js',
         'Simulator.js'
       ];
 
@@ -677,8 +681,9 @@ class TestFramework {
           for (var i = 1; i <= row; i++) {
             var r = dataSheet[i];
             if (!r || typeof r !== 'object') { continue; }
+            // Age and year are state values, not accumulated - don't divide by runs
             var numericFields = [
-              'age','year','incomeSalaries','incomeRSUs','incomeRentals','incomePrivatePension','incomeStatePension',
+              'incomeSalaries','incomeRSUs','incomeRentals','incomePrivatePension','incomeStatePension',
               'incomeFundsRent','incomeSharesRent','incomeCash','realEstateCapital','netIncome','expenses','pensionFund',
               'cash','indexFundsCapital','sharesCapital','pensionContribution','withdrawalRate','worth'
             ];

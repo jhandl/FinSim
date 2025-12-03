@@ -49,7 +49,8 @@ module.exports = {
       priorityCash: 1,              // Withdraw from cash first
       priorityPension: 4,           // Withdraw from pension last
       priorityFunds: 2,             // Withdraw from funds second
-      priorityShares: 3             // Withdraw from shares third
+      priorityShares: 3,            // Withdraw from shares third
+      StartCountry: 'ie'
     },
     
     events: [

@@ -51,7 +51,8 @@ module.exports = {
         marriageYear: 2029,           // Age 29
         youngestChildBorn: 2032,      // Age 32 (youngest child)
         oldestChildBorn: 2030,        // Age 30 (oldest child)
-        personalTaxCredit: 1875
+        personalTaxCredit: 1875,
+        StartCountry: 'ie'
       },
       
       events: [

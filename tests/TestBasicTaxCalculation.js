@@ -48,7 +48,8 @@ module.exports = {
       marriageYear: null,          // Single person
       youngestChildBorn: null,
       oldestChildBorn: null,
-      personalTaxCredit: 1875      // Critical missing parameter!
+      personalTaxCredit: 1875,     // Critical missing parameter!
+      StartCountry: 'ie'
     },
     
     events: [

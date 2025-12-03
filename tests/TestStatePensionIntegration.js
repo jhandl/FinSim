@@ -37,7 +37,8 @@ const TestStatePensionIntegration = {
       marriageYear: null,         // Added missing parameter
       youngestChildBorn: null,    // Added missing parameter
       oldestChildBorn: null,      // Added missing parameter
-      personalTaxCredit: 1875     // Added missing parameter - critical for tax calculations
+      personalTaxCredit: 1875,    // Added missing parameter - critical for tax calculations
+      StartCountry: 'ie'
     },
     events: [
       // Fixed event structure to match simulator requirements

@@ -13,7 +13,8 @@ const TestDebugRetirement = {
       statePensionAmount: 15028,
       pensionGrowthRate: 0,
       initialSavings: 50000,      // Initial cash
-      initialPension: 500000      // Initial pension fund
+      initialPension: 500000,    // Initial pension fund
+      StartCountry: 'ie'
     },
     events: [
       {

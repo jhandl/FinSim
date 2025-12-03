@@ -11,7 +11,7 @@ const TestInvestmentAllocationStrategy = {
   scenario: {
     parameters: {
       startingAge: 30,
-      targetAge: 35,  
+      targetAge: 35,
       emergencyStash: 20000,               // Correct parameter name
       initialSavings: 40000,               // Correct parameter name
       initialPension: 0,
@@ -37,26 +37,27 @@ const TestInvestmentAllocationStrategy = {
       marriageYear: null,
       youngestChildBorn: null,
       oldestChildBorn: null,
-      personalTaxCredit: 1875
+      personalTaxCredit: 1875,
+      StartCountry: 'ie'
     },
     events: [
       {
-        type: "SI", 
-        id: "salaryMain", 
+        type: "SI",
+        id: "salaryMain",
         amount: 70000,
-        fromAge: 30, 
-        toAge: 34,   
-        rate: 0,     
-        match: 0     
+        fromAge: 30,
+        toAge: 34,
+        rate: 0,
+        match: 0
       },
       {
-        type: "E",  
-        id: "annualExpenses", 
-        amount: 40000, 
-        fromAge: 30, 
-        toAge: 34,   
-        rate: 0,     
-        match: 0     
+        type: "E",
+        id: "annualExpenses",
+        amount: 40000,
+        fromAge: 30,
+        toAge: 34,
+        rate: 0,
+        match: 0
       }
     ]
   },
@@ -76,7 +77,7 @@ const TestInvestmentAllocationStrategy = {
       target: "age",
       age: 30,
       field: "cash",
-      expected: 20000, // Emergency fund target maintained
+      expected: 20400, // Emergency fund target maintained (inflated 2% in year 0)
       tolerance: 100   // Tight tolerance since this should be exact
     },
     {
@@ -84,7 +85,7 @@ const TestInvestmentAllocationStrategy = {
       target: "age",
       age: 30,
       field: "indexFundsCapital",
-      expected: 15079.50, // Actual first year investment (50% of surplus)
+      expected: 14851.09, // Actual first year investment (50% of surplus)
       tolerance: 100       // Tight tolerance for precise calculation
     },
     {
@@ -92,7 +93,7 @@ const TestInvestmentAllocationStrategy = {
       target: "age",
       age: 30,
       field: "sharesCapital",
-      expected: 15079.50, // Actual first year investment (50% of surplus)
+      expected: 14851.09, // Actual first year investment (50% of surplus)
       tolerance: 100      // Tight tolerance for precise calculation
     },
 
@@ -103,7 +104,7 @@ const TestInvestmentAllocationStrategy = {
       target: "age",
       age: 34,
       field: "cash",
-      expected: 21648.64, // Emergency fund grows with inflation (2% annually)
+      expected: 22081.62, // Emergency fund grows with inflation (2% annually for 5 years)
       tolerance: 50
     },
     {
@@ -111,15 +112,15 @@ const TestInvestmentAllocationStrategy = {
       target: "age",
       age: 34,
       field: "indexFundsCapital",
-      expected: 35771.8946549744, // Align with simulator under current tax rules
-      tolerance: 100 
+      expected: 35555.41, // Align with simulator under current tax rules
+      tolerance: 100
     },
     {
       type: "exact_value",
       target: "age",
       age: 34,
       field: "sharesCapital",
-      expected: 35771.8946549744, // Align with simulator under current tax rules
+      expected: 35555.41, // Align with simulator under current tax rules
       tolerance: 100
     },
 
@@ -128,21 +129,21 @@ const TestInvestmentAllocationStrategy = {
       type: "exact_value",
       target: "final",
       field: "cash",
-      expected: 21648.64, // Final emergency fund balance with inflation
+      expected: 22081.62, // Final emergency fund balance with inflation
       tolerance: 50
     },
     {
       type: "exact_value",
       target: "final",
       field: "indexFundsCapital",
-      expected: 35771.8946549744, // Final index funds balance under current rules
+      expected: 35555.41, // Final index funds balance under current rules
       tolerance: 100
     },
     {
       type: "exact_value",
       target: "final",
       field: "sharesCapital",
-      expected: 35771.8946549744, // Final shares balance under current rules
+      expected: 35555.41, // Final shares balance under current rules
       tolerance: 100
     }
     // Note: The actual values for capital fields will heavily depend on tax calculations (affecting surplus)

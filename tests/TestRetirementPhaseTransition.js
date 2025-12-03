@@ -51,7 +51,8 @@ const TestRetirementPhaseTransition = {
       emergencyStash: 0,
       marriageYear: null,
       youngestChildBorn: null,
-      oldestChildBorn: null
+      oldestChildBorn: null,
+      StartCountry: 'ie'
     },
     events: [
       {

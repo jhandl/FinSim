@@ -52,7 +52,8 @@ const TestEmergencyFundUsage = {
       emergencyStash: 0,               // No additional emergency stash needed
       marriageYear: null,
       youngestChildBorn: null,
-      oldestChildBorn: null
+      oldestChildBorn: null,
+      StartCountry: 'ie'
     },
     
     events: [

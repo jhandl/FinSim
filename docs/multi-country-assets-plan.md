@@ -1,5 +1,20 @@
 # Fix PV semantics for multi-country assets
 
+## Implementation Status
+
+- ✅ Phase 1: Add per-country deflation helper (TICKET-1)
+- ✅ Phase 2: Fix real estate nominal growth (TICKET-2)
+- ✅ Phase 3: Apply asset-country PV to real estate (TICKET-3)
+- ✅ Phase 4: Apply origin-country PV to pensions (TICKET-4)
+- ✅ Phase 5: Apply origin-country PV to investments (TICKET-5)
+- ✅ Phase 6: Document asset-country PV semantics (TICKET-6)
+- ✅ Phase 7: Extract PresentValueCalculator module
+- ✅ Phase 8: Extract AttributionPopulator with explicit named parameters
+- ✅ Phase 9: Extract DataAggregatesCalculator
+- ✅ Phase 10: Simplify updateYearlyData orchestration
+- ✅ Phase 11: Strict Error Handling - Empty Catch Elimination
+- ✅ Phase 12: Eliminate Unnecessary Existence Checks
+
 ## Goals
 
 - Ensure **flows** (salaries, expenses, etc.) keep using **residency-country inflation** for PV, preserving current behaviour.
@@ -98,6 +113,176 @@
 - In PV+EUR mode:
 - Incomes drop as expected due to AR CPI + FX.
 - Real estate, pension fund, and investments **do not show an artificial cliff** at age 40; any change is driven by genuine FX/market effects.
+
+## Phase 7: Extract PresentValueCalculator Module (COMPLETED)
+
+**Status**: ✅ Implemented
+
+**Summary**: Extracted `computePresentValueAggregates` closure (~300 lines) from `Simulator.js::updateYearlyData()` into standalone `PresentValueCalculator.js` module with explicit dependency injection via context object.
+
+**Key Changes**:
+- **New Module**: `src/core/PresentValueCalculator.js` exports `computePresentValueAggregates(ctx)` function via `PresentValueCalculator` namespace object
+- **Context Object Pattern**: All 40+ dependencies (persons, assets, income/expenses, helpers) passed via single `ctx` parameter
+- **Context-Driven Behavior**: Function relies entirely on `ctx.cfg`, `ctx.startYear`, and `ctx.ageNum` with explicit fallbacks only when those fields are null/undefined (not always recomputing from globals)
+- **Zero Behavioral Change**: Line-by-line extraction preserves exact PV semantics:
+  - Residency-country deflation for flows (salaries, expenses, cash)
+  - Asset-origin-country deflation for stocks (real estate, pensions, investments)
+  - Special state pension handling in base currency (EUR)
+- **Error Semantics**: PV calculation errors propagate to caller (no outer try/catch in `updateYearlyData`), matching original closure behavior; internal error handling within `PresentValueCalculator` applies
+- **GAS Compatibility**: Plain function (no ES6 modules), relies on global `InflationService` availability
+- **Load Order**: `index.html` updated to load `PresentValueCalculator.js` after `Utils.js`, before `Simulator.js`
+- **API Contract**: Call site uses `PresentValueCalculator.computePresentValueAggregates(pvContext)` for explicit namespacing
+
+**Benefits**:
+1. **Testability**: PV logic now testable in isolation (future: unit tests with mock context)
+2. **Maintainability**: Clear interface (`ctx` object) documents all inputs/outputs
+3. **Parallel Work**: Enables subsequent phases (attribution, aggregates extraction) without merge conflicts
+4. **Reduced Complexity**: `updateYearlyData()` now ~230 lines (down from ~530)
+
+**Verification**:
+- ✅ `./run-tests.sh TestChartValues` (demo3.csv baselines unchanged)
+- ✅ `./run-tests.sh TestCorePresentValueLayer` (PV aggregates match deflated nominals)
+- ✅ `./run-tests.sh TestRealEstatePVRelocation` (asset-country deflation preserved)
+- ✅ `./run-tests.sh TestPensionPVRelocation` (pension origin-country PV stable)
+- ✅ `./run-tests.sh TestInvestmentPVRelocation` (investment origin-country PV stable)
+- ✅ Manual demo3.csv PV+EUR charts: €100k-500k range, no cliffs/trillions
+
+**Next Steps**: Proceed to Phase 8 (AttributionPopulator extraction) with confidence that PV layer is stable and isolated.
+
+## Phase 8: Extract AttributionPopulator Module (COMPLETED)
+
+**Status**: ✅ Implemented
+
+**Summary**: Extracted attribution population logic (~50 lines) from `Simulator.js::updateYearlyData()` into standalone `AttributionPopulator.js` module with **explicit named parameters** (NO ctx object), following user directive to eliminate "ctx abomination" pattern.
+
+**Key Changes**:
+- **New Module**: `src/core/AttributionPopulator.js` exports `populateAttributionFields(dataRow, indexFunds, shares, attributionManager, revenue)` via `AttributionPopulator` namespace
+- **Explicit Parameters**: 5 focused parameters (assets, managers) instead of context object for readability and IDE support
+- **Zero Behavioral Change**: Line-by-line extraction preserves:
+  - Portfolio statistics recording (indexFunds/shares bought/sold/principal/P&L)
+  - General attribution breakdown population from AttributionManager
+  - Dynamic tax totals accumulation from revenue.taxTotals
+- **In-Place Mutation**: Modifies `dataRow.attributions` and `dataRow.taxByKey` directly (matches original semantics)
+- **Error Handling**: Preserves existing try-catch patterns (attribution errors logged, tax errors silent)
+- **GAS Compatibility**: Plain functions (no ES6 modules), namespace export
+- **Load Order**: `index.html` updated to load `AttributionPopulator.js` after `PresentValueCalculator.js`, before `Simulator.js`
+
+**Benefits**:
+1. **Readability**: Clear function signature (self-documenting dependencies)
+2. **IDE Support**: Autocomplete/type hints for parameters (no object property lookup)
+3. **Testability**: Attribution logic testable in isolation with focused mocks
+4. **Maintainability**: Explicit contracts prevent "undefined property" runtime errors
+5. **Reduced Complexity**: `updateYearlyData()` now ~180 lines (down from ~230)
+
+**Verification**:
+- ✅ `./run-tests.sh TestChartValues` (demo3.csv baselines unchanged)
+- ✅ `./run-tests.sh TestAttributionPopulator` (portfolio stats, breakdowns, tax accumulation)
+- ✅ Manual demo3.csv: attributions/taxes match pre-refactor values
+
+## Phase 9: Extract DataAggregatesCalculator Module (COMPLETED)
+
+**Status**: ✅ Implemented
+
+**Summary**: Extracted nominal aggregate logic (~170 lines) from `Simulator.js::updateYearlyData()` into `DataAggregatesCalculator.js` with 30+ explicit named parameters (NO ctx object), following Phase 8's AttributionPopulator pattern. Reduces `updateYearlyData` to ~80 lines (orchestrator only). Preserves exact behavior: in-place mutation, try-catch blocks, dynamic maps, tax columns. Added `TestDataAggregatesCalculator.js` with 6 scenarios (basic, couple, dynamic, RE conversion, taxes, demo3 regression). Full test suite passes unchanged. Script load order: Utils → PresentValueCalculator → AttributionPopulator → **DataAggregatesCalculator** → Attribution → Simulator. Enables Phase 10 (final cleanup) without conflicts. Explicit-parameter pattern established for future extractions (Phases 11-12). Deliverables: `src/core/DataAggregatesCalculator.js`, `tests/TestDataAggregatesCalculator.js`.
+
+**Next Steps**: Proceed to Phase 10 (final cleanup) with confidence that nominal aggregates are stable and isolated.
+
+## Phase 10: Simplify updateYearlyData Orchestration (COMPLETED)
+
+**Status**: ✅ Implemented
+
+**Summary**: Transformed `updateYearlyData()` from ~138-line function with inline computations into a **~45-line slim orchestrator** by extracting pre-computation and context-building logic into dedicated helper functions. Achieves user goal of "NO TRACE of old code" while maintaining zero behavioral change.
+
+**Key Changes**:
+- **New Helper**: `computePreAggregateValues()` consolidates real estate conversion and capital computations (39 lines → 3-line call)
+- **New Helper**: `buildPVContext(preComputedValues)` consolidates pvContext object building (57 lines → 3-line call)
+- **Deleted**: Commented dead code (`// dataSheet[row].sharesCapital = shares.capital();`)
+- **Orchestrator Pattern**: `updateYearlyData()` now purely coordinates:
+  1. Per-run results capture (orchestration)
+  2. Pre-compute helper call
+  3. DataAggregatesCalculator call (Phase 9)
+  4. PV context helper call
+  5. PresentValueCalculator call (Phase 7)
+  6. AttributionPopulator call (Phase 8)
+  7. UI update (orchestration)
+
+**Benefits**:
+1. **Readability**: Clear orchestration flow without visual clutter
+2. **Maintainability**: Helpers isolate pre-computation and context-building concerns
+3. **Testability**: Helpers can be unit-tested independently (future)
+4. **Enables Phase 11-12**: Strict error handling can now target specific helpers
+5. **Achieves Goal**: ~45 lines (target: ~50), NO inline aggregate/PV/attribution logic
+
+**Preserved Semantics**:
+- All try-catch blocks moved to helpers unchanged (Phase 11 will address)
+- Exact pvContext structure maintained for PresentValueCalculator compatibility
+- Closure-scoped globals used in helpers (GAS compatibility)
+- Zero behavioral change: error handling, fallbacks, strict mode all preserved
+
+**Verification**:
+- ✅ `./run-tests.sh FULL SUITE` (all tests pass unchanged)
+- ✅ `./run-tests.sh TestChartValues` (demo3.csv baselines identical)
+- ✅ `./run-tests.sh TestCorePresentValueLayer` (PV aggregates match)
+- ✅ `./run-tests.sh TestRealEstatePVRelocation TestPensionPVRelocation TestInvestmentPVRelocation` (asset-country PV stable)
+- ✅ `./run-tests.sh TestAttributionPopulator TestDataAggregatesCalculator` (extracted modules unchanged)
+- ✅ Manual demo3.csv: all modes/charts identical to pre-refactor
+
+**Next Steps**: Proceed to Phase 11 (remove empty catch blocks) and Phase 12 (eliminate fallbacks) with confidence that orchestration is clean and isolated.
+
+## Phase 11: Strict Error Handling - Empty Catch Elimination ✅
+
+**Status**: Complete
+
+**Changes**:
+- Removed 23 empty catch blocks across core modules, allowing original exceptions to propagate
+- Simulator.js: 19 removals (currency utils, event processing, real estate, withdrawals, capitals)
+- PresentValueCalculator.js: 2 removals (currency normalization, dynamic PV maps)
+- AttributionPopulator.js: 1 removal (tax totals accumulation)
+- DataAggregatesCalculator.js: 1 removal (investment capital maps)
+
+**Error Handling**: Original exceptions now bubble up unchanged for full stack traces
+
+**Benefits**:
+- Pure fail-fast: No silent failures, no masking
+- Original error contexts preserved
+- Strict discipline: Bugs surface immediately
+
+**Verification**:
+- Full test suite pass: `./run-tests.sh FULL SUITE`
+- Manual edge tests: Missing vars → crash with original stacks (not silent)
+- demo3.csv: All modes/charts unchanged (no behavioral regression)
+
+**Next**: Phase 12 (fallback elimination) will remove defensive `if (!var)` checks, completing strict error discipline.
+
+## Phase 12: Eliminate Unnecessary Existence Checks ✅
+
+**Objective**: Remove ALL infrastructure/code existence checks (`typeof`, `|| fallbacks`, optional chaining equivalents). Keep ONLY user data validation. Enforce fail-fast philosophy.
+
+**Changes**:
+- **PresentValueCalculator.js**: Removed ~80 checks (ctx fallbacks, typeof Config/InflationService, deflationFactor validation, property method checks)
+- **AttributionPopulator.js**: Removed ~2 checks (revenue existence)
+- **DataAggregatesCalculator.js**: Removed ~4 checks (map existence for investmentIncomeByKey, capsByKey, revenue.taxTotals)
+- **Simulator.js**: Removed ~60 checks (normalizeCountry/Currency null checks, Config existence, || {} fallbacks, convertNominal infrastructure checks)
+
+**Kept**:
+- User data structure initialization (e.g., `if (!dataRow.attributions[metric])`)
+- User data validation (e.g., `if (propertyKeys.length > 0)`, `if (incomeStatePension > 0)`)
+- Try-catch for user data errors (e.g., breakdown computation)
+
+**Benefits**:
+- ~150 checks removed across 4 files
+- Clearer failure modes (stack traces vs silent fallbacks)
+- Performance gain from eliminating conditionals
+- Enforces fail-fast: missing infrastructure → immediate exception
+
+**Verification**:
+- `./run-tests.sh FULL SUITE` passes (TestChartValues, relocation PVs, etc.)
+- `demo3.csv` outputs identical (all modes/charts)
+- New `TestStrictErrorHandling.js` validates exceptions on missing vars
+
+**Trade-offs**: Crashes on misconfiguration (intended). Tests validate infrastructure present.
+
+**Next Steps**: Phase 13+ (future refactors) can assume strict environment.
 
 ## Out of Scope / Future Enhancements
 

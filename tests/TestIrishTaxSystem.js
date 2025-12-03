@@ -147,6 +147,7 @@ module.exports = {
       growthRateShares: 0.0, growthDevShares: 0.0,
       inflation: 0.0,
       FundsAllocation: 0, SharesAllocation: 0,
+      StartCountry: 'ie'
     },
     
     events: [

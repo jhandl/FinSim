@@ -45,7 +45,8 @@ module.exports = {
       marriageYear: 2000,          // Married for tax purposes  
       youngestChildBorn: null,
       oldestChildBorn: null,
-      personalTaxCredit: 1875      // Standard personal tax credit
+      personalTaxCredit: 1875,     // Standard personal tax credit
+      StartCountry: 'ie'
     },
 
     events: [

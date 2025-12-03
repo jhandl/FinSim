@@ -1,5 +1,3 @@
-/* This file has to work on both the website and Google Sheets */
-
 var uiManager, params, events, config, dataSheet, row, errors;
 var year, periods, failedAt, success, montecarlo;
 var revenue, realEstate, stockGrowthOverride, attributionManager;
@@ -22,6 +20,7 @@ var stableTaxIds;
 var currentCountry, countryInflationOverrides;
 // Active residence currency (upper-cased ISO code) and cache for currency-country lookups
 var residenceCurrency, currencyCountryCache;
+var economicData, baseCountryCode;
 
 const Phases = {
   growth: 'growth',
@@ -60,29 +59,23 @@ async function run() {
 }
 
 function normalizeCountry(code) {
-  if (code === null || code === undefined) return '';
+  if (code === null || code === undefined) throw new Error('normalizeCountry: code is null/undefined');
   return String(code).trim().toLowerCase();
 }
 
 function normalizeCurrency(code) {
-  if (code === null || code === undefined) return '';
+  if (code === null || code === undefined) throw new Error('normalizeCurrency: code is null/undefined');
   return String(code).trim().toUpperCase();
 }
 
 function getCurrencyForCountry(code) {
   var normalized = normalizeCountry(code);
-  if (!normalized) return null;
-  try {
-    var cfg = Config.getInstance();
-    if (cfg && typeof cfg.getCachedTaxRuleSet === 'function') {
-      var rs = cfg.getCachedTaxRuleSet(normalized);
-      if (rs && typeof rs.getCurrencyCode === 'function') {
-        var cur = rs.getCurrencyCode();
-        if (cur) return normalizeCurrency(cur);
-      }
-    }
-  } catch (_) { }
-  return null;
+  if (!normalized) throw new Error('getCurrencyForCountry: empty country code');
+  var cfg = Config.getInstance();
+  var rs = cfg.getCachedTaxRuleSet(normalized);
+  var cur = rs.getCurrencyCode();
+  if (cur) return normalizeCurrency(cur);
+  throw new Error('getCurrencyForCountry: no currency for ' + code);
 }
 
 function ensureCurrencyCountryCache() {
@@ -91,9 +84,13 @@ function ensureCurrencyCountryCache() {
 }
 
 function findCountryForCurrency(currencyCode, preferredCountry) {
+  if (!currencyCode) {
+    var preferred = preferredCountry ? normalizeCountry(preferredCountry) : null;
+    return preferred || normalizeCountry(Config.getInstance().getDefaultCountry());
+  }
   var currency = normalizeCurrency(currencyCode);
-  var preferred = normalizeCountry(preferredCountry);
-  if (!currency) return preferred || normalizeCountry((Config.getInstance() || {}).getDefaultCountry && Config.getInstance().getDefaultCountry());
+  var preferred = preferredCountry ? normalizeCountry(preferredCountry) : null;
+  if (!currency) return preferred || normalizeCountry(Config.getInstance().getDefaultCountry());
   var cache = ensureCurrencyCountryCache();
   if (cache[currency]) return cache[currency];
 
@@ -105,45 +102,26 @@ function findCountryForCurrency(currencyCode, preferredCountry) {
     }
   }
 
-  try {
-    var cfg = Config.getInstance();
-    if (cfg && typeof cfg.listCachedRuleSets === 'function') {
-      var cachedSets = cfg.listCachedRuleSets();
-      for (var key in cachedSets) {
-        if (!Object.prototype.hasOwnProperty.call(cachedSets, key)) continue;
-        var rs = cachedSets[key];
-        if (!rs || typeof rs.getCurrencyCode !== 'function') continue;
-        var rsCurrency = normalizeCurrency(rs.getCurrencyCode());
-        if (rsCurrency === currency) {
-          var countryCode = null;
-          if (typeof rs.getCountryCode === 'function') {
-            countryCode = rs.getCountryCode();
-          }
-          if (!countryCode) {
-            countryCode = key;
-          }
-          cache[currency] = normalizeCountry(countryCode);
-          return cache[currency];
-        }
+  var cfg = Config.getInstance();
+  var cachedSets = cfg.listCachedRuleSets();
+  for (var key in cachedSets) {
+    if (!Object.prototype.hasOwnProperty.call(cachedSets, key)) continue;
+    var rs = cachedSets[key];
+    var rsCurrency = normalizeCurrency(rs.getCurrencyCode());
+    if (rsCurrency === currency) {
+      var countryCode = rs.getCountryCode();
+      if (!countryCode) {
+        countryCode = key;
       }
+      cache[currency] = normalizeCountry(countryCode);
+      return cache[currency];
     }
-  } catch (_) { }
+  }
 
   if (preferred) {
     cache[currency] = preferred;
     return preferred;
   }
-
-  try {
-    var cfg2 = Config.getInstance();
-    if (cfg2 && typeof cfg2.getDefaultCountry === 'function') {
-      var fallback = normalizeCountry(cfg2.getDefaultCountry());
-      if (fallback) {
-        cache[currency] = fallback;
-        return fallback;
-      }
-    }
-  } catch (_) { }
 
   // Return null instead of empty string when no match found
   // Don't cache null to allow retries with different preferredCountry
@@ -162,7 +140,7 @@ function getEventCurrencyInfo(event, fallbackCountry) {
     info.currency = normalizeCurrency(event.currency);
     info.country = findCountryForCurrency(info.currency, linkedCountry || fallbackCountry || currentCountry);
     if (!info.country) {
-      info.country = normalizeCountry(linkedCountry || fallbackCountry || currentCountry) || normalizeCountry((Config.getInstance() || {}).getDefaultCountry && Config.getInstance().getDefaultCountry());
+      info.country = normalizeCountry(linkedCountry || fallbackCountry || currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
     }
   } else if (linkedCountry) {
     info.country = linkedCountry;
@@ -178,7 +156,7 @@ function getEventCurrencyInfo(event, fallbackCountry) {
   if (!info.country) {
     info.country = findCountryForCurrency(info.currency, fallbackCountry || currentCountry);
     if (!info.country) {
-      info.country = normalizeCountry(fallbackCountry || currentCountry) || normalizeCountry((Config.getInstance() || {}).getDefaultCountry && Config.getInstance().getDefaultCountry());
+      info.country = normalizeCountry(fallbackCountry || currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
     }
   }
   return info;
@@ -205,33 +183,11 @@ function getEventCurrencyInfo(event, fallbackCountry) {
  */
 function convertNominal(value, fromCountry, toCountry, year) {
   if (!value || !fromCountry || !toCountry) return value || null;
-  var econ = null;
-  try {
-    if (typeof config !== 'undefined' && config && typeof config.getEconomicData === 'function') {
-      econ = config.getEconomicData();
-    } else {
-      var cfg = Config.getInstance();
-      if (cfg && typeof cfg.getEconomicData === 'function') {
-        econ = cfg.getEconomicData();
-      }
-    }
-  } catch (_) { econ = null; }
-  if (!econ || !econ.ready || typeof econ.convert !== 'function') {
-    return null;
-  }
-  var baseYear = null;
-  try {
-    if (config && typeof config.getSimulationStartYear === 'function') {
-      baseYear = config.getSimulationStartYear();
-    } else {
-      var cfg2 = Config.getInstance();
-      if (cfg2 && typeof cfg2.getSimulationStartYear === 'function') {
-        baseYear = cfg2.getSimulationStartYear();
-      }
-    }
-  } catch (_) { baseYear = null; }
+  var econ = config.getEconomicData();
+  if (!econ.ready) throw new Error('convertNominal: EconomicData not ready');
+  var baseYear = config.getSimulationStartYear();
   var options = {
-    baseYear: (baseYear != null) ? baseYear : new Date().getFullYear(),
+    baseYear: baseYear,
     fxMode: 'evolution' // Use evolved FX (inflation-driven) for all conversions to ensure correct spot rates
   };
   var fromCountryUpper = String(fromCountry).toUpperCase();
@@ -257,12 +213,12 @@ function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toC
   var sourceCountry = findCountryForCurrency(sourceCurrency, fromCountry);
   var sourceCountryMapped = !!sourceCountry; // Track if we successfully mapped currency to country
   if (!sourceCountry) {
-    sourceCountry = normalizeCountry(fromCountry || currentCountry) || normalizeCountry((Config.getInstance() || {}).getDefaultCountry && Config.getInstance().getDefaultCountry());
+    sourceCountry = normalizeCountry(fromCountry || currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
   }
   var targetCountry = findCountryForCurrency(targetCurrency, toCountry);
   var targetCountryMapped = !!targetCountry; // Track if we successfully mapped currency to country
   if (!targetCountry) {
-    targetCountry = normalizeCountry(toCountry || currentCountry) || normalizeCountry((Config.getInstance() || {}).getDefaultCountry && Config.getInstance().getDefaultCountry());
+    targetCountry = normalizeCountry(toCountry || currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
   }
 
   // In strict mode, fail if we couldn't map currency to country (even if we have fallback countries)
@@ -270,12 +226,10 @@ function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toC
     if (typeof errors !== 'undefined') {
       errors = true;
     }
-    try {
-      if (uiManager && typeof uiManager.setStatus === 'function') {
-        var missingCurrency = !sourceCountryMapped ? sourceCurrency : targetCurrency;
-        uiManager.setStatus("Unknown currency code: " + missingCurrency + " - cannot map to country", STATUS_COLORS.ERROR);
-      }
-    } catch (_) { }
+    if (uiManager && typeof uiManager.setStatus === 'function') {
+      var missingCurrency = !sourceCountryMapped ? sourceCurrency : targetCurrency;
+      uiManager.setStatus("Unknown currency code: " + missingCurrency + " - cannot map to country", STATUS_COLORS.ERROR);
+    }
     return null;
   }
 
@@ -283,19 +237,17 @@ function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toC
   if (converted === null || typeof converted !== 'number' || isNaN(converted)) {
     // Existing error handling (lines 270-286) is good, keep as-is
     console.error('convertCurrencyAmount: convertNominal failed for ' + sourceCountry + '->' + targetCountry + ' at year ' + year + '');
-    try { console.warn("Currency conversion failed:", value, sourceCurrency, targetCurrency, year); } catch (_) { }
+    console.warn("Currency conversion failed:", value, sourceCurrency, targetCurrency, year);
     if (typeof errors !== 'undefined') {
       errors = true;
     }
-    try {
-      if (uiManager && typeof uiManager.setStatus === 'function') {
-        if (strict) {
-          uiManager.setStatus("Currency conversion failed - check economic data for " + sourceCurrency + " to " + targetCurrency, STATUS_COLORS.ERROR);
-        } else {
-          uiManager.setStatus("Currency conversion failed - check economic data", STATUS_COLORS.WARNING);
-        }
+    if (uiManager && typeof uiManager.setStatus === 'function') {
+      if (strict) {
+        uiManager.setStatus("Currency conversion failed - check economic data for " + sourceCurrency + " to " + targetCurrency, STATUS_COLORS.ERROR);
+      } else {
+        uiManager.setStatus("Currency conversion failed - check economic data", STATUS_COLORS.WARNING);
       }
-    } catch (_) { }
+    }
     if (strict) {
       return null;
     }
@@ -310,11 +262,9 @@ function convertToResidenceCurrency(amount, currency, country, year) {
 }
 
 function initializeUI() {
-  if (typeof SpreadsheetApp !== 'undefined') {
-    uiManager = new UIManager(GasUI.getInstance());
-  } else {
-    uiManager = new UIManager(WebUI.getInstance());
-  }
+  uiManager = (typeof SpreadsheetApp !== 'undefined')
+    ? new UIManager(GasUI.getInstance())
+    : new UIManager(WebUI.getInstance());
 }
 
 function readScenario(validate) {
@@ -366,19 +316,15 @@ async function initializeSimulator() {
     return false;
   }
 
-  // When relocation is enabled, StartCountry is mandatory
-  try {
-    if (config && typeof config.isRelocationEnabled === 'function' && config.isRelocationEnabled()) {
-      // Accept both canonical 'StartCountry' and legacy 'startingCountry' param names
-      var sc = (params && (params.StartCountry || params.startingCountry)) ? String(params.StartCountry || params.startingCountry).trim() : '';
-      if (!sc) {
-        errors = true;
-        success = false;
-        uiManager.setStatus("StartCountry is required when relocation is enabled", STATUS_COLORS.ERROR);
-        return false;
-      }
-    }
-  } catch (_) { }
+  // StartCountry is mandatory
+  // Accept both canonical 'StartCountry' and legacy 'startingCountry' param names
+  var sc = (params && (params.StartCountry || params.startingCountry)) ? String(params.StartCountry || params.startingCountry).trim() : '';
+  if (!sc) {
+    errors = true;
+    success = false;
+    uiManager.setStatus("StartCountry is required", STATUS_COLORS.ERROR);
+    return false;
+  }
 
   // Preload tax rulesets for all countries referenced in events (await to ensure readiness)
   var startCountry = params.StartCountry || config.getDefaultCountry();
@@ -513,6 +459,7 @@ function initializeSimulationVariables() {
 
   year = new Date().getFullYear() - 1;
   cash = params.initialSavings;
+  targetCash = params.emergencyStash; // Initialize target cash (emergency stash) in starting currency
   failedAt = 0;
   row = 0;
 }
@@ -584,8 +531,63 @@ function resetYearlyVariables() {
   residenceCurrency = getCurrencyForCountry(currentCountry) || residenceCurrency || 'EUR';
 }
 
+function resolveCountryInflation(code) {
+  // Prefer InflationService when available to keep logic in one place.
+  if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function') {
+    return InflationService.resolveInflationRate(code, year, {
+      params: params,
+      config: config,
+      economicData: economicData,
+      countryInflationOverrides: countryInflationOverrides,
+      baseCountry: baseCountryCode,
+      defaultRate: 0.02
+    });
+  }
+
+  // Fallback: legacy inline logic (kept for safety in non-browser test contexts).
+  var key = normalizeCountry(code);
+  if (!key) key = baseCountryCode;
+  if (countryInflationOverrides && countryInflationOverrides.hasOwnProperty(key)) {
+    var override = countryInflationOverrides[key];
+
+    if (override !== null && override !== undefined && override !== '') {
+      return override;
+    }
+  }
+  if (key === baseCountryCode && typeof params.inflation === 'number') {
+    return params.inflation;
+  }
+  if (economicData && economicData.ready) {
+
+    if (typeof economicData.getInflationForYear === 'function') {
+      var cpiYear = economicData.getInflationForYear(key, year);
+      if (cpiYear != null) {
+        return Number(cpiYear) / 100;
+      }
+    }
+    var cpi = economicData.getInflation(key);
+    if (cpi != null) {
+      return Number(cpi) / 100;
+    }
+  }
+  var rs = config.getCachedTaxRuleSet ? config.getCachedTaxRuleSet(key) : null;
+  if (rs && typeof rs.getInflationRate === 'function') {
+    var rate = rs.getInflationRate();
+    if (rate !== null && rate !== undefined) {
+
+      return rate;
+    }
+  }
+  if (typeof params.inflation === 'number') {
+    return params.inflation;
+  }
+
+  return 0.02;
+}
+
 function runSimulation() {
   initializeSimulationVariables();
+
 
   while (person1.age < params.targetAge) {
 
@@ -651,62 +653,9 @@ function calculatePensionIncome() {
 function processEvents() {
   expenses = 0;
   if (!countryInflationOverrides) countryInflationOverrides = {};
-  var economicData = (typeof config.getEconomicData === 'function') ? config.getEconomicData() : null;
-  var baseCountryCode = ((params.StartCountry || config.getDefaultCountry() || '') + '').toLowerCase();
-  function normalizeCountry(code) {
-    return (code || '').toString().trim().toLowerCase();
-  }
+  economicData = (typeof config.getEconomicData === 'function') ? config.getEconomicData() : null;
+  baseCountryCode = ((params.StartCountry || config.getDefaultCountry() || '') + '').toLowerCase();
 
-  // Centralised inflation resolution (thin wrapper over InflationService).
-  function resolveCountryInflation(code) {
-    // Prefer InflationService when available to keep logic in one place.
-    if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function') {
-      return InflationService.resolveInflationRate(code, year, {
-        params: params,
-        config: config,
-        economicData: economicData,
-        countryInflationOverrides: countryInflationOverrides,
-        baseCountry: baseCountryCode,
-        defaultRate: 0.02
-      });
-    }
-
-    // Fallback: legacy inline logic (kept for safety in non-browser test contexts).
-    var key = normalizeCountry(code);
-    if (!key) key = baseCountryCode;
-    if (countryInflationOverrides && countryInflationOverrides.hasOwnProperty(key)) {
-      var override = countryInflationOverrides[key];
-      if (override !== null && override !== undefined && override !== '') {
-        return override;
-      }
-    }
-    if (key === baseCountryCode && typeof params.inflation === 'number') {
-      return params.inflation;
-    }
-    if (economicData && economicData.ready) {
-      if (typeof economicData.getInflationForYear === 'function') {
-        var cpiYear = economicData.getInflationForYear(key, year);
-        if (cpiYear != null) {
-          return Number(cpiYear) / 100;
-        }
-      }
-      var cpi = economicData.getInflation(key);
-      if (cpi != null) {
-        return Number(cpi) / 100;
-      }
-    }
-    var rs = config.getCachedTaxRuleSet ? config.getCachedTaxRuleSet(key) : null;
-    if (rs && typeof rs.getInflationRate === 'function') {
-      var rate = rs.getInflationRate();
-      if (rate !== null && rate !== undefined) {
-        return rate;
-      }
-    }
-    if (typeof params.inflation === 'number') {
-      return params.inflation;
-    }
-    return 0.02;
-  }
 
   function createFlowState() {
     return {
@@ -720,12 +669,12 @@ function processEvents() {
     var currency = normalizeCurrency((info && info.currency) ? info.currency : (residenceCurrency || 'EUR'));
     var country = (info && info.country) ? normalizeCountry(info.country) : findCountryForCurrency(currency, currentCountry);
     if (!country) {
-      country = normalizeCountry(currentCountry) || normalizeCountry((Config.getInstance() || {}).getDefaultCountry && Config.getInstance().getDefaultCountry());
+      country = normalizeCountry(currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
     } else {
       country = normalizeCountry(country);
     }
     return {
-      currency: currency || 'EUR',
+      currency: currency,
       country: country
     };
   }
@@ -804,11 +753,9 @@ function processEvents() {
       if (typeof errors !== 'undefined') {
         errors = true;
       }
-      try {
-        if (uiManager && typeof uiManager.setStatus === 'function') {
-          uiManager.setStatus("Unknown currency code: " + normalizedCurrency + " - cannot map to country", STATUS_COLORS.ERROR);
-        }
-      } catch (_) { }
+      if (uiManager && typeof uiManager.setStatus === 'function') {
+        uiManager.setStatus("Unknown currency code: " + normalizedCurrency + " - cannot map to country", STATUS_COLORS.ERROR);
+      }
       success = false;
       failedAt = person1.age;
       return 1; // Return 1 to avoid division by zero, but simulation will fail due to errors flag
@@ -1049,7 +996,9 @@ function processEvents() {
             var dbiSpec = (rsDbi && typeof rsDbi.getDefinedBenefitSpec === 'function') ? rsDbi.getDefinedBenefitSpec() : null;
             if (!dbiSpec || !dbiSpec.treatment) {
               errors = true;
-              try { uiManager.setStatus("Tax rules error: Defined Benefit behaviour is not defined in the active ruleset.", STATUS_COLORS.ERROR); } catch (_) { }
+              if (uiManager && typeof uiManager.setStatus === 'function') {
+                uiManager.setStatus("Tax rules error: Defined Benefit behaviour is not defined in the active ruleset.", STATUS_COLORS.ERROR);
+              }
             } else {
               switch (dbiSpec.treatment) {
                 case 'privatePension':
@@ -1061,7 +1010,9 @@ function processEvents() {
                   break;
                 default:
                   errors = true;
-                  try { uiManager.setStatus("Tax rules error: Unknown DBI treatment '" + String(dbiSpec.treatment) + "'.", STATUS_COLORS.ERROR); } catch (_) { }
+                  if (uiManager && typeof uiManager.setStatus === 'function') {
+                    uiManager.setStatus("Tax rules error: Unknown DBI treatment '" + String(dbiSpec.treatment) + "'.", STATUS_COLORS.ERROR);
+                  }
                   break;
               }
             }
@@ -1127,16 +1078,12 @@ function processEvents() {
     if (event.type === 'R' && event.toAge && person1.age === event.toAge) {
       var propertyCurrency = null;
       var propertyCountry = null;
-      try {
-        if (realEstate && typeof realEstate.getCurrency === 'function') {
-          propertyCurrency = realEstate.getCurrency(event.id);
-        }
-      } catch (_) { }
-      try {
-        if (realEstate && typeof realEstate.getLinkedCountry === 'function') {
-          propertyCountry = realEstate.getLinkedCountry(event.id);
-        }
-      } catch (_) { }
+      if (realEstate && typeof realEstate.getCurrency === 'function') {
+        propertyCurrency = realEstate.getCurrency(event.id);
+      }
+      if (realEstate && typeof realEstate.getLinkedCountry === 'function') {
+        propertyCountry = realEstate.getLinkedCountry(event.id);
+      }
       var saleInfo = getEventCurrencyInfo(event, propertyCountry || currentCountry);
       var saleEntryInfo = {
         currency: propertyCurrency || saleInfo.currency,
@@ -1292,14 +1239,10 @@ function processEvents() {
           var payment = realEstate.getPayment(event.id);
           var mortgageCurrency = mortgageInfo.currency;
           var mortgageCountry = mortgageInfo.country;
-          try {
-            var storedCurrency = realEstate.getCurrency(event.id);
-            if (storedCurrency) mortgageCurrency = storedCurrency;
-          } catch (_) { }
-          try {
-            var storedCountry = realEstate.getLinkedCountry(event.id);
-            if (storedCountry) mortgageCountry = storedCountry;
-          } catch (_) { }
+          var storedCurrency = realEstate.getCurrency(event.id);
+          if (storedCurrency) mortgageCurrency = storedCurrency;
+          var storedCountry = realEstate.getLinkedCountry(event.id);
+          if (storedCountry) mortgageCountry = storedCountry;
           recordExpenseEntry(flowState, { currency: mortgageCurrency, country: mortgageCountry }, payment, {
             type: 'mortgage',
             eventId: event.id,
@@ -1362,15 +1305,27 @@ function processEvents() {
             var prevCurrency = residenceCurrency;
             var prevCountryNormalized = prevCountry;
             var newResidenceCurrency = getCurrencyForCountry(destCountry) || prevCurrency || 'EUR';
-            if (allowCashConversion && prevCurrency && newResidenceCurrency && prevCurrency !== newResidenceCurrency) {
-              // TODO(financial-engine): convert pooled cash once multi-currency cash tracking lands.
-              var convertedCash = convertCurrencyAmount(cash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
-              if (convertedCash === null) {
+            if (prevCurrency && newResidenceCurrency && prevCurrency !== newResidenceCurrency) {
+              if (allowCashConversion) {
+                // TODO(financial-engine): convert pooled cash once multi-currency cash tracking lands.
+                var convertedCash = convertCurrencyAmount(cash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
+                if (convertedCash === null) {
+                  success = false;
+                  failedAt = person1.age;
+                  return; // Abort processing this year
+                }
+                cash = convertedCash;
+              }
+
+              // Convert target cash (emergency stash) to new currency to maintain purchasing power
+              // This must happen regardless of allowCashConversion, as the target is a policy goal in the local currency
+              var convertedTargetCash = convertCurrencyAmount(targetCash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
+              if (convertedTargetCash === null) {
                 success = false;
                 failedAt = person1.age;
                 return; // Abort processing this year
               }
-              cash = convertedCash;
+              targetCash = convertedTargetCash;
             }
             currentCountry = destCountry;
             residenceCurrency = newResidenceCurrency;
@@ -1409,7 +1364,10 @@ function handleInvestments() {
     savings = netIncome - expenses;
     cash += savings;
   }
-  targetCash = adjust(params.emergencyStash);
+  // Inflate target cash (emergency stash) at residence country inflation to maintain purchasing power
+  var residenceInflation = resolveCountryInflation(currentCountry);
+  targetCash *= (1 + residenceInflation);
+
   if (cash < targetCash) {
     cashDeficit = targetCash - cash;
   }
@@ -1462,9 +1420,15 @@ function handleInvestments() {
       cash -= invested;
     }
   }
-  if ((netIncome > expenses + invested) && (targetCash - cash > 0.001)) {
-    let addToStash = netIncome - (expenses + invested);
-    cash += addToStash;
+  // If cash is below targetCash (inflated emergency stash), top it up from surplus income
+  // This ensures cash grows to match the inflated target over time
+  if (cash < targetCash && netIncome > expenses + invested) {
+    let availableSurplus = netIncome - expenses - invested;
+    let needed = targetCash - cash;
+    let topUp = Math.min(needed, availableSurplus);
+    if (topUp > 0) {
+      cash += topUp;
+    }
   }
   if ((netIncome < expenses - 100) && success) {
     success = false;
@@ -1565,13 +1529,11 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
               incomeSharesRent += sold;
             }
             // Record dynamic income for this investment type
-            try {
-              if (entry && entry.key) {
-                if (!investmentIncomeByKey) investmentIncomeByKey = {};
-                if (!investmentIncomeByKey[entry.key]) investmentIncomeByKey[entry.key] = 0;
-                investmentIncomeByKey[entry.key] += sold;
-              }
-            } catch (_) { }
+            if (entry && entry.key) {
+              if (!investmentIncomeByKey) investmentIncomeByKey = {};
+              if (!investmentIncomeByKey[entry.key]) investmentIncomeByKey[entry.key] = 0;
+              investmentIncomeByKey[entry.key] += sold;
+            }
             keepTrying = true;
           }
         }
@@ -1650,11 +1612,9 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
             totalWithdraw += withdraw;
             let soldAmt = indexFunds.sell(withdraw);
             incomeFundsRent += soldAmt;
-            try {
-              if (!investmentIncomeByKey) investmentIncomeByKey = {};
-              if (!investmentIncomeByKey['indexFunds']) investmentIncomeByKey['indexFunds'] = 0;
-              investmentIncomeByKey['indexFunds'] += soldAmt;
-            } catch (_) { }
+            if (!investmentIncomeByKey) investmentIncomeByKey = {};
+            if (!investmentIncomeByKey['indexFunds']) investmentIncomeByKey['indexFunds'] = 0;
+            investmentIncomeByKey['indexFunds'] += soldAmt;
             keepTrying = true;
           }
           break;
@@ -1664,11 +1624,9 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
             totalWithdraw += withdraw;
             let soldAmt = shares.sell(withdraw);
             incomeSharesRent += soldAmt;
-            try {
-              if (!investmentIncomeByKey) investmentIncomeByKey = {};
-              if (!investmentIncomeByKey['shares']) investmentIncomeByKey['shares'] = 0;
-              investmentIncomeByKey['shares'] += soldAmt;
-            } catch (_) { }
+            if (!investmentIncomeByKey) investmentIncomeByKey = {};
+            if (!investmentIncomeByKey['shares']) investmentIncomeByKey['shares'] = 0;
+            investmentIncomeByKey['shares'] += soldAmt;
             keepTrying = true;
           }
           break;
@@ -1698,20 +1656,16 @@ function liquidateAll() {
   if (indexFunds.capital() > 0) {
     var soldIdx = indexFunds.sell(indexFunds.capital());
     incomeFundsRent += soldIdx;
-    try {
-      if (!investmentIncomeByKey) investmentIncomeByKey = {};
-      if (!investmentIncomeByKey['indexFunds']) investmentIncomeByKey['indexFunds'] = 0;
-      investmentIncomeByKey['indexFunds'] += soldIdx;
-    } catch (_) { }
+    if (!investmentIncomeByKey) investmentIncomeByKey = {};
+    if (!investmentIncomeByKey['indexFunds']) investmentIncomeByKey['indexFunds'] = 0;
+    investmentIncomeByKey['indexFunds'] += soldIdx;
   }
   if (shares.capital() > 0) {
     var soldSh = shares.sell(shares.capital());
     incomeSharesRent += soldSh;
-    try {
-      if (!investmentIncomeByKey) investmentIncomeByKey = {};
-      if (!investmentIncomeByKey['shares']) investmentIncomeByKey['shares'] = 0;
-      investmentIncomeByKey['shares'] += soldSh;
-    } catch (_) { }
+    if (!investmentIncomeByKey) investmentIncomeByKey = {};
+    if (!investmentIncomeByKey['shares']) investmentIncomeByKey['shares'] = 0;
+    investmentIncomeByKey['shares'] += soldSh;
   }
   // Also liquidate any additional generic investment assets (avoid double-selling legacy ones)
   if (investmentAssets && investmentAssets.length > 2) {
@@ -1785,7 +1739,7 @@ function initializeRealEstate() {
           } else {
             props.get(event.id).fromAge = event.fromAge;
           }
-          var prePurchaseInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry || params.StartCountry);
+          var prePurchaseInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
           props.get(event.id).property = realEstate.buy(event.id, event.amount, event.rate, prePurchaseInfo.currency, prePurchaseInfo.country);
         }
         break;
@@ -1799,7 +1753,7 @@ function initializeRealEstate() {
           } else {
             props.get(event.id).fromAge = event.fromAge;
           }
-          var preMortgageInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry || params.StartCountry);
+          var preMortgageInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
           props.get(event.id).property = realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount, preMortgageInfo.currency, preMortgageInfo.country);
         }
         break;
@@ -1815,12 +1769,97 @@ function initializeRealEstate() {
   }
 }
 
+function computePreAggregateValues() {
+  var realEstateConverted = realEstate.getTotalValueConverted(residenceCurrency, currentCountry, year);
+  if (realEstateConverted === null) {
+    throw new Error('Real estate value conversion failed: cannot convert total value to ' + residenceCurrency + ' for country ' + currentCountry + ' at year ' + year);
+  }
+  var indexFundsCap = indexFunds.capital();
+  var sharesCap = shares.capital();
+  // Compute capitals by key while avoiding double-counting legacy assets
+  var capsByKey = {};
+  capsByKey['indexFunds'] = indexFunds.capital();
+  capsByKey['shares'] = shares.capital();
+  if (investmentAssets && investmentAssets.length > 0) {
+    for (var ci = 0; ci < investmentAssets.length; ci++) {
+      var centry = investmentAssets[ci];
+      if (!centry || !centry.asset || typeof centry.asset.capital !== 'function') continue;
+      var assetObj = centry.asset;
+      if (assetObj === indexFunds || assetObj === shares) continue; // skip legacy duplicates
+      var c = assetObj.capital();
+      capsByKey[centry.key] = (capsByKey[centry.key] || 0) + c;
+    }
+  }
+  return {
+    realEstateConverted: realEstateConverted,
+    indexFundsCap: indexFundsCap,
+    sharesCap: sharesCap,
+    capsByKey: capsByKey
+  };
+}
+
+function buildPVContext(preComputedValues) {
+  var cfg = Config.getInstance();
+  var startYear = cfg.getSimulationStartYear();
+  return {
+    // Output target
+    dataRow: dataSheet[row],
+
+    // Core simulation state
+    person1: person1,
+    person2: person2,
+    params: params,
+    cfg: cfg,
+    countryInflationOverrides: (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null,
+    year: year,
+    ageNum: person1.age,
+    currentCountry: currentCountry,
+    residenceCurrency: residenceCurrency,
+    startYear: startYear,
+
+    // Asset managers
+    realEstate: realEstate,
+    indexFunds: indexFunds,
+    shares: shares,
+    investmentAssets: investmentAssets,
+
+    // Pre-computed values
+    realEstateConverted: preComputedValues.realEstateConverted,
+    indexFundsCap: preComputedValues.indexFundsCap,
+    sharesCap: preComputedValues.sharesCap,
+    capsByKey: preComputedValues.capsByKey,
+
+    // Income/expense flows
+    incomeSalaries: incomeSalaries,
+    incomeShares: incomeShares,
+    incomeRentals: incomeRentals,
+    incomePrivatePension: incomePrivatePension,
+    incomeStatePension: incomeStatePension,
+    incomeStatePensionBaseCurrency: (typeof incomeStatePensionBaseCurrency !== 'undefined') ? incomeStatePensionBaseCurrency : 0,
+    incomeFundsRent: incomeFundsRent,
+    incomeSharesRent: incomeSharesRent,
+    cashWithdraw: cashWithdraw,
+    incomeDefinedBenefit: incomeDefinedBenefit,
+    incomeTaxFree: incomeTaxFree,
+    netIncome: netIncome,
+    expenses: expenses,
+    cash: cash,
+    personalPensionContribution: personalPensionContribution,
+
+    // Dynamic maps
+    investmentIncomeByKey: investmentIncomeByKey,
+
+    // Helper function references (to avoid global coupling)
+    getDeflationFactor: getDeflationFactor,
+    getDeflationFactorForCountry: getDeflationFactorForCountry,
+    normalizeCurrency: normalizeCurrency,
+    normalizeCountry: normalizeCountry,
+    convertCurrencyAmount: convertCurrencyAmount,
+    getCurrencyForCountry: getCurrencyForCountry
+  };
+}
 
 function updateYearlyData() {
-  // This is used below to hide the deemed disposal tax payments, otherwise they're shown as income.
-  let FundsTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeFundsRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
-  let SharesTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeSharesRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
-
   // Capture per-run data for pinch point visualization
   if (!perRunResults[currentRun]) {
     perRunResults[currentRun] = [];
@@ -1834,518 +1873,34 @@ function updateYearlyData() {
     attributions: attributionManager.getAllAttributions()
   });
 
-  if (!(row in dataSheet)) {
-    dataSheet[row] = {
-      "age": 0,
-      "year": 0,
-      // Nominal aggregates
-      "incomeSalaries": 0,
-      "incomeRSUs": 0,
-      "incomeRentals": 0,
-      "incomePrivatePension": 0,
-      "incomeStatePension": 0,
-      "incomeFundsRent": 0,
-      "incomeSharesRent": 0,
-      "incomeCash": 0,
-      "incomeDefinedBenefit": 0,
-      "incomeTaxFree": 0,
-      "realEstateCapital": 0,
-      "netIncome": 0,
-      "expenses": 0,
-      "pensionFund": 0,
-      "cash": 0,
-      "indexFundsCapital": 0,
-      "sharesCapital": 0,
-      "pensionContribution": 0,
-      "withdrawalRate": 0,
-      "worth": 0,
-      // Present-value (PV) aggregates – expressed in simulation-start year terms
-      "incomeSalariesPV": 0,
-      "incomeRSUsPV": 0,
-      "incomeRentalsPV": 0,
-      "incomePrivatePensionPV": 0,
-      "incomeStatePensionPV": 0,
-      "incomeFundsRentPV": 0,
-      "incomeSharesRentPV": 0,
-      "incomeCashPV": 0,
-      "incomeDefinedBenefitPV": 0,
-      "incomeTaxFreePV": 0,
-      "realEstateCapitalPV": 0,
-      "netIncomePV": 0,
-      "expensesPV": 0,
-      "pensionFundPV": 0,
-      "cashPV": 0,
-      "indexFundsCapitalPV": 0,
-      "sharesCapitalPV": 0,
-      "worthPV": 0,
-      // Attribution and dynamic per-key maps (nominal and PV)
-      "attributions": {},
-      "investmentIncomeByKey": {},
-      "investmentCapitalByKey": {},
-      "investmentIncomeByKeyPV": {},
-      "investmentCapitalByKeyPV": {},
-      "taxByKey": {}
-    };
-    // Pre-initialize stable tax columns for consistency across rows
-    if (stableTaxIds && stableTaxIds.length > 0) {
-      for (var ti = 0; ti < stableTaxIds.length; ti++) {
-        var tcol = 'Tax__' + stableTaxIds[ti];
-        if (dataSheet[row][tcol] === undefined) dataSheet[row][tcol] = 0;
-      }
-    }
+  // Pre-compute values needed by aggregates and PV calculators
+  var preComputedValues = computePreAggregateValues();
 
-    // Initialize dynamic tax columns based on current tax totals
-    if (revenue && revenue.taxTotals) {
-      for (const taxId in revenue.taxTotals) {
-        const taxColumnName = `Tax__${taxId}`;
-        dataSheet[row][taxColumnName] = 0;
-      }
-    }
-  }
-  dataSheet[row].age += person1.age;
-  dataSheet[row].year += year;
-  var realEstateConverted = 0;
-  try {
-    if (realEstate && typeof realEstate.getTotalValueConverted === 'function') {
-      var converted = realEstate.getTotalValueConverted(residenceCurrency, currentCountry, year);
-      if (converted === null) {
-        // Strict mode failure: abort simulation
-        success = false;
-        failedAt = person1.age;
-        realEstateConverted = 0;
-      } else {
-        realEstateConverted = converted;
-      }
-    } else if (realEstate && typeof realEstate.getTotalValue === 'function') {
-      realEstateConverted = realEstate.getTotalValue();
-    }
-  } catch (_) {
-    try {
-      realEstateConverted = realEstate.getTotalValue();
-    } catch (__) {
-      realEstateConverted = 0;
-    }
-  }
-  dataSheet[row].incomeSalaries += incomeSalaries;
-  dataSheet[row].incomeRSUs += incomeShares;
-  dataSheet[row].incomeRentals += incomeRentals;
-  dataSheet[row].incomePrivatePension += incomePrivatePension;
-  dataSheet[row].incomeStatePension += incomeStatePension;
-  dataSheet[row].incomeFundsRent += incomeFundsRent;
-  dataSheet[row].incomeSharesRent += incomeSharesRent;
-  dataSheet[row].incomeCash += Math.max(cashWithdraw, 0);
-  dataSheet[row].incomeDefinedBenefit += incomeDefinedBenefit;
-  dataSheet[row].incomeTaxFree += incomeTaxFree;
-  dataSheet[row].realEstateCapital += realEstateConverted;
-  dataSheet[row].netIncome += netIncome;
-  dataSheet[row].expenses += expenses;
-  dataSheet[row].pensionFund += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
-  dataSheet[row].cash += cash;
-  var indexFundsCap = indexFunds.capital();
-  var sharesCap = shares.capital();
-  dataSheet[row].indexFundsCapital += indexFundsCap;
-  dataSheet[row].sharesCapital += sharesCap;
-  // Accumulate per-type income and capital for dynamic UI columns
-  try {
-    if (investmentIncomeByKey) {
-      for (var k in investmentIncomeByKey) {
-        if (!dataSheet[row].investmentIncomeByKey[k]) dataSheet[row].investmentIncomeByKey[k] = 0;
-        dataSheet[row].investmentIncomeByKey[k] += investmentIncomeByKey[k];
-      }
-    }
-    // Compute capitals by key while avoiding double-counting legacy assets
-    var capsByKey = {};
-    try { capsByKey['indexFunds'] = indexFunds.capital(); } catch (_) { }
-    try { capsByKey['shares'] = shares.capital(); } catch (_) { }
-    if (investmentAssets && investmentAssets.length > 0) {
-      for (var ci = 0; ci < investmentAssets.length; ci++) {
-        var centry = investmentAssets[ci];
-        if (!centry || !centry.asset || typeof centry.asset.capital !== 'function') continue;
-        var assetObj = centry.asset;
-        if (assetObj === indexFunds || assetObj === shares) continue; // skip legacy duplicates
-        var c = assetObj.capital();
-        capsByKey[centry.key] = (capsByKey[centry.key] || 0) + c;
-      }
-    }
-    for (var key in capsByKey) {
-      if (!dataSheet[row].investmentCapitalByKey[key]) dataSheet[row].investmentCapitalByKey[key] = 0;
-      dataSheet[row].investmentCapitalByKey[key] += capsByKey[key];
-    }
-  } catch (_) { }
-  dataSheet[row].pensionContribution += personalPensionContribution;
-  dataSheet[row].withdrawalRate += withdrawalRate;
+  // Compute nominal aggregates (extracted to DataAggregatesCalculator.js for testability)
+  DataAggregatesCalculator.computeNominalAggregates(
+    dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
+    incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
+    expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
+    investmentAssets, realEstate, preComputedValues.realEstateConverted, preComputedValues.indexFundsCap, preComputedValues.sharesCap, preComputedValues.capsByKey,
+    investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
+  );
 
-  // Populate dynamic tax columns
-  if (revenue && revenue.taxTotals) {
-    for (const taxId in revenue.taxTotals) {
-      const taxColumnName = `Tax__${taxId}`;
-      if (!dataSheet[row][taxColumnName]) {
-        dataSheet[row][taxColumnName] = 0;
-      }
-      dataSheet[row][taxColumnName] += revenue.getTaxByType(taxId);
-    }
-  }
+  // Build context for PV calculation
+  var pvContext = buildPVContext(preComputedValues);
 
-  // Compute present-value aggregates using a single deflation factor per row.
-  // This preserves existing nominal behaviour while exposing a PV layer that
-  // expresses amounts in simulation-start-year purchasing power for the
-  // residency country at this age.
-  (function computePresentValueAggregates() {
-    var cfg, startYear, ageNum, pvCountry, inflationRate, deflationFactor, countryOverrides;
-    try {
-      ageNum = person1.age;
-      cfg = (typeof Config !== 'undefined' && Config && typeof Config.getInstance === 'function') ? Config.getInstance() : null;
-      countryOverrides = (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null;
-      startYear = (cfg && typeof cfg.getSimulationStartYear === 'function') ? cfg.getSimulationStartYear() : null;
-      pvCountry = currentCountry || ((params.StartCountry || (cfg && cfg.getDefaultCountry && cfg.getDefaultCountry()) || '') + '').toLowerCase();
-      inflationRate = null;
-      if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function' && startYear !== null) {
-        // FIX: Use actual calendar year (year) instead of startYear + ageNum
-        // The year variable is already the correct calendar year for this simulation step
-        var currentYearPv = (typeof year !== 'undefined' && year !== null) ? year : (startYear + (ageNum - (params.startingAge || 0)));
-        inflationRate = InflationService.resolveInflationRate(pvCountry, currentYearPv, {
-          params: (typeof params !== 'undefined') ? params : null,
-          config: cfg,
-          countryInflationOverrides: (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null
-        });
-      }
-      if (inflationRate === null || inflationRate === undefined) {
-        // Fallback to scenario/global inflation to preserve behaviour
-        inflationRate = (params && typeof params.inflation === 'number') ? params.inflation : 0;
-      }
-      // Use getDeflationFactor(age, startYear, rate) so PV is consistent with UI helpers
-      deflationFactor = (typeof getDeflationFactor === 'function') ? getDeflationFactor(ageNum, startYear, inflationRate) : 1;
-      if (deflationFactor === null || deflationFactor === undefined || !isFinite(deflationFactor) || deflationFactor <= 0) {
-        deflationFactor = 1;
-      }
-    } catch (_e) {
-      deflationFactor = 1;
-    }
+  // Compute present-value aggregates (extracted to PresentValueCalculator.js for testability)
+  PresentValueCalculator.computePresentValueAggregates(pvContext);
 
-    var realEstateCapitalPV = 0;
-    var usedPerPropertyRealEstatePV = false;
-    try {
-      var realEstateCollection = (realEstate && realEstate.properties && typeof realEstate.properties === 'object') ? realEstate.properties : null;
-      if (realEstateCollection) {
-        var propertyKeys = [];
-        try {
-          propertyKeys = Object.keys(realEstateCollection);
-        } catch (_) {
-          propertyKeys = [];
-        }
-        if (propertyKeys.length > 0) {
-          var normalizedResidenceCurrency = residenceCurrency || '';
-          try {
-            if (typeof normalizeCurrency === 'function') {
-              normalizedResidenceCurrency = normalizeCurrency(normalizedResidenceCurrency);
-            } else if (normalizedResidenceCurrency && typeof normalizedResidenceCurrency === 'string') {
-              normalizedResidenceCurrency = normalizedResidenceCurrency.trim().toUpperCase();
-            }
-          } catch (_) { }
-          for (var rk = 0; rk < propertyKeys.length; rk++) {
-            var propKey = propertyKeys[rk];
-            if (!Object.prototype.hasOwnProperty.call(realEstateCollection, propKey)) continue;
-            var prop = realEstateCollection[propKey];
-            if (!prop || typeof prop.getValue !== 'function') continue;
-            var propertyNominalValue = 0;
-            try {
-              propertyNominalValue = prop.getValue();
-              if (propertyNominalValue === null || propertyNominalValue === undefined || !isFinite(propertyNominalValue)) {
-                propertyNominalValue = 0;
-              }
-            } catch (_) {
-              propertyNominalValue = 0;
-            }
-            var assetCountryForPV = '';
-            try {
-              if (typeof prop.getLinkedCountry === 'function') {
-                assetCountryForPV = prop.getLinkedCountry() || '';
-              }
-            } catch (_) {
-              assetCountryForPV = '';
-            }
-            if (!assetCountryForPV && params && params.StartCountry) {
-              assetCountryForPV = params.StartCountry;
-            }
-            assetCountryForPV = (assetCountryForPV || '');
-            if (assetCountryForPV && typeof assetCountryForPV === 'string') {
-              assetCountryForPV = assetCountryForPV.toLowerCase();
-            } else {
-              assetCountryForPV = '';
-            }
-            var propertyDeflationFactor = 1;
-            if (typeof getDeflationFactorForCountry === 'function') {
-              try {
-                propertyDeflationFactor = getDeflationFactorForCountry(assetCountryForPV, ageNum, startYear, {
-                  params: (typeof params !== 'undefined') ? params : null,
-                  config: cfg,
-                  countryInflationOverrides: countryOverrides,
-                  year: (typeof year !== 'undefined') ? year : null
-                });
-              } catch (_) {
-                propertyDeflationFactor = 1;
-              }
-            }
-            if (propertyDeflationFactor === null || propertyDeflationFactor === undefined || !isFinite(propertyDeflationFactor) || propertyDeflationFactor <= 0) {
-              propertyDeflationFactor = 1;
-            }
-
-            var propertyPVInAssetCurrency = propertyNominalValue * propertyDeflationFactor;
-
-            var propertyPVInResidenceCurrency = propertyPVInAssetCurrency;
-            var conversionFailed = false;
-            try {
-              var propertyCurrencyCode = (typeof prop.getCurrency === 'function') ? prop.getCurrency() : null;
-              var propertyCurrencyNormalized = propertyCurrencyCode || '';
-              if (typeof normalizeCurrency === 'function') {
-                propertyCurrencyNormalized = normalizeCurrency(propertyCurrencyNormalized);
-              } else if (propertyCurrencyNormalized && typeof propertyCurrencyNormalized === 'string') {
-                propertyCurrencyNormalized = propertyCurrencyNormalized.trim().toUpperCase();
-              }
-              var propertyCountryForConversion = assetCountryForPV || currentCountry || (params && params.StartCountry) || '';
-              if (typeof normalizeCountry === 'function') {
-                propertyCountryForConversion = normalizeCountry(propertyCountryForConversion);
-              } else if (propertyCountryForConversion && typeof propertyCountryForConversion === 'string') {
-                propertyCountryForConversion = propertyCountryForConversion.trim().toLowerCase();
-              }
-              var conversionYear = (startYear !== null && startYear !== undefined) ? startYear : year;
-              if (!propertyCurrencyNormalized || propertyCurrencyNormalized === normalizedResidenceCurrency || typeof convertCurrencyAmount !== 'function') {
-                propertyPVInResidenceCurrency = propertyPVInAssetCurrency;
-                if (propertyCurrencyNormalized && normalizedResidenceCurrency && propertyCurrencyNormalized !== normalizedResidenceCurrency && typeof convertCurrencyAmount !== 'function') {
-                  conversionFailed = true;
-                }
-              } else {
-                var convertedPV = convertCurrencyAmount(propertyPVInAssetCurrency, propertyCurrencyNormalized, propertyCountryForConversion, normalizedResidenceCurrency, currentCountry, conversionYear, true);
-                if (convertedPV === null) {
-                  conversionFailed = true;
-                } else {
-                  propertyPVInResidenceCurrency = convertedPV;
-                }
-              }
-            } catch (_) {
-              conversionFailed = true;
-            }
-            if (conversionFailed) {
-              usedPerPropertyRealEstatePV = false;
-              realEstateCapitalPV = 0;
-              break;
-            }
-
-            realEstateCapitalPV += propertyPVInResidenceCurrency;
-            usedPerPropertyRealEstatePV = true;
-          }
-        }
-      }
-    } catch (_errProp) {
-      usedPerPropertyRealEstatePV = false;
-      realEstateCapitalPV = 0;
-    }
-    if (!usedPerPropertyRealEstatePV) {
-      realEstateCapitalPV = realEstateConverted * deflationFactor;
-    }
-
-    // Pension PV: Use origin-country (StartCountry) deflation, not residency deflation
-    // Pensions should be deflated using the country where contributions were made
-    var pensionOriginCountry = (params && params.StartCountry) ? String(params.StartCountry).toLowerCase() : '';
-    var pensionDeflator = 1;
-    if (pensionOriginCountry && typeof getDeflationFactorForCountry === 'function') {
-      try {
-        pensionDeflator = getDeflationFactorForCountry(pensionOriginCountry, ageNum, startYear, {
-          params: (typeof params !== 'undefined') ? params : null,
-          config: cfg,
-          countryInflationOverrides: countryOverrides,
-          year: (typeof year !== 'undefined') ? year : null
-        });
-      } catch (_) {
-        pensionDeflator = 1;
-      }
-    }
-    if (pensionDeflator === null || pensionDeflator === undefined || !isFinite(pensionDeflator) || pensionDeflator <= 0) {
-      pensionDeflator = 1;
-    }
-    var pensionFundNominal = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
-
-    // State Pension PV: Calculate PV in base currency (EUR) using Ireland's inflation, then convert to residence currency
-    // This ensures State Pension purchasing power is measured in the paying country's terms
-    var statePensionPVInBaseCurrency = 0;
-    var statePensionPVInResidenceCurrency = 0;
-    if (incomeStatePension > 0 && incomeStatePensionBaseCurrency > 0 && person1 && person1.statePensionCountryParam) {
-      var statePensionCountry = String(person1.statePensionCountryParam).toLowerCase();
-      var statePensionInflationRate = null;
-      if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function' && startYear !== null) {
-        var currentYearPv = (typeof year !== 'undefined' && year !== null) ? year : (startYear + (ageNum - (params.startingAge || 0)));
-        statePensionInflationRate = InflationService.resolveInflationRate(statePensionCountry, currentYearPv, {
-          params: (typeof params !== 'undefined') ? params : null,
-          config: cfg,
-          countryInflationOverrides: (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null
-        });
-      }
-      if (statePensionInflationRate === null || statePensionInflationRate === undefined) {
-        statePensionInflationRate = (params && typeof params.inflation === 'number') ? params.inflation : 0;
-      }
-      var statePensionPVFactor = (typeof getDeflationFactor === 'function') ? getDeflationFactor(ageNum, startYear, statePensionInflationRate) : 1;
-      if (statePensionPVFactor === null || statePensionPVFactor === undefined || !isFinite(statePensionPVFactor) || statePensionPVFactor <= 0) {
-        statePensionPVFactor = 1;
-      }
-      // Calculate PV in base currency (EUR) using Ireland's inflation
-      statePensionPVInBaseCurrency = incomeStatePensionBaseCurrency * statePensionPVFactor;
-      // For State Pension PV: Keep it in EUR (base currency) - do NOT convert to residence currency
-      // The nominal State Pension is converted to ARS for the ledger (correct)
-      // But PV should remain in EUR because it represents Ireland's purchasing power
-      // ChartManager will handle conversion when displaying, recognizing this is EUR
-      var baseCurrency = person1.statePensionCurrencyParam || getCurrencyForCountry(statePensionCountry);
-      statePensionPVInResidenceCurrency = statePensionPVInBaseCurrency;
-    } else {
-      // Fallback: use standard PV calculation if base currency not available
-      var statePensionPVFactor = deflationFactor;
-      if (incomeStatePension > 0 && person1 && person1.statePensionCountryParam) {
-        var statePensionCountry = String(person1.statePensionCountryParam).toLowerCase();
-        if (statePensionCountry !== pvCountry) {
-          var statePensionInflationRate = null;
-          if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function' && startYear !== null) {
-            var currentYearPv = (typeof year !== 'undefined' && year !== null) ? year : (startYear + (ageNum - (params.startingAge || 0)));
-            statePensionInflationRate = InflationService.resolveInflationRate(statePensionCountry, currentYearPv, {
-              params: (typeof params !== 'undefined') ? params : null,
-              config: cfg,
-              countryInflationOverrides: (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null
-            });
-          }
-          if (statePensionInflationRate === null || statePensionInflationRate === undefined) {
-            statePensionInflationRate = (params && typeof params.inflation === 'number') ? params.inflation : 0;
-          }
-          statePensionPVFactor = (typeof getDeflationFactor === 'function') ? getDeflationFactor(ageNum, startYear, statePensionInflationRate) : 1;
-          if (statePensionPVFactor === null || statePensionPVFactor === undefined || !isFinite(statePensionPVFactor) || statePensionPVFactor <= 0) {
-            statePensionPVFactor = 1;
-          }
-        }
-      }
-      statePensionPVInResidenceCurrency = incomeStatePension * statePensionPVFactor;
-    }
-
-    if (deflationFactor === 1 && (statePensionPVInResidenceCurrency === 0 || statePensionPVInResidenceCurrency === incomeStatePension)) {
-      // Still initialise PV fields so downstream consumers can assume presence.
-      dataSheet[row].incomeSalariesPV += incomeSalaries;
-      dataSheet[row].incomeRSUsPV += incomeShares;
-      dataSheet[row].incomeRentalsPV += incomeRentals;
-      dataSheet[row].incomePrivatePensionPV += incomePrivatePension;
-      dataSheet[row].incomeStatePensionPV += (statePensionPVInResidenceCurrency > 0) ? statePensionPVInResidenceCurrency : incomeStatePension;
-      dataSheet[row].incomeFundsRentPV += incomeFundsRent;
-      dataSheet[row].incomeSharesRentPV += incomeSharesRent;
-      dataSheet[row].incomeCashPV += Math.max(cashWithdraw, 0);
-      dataSheet[row].incomeDefinedBenefitPV += incomeDefinedBenefit;
-      dataSheet[row].incomeTaxFreePV += incomeTaxFree;
-      dataSheet[row].realEstateCapitalPV += realEstateCapitalPV;
-      dataSheet[row].netIncomePV += netIncome;
-      dataSheet[row].expensesPV += expenses;
-      dataSheet[row].pensionFundPV += pensionFundNominal * pensionDeflator;
-      dataSheet[row].cashPV += cash;
-      dataSheet[row].indexFundsCapitalPV += indexFundsCap;
-      dataSheet[row].sharesCapitalPV += sharesCap;
-      dataSheet[row].worthPV += realEstateCapitalPV + (pensionFundNominal * pensionDeflator) + indexFundsCap + sharesCap + cash;
-    } else {
-      dataSheet[row].incomeSalariesPV += incomeSalaries * deflationFactor;
-      dataSheet[row].incomeRSUsPV += incomeShares * deflationFactor;
-      dataSheet[row].incomeRentalsPV += incomeRentals * deflationFactor;
-      dataSheet[row].incomePrivatePensionPV += incomePrivatePension * deflationFactor;
-      // State Pension PV: Use the pre-calculated statePensionPVInResidenceCurrency (calculated above before the if/else)
-      dataSheet[row].incomeStatePensionPV += statePensionPVInResidenceCurrency;
-      dataSheet[row].incomeFundsRentPV += incomeFundsRent * deflationFactor;
-      dataSheet[row].incomeSharesRentPV += incomeSharesRent * deflationFactor;
-      dataSheet[row].incomeCashPV += Math.max(cashWithdraw, 0) * deflationFactor;
-      dataSheet[row].incomeDefinedBenefitPV += incomeDefinedBenefit * deflationFactor;
-      dataSheet[row].incomeTaxFreePV += incomeTaxFree * deflationFactor;
-      dataSheet[row].realEstateCapitalPV += realEstateCapitalPV;
-      dataSheet[row].netIncomePV += netIncome * deflationFactor;
-      dataSheet[row].expensesPV += expenses * deflationFactor;
-      dataSheet[row].pensionFundPV += pensionFundNominal * pensionDeflator;
-      dataSheet[row].cashPV += cash * deflationFactor;
-      dataSheet[row].indexFundsCapitalPV += indexFundsCap * deflationFactor;
-      dataSheet[row].sharesCapitalPV += sharesCap * deflationFactor;
-      dataSheet[row].worthPV += realEstateCapitalPV + (pensionFundNominal * pensionDeflator) + indexFundsCap * deflationFactor + sharesCap * deflationFactor + cash * deflationFactor;
-    }
-
-    // Dynamic PV maps for per-investment-type income and capital. These mirror
-    // the nominal investmentIncomeByKey / investmentCapitalByKey maps so that
-    // dynamic Income__/Capital__ columns in the UI can also be “exact by
-    // construction” rather than deflated in the browser.
-    try {
-      if (investmentIncomeByKey) {
-        for (var ik in investmentIncomeByKey) {
-          if (!dataSheet[row].investmentIncomeByKeyPV[ik]) dataSheet[row].investmentIncomeByKeyPV[ik] = 0;
-          if (deflationFactor === 1) {
-            dataSheet[row].investmentIncomeByKeyPV[ik] += investmentIncomeByKey[ik];
-          } else {
-            dataSheet[row].investmentIncomeByKeyPV[ik] += investmentIncomeByKey[ik] * deflationFactor;
-          }
-        }
-      }
-      if (typeof capsByKey !== 'undefined' && capsByKey) {
-        for (var ck in capsByKey) {
-          if (!dataSheet[row].investmentCapitalByKeyPV[ck]) dataSheet[row].investmentCapitalByKeyPV[ck] = 0;
-          if (deflationFactor === 1) {
-            dataSheet[row].investmentCapitalByKeyPV[ck] += capsByKey[ck];
-          } else {
-            dataSheet[row].investmentCapitalByKeyPV[ck] += capsByKey[ck] * deflationFactor;
-          }
-        }
-      }
-    } catch (_e2) { }
-  })();
-
-  dataSheet[row].worth += realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFundsCap + sharesCap + cash;
-
-  // Record portfolio statistics for tooltip attribution
-  const indexFundsStats = indexFunds.getPortfolioStats();
-  const indexFundsNet = indexFundsStats.yearlyBought - indexFundsStats.yearlySold;
-  if (indexFundsNet > 0) {
-    attributionManager.record('indexfundscapital', 'Bought', indexFundsNet);
-  } else if (indexFundsNet < 0) {
-    attributionManager.record('indexfundscapital', 'Sold', -indexFundsNet);
-  }
-  attributionManager.record('indexfundscapital', 'Principal', indexFundsStats.principal);
-  attributionManager.record('indexfundscapital', 'P/L', indexFundsStats.totalGain);
-
-  const sharesStats = shares.getPortfolioStats();
-  const sharesNet = sharesStats.yearlyBought - sharesStats.yearlySold;
-  if (sharesNet > 0) {
-    attributionManager.record('sharescapital', 'Bought', sharesNet);
-  } else if (sharesNet < 0) {
-    attributionManager.record('sharescapital', 'Sold', -sharesNet);
-  }
-  attributionManager.record('sharescapital', 'Principal', sharesStats.principal);
-  attributionManager.record('sharescapital', 'P/L', sharesStats.totalGain);
-
-  const currentAttributions = attributionManager.getAllAttributions();
-  for (const metric in currentAttributions) {
-    if (!dataSheet[row].attributions[metric]) {
-      dataSheet[row].attributions[metric] = {};
-    }
-    try {
-      const breakdown = currentAttributions[metric].getBreakdown();
-      for (const source in breakdown) {
-        if (!dataSheet[row].attributions[metric][source]) {
-          dataSheet[row].attributions[metric][source] = 0;
-        }
-        dataSheet[row].attributions[metric][source] += breakdown[source];
-      }
-    } catch (error) {
-      console.error(`Error getting breakdown for ${metric}:`, error);
-    }
-  }
-
-  // After processing standard taxes accumulation, accumulate dynamic taxTotals
-  try {
-    const totMap = revenue.taxTotals || {};
-    if (!dataSheet[row].taxByKey) dataSheet[row].taxByKey = {};
-    for (const tId in totMap) {
-      if (!dataSheet[row].taxByKey[tId]) dataSheet[row].taxByKey[tId] = 0;
-      dataSheet[row].taxByKey[tId] += totMap[tId];
-    }
-  } catch (_) { }
+  // Populate attribution fields (extracted to AttributionPopulator.js for testability)
+  AttributionPopulator.populateAttributionFields(
+    dataSheet[row],
+    indexFunds,
+    shares,
+    attributionManager,
+    revenue
+  );
 
   if (!montecarlo) {
     uiManager.updateDataRow(row, (person1.age - params.startingAge) / (100 - params.startingAge));
   }
-  // At the end of the year, when updating the data sheet
-  // dataSheet[row].sharesCapital = shares.capital();
 }

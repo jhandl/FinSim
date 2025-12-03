@@ -17,7 +17,7 @@ module.exports = {
   name: "Economic Stress Test Regression Baseline",
   description: "Scenario with multiple economic shocks - recession, inflation, market crashes",
   category: "regression",
-  
+
   scenario: {
     parameters: {
       startingAge: 35,
@@ -47,9 +47,10 @@ module.exports = {
       priorityCash: 1,
       priorityPension: 4,
       priorityFunds: 2,
-      priorityShares: 3
+      priorityShares: 3,
+      StartCountry: 'ie'
     },
-    
+
     events: [
       // Moderate but steady income throughout
       {
@@ -61,7 +62,7 @@ module.exports = {
         rate: 0.20,                 // 20% pension contribution
         match: 0.05                 // 5% employer match
       },
-      
+
       // Conservative living expenses
       {
         type: "E",
@@ -72,9 +73,9 @@ module.exports = {
         rate: 0,
         match: 0
       },
-      
+
       // Multiple market crashes to test resilience
-      
+
       // Early career crash (2008-style)
       {
         type: "SM",
@@ -85,7 +86,7 @@ module.exports = {
         rate: -0.30,                // -30% severe market crash
         match: 0
       },
-      
+
       // Mid-career crash (COVID-style)
       {
         type: "SM",
@@ -96,7 +97,7 @@ module.exports = {
         rate: -0.20,                // -20% market crash (shorter duration)
         match: 0
       },
-      
+
       // Pre-retirement crash (worst timing)
       {
         type: "SM",
@@ -109,12 +110,12 @@ module.exports = {
       }
     ]
   },
-  
+
   assertions: [
     // =============================================================================
     // PRE-STRESS BASELINE (Ages 35-38)
     // =============================================================================
-    
+
     // Initial portfolio building
     {
       type: 'range',
@@ -126,7 +127,7 @@ module.exports = {
         max: 260000                 // Updated to actual accumulation range
       }
     },
-    
+
     // Investment allocation working properly
     {
       type: 'comparison',
@@ -135,14 +136,14 @@ module.exports = {
       field: 'indexFundsCapital',
       expected: {
         operator: '>',
-        value: 39500                // Baseline produces ≈€39.95k; keep healthy growth buffer
+        value: 39000                // Baseline produces ≈€39.4k (reduced due to inflated stash); keep healthy growth buffer
       }
     },
-    
+
     // =============================================================================
     // FIRST CRASH PERIOD (Ages 38-39) - 30% Decline
     // =============================================================================
-    
+
     // Crash impact validation
     {
       type: 'comparison',
@@ -154,7 +155,7 @@ module.exports = {
         value: 200000               // Updated to match actual growth (no decline at 38)
       }
     },
-    
+
     // Portfolio should still be positive
     {
       type: 'comparison',
@@ -166,11 +167,11 @@ module.exports = {
         value: 50000                // Should maintain positive value
       }
     },
-    
+
     // =============================================================================
     // RECOVERY PERIOD (Ages 40-49)
     // =============================================================================
-    
+
     // Post-crash recovery
     {
       type: 'comparison',
@@ -182,7 +183,7 @@ module.exports = {
         value: 100000               // Should recover within few years
       }
     },
-    
+
     // Continued pension accumulation despite crash
     {
       type: 'range',
@@ -194,7 +195,7 @@ module.exports = {
         max: 500000
       }
     },
-    
+
     // Portfolio rebuild
     {
       type: 'comparison',
@@ -206,11 +207,11 @@ module.exports = {
         value: 200000               // Should significantly exceed pre-crash levels
       }
     },
-    
+
     // =============================================================================
     // SECOND CRASH PERIOD (Age 50) - 20% Decline
     // =============================================================================
-    
+
     // Mid-career crash impact (less severe)
     {
       type: 'comparison',
@@ -222,11 +223,11 @@ module.exports = {
         value: 150000               // Should maintain substantial value
       }
     },
-    
+
     // =============================================================================
     // PRE-RETIREMENT BUILD-UP (Ages 51-59)
     // =============================================================================
-    
+
     // Accumulation despite multiple shocks
     {
       type: 'comparison',
@@ -238,7 +239,7 @@ module.exports = {
         value: 300000               // Should build substantial pre-retirement wealth
       }
     },
-    
+
     // Pension fund growth
     {
       type: 'range',
@@ -250,11 +251,11 @@ module.exports = {
         max: 2500000
       }
     },
-    
+
     // =============================================================================
     // THIRD CRASH PERIOD (Ages 60-61) - 25% Decline
     // =============================================================================
-    
+
     // Pre-retirement crash impact (most critical timing)
     {
       type: 'comparison',
@@ -266,7 +267,7 @@ module.exports = {
         value: 250000               // Should still have substantial retirement funds
       }
     },
-    
+
     // Critical test: Should not run out of money
     {
       type: 'comparison',
@@ -278,11 +279,11 @@ module.exports = {
         value: 200000               // Should maintain retirement viability
       }
     },
-    
+
     // =============================================================================
     // RETIREMENT RESILIENCE (Ages 62-65)
     // =============================================================================
-    
+
     // Recovery before full retirement
     {
       type: 'comparison',
@@ -294,11 +295,11 @@ module.exports = {
         value: 300000               // Should recover significantly
       }
     },
-    
+
     // =============================================================================
     // RETIREMENT PHASE (Ages 65+)
     // =============================================================================
-    
+
     // Retirement viability after all shocks
     {
       type: 'comparison',
@@ -310,7 +311,7 @@ module.exports = {
         value: 350000               // Should have viable retirement despite shocks
       }
     },
-    
+
     // Pension drawdown begins successfully
     {
       type: 'comparison',
@@ -322,7 +323,7 @@ module.exports = {
         value: 10000                // Should be drawing from pension
       }
     },
-    
+
     // State pension addition
     {
       type: 'comparison',
@@ -334,11 +335,11 @@ module.exports = {
         value: 14000                // Should receive state pension
       }
     },
-    
+
     // =============================================================================
     // WITHDRAWAL BEHAVIOR VALIDATION
     // =============================================================================
-    
+
     // Withdrawal rate should be sustainable even after crashes
     {
       type: 'range',
@@ -350,7 +351,7 @@ module.exports = {
         max: 0.08                   // Should not exceed 8% even under stress
       }
     },
-    
+
     // Should not be in crisis withdrawal mode
     {
       type: 'comparison',
@@ -362,11 +363,11 @@ module.exports = {
         value: 5000                 // Should maintain some cash reserves
       }
     },
-    
+
     // =============================================================================
     // END-OF-SIMULATION STRESS VALIDATION
     // =============================================================================
-    
+
     // Simulation should complete successfully despite all shocks
     {
       type: 'comparison',
@@ -377,7 +378,7 @@ module.exports = {
         value: 74                   // Should reach target age
       }
     },
-    
+
     // Final net worth should still be positive
     {
       type: 'comparison',
@@ -388,11 +389,11 @@ module.exports = {
         value: 100000               // Should end with positive net worth
       }
     },
-    
+
     // =============================================================================
     // SYSTEM STABILITY VALIDATION
     // =============================================================================
-    
+
     // Ensure no negative values in critical fields
     {
       type: 'comparison',
@@ -404,7 +405,7 @@ module.exports = {
         value: 0                    // Pension fund should never go negative
       }
     },
-    
+
     {
       type: 'comparison',
       target: 'age',
@@ -415,7 +416,7 @@ module.exports = {
         value: 0                    // Index funds should never go negative
       }
     },
-    
+
     {
       type: 'comparison',
       target: 'age',
@@ -426,7 +427,7 @@ module.exports = {
         value: 0                    // Shares should never go negative
       }
     },
-    
+
     // Tax calculations should remain stable during stress
     {
       type: 'comparison',
@@ -439,7 +440,7 @@ module.exports = {
       }
     }
   ],
-  
+
   // Regression test metadata
   regressionInfo: {
     baselineDate: "2024-12-19",

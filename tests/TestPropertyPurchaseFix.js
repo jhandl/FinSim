@@ -35,7 +35,8 @@ module.exports = {
             growthDevShares: 0,
             growthRatePension: 0.06,
             growthDevPension: 0,
-            economyMode: 'deterministic'
+            economyMode: 'deterministic',
+            StartCountry: 'ie'
         },
         events: [
             {

@@ -37,7 +37,8 @@ const TestRealEstateTransaction = {
       marriageYear: null,               // Single person
       youngestChildBorn: null,
       oldestChildBorn: null,
-      personalTaxCredit: 1875
+      personalTaxCredit: 1875,
+      StartCountry: 'ie'
     },
     events: [
       {

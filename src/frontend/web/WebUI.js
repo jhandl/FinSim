@@ -1,83 +1,83 @@
 var WebUI_instance = null;
 
 class WebUI extends AbstractUI {
-  
+
   constructor() {
-      super();
-      
-      // Initialize simulation state tracking
-      this.isSimulationRunning = false;
-      this.currentSimMode = 'single'; // Default to single person mode
-      this.currentEconomyMode = 'deterministic'; // Default to deterministic mode
-      this.preservedVolatilityValues = {}; // Store volatility values when switching modes
-      
-      this.p1Labels = {
-        'StartingAge': { neutral: 'Current Age', your: 'Your Current Age' },
-        'InitialPension': { neutral: 'Pension Fund', your: 'Your Pension Fund' },
-        'RetirementAge': { neutral: 'Retirement Age', your: 'Your Retirement Age' },
-        'PensionContributionPercentage': { neutral: 'Pension Contribution', your: 'Your Pension Contribution' },
-        'StatePensionWeekly': { neutral: 'State Pension (Weekly)', your: 'Your State Pension (Weekly)' },
-        'InitialSavings': { neutral: 'Current Savings', your: 'Current Savings (Joint)' }
-      };
-      this.p2InputIds = ['P2StartingAge', 'InitialPensionP2', 'P2RetirementAge', 'PensionContributionPercentageP2', 'P2StatePensionWeekly'];
-      
-      // Initialize in a specific order to ensure dependencies are met
-      this.formatUtils = new FormatUtils();
-      this.notificationUtils = new NotificationUtils();
-      this.errorModalUtils = new ErrorModalUtils();
-      this.fieldLabelsManager = FieldLabelsManager.getInstance();
-      this.chartManager = new ChartManager(this);
-      this.tableManager = new TableManager(this);
-      this.fileManager = new FileManager(this);
-      this.eventsTableManager = new EventsTableManager(this);
-      this.eventAccordionManager = new EventAccordionManager(this);
-      this.eventsWizard = new EventsWizard(this);
-      this.dragAndDrop = new DragAndDrop();
+    super();
 
-      // Initialize WelcomeModal with error checking
-      try {
-        this.welcomeModal = new WelcomeModal();
-      } catch (error) {
-        console.error('Error creating WelcomeModal:', error);
-        this.welcomeModal = null;
-      }
+    // Initialize simulation state tracking
+    this.isSimulationRunning = false;
+    this.currentSimMode = 'single'; // Default to single person mode
+    this.currentEconomyMode = 'deterministic'; // Default to deterministic mode
+    this.preservedVolatilityValues = {}; // Store volatility values when switching modes
 
-      this.editCallbacks = new Map();
-      
-      // Connect error modal to notification utils
-      this.notificationUtils.setErrorModalUtils(this.errorModalUtils);
-      
-      // Setup event listeners
-      this.setupChangeListener();
-      this.setupRunSimulationButton();
-      this.setupWizardInvocation();
-      this.setupNavigation();
-      this.setupLoadDemoScenarioButton();
-      this.setupSimModeToggle(); // Setup the single/couple mode toggle
-      this.setupEconomyModeToggle(); // Setup the deterministic/Monte Carlo mode toggle
-      this.setupParameterTooltips(); // Setup parameter age field tooltips
-      this.setupVisualizationControls(); // Setup visualization controls
-      // Pension Capped dropdown depends on Config/tax rules; initialize after Config.initialize()
-      this.setupPensionContributionTooltips(); // Tooltips for pension contribution inputs
-      this.setupCardInfoIcons(); // Setup info icons on cards
-      this.setupDataExportButton(); // Setup data table CSV export button
-      this.setupIconTooltips(); // Setup tooltips for various mode toggle icons
-      this.setupCursorEndOnFocus(); // Ensure caret is placed at the end when inputs receive focus
-      this.setupMobileLongPressHelp(); // Long-press on inputs/selects opens contextual help on mobile
-      this.setupStatusClickHandler(); // Setup click handler for relocation impact status
-      this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
-      
-      // Defer adding the initial empty event row until after Config is initialized
-      
-      // Set initial UI state
-      this.setStatus("Ready", STATUS_COLORS.INFO);
-      // Baseline will be established after Config is initialized (see DOMContentLoaded)
-      
-      this.updateUIForSimMode(); // Set initial UI state based on mode
-      this.updateUIForEconomyMode(); // Set initial UI state for economy mode
-      if (this.eventsTableManager) { // Ensure event table UI is also updated on init
-        this.eventsTableManager.updateEventRowsVisibilityAndTypes();
-      }
+    this.p1Labels = {
+      'StartingAge': { neutral: 'Current Age', your: 'Your Current Age' },
+      'InitialPension': { neutral: 'Pension Fund', your: 'Your Pension Fund' },
+      'RetirementAge': { neutral: 'Retirement Age', your: 'Your Retirement Age' },
+      'PensionContributionPercentage': { neutral: 'Pension Contribution', your: 'Your Pension Contribution' },
+      'StatePensionWeekly': { neutral: 'State Pension (Weekly)', your: 'Your State Pension (Weekly)' },
+      'InitialSavings': { neutral: 'Current Savings', your: 'Current Savings (Joint)' }
+    };
+    this.p2InputIds = ['P2StartingAge', 'InitialPensionP2', 'P2RetirementAge', 'PensionContributionPercentageP2', 'P2StatePensionWeekly'];
+
+    // Initialize in a specific order to ensure dependencies are met
+    this.formatUtils = new FormatUtils();
+    this.notificationUtils = new NotificationUtils();
+    this.errorModalUtils = new ErrorModalUtils();
+    this.fieldLabelsManager = FieldLabelsManager.getInstance();
+    this.chartManager = new ChartManager(this);
+    this.tableManager = new TableManager(this);
+    this.fileManager = new FileManager(this);
+    this.eventsTableManager = new EventsTableManager(this);
+    this.eventAccordionManager = new EventAccordionManager(this);
+    this.eventsWizard = new EventsWizard(this);
+    this.dragAndDrop = new DragAndDrop();
+
+    // Initialize WelcomeModal with error checking
+    try {
+      this.welcomeModal = new WelcomeModal();
+    } catch (error) {
+      console.error('Error creating WelcomeModal:', error);
+      this.welcomeModal = null;
+    }
+
+    this.editCallbacks = new Map();
+
+    // Connect error modal to notification utils
+    this.notificationUtils.setErrorModalUtils(this.errorModalUtils);
+
+    // Setup event listeners
+    this.setupChangeListener();
+    this.setupRunSimulationButton();
+    this.setupWizardInvocation();
+    this.setupNavigation();
+    this.setupLoadDemoScenarioButton();
+    this.setupSimModeToggle(); // Setup the single/couple mode toggle
+    this.setupEconomyModeToggle(); // Setup the deterministic/Monte Carlo mode toggle
+    this.setupParameterTooltips(); // Setup parameter age field tooltips
+    this.setupVisualizationControls(); // Setup visualization controls
+    // Pension Capped dropdown depends on Config/tax rules; initialize after Config.initialize()
+    this.setupPensionContributionTooltips(); // Tooltips for pension contribution inputs
+    this.setupCardInfoIcons(); // Setup info icons on cards
+    this.setupDataExportButton(); // Setup data table CSV export button
+    this.setupIconTooltips(); // Setup tooltips for various mode toggle icons
+    this.setupCursorEndOnFocus(); // Ensure caret is placed at the end when inputs receive focus
+    this.setupMobileLongPressHelp(); // Long-press on inputs/selects opens contextual help on mobile
+    this.setupStatusClickHandler(); // Setup click handler for relocation impact status
+    this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
+
+    // Defer adding the initial empty event row until after Config is initialized
+
+    // Set initial UI state
+    this.setStatus("Ready", STATUS_COLORS.INFO);
+    // Baseline will be established after Config is initialized (see DOMContentLoaded)
+
+    this.updateUIForSimMode(); // Set initial UI state based on mode
+    this.updateUIForEconomyMode(); // Set initial UI state for economy mode
+    if (this.eventsTableManager) { // Ensure event table UI is also updated on init
+      this.eventsTableManager.updateEventRowsVisibilityAndTypes();
+    }
   }
 
   // Singleton
@@ -88,7 +88,7 @@ class WebUI extends AbstractUI {
     return WebUI_instance;
   }
 
-  setStatus(message, color=STATUS_COLORS.INFO) {
+  setStatus(message, color = STATUS_COLORS.INFO) {
     this.notificationUtils.setStatus(message, color);
   }
 
@@ -102,7 +102,7 @@ class WebUI extends AbstractUI {
 
   clearElementWarning(element) {
     this.notificationUtils.clearElementWarning(element);
-  } 
+  }
 
   clearAllWarnings() {
     this.notificationUtils.clearAllWarnings();
@@ -138,12 +138,12 @@ class WebUI extends AbstractUI {
     const runButton = document.getElementById('runSimulation');
     const mobileRunButton = document.getElementById('runSimulationMobile');
     const hasImpacts = this.relocationImpactCount && this.relocationImpactCount > 0;
-    
+
     // Don't disable if simulation is already running
     if (this.isSimulationRunning) {
       return;
     }
-    
+
     if (runButton) {
       runButton.disabled = hasImpacts;
       if (hasImpacts) {
@@ -154,7 +154,7 @@ class WebUI extends AbstractUI {
         runButton.style.pointerEvents = '';
       }
     }
-    
+
     if (mobileRunButton) {
       mobileRunButton.disabled = hasImpacts;
       if (hasImpacts) {
@@ -236,8 +236,8 @@ class WebUI extends AbstractUI {
   getVersion() {
     const key = 'simulatorVersion';
     let stored = null;
-    if (typeof localStorage !== 'undefined') { 
-      stored = localStorage.getItem(key); 
+    if (typeof localStorage !== 'undefined') {
+      stored = localStorage.getItem(key);
     }
     // Record whether a version was actually present in localStorage so callers
     // (e.g. Config.initialize) can decide whether to show one-time update toasts.
@@ -306,7 +306,7 @@ class WebUI extends AbstractUI {
   }
 
   // No-op placeholder; app-level code update toast is handled in Config.newCodeVersion()
-  newCodeVersion(latestVersion) {}
+  newCodeVersion(latestVersion) { }
 
   isPercentage(elementId) {
     const element = document.getElementById(elementId);
@@ -349,13 +349,46 @@ class WebUI extends AbstractUI {
   fetchUrl(url) {
     return this.fileManager.fetchUrl(url);
   }
-  
+
   saveToFile() {
     return this.fileManager.saveToFile();
   }
 
   async loadFromFile(file) {
+    // Explicitly reset currency selectors to default state before loading
+    if (this.chartManager) {
+      this.chartManager.reportingCurrency = null; // Force reset
+      this.chartManager.setupChartCurrencyControls(this);
+    }
+    if (this.tableManager) {
+      this.tableManager.reportingCurrency = null; // Force reset
+      this.tableManager.setupTableCurrencyControls();
+    }
+
     await this.fileManager.loadFromFile(file);
+    RelocationUtils.extractRelocationTransitions(this, this.chartManager);
+    // Rebuild currency selector now that scenario events (and currencies) are available
+    this.chartManager.setupChartCurrencyControls(this);
+    this.chartManager.refreshChartsWithCurrency();
+    // Also refresh table currency controls
+    if (this.tableManager) {
+      RelocationUtils.extractRelocationTransitions(this, this.tableManager);
+      this.tableManager.setupTableCurrencyControls();
+    }
+  }
+
+  async loadFromUrl(url, name) {
+    // Explicitly reset currency selectors to default state before loading
+    if (this.chartManager) {
+      this.chartManager.reportingCurrency = null; // Force reset
+      this.chartManager.setupChartCurrencyControls(this);
+    }
+    if (this.tableManager) {
+      this.tableManager.reportingCurrency = null; // Force reset
+      this.tableManager.setupTableCurrencyControls();
+    }
+
+    await this.fileManager.loadFromUrl(url, name);
     RelocationUtils.extractRelocationTransitions(this, this.chartManager);
     // Rebuild currency selector now that scenario events (and currencies) are available
     this.chartManager.setupChartCurrencyControls(this);
@@ -396,7 +429,7 @@ class WebUI extends AbstractUI {
       loadDemoButton.addEventListener('click', async () => {
         try {
           // Unsaved changes check is now handled in loadFromUrl
-          await this.fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "demo");
+          await this.loadFromUrl("/src/frontend/web/assets/demo.csv", "demo");
           // After successfully loading the demo scenario, scroll to graphs and run the simulation
           const runButton = document.getElementById('runSimulation');
           if (runButton && !this.isSimulationRunning) {
@@ -407,8 +440,8 @@ class WebUI extends AbstractUI {
               // Instead of programmatic click, directly call the handler method
               // Create a mock event object to avoid issues with preventDefault/stopPropagation
               const mockEvent = {
-                preventDefault: () => {},
-                stopPropagation: () => {}
+                preventDefault: () => { },
+                stopPropagation: () => { }
               };
               this.handleRunSimulation(mockEvent);
             }, 200);
@@ -619,101 +652,101 @@ class WebUI extends AbstractUI {
     // Remove any previously added dynamic income columns to avoid duplicates
     Array.from(headerRow.querySelectorAll('th[data-key^="Income__"]')).forEach(th => th.remove());
 
-      // Insert dynamic income columns so that IncomeCash remains LAST in Gross Income
-      const cashTh = headerRow.querySelector('th[data-key="IncomeCash"]');
-      if (cashTh) {
-        for (let i = 0; i < types.length; i++) {
-          const type = types[i];
-          const key = type && type.key ? type.key : `asset${i}`;
-          const label = type && type.label ? type.label : key;
-          const th = document.createElement('th');
-          th.setAttribute('data-key', `Income__${key}`);
-          th.title = `Income generated from ${label} investments`;
-          th.textContent = label;
-          cashTh.insertAdjacentElement('beforebegin', th);
-        }
-      } else {
-        // Fallback: append after the last existing income column
-        const incomeHeaders = Array.from(headerRow.querySelectorAll('th[data-key^="Income"]'));
-        let incomeAnchor = incomeHeaders.length > 0 ? incomeHeaders[incomeHeaders.length - 1] : null;
-        if (!incomeAnchor) return;
-        for (let i = 0; i < types.length; i++) {
-          const type = types[i];
-          const key = type && type.key ? type.key : `asset${i}`;
-          const label = type && type.label ? type.label : key;
-          const th = document.createElement('th');
-          th.setAttribute('data-key', `Income__${key}`);
-          th.title = `Income generated from ${label} investments`;
-          th.textContent = label;
-          incomeAnchor.insertAdjacentElement('afterend', th);
-          incomeAnchor = th;
-        }
+    // Insert dynamic income columns so that IncomeCash remains LAST in Gross Income
+    const cashTh = headerRow.querySelector('th[data-key="IncomeCash"]');
+    if (cashTh) {
+      for (let i = 0; i < types.length; i++) {
+        const type = types[i];
+        const key = type && type.key ? type.key : `asset${i}`;
+        const label = type && type.label ? type.label : key;
+        const th = document.createElement('th');
+        th.setAttribute('data-key', `Income__${key}`);
+        th.title = `Income generated from ${label} investments`;
+        th.textContent = label;
+        cashTh.insertAdjacentElement('beforebegin', th);
       }
+    } else {
+      // Fallback: append after the last existing income column
+      const incomeHeaders = Array.from(headerRow.querySelectorAll('th[data-key^="Income"]'));
+      let incomeAnchor = incomeHeaders.length > 0 ? incomeHeaders[incomeHeaders.length - 1] : null;
+      if (!incomeAnchor) return;
+      for (let i = 0; i < types.length; i++) {
+        const type = types[i];
+        const key = type && type.key ? type.key : `asset${i}`;
+        const label = type && type.label ? type.label : key;
+        const th = document.createElement('th');
+        th.setAttribute('data-key', `Income__${key}`);
+        th.title = `Income generated from ${label} investments`;
+        th.textContent = label;
+        incomeAnchor.insertAdjacentElement('afterend', th);
+        incomeAnchor = th;
+      }
+    }
 
-      // Remove legacy capital columns (Funds/Shares) and insert dynamic capitals after RealEstateCapital
-      const legacyCapitalKeys = ['FundsCapital', 'SharesCapital'];
-      legacyCapitalKeys.forEach(k => {
-        const th = headerRow.querySelector(`th[data-key="${k}"]`);
-        if (th) th.remove();
+    // Remove legacy capital columns (Funds/Shares) and insert dynamic capitals after RealEstateCapital
+    const legacyCapitalKeys = ['FundsCapital', 'SharesCapital'];
+    legacyCapitalKeys.forEach(k => {
+      const th = headerRow.querySelector(`th[data-key="${k}"]`);
+      if (th) th.remove();
+    });
+    // Remove any previously added dynamic capital columns to avoid duplicates
+    Array.from(headerRow.querySelectorAll('th[data-key^="Capital__"]')).forEach(th => th.remove());
+    let capitalAnchor = headerRow.querySelector('th[data-key="RealEstateCapital"]');
+    if (capitalAnchor) {
+      for (let i = 0; i < types.length; i++) {
+        const type = types[i];
+        const key = type && type.key ? type.key : `asset${i}`;
+        const label = type && type.label ? type.label : key;
+        const th = document.createElement('th');
+        th.setAttribute('data-key', `Capital__${key}`);
+        th.title = `Total value of your ${label} investments`;
+        th.textContent = label;
+        capitalAnchor.insertAdjacentElement('afterend', th);
+        capitalAnchor = th;
+      }
+    }
+
+    // Handle income column visibility if provided
+    if (incomeVisibility) {
+      // After line 526 (in the income visibility handling section)
+      const incomeHeaders = headerRow.querySelectorAll('th[data-key^="Income"]');
+
+      // 1) Build target visible list deterministically from header order
+      const visibilityList = Array.from(incomeHeaders).map(th => {
+        const key = th.getAttribute('data-key').toLowerCase();
+        return !!incomeVisibility[key];
       });
-      // Remove any previously added dynamic capital columns to avoid duplicates
-      Array.from(headerRow.querySelectorAll('th[data-key^="Capital__"]')).forEach(th => th.remove());
-      let capitalAnchor = headerRow.querySelector('th[data-key="RealEstateCapital"]');
-      if (capitalAnchor) {
-        for (let i = 0; i < types.length; i++) {
-          const type = types[i];
-          const key = type && type.key ? type.key : `asset${i}`;
-          const label = type && type.label ? type.label : key;
-          const th = document.createElement('th');
-          th.setAttribute('data-key', `Capital__${key}`);
-          th.title = `Total value of your ${label} investments`;
-          th.textContent = label;
-          capitalAnchor.insertAdjacentElement('afterend', th);
-          capitalAnchor = th;
+
+      // 2) Apply header visibility from the list
+      Array.from(incomeHeaders).forEach((th, i) => {
+        th.style.display = visibilityList[i] ? '' : 'none';
+      });
+
+      // 3) Rebuild body rows to match new header set
+      const uiMgr = (typeof window !== 'undefined' && window.uiManager) ? window.uiManager : (typeof uiManager !== 'undefined' ? uiManager : null);
+      if (uiMgr && typeof uiMgr.updateDataRow === 'function') {
+        const ds = (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) ? dataSheet : null;
+        const total = ds ? Math.max(0, ds.length - 1) : 0;
+        for (let i = 1; i <= total; i++) {
+          uiMgr.updateDataRow(i, i / Math.max(1, total));
         }
       }
+    }
 
-      // Handle income column visibility if provided
-      if (incomeVisibility) {
-        // After line 526 (in the income visibility handling section)
-        const incomeHeaders = headerRow.querySelectorAll('th[data-key^="Income"]');
-
-        // 1) Build target visible list deterministically from header order
-        const visibilityList = Array.from(incomeHeaders).map(th => {
-          const key = th.getAttribute('data-key').toLowerCase();
-          return !!incomeVisibility[key];
-        });
-
-        // 2) Apply header visibility from the list
-        Array.from(incomeHeaders).forEach((th, i) => {
-          th.style.display = visibilityList[i] ? '' : 'none';
-        });
-
-        // 3) Rebuild body rows to match new header set
-        const uiMgr = (typeof window !== 'undefined' && window.uiManager) ? window.uiManager : (typeof uiManager !== 'undefined' ? uiManager : null);
-        if (uiMgr && typeof uiMgr.updateDataRow === 'function') {
-          const ds = (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) ? dataSheet : null;
-          const total = ds ? Math.max(0, ds.length - 1) : 0;
-          for (let i = 1; i <= total; i++) {
-            uiMgr.updateDataRow(i, i / Math.max(1, total));
-          }
-        }
-      }
-
-      // Adjust header group colspans for Gross Income and Assets
-      const groupCells = Array.from(headerGroupsRow.querySelectorAll('th'));
-      const grossIncomeGroup = groupCells.find(th => (th.textContent || '').trim() === 'Gross Income');
-      const assetsGroup = groupCells.find(th => (th.textContent || '').trim() === 'Assets');
-      if (grossIncomeGroup) {
-        // Compute from number of visible income <th> elements
-        const incomeHeaders = Array.from(headerRow.querySelectorAll('th[data-key^="Income"]'));
-        const visibleCount = incomeHeaders.filter(th => th.style.display !== 'none').length;
-        grossIncomeGroup.colSpan = visibleCount;
-      }
-      if (assetsGroup) {
-        // PensionFund, Cash, RealEstateCapital (3) + dynamic capital columns (N)
-        assetsGroup.colSpan = 3 + types.length;
-      }
+    // Adjust header group colspans for Gross Income and Assets
+    const groupCells = Array.from(headerGroupsRow.querySelectorAll('th'));
+    const grossIncomeGroup = groupCells.find(th => (th.textContent || '').trim() === 'Gross Income');
+    const assetsGroup = groupCells.find(th => (th.textContent || '').trim() === 'Assets');
+    if (grossIncomeGroup) {
+      // Compute from number of visible income <th> elements
+      const incomeHeaders = Array.from(headerRow.querySelectorAll('th[data-key^="Income"]'));
+      const visibleCount = incomeHeaders.filter(th => th.style.display !== 'none').length;
+      grossIncomeGroup.colSpan = visibleCount;
+    }
+    if (assetsGroup) {
+      // PensionFund, Cash, RealEstateCapital (3) + dynamic capital columns (N)
+      assetsGroup.colSpan = 3 + types.length;
+    }
 
     // Update vertical group borders to align with the new dynamic layout
     if (typeof this.updateGroupBorders === 'function') this.updateGroupBorders();
@@ -730,67 +763,67 @@ class WebUI extends AbstractUI {
     const headerRow = thead.querySelector('tr:nth-child(2)');
     if (!headerRow) return;
 
-      const allHeaders = Array.from(headerRow.querySelectorAll('th[data-key]'));
-      if (allHeaders.length === 0) return;
-      const headers = allHeaders.filter(h => h.style.display !== 'none');
+    const allHeaders = Array.from(headerRow.querySelectorAll('th[data-key]'));
+    if (allHeaders.length === 0) return;
+    const headers = allHeaders.filter(h => h.style.display !== 'none');
 
-      // Helper predicates
-      const isIncome = (k) => k.indexOf('Income') === 0;
-      const isTax = (k) => k.indexOf('Tax__') === 0;
-      // Asset group includes pension, cash, real estate and investment capitals ONLY
-      const isAsset = (k) => (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' || k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
+    // Helper predicates
+    const isIncome = (k) => k.indexOf('Income') === 0;
+    const isTax = (k) => k.indexOf('Tax__') === 0;
+    // Asset group includes pension, cash, real estate and investment capitals ONLY
+    const isAsset = (k) => (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' || k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
 
-      // Clear existing markers and borders
-      for (let i = 0; i < allHeaders.length; i++) {
-        allHeaders[i].removeAttribute('data-group-end');
-        allHeaders[i].style.borderRight = '';
+    // Clear existing markers and borders
+    for (let i = 0; i < allHeaders.length; i++) {
+      allHeaders[i].removeAttribute('data-group-end');
+      allHeaders[i].style.borderRight = '';
+    }
+
+    // Compute group-end indices
+    const findLastIndex = (predicate) => {
+      for (let i = headers.length - 1; i >= 0; i--) {
+        if (predicate(headers[i].dataset.key)) return i;
       }
+      return -1;
+    };
 
-      // Compute group-end indices
-      const findLastIndex = (predicate) => {
-        for (let i = headers.length - 1; i >= 0; i--) {
-          if (predicate(headers[i].dataset.key)) return i;
-        }
-        return -1;
-      };
+    // After Year column
+    const yearIdx = headers.findIndex(th => th.dataset.key === 'Year');
 
-      // After Year column
-      const yearIdx = headers.findIndex(th => th.dataset.key === 'Year');
+    // Gross Income: last header with key starting with 'Income'
+    const incomeLastIdx = findLastIndex(k => isIncome(k));
 
-      // Gross Income: last header with key starting with 'Income'
-      const incomeLastIdx = findLastIndex(k => isIncome(k));
+    // Deductions: last Tax__ column, fallback to PensionContribution
+    let deductionsLastIdx = findLastIndex(k => isTax(k));
+    if (deductionsLastIdx === -1) deductionsLastIdx = headers.findIndex(th => th.dataset.key === 'PensionContribution');
 
-      // Deductions: last Tax__ column, fallback to PensionContribution
-      let deductionsLastIdx = findLastIndex(k => isTax(k));
-      if (deductionsLastIdx === -1) deductionsLastIdx = headers.findIndex(th => th.dataset.key === 'PensionContribution');
+    // Net Cashflow: after Expenses
+    const netCashflowLastIdx = headers.findIndex(th => th.dataset.key === 'Expenses');
 
-      // Net Cashflow: after Expenses
-      const netCashflowLastIdx = headers.findIndex(th => th.dataset.key === 'Expenses');
+    // Assets: last asset column (dynamic capitals if present)
+    let assetsLastIdx = findLastIndex(k => isAsset(k));
+    // If no dynamic capitals present, fall back to SharesCapital (static) if visible
+    if (assetsLastIdx === -1) {
+      assetsLastIdx = headers.findIndex(th => th.dataset.key === 'SharesCapital');
+      if (assetsLastIdx === -1) assetsLastIdx = headers.findIndex(th => th.dataset.key === 'RealEstateCapital');
+    }
 
-      // Assets: last asset column (dynamic capitals if present)
-      let assetsLastIdx = findLastIndex(k => isAsset(k));
-      // If no dynamic capitals present, fall back to SharesCapital (static) if visible
-      if (assetsLastIdx === -1) {
-        assetsLastIdx = headers.findIndex(th => th.dataset.key === 'SharesCapital');
-        if (assetsLastIdx === -1) assetsLastIdx = headers.findIndex(th => th.dataset.key === 'RealEstateCapital');
-      }
+    // Build list of boundary indices (skip -1)
+    const boundaryIdxs = [yearIdx, incomeLastIdx, deductionsLastIdx, netCashflowLastIdx, assetsLastIdx].filter(i => i >= 0);
 
-      // Build list of boundary indices (skip -1)
-      const boundaryIdxs = [yearIdx, incomeLastIdx, deductionsLastIdx, netCashflowLastIdx, assetsLastIdx].filter(i => i >= 0);
+    // Apply markers and visual border to headers
+    for (let i = 0; i < boundaryIdxs.length; i++) {
+      const th = headers[boundaryIdxs[i]];
+      th.setAttribute('data-group-end', '1');
+      th.style.borderRight = '3px solid #666';
+    }
 
-      // Apply markers and visual border to headers
-      for (let i = 0; i < boundaryIdxs.length; i++) {
-        const th = headers[boundaryIdxs[i]];
-        th.setAttribute('data-group-end', '1');
-        th.style.borderRight = '3px solid #666';
-      }
-
-      // Always close the table with a right-side border on the last column
-      if (headers.length > 0) {
-        const lastTh = headers[headers.length - 1];
-        lastTh.setAttribute('data-group-end', '1');
-        lastTh.style.borderRight = '3px solid #666';
-      }
+    // Always close the table with a right-side border on the last column
+    if (headers.length > 0) {
+      const lastTh = headers[headers.length - 1];
+      lastTh.setAttribute('data-group-end', '1');
+      lastTh.style.borderRight = '3px solid #666';
+    }
   }
 
   setupRunSimulationButton() {
@@ -851,13 +884,13 @@ class WebUI extends AbstractUI {
     runButton.disabled = true;
     runButton.classList.add('disabled');
     runButton.style.pointerEvents = 'none';
-    
+
     if (mobileRunButton) {
       mobileRunButton.disabled = true;
       mobileRunButton.classList.add('disabled');
       mobileRunButton.style.pointerEvents = 'none';
     }
-    
+
     this.setStatus('Running...');
     runButton.offsetHeight; // This forces the browser to recalculate layout immediately
 
@@ -873,13 +906,13 @@ class WebUI extends AbstractUI {
         runButton.disabled = false;
         runButton.classList.remove('disabled');
         runButton.style.pointerEvents = '';
-        
+
         // Also re-enable mobile button on error
         if (mobileRunButton) {
           mobileRunButton.disabled = false;
           mobileRunButton.classList.remove('disabled');
           mobileRunButton.style.pointerEvents = '';
-        }      
+        }
       }
     }, 50); // Increased from 0 to 50ms to allow browser to render visual changes before CPU-intensive simulation
   }
@@ -912,8 +945,8 @@ class WebUI extends AbstractUI {
         e.stopPropagation();
         // Close any open dropdowns before launching the wizard
         if (window.__openDropdowns) {
-          window.__openDropdowns.forEach((closer) => { 
-            if (typeof closer === 'function') closer(); 
+          window.__openDropdowns.forEach((closer) => {
+            if (typeof closer === 'function') closer();
           });
         }
         wizard.start({ type: 'help', startAtStep: 0 });
@@ -924,8 +957,8 @@ class WebUI extends AbstractUI {
         event.preventDefault();
         // Close any open dropdowns before launching the wizard
         if (window.__openDropdowns) {
-          window.__openDropdowns.forEach((closer) => { 
-            if (typeof closer === 'function') closer(); 
+          window.__openDropdowns.forEach((closer) => {
+            if (typeof closer === 'function') closer();
           });
         }
         // For keyboard shortcut, use same logic as Help button
@@ -1120,12 +1153,12 @@ class WebUI extends AbstractUI {
 
   flush(rerender = false) {
     if (rerender) {
-        if (window.dataSheet && window.dataSheet.length > 0) {
-            for (let i = 1; i < window.dataSheet.length; i++) {
-                this.setDataRow(i, window.dataSheet[i]);
-            }
+      if (window.dataSheet && window.dataSheet.length > 0) {
+        for (let i = 1; i < window.dataSheet.length; i++) {
+          this.setDataRow(i, window.dataSheet[i]);
         }
-        return;
+      }
+      return;
     }
     // flush() is called at the end of updateStatusCell, which signals simulation completion
     if (this.isSimulationRunning) {
@@ -1165,20 +1198,20 @@ class WebUI extends AbstractUI {
         const header = document.querySelector('header');
         const headerHeight = header ? header.offsetHeight : 60; // fallback to 60px
         const additionalPadding = 20; // Extra space for visual comfort
-        
+
         // Get the graphs section position
         const graphsRect = graphsSection.getBoundingClientRect();
         const currentScrollY = window.scrollY;
         const targetScrollY = currentScrollY + graphsRect.top - headerHeight - additionalPadding;
-        
+
         // Check if we need to scroll at all
         const scrollDistance = Math.abs(targetScrollY - currentScrollY);
-        
+
         // Robust check: simulate what the browser will actually do
         const maxScrollY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
         const clampedTargetScrollY = Math.max(0, Math.min(targetScrollY, maxScrollY));
         const wouldActuallyScroll = Math.abs(clampedTargetScrollY - currentScrollY) > 1; // 1px tolerance for rounding
-        
+
         if (!wouldActuallyScroll) {
           // Browser won't actually scroll, resolve immediately
           resolve();
@@ -1214,7 +1247,7 @@ class WebUI extends AbstractUI {
 
         // Check if scrollend is supported
         const supportsScrollEnd = 'onscrollend' in window;
-        
+
         if (supportsScrollEnd) {
           // Modern browsers with scrollend support
           window.addEventListener('scrollend', handleScrollEnd, { once: true });
@@ -1316,7 +1349,7 @@ class WebUI extends AbstractUI {
 
   switchEconomyMode(mode) {
     if (this.currentEconomyMode === mode) return;
-    
+
     this.preserveVolatilityValues();
     this.currentEconomyMode = mode;
     this.updateUIForEconomyMode();
@@ -1324,11 +1357,11 @@ class WebUI extends AbstractUI {
 
   updateUIForEconomyMode() {
     const isDeterministic = this.currentEconomyMode === 'deterministic';
-    
+
     // Update toggle visual state
     const deterministic = document.getElementById('economyModeDeterministic');
     const monteCarlo = document.getElementById('economyModeMonteCarlo');
-    
+
     if (deterministic && monteCarlo) {
       if (isDeterministic) {
         deterministic.classList.add('mode-toggle-active');
@@ -1338,19 +1371,19 @@ class WebUI extends AbstractUI {
         deterministic.classList.remove('mode-toggle-active');
       }
     }
-    
+
     // Show/hide volatility column - use visibility to maintain table layout
     const volatilityHeader = document.querySelector('#growthRates th:nth-child(3)');
     const volatilityCells = document.querySelectorAll('#growthRates td:nth-child(3)');
-    
+
     if (volatilityHeader) {
       volatilityHeader.style.visibility = isDeterministic ? 'hidden' : '';
     }
-    
+
     volatilityCells.forEach(cell => {
       cell.style.visibility = isDeterministic ? 'hidden' : '';
     });
-    
+
     // Restore or preserve values
     if (isDeterministic) {
       // Values are already preserved above
@@ -1361,7 +1394,7 @@ class WebUI extends AbstractUI {
 
   preserveVolatilityValues() {
     const volatilityFields = ['PensionGrowthStdDev', 'FundsGrowthStdDev', 'SharesGrowthStdDev'];
-    
+
     volatilityFields.forEach(fieldId => {
       const element = document.getElementById(fieldId);
       if (element && element.value) {
@@ -1372,7 +1405,7 @@ class WebUI extends AbstractUI {
 
   restoreVolatilityValues() {
     const volatilityFields = ['PensionGrowthStdDev', 'FundsGrowthStdDev', 'SharesGrowthStdDev'];
-    
+
     volatilityFields.forEach(fieldId => {
       const element = document.getElementById(fieldId);
       if (element && this.preservedVolatilityValues[fieldId]) {
@@ -1425,32 +1458,32 @@ class WebUI extends AbstractUI {
           ? rs.getPensionContributionAgeBands()
           : (cfg && cfg.pensionContributionRateBands) ? cfg.pensionContributionRateBands : {};
 
-          const keys = Object.keys(bands)
-            .map(k => parseInt(k, 10))
-            .filter(n => !isNaN(n))
-            .sort((a, b) => a - b);
+        const keys = Object.keys(bands)
+          .map(k => parseInt(k, 10))
+          .filter(n => !isNaN(n))
+          .sort((a, b) => a - b);
 
-          // If no bands, show an empty table header
-          if (keys.length === 0) {
-            return '| Age | Contrib |\n| --- | --- |';
-          }
+        // If no bands, show an empty table header
+        if (keys.length === 0) {
+          return '| Age | Contrib |\n| --- | --- |';
+        }
 
-          const lines = [];
-          lines.push('| Age | Contrib |');
-          lines.push('| --- | --- |');
+        const lines = [];
+        lines.push('| Age | Contrib |');
+        lines.push('| --- | --- |');
 
-          for (let i = 0; i < keys.length; i++) {
-            const start = keys[i];
-            const end = (i < keys.length - 1) ? (keys[i + 1] - 1) : null;
-            const label = (i === 0 && start === 0)
-              ? `<${keys[i + 1]}`
-              : (end === null ? `${start}+` : `${start}-${end}`);
-            const maxRate = parseFloat(bands[String(start)]);
-            const actual = (isNaN(maxRate) ? 0 : maxRate) * entered;
-            lines.push(`| ${label} | ${FormatUtils.formatPercentage(actual)} |`);
-          }
+        for (let i = 0; i < keys.length; i++) {
+          const start = keys[i];
+          const end = (i < keys.length - 1) ? (keys[i + 1] - 1) : null;
+          const label = (i === 0 && start === 0)
+            ? `<${keys[i + 1]}`
+            : (end === null ? `${start}+` : `${start}-${end}`);
+          const maxRate = parseFloat(bands[String(start)]);
+          const actual = (isNaN(maxRate) ? 0 : maxRate) * entered;
+          lines.push(`| ${label} | ${FormatUtils.formatPercentage(actual)} |`);
+        }
 
-          return lines.join('\n');
+        return lines.join('\n');
       }, {
         showOnFocus: true,
         persistWhileFocused: true,
@@ -1525,7 +1558,7 @@ class WebUI extends AbstractUI {
   scheduleParameterTooltip(inputElement, fieldId) {
     // Clear any existing timeout
     this.cancelParameterTooltip();
-    
+
     // Schedule tooltip to show after delay
     this.parameterTooltipTimeout = setTimeout(() => {
       this.showParameterTooltip(inputElement, fieldId);
@@ -1539,7 +1572,7 @@ class WebUI extends AbstractUI {
       clearTimeout(this.parameterTooltipTimeout);
       this.parameterTooltipTimeout = null;
     }
-    
+
     // Hide any visible tooltip
     this.hideParameterTooltip();
   }
@@ -1599,7 +1632,7 @@ class WebUI extends AbstractUI {
               html = FormatUtils.processVariables(html);
               html = FormatUtils.replaceAgeYearPlaceholders(html);
             }
-          } catch (_) {}
+          } catch (_) { }
           // Extract text inside the <li><b>Label</b>: description</li> items
           const extract = (label) => {
             const re = new RegExp(`<li>\\s*<b>${label}<\\/b>\\s*:\\s*([^<]+)<\\/li>`, 'i');
@@ -1610,7 +1643,7 @@ class WebUI extends AbstractUI {
           noDesc = extract('No');
           matchDesc = extract('Match');
         }
-      } catch (_) {}
+      } catch (_) { }
 
       const current = hiddenInput.value || 'Yes';
       toggleEl.textContent = current;
@@ -1739,7 +1772,7 @@ class WebUI extends AbstractUI {
       if (!country) return;
       const config = Config.getInstance();
       const available = config.getAvailableCountries();
-      const match = available.find(function(c){
+      const match = available.find(function (c) {
         var code = (c && c.code != null) ? String(c.code) : '';
         return code.trim().toLowerCase() === country;
       });
@@ -1839,7 +1872,7 @@ class WebUI extends AbstractUI {
 
     // Use the passed preset name instead of trying to get it from DOM
     const selectedPreset = presetName || 'default';
-    
+
     // For "Plain" color scheme, clear all background colors to allow CSS zebra striping
     if (selectedPreset === 'default') {
       // Clear background colors from all data rows to let CSS zebra striping take over
@@ -1849,15 +1882,15 @@ class WebUI extends AbstractUI {
       }
       return;
     }
-    
+
     const config = window.uiManager.createVisualizationConfig(selectedPreset);
-    
+
     // Calculate new colors
     if (typeof PinchPointVisualizer !== 'undefined') {
       try {
         const visualizer = new PinchPointVisualizer(config);
         const rowColors = visualizer.calculateRowColors(perRunResults);
-        
+
         // Apply colors to existing table rows
         for (const row in rowColors) {
           const rowIndex = parseInt(row);
@@ -1990,8 +2023,8 @@ class WebUI extends AbstractUI {
 
             // Close any open dropdowns before launching the wizard
             if (window.__openDropdowns) {
-              window.__openDropdowns.forEach((closer) => { 
-                if (typeof closer === 'function') closer(); 
+              window.__openDropdowns.forEach((closer) => {
+                if (typeof closer === 'function') closer();
               });
             }
 
@@ -2069,11 +2102,11 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     }
 
     // Attach TooltipUtils to static data table headers (replace native title tooltips)
-    document.querySelectorAll('#Data thead th[title]').forEach(th => { 
-      const txt = th.getAttribute('title'); 
-      if (!txt) return; 
-      th.removeAttribute('title'); 
-      TooltipUtils.attachTooltip(th, txt, { hoverDelay: 150, touchDelay: 250 }); 
+    document.querySelectorAll('#Data thead th[title]').forEach(th => {
+      const txt = th.getAttribute('title');
+      if (!txt) return;
+      th.removeAttribute('title');
+      TooltipUtils.attachTooltip(th, txt, { hoverDelay: 150, touchDelay: 250 });
     });
 
     // After labels and headers are present, apply pinned-only income visibility
@@ -2101,7 +2134,7 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     if (webUi.tableManager) {
       webUi.tableManager.setupTableCurrencyControls();
     }
-    
+
     // Apply saved preferences (view mode + age/year) now that Config is ready
     if (webUi.eventsTableManager) webUi.eventsTableManager._applySavedPreferences();
 

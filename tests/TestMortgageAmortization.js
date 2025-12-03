@@ -37,7 +37,8 @@ const TestMortgageAmortization = {
       marriageYear: null,
       youngestChildBorn: null,
       oldestChildBorn: null,
-      personalTaxCredit: 1875          // Required for tax calculations
+      personalTaxCredit: 1875,          // Required for tax calculations
+      StartCountry: 'ie'
     },
     events: [
       // Real Estate Purchase Event (€70k down payment for €350k property)

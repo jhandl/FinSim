@@ -18,7 +18,8 @@ const TestMarketCrashImpact = {
       growthRateFunds: 0, // Set to 0 to test MRO in isolation
       growthRateShares: 0,   
       pensionGrowthRate: 0,  
-      inflation: 0           
+      inflation: 0,
+      StartCountry: 'ie'
     },
     events: [
       {

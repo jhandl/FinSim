@@ -14,24 +14,24 @@ class FileManager {
   }
 
   hasUnsavedChanges() {
-      const currentState = serializeSimulation(this.webUI);
+    const currentState = serializeSimulation(this.webUI);
 
-      // If we haven't saved yet, treat as unsaved only if real data differs
-      if (this.lastSavedState === null) {
+    // If we haven't saved yet, treat as unsaved only if real data differs
+    if (this.lastSavedState === null) {
+      return true;
+    }
+
+    const normalize = (csv) => {
+      return csv
+        .split('\n')
+        .filter(line => {
+          if (line.startsWith('EventsSortPreset,')) return false;
           return true;
-      }
+        })
+        .join('\n');
+    };
 
-      const normalize = (csv) => {
-          return csv
-              .split('\n')
-              .filter(line => {
-                  if (line.startsWith('EventsSortPreset,')) return false;
-                  return true;
-              })
-              .join('\n');
-      };
-
-      return normalize(currentState) !== normalize(this.lastSavedState);
+    return normalize(currentState) !== normalize(this.lastSavedState);
   }
 
   setupSaveButton() {
@@ -68,10 +68,10 @@ class FileManager {
             },
           }],
         });
-        
+
         const scenarioName = handle.name.replace('.csv', '');
         this.setScenarioName(scenarioName);
-        
+
         const writable = await handle.createWritable();
         await writable.write(csvContent);
         await writable.close();
@@ -99,7 +99,7 @@ class FileManager {
 
   async loadFromFile(file) {
     if (!file) return;
-    
+
     // Check for unsaved changes before proceeding
     if (this.hasUnsavedChanges()) {
       const proceed = await this.webUI.showAlert("Loading a new scenario will overwrite any unsaved changes. Are you sure you want to proceed?", "Confirm Load", true);
@@ -107,7 +107,7 @@ class FileManager {
         return; // User cancelled
       }
     }
-    
+
     const scenarioName = file.name.replace('.csv', '');
     const fileInput = document.getElementById('loadSimulationDialog');
     try {
@@ -131,7 +131,7 @@ class FileManager {
         return; // User cancelled
       }
     }
-    
+
     try {
       const content = await this.fetchUrl(url); // ensure await here
       await this.loadFromString(content, name);
@@ -156,6 +156,14 @@ class FileManager {
     if (this.webUI.eventsTableManager) {
       this.webUI.eventsTableManager.handleAgeYearToggle('age');
     }
+
+    // Reset StartCountry to default to prevent state leakage from previous scenarios
+    try {
+      const cfg = Config.getInstance();
+      if (cfg && typeof cfg.getDefaultCountry === 'function') {
+        this.webUI.setValue('StartCountry', cfg.getDefaultCountry());
+      }
+    } catch (_) { }
 
     const eventData = deserializeSimulation(content, this.webUI);
 
@@ -211,10 +219,10 @@ class FileManager {
                 const acCode = String(ac.code).trim().toLowerCase();
                 try {
                   await configForMetaValidation.getTaxRuleSet(acCode);
-                } catch (_) {}
+                } catch (_) { }
               });
               await Promise.all(preloadPromises);
-            } catch (_) {}
+            } catch (_) { }
           }
           // Refresh cached rule sets after preloading (they may have been loaded)
           if (typeof configForMetaValidation.listCachedRuleSets === 'function') {
@@ -227,11 +235,11 @@ class FileManager {
                 if (ruleset && typeof ruleset.getCurrencyCode === 'function') {
                   registerCurrencyCode(ruleset.getCurrencyCode(), knownCurrencyCodes);
                 }
-              } catch (_) {}
+              } catch (_) { }
             }
           }
           if (typeof configForMetaValidation.getDefaultCountry === 'function' &&
-              typeof configForMetaValidation.getCachedTaxRuleSet === 'function') {
+            typeof configForMetaValidation.getCachedTaxRuleSet === 'function') {
             const defaultCode = configForMetaValidation.getDefaultCountry();
             const defaultRuleset = configForMetaValidation.getCachedTaxRuleSet(defaultCode);
             try {
@@ -241,7 +249,7 @@ class FileManager {
                   cachedRuleSetsForValidation[defaultCode] = defaultRuleset;
                 }
               }
-            } catch (_) {}
+            } catch (_) { }
           }
         }
       } catch (_) {
@@ -290,7 +298,7 @@ class FileManager {
                         registerCurrencyCode(lcRuleset.getCurrencyCode(), knownCurrencyCodes);
                       }
                     }
-                  } catch (_) {}
+                  } catch (_) { }
                 }
               }
               if (kv.cur) {
@@ -346,7 +354,7 @@ class FileManager {
                                     }
                                   }
                                 }
-                              } catch (_) {}
+                              } catch (_) { }
                             }
                             if (!foundInAvailable && !warnedCurrencyCodes[currencyCode]) {
                               console.warn('Unknown currency code in Meta:', kv.cur, '- Event may not display correctly');
@@ -356,7 +364,7 @@ class FileManager {
                         }
                       }
                     }
-                  } catch (_) {}
+                  } catch (_) { }
                 }
               }
               if (kv.lei) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-event-id', kv.lei);
@@ -426,7 +434,7 @@ class FileManager {
             this.webUI.eventsTableManager.updateRelocationImpactIndicators(events);
           }
           // Refresh accordion to reflect impacts on initial load
-          try { if (this.webUI.eventAccordionManager) { this.webUI.eventAccordionManager.refresh(); } } catch (_) {}
+          try { if (this.webUI.eventAccordionManager) { this.webUI.eventAccordionManager.refresh(); } } catch (_) { }
         }
       } catch (_) { /* non-fatal */ }
       this.webUI.updateStatusForRelocationImpacts(events);
@@ -441,7 +449,7 @@ class FileManager {
       // Add cache-busting parameter to ensure fresh content
       const separator = url.includes('?') ? '&' : '?';
       const cacheBustUrl = `${url}${separator}_t=${Date.now()}`;
-      
+
       const response = await fetch(cacheBustUrl, {
         cache: 'no-store', // Prevent any caching
         headers: {
@@ -449,7 +457,7 @@ class FileManager {
           'Pragma': 'no-cache'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

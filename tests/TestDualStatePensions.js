@@ -45,7 +45,8 @@ module.exports = {
       priorityFunds: 3,
       priorityShares: 4,
       youngestChildBorn: null,
-      oldestChildBorn: null
+      oldestChildBorn: null,
+      StartCountry: 'ie'
     },
 
     events: [

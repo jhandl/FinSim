@@ -28,21 +28,21 @@ class Taxman {
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
       this.pensionContribAmountP1 += contribution;
       this.pensionContribReliefP1 += relief;
-      this.salariesP1.push({amount: amount, contribRate: contribRate, description: description});
-      this.salariesP1.sort((a,b) => a.amount - b.amount);
+      this.salariesP1.push({ amount: amount, contribRate: contribRate, description: description });
+      this.salariesP1.sort((a, b) => a.amount - b.amount);
     } else if (person && this.person2Ref && person.id === this.person2Ref.id) {
       this.pensionContribAmountP2 += contribution;
       this.pensionContribReliefP2 += relief;
-      this.salariesP2.push({amount: amount, contribRate: contribRate, description: description});
-      this.salariesP2.sort((a,b) => a.amount - b.amount);
-   }
+      this.salariesP2.push({ amount: amount, contribRate: contribRate, description: description });
+      this.salariesP2.sort((a, b) => a.amount - b.amount);
+    }
   };
-  
+
   declareNonEuSharesIncome(amount, description) {
     this.nonEuShares += amount;
     this.attributionManager.record('nonEuShares', description, amount);
   };
-  
+
   declarePrivatePensionIncome(amount, person, description) {
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
       this.privatePensionP1 += amount;
@@ -52,7 +52,7 @@ class Taxman {
       this.attributionManager.record('privatepensionp2', description, amount);
     }
   };
-  
+
   declarePrivatePensionLumpSum(amount, person) {
     const description = `Pension Lump Sum P${person.id}`;
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
@@ -65,22 +65,22 @@ class Taxman {
       this.attributionManager.record('privatepensionlumpsum', description, amount);
     }
   };
-  
+
   declareStatePensionIncome(amount) {
     this.statePension += amount;
     // Attribution for state pension is handled in Simulator.js
   };
-  
+
   declareInvestmentIncome(amount, description) {
     this.investmentIncome += amount;
     this.attributionManager.record('investmentincome', description, amount);
   };
-  
+
   declareOtherIncome(amount, description) {
     this.income += amount;
     this.attributionManager.record('income', description, amount);
   };
-    
+
   declareInvestmentGains(amount, taxRate, description, options) {
     // Backward-compatible API with optional options object for per-gain flags
     // options: { category: 'cgt'|'exitTax', eligibleForAnnualExemption: boolean, allowLossOffset: boolean }
@@ -103,7 +103,7 @@ class Taxman {
     };
     rateBucket.entries.push(entry);
   };
-    
+
   computeTaxes() {
     this.resetTaxAttributions();
     // Reset dynamic totals at start of each computation
@@ -117,14 +117,14 @@ class Taxman {
 
   netIncome() {
     this.computeTaxes();
-    let gross = this.income - (this.pensionContribAmountP1 + this.pensionContribAmountP2) + 
-                  (this.privatePensionP1 + this.privatePensionP2) + 
-                  this.statePension + this.investmentIncome + this.nonEuShares;
-    
+    let gross = this.income - (this.pensionContribAmountP1 + this.pensionContribAmountP2) +
+      (this.privatePensionP1 + this.privatePensionP2) +
+      this.statePension + this.investmentIncome + this.nonEuShares;
+
     const totalTax = this.getAllTaxesTotal();
     return gross - totalTax;
   };
-  
+
   reset(person1, person2_optional, attributionManager, currentCountry, year) {
     this.attributionManager = attributionManager;
     this.currentYear = (typeof year === 'number') ? year : (this.currentYear || null);
@@ -157,7 +157,7 @@ class Taxman {
     this.people = this.person1Ref ? (this.person2Ref ? 2 : 1) : 0;
 
     this.married = ((typeof params.marriageYear === 'number') && (params.marriageYear > 0) && (typeof this.currentYear === 'number') && (this.currentYear >= params.marriageYear));
-    
+
     if ((typeof params.oldestChildBorn === 'number') || (typeof params.youngestChildBorn === 'number')) {
       let dependentStartYear = (typeof params.oldestChildBorn === 'number' ? params.oldestChildBorn : params.youngestChildBorn);
       let dependentEndYear = (typeof params.youngestChildBorn === 'number' ? params.youngestChildBorn : params.oldestChildBorn) + 18;
@@ -190,12 +190,12 @@ class Taxman {
   getActiveCrossBorderTaxCountries() {
     if (!this.countryHistory || this.countryHistory.length <= 1) return [];
     if (!this.ruleset) return [];
-    
+
     var active = [];
     var currentYear = (typeof this.currentYear === 'number') ? this.currentYear : null;
     if (currentYear === null) return [];
     var currentCountry = this.countryHistory[this.countryHistory.length - 1].country;
-    
+
     // Check each previous country for trailing tax obligations
     for (var i = 0; i < this.countryHistory.length - 1; i++) {
       var entry = this.countryHistory[i];
@@ -205,11 +205,11 @@ class Taxman {
       var cfg = Config.getInstance();
       var prevRuleset = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(entry.country) : null;
       if (!prevRuleset) continue;
-      
+
       var residencyRules = prevRuleset.getResidencyRules();
       var trailingYears = residencyRules.postEmigrationTaxYears || 0;
       var taxesForeign = residencyRules.taxesForeignIncome || false;
-      
+
       // Include trailing taxation for full calendar years AFTER exit, inclusive of the final year.
       // Example: postEmigrationTaxYears = 3, exit at Y:
       // active in Y+1, Y+2, Y+3 (yearsSinceExit = 1..3); not active at Y (0) or Y+4 (4).
@@ -223,7 +223,7 @@ class Taxman {
         });
       }
     }
-    
+
     return active;
   }
 
@@ -258,8 +258,8 @@ class Taxman {
       }));
 
     const sortedLimits = Object.keys(adjustedBands)
-      .map(k=>parseFloat(k))
-      .sort((a,b)=>a-b);
+      .map(k => parseFloat(k))
+      .sort((a, b) => a - b);
 
     const totalTax = sortedLimits
       .map((lowerLimit, index) => {
@@ -291,12 +291,12 @@ class Taxman {
   computeTaxFromBands(bands, income) {
     if (!bands || typeof bands !== 'object') return 0;
     const entries = Object.entries(bands).map(([limit, rate]) => [parseFloat(limit), rate]);
-    entries.sort((a,b)=>a[0]-b[0]);
+    entries.sort((a, b) => a[0] - b[0]);
     let tax = 0;
     for (let i = 0; i < entries.length; i++) {
       const cur = entries[i][0];
       const rate = entries[i][1];
-      const next = i + 1 < entries.length ? entries[i+1][0] : Infinity;
+      const next = i + 1 < entries.length ? entries[i + 1][0] : Infinity;
       if (income <= cur) break;
       const taxable = Math.min(income, next) - cur;
       if (taxable > 0) tax += taxable * rate;
@@ -304,18 +304,18 @@ class Taxman {
     }
     return tax;
   }
-  
+
   computeIT() {
     // Create an attribution object for taxable income
     const taxableIncomeAttribution = new Attribution('taxableIncome');
-    
+
     // Add income sources
     const incomeAttribution = this.attributionManager.getAttribution('income');
     if (incomeAttribution) {
-        const incomeBreakdown = incomeAttribution.getBreakdown();
-        for (const source in incomeBreakdown) {
-            taxableIncomeAttribution.add(source, incomeBreakdown[source]);
-        }
+      const incomeBreakdown = incomeAttribution.getBreakdown();
+      for (const source in incomeBreakdown) {
+        taxableIncomeAttribution.add(source, incomeBreakdown[source]);
+      }
     }
 
     // Add private pension income
@@ -325,10 +325,10 @@ class Taxman {
     // Add non-EU shares income
     const nonEuSharesAttribution = this.attributionManager.getAttribution('nonEuShares');
     if (nonEuSharesAttribution) {
-        const nonEuSharesBreakdown = nonEuSharesAttribution.getBreakdown();
-        for (const source in nonEuSharesBreakdown) {
-            taxableIncomeAttribution.add(source, nonEuSharesBreakdown[source]);
-        }
+      const nonEuSharesBreakdown = nonEuSharesAttribution.getBreakdown();
+      for (const source in nonEuSharesBreakdown) {
+        taxableIncomeAttribution.add(source, nonEuSharesBreakdown[source]);
+      }
     }
 
     // Subtract pension contribution relief
@@ -345,8 +345,8 @@ class Taxman {
     var status = this.married ? 'married' : 'single';
     itBands = this.ruleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
     if (this.married) {
-      const p1TotalSalary = this.salariesP1.reduce(function(sum, s) { return sum + s.amount; }, 0);
-      const p2TotalSalary = this.person2Ref ? this.salariesP2.reduce(function(sum, s) { return sum + s.amount; }, 0) : 0;
+      const p1TotalSalary = this.salariesP1.reduce(function (sum, s) { return sum + s.amount; }, 0);
+      const p2TotalSalary = this.person2Ref ? this.salariesP2.reduce(function (sum, s) { return sum + s.amount; }, 0) : 0;
       var maxIncrease = adjust(this.ruleset.getIncomeTaxJointBandIncreaseMax());
       if (p1TotalSalary > 0 && p2TotalSalary > 0) {
         marriedBandIncrease = Math.min(maxIncrease, Math.min(p1TotalSalary, p2TotalSalary));
@@ -359,19 +359,20 @@ class Taxman {
 
     let tax = this.computeProgressiveTax(itBands, taxableIncomeAttribution, 'incomeTax', 1, marriedBandIncrease);
 
+
     if (this.privatePensionLumpSumCountP1 > 0) {
-        const lumpSumAttribution = new Attribution('pensionLumpSum');
-        lumpSumAttribution.add('Pension Lump Sum P1', this.privatePensionLumpSumP1);
-        var lumpBands = this.ruleset.getPensionLumpSumTaxBands();
-        tax += this.computeProgressiveTax(lumpBands, lumpSumAttribution, 'incomeTax');
+      const lumpSumAttribution = new Attribution('pensionLumpSum');
+      lumpSumAttribution.add('Pension Lump Sum P1', this.privatePensionLumpSumP1);
+      var lumpBands = this.ruleset.getPensionLumpSumTaxBands();
+      tax += this.computeProgressiveTax(lumpBands, lumpSumAttribution, 'incomeTax');
     }
     if (this.privatePensionLumpSumCountP2 > 0) {
-        const lumpSumAttribution = new Attribution('pensionLumpSum');
-        lumpSumAttribution.add('Pension Lump Sum P2', this.privatePensionLumpSumP2);
-        var lumpBands2 = this.ruleset.getPensionLumpSumTaxBands();
-        tax += this.computeProgressiveTax(lumpBands2, lumpSumAttribution, 'incomeTax');
+      const lumpSumAttribution = new Attribution('pensionLumpSum');
+      lumpSumAttribution.add('Pension Lump Sum P2', this.privatePensionLumpSumP2);
+      var lumpBands2 = this.ruleset.getPensionLumpSumTaxBands();
+      tax += this.computeProgressiveTax(lumpBands2, lumpSumAttribution, 'incomeTax');
     }
-    
+
     let numSalaryEarners = (this.salariesP1.length > 0 ? 1 : 0) + (this.salariesP2.length > 0 ? 1 : 0);
     var employeeCredit = this.ruleset.getIncomeTaxEmployeeCredit();
     var ageCredit = this.ruleset.getIncomeTaxAgeCredit();
@@ -384,8 +385,8 @@ class Taxman {
       : { amount: employeeCredit, min: null, max: null };
 
     // Sum PAYE salaries per person
-    const p1TotalSalary = this.salariesP1.reduce(function(sum, s) { return sum + s.amount; }, 0);
-    const p2TotalSalary = this.salariesP2.reduce(function(sum, s) { return sum + s.amount; }, 0);
+    const p1TotalSalary = this.salariesP1.reduce(function (sum, s) { return sum + s.amount; }, 0);
+    const p2TotalSalary = this.salariesP2.reduce(function (sum, s) { return sum + s.amount; }, 0);
 
     const computePerPersonEmployeeCredit = (salaryTotal) => {
       if (!salaryTotal || salaryTotal <= 0) return 0;
@@ -422,13 +423,13 @@ class Taxman {
     if (this.married && this.person2Ref && this.person2Ref.age >= ageExemptionAge) {
       credit += adjust(ageCredit);
     }
-    
+
     let exemption = ageExemptionLimit * (this.married ? 2 : 1);
 
     let p1AgeEligible = (this.person1Ref && this.person1Ref.age >= ageExemptionAge);
     let p2AgeEligible = (this.married && this.person2Ref && this.person2Ref.age >= ageExemptionAge);
     let isEligibleForAgeExemption = p1AgeEligible || p2AgeEligible;
-    
+
     const taxableAmount = taxableIncomeAttribution.getTotal();
     const ageExempt = (isEligibleForAgeExemption && taxableAmount <= adjust(exemption) && (this.privatePensionLumpSumCountP1 === 0 && this.privatePensionLumpSumCountP2 === 0));
     if (ageExempt) {
@@ -439,7 +440,7 @@ class Taxman {
         if (this.attributionManager && this.attributionManager.yearlyAttributions && this.attributionManager.yearlyAttributions['tax:incomeTax']) {
           this.attributionManager.yearlyAttributions['tax:incomeTax'] = new Attribution('tax:incomeTax');
         }
-      } catch (_) {}
+      } catch (_) { }
     } else {
       // Apply credits exactly once as a negative record against band taxes already recorded above
       this._recordTax('incomeTax', 'Tax Credit', -Math.min(tax, credit));
@@ -463,8 +464,8 @@ class Taxman {
         for (const k in bd2) baseMap[k] = (baseMap[k] || 0) + bd2[k];
       }
       // Remove salary sources to focus on non-employment income
-      var removeSalary = function(list) {
-        list.forEach(function(s) {
+      var removeSalary = function (list) {
+        list.forEach(function (s) {
           if (s && s.description && baseMap.hasOwnProperty(s.description)) delete baseMap[s.description];
         });
       };
@@ -499,11 +500,11 @@ class Taxman {
       ? this.ruleset.getSocialContributions() : [];
     if (!Array.isArray(contributions) || contributions.length === 0) return;
 
-    const getRateForAge = function(contrib, age) {
+    const getRateForAge = function (contrib, age) {
       let rate = typeof contrib.rate === 'number' ? contrib.rate : 0;
       const adj = contrib.ageAdjustments || {};
-      const thresholds = Object.keys(adj).map(k=>parseInt(k)).sort((a,b)=>a-b);
-      for (let i=0;i<thresholds.length;i++) { if (age>=thresholds[i]) rate = adj[String(thresholds[i])]; }
+      const thresholds = Object.keys(adj).map(k => parseInt(k)).sort((a, b) => a - b);
+      for (let i = 0; i < thresholds.length; i++) { if (age >= thresholds[i]) rate = adj[String(thresholds[i])]; }
       return rate;
     };
 
@@ -538,7 +539,7 @@ class Taxman {
     const nonEuAttr = this.attributionManager.getAttribution('nonEuShares');
     if (nonEuAttr) {
       const ne = nonEuAttr.getBreakdown();
-      for (const k in ne) nonPayeIncomeAttribution[k] = (nonPayeIncomeAttribution[k]||0)+ne[k];
+      for (const k in ne) nonPayeIncomeAttribution[k] = (nonPayeIncomeAttribution[k] || 0) + ne[k];
     }
     // Remove PAYE salary descriptions to avoid double-charging social contributions like PRSI.
     const removeSalarySources = (list) => {
@@ -563,10 +564,10 @@ class Taxman {
 
     const buildAdditionalTaxIncomeAttribution = (personIdx, taxObj) => {
       const attr = new Attribution('additionalTaxIncome');
-      const salaries = personIdx===1 ? this.salariesP1 : this.salariesP2;
-      salaries.forEach(s=>attr.add(s.description, s.amount));
-      const privPension = personIdx===1? this.privatePensionP1 : this.privatePensionP2;
-      if (privPension>0) attr.add(`Private Pension P${personIdx}`, privPension);
+      const salaries = personIdx === 1 ? this.salariesP1 : this.salariesP2;
+      salaries.forEach(s => attr.add(s.description, s.amount));
+      const privPension = personIdx === 1 ? this.privatePensionP1 : this.privatePensionP2;
+      if (privPension > 0) attr.add(`Private Pension P${personIdx}`, privPension);
 
       // Default base includes non-EU shares when tax base is 'income'
       const base = taxObj && taxObj.base ? taxObj.base : 'income';
@@ -575,7 +576,7 @@ class Taxman {
         if (neAttr) {
           const bd = neAttr.getBreakdown();
           for (const source in bd) {
-            const part = this.person2Ref ? bd[source]/2 : bd[source];
+            const part = this.person2Ref ? bd[source] / 2 : bd[source];
             attr.add(source, part);
           }
         }
@@ -585,7 +586,7 @@ class Taxman {
     };
 
     for (const taxObj of extras) {
-      const taxId = String(taxObj.name||'addtax').toLowerCase();
+      const taxId = String(taxObj.name || 'addtax').toLowerCase();
       // New dual exemption model:
       // - incomeExemptionThreshold (cliff): if total income <= threshold, no tax; if above, tax applies on full base
       // - deductibleExemptionAmount (deduction): subtract this amount from taxable base before applying brackets
@@ -627,10 +628,10 @@ class Taxman {
 
             // Next, ageBasedBrackets override if applicable
             const ageBands = taxObj.ageBasedBrackets || {};
-            const thresholds = Object.keys(ageBands).map(k=>parseInt(k)).sort((a,b)=>a-b);
+            const thresholds = Object.keys(ageBands).map(k => parseInt(k)).sort((a, b) => a - b);
             let chosen = null;
-            for (let i=0;i<thresholds.length;i++){ if(person.age>=thresholds[i]) chosen = thresholds[i]; }
-            if(chosen!==null) bands = ageBands[String(chosen)];
+            for (let i = 0; i < thresholds.length; i++) { if (person.age >= thresholds[i]) chosen = thresholds[i]; }
+            if (chosen !== null) bands = ageBands[String(chosen)];
           }
         } catch (e) {
           // If anything goes wrong picking bands, fall back to declared brackets
@@ -771,9 +772,9 @@ class Taxman {
       if (this.attributionManager && displayReliefTax > 0) {
         this.attributionManager.record('tax:capitalGains', 'CGT Relief', -displayReliefTax);
       }
-    } catch (_) {}
+    } catch (_) { }
   };
-  
+
   clone() {
     const copy = new Taxman();
     copy.gains = {};
@@ -782,7 +783,7 @@ class Taxman {
       copy.gains[key] = {
         amount: gainData.amount,
         sources: {},
-        entries: Array.isArray(gainData.entries) ? gainData.entries.map(function(e){ return { amount: e.amount, description: e.description, category: e.category, eligibleForAnnualExemption: e.eligibleForAnnualExemption, allowLossOffset: e.allowLossOffset }; }) : []
+        entries: Array.isArray(gainData.entries) ? gainData.entries.map(function (e) { return { amount: e.amount, description: e.description, category: e.category, eligibleForAnnualExemption: e.eligibleForAnnualExemption, allowLossOffset: e.allowLossOffset }; }) : []
       };
     }
     copy.income = this.income;
@@ -805,26 +806,26 @@ class Taxman {
     copy.person1Ref = this.person1Ref;
     copy.person2Ref = this.person2Ref;
 
-    copy.salariesP1 = this.salariesP1.map(s => ({...s}));
-    copy.salariesP2 = this.salariesP2.map(s => ({...s}));
+    copy.salariesP1 = this.salariesP1.map(s => ({ ...s }));
+    copy.salariesP2 = this.salariesP2.map(s => ({ ...s }));
 
-    copy.taxTotals = this.taxTotals ? {...this.taxTotals} : {};
+    copy.taxTotals = this.taxTotals ? { ...this.taxTotals } : {};
 
     copy.ruleset = this.ruleset;
 
     copy.married = this.married;
     copy.dependentChildren = this.dependentChildren;
-    
+
     // Preserve cross-border tracking and temporal context in clone
     copy.countryHistory = Array.isArray(this.countryHistory) ? this.countryHistory.slice() : [];
     copy.currentYear = this.currentYear || null;
-    
+
     copy.attributionManager = {
-      record: function() {},
-      getAttribution: function() { return null; },
+      record: function () { },
+      getAttribution: function () { return null; },
       yearlyAttributions: {}
     };
-    
+
     return copy;
   };
 

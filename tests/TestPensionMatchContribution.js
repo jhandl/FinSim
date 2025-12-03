@@ -40,7 +40,8 @@ const TestPensionMatchContribution = {
             youngestChildBorn: null,
             oldestChildBorn: null,
             personalTaxCredit: 1875,
-            statePensionWeekly: 289
+            statePensionWeekly: 289,
+            StartCountry: 'ie'
         },
         events: [
             {

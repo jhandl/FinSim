@@ -27,7 +27,8 @@ module.exports = {
       // Other
       inflation: 0.0,
       personalTaxCredit: 1875,
-      statePensionWeekly: 289
+      statePensionWeekly: 289,
+      StartCountry: 'ie'
     },
     events: [
       { type: 'E', id: 'bigExpense', amount: 11000, fromAge: 30, toAge: 30, rate: 0, match: 0 }

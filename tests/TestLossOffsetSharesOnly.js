@@ -24,7 +24,8 @@ module.exports = {
       priorityShares: 1,
       inflation: 0.0,
       personalTaxCredit: 1875,
-      statePensionWeekly: 289
+      statePensionWeekly: 289,
+      StartCountry: 'ie'
     },
     events: [
       // Year 1: force a -20% market year and realize a loss by selling shares
