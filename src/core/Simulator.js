@@ -1364,9 +1364,7 @@ function handleInvestments() {
     savings = netIncome - expenses;
     cash += savings;
   }
-  // Inflate target cash (emergency stash) at residence country inflation to maintain purchasing power
-  var residenceInflation = resolveCountryInflation(currentCountry);
-  targetCash *= (1 + residenceInflation);
+
 
   if (cash < targetCash) {
     cashDeficit = targetCash - cash;
@@ -1430,6 +1428,11 @@ function handleInvestments() {
       cash += topUp;
     }
   }
+
+  // Inflate target cash (emergency stash) at residence country inflation to maintain purchasing power
+  // This is done at the end of the year so it applies to the target for the NEXT year
+  var residenceInflation = resolveCountryInflation(currentCountry);
+  targetCash *= (1 + residenceInflation);
   if ((netIncome < expenses - 100) && success) {
     success = false;
     failedAt = person1.age;
