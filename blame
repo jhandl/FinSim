@@ -1,0 +1,261 @@
+#!/usr/bin/env node
+
+/**
+ * Regression Bisect Tool
+ * 
+ * Automates finding the commit that introduced simulation differences between two branches.
+ * 
+ * Usage:
+ *   node bisect_regression.js --feature <branch> --scenario <path> [--repo <path>]
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { execSync, spawnSync } = require('child_process');
+const os = require('os');
+
+// --- Argument Parsing ---
+
+function parseArgs(argv) {
+  const args = {
+    feature: null,
+    base: 'main',
+    scenario: null,
+    repo: process.cwd(),
+    tolerance: 0,
+  };
+
+  for (let i = 2; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--feature') { args.feature = argv[++i]; continue; }
+    if (arg === '--base') { args.base = argv[++i]; continue; }
+    if (arg === '--scenario') { args.scenario = argv[++i]; continue; }
+    if (arg === '--repo') { args.repo = argv[++i]; continue; }
+    if (arg === '--tolerance') { args.tolerance = parseFloat(argv[++i]); continue; }
+    if (arg === '--help' || arg === '-h') {
+      printHelp();
+      process.exit(0);
+    }
+  }
+
+  if (!args.feature || !args.scenario) {
+    console.error('Error: --feature and --scenario are required.');
+    printHelp();
+    process.exit(1);
+  }
+
+  return args;
+}
+
+function printHelp() {
+  console.log(`
+Regression Bisect Tool
+
+Usage:
+  ./blame --feature <branch> --scenario <path> [options]
+
+Options:
+  --feature <branch>    Feature branch name to check against base
+  --base <branch>       Base branch name (default: main)
+  --scenario <path>     Path to the scenario file (CSV/JSON/JS)
+  --repo <path>         Path to the repository (default: current directory)
+  --tolerance <number>  Tolerance for compare.js (default: 0)
+`);
+}
+
+// --- Git Operations ---
+
+function runGit(cmd, cwd) {
+  try {
+    return execSync(`git ${cmd}`, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
+  } catch (e) {
+    throw new Error(`Git command failed: git ${cmd}\n${e.stderr}`);
+  }
+}
+
+function cloneRepo(source, dest) {
+  // Use local clone for speed
+  execSync(`git clone "${source}" "${dest}"`, { stdio: 'inherit' });
+
+  // Symlink node_modules if it exists
+  const nodeModules = path.join(source, 'node_modules');
+  if (fs.existsSync(nodeModules)) {
+    try {
+      fs.symlinkSync(nodeModules, path.join(dest, 'node_modules'));
+    } catch (e) {
+      console.warn('Warning: Failed to symlink node_modules:', e.message);
+    }
+  }
+}
+
+function checkout(cwd, ref) {
+  runGit(`checkout "${ref}"`, cwd);
+}
+
+function getCommits(cwd, from, to) {
+  const output = runGit(`log "${from}".."${to}" --pretty=format:"%H" --reverse`, cwd);
+  return output.split('\n').filter(Boolean);
+}
+
+function getCommitInfo(cwd, hash) {
+  const msg = runGit(`show -s --format="%s%n%b" "${hash}"`, cwd);
+  const stat = runGit(`show --stat "${hash}"`, cwd);
+  return { msg, stat };
+}
+
+// --- Comparison Logic ---
+
+function runCompare(repoA, repoB, scenario, tolerance) {
+  const comparePath = path.join(process.cwd(), 'compare.js');
+  if (!fs.existsSync(comparePath)) {
+    throw new Error('Could not locate compare.js in current directory.');
+  }
+
+  const args = [
+    comparePath,
+    '--repoA', repoA,
+    '--repoB', repoB,
+    '--output', 'json',
+    '--tolerance', String(tolerance),
+    '--forceDeterministic',
+    scenario
+  ];
+
+  const result = spawnSync(process.execPath, args, { encoding: 'utf8' });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  try {
+    const output = JSON.parse(result.stdout);
+    const report = Array.isArray(output) ? output[0] : (output.reports ? output.reports[0] : output);
+    if (!report) {
+      if (result.status > 1) {
+        throw new Error(`compare.js failed with status ${result.status}: ${result.stderr}`);
+      }
+      return { hasDiff: false, diffs: [] };
+    }
+
+    return {
+      hasDiff: report.diffs && report.diffs.length > 0,
+      diffs: report.diffs || []
+    };
+  } catch (e) {
+    console.error('Failed to parse compare.js output:', result.stdout);
+    console.error('Stderr:', result.stderr);
+    throw new Error('compare.js output parsing failed');
+  }
+}
+
+// --- Main ---
+
+async function main() {
+  const args = parseArgs(process.argv);
+
+  const originalRepo = path.resolve(args.repo);
+  const scenarioPath = path.resolve(args.scenario);
+
+  if (!fs.existsSync(originalRepo)) {
+    throw new Error(`Repository not found at ${originalRepo}`);
+  }
+  if (!fs.existsSync(scenarioPath)) {
+    throw new Error(`Scenario not found at ${scenarioPath}`);
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'blame-'));
+  const dirMain = path.join(tmpDir, 'main');
+  const dirFeature = path.join(tmpDir, 'feature');
+
+  try {
+    // Clone repo
+    cloneRepo(originalRepo, dirMain);
+    cloneRepo(originalRepo, dirFeature);
+
+    // Checkout initial state
+    checkout(dirMain, args.base);
+
+    // We need both base and feature in dirFeature to compute the log
+    checkout(dirFeature, args.base);
+    checkout(dirFeature, args.feature);
+
+    // Get commits
+    const commits = getCommits(dirFeature, args.base, args.feature);
+    console.log(`Found ${commits.length} commits to check.`);
+
+    if (commits.length === 0) {
+      console.log('No commits found between main and feature branch.');
+      return;
+    }
+
+    // Initial check: Base vs Feature (Head)
+    const initialResult = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
+
+    if (!initialResult.hasDiff) {
+      console.log('No differences found between base and feature branch.');
+      return;
+    }
+
+    let low = 0;
+    let high = commits.length - 1;
+    let offendingIndex = -1;
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      const commitHash = commits[mid];
+
+      process.stdout.write(`Checking commit ${mid + 1}/${commits.length}: ${commitHash.substring(0, 7)}... `);
+
+      checkout(dirFeature, commitHash);
+
+      const result = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
+
+      if (result.hasDiff) {
+        offendingIndex = mid;
+        high = mid - 1;
+        console.log('Diff found.');
+      } else {
+        low = mid + 1;
+        console.log('No diff.');
+      }
+    }
+
+    if (offendingIndex !== -1) {
+      const badCommit = commits[offendingIndex];
+
+      const info = getCommitInfo(dirFeature, badCommit);
+      console.log(`\nChanges:\n${info.stat}\n`);
+
+      console.log('Value Differences:\n');
+      checkout(dirFeature, badCommit);
+      const finalResult = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
+
+      if (finalResult.diffs.length > 0) {
+        const diffs = finalResult.diffs;
+        diffs.sort((a, b) => a.row - b.row);
+
+        // Concise output format: Age <age>: <field> Main=<val> Feature=<val>
+        diffs.forEach(d => {
+          if (d.type === 'row_mismatch') {
+            console.log(`Row ${d.row}: Row mismatch (Main=${d.aExists}, Feature=${d.bExists})`);
+          } else {
+            const ageStr = (d.age !== null && d.age !== undefined) ? `Age ${d.age}` : `Row ${d.row}`;
+            console.log(`${ageStr}, "${d.field}", Main=${d.a}, Feature=${d.b}`);
+          }
+        });
+      } else {
+        console.log('No differences found in final check? This shouldn\'t happen.');
+      }
+
+    } else {
+      console.log('Search completed but no single offending commit found (logic error?).');
+    }
+
+  } catch (err) {
+    console.error('An error occurred:', err);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+main();

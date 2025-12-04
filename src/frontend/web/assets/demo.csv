@@ -1,5 +1,6 @@
 # Ireland Financial Simulator v1.27 Save File
 # Parameters
+StartCountry,IE
 StartingAge,30
 TargetAge,90
 InitialSavings,20000
