@@ -58,18 +58,18 @@ function ts() {
 
 function printHelp() {
   const msg = `\nCompare FinSim scenarios across two repos\n\n` +
-  `Options:\n` +
-  `  --repoA <path>               Absolute path to repo A (default /Users/jhandl/FinSim)\n` +
-  `  --repoB <path>               Absolute path to repo B (default /Users/jhandl/FinSim1)\n` +
-  `  --tolerance <percent>        Percentage tolerance for diffs (e.g., 0.5 for 0.5%)\n` +
-  `  --fields <csv>               Comma-separated list of fields to compare (default: all numeric top-level fields)\n` +
-  `  --output <console|json>      Output mode (default console)\n` +
-  `  --forceDeterministic         Force zero volatility to avoid Monte Carlo (off by default)\n` +
-  `  --showEqual                  Also show equal rows/fields (default false)\n` +
-  `  --help                       Show this help\n` +
-  `\nExamples:\n` +
-  `  node compare.js --repoA /Users/jhandl/FinSim --repoB /Users/jhandl/FinSim1 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n` +
-  `  node compare.js --fields age,year,netIncome,expenses,Tax__incomeTax,Tax__socialContrib --tolerance 0.01 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n`;
+    `Options:\n` +
+    `  --repoA <path>               Absolute path to repo A (default /Users/jhandl/FinSim)\n` +
+    `  --repoB <path>               Absolute path to repo B (default /Users/jhandl/FinSim1)\n` +
+    `  --tolerance <percent>        Percentage tolerance for diffs (e.g., 0.5 for 0.5%)\n` +
+    `  --fields <csv>               Comma-separated list of fields to compare (default: all numeric top-level fields)\n` +
+    `  --output <console|json>      Output mode (default console)\n` +
+    `  --forceDeterministic         Force zero volatility to avoid Monte Carlo (off by default)\n` +
+    `  --showEqual                  Also show equal rows/fields (default false)\n` +
+    `  --help                       Show this help\n` +
+    `\nExamples:\n` +
+    `  node compare.js --repoA /Users/jhandl/FinSim --repoB /Users/jhandl/FinSim1 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n` +
+    `  node compare.js --fields age,year,netIncome,expenses,Tax__incomeTax,Tax__socialContrib --tolerance 0.01 /Users/jhandl/FinSim/src/frontend/web/assets/demo.csv\n`;
   console.log(msg);
 }
 
@@ -228,6 +228,7 @@ function mapParametersFromCsv(raw) {
 
   const params = {
     startingAge: parseNumber(raw['StartingAge']) || 0,
+    StartCountry: raw['StartCountry'] ? String(raw['StartCountry']).trim() : 'IE',
     targetAge: parseNumber(raw['TargetAge']) || 0,
     initialSavings: parseNumber(raw['InitialSavings']) || 0,
     initialPension: parseNumber(raw['InitialPension']) || 0,
@@ -279,7 +280,7 @@ async function runWithFramework(FrameworkClass, scenarioDef, opts = {}) {
     // (debug removed)
 
     const localScenario = prepareScenarioForRun(scenarioDef, opts);
-    
+
     // (debug removed)
 
     const loaded = fw.loadScenario(localScenario);
@@ -290,7 +291,7 @@ async function runWithFramework(FrameworkClass, scenarioDef, opts = {}) {
     // (debug removed)
 
     const results = await fw.runSimulation();
-    
+
     if (!results || !results.dataSheet) {
       throw new Error('Simulation did not return dataSheet');
     }
@@ -298,16 +299,16 @@ async function runWithFramework(FrameworkClass, scenarioDef, opts = {}) {
     // (debug removed)
 
     const rows = toValidRows(results.dataSheet);
-    
+
     // (debug removed)
 
     const last = rows.length > 0 ? rows[rows.length - 1] : null;
     const finalYear = last && typeof last.year !== 'undefined' ? last.year : 'n/a';
     const finalWorth = last && typeof last.worth !== 'undefined' ? roundValueForField('worth', last.worth) : 'n/a';
     const mc = results && results.montecarlo ? `, montecarlo runs=${results.runs}` : '';
-    
+
     // (debug removed)
-    
+
     return results;
   } finally {
     if (typeof fw.reset === 'function') {
@@ -379,7 +380,8 @@ function compareSheets(rowsA, rowsB, fields, tolerancePercent, keyMapA, keyMapB)
       const percentDiff = (diffAbs / denom) * 100;
       const equal = percentDiff <= tolerancePercent;
       if (!equal) {
-        diffs.push({ row: i, field, a: va, b: vb, deltaPct: percentDiff });
+        const age = (a && a.age !== undefined) ? a.age : (b && b.age !== undefined ? b.age : null);
+        diffs.push({ row: i, age, field, a: va, b: vb, deltaPct: percentDiff });
       }
     }
   }
@@ -520,7 +522,7 @@ async function main() {
 
     const fields = (args.fields && args.fields.length > 0)
       ? args.fields
-      : (function() {
+      : (function () {
         const autoA = rowsA.length > 0 ? detectNumericFields(rowsA) : [];
         const autoB = rowsB.length > 0 ? detectNumericFields(rowsB) : [];
         return Array.from(new Set(autoA.concat(autoB)));
