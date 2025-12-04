@@ -120,10 +120,8 @@ async function loadPage(routeConfig) {
         // Add the new iframe to the container
         container.appendChild(newFrame);
         
-        // Build iframe source with a hard cache-bust token so a stale CDN response can never be reused
-        const version = localStorage.getItem('simulatorVersion') || '1.27';
-        const cacheBust = Date.now().toString(36) + Math.random().toString(36).slice(2);
-        newFrame.src = `${routeConfig.contentPath}?v=${encodeURIComponent(version)}&cb=${cacheBust}`;
+        // Build iframe source (cache-busted)
+        newFrame.src = routeConfig.contentPath + '?v=' + new Date().getTime();
         
     } catch (error) {
         document.getElementById('app-container').innerHTML = `
