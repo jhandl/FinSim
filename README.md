@@ -1,8 +1,15 @@
-# Bugs
+# Roadmap
+- Generalize taxman
+- Add a feedback form
+- Use a build pipeline and close the repo 
+- Add monetisation
+
+# Issues
 - Real Estate equity is possibly not being computed correctly.
 - PRSI tax credit is not being applied.
 - The tax deductions are not being PVd.
 - Check: is withdraw% computed on the full "net worth"? Or on the investments & pensions, as it should?
+- Investment types should be defined in the tax rules files, including what currency they use (local or specific to the asset).
 - Relocation issues:
   - Pensions need to be tracked by country. Currently it's all one pension fund, even if the person contributes to different pension schemes in different countries.
   - Missing resolution option: Cut short. "For the income and expense events, an option should be to cut it short. For example, if I move to Argentina at age 40 and there's an income event in EUR from age 30 to 50, an option should be to change the toAge to 40. The phrasing could be tricky with this one, try to make it as neutral as possible."
@@ -13,15 +20,10 @@
   - No validation that there's no two relocations the same year.
   - Start country detector needs to use proper geolocation services.
   - Events that were split have amounts calculated with certain assumptions. Whenever the economic data changes (when running the getFinData.py script), the amounts need to be flagged as outdated.
-
-# Roadmap
-
-- Generalize taxman
-- Add a feedback form
-- Use a build pipeline and close the repo 
-- Add monetisation
+  - Investment assets need to be PVd.
 
 ### Improvements
+- Add a target of "money I want to leave to my children". The scenario fails if the money at the end is not enough.
 - Move to WASM
    - Set up build process
    - Move code to new private repo (or rename repo and create new finsim repo for prod)
