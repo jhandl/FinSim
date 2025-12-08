@@ -6,12 +6,17 @@
 
 # Issues
 - Real Estate equity is possibly not being computed correctly.
+- InvestmentTypeFactory should implement Equity, not extend it. Why are they separate?
 - PRSI tax credit is not being applied.
 - The tax deductions are not being PVd.
 - Check: is withdraw% computed on the full "net worth"? Or on the investments & pensions, as it should?
 - Investment types should be defined in the tax rules files, including what currency they use (local or specific to the asset).
+- Private pensions should be converted into a configurable investment type.
+- Some investments produce dividends, and those need to be taxed.
 - Relocation issues:
   - Pensions need to be tracked by country. Currently it's all one pension fund, even if the person contributes to different pension schemes in different countries.
+  - What happens to deemed disposal counters when you relocate mid-cycle? If you've held an Irish ETF for 6 years and relocate to AR, does the 8-year counter reset or continue?
+  - How are initial balances handled for a scenario starting in Ireland with existing US ETF holdings, and for multi-type initial allocations (e.g., initial balance split across 3 different investmentTypes)?
   - Missing resolution option: Cut short. "For the income and expense events, an option should be to cut it short. For example, if I move to Argentina at age 40 and there's an income event in EUR from age 30 to 50, an option should be to change the toAge to 40. The phrasing could be tricky with this one, try to make it as neutral as possible."
   - Creating an event within a relocation period should assume local currency (both when rendering and in the wizard) 
   - State pension parameter is for one country only. What about other countries?
