@@ -16,10 +16,23 @@ class GenericInvestmentAsset extends Equity {
     this._ruleset = ruleset || null;
     this.key = this._typeDef.key || 'asset';
     this.label = this._typeDef.label || this.key;
+    this.baseCurrency = this._typeDef.baseCurrency;
+    this.assetCountry = this._typeDef.assetCountry;
+    this.contributionCurrencyMode = this._typeDef.contributionCurrencyMode;
+    this.residenceScope = this._typeDef.residenceScope;
     this._taxCategory = GenericInvestmentAsset._resolveTaxCategory(investmentTypeDef);
     this._deemedDisposalYears = GenericInvestmentAsset._resolveDeemedDisposalYears(investmentTypeDef);
     this.canOffsetLosses = GenericInvestmentAsset._resolveAllowLossOffset(investmentTypeDef);
     this.eligibleForAnnualExemption = GenericInvestmentAsset._resolveAnnualExemptionEligibility(investmentTypeDef);
+  }
+
+  // Override currency methods for multi-country assets
+  _getBaseCurrency() {
+    return this.baseCurrency; // From investmentTypeDef
+  }
+
+  _getAssetCountry() {
+    return this.assetCountry; // From investmentTypeDef
   }
 
   static _resolveTaxCategory(typeDef) {
@@ -95,8 +108,25 @@ class GenericInvestmentAsset extends Equity {
   addYear() {
     super.addYear();
     // For exit tax categories, apply deemed disposal if configured
+    // Resolve deemed disposal rules for CURRENT country (matches legacy IndexFunds behavior)
     if (this._taxCategory === 'exitTax') {
-      var dd = this._deemedDisposalYears;
+      var activeDeemedDisposalYears = 0;
+      try {
+        var cfg = Config.getInstance();
+        // Use global currentCountry variable if available, otherwise fall back to default
+        var targetCountry = (typeof currentCountry !== 'undefined') ? currentCountry : cfg.getDefaultCountry();
+        var ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(targetCountry) : null;
+        if (ruleset && typeof ruleset.findInvestmentTypeByKey === 'function') {
+          var t = ruleset.findInvestmentTypeByKey(this.key);
+          if (t && t.taxation && t.taxation.exitTax && typeof t.taxation.exitTax.deemedDisposalYears === 'number') {
+            activeDeemedDisposalYears = t.taxation.exitTax.deemedDisposalYears;
+          }
+        }
+      } catch (_) {
+        // Fallback to initial value if resolution fails
+        activeDeemedDisposalYears = this._deemedDisposalYears;
+      }
+      var dd = activeDeemedDisposalYears;
       if (dd && dd > 0) {
         for (var i = 0; i < this.portfolio.length; i++) {
           if (this.portfolio[i].age % dd === 0) {
@@ -135,7 +165,19 @@ class InvestmentTypeFactory {
       var key = t && t.key ? t.key : 'asset' + i;
       var gr = growthRatesByKey && growthRatesByKey[key] !== undefined ? growthRatesByKey[key] : 0;
       var sd = stdDevsByKey && stdDevsByKey[key] !== undefined ? stdDevsByKey[key] : 0;
-      assets.push({ key: key, label: (t.label || key), asset: new GenericInvestmentAsset(t, gr, sd, ruleset) });
+      var baseCurrency = t.baseCurrency;
+      var assetCountry = t.assetCountry;
+      var contributionCurrencyMode = t.contributionCurrencyMode;
+      var residenceScope = t.residenceScope;
+      assets.push({
+        key: key,
+        label: (t.label || key),
+        asset: new GenericInvestmentAsset(t, gr, sd, ruleset),
+        baseCurrency: baseCurrency,
+        assetCountry: assetCountry,
+        contributionCurrencyMode: contributionCurrencyMode,
+        residenceScope: residenceScope
+      });
     }
     return assets;
   }

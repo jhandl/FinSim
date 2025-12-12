@@ -138,23 +138,23 @@ class EventAccordionManager {
   createAccordionItems() {
     const container = document.createElement('div');
     container.className = 'events-accordion-items';
-    
+
     // Get events from table and convert to accordion items
     this.syncEventsFromTable();
-    
+
     if (this.events.length === 0) {
       // Create empty state message directly without the box
       const emptyState = document.createElement('div');
       emptyState.className = 'accordion-empty-state';
       emptyState.innerHTML = '<p>No events yet. Add events with the wizard or using the Add Event button.</p>';
-      
+
       return emptyState; // Return the empty state directly instead of the container
     } else {
       this.events.forEach((event, index) => {
         const item = this.createAccordionItem(event, index);
         container.appendChild(item);
       });
-      
+
       return container;
     }
   }
@@ -167,20 +167,20 @@ class EventAccordionManager {
     this.events = [];
     // Align with readEvents: only consider visible rows
     const tableRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none');
-    
+
     tableRows.forEach((row, index) => {
       const event = this.extractEventFromRow(row);
       if (event) {
         event.accordionId = `accordion-item-${index}`;
         event.tableRowIndex = index;
-        
+
         // Generate a unique ID if one doesn't exist on the row
         if (!row.dataset.eventId) {
           row.dataset.eventId = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`;
         }
-        
+
         event.id = row.dataset.eventId;
-        
+
         this.events.push(event);
       }
     });
@@ -270,7 +270,7 @@ class EventAccordionManager {
     item.className = 'events-accordion-item';
     item.dataset.eventIndex = index;
     item.dataset.accordionId = event.accordionId;
-    
+
     // Apply color coding based on event type
     const colorClass = this.getEventColorClass(event.type);
     if (colorClass) {
@@ -283,11 +283,11 @@ class EventAccordionManager {
     }
 
     const isExpanded = this.expandedItems.has(event.accordionId);
-    
+
     // Create summary renderer instance
     const summaryRenderer = new EventSummaryRenderer(this.webUI);
     const summary = summaryRenderer.generateSummary(event);
-    
+
     item.innerHTML = `
       <div class="accordion-item-header" data-accordion-id="${event.accordionId}">
         <div class="accordion-item-controls-left">
@@ -311,7 +311,7 @@ class EventAccordionManager {
 
     // Setup click handlers
     this.setupAccordionItemHandlers(item, event);
-    
+
     // Render details if expanded
     if (isExpanded) {
       this.renderItemDetails(item, event);
@@ -320,7 +320,7 @@ class EventAccordionManager {
     // Attach tooltip
     const badge = item.querySelector('.relocation-impact-badge');
     if (badge && event.relocationImpact) {
-      TooltipUtils.attachTooltip(badge, event.relocationImpact.message, {hoverDelay: 300, touchDelay: 400});
+      TooltipUtils.attachTooltip(badge, event.relocationImpact.message, { hoverDelay: 300, touchDelay: 400 });
     }
 
     return item;
@@ -370,9 +370,9 @@ class EventAccordionManager {
     if (header) {
       header.addEventListener('click', (e) => {
         // Don't toggle if clicking on buttons
-        if (e.target.closest('.accordion-expand-btn') || 
-            e.target.closest('.accordion-delete-btn') || 
-            e.target.closest('.relocation-impact-badge')) {
+        if (e.target.closest('.accordion-expand-btn') ||
+          e.target.closest('.accordion-delete-btn') ||
+          e.target.closest('.relocation-impact-badge')) {
           return;
         }
         e.preventDefault();
@@ -410,7 +410,7 @@ class EventAccordionManager {
    */
   expandResolutionPanel(accordionId) {
     const item = (document.querySelector(`.events-accordion-item[data-accordion-id="${accordionId}"]`) ||
-                 (document.querySelector(`[data-accordion-id="${accordionId}"]`) && document.querySelector(`[data-accordion-id="${accordionId}"]`).closest('.events-accordion-item')));
+      (document.querySelector(`[data-accordion-id="${accordionId}"]`) && document.querySelector(`[data-accordion-id="${accordionId}"]`).closest('.events-accordion-item')));
     if (!item) return;
     const event = this.events.find(e => e.accordionId === accordionId);
     if (!event || !event.relocationImpact) return;
@@ -429,7 +429,7 @@ class EventAccordionManager {
   collapseResolutionPanel(accordionId) {
     // Ensure we operate on the root item
     const item = (document.querySelector(`.events-accordion-item[data-accordion-id="${accordionId}"]`) ||
-                 (document.querySelector(`[data-accordion-id="${accordionId}"]`) && document.querySelector(`[data-accordion-id="${accordionId}"]`).closest('.events-accordion-item')));
+      (document.querySelector(`[data-accordion-id="${accordionId}"]`) && document.querySelector(`[data-accordion-id="${accordionId}"]`).closest('.events-accordion-item')));
     if (!item) return;
     RelocationImpactAssistant.collapsePanelInAccordion(item);
     delete item.dataset.hasResolutionPanel;
@@ -509,10 +509,10 @@ class EventAccordionManager {
 
       // Remove expanded class from root item for styling
       item.classList.remove('expanded');
-      
+
       // Then start the collapse animation
       content.classList.remove('expanded');
-      
+
       // Wait for collapse transition (matching CSS 300ms) before clearing collapsing class
       setTimeout(() => {
         item.classList.remove('collapsing');
@@ -557,7 +557,7 @@ class EventAccordionManager {
         // Use a transitionend listener to ensure we scroll *after* the panel
         // is fully expanded (covers manual clicks as well as programmatic).
         let scrollCalled = false;
-        
+
         const onTransitionEnd = (ev) => {
           if (ev.target === content && ev.propertyName === 'max-height') {
             content.removeEventListener('transitionend', onTransitionEnd);
@@ -568,7 +568,7 @@ class EventAccordionManager {
           }
         };
         content.addEventListener('transitionend', onTransitionEnd);
-        
+
         // Fallback timeout in case transitionend doesn't fire (Safari compatibility)
         // Use longer timeout on mobile devices which may be slower under load
         const isMobile = window.innerWidth < 800;
@@ -675,7 +675,7 @@ class EventAccordionManager {
             .filter(Boolean)
         );
       }
-    } catch(_) { /* non-fatal */ }
+    } catch (_) { /* non-fatal */ }
 
     // Before re-render, collapse any open resolution panels to avoid leaking listeners
     const items = document.querySelectorAll('.events-accordion-item');
@@ -696,7 +696,7 @@ class EventAccordionManager {
     // Re-render the accordion
     this.renderAccordion();
     this.applySortingWithAnimation();
-    
+
     // Rebuild expandedItems based on stable event ids captured earlier
     try {
       if (previouslyExpandedEventIds && previouslyExpandedEventIds.size) {
@@ -708,14 +708,14 @@ class EventAccordionManager {
         });
         this.expandedItems = rebuilt;
       }
-    } catch(_) { /* non-fatal */ }
+    } catch (_) { /* non-fatal */ }
 
     // Update grid columns and check for wrapping after rendering
     setTimeout(() => {
       this.updateGridColumns();
       this.checkAndApplyWrapping();
     }, 50);
-    
+
     // Restore expanded state
     [...this.expandedItems].forEach(id => {
       const item = document.querySelector(`[data-accordion-id="${id}"]`);
@@ -796,7 +796,7 @@ class EventAccordionManager {
     const foundItem = window.AccordionSorter.highlightNewItem(container, (item) => {
       return this.isNewlyCreatedAccordionItem(item, this._newEventId);
     });
-    
+
     // If we found the item, expand it
     if (foundItem) {
       const accordionId = foundItem.dataset.accordionId;
@@ -905,7 +905,7 @@ class EventAccordionManager {
               const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
               if (cfg && typeof cfg.getTaxRuleSet === 'function') {
                 Promise.resolve(cfg.getTaxRuleSet(code.toLowerCase()))
-                  .catch(() => {})
+                  .catch(() => { })
                   .finally(() => {
                     // Launch MV wizard with destination context; name remains optional
                     etm.startWizardForEventType('MV', {
@@ -992,7 +992,7 @@ class EventAccordionManager {
         input.addEventListener('input', (e) => {
           const value = e.target.value;
           const validation = this.validateField(value, field.type, event);
-          
+
           if (validation.isValid) {
             this.clearFieldValidation(input);
             this.syncFieldToTable(event, field.tableClass, value);
@@ -1004,11 +1004,11 @@ class EventAccordionManager {
             }
           }
         });
-        
+
         // Final validation and summary refresh on blur
         input.addEventListener('blur', (e) => {
           const value = e.target.value;
-          
+
           const validation = this.validateField(value, field.type, event);
 
           if (validation.isValid) {
@@ -1190,7 +1190,7 @@ class EventAccordionManager {
     if (tableInput && tableInput.value !== value) {
       // Apply appropriate formatting based on field type
       let formattedValue = value;
-      
+
       if (tableInput.classList.contains('currency')) {
         // Format currency values
         const numValue = parseFloat(value);
@@ -1204,7 +1204,7 @@ class EventAccordionManager {
           formattedValue = FormatUtils.formatPercentage(numValue);
         }
       }
-      
+
       tableInput.value = formattedValue;
 
       // Trigger change event to ensure any table-side validation/formatting occurs
@@ -1252,7 +1252,7 @@ class EventAccordionManager {
     if (event.id) {
       const tableRows = document.querySelectorAll('#Events tbody tr');
       const rowByEventId = Array.from(tableRows).find(row => row.dataset.eventId === event.id);
-      
+
       if (rowByEventId) {
         // Update tableRowIndex to match current position
         const currentIndex = Array.from(tableRows).indexOf(rowByEventId);
@@ -1262,7 +1262,7 @@ class EventAccordionManager {
         return rowByEventId;
       }
     }
-    
+
     // Fallback to index-based lookup if ID matching failed
     if (event.tableRowIndex !== undefined) {
       const tableRows = document.querySelectorAll('#Events tbody tr');
@@ -1274,10 +1274,10 @@ class EventAccordionManager {
     return Array.from(tableRows).find(row => {
       const rowEvent = this.extractEventFromRow(row);
       return rowEvent &&
-             rowEvent.name === event.name &&
-             rowEvent.amount === event.amount &&
-             rowEvent.fromAge === event.fromAge &&
-             rowEvent.toAge === event.toAge;
+        rowEvent.name === event.name &&
+        rowEvent.amount === event.amount &&
+        rowEvent.fromAge === event.fromAge &&
+        rowEvent.toAge === event.toAge;
     });
   }
 
@@ -1471,8 +1471,8 @@ class EventAccordionManager {
                 RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
                 this.webUI.tableManager.setupTableCurrencyControls();
               }
-            // Ensure accordion view reflects latest table state
-            this.refresh();
+              // Ensure accordion view reflects latest table state
+              this.refresh();
             }
           } catch (_) { /* non-fatal */ }
         }
@@ -1509,7 +1509,7 @@ class EventAccordionManager {
    * Apply warning highlight to a single accordion item header from a table row state
    */
   _applyHeaderWarningsForItem(accItem, tableRow) {
-    const warningRGB = `rgb(${parseInt(STATUS_COLORS.WARNING.slice(1,3), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(3,5), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(5,7), 16)})`;
+    const warningRGB = `rgb(${parseInt(STATUS_COLORS.WARNING.slice(1, 3), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(3, 5), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(5, 7), 16)})`;
 
     const getMsg = (el) => (el && el.getAttribute && el.getAttribute('data-tooltip')) || '';
     const mark = (el, msg) => {
@@ -1578,7 +1578,7 @@ class EventAccordionManager {
    * Apply warning highlight to expanded accordion inputs based on table row warnings
    */
   _applyExpandedFieldWarnings(container, tableRow) {
-    const warningRGB = `rgb(${parseInt(STATUS_COLORS.WARNING.slice(1,3), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(3,5), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(5,7), 16)})`;
+    const warningRGB = `rgb(${parseInt(STATUS_COLORS.WARNING.slice(1, 3), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(3, 5), 16)}, ${parseInt(STATUS_COLORS.WARNING.slice(5, 7), 16)})`;
 
     const markInput = (el, msg) => {
       if (!el) return;
@@ -1663,17 +1663,17 @@ class EventAccordionManager {
     // Handle sorting and animation for accordion view
     // This will also sort the table when it applies accordion sorting
     this.refreshWithNewEventAnimation(eventData, id);
-    
+
     // After animation, find and expand the newly added event
     setTimeout(() => {
       if (!id) return;
-      
+
       // Find the accordion item with matching eventId
       const accordionItems = document.querySelectorAll('.events-accordion-item');
       for (const item of accordionItems) {
         const accordionId = item.dataset.accordionId;
         if (!accordionId) continue;
-        
+
         // Find the corresponding event in the events array
         const event = this.events.find(e => e.accordionId === accordionId);
         if (event && event.id === id) {
@@ -2014,7 +2014,7 @@ class EventAccordionManager {
       if (input) {
         // Apply appropriate formatting based on field type
         let formattedValue = value;
-        
+
         if (input.classList.contains('currency')) {
           // Format currency values
           const numValue = parseFloat(value);
@@ -2028,7 +2028,7 @@ class EventAccordionManager {
             formattedValue = FormatUtils.formatPercentage(numValue);
           }
         }
-        
+
         input.value = formattedValue;
       }
     }
@@ -2069,7 +2069,7 @@ class EventAccordionManager {
           const labelEl = row.querySelector('label');
           if (labelEl) {
             let lbl;
-            switch(field.key) {
+            switch (field.key) {
               case 'amount':
                 lbl = this.fieldLabelsManager.getFieldLabel(event.type, 'amount'); break;
               case 'toAge':
@@ -2183,7 +2183,7 @@ class EventAccordionManager {
         if (input) {
           // Apply appropriate formatting based on field type
           let formattedValue = preservedValues[mapping.key];
-          
+
           if (input.classList.contains('currency')) {
             // Format currency values
             const numValue = parseFloat(formattedValue);
@@ -2197,7 +2197,7 @@ class EventAccordionManager {
               formattedValue = FormatUtils.formatPercentage(numValue);
             }
           }
-          
+
           input.value = formattedValue;
         }
       }

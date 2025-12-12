@@ -182,6 +182,7 @@ If there is no UI jest tests in the tests directory for the feature you want to 
 *   **Write Tests:** Any new feature or bug fix for the core logic should be accompanied by a corresponding test. 
 *   **UI Testing:** If you rely on the user for UI testing and validation, remember that the user is always running a local server. Don't start a new server and don't open browser windows.
 *   **Cache busting:** If you make any change to a javascript or css file, you must update the cache-busting parameter at the end of that file's url in the 'SYSTEM UTILITIES' section in ./src/frontend/web/ifs/index.html (or at the beginning of that file if it's a css change) and set it to the current date (plus a version number if the date is the same), so users always get the updated version. This is VERY IMPORTANT.
+*   **Code Semantics Strictness:** The code must assume required configuration and helper functions exist. Avoid defensive checks or default fallbacks for missing infrastructure—treat missing configuration as a hard error.
 
 ## 6. Local Setup
 

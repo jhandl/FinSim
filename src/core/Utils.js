@@ -338,26 +338,24 @@ function isBetween(num, min, max) {
 }
 
 function serializeSimulation(ui) {
+  var config = Config.getInstance();
+  var startCountryEl = document.getElementById('StartCountry');
+  var startCountry = (startCountryEl && startCountryEl.value) || config.getDefaultCountry();
+  var startRuleset = config.getCachedTaxRuleSet(startCountry);
+  var investmentTypes = startRuleset.getInvestmentTypes() || [];
+
   // Collect all parameters
   const parameters = {
     StartingAge: ui.getValue('StartingAge'),
     TargetAge: ui.getValue('TargetAge'),
     InitialSavings: ui.getValue('InitialSavings'),
     InitialPension: ui.getValue('InitialPension'),
-    InitialFunds: ui.getValue('InitialFunds'),
-    InitialShares: ui.getValue('InitialShares'),
     RetirementAge: ui.getValue('RetirementAge'),
     EmergencyStash: ui.getValue('EmergencyStash'),
-    FundsAllocation: ui.getValue('FundsAllocation'),
-    SharesAllocation: ui.getValue('SharesAllocation'),
     PensionContributionPercentage: ui.getValue('PensionContributionPercentage'),
     PensionContributionCapped: ui.getValue('PensionContributionCapped'),
     PensionGrowthRate: ui.getValue('PensionGrowthRate'),
     PensionGrowthStdDev: ui.getValue('PensionGrowthStdDev'),
-    FundsGrowthRate: ui.getValue('FundsGrowthRate'),
-    FundsGrowthStdDev: ui.getValue('FundsGrowthStdDev'),
-    SharesGrowthRate: ui.getValue('SharesGrowthRate'),
-    SharesGrowthStdDev: ui.getValue('SharesGrowthStdDev'),
     Inflation: ui.getValue('Inflation'),
     MarriageYear: ui.getValue('MarriageYear'),
     YoungestChildBorn: ui.getValue('YoungestChildBorn'),
@@ -380,8 +378,17 @@ function serializeSimulation(ui) {
     economy_mode: ui.getValue('economy_mode')
   };
 
+  // Dynamic investment parameters from ruleset
+  for (var i = 0; i < investmentTypes.length; i++) {
+    var type = investmentTypes[i];
+    var key = type.key;
+    parameters['InitialCapital_' + key] = ui.getValue('InitialCapital_' + key);
+    parameters['InvestmentAllocation_' + key] = ui.getValue('InvestmentAllocation_' + key);
+    parameters[key + 'GrowthRate'] = ui.getValue(key + 'GrowthRate');
+    parameters[key + 'GrowthStdDev'] = ui.getValue(key + 'GrowthStdDev');
+  }
+
   // Conditionally add StartCountry if relocation is enabled
-  const config = Config.getInstance();
   if (config.isRelocationEnabled()) {
     parameters.StartCountry = ui.getValue('StartCountry');
   }
@@ -656,16 +663,24 @@ function deserializeSimulation(content, ui) {
     if (section.includes('Parameters')) {
       const [key, value] = line.split(',');
 
-      // Map legacy field names to current field names for backward compatibility
+      // Map legacy CSV field names to current dynamic element IDs
       const legacyFieldMap = {
-        'InitialETFs': 'InitialFunds',
-        'InitialTrusts': 'InitialShares',
-        'EtfAllocation': 'FundsAllocation',
-        'TrustAllocation': 'SharesAllocation',
-        'EtfGrowthRate': 'FundsGrowthRate',
-        'EtfGrowthStdDev': 'FundsGrowthStdDev',
-        'TrustGrowthRate': 'SharesGrowthRate',
-        'TrustGrowthStdDev': 'SharesGrowthStdDev',
+        'InitialETFs': 'InitialCapital_indexFunds',
+        'InitialTrusts': 'InitialCapital_shares',
+        'InitialFunds': 'InitialCapital_indexFunds',
+        'InitialShares': 'InitialCapital_shares',
+        'EtfAllocation': 'InvestmentAllocation_indexFunds',
+        'TrustAllocation': 'InvestmentAllocation_shares',
+        'FundsAllocation': 'InvestmentAllocation_indexFunds',
+        'SharesAllocation': 'InvestmentAllocation_shares',
+        'EtfGrowthRate': 'indexFundsGrowthRate',
+        'EtfGrowthStdDev': 'indexFundsGrowthStdDev',
+        'TrustGrowthRate': 'sharesGrowthRate',
+        'TrustGrowthStdDev': 'sharesGrowthStdDev',
+        'FundsGrowthRate': 'indexFundsGrowthRate',
+        'FundsGrowthStdDev': 'indexFundsGrowthStdDev',
+        'SharesGrowthRate': 'sharesGrowthRate',
+        'SharesGrowthStdDev': 'sharesGrowthStdDev',
         'PriorityETF': 'PriorityFunds',
         'PriorityTrust': 'PriorityShares'
       };
@@ -683,8 +698,8 @@ function deserializeSimulation(content, ui) {
         if (actualKey === 'economy_mode') {
           economyModeExists = true;
         }
-        // Track if file has volatility values
-        if ((actualKey === 'PensionGrowthStdDev' || actualKey === 'FundsGrowthStdDev' || actualKey === 'SharesGrowthStdDev')
+        // Track if file has volatility values (pension or any investment type)
+        if ((actualKey === 'PensionGrowthStdDev' || actualKey.endsWith('GrowthStdDev'))
           && value && parseFloat(value) > 0) {
           hasVolatilityInFile = true;
         }

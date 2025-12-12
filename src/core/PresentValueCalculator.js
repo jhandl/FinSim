@@ -33,9 +33,10 @@ function computePresentValueAggregates(ctx) {
   var shares = ctx.shares;
   var investmentAssets = ctx.investmentAssets;
   var realEstateConverted = ctx.realEstateConverted;
-  var indexFundsCap = ctx.indexFundsCap;
-  var sharesCap = ctx.sharesCap;
   var capsByKey = ctx.capsByKey;
+  // Derive legacy caps from capsByKey (the canonical source)
+  var indexFundsCap = capsByKey['indexFunds'];
+  var sharesCap = capsByKey['shares'];
   var incomeSalaries = ctx.incomeSalaries;
   var incomeShares = ctx.incomeShares;
   var incomeRentals = ctx.incomeRentals;
@@ -58,6 +59,18 @@ function computePresentValueAggregates(ctx) {
   var normalizeCountry = ctx.normalizeCountry;
   var convertCurrencyAmount = ctx.convertCurrencyAmount;
   var getCurrencyForCountry = ctx.getCurrencyForCountry;
+
+  // Build lookup map: key → { assetCountry, residenceScope, ... }
+  // Per asset-plan.md §9: assume assets is a valid array, no defensive guards
+  function buildInvestmentTypeLookup(assets) {
+    var lookup = {};
+    for (var i = 0; i < assets.length; i++) {
+      var entry = assets[i];
+      lookup[entry.key] = entry;
+    }
+    return lookup;
+  }
+  var investmentTypeLookup = buildInvestmentTypeLookup(investmentAssets);
 
   if (!params.StartCountry) throw new Error('PresentValueCalculator: params.StartCountry is required');
   var pvCountry = currentCountry || params.StartCountry.toLowerCase();
@@ -145,6 +158,44 @@ function computePresentValueAggregates(ctx) {
     statePensionPVInResidenceCurrency = incomeStatePension * deflationFactor;
   }
 
+  // Per-investment-type PV deflators (asset-plan.md §4.1):
+  // - Global assets (residenceScope='global'): deflate using assetCountry CPI
+  // - Local assets (residenceScope='local'): deflate using residency CPI
+  // This aligns investments with real estate/pension PV semantics.
+  // NOTE: This must run BEFORE the legacy column updates below, which read from investmentCapitalByKeyPV
+  if (capsByKey) {
+    for (var ck in capsByKey) {
+      if (!dataRow.investmentCapitalByKeyPV[ck]) dataRow.investmentCapitalByKeyPV[ck] = 0;
+
+      // Lookup investment type metadata for per-type PV deflation
+      // Per asset-plan.md §9: when investmentAssets has entries, typeEntry must exist for every key in capsByKey
+      // Legacy fallback: when investmentAssets is empty (no investmentTypes in rules), use residency deflator
+      var typeEntry = investmentTypeLookup[ck];
+      var typeDeflator = deflationFactor; // default to residency deflator
+
+      if (investmentAssets && investmentAssets.length > 0) {
+        // Multi-asset path: per asset-plan.md §9, typeEntry must exist
+        if (!typeEntry) {
+          throw new Error('PresentValueCalculator: missing investmentTypes entry for key "' + ck + '"');
+        }
+        // Per asset-plan.md §4.1: global assets use assetCountry CPI, local use residency
+        if (typeEntry.residenceScope === 'global') {
+          var assetCountryNormalized = normalizeCountry(typeEntry.assetCountry);
+          typeDeflator = getDeflationFactorForCountry(assetCountryNormalized, ageNum, startYear, {
+            params: params,
+            config: cfg,
+            countryInflationOverrides: countryInflationOverrides,
+            year: year
+          });
+        }
+        // else: residenceScope === 'local' → use residency deflationFactor (already set)
+      }
+      // else: legacy path (no investmentTypes) → use residency deflationFactor
+
+      dataRow.investmentCapitalByKeyPV[ck] += capsByKey[ck] * typeDeflator;
+    }
+  }
+
   if (deflationFactor === 1 && (statePensionPVInResidenceCurrency === 0 || statePensionPVInResidenceCurrency === incomeStatePension)) {
     // Still initialise PV fields so downstream consumers can assume presence.
     dataRow.incomeSalariesPV += incomeSalaries;
@@ -162,9 +213,13 @@ function computePresentValueAggregates(ctx) {
     dataRow.expensesPV += expenses;
     dataRow.pensionFundPV += pensionFundNominal * pensionDeflator;
     dataRow.cashPV += cash;
-    dataRow.indexFundsCapitalPV += indexFundsCap;
-    dataRow.sharesCapitalPV += sharesCap;
-    dataRow.worthPV += realEstateCapitalPV + (pensionFundNominal * pensionDeflator) + indexFundsCap + sharesCap + cash;
+    dataRow.indexFundsCapitalPV += (dataRow.investmentCapitalByKeyPV['indexFunds'] || 0);
+    dataRow.sharesCapitalPV += (dataRow.investmentCapitalByKeyPV['shares'] || 0);
+    var investmentsPV = 0;
+    for (var wk in dataRow.investmentCapitalByKeyPV) {
+      investmentsPV += dataRow.investmentCapitalByKeyPV[wk];
+    }
+    dataRow.worthPV += realEstateCapitalPV + (pensionFundNominal * pensionDeflator) + investmentsPV + cash;
   } else {
     dataRow.incomeSalariesPV += incomeSalaries * deflationFactor;
     dataRow.incomeRSUsPV += incomeShares * deflationFactor;
@@ -182,9 +237,13 @@ function computePresentValueAggregates(ctx) {
     dataRow.expensesPV += expenses * deflationFactor;
     dataRow.pensionFundPV += pensionFundNominal * pensionDeflator;
     dataRow.cashPV += cash * deflationFactor;
-    dataRow.indexFundsCapitalPV += indexFundsCap * deflationFactor;
-    dataRow.sharesCapitalPV += sharesCap * deflationFactor;
-    dataRow.worthPV += realEstateCapitalPV + (pensionFundNominal * pensionDeflator) + indexFundsCap * deflationFactor + sharesCap * deflationFactor + cash * deflationFactor;
+    dataRow.indexFundsCapitalPV += (dataRow.investmentCapitalByKeyPV['indexFunds'] || 0);
+    dataRow.sharesCapitalPV += (dataRow.investmentCapitalByKeyPV['shares'] || 0);
+    var investmentsPV = 0;
+    for (var wk in dataRow.investmentCapitalByKeyPV) {
+      investmentsPV += dataRow.investmentCapitalByKeyPV[wk];
+    }
+    dataRow.worthPV += realEstateCapitalPV + (pensionFundNominal * pensionDeflator) + investmentsPV + cash * deflationFactor;
   }
 
   // Dynamic PV maps for per-investment-type income and capital. These mirror
@@ -201,16 +260,7 @@ function computePresentValueAggregates(ctx) {
       }
     }
   }
-  if (capsByKey) {
-    for (var ck in capsByKey) {
-      if (!dataRow.investmentCapitalByKeyPV[ck]) dataRow.investmentCapitalByKeyPV[ck] = 0;
-      if (deflationFactor === 1) {
-        dataRow.investmentCapitalByKeyPV[ck] += capsByKey[ck];
-      } else {
-        dataRow.investmentCapitalByKeyPV[ck] += capsByKey[ck] * deflationFactor;
-      }
-    }
-  }
+
 }
 
 // Expose via namespace object for explicit API contract

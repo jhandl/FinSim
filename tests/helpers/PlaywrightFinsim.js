@@ -8,7 +8,7 @@ export async function loadSimulator(page, { wizardOn = false } = {}) {
     try {
       localStorage.setItem('welcomeModalState', 'off');
       localStorage.setItem('eventsWizardState', wizardEnabled ? 'on' : 'off');
-    } catch (_) {}
+    } catch (_) { }
   }, { wizardEnabled: wizardOn });
 
   await page.goto(BASE_URL);
@@ -41,14 +41,14 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
     events = eventsOrOptions;
     opts = options;
   }
-  
+
   const { startCountry = 'ie' } = opts;
-  
+
   // Ensure events is an array
   if (!Array.isArray(events)) {
     events = [];
   }
-  
+
   // Wait for Events table body to exist - this is a more reliable indicator than WebUI
   // The table body is created when eventsTableManager is initialized
   await frame.locator('#Events tbody').waitFor({ state: 'attached', timeout: 5000 });
@@ -63,8 +63,8 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
         const win = iframe.contentWindow;
         // Check if WebUI class exists and getInstance method is available
         try {
-          return !!(win.WebUI && typeof win.WebUI.getInstance === 'function' 
-            && win.WebUI.getInstance() 
+          return !!(win.WebUI && typeof win.WebUI.getInstance === 'function'
+            && win.WebUI.getInstance()
             && win.WebUI.getInstance().eventsTableManager);
         } catch (e) {
           return false;
@@ -80,11 +80,11 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
   }
 
   const evaluateArgs = { eventsData: events, startCountry: startCountry };
-  
+
   await frame.locator('body').evaluate(async (el, { eventsData: evts, startCountry: sc }) => {
     const events = evts || [];
     const startCountry = sc || 'ie';
-    
+
     // Try to get WebUI instance - check both window.WebUI and global WebUI
     let webUI = null;
     let lastError = null;
@@ -107,12 +107,12 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
         }
       }
     }
-    
+
     if (!webUI) {
       const errorMsg = lastError ? lastError.message : 'WebUI class not found';
       throw new Error('Cannot access WebUI: ' + errorMsg);
     }
-    
+
     if (!webUI.eventsTableManager) {
       throw new Error('webUI.eventsTableManager is missing - WebUI may not be fully initialized');
     }
@@ -123,7 +123,7 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
     tbody.innerHTML = '';
     etm.eventRowCounter = 0;
 
-    const ensureHiddenInput = function(row, suffix, value) {
+    const ensureHiddenInput = function (row, suffix, value) {
       const selector = `.event-${suffix}`;
       const existing = row.querySelector(selector);
       if (existing) {
@@ -183,9 +183,9 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
     // Ensure relocation is enabled before analysis
     const config = window.Config && window.Config.getInstance ? window.Config.getInstance() : null;
     const relocationEnabled = config && typeof config.isRelocationEnabled === 'function' && config.isRelocationEnabled();
-    
+
     const eventsData = webUI.readEvents(false);
-    
+
     // Analyze relocation impacts if relocation is enabled
     if (relocationEnabled && window.RelocationImpactDetector && typeof window.RelocationImpactDetector.analyzeEvents === 'function') {
       const currentStart = etm.getStartCountry();
@@ -202,11 +202,11 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
         etm.updateRelocationImpactIndicators(eventsData);
       }
     }
-    
+
     if (typeof webUI.updateStatusForRelocationImpacts === 'function') {
       webUI.updateStatusForRelocationImpacts(eventsData);
     }
-    
+
     // Also refresh accordion view if it exists
     if (webUI.eventAccordionManager && typeof webUI.eventAccordionManager.refresh === 'function') {
       webUI.eventAccordionManager.refresh();

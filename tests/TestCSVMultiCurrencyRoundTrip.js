@@ -76,7 +76,8 @@ module.exports = {
 
       const fakeRuleSet = {
         getCurrencyCode: () => 'AAA',
-        getCurrencySymbol: () => '¤A'
+        getCurrencySymbol: () => '¤A',
+        getInvestmentTypes: () => []
       };
 
       const fakeConfigInstance = {

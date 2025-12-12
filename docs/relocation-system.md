@@ -129,12 +129,13 @@ Relocation events trigger country context changes in the simulator, updating `cu
 
 ### Event Classification
 
-When relocation events are added, the detector classifies affected events into four categories:
+When relocation events are added, the detector classifies affected events into five categories:
 
 - **Boundary Crossers**: Events spanning relocation boundaries (e.g., salary from age 30-40 when relocating at 35) need splitting or currency pegging.
 - **Simple Events**: Events entirely within the new country period need currency review and cost-of-living adjustment.
 - **Property Auto-Peg**: Property events (rentals, mortgages) need linking to their origin country for correct inflation and currency.
 - **Pension Conflicts**: Pensionable salary events after moving to state-only pension countries need conversion to non-pensionable type.
+- **Local Holdings**: Investment holdings with `residenceScope = "local"` and `assetCountry` matching the origin country when an MV-* event occurs. This surfaces guidance for the user (keep, sell, reinvest) rather than performing automatic liquidation.
 
 ### Detection Logic
 

@@ -1,1079 +1,1133 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title></title>
-    <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico?v=2025-08-23-usc">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-    <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20251101-3">
-    <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=2025-10-28-1">
-    <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-23-usc">
-    <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-23-usc"/>
-    <script src="/src/frontend/web/ifs/libs/bubbles.js?v=2025-08-23-usc"></script>
-    <script src="/src/frontend/web/ifs/libs/chart.js?v=2025-08-23-usc"></script>
-    <script src="/src/frontend/web/ifs/libs/chartjs-annotation-lite.js?v=20251110"></script>
-    <script src="/src/frontend/web/ifs/libs/js-yaml.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title></title>
+  <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico?v=2025-08-23-usc">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20251101-3">
+  <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=2025-10-28-1">
+  <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-23-usc">
+  <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-23-usc" />
+  <script src="/src/frontend/web/ifs/libs/bubbles.js?v=2025-08-23-usc"></script>
+  <script src="/src/frontend/web/ifs/libs/chart.js?v=2025-08-23-usc"></script>
+  <script src="/src/frontend/web/ifs/libs/chartjs-annotation-lite.js?v=20251110"></script>
+  <script src="/src/frontend/web/ifs/libs/js-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
+
 <body>
-    <div id="loading-overlay">
-        <div class="spinner"></div>
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+  <!-- Loading overlay above will be hidden by JS once initialization completes -->
+  <header class="header-hidden">
+    <div class="header-left">
+      <a href="/" class="app-icon-link" style="display: none;"><img src="/src/frontend/web/ifs/IFS.ico" alt=""
+          class="app-icon"></a>
+      <h1 class="app-name"><a href="/"></a></h1>
     </div>
-    <!-- Loading overlay above will be hidden by JS once initialization completes -->
-    <header class="header-hidden">
-        <div class="header-left">
-            <a href="/" class="app-icon-link" style="display: none;"><img src="/src/frontend/web/ifs/IFS.ico" alt="" class="app-icon"></a>
-            <h1 class="app-name"><a href="/"></a></h1>
+    <div class="header-center-right">
+      <div class="header-center">
+        <div class="button-group-primary">
+          <button id="runSimulation" class="primary-button"><span>Run Simulation</span></button>
+          <div id="progress" class="status-indicator">Ready</div>
+          <button id="saveSimulation" class="secondary-button">Save</button>
+          <input type="file" id="loadSimulationDialog" accept=".csv" style="display: none;">
+          <button id="loadSimulation" class="secondary-button">Load</button>
         </div>
-        <div class="header-center-right">
-            <div class="header-center">
-                <div class="button-group-primary">
-                    <button id="runSimulation" class="primary-button"><span>Run Simulation</span></button>
-                    <div id="progress" class="status-indicator">Ready</div>
-                    <button id="saveSimulation" class="secondary-button">Save</button>
-                    <input type="file" id="loadSimulationDialog" accept=".csv" style="display: none;">
-                    <button id="loadSimulation" class="secondary-button">Load</button>
-                </div>
-                <div class="button-group-secondary">
-                    <button id="loadDemoScenarioHeader" class="secondary-button">Demo</button>
-                    <button id="startWizard" class="secondary-button">Help</button>
-                </div>
-            </div>
-            <div class="header-right">
-            </div>
+        <div class="button-group-secondary">
+          <button id="loadDemoScenarioHeader" class="secondary-button">Demo</button>
+          <button id="startWizard" class="secondary-button">Help</button>
         </div>
-        
-        <!-- Mobile Burger Menu -->
-        <button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Toggle mobile menu">
-            <span></span>
-            <span></span>
-            <span></span>
+      </div>
+      <div class="header-right">
+      </div>
+    </div>
+
+    <!-- Mobile Burger Menu -->
+    <button id="mobileMenuToggle" class="mobile-menu-toggle" aria-label="Toggle mobile menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <!-- Mobile Navigation Menu -->
+    <nav id="mobileMenu" class="mobile-menu">
+      <div class="mobile-menu-content">
+        <button id="runSimulationMobile" class="mobile-menu-button primary-button">
+          <i class="fas fa-play"></i>
+          <span>Run Simulation</span>
         </button>
-        
-        <!-- Mobile Navigation Menu -->
-        <nav id="mobileMenu" class="mobile-menu">
-            <div class="mobile-menu-content">
-                <button id="runSimulationMobile" class="mobile-menu-button primary-button">
-                    <i class="fas fa-play"></i>
-                    <span>Run Simulation</span>
-                </button>
-                <div id="progressMobile" class="mobile-menu-status">Ready</div>
-                
-                <div class="mobile-menu-divider"></div>
-                
-                <button id="saveSimulationMobile" class="mobile-menu-button secondary-button">
-                    <i class="fas fa-save"></i>
-                    <span>Save Scenario</span>
-                </button>
-                <button id="loadSimulationMobile" class="mobile-menu-button secondary-button">
-                    <i class="fas fa-folder-open"></i>
-                    <span>Load Scenario</span>
-                </button>
-                
-                <div class="mobile-menu-divider"></div>
-                
-                <button id="loadDemoScenarioMobile" class="mobile-menu-button secondary-button">
-                    <i class="fas fa-play-circle"></i>
-                    <span>Demo</span>
-                </button>
-                <button id="startWizardMobile" class="mobile-menu-button secondary-button">
-                    <i class="fas fa-question-circle"></i>
-                    <span>Help</span>
-                </button>
-                
-                <button id="experimentalToggleMobile" class="mobile-menu-button secondary-button toggle-button" data-toggle-state="off">
-                    <i class="fas fa-toggle-off"></i>
-                    <span>Tooltips: <strong>off</strong></span>
-                </button>
+        <div id="progressMobile" class="mobile-menu-status">Ready</div>
 
-                <button id="eventsWizardToggleMobile" class="mobile-menu-button secondary-button toggle-button" data-toggle-state="on">
-                    <span>Event Wizard</span>
-                    <div class="toggle-switch active">
-                        <div class="toggle-slider"></div>
-                    </div>
-                </button>
-                
-                <button id="welcomeModalToggleMobile" class="mobile-menu-button secondary-button toggle-button" data-toggle-state="on">
-                    <span>Intro Window</span>
-                    <div class="toggle-switch active">
-                        <div class="toggle-slider"></div>
-                    </div>
-                </button>
-                
-                <button id="presentValueToggleMobile" class="mobile-menu-button secondary-button toggle-button" data-toggle-state="off">
-                    <span>Present Value</span>
-                    <div class="toggle-switch">
-                        <div class="toggle-slider"></div>
-                    </div>
-                </button>
-                
-                <div class="mobile-menu-divider"></div>
-                
-                <a href="https://www.buymeacoffee.com/jhandl" target="_blank" class="coffee-button">
-                    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png" alt="Buy Me A Coffee" style="height: 36px; width: auto;">
-                </a>
-            </div>
-        </nav>
-    </header>
+        <div class="mobile-menu-divider"></div>
 
-    <main>
-        <div class="parameters-section">
-            <div class="card" id="startingPosition">
-                <div class="card-header-flex">
-                    <h2>Starting Position</h2>
-                    <div class="simulation-mode-toggle">
-                        <span id="simModeSingle" class="mode-toggle-option mode-toggle-active"><i class="fas fa-user"></i></span>
-                        <span id="simModeCouple" class="mode-toggle-option"><i class="fas fa-user-friends"></i></span>
-                    </div>
-                </div>
-                <div class="input-group">
-                    <div class="input-wrapper">
-                        <label for="StartingAge">Your Current Age</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="StartingAge" autocomplete="off">
-                    </div>
-                    <div class="input-wrapper">
-                        <label for="P2StartingAge">Their Current Age</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="P2StartingAge" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="InitialSavings">Current Savings (Joint)</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="InitialSavings" class="currency" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="InitialPension">Your Pension Fund</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="InitialPension" class="currency" autocomplete="off">
-                    </div>
-                    <div class="input-wrapper">
-                        <label for="InitialPensionP2">Their Pension Fund</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="InitialPensionP2" class="currency" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="InitialFunds">Index Funds</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="InitialFunds" class="currency" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="InitialShares">Shares</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="InitialShares" class="currency" autocomplete="off">
-                    </div>
-                </div>
-            </div>
+        <button id="saveSimulationMobile" class="mobile-menu-button secondary-button">
+          <i class="fas fa-save"></i>
+          <span>Save Scenario</span>
+        </button>
+        <button id="loadSimulationMobile" class="mobile-menu-button secondary-button">
+          <i class="fas fa-folder-open"></i>
+          <span>Load Scenario</span>
+        </button>
 
-            <div class="card" id="personalCircumstances">
-                <h2>Personal Circumstances</h2>
-                <div class="input-group">
-                    <div class="input-wrapper">
-                        <label for="MarriageYear">Marriage Year</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="MarriageYear" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="OldestChildBorn">Oldest Child Birth Year</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="OldestChildBorn" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="YoungestChildBorn">Youngest Child Birth Year</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="YoungestChildBorn" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="PersonalTaxCredit">Personal Tax Credit</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="PersonalTaxCredit" class="currency" autocomplete="off">
-                    </div>
+        <div class="mobile-menu-divider"></div>
 
-                    <div class="input-wrapper">
-                        <label for="StatePensionWeekly">Your State Pension (Weekly)</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="StatePensionWeekly" class="currency" data-1p-ignore autocomplete="off">
-                    </div>
-                    <div class="input-wrapper">
-                        <label for="P2StatePensionWeekly">Their State Pension (Weekly)</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="P2StatePensionWeekly" class="currency" data-1p-ignore autocomplete="off">
-                    </div>
-                </div>
-            </div>
+        <button id="loadDemoScenarioMobile" class="mobile-menu-button secondary-button">
+          <i class="fas fa-play-circle"></i>
+          <span>Demo</span>
+        </button>
+        <button id="startWizardMobile" class="mobile-menu-button secondary-button">
+          <i class="fas fa-question-circle"></i>
+          <span>Help</span>
+        </button>
 
-            <div class="card" id="Targets">
-                <h2>Targets</h2>
-                <div class="input-group">
-                    <div class="input-wrapper">
-                        <label for="RetirementAge">Your Retirement Age</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="RetirementAge" autocomplete="off">
-                    </div>
-                    <div class="input-wrapper">
-                        <label for="P2RetirementAge">Their Retirement Age</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="P2RetirementAge" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="TargetAge">Final Age</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="TargetAge" autocomplete="off">
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="EmergencyStash">Emergency Fund</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="EmergencyStash" class="currency" autocomplete="off">
-                    </div>
-                </div>
-            </div>
+        <button id="experimentalToggleMobile" class="mobile-menu-button secondary-button toggle-button"
+          data-toggle-state="off">
+          <i class="fas fa-toggle-off"></i>
+          <span>Tooltips: <strong>off</strong></span>
+        </button>
 
-            <div class="card" id="Allocations">
-                <h2>Allocations</h2>
-                <div class="input-group">
-                    <div class="input-wrapper">
-                        <label for="FundsAllocation">Index Funds Allocation</label>
-                        <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*" id="FundsAllocation" class="percentage" step="1" placeholder=" " autocomplete="off"></div>
-                    </div>
-                    
-                    <div class="input-wrapper">
-                        <label for="SharesAllocation">Shares Allocation</label>
-                        <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*" id="SharesAllocation" class="percentage" step="1" placeholder=" " autocomplete="off"></div>
-                    </div>
+        <button id="eventsWizardToggleMobile" class="mobile-menu-button secondary-button toggle-button"
+          data-toggle-state="on">
+          <span>Event Wizard</span>
+          <div class="toggle-switch active">
+            <div class="toggle-slider"></div>
+          </div>
+        </button>
 
-                    <div class="input-wrapper">
-                        <label for="PensionContributionPercentage">Your Pension Contribution</label>
-                        <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*" id="PensionContributionPercentage" class="percentage" step="1" placeholder=" " autocomplete="off"></div>
-                    </div>
-                    <div class="input-wrapper">
-                        <label for="PensionContributionPercentageP2">Their Pension Contribution</label>
-                        <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*" id="PensionContributionPercentageP2" class="percentage" step="1" placeholder=" " autocomplete="off"></div>
-                    </div>
+        <button id="welcomeModalToggleMobile" class="mobile-menu-button secondary-button toggle-button"
+          data-toggle-state="on">
+          <span>Intro Window</span>
+          <div class="toggle-switch active">
+            <div class="toggle-slider"></div>
+          </div>
+        </button>
 
-                    <div class="input-wrapper">
-                        <label for="PensionContributionCappedToggle">Pension Contrib. Capped</label>
-                        <input type="hidden" id="PensionContributionCapped" class="string" value="Yes" autocomplete="off">
-                        <div class="pension-capped-dd visualization-control" id="PensionContributionCappedControl">
-                            <span id="PensionContributionCappedToggle" class="dd-toggle pseudo-select">Yes</span>
-                            <div id="PensionContributionCappedOptions" class="visualization-dropdown" style="display:none;"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <button id="presentValueToggleMobile" class="mobile-menu-button secondary-button toggle-button"
+          data-toggle-state="off">
+          <span>Present Value</span>
+          <div class="toggle-switch">
+            <div class="toggle-slider"></div>
+          </div>
+        </button>
 
-            <div class="card" id="drawdownPriorities">
-                <h2>Drawdown Priorities</h2>
-                <div class="priorities-container">
-                    <div class="priority-item" draggable="true" data-priority-id="PriorityCash">
-                        <div class="drag-handle">⋮⋮</div>
-                        <div class="priority-icon">💰</div>
-                        <div class="priority-label">Cash</div>
-                        <input type="hidden" id="PriorityCash" value="1">
-                    </div>
-                    <div class="priority-item" draggable="true" data-priority-id="PriorityPension">
-                        <div class="drag-handle">⋮⋮</div>
-                        <div class="priority-icon">🏦</div>
-                        <div class="priority-label">Private Pension</div>
-                        <input type="hidden" id="PriorityPension" value="2">
-                    </div>
-                    <div class="priority-item" draggable="true" data-priority-id="PriorityFunds">
-                        <div class="drag-handle">⋮⋮</div>
-                        <div class="priority-icon">📈</div>
-                        <div class="priority-label">Index Funds</div>
-                        <input type="hidden" id="PriorityFunds" value="3">
-                    </div>
-                    <div class="priority-item" draggable="true" data-priority-id="PriorityShares">
-                        <div class="drag-handle">⋮⋮</div>
-                        <div class="priority-icon">🏢</div>
-                        <div class="priority-label">Shares</div>
-                        <input type="hidden" id="PriorityShares" value="4">
-                    </div>
-                </div>
-            </div>
+        <div class="mobile-menu-divider"></div>
 
-            <div class="card" id="growthRates">
-                <div class="card-header-flex">
-                    <h2>Economy</h2>
-                    <div class="simulation-mode-toggle" id="economyModeToggle">
-                        <span id="economyModeDeterministic" class="mode-toggle-option mode-toggle-active">
-                            <svg width="20" height="16" viewBox="0 0 20 16" fill="currentColor">
-                                <!-- Chart axes -->
-                                <line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1"/>
-                                <line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1"/>
-                                <!-- Data line -->
-                                <line x1="3" y1="12" x2="19" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </span>
-                        <span id="economyModeMonteCarlo" class="mode-toggle-option">
-                            <svg width="20" height="16" viewBox="0 0 20 16" fill="currentColor">
-                                <!-- Chart axes -->
-                                <line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1"/>
-                                <line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1"/>
-                                <!-- Data line -->
-                                <path d="M3 12 L6 9 L9 11 L12 7 L15 10 L19 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                            </svg>
-                        </span>
-                    </div>
-                </div>
-                <table class="growth-rates-table">
-                    <thead>
-                        <tr>
-                            <th></th>
-                            <th>Growth Rate</th>
-                            <th>Volatility</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Pension</td>
-                            <td><div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*" id="PensionGrowthRate" class="percentage" step="1" autocomplete="off"></div></td>
-                            <td><div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*" id="PensionGrowthStdDev" class="percentage" step="1" autocomplete="off"></div></td>
-                        </tr>
-                        <tr>
-                            <td>Index Funds</td>
-                            <td><div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*" id="FundsGrowthRate" class="percentage" step="1" autocomplete="off"></div></td>
-                            <td><div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*" id="FundsGrowthStdDev" class="percentage" step="1" autocomplete="off"></div></td>
-                        </tr>
-                        <tr>
-                            <td>Shares</td>
-                            <td><div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*" id="SharesGrowthRate" class="percentage" step="1" autocomplete="off"></div></td>
-                            <td><div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*" id="SharesGrowthStdDev" class="percentage" step="1" autocomplete="off"></div></td>
-                        </tr>
-                        <tr>
-                            <td>Inflation</td>
-                            <td><input type="text" inputmode="numeric" pattern="[0-9]*" id="Inflation" class="percentage" step="0.1" autocomplete="off"></td>
-                            <td></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+        <a href="https://www.buymeacoffee.com/jhandl" target="_blank" class="coffee-button">
+          <img src="https://cdn.buymeacoffee.com/buttons/v2/default-green.png" alt="Buy Me A Coffee"
+            style="height: 36px; width: auto;">
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <div class="parameters-section">
+      <div class="card" id="startingPosition">
+        <div class="card-header-flex">
+          <h2>Starting Position</h2>
+          <div class="simulation-mode-toggle">
+            <span id="simModeSingle" class="mode-toggle-option mode-toggle-active"><i class="fas fa-user"></i></span>
+            <span id="simModeCouple" class="mode-toggle-option"><i class="fas fa-user-friends"></i></span>
+          </div>
         </div>
+        <div class="input-group">
+          <div class="input-wrapper">
+            <label for="StartingAge">Your Current Age</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="StartingAge" autocomplete="off">
+          </div>
+          <div class="input-wrapper">
+            <label for="P2StartingAge">Their Current Age</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="P2StartingAge" autocomplete="off">
+          </div>
 
-        <div class="events-section card">
-            <div class="card-header-flex">
-                <h2 id="EventsTitle">Events</h2>
-                <div class="events-header-controls">
-                    <div class="view-toggle">
-                        <span id="viewModeTable" class="mode-toggle-option mode-toggle-active" title="Table view" aria-label="Table view"><i class="fas fa-table"></i></span>
-                        <span id="viewModeAccordion" class="mode-toggle-option" title="Accordion view" aria-label="Accordion view"><i class="fas fa-list-ul"></i></span>
-                    </div>
-                    <div class="age-year-toggle">
-                        <span id="ageYearModeAge" class="mode-toggle-option mode-toggle-active">Age</span>
-                        <span id="ageYearModeYear" class="mode-toggle-option">Year</span>
-                    </div>
+          <div class="input-wrapper">
+            <label for="InitialSavings">Current Savings (Joint)</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="InitialSavings" class="currency"
+              autocomplete="off">
+          </div>
+
+          <div class="input-wrapper">
+            <label for="InitialPension">Your Pension Fund</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="InitialPension" class="currency"
+              autocomplete="off">
+          </div>
+          <div class="input-wrapper">
+            <label for="InitialPensionP2">Their Pension Fund</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="InitialPensionP2" class="currency"
+              autocomplete="off">
+          </div>
+
+          <div class="input-wrapper">
+            <label for="InitialCapital_indexFunds">Index Funds</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="InitialCapital_indexFunds" class="currency"
+              autocomplete="off">
+          </div>
+
+          <div class="input-wrapper">
+            <label for="InitialCapital_shares">Shares</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="InitialCapital_shares" class="currency"
+              autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="personalCircumstances">
+        <h2>Personal Circumstances</h2>
+        <div class="input-group">
+          <div class="input-wrapper">
+            <label for="MarriageYear">Marriage Year</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="MarriageYear" autocomplete="off">
+          </div>
+
+          <div class="input-wrapper">
+            <label for="OldestChildBorn">Oldest Child Birth Year</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="OldestChildBorn" autocomplete="off">
+          </div>
+
+          <div class="input-wrapper">
+            <label for="YoungestChildBorn">Youngest Child Birth Year</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="YoungestChildBorn" autocomplete="off">
+          </div>
+
+          <div class="input-wrapper">
+            <label for="PersonalTaxCredit">Personal Tax Credit</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="PersonalTaxCredit" class="currency"
+              autocomplete="off">
+          </div>
+
+          <div class="input-wrapper">
+            <label for="StatePensionWeekly">Your State Pension (Weekly)</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="StatePensionWeekly" class="currency"
+              data-1p-ignore autocomplete="off">
+          </div>
+          <div class="input-wrapper">
+            <label for="P2StatePensionWeekly">Their State Pension (Weekly)</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="P2StatePensionWeekly" class="currency"
+              data-1p-ignore autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="Targets">
+        <h2>Targets</h2>
+        <div class="input-group">
+          <div class="input-wrapper">
+            <label for="RetirementAge">Your Retirement Age</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="RetirementAge" autocomplete="off">
+          </div>
+          <div class="input-wrapper">
+            <label for="P2RetirementAge">Their Retirement Age</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="P2RetirementAge" autocomplete="off">
+          </div>
+
+          <div class="input-wrapper">
+            <label for="TargetAge">Final Age</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="TargetAge" autocomplete="off">
+          </div>
+
+          <div class="input-wrapper">
+            <label for="EmergencyStash">Emergency Fund</label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" id="EmergencyStash" class="currency"
+              autocomplete="off">
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="Allocations">
+        <h2>Allocations</h2>
+        <div class="input-group">
+          <div class="input-wrapper">
+            <label for="InvestmentAllocation_indexFunds">Index Funds Allocation</label>
+            <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
+                id="InvestmentAllocation_indexFunds" class="percentage" step="1" placeholder=" " autocomplete="off"></div>
+          </div>
+
+          <div class="input-wrapper">
+            <label for="InvestmentAllocation_shares">Shares Allocation</label>
+            <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
+                id="InvestmentAllocation_shares" class="percentage" step="1" placeholder=" " autocomplete="off"></div>
+          </div>
+
+          <div class="input-wrapper">
+            <label for="PensionContributionPercentage">Your Pension Contribution</label>
+            <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
+                id="PensionContributionPercentage" class="percentage" step="1" placeholder=" " autocomplete="off"></div>
+          </div>
+          <div class="input-wrapper">
+            <label for="PensionContributionPercentageP2">Their Pension Contribution</label>
+            <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
+                id="PensionContributionPercentageP2" class="percentage" step="1" placeholder=" " autocomplete="off">
+            </div>
+          </div>
+
+          <div class="input-wrapper">
+            <label for="PensionContributionCappedToggle">Pension Contrib. Capped</label>
+            <input type="hidden" id="PensionContributionCapped" class="string" value="Yes" autocomplete="off">
+            <div class="pension-capped-dd visualization-control" id="PensionContributionCappedControl">
+              <span id="PensionContributionCappedToggle" class="dd-toggle pseudo-select">Yes</span>
+              <div id="PensionContributionCappedOptions" class="visualization-dropdown" style="display:none;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="drawdownPriorities">
+        <h2>Drawdown Priorities</h2>
+        <div class="priorities-container">
+          <div class="priority-item" draggable="true" data-priority-id="PriorityCash">
+            <div class="drag-handle">⋮⋮</div>
+            <div class="priority-icon">💰</div>
+            <div class="priority-label">Cash</div>
+            <input type="hidden" id="PriorityCash" value="1">
+          </div>
+          <div class="priority-item" draggable="true" data-priority-id="PriorityPension">
+            <div class="drag-handle">⋮⋮</div>
+            <div class="priority-icon">🏦</div>
+            <div class="priority-label">Private Pension</div>
+            <input type="hidden" id="PriorityPension" value="2">
+          </div>
+          <div class="priority-item" draggable="true" data-priority-id="PriorityFunds">
+            <div class="drag-handle">⋮⋮</div>
+            <div class="priority-icon">📈</div>
+            <div class="priority-label">Index Funds</div>
+            <input type="hidden" id="PriorityFunds" value="3">
+          </div>
+          <div class="priority-item" draggable="true" data-priority-id="PriorityShares">
+            <div class="drag-handle">⋮⋮</div>
+            <div class="priority-icon">🏢</div>
+            <div class="priority-label">Shares</div>
+            <input type="hidden" id="PriorityShares" value="4">
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="growthRates">
+        <div class="card-header-flex">
+          <h2>Economy</h2>
+          <div class="simulation-mode-toggle" id="economyModeToggle">
+            <span id="economyModeDeterministic" class="mode-toggle-option mode-toggle-active">
+              <svg width="20" height="16" viewBox="0 0 20 16" fill="currentColor">
+                <!-- Chart axes -->
+                <line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1" />
+                <line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1" />
+                <!-- Data line -->
+                <line x1="3" y1="12" x2="19" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" />
+              </svg>
+            </span>
+            <span id="economyModeMonteCarlo" class="mode-toggle-option">
+              <svg width="20" height="16" viewBox="0 0 20 16" fill="currentColor">
+                <!-- Chart axes -->
+                <line x1="2" y1="14" x2="20" y2="14" stroke="currentColor" stroke-width="1" />
+                <line x1="2" y1="2" x2="2" y2="14" stroke="currentColor" stroke-width="1" />
+                <!-- Data line -->
+                <path d="M3 12 L6 9 L9 11 L12 7 L15 10 L19 4" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              </svg>
+            </span>
+          </div>
+        </div>
+        <table class="growth-rates-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Growth Rate</th>
+              <th>Volatility</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Pension</td>
+              <td>
+                <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
+                    id="PensionGrowthRate" class="percentage" step="1" autocomplete="off"></div>
+              </td>
+              <td>
+                <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
+                    id="PensionGrowthStdDev" class="percentage" step="1" autocomplete="off"></div>
+              </td>
+            </tr>
+            <tr>
+              <td>Index Funds</td>
+              <td>
+                <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
+                    id="indexFundsGrowthRate" class="percentage" step="1" autocomplete="off"></div>
+              </td>
+              <td>
+                <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
+                    id="indexFundsGrowthStdDev" class="percentage" step="1" autocomplete="off"></div>
+              </td>
+            </tr>
+            <tr>
+              <td>Shares</td>
+              <td>
+                <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
+                    id="sharesGrowthRate" class="percentage" step="1" autocomplete="off"></div>
+              </td>
+              <td>
+                <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
+                    id="sharesGrowthStdDev" class="percentage" step="1" autocomplete="off"></div>
+              </td>
+            </tr>
+            <tr>
+              <td>Inflation</td>
+              <td><input type="text" inputmode="numeric" pattern="[0-9]*" id="Inflation" class="percentage" step="0.1"
+                  autocomplete="off"></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="events-section card">
+      <div class="card-header-flex">
+        <h2 id="EventsTitle">Events</h2>
+        <div class="events-header-controls">
+          <div class="view-toggle">
+            <span id="viewModeTable" class="mode-toggle-option mode-toggle-active" title="Table view"
+              aria-label="Table view"><i class="fas fa-table"></i></span>
+            <span id="viewModeAccordion" class="mode-toggle-option" title="Accordion view"
+              aria-label="Accordion view"><i class="fas fa-list-ul"></i></span>
+          </div>
+          <div class="age-year-toggle">
+            <span id="ageYearModeAge" class="mode-toggle-option mode-toggle-active">Age</span>
+            <span id="ageYearModeYear" class="mode-toggle-option">Year</span>
+          </div>
+        </div>
+      </div>
+      <div class="table-container">
+        <table id="Events">
+          <thead>
+            <tr>
+              <th class="sortable" data-col="event-type">Event Type <span class="sort-caret">⇅</span></th>
+              <th class="sortable" data-col="event-name">Name <span class="sort-caret">⇅</span></th>
+              <th class="sortable" data-col="event-amount">Amount <span class="sort-caret">⇅</span></th>
+              <th id="fromAgeHeader" class="sortable" data-col="from-age"><span class="header-text">From Age
+                </span><span class="sort-caret">⇅</span></th>
+              <th id="toAgeHeader" class="sortable" data-col="to-age"><span class="header-text">To Age </span><span
+                  class="sort-caret">⇅</span></th>
+              <th class="sortable" data-col="event-rate">Rate <span class="sort-caret">⇅</span></th>
+              <th class="sortable" data-col="event-match">Match <span class="sort-caret">⇅</span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Rows will be added dynamically -->
+          </tbody>
+        </table>
+      </div>
+      <div class="events-table-actions">
+        <button id="addEventRow" class="secondary-button">Add Event</button>
+      </div>
+    </div>
+
+    <div class="graphs-section">
+      <div class="graph-container">
+        <canvas id="cashflowGraph"></canvas>
+      </div>
+      <div class="graph-container">
+        <canvas id="assetsGraph"></canvas>
+      </div>
+    </div>
+
+    <div class="data-section card">
+      <div class="card-header-flex">
+        <h2>Simulation Data</h2>
+        <div id="data-table-controls"></div>
+      </div>
+
+      <div class="table-container">
+        <table id="Data">
+          <thead>
+            <tr class="header-groups">
+              <th colspan="2">
+                <div class="table-controls">
+                  <div class="visualization-control">
+                    <button id="visualizationToggle" class="visualization-icon-btn" title="Visualization Settings">
+                      <i class="fas fa-palette"></i>
+                    </button>
+                    <span id="selectedPresetDisplay" class="selected-preset-display">Default</span>
+                  </div>
+                  <div class="export-control">
+                    <button id="exportDataCSV" class="visualization-icon-btn"
+                      data-description="Export data table as CSV">
+                      <i class="fas fa-download"></i>
+                    </button>
+                  </div>
                 </div>
-            </div>
-            <div class="table-container">
-                <table id="Events">
-                    <thead>
-                        <tr>
-                            <th class="sortable" data-col="event-type">Event Type <span class="sort-caret">⇅</span></th>
-                            <th class="sortable" data-col="event-name">Name <span class="sort-caret">⇅</span></th>
-                            <th class="sortable" data-col="event-amount">Amount <span class="sort-caret">⇅</span></th>
-                            <th id="fromAgeHeader" class="sortable" data-col="from-age"><span class="header-text">From Age </span><span class="sort-caret">⇅</span></th>
-                            <th id="toAgeHeader" class="sortable" data-col="to-age"><span class="header-text">To Age </span><span class="sort-caret">⇅</span></th>
-                            <th class="sortable" data-col="event-rate">Rate <span class="sort-caret">⇅</span></th>
-                            <th class="sortable" data-col="event-match">Match <span class="sort-caret">⇅</span></th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Rows will be added dynamically -->
-                    </tbody>
-                </table>
-            </div>
-            <div class="events-table-actions">
-                <button id="addEventRow" class="secondary-button">Add Event</button>
-            </div>
-        </div>
+                <!-- Direct Dropdown Menu -->
+                <div class="visualization-dropdown" id="presetOptions" style="display: none;">
+                  <div class="dropdown-header">Color Scheme</div>
+                  <!-- Options will be populated dynamically -->
+                </div>
+              </th>
+              <th colspan="8">Gross Income</th>
+              <th colspan="1" data-group="deductions">Deductions</th>
+              <th colspan="2">Net Cashflow</th>
+              <th colspan="5">Assets</th>
+              <th colspan="2"></th>
+            </tr>
+            <tr>
+              <th data-key="Age" title="Your age in this simulation year">Age</th>
+              <th data-key="Year" title="Calendar year of the simulation">Year</th>
+              <th data-key="IncomeSalaries" title="Total salary income received this year">Salaries</th>
+              <th data-key="IncomeRentals" title="Rental income from real estate properties">Rentals</th>
+              <th data-key="IncomeRSUs" title="Income from Restricted Stock Units (RSUs) vesting">RSUs</th>
+              <th data-key="IncomePrivatePension" title="Withdrawals from private pension funds">P.Pension</th>
+              <th data-key="IncomeStatePension" title="State pension payments received">S.Pension</th>
+              <th data-key="IncomeDefinedBenefit" title="Defined Benefit pension income">DBI</th>
+              <th data-key="IncomeTaxFree" title="Tax-free income">Tax Free</th>
+              <th data-key="IncomeFundsRent" title="Income generated from index fund investments">Index Funds</th>
+              <th data-key="IncomeSharesRent" title="Income generated from Investment Trusts or individual shares">
+                Shares</th>
+              <th data-key="IncomeCash" title="Withdrawals from cash savings">Cash</th>
+              <th data-key="PensionContribution"
+                title="Amount contributed to private pensions (excluding employer match)">P.Contrib</th>
+              <th data-key="NetIncome" title="Total income after all taxes and deductions">Inflows</th>
+              <th data-key="Expenses" title="Total annual expenses">Outflows</th>
+              <th data-key="PensionFund" title="Total value of private pension funds">Pension</th>
+              <th data-key="Cash" title="Total cash savings">Cash</th>
+              <th data-key="RealEstateCapital" title="Total value of your owned real estate">R.Estate</th>
+              <th data-key="FundsCapital" title="Total value of your index fund investments">Index Funds</th>
+              <th data-key="SharesCapital"
+                title="Total value of your Investment Trusts or individual share investments">Shares</th>
+              <th data-key="WithdrawalRate"
+                title="Percentage of your liquid assets (Index Funds + Shares + Pension) that you're withdrawing to cover your expenses.">
+                Withdraw%</th>
+              <th data-key="Worth" title="Your total net worth (sum of all assets)">Net Worth</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Rows will be added dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-        <div class="graphs-section">
-            <div class="graph-container">
-                <canvas id="cashflowGraph"></canvas>
-            </div>
-            <div class="graph-container">
-                <canvas id="assetsGraph"></canvas>
-            </div>
-        </div>
+    <div id="mobile-data-message" class="data-section card" style="text-align: center;">
+      <p>📊 The detailed data table is available on wider screens. <a href="#" id="show-data-link">Show anyway</a>.</p>
+    </div>
+  </main>
 
-        <div class="data-section card">
-            <div class="card-header-flex">
-                <h2>Simulation Data</h2>
-                <div id="data-table-controls"></div>
-            </div>
+  <!-- SYSTEM UTILITIES SECTION -->
+  <script src="/src/frontend/AbstractUI.js?v=20251101"></script>
+  <script src="/src/frontend/UIManager.js?v=2025-12-10-3"></script>
+  <script src="/src/frontend/web/utils/DOMUtils.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/DeviceUtils.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/FormatUtils.js?v=20250115-1"></script>
+  <script src="/src/frontend/web/utils/TooltipUtils.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/DropdownUtils.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/SortingUtils.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/RowSorter.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/AccordionSorter.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/NotificationUtils.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/ErrorModalUtils.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/FieldLabelsManager.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/ValidationUtils.js?v=20251101"></script>
+  <script src="/src/frontend/web/utils/RelocationUtils.js?v=20251104b"></script>
+  <script src="/src/frontend/web/components/TableManager.js?v=2025-11-26-1"></script>
+  <script src="/src/frontend/web/components/EventsTableManager.js?v=20251210-1"></script>
+  <script src="/src/frontend/web/components/RelocationImpactDetector.js?v=20251210-1"></script>
+  <script src="/src/frontend/web/components/RelocationImpactAssistant.js?v=20251210-1"></script>
+  <script src="/src/frontend/web/components/EventSummaryRenderer.js?v=20250115-1"></script>
+  <script src="/src/frontend/web/components/EventAccordionManager.js?v=20251101"></script>
+  <script src="/src/frontend/web/components/WizardManager.js?v=20251101"></script>
+  <script src="/src/frontend/web/components/WizardRenderer.js?v=20251101"></script>
+  <script src="/src/frontend/web/components/EventsWizard.js?v=20251109"></script>
+  <script src="/src/frontend/web/components/ChartManager.js?v=2025-11-26-1"></script>
+  <script src="/src/frontend/web/components/FileManager.js?v=2025-11-02-2"></script>
+  <script src="/src/frontend/web/components/DragAndDrop.js?v=20251101"></script>
+  <script src="/src/frontend/web/components/Wizard.js?v=20251220"></script>
+  <script src="/src/frontend/web/components/ContentRenderer.js?v=20251101"></script>
+  <script src="/src/frontend/web/components/WelcomeModal.js?v=20251101"></script>
+  <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
+  <script src="/src/frontend/web/WebUI.js?v=20251210-6"></script>
+  <script src="/src/core/TaxRuleSet.js?v=2025-11-09-1"></script>
+  <script src="/src/core/Config.js?v=2025-11-02-2"></script>
+  <script src="/src/core/Events.js?v=2025-09-04"></script>
+  <script src="/src/core/EconomicData.js?v=2025-11-27-1"></script>
+  <script src="/src/core/Person.js?v=2025-11-02-2"></script>
+  <script src="/src/core/Taxman.js?v=2025-01-15-1"></script>
+  <script src="/src/core/Equities.js?v=2025-12-10-1"></script>
+  <script src="/src/core/InvestmentTypeFactory.js?v=2025-12-10-2"></script>
+  <script src="/src/core/RealEstate.js?v=2025-11-26-1"></script>
+  <script src="/src/core/InflationService.js?v=2025-11-26-2"></script>
+  <script src="/src/core/Utils.js?v=2025-12-10-4"></script>
+  <script src="/src/core/PresentValueCalculator.js?v=20250131-03"></script>
+  <script src="/src/core/AttributionPopulator.js?v=2025-11-30-1"></script>
+  <script src="/src/core/DataAggregatesCalculator.js?v=20250201-02"></script>
+  <script src="/src/core/Attribution.js?v=2025-11-05-1"></script>
+  <script src="/src/core/AttributionManager.js?v=2025-09-04"></script>
+  <script src="/src/core/Simulator.js?v=2025-12-10-10"></script>
 
-            <div class="table-container">
-                <table id="Data">
-                    <thead>
-                        <tr class="header-groups">
-                            <th colspan="2">
-                                <div class="table-controls">
-                                    <div class="visualization-control">
-                                        <button id="visualizationToggle" class="visualization-icon-btn" title="Visualization Settings">
-                                            <i class="fas fa-palette"></i>
-                                        </button>
-                                        <span id="selectedPresetDisplay" class="selected-preset-display">Default</span>
-                                    </div>
-                                    <div class="export-control">
-                                        <button id="exportDataCSV" class="visualization-icon-btn" data-description="Export data table as CSV">
-                                            <i class="fas fa-download"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <!-- Direct Dropdown Menu -->
-                                <div class="visualization-dropdown" id="presetOptions" style="display: none;">
-                                    <div class="dropdown-header">Color Scheme</div>
-                                    <!-- Options will be populated dynamically -->
-                                </div>
-                            </th>
-                            <th colspan="8">Gross Income</th>
-                            <th colspan="1" data-group="deductions">Deductions</th>
-                            <th colspan="2">Net Cashflow</th>
-                            <th colspan="5">Assets</th>
-                            <th colspan="2"></th>
-                        </tr>
-                        <tr>
-                            <th data-key="Age" title="Your age in this simulation year">Age</th>
-                            <th data-key="Year" title="Calendar year of the simulation">Year</th>
-                            <th data-key="IncomeSalaries" title="Total salary income received this year">Salaries</th>
-                            <th data-key="IncomeRentals" title="Rental income from real estate properties">Rentals</th>
-                            <th data-key="IncomeRSUs" title="Income from Restricted Stock Units (RSUs) vesting">RSUs</th>
-                            <th data-key="IncomePrivatePension" title="Withdrawals from private pension funds">P.Pension</th>
-                            <th data-key="IncomeStatePension" title="State pension payments received">S.Pension</th>
-                            <th data-key="IncomeDefinedBenefit" title="Defined Benefit pension income">DBI</th>
-                            <th data-key="IncomeTaxFree" title="Tax-free income">Tax Free</th>
-                            <th data-key="IncomeFundsRent" title="Income generated from index fund investments">Index Funds</th>
-                            <th data-key="IncomeSharesRent" title="Income generated from Investment Trusts or individual shares">Shares</th>
-                            <th data-key="IncomeCash" title="Withdrawals from cash savings">Cash</th>
-                            <th data-key="PensionContribution" title="Amount contributed to private pensions (excluding employer match)">P.Contrib</th>
-                            <th data-key="NetIncome" title="Total income after all taxes and deductions">Inflows</th>
-                            <th data-key="Expenses" title="Total annual expenses">Outflows</th>
-                            <th data-key="PensionFund" title="Total value of private pension funds">Pension</th>
-                            <th data-key="Cash" title="Total cash savings">Cash</th>
-                            <th data-key="RealEstateCapital" title="Total value of your owned real estate">R.Estate</th>
-                            <th data-key="FundsCapital" title="Total value of your index fund investments">Index Funds</th>
-                            <th data-key="SharesCapital" title="Total value of your Investment Trusts or individual share investments">Shares</th>
-                            <th data-key="WithdrawalRate" title="Percentage of your liquid assets (Index Funds + Shares + Pension) that you're withdrawing to cover your expenses.">Withdraw%</th>
-                            <th data-key="Worth" title="Your total net worth (sum of all assets)">Net Worth</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Rows will be added dynamically -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="mobile-data-message" class="data-section card" style="text-align: center;">
-            <p>📊 The detailed data table is available on wider screens. <a href="#" id="show-data-link">Show anyway</a>.</p>
-        </div>
-    </main>
-
-    <!-- SYSTEM UTILITIES SECTION -->
-    <script src="/src/frontend/AbstractUI.js?v=20251101"></script>
-    <script src="/src/frontend/UIManager.js?v=2025-12-01-1"></script>
-    <script src="/src/frontend/web/utils/DOMUtils.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/DeviceUtils.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/FormatUtils.js?v=20250115-1"></script>
-    <script src="/src/frontend/web/utils/TooltipUtils.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/DropdownUtils.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/SortingUtils.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/RowSorter.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/AccordionSorter.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/NotificationUtils.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/ErrorModalUtils.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/FieldLabelsManager.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/ValidationUtils.js?v=20251101"></script>
-    <script src="/src/frontend/web/utils/RelocationUtils.js?v=20251104b"></script>
-    <script src="/src/frontend/web/components/TableManager.js?v=2025-11-26-1"></script>
-    <script src="/src/frontend/web/components/EventsTableManager.js?v=20250115-1"></script>
-    <script src="/src/frontend/web/components/RelocationImpactDetector.js?v=20251101"></script>
-    <script src="/src/frontend/web/components/RelocationImpactAssistant.js?v=20250115-2"></script>
-    <script src="/src/frontend/web/components/EventSummaryRenderer.js?v=20250115-1"></script>
-    <script src="/src/frontend/web/components/EventAccordionManager.js?v=20251101"></script>
-    <script src="/src/frontend/web/components/WizardManager.js?v=20251101"></script>
-    <script src="/src/frontend/web/components/WizardRenderer.js?v=20251101"></script>
-    <script src="/src/frontend/web/components/EventsWizard.js?v=20251109"></script>
-    <script src="/src/frontend/web/components/ChartManager.js?v=2025-11-26-1"></script>
-    <script src="/src/frontend/web/components/FileManager.js?v=2025-11-02-2"></script>
-    <script src="/src/frontend/web/components/DragAndDrop.js?v=20251101"></script>
-    <script src="/src/frontend/web/components/Wizard.js?v=20251220"></script>
-    <script src="/src/frontend/web/components/ContentRenderer.js?v=20251101"></script>
-    <script src="/src/frontend/web/components/WelcomeModal.js?v=20251101"></script>
-    <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
-    <script src="/src/frontend/web/WebUI.js?v=20251105-1"></script>
-    <script src="/src/core/TaxRuleSet.js?v=2025-11-09-1"></script>
-    <script src="/src/core/Config.js?v=2025-11-02-2"></script>
-    <script src="/src/core/Events.js?v=2025-09-04"></script>
-    <script src="/src/core/EconomicData.js?v=2025-11-27-1"></script>
-    <script src="/src/core/Person.js?v=2025-11-02-2"></script>
-    <script src="/src/core/Taxman.js?v=2025-01-15-1"></script>
-    <script src="/src/core/Equities.js?v=2025-09-04"></script>
-    <script src="/src/core/InvestmentTypeFactory.js?v=2025-09-04"></script>
-    <script src="/src/core/RealEstate.js?v=2025-11-26-1"></script>
-    <script src="/src/core/InflationService.js?v=2025-11-26-2"></script>
-    <script src="/src/core/Utils.js?v=2025-11-26-2"></script>
-    <script src="/src/core/PresentValueCalculator.js?v=20250131-03"></script>
-    <script src="/src/core/AttributionPopulator.js?v=2025-11-30-1"></script>
-    <script src="/src/core/DataAggregatesCalculator.js?v=20250201-02"></script>
-    <script src="/src/core/Attribution.js?v=2025-11-05-1"></script>
-    <script src="/src/core/AttributionManager.js?v=2025-09-04"></script>
-    <script src="/src/core/Simulator.js?v=2025-12-01-1"></script>
-    
-    <!-- Init app name after Config is initialized -->
-    <script>
+  <!-- Init app name after Config is initialized -->
+  <script>
     // Update document title, header app-name and app-icon alt using Config once available
-    (function() {
-        async function applyAppName() {
-            try {
-                // Wait until Config is initialized in WebUI flow; Config.getInstance() will throw if not ready
-                let appName = null;
-                try {
-                    if (window.Config && typeof Config.getInstance === 'function') {
-                        appName = Config.getInstance().getApplicationName();
-                    }
-                } catch (_) {
-                    // If Config isn't initialized yet, listen for DOMContentLoaded completion in WebUI which initializes Config
-                    // Fallback: poll until Config is ready (short-lived polling)
-                    const start = Date.now();
-                    while (Date.now() - start < 3000) {
-                        try { if (window.Config && typeof Config.getInstance === 'function') { appName = Config.getInstance().getApplicationName(); break; } } catch (_) {}
-                        await new Promise(r => setTimeout(r, 100));
-                    }
-                }
+    (function () {
+      async function applyAppName() {
+        try {
+          // Wait until Config is initialized in WebUI flow; Config.getInstance() will throw if not ready
+          let appName = null;
+          try {
+            if (window.Config && typeof Config.getInstance === 'function') {
+              appName = Config.getInstance().getApplicationName();
+            }
+          } catch (_) {
+            // If Config isn't initialized yet, listen for DOMContentLoaded completion in WebUI which initializes Config
+            // Fallback: poll until Config is ready (short-lived polling)
+            const start = Date.now();
+            while (Date.now() - start < 3000) {
+              try { if (window.Config && typeof Config.getInstance === 'function') { appName = Config.getInstance().getApplicationName(); break; } } catch (_) { }
+              await new Promise(r => setTimeout(r, 100));
+            }
+          }
 
-                if (!appName) appName = 'Ireland Financial Simulator';
+          if (!appName) appName = 'Ireland Financial Simulator';
 
-                // Set document title
-                try { document.title = appName; } catch (_) {}
+          // Set document title
+          try { document.title = appName; } catch (_) { }
 
-                // Update header name anchor text
-                try {
-                    const appNameEl = document.querySelector('.app-name a');
-                    if (appNameEl) appNameEl.textContent = appName;
-                } catch (_) {}
+          // Update header name anchor text
+          try {
+            const appNameEl = document.querySelector('.app-name a');
+            if (appNameEl) appNameEl.textContent = appName;
+          } catch (_) { }
 
-                // Update app icon alt
-                try {
-                    const icon = document.querySelector('.app-icon');
-                    if (icon) icon.setAttribute('alt', appName);
-                } catch (_) {}
-            } catch (err) { /* swallow errors */ }
-        }
+          // Update app icon alt
+          try {
+            const icon = document.querySelector('.app-icon');
+            if (icon) icon.setAttribute('alt', appName);
+          } catch (_) { }
+        } catch (err) { /* swallow errors */ }
+      }
 
-        // Defer applying name until after WebUI initializes Config; DOMContentLoaded may have already fired
-        if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            // Slight delay to allow WebUI to call Config.initialize
-            setTimeout(applyAppName, 50);
-        } else {
-            document.addEventListener('DOMContentLoaded', function() { setTimeout(applyAppName, 50); });
-        }
+      // Defer applying name until after WebUI initializes Config; DOMContentLoaded may have already fired
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        // Slight delay to allow WebUI to call Config.initialize
+        setTimeout(applyAppName, 50);
+      } else {
+        document.addEventListener('DOMContentLoaded', function () { setTimeout(applyAppName, 50); });
+      }
     })();
-    </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const showLink = document.getElementById('show-data-link');
-            const dataSection = document.querySelector('.data-section');
-            const mobileMessage = document.getElementById('mobile-data-message');
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const showLink = document.getElementById('show-data-link');
+      const dataSection = document.querySelector('.data-section');
+      const mobileMessage = document.getElementById('mobile-data-message');
 
-            if (showLink && dataSection && mobileMessage) {
-                showLink.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    dataSection.style.display = 'block';
-                    mobileMessage.style.display = 'none';
-                    
-                    // Recalculate sticky column widths after table is shown
-                    setTimeout(updateStickyColumnWidths, 100);
-                });
-            }
+      if (showLink && dataSection && mobileMessage) {
+        showLink.addEventListener('click', function (e) {
+          e.preventDefault();
+          dataSection.style.display = 'block';
+          mobileMessage.style.display = 'none';
+
+          // Recalculate sticky column widths after table is shown
+          setTimeout(updateStickyColumnWidths, 100);
         });
-    </script>
-    
-    <!-- Mobile Burger Menu Controller -->
-    <script>
+      }
+    });
+  </script>
+
+  <!-- Mobile Burger Menu Controller -->
+  <script>
     class MobileBurgerMenu {
-        constructor() {
-            this.menuToggle = document.getElementById('mobileMenuToggle');
-            this.mobileMenu = document.getElementById('mobileMenu');
-            this.menuContent = document.querySelector('.mobile-menu-content');
-            this.isOpen = false;
-            
-            this.init();
-        }
-        
-        init() {
-            // Bind event listeners
-            this.menuToggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.toggleMenu();
-            });
-            
-            // Close menu when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!this.isOpen) return;
+      constructor() {
+        this.menuToggle = document.getElementById('mobileMenuToggle');
+        this.mobileMenu = document.getElementById('mobileMenu');
+        this.menuContent = document.querySelector('.mobile-menu-content');
+        this.isOpen = false;
 
-                // Ignore clicks inside the burger menu itself or on its toggle
-                if (this.mobileMenu.contains(e.target) || this.menuToggle.contains(e.target)) {
-                    return;
-                }
+        this.init();
+      }
 
-                // If the on-screen wizard is active, ignore clicks inside its popover
-                const wizardActive = document.body.getAttribute('data-wizard-active') === 'true';
-                if (wizardActive && e.target.closest('.driver-popover')) {
-                    return;
-                }
+      init() {
+        // Bind event listeners
+        this.menuToggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.toggleMenu();
+        });
 
-                // Otherwise treat it as an outside click
-                this.closeMenu();
-            });
-            
-            // Handle ESC key
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && this.isOpen) {
-                    this.closeMenu();
-                }
-            });
-            
-            // Update menu content on resize
-            window.addEventListener('resize', () => {
-                this.updateMenuContent();
-            });
-            
-            // Sync mobile menu buttons with desktop actions
-            this.syncMenuButtons();
-            
-            // Update mobile status indicator
-            this.syncStatusIndicator();
-            
-            // Initialize toggle state from localStorage
-            this.initializeToggleState();
-        }
-        
-        toggleMenu() {
-            if (this.isOpen) {
-                this.closeMenu();
-            } else {
-                this.openMenu();
-            }
-        }
-        
-        openMenu() {
-            this.isOpen = true;
-            this.menuToggle.classList.add('active');
-            this.mobileMenu.classList.add('active');
-            this.updateMenuContent();
-        }
-        
-        closeMenu() {
-            this.isOpen = false;
-            this.menuToggle.classList.remove('active');
-            this.mobileMenu.classList.remove('active');
-        }
-        
-        updateMenuContent() {
-            const currentWidth = window.innerWidth;
-            const breakpoints = getBreakpoints();
-            const runButton = document.getElementById('runSimulationMobile');
-            const statusDiv = document.getElementById('progressMobile');
-            const saveButton = document.getElementById('saveSimulationMobile');
-            const loadButton = document.getElementById('loadSimulationMobile');
-            const demoButton = document.getElementById('loadDemoScenarioMobile');
-            const helpButton = document.getElementById('startWizardMobile');
-            const toggleButton = document.getElementById('experimentalToggleMobile');
-            const eventsWizardToggleButton = document.getElementById('eventsWizardToggleMobile');
-            const presentValueToggleButton = document.getElementById('presentValueToggleMobile');
-            const firstDivider = document.querySelector('.mobile-menu-divider');
-            const secondDivider = document.querySelectorAll('.mobile-menu-divider')[1];
-            const thirdDivider = document.querySelectorAll('.mobile-menu-divider')[2];
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!this.isOpen) return;
 
-            // Hardcoded toggle to show/hide the experimental toggle button
-            const SHOW_TOGGLE_BUTTON = false;
-            // Always show the Events Wizard toggle
-            const SHOW_EVENTS_WIZARD_TOGGLE = true;
-            // Always show the Present Value toggle
-            const SHOW_PRESENT_VALUE_TOGGLE = true;
-            
-            // Track which sections have visible content
-            let hasRunSection = false;
-            let hasSaveLoadSection = false;
-            let hasDemoHelpSection = false;
-            let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE;
-            
-            if (currentWidth > breakpoints.tablet) {
-                // Desktop mode: Only show Demo/Help/Coffee buttons that are visible in header but burger menu is always available
-                if (runButton) runButton.style.display = 'none';
-                if (statusDiv) statusDiv.style.display = 'none';
-                if (saveButton) saveButton.style.display = 'none';
-                if (loadButton) loadButton.style.display = 'none';
-                if (demoButton) demoButton.style.display = 'none';
-                if (helpButton) helpButton.style.display = 'none';
-                
-                hasRunSection = false;
-                hasSaveLoadSection = false;
-                hasDemoHelpSection = false;
-            } else if (currentWidth > breakpoints.mobile) {
-                // Tablet mode: Show Demo/Help buttons (moved to burger menu)
-                if (runButton) runButton.style.display = 'none';
-                if (statusDiv) statusDiv.style.display = 'none';
-                if (saveButton) saveButton.style.display = 'none';
-                if (loadButton) loadButton.style.display = 'none';
-                if (demoButton) demoButton.style.display = 'flex';
-                if (helpButton) helpButton.style.display = 'flex';
-                
-                hasRunSection = false;
-                hasSaveLoadSection = false;
-                hasDemoHelpSection = true;
-            } else {
-                // Mobile mode: Show Save/Load + Demo/Help (all hidden from header)
-                if (runButton) runButton.style.display = 'none';
-                if (statusDiv) statusDiv.style.display = 'none';
-                if (saveButton) saveButton.style.display = 'flex';
-                if (loadButton) loadButton.style.display = 'flex';
-                if (demoButton) demoButton.style.display = 'flex';
-                if (helpButton) helpButton.style.display = 'flex';
-                
-                hasRunSection = false;
-                hasSaveLoadSection = true;
-                hasDemoHelpSection = true;
-            }
-            
-            // Show dividers only when they separate visible content
-            // First divider: between Run/Status and Save/Load
-            if (firstDivider) {
-                firstDivider.style.display = (hasRunSection && hasSaveLoadSection) ? 'block' : 'none';
-            }
-            
-            // Second divider: between Save/Load and Demo/Help/Toggle
-            if (secondDivider) {
-                secondDivider.style.display = (hasSaveLoadSection && hasDemoHelpSection) ? 'block' : 'none';
-            }
-            
-            // Show/hide toggle buttons based on the hardcoded booleans
-            if (toggleButton) {
-                toggleButton.style.display = SHOW_TOGGLE_BUTTON ? 'flex' : 'none';
-            }
+          // Ignore clicks inside the burger menu itself or on its toggle
+          if (this.mobileMenu.contains(e.target) || this.menuToggle.contains(e.target)) {
+            return;
+          }
 
-            if (eventsWizardToggleButton) {
-                eventsWizardToggleButton.style.display = SHOW_EVENTS_WIZARD_TOGGLE ? 'flex' : 'none';
-            }
-            if (presentValueToggleButton) {
-                presentValueToggleButton.style.display = SHOW_PRESENT_VALUE_TOGGLE ? 'flex' : 'none';
-            }
-            
-            // Third divider: between Demo/Help/Toggle and Coffee (Coffee is always visible)
-            if (thirdDivider) {
-                thirdDivider.style.display = (hasDemoHelpSection || hasToggleSection) ? 'block' : 'none';
-            }
-        }
-        
-        syncMenuButtons() {
-            // Run Simulation
-            const runSimMobile = document.getElementById('runSimulationMobile');
-            const runSimDesktop = document.getElementById('runSimulation');
-            if (runSimMobile && runSimDesktop) {
-                runSimMobile.addEventListener('click', () => {
-                    this.closeMenu();
-                    runSimDesktop.click();
-                });
-            }
-            
-            // Save Simulation
-            const saveMobile = document.getElementById('saveSimulationMobile');
-            const saveDesktop = document.getElementById('saveSimulation');
-            if (saveMobile && saveDesktop) {
-                saveMobile.addEventListener('click', () => {
-                    this.closeMenu();
-                    saveDesktop.click();
-                });
-            }
-            
-            // Load Simulation
-            const loadMobile = document.getElementById('loadSimulationMobile');
-            const loadDesktop = document.getElementById('loadSimulation');
-            if (loadMobile && loadDesktop) {
-                loadMobile.addEventListener('click', () => {
-                    this.closeMenu();
-                    loadDesktop.click();
-                });
-            }
-            
-            // Demo
-            const demoMobile = document.getElementById('loadDemoScenarioMobile');
-            const demoDesktop = document.getElementById('loadDemoScenarioHeader');
-            if (demoMobile && demoDesktop) {
-                demoMobile.addEventListener('click', () => {
-                    this.closeMenu();
-                    demoDesktop.click();
-                });
-            }
-            
-            // Help/Wizard
-            const helpMobile = document.getElementById('startWizardMobile');
-            const helpDesktop = document.getElementById('startWizard');
-            if (helpMobile && helpDesktop) {
-                helpMobile.addEventListener('click', () => {
-                    this.closeMenu();
-                    helpDesktop.click();
-                });
-            }
-            
-            // Experimental Toggle
-            const toggleMobile = document.getElementById('experimentalToggleMobile');
-            if (toggleMobile) {
-                toggleMobile.addEventListener('click', () => {
-                    this.handleToggle(toggleMobile);
-                });
-            }
+          // If the on-screen wizard is active, ignore clicks inside its popover
+          const wizardActive = document.body.getAttribute('data-wizard-active') === 'true';
+          if (wizardActive && e.target.closest('.driver-popover')) {
+            return;
+          }
 
-            // Events Wizard Toggle
-            const eventsWizardToggleMobile = document.getElementById('eventsWizardToggleMobile');
-            if (eventsWizardToggleMobile) {
-                eventsWizardToggleMobile.addEventListener('click', () => {
-                    this.handleEventsWizardToggle(eventsWizardToggleMobile);
-                });
-            }
-            
-            // Present Value Toggle
-            const presentValueToggleMobile = document.getElementById('presentValueToggleMobile');
-            if (presentValueToggleMobile) {
-                presentValueToggleMobile.addEventListener('click', () => {
-                    this.handlePresentValueToggle(presentValueToggleMobile);
-                });
-            }
+          // Otherwise treat it as an outside click
+          this.closeMenu();
+        });
+
+        // Handle ESC key
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && this.isOpen) {
+            this.closeMenu();
+          }
+        });
+
+        // Update menu content on resize
+        window.addEventListener('resize', () => {
+          this.updateMenuContent();
+        });
+
+        // Sync mobile menu buttons with desktop actions
+        this.syncMenuButtons();
+
+        // Update mobile status indicator
+        this.syncStatusIndicator();
+
+        // Initialize toggle state from localStorage
+        this.initializeToggleState();
+      }
+
+      toggleMenu() {
+        if (this.isOpen) {
+          this.closeMenu();
+        } else {
+          this.openMenu();
         }
-        
-        syncStatusIndicator() {
-            const progressDesktop = document.getElementById('progress');
-            const progressMobile = document.getElementById('progressMobile');
-            
-            if (progressDesktop && progressMobile) {
-                // Initial sync
+      }
+
+      openMenu() {
+        this.isOpen = true;
+        this.menuToggle.classList.add('active');
+        this.mobileMenu.classList.add('active');
+        this.updateMenuContent();
+      }
+
+      closeMenu() {
+        this.isOpen = false;
+        this.menuToggle.classList.remove('active');
+        this.mobileMenu.classList.remove('active');
+      }
+
+      updateMenuContent() {
+        const currentWidth = window.innerWidth;
+        const breakpoints = getBreakpoints();
+        const runButton = document.getElementById('runSimulationMobile');
+        const statusDiv = document.getElementById('progressMobile');
+        const saveButton = document.getElementById('saveSimulationMobile');
+        const loadButton = document.getElementById('loadSimulationMobile');
+        const demoButton = document.getElementById('loadDemoScenarioMobile');
+        const helpButton = document.getElementById('startWizardMobile');
+        const toggleButton = document.getElementById('experimentalToggleMobile');
+        const eventsWizardToggleButton = document.getElementById('eventsWizardToggleMobile');
+        const presentValueToggleButton = document.getElementById('presentValueToggleMobile');
+        const firstDivider = document.querySelector('.mobile-menu-divider');
+        const secondDivider = document.querySelectorAll('.mobile-menu-divider')[1];
+        const thirdDivider = document.querySelectorAll('.mobile-menu-divider')[2];
+
+        // Hardcoded toggle to show/hide the experimental toggle button
+        const SHOW_TOGGLE_BUTTON = false;
+        // Always show the Events Wizard toggle
+        const SHOW_EVENTS_WIZARD_TOGGLE = true;
+        // Always show the Present Value toggle
+        const SHOW_PRESENT_VALUE_TOGGLE = true;
+
+        // Track which sections have visible content
+        let hasRunSection = false;
+        let hasSaveLoadSection = false;
+        let hasDemoHelpSection = false;
+        let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE;
+
+        if (currentWidth > breakpoints.tablet) {
+          // Desktop mode: Only show Demo/Help/Coffee buttons that are visible in header but burger menu is always available
+          if (runButton) runButton.style.display = 'none';
+          if (statusDiv) statusDiv.style.display = 'none';
+          if (saveButton) saveButton.style.display = 'none';
+          if (loadButton) loadButton.style.display = 'none';
+          if (demoButton) demoButton.style.display = 'none';
+          if (helpButton) helpButton.style.display = 'none';
+
+          hasRunSection = false;
+          hasSaveLoadSection = false;
+          hasDemoHelpSection = false;
+        } else if (currentWidth > breakpoints.mobile) {
+          // Tablet mode: Show Demo/Help buttons (moved to burger menu)
+          if (runButton) runButton.style.display = 'none';
+          if (statusDiv) statusDiv.style.display = 'none';
+          if (saveButton) saveButton.style.display = 'none';
+          if (loadButton) loadButton.style.display = 'none';
+          if (demoButton) demoButton.style.display = 'flex';
+          if (helpButton) helpButton.style.display = 'flex';
+
+          hasRunSection = false;
+          hasSaveLoadSection = false;
+          hasDemoHelpSection = true;
+        } else {
+          // Mobile mode: Show Save/Load + Demo/Help (all hidden from header)
+          if (runButton) runButton.style.display = 'none';
+          if (statusDiv) statusDiv.style.display = 'none';
+          if (saveButton) saveButton.style.display = 'flex';
+          if (loadButton) loadButton.style.display = 'flex';
+          if (demoButton) demoButton.style.display = 'flex';
+          if (helpButton) helpButton.style.display = 'flex';
+
+          hasRunSection = false;
+          hasSaveLoadSection = true;
+          hasDemoHelpSection = true;
+        }
+
+        // Show dividers only when they separate visible content
+        // First divider: between Run/Status and Save/Load
+        if (firstDivider) {
+          firstDivider.style.display = (hasRunSection && hasSaveLoadSection) ? 'block' : 'none';
+        }
+
+        // Second divider: between Save/Load and Demo/Help/Toggle
+        if (secondDivider) {
+          secondDivider.style.display = (hasSaveLoadSection && hasDemoHelpSection) ? 'block' : 'none';
+        }
+
+        // Show/hide toggle buttons based on the hardcoded booleans
+        if (toggleButton) {
+          toggleButton.style.display = SHOW_TOGGLE_BUTTON ? 'flex' : 'none';
+        }
+
+        if (eventsWizardToggleButton) {
+          eventsWizardToggleButton.style.display = SHOW_EVENTS_WIZARD_TOGGLE ? 'flex' : 'none';
+        }
+        if (presentValueToggleButton) {
+          presentValueToggleButton.style.display = SHOW_PRESENT_VALUE_TOGGLE ? 'flex' : 'none';
+        }
+
+        // Third divider: between Demo/Help/Toggle and Coffee (Coffee is always visible)
+        if (thirdDivider) {
+          thirdDivider.style.display = (hasDemoHelpSection || hasToggleSection) ? 'block' : 'none';
+        }
+      }
+
+      syncMenuButtons() {
+        // Run Simulation
+        const runSimMobile = document.getElementById('runSimulationMobile');
+        const runSimDesktop = document.getElementById('runSimulation');
+        if (runSimMobile && runSimDesktop) {
+          runSimMobile.addEventListener('click', () => {
+            this.closeMenu();
+            runSimDesktop.click();
+          });
+        }
+
+        // Save Simulation
+        const saveMobile = document.getElementById('saveSimulationMobile');
+        const saveDesktop = document.getElementById('saveSimulation');
+        if (saveMobile && saveDesktop) {
+          saveMobile.addEventListener('click', () => {
+            this.closeMenu();
+            saveDesktop.click();
+          });
+        }
+
+        // Load Simulation
+        const loadMobile = document.getElementById('loadSimulationMobile');
+        const loadDesktop = document.getElementById('loadSimulation');
+        if (loadMobile && loadDesktop) {
+          loadMobile.addEventListener('click', () => {
+            this.closeMenu();
+            loadDesktop.click();
+          });
+        }
+
+        // Demo
+        const demoMobile = document.getElementById('loadDemoScenarioMobile');
+        const demoDesktop = document.getElementById('loadDemoScenarioHeader');
+        if (demoMobile && demoDesktop) {
+          demoMobile.addEventListener('click', () => {
+            this.closeMenu();
+            demoDesktop.click();
+          });
+        }
+
+        // Help/Wizard
+        const helpMobile = document.getElementById('startWizardMobile');
+        const helpDesktop = document.getElementById('startWizard');
+        if (helpMobile && helpDesktop) {
+          helpMobile.addEventListener('click', () => {
+            this.closeMenu();
+            helpDesktop.click();
+          });
+        }
+
+        // Experimental Toggle
+        const toggleMobile = document.getElementById('experimentalToggleMobile');
+        if (toggleMobile) {
+          toggleMobile.addEventListener('click', () => {
+            this.handleToggle(toggleMobile);
+          });
+        }
+
+        // Events Wizard Toggle
+        const eventsWizardToggleMobile = document.getElementById('eventsWizardToggleMobile');
+        if (eventsWizardToggleMobile) {
+          eventsWizardToggleMobile.addEventListener('click', () => {
+            this.handleEventsWizardToggle(eventsWizardToggleMobile);
+          });
+        }
+
+        // Present Value Toggle
+        const presentValueToggleMobile = document.getElementById('presentValueToggleMobile');
+        if (presentValueToggleMobile) {
+          presentValueToggleMobile.addEventListener('click', () => {
+            this.handlePresentValueToggle(presentValueToggleMobile);
+          });
+        }
+      }
+
+      syncStatusIndicator() {
+        const progressDesktop = document.getElementById('progress');
+        const progressMobile = document.getElementById('progressMobile');
+
+        if (progressDesktop && progressMobile) {
+          // Initial sync
+          progressMobile.textContent = progressDesktop.textContent;
+          progressMobile.className = progressDesktop.className.replace('status-indicator', 'mobile-menu-status');
+
+          // Watch for changes using MutationObserver
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              if (mutation.type === 'childList' || mutation.type === 'characterData') {
                 progressMobile.textContent = progressDesktop.textContent;
+              }
+              if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
                 progressMobile.className = progressDesktop.className.replace('status-indicator', 'mobile-menu-status');
-                
-                // Watch for changes using MutationObserver
-                const observer = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                        if (mutation.type === 'childList' || mutation.type === 'characterData') {
-                            progressMobile.textContent = progressDesktop.textContent;
-                        }
-                        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                            progressMobile.className = progressDesktop.className.replace('status-indicator', 'mobile-menu-status');
-                        }
-                    });
-                });
-                
-                observer.observe(progressDesktop, {
-                    childList: true,
-                    characterData: true,
-                    attributes: true,
-                    subtree: true
-                });
-            }
+              }
+            });
+          });
+
+          observer.observe(progressDesktop, {
+            childList: true,
+            characterData: true,
+            attributes: true,
+            subtree: true
+          });
         }
-        
-        handleToggle(toggleButton) {
-            const currentState = toggleButton.getAttribute('data-toggle-state');
-            const newState = currentState === 'off' ? 'on' : 'off';
-            const icon = toggleButton.querySelector('i');
-            const textSpan = toggleButton.querySelector('span');
-            
-            // Update the button state
-            toggleButton.setAttribute('data-toggle-state', newState);
-            
-            // Update the icon
-            if (newState === 'on') {
-                icon.classList.remove('fa-toggle-off');
-                icon.classList.add('fa-toggle-on');
-                textSpan.innerHTML = 'Tooltips: <strong>on</strong>';
-            } else {
-                icon.classList.remove('fa-toggle-on');
-                icon.classList.add('fa-toggle-off');
-                textSpan.innerHTML = 'Tooltips: <strong>off</strong>';
-            }
-            
-            // Store the state in localStorage for persistence
-            localStorage.setItem('experimentalFeatureState', newState);
-            
-            // Trigger custom event that other parts of the app can listen to
-            window.dispatchEvent(new CustomEvent('experimentalFeatureToggle', {
-                detail: { state: newState, enabled: newState === 'on' }
-            }));
+      }
+
+      handleToggle(toggleButton) {
+        const currentState = toggleButton.getAttribute('data-toggle-state');
+        const newState = currentState === 'off' ? 'on' : 'off';
+        const icon = toggleButton.querySelector('i');
+        const textSpan = toggleButton.querySelector('span');
+
+        // Update the button state
+        toggleButton.setAttribute('data-toggle-state', newState);
+
+        // Update the icon
+        if (newState === 'on') {
+          icon.classList.remove('fa-toggle-off');
+          icon.classList.add('fa-toggle-on');
+          textSpan.innerHTML = 'Tooltips: <strong>on</strong>';
+        } else {
+          icon.classList.remove('fa-toggle-on');
+          icon.classList.add('fa-toggle-off');
+          textSpan.innerHTML = 'Tooltips: <strong>off</strong>';
         }
 
-        handleEventsWizardToggle(toggleButton) {
-            const currentState = toggleButton.getAttribute('data-toggle-state');
-            const newState = currentState === 'off' ? 'on' : 'off';
-            const toggleSwitch = toggleButton.querySelector('.toggle-switch');
+        // Store the state in localStorage for persistence
+        localStorage.setItem('experimentalFeatureState', newState);
 
-            // Update the button state
-            toggleButton.setAttribute('data-toggle-state', newState);
+        // Trigger custom event that other parts of the app can listen to
+        window.dispatchEvent(new CustomEvent('experimentalFeatureToggle', {
+          detail: { state: newState, enabled: newState === 'on' }
+        }));
+      }
 
-            // Update the toggle switch visual state
-            if (newState === 'on') {
-                toggleSwitch.classList.add('active');
-            } else {
-                toggleSwitch.classList.remove('active');
-            }
+      handleEventsWizardToggle(toggleButton) {
+        const currentState = toggleButton.getAttribute('data-toggle-state');
+        const newState = currentState === 'off' ? 'on' : 'off';
+        const toggleSwitch = toggleButton.querySelector('.toggle-switch');
 
-            // Store the state in localStorage for persistence
-            localStorage.setItem('eventsWizardState', newState);
+        // Update the button state
+        toggleButton.setAttribute('data-toggle-state', newState);
 
-            // Trigger custom event that other parts of the app can listen to
-            window.dispatchEvent(new CustomEvent('eventsWizardToggle', {
-                detail: { state: newState, enabled: newState === 'on' }
-            }));
+        // Update the toggle switch visual state
+        if (newState === 'on') {
+          toggleSwitch.classList.add('active');
+        } else {
+          toggleSwitch.classList.remove('active');
         }
 
-        handlePresentValueToggle(toggleButton) {
-            const currentState = toggleButton.getAttribute('data-toggle-state');
-            const newState = currentState === 'off' ? 'on' : 'off';
-            const toggleSwitch = toggleButton.querySelector('.toggle-switch');
+        // Store the state in localStorage for persistence
+        localStorage.setItem('eventsWizardState', newState);
 
-            // Update the button state
-            toggleButton.setAttribute('data-toggle-state', newState);
+        // Trigger custom event that other parts of the app can listen to
+        window.dispatchEvent(new CustomEvent('eventsWizardToggle', {
+          detail: { state: newState, enabled: newState === 'on' }
+        }));
+      }
 
-            // Update the toggle switch visual state
-            if (newState === 'on') {
-                toggleSwitch.classList.add('active');
-            } else {
-                toggleSwitch.classList.remove('active');
-            }
+      handlePresentValueToggle(toggleButton) {
+        const currentState = toggleButton.getAttribute('data-toggle-state');
+        const newState = currentState === 'off' ? 'on' : 'off';
+        const toggleSwitch = toggleButton.querySelector('.toggle-switch');
 
-            // Store the state in localStorage for persistence
-            localStorage.setItem('presentValueMode', newState);
+        // Update the button state
+        toggleButton.setAttribute('data-toggle-state', newState);
 
-            // Trigger custom event that other parts of the app can listen to
-            window.dispatchEvent(new CustomEvent('presentValueToggle', {
-                detail: { state: newState, enabled: newState === 'on' }
-            }));
-
-            // Apply to managers via WebUI singleton
-            try {
-                if (typeof WebUI !== 'undefined') {
-                    const webUI = WebUI.getInstance();
-                    if (webUI && webUI.tableManager && typeof webUI.tableManager.setPresentValueMode === 'function') {
-                        webUI.tableManager.setPresentValueMode(newState === 'on');
-                    }
-                    if (webUI && webUI.chartManager && typeof webUI.chartManager.setPresentValueMode === 'function') {
-                        webUI.chartManager.setPresentValueMode(newState === 'on');
-                    }
-                }
-            } catch (_) { /* no-op */ }
+        // Update the toggle switch visual state
+        if (newState === 'on') {
+          toggleSwitch.classList.add('active');
+        } else {
+          toggleSwitch.classList.remove('active');
         }
 
-        initializeToggleState() {
-            // Initialize experimental toggle
-            const toggleButton = document.getElementById('experimentalToggleMobile');
-            if (toggleButton) {
-                // Get saved state from localStorage
-                const savedState = localStorage.getItem('experimentalFeatureState') || 'off';
-                const icon = toggleButton.querySelector('i');
-                const textSpan = toggleButton.querySelector('span');
+        // Store the state in localStorage for persistence
+        localStorage.setItem('presentValueMode', newState);
 
-                // Set the initial state
-                toggleButton.setAttribute('data-toggle-state', savedState);
+        // Trigger custom event that other parts of the app can listen to
+        window.dispatchEvent(new CustomEvent('presentValueToggle', {
+          detail: { state: newState, enabled: newState === 'on' }
+        }));
 
-                // Update the icon and text based on saved state
-                if (savedState === 'on') {
-                    icon.classList.remove('fa-toggle-off');
-                    icon.classList.add('fa-toggle-on');
-                    textSpan.innerHTML = 'Tooltips: <strong>on</strong>';
-                } else {
-                    icon.classList.remove('fa-toggle-on');
-                    icon.classList.add('fa-toggle-off');
-                    textSpan.innerHTML = 'Tooltips: <strong>off</strong>';
-                }
-
-                // Dispatch initial event for any listeners
-                window.dispatchEvent(new CustomEvent('experimentalFeatureToggle', {
-                    detail: { state: savedState, enabled: savedState === 'on' }
-                }));
+        // Apply to managers via WebUI singleton
+        try {
+          if (typeof WebUI !== 'undefined') {
+            const webUI = WebUI.getInstance();
+            if (webUI && webUI.tableManager && typeof webUI.tableManager.setPresentValueMode === 'function') {
+              webUI.tableManager.setPresentValueMode(newState === 'on');
             }
-
-            // Initialize Events Wizard toggle
-            const eventsWizardToggleButton = document.getElementById('eventsWizardToggleMobile');
-            if (eventsWizardToggleButton) {
-                // Get saved state from localStorage (default to 'on')
-                const savedState = localStorage.getItem('eventsWizardState') || 'on';
-                const toggleSwitch = eventsWizardToggleButton.querySelector('.toggle-switch');
-
-                // Set the initial state
-                eventsWizardToggleButton.setAttribute('data-toggle-state', savedState);
-
-                // Update the toggle switch visual state based on saved state
-                if (savedState === 'on') {
-                    toggleSwitch.classList.add('active');
-                } else {
-                    toggleSwitch.classList.remove('active');
-                }
-
-                // Dispatch initial event for any listeners
-                window.dispatchEvent(new CustomEvent('eventsWizardToggle', {
-                    detail: { state: savedState, enabled: savedState === 'on' }
-                }));
+            if (webUI && webUI.chartManager && typeof webUI.chartManager.setPresentValueMode === 'function') {
+              webUI.chartManager.setPresentValueMode(newState === 'on');
             }
+          }
+        } catch (_) { /* no-op */ }
+      }
 
-            // Initialize Present Value toggle
-            const presentValueToggleButton = document.getElementById('presentValueToggleMobile');
-            if (presentValueToggleButton) {
-                // Get saved state from localStorage (default to 'off')
-                const savedState = localStorage.getItem('presentValueMode') || 'off';
-                const toggleSwitch = presentValueToggleButton.querySelector('.toggle-switch');
+      initializeToggleState() {
+        // Initialize experimental toggle
+        const toggleButton = document.getElementById('experimentalToggleMobile');
+        if (toggleButton) {
+          // Get saved state from localStorage
+          const savedState = localStorage.getItem('experimentalFeatureState') || 'off';
+          const icon = toggleButton.querySelector('i');
+          const textSpan = toggleButton.querySelector('span');
 
-                // Set the initial state
-                presentValueToggleButton.setAttribute('data-toggle-state', savedState);
+          // Set the initial state
+          toggleButton.setAttribute('data-toggle-state', savedState);
 
-                // Update the toggle switch visual state based on saved state
-                if (savedState === 'on') {
-                    toggleSwitch.classList.add('active');
-                } else {
-                    toggleSwitch.classList.remove('active');
-                }
+          // Update the icon and text based on saved state
+          if (savedState === 'on') {
+            icon.classList.remove('fa-toggle-off');
+            icon.classList.add('fa-toggle-on');
+            textSpan.innerHTML = 'Tooltips: <strong>on</strong>';
+          } else {
+            icon.classList.remove('fa-toggle-on');
+            icon.classList.add('fa-toggle-off');
+            textSpan.innerHTML = 'Tooltips: <strong>off</strong>';
+          }
 
-                // Dispatch initial event for any listeners
-                window.dispatchEvent(new CustomEvent('presentValueToggle', {
-                    detail: { state: savedState, enabled: savedState === 'on' }
-                }));
-
-                // Apply initial state to managers
-                try {
-                    if (typeof WebUI !== 'undefined') {
-                        const webUI = WebUI.getInstance();
-                        const enabled = (savedState === 'on');
-                        if (webUI && webUI.tableManager && typeof webUI.tableManager.setPresentValueMode === 'function') {
-                            webUI.tableManager.setPresentValueMode(enabled);
-                        }
-                        if (webUI && webUI.chartManager && typeof webUI.chartManager.setPresentValueMode === 'function') {
-                            webUI.chartManager.setPresentValueMode(enabled);
-                        }
-                    }
-                } catch (_) { /* no-op */ }
-            }
+          // Dispatch initial event for any listeners
+          window.dispatchEvent(new CustomEvent('experimentalFeatureToggle', {
+            detail: { state: savedState, enabled: savedState === 'on' }
+          }));
         }
+
+        // Initialize Events Wizard toggle
+        const eventsWizardToggleButton = document.getElementById('eventsWizardToggleMobile');
+        if (eventsWizardToggleButton) {
+          // Get saved state from localStorage (default to 'on')
+          const savedState = localStorage.getItem('eventsWizardState') || 'on';
+          const toggleSwitch = eventsWizardToggleButton.querySelector('.toggle-switch');
+
+          // Set the initial state
+          eventsWizardToggleButton.setAttribute('data-toggle-state', savedState);
+
+          // Update the toggle switch visual state based on saved state
+          if (savedState === 'on') {
+            toggleSwitch.classList.add('active');
+          } else {
+            toggleSwitch.classList.remove('active');
+          }
+
+          // Dispatch initial event for any listeners
+          window.dispatchEvent(new CustomEvent('eventsWizardToggle', {
+            detail: { state: savedState, enabled: savedState === 'on' }
+          }));
+        }
+
+        // Initialize Present Value toggle
+        const presentValueToggleButton = document.getElementById('presentValueToggleMobile');
+        if (presentValueToggleButton) {
+          // Get saved state from localStorage (default to 'off')
+          const savedState = localStorage.getItem('presentValueMode') || 'off';
+          const toggleSwitch = presentValueToggleButton.querySelector('.toggle-switch');
+
+          // Set the initial state
+          presentValueToggleButton.setAttribute('data-toggle-state', savedState);
+
+          // Update the toggle switch visual state based on saved state
+          if (savedState === 'on') {
+            toggleSwitch.classList.add('active');
+          } else {
+            toggleSwitch.classList.remove('active');
+          }
+
+          // Dispatch initial event for any listeners
+          window.dispatchEvent(new CustomEvent('presentValueToggle', {
+            detail: { state: savedState, enabled: savedState === 'on' }
+          }));
+
+          // Apply initial state to managers
+          try {
+            if (typeof WebUI !== 'undefined') {
+              const webUI = WebUI.getInstance();
+              const enabled = (savedState === 'on');
+              if (webUI && webUI.tableManager && typeof webUI.tableManager.setPresentValueMode === 'function') {
+                webUI.tableManager.setPresentValueMode(enabled);
+              }
+              if (webUI && webUI.chartManager && typeof webUI.chartManager.setPresentValueMode === 'function') {
+                webUI.chartManager.setPresentValueMode(enabled);
+              }
+            }
+          } catch (_) { /* no-op */ }
+        }
+      }
     }
-    
-        // Get breakpoint values from CSS custom properties
+
+    // Get breakpoint values from CSS custom properties
     function getBreakpoints() {
-        const style = getComputedStyle(document.documentElement);
-        return {
-            tablet: parseInt(style.getPropertyValue('--breakpoint-tablet')),
-            mobile: parseInt(style.getPropertyValue('--breakpoint-mobile'))
-        };
+      const style = getComputedStyle(document.documentElement);
+      return {
+        tablet: parseInt(style.getPropertyValue('--breakpoint-tablet')),
+        mobile: parseInt(style.getPropertyValue('--breakpoint-mobile'))
+      };
     }
 
     // Get layout breakpoint values from CSS custom properties
     function getLayoutBreakpoints() {
-        const style = getComputedStyle(document.documentElement);
-        return {
-            wide: parseInt(style.getPropertyValue('--layout-breakpoint-wide')),
-            medium: parseInt(style.getPropertyValue('--layout-breakpoint-medium')),
-            narrow: parseInt(style.getPropertyValue('--layout-breakpoint-narrow')),
-            mobile: parseInt(style.getPropertyValue('--layout-breakpoint-mobile'))
-        };
+      const style = getComputedStyle(document.documentElement);
+      return {
+        wide: parseInt(style.getPropertyValue('--layout-breakpoint-wide')),
+        medium: parseInt(style.getPropertyValue('--layout-breakpoint-medium')),
+        narrow: parseInt(style.getPropertyValue('--layout-breakpoint-narrow')),
+        mobile: parseInt(style.getPropertyValue('--layout-breakpoint-mobile'))
+      };
     }
 
     // Generate header responsive CSS from centralized breakpoints
     function generateHeaderResponsiveCSS() {
-        const bp = getBreakpoints();
-        
-        const css = `
+      const bp = getBreakpoints();
+
+      const css = `
         /* Global max-width constraint for header to align with main content */
         header {
           max-width: 2350px;
@@ -1145,22 +1199,22 @@
          }
         `;
 
-        // Inject CSS into the page
-        let styleElement = document.getElementById('dynamic-header-responsive-css');
-        if (!styleElement) {
-            styleElement = document.createElement('style');
-            styleElement.id = 'dynamic-header-responsive-css';
-            document.head.appendChild(styleElement);
-        }
-        styleElement.textContent = css;
+      // Inject CSS into the page
+      let styleElement = document.getElementById('dynamic-header-responsive-css');
+      if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = 'dynamic-header-responsive-css';
+        document.head.appendChild(styleElement);
+      }
+      styleElement.textContent = css;
     }
 
     // Generate layout responsive CSS from centralized breakpoints
     function generateLayoutResponsiveCSS() {
-        const lbp = getLayoutBreakpoints();
-        const bp = getBreakpoints();
-        
-        const css = `
+      const lbp = getLayoutBreakpoints();
+      const bp = getBreakpoints();
+
+      const css = `
         /* Global max-width constraint for all screen sizes */
         main {
           max-width: 2350px;
@@ -1299,331 +1353,332 @@
         }
         `;
 
-        // Inject CSS into the page
-        let styleElement = document.getElementById('dynamic-layout-responsive-css');
-        if (!styleElement) {
-            styleElement = document.createElement('style');
-            styleElement.id = 'dynamic-layout-responsive-css';
-            document.head.appendChild(styleElement);
-        }
-        styleElement.textContent = css;
+      // Inject CSS into the page
+      let styleElement = document.getElementById('dynamic-layout-responsive-css');
+      if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = 'dynamic-layout-responsive-css';
+        document.head.appendChild(styleElement);
+      }
+      styleElement.textContent = css;
     }
-            
-    document.addEventListener('DOMContentLoaded', () => {
-        // Generate header responsive CSS from centralized breakpoints
-        generateHeaderResponsiveCSS();
-        
-        // Generate layout responsive CSS from centralized breakpoints
-        generateLayoutResponsiveCSS();
-        
-        // Create global instance for wizard access
-        window.mobileBurgerMenuInstance = new MobileBurgerMenu();
-        initializeResponsiveHeader();
-    });
-    
-        // Clean up any previous squeeze adjustments on load
-    function cleanupButtonStyles() {
-        const allButtons = document.querySelectorAll('.header-center button, .header-right button');
-        const allContainers = document.querySelectorAll('.header-center, .header-right');
-        
-        allButtons.forEach(btn => {
-            btn.style.removeProperty('padding');
-            btn.style.removeProperty('font-size');
-        });
-        
-        allContainers.forEach(container => {
-            container.style.removeProperty('gap');
-        });
-    }
-    
-    function initializeResponsiveHeader() {
-        // Clean up any existing squeeze adjustments
-        cleanupButtonStyles();
 
-        // Reveal the header (hidden by default for first-render flash prevention)
-        const header = document.querySelector('header');
-        if (header && header.classList.contains('header-hidden')) {
-            // Use requestAnimationFrame to ensure this runs in next paint cycle for smoother animation
-            requestAnimationFrame(() => header.classList.remove('header-hidden'));
-        }
+    document.addEventListener('DOMContentLoaded', () => {
+      // Generate header responsive CSS from centralized breakpoints
+      generateHeaderResponsiveCSS();
+
+      // Generate layout responsive CSS from centralized breakpoints
+      generateLayoutResponsiveCSS();
+
+      // Create global instance for wizard access
+      window.mobileBurgerMenuInstance = new MobileBurgerMenu();
+      initializeResponsiveHeader();
+    });
+
+    // Clean up any previous squeeze adjustments on load
+    function cleanupButtonStyles() {
+      const allButtons = document.querySelectorAll('.header-center button, .header-right button');
+      const allContainers = document.querySelectorAll('.header-center, .header-right');
+
+      allButtons.forEach(btn => {
+        btn.style.removeProperty('padding');
+        btn.style.removeProperty('font-size');
+      });
+
+      allContainers.forEach(container => {
+        container.style.removeProperty('gap');
+      });
     }
-    
+
+    function initializeResponsiveHeader() {
+      // Clean up any existing squeeze adjustments
+      cleanupButtonStyles();
+
+      // Reveal the header (hidden by default for first-render flash prevention)
+      const header = document.querySelector('header');
+      if (header && header.classList.contains('header-hidden')) {
+        // Use requestAnimationFrame to ensure this runs in next paint cycle for smoother animation
+        requestAnimationFrame(() => header.classList.remove('header-hidden'));
+      }
+    }
+
     // Fix iOS Safari zoom on orientation change
     let lastOrientation = window.orientation;
     function preventZoomOnOrientationChange(isOrientationChange = false) {
-        const viewport = document.querySelector('meta[name="viewport"]');
-        if (viewport) {
-            // Force viewport reset on orientation change
-            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
-            
-            // Only scroll to top on actual orientation changes, not regular resize events
-            if (isOrientationChange) {
-                setTimeout(() => {
-                    if (window.visualViewport) {
-                        window.scrollTo(0, 0);
-                    }
-                }, 100);
+      const viewport = document.querySelector('meta[name="viewport"]');
+      if (viewport) {
+        // Force viewport reset on orientation change
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+
+        // Only scroll to top on actual orientation changes, not regular resize events
+        if (isOrientationChange) {
+          setTimeout(() => {
+            if (window.visualViewport) {
+              window.scrollTo(0, 0);
             }
+          }, 100);
         }
+      }
     }
 
     // Listen for orientation changes
     window.addEventListener('orientationchange', () => {
-        lastOrientation = window.orientation;
-        preventZoomOnOrientationChange(true);
+      lastOrientation = window.orientation;
+      preventZoomOnOrientationChange(true);
     });
-    
+
     // Listen for resize events but only scroll to top if orientation actually changed
     let orientationResizeTimeout;
-    window.addEventListener('resize', function() {
-        clearTimeout(orientationResizeTimeout);
-        orientationResizeTimeout = setTimeout(() => {
-            // Check if orientation actually changed (fallback for devices that don't fire orientationchange)
-            const currentOrientation = window.orientation;
-            const orientationChanged = currentOrientation !== lastOrientation;
-            if (orientationChanged) {
-                lastOrientation = currentOrientation;
-            }
-            preventZoomOnOrientationChange(orientationChanged);
-        }, 100);
+    window.addEventListener('resize', function () {
+      clearTimeout(orientationResizeTimeout);
+      orientationResizeTimeout = setTimeout(() => {
+        // Check if orientation actually changed (fallback for devices that don't fire orientationchange)
+        const currentOrientation = window.orientation;
+        const orientationChanged = currentOrientation !== lastOrientation;
+        if (orientationChanged) {
+          lastOrientation = currentOrientation;
+        }
+        preventZoomOnOrientationChange(orientationChanged);
+      }, 100);
     });
-    </script>
+  </script>
 
-    <!-- Dynamic Sticky Column Width Calculator -->
-    <script>
+  <!-- Dynamic Sticky Column Width Calculator -->
+  <script>
     // Calculate and set dynamic Age column width for sticky positioning
     function updateStickyColumnWidths() {
-        const dataTable = document.getElementById('Data');
-        if (!dataTable) return;
-        
-        const ageHeader = dataTable.querySelector('thead tr:last-child th:nth-child(1)');
-        if (!ageHeader) return;
-        
-        // Get the computed width of the Age column including borders and padding
-        const ageWidth = ageHeader.offsetWidth;
-        
-        // Set CSS custom property for dynamic positioning
-        dataTable.style.setProperty('--age-column-width', `${ageWidth}px`);
+      const dataTable = document.getElementById('Data');
+      if (!dataTable) return;
+
+      const ageHeader = dataTable.querySelector('thead tr:last-child th:nth-child(1)');
+      if (!ageHeader) return;
+
+      // Get the computed width of the Age column including borders and padding
+      const ageWidth = ageHeader.offsetWidth;
+
+      // Set CSS custom property for dynamic positioning
+      dataTable.style.setProperty('--age-column-width', `${ageWidth}px`);
     }
-    
+
     // Update on DOM content loaded
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initial calculation with a small delay to ensure table is rendered
-        setTimeout(updateStickyColumnWidths, 100);
+    document.addEventListener('DOMContentLoaded', function () {
+      // Initial calculation with a small delay to ensure table is rendered
+      setTimeout(updateStickyColumnWidths, 100);
     });
-    
+
     // Update on window resize
     window.addEventListener('resize', updateStickyColumnWidths);
-    
+
     // Update when table content changes (observe for changes)
-    const observer = new MutationObserver(function(mutations) {
-        let shouldUpdate = false;
-        mutations.forEach(function(mutation) {
-            if (mutation.type === 'childList' && 
-                (mutation.target.closest('#Data') || mutation.target.id === 'Data')) {
-                shouldUpdate = true;
-            }
-        });
-        if (shouldUpdate) {
-            setTimeout(updateStickyColumnWidths, 50);
+    const observer = new MutationObserver(function (mutations) {
+      let shouldUpdate = false;
+      mutations.forEach(function (mutation) {
+        if (mutation.type === 'childList' &&
+          (mutation.target.closest('#Data') || mutation.target.id === 'Data')) {
+          shouldUpdate = true;
         }
+      });
+      if (shouldUpdate) {
+        setTimeout(updateStickyColumnWidths, 50);
+      }
     });
-    
+
     // Start observing when DOM is ready
-    document.addEventListener('DOMContentLoaded', function() {
-        const dataTable = document.getElementById('Data');
-        if (dataTable) {
-            observer.observe(dataTable, {
-                childList: true,
-                subtree: true
-            });
-        }
+    document.addEventListener('DOMContentLoaded', function () {
+      const dataTable = document.getElementById('Data');
+      if (dataTable) {
+        observer.observe(dataTable, {
+          childList: true,
+          subtree: true
+        });
+      }
     });
-    
+
     // Track color scheme changes for zebra striping control
     function updateColorSchemeAttribute(presetName) {
-        const dataTable = document.getElementById('Data');
-        if (dataTable) {
-            dataTable.setAttribute('data-color-scheme', presetName || 'default');
-        }
+      const dataTable = document.getElementById('Data');
+      if (dataTable) {
+        dataTable.setAttribute('data-color-scheme', presetName || 'default');
+      }
     }
-    
+
     // Listen for color scheme dropdown changes
-    document.addEventListener('DOMContentLoaded', function() {
-        const dropdown = document.getElementById('presetOptions');
-        if (dropdown) {
-            dropdown.addEventListener('click', function(e) {
-                const option = e.target.closest('[data-value]');
-                if (option) {
-                    const presetName = option.getAttribute('data-value');
-                    updateColorSchemeAttribute(presetName);
-                }
-            });
-        }
-        
-        // Set initial color scheme attribute
-        updateColorSchemeAttribute('default');
+    document.addEventListener('DOMContentLoaded', function () {
+      const dropdown = document.getElementById('presetOptions');
+      if (dropdown) {
+        dropdown.addEventListener('click', function (e) {
+          const option = e.target.closest('[data-value]');
+          if (option) {
+            const presetName = option.getAttribute('data-value');
+            updateColorSchemeAttribute(presetName);
+          }
+        });
+      }
+
+      // Set initial color scheme attribute
+      updateColorSchemeAttribute('default');
     });
-    </script>
+  </script>
 
-    <!-- App Icon Version Tooltip -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const appIcon = document.querySelector('.app-icon');
-        if (appIcon) {
-            // Get current version from localStorage or default
-            const currentVersion = localStorage.getItem('simulatorVersion') || '1.27';
-            const tooltipText = `Ireland Financial Simulator\nVersion ${currentVersion}`;
-            
-            // Use TooltipUtils to attach tooltip with 5-second delay
-            TooltipUtils.attachTooltip(appIcon, tooltipText, {
-                hoverDelay: 5000,  // 5 seconds
-                touchDelay: 5000   // 5 seconds for touch devices too
-            });
-        }
+  <!-- App Icon Version Tooltip -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const appIcon = document.querySelector('.app-icon');
+      if (appIcon) {
+        // Get current version from localStorage or default
+        const currentVersion = localStorage.getItem('simulatorVersion') || '1.27';
+        const tooltipText = `Ireland Financial Simulator\nVersion ${currentVersion}`;
+
+        // Use TooltipUtils to attach tooltip with 5-second delay
+        TooltipUtils.attachTooltip(appIcon, tooltipText, {
+          hoverDelay: 5000,  // 5 seconds
+          touchDelay: 5000   // 5 seconds for touch devices too
+        });
+      }
     });
-    </script>
+  </script>
 
 
-    <!-- Error Modal -->
-    <div id="errorModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Error</h3>
-                <span class="modal-close">&times;</span>
-            </div>
-            <div class="modal-body">
-                <p id="errorMessage"></p>
-            </div>
-            <div class="modal-footer">
-                <button id="errorModalCancel" class="secondary-button">Cancel</button>
-                <button id="errorModalClose" class="primary-button">OK</button>
-            </div>
-        </div>
+  <!-- Error Modal -->
+  <div id="errorModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Error</h3>
+        <span class="modal-close">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p id="errorMessage"></p>
+      </div>
+      <div class="modal-footer">
+        <button id="errorModalCancel" class="secondary-button">Cancel</button>
+        <button id="errorModalClose" class="primary-button">OK</button>
+      </div>
     </div>
+  </div>
 
-    <script>
-    window.addEventListener('error', function(event) {
+  <script>
+    window.addEventListener('error', function (event) {
       console.error('Global error handler:', event.error ? event.error.stack : event.message);
     });
-    window.addEventListener('unhandledrejection', function(event) {
+    window.addEventListener('unhandledrejection', function (event) {
       console.error('Global unhandledrejection:', event.reason ? event.reason.stack : event.reason);
     });
-    </script>
-    
+  </script>
 
-<script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const toggle = document.getElementById('welcomeModalToggleMobile');
-            if (!toggle) return;
 
-            const toggleSwitch = toggle.querySelector('.toggle-switch');
-            const savedState = localStorage.getItem('welcomeModalState') || 'on';
-            toggle.setAttribute('data-toggle-state', savedState);
-            if (toggleSwitch) {
-                if (savedState === 'on') {
-                    toggleSwitch.classList.add('active');
-                } else {
-                    toggleSwitch.classList.remove('active');
-                }
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const toggle = document.getElementById('welcomeModalToggleMobile');
+      if (!toggle) return;
+
+      const toggleSwitch = toggle.querySelector('.toggle-switch');
+      const savedState = localStorage.getItem('welcomeModalState') || 'on';
+      toggle.setAttribute('data-toggle-state', savedState);
+      if (toggleSwitch) {
+        if (savedState === 'on') {
+          toggleSwitch.classList.add('active');
+        } else {
+          toggleSwitch.classList.remove('active');
+        }
+      }
+
+      // Attach tooltips to toggles for all layouts
+      function attachToggleTooltip(el, textOrProvider) {
+        if (!el || typeof TooltipUtils === 'undefined') return;
+        // Use reusable TooltipUtils hover/long-press behaviour; supports function providers
+        TooltipUtils.attachTooltip(el, textOrProvider);
+        // Additionally, on mobile tap show a brief tooltip without long-press
+        el.addEventListener('click', function (ev) {
+          if (window.innerWidth <= 768) {
+            let tooltipText;
+            try {
+              tooltipText = (typeof textOrProvider === 'function') ? textOrProvider() : textOrProvider;
+            } catch (_) {
+              tooltipText = (typeof textOrProvider === 'string') ? textOrProvider : "Show all values in today's currency (adjusted for inflation)";
             }
+            const tt = TooltipUtils.showTooltip(tooltipText, el, { isMobile: true });
+            setTimeout(() => TooltipUtils.hideTooltip(tt), 2000);
+          }
+        }, { passive: true });
+      }
 
-            // Attach tooltips to toggles for all layouts
-            function attachToggleTooltip(el, textOrProvider) {
-                if (!el || typeof TooltipUtils === 'undefined') return;
-                // Use reusable TooltipUtils hover/long-press behaviour; supports function providers
-                TooltipUtils.attachTooltip(el, textOrProvider);
-                // Additionally, on mobile tap show a brief tooltip without long-press
-                el.addEventListener('click', function(ev) {
-                    if (window.innerWidth <= 768) {
-                        let tooltipText;
-                        try {
-                            tooltipText = (typeof textOrProvider === 'function') ? textOrProvider() : textOrProvider;
-                        } catch (_) {
-                            tooltipText = (typeof textOrProvider === 'string') ? textOrProvider : "Show all values in today's currency (adjusted for inflation)";
-                        }
-                        const tt = TooltipUtils.showTooltip(tooltipText, el, { isMobile: true });
-                        setTimeout(() => TooltipUtils.hideTooltip(tt), 2000);
-                    }
-                }, { passive: true });
+      // Attach tooltips to toggles (mobile & desktop will reuse same logic)
+      const eventsToggle = document.getElementById('eventsWizardToggleMobile');
+      const presentValueToggle = document.getElementById('presentValueToggleMobile');
+      if (typeof TooltipUtils !== 'undefined') {
+        if (eventsToggle) {
+          attachToggleTooltip(eventsToggle, 'Toggle the Event Wizard for creating events.');
+        }
+        if (presentValueToggle) {
+          attachToggleTooltip(presentValueToggle, function () {
+            try {
+              // Derive reporting currency without creating WebUI early
+              let country = null;
+              let currencyCode = null;
+
+              // 1) Prefer reading directly from DOM (hidden input created by Start Country dropdown)
+              const hidden = document.getElementById('StartCountry');
+              if (hidden && hidden.value) {
+                country = String(hidden.value).toLowerCase();
+              } else {
+                // 2) If a WebUI instance already exists, read via it (do NOT instantiate)
+                const existingWebUI = (typeof window !== 'undefined' && window.WebUI_instance) ? window.WebUI_instance : null;
+                if (existingWebUI && typeof existingWebUI.getValue === 'function') {
+                  const v = existingWebUI.getValue('StartCountry');
+                  if (v) country = String(v).toLowerCase();
+                }
+              }
+
+              // 3) Fallback to Config default country
+              if (!country && typeof Config !== 'undefined' && typeof Config.getInstance === 'function') {
+                try { country = String(Config.getInstance().getDefaultCountry() || '').toLowerCase(); } catch (_) { }
+              }
+
+              // 4) Resolve currency via cached tax rule set
+              if (country && typeof Config !== 'undefined' && typeof Config.getInstance === 'function') {
+                try {
+                  const rs = Config.getInstance().getCachedTaxRuleSet(country);
+                  if (rs && typeof rs.getCurrencyCode === 'function') {
+                    currencyCode = rs.getCurrencyCode();
+                  }
+                } catch (_) { }
+              }
+
+              const cc = currencyCode || 'currency';
+              return "Show all values in today's " + cc + " (adjusted for inflation)";
+            } catch (_) {
+              return "Show all values in today's currency (adjusted for inflation)";
             }
+          });
+        }
+        attachToggleTooltip(toggle, 'Toggle to always show the intro window on start-up or only through the Help button.');
+      }
 
-            // Attach tooltips to toggles (mobile & desktop will reuse same logic)
-            const eventsToggle = document.getElementById('eventsWizardToggleMobile');
-            const presentValueToggle = document.getElementById('presentValueToggleMobile');
-            if (typeof TooltipUtils !== 'undefined') {
-                if (eventsToggle) {
-                    attachToggleTooltip(eventsToggle, 'Toggle the Event Wizard for creating events.');
-                }
-                if (presentValueToggle) {
-                    attachToggleTooltip(presentValueToggle, function() {
-                        try {
-                            // Derive reporting currency without creating WebUI early
-                            let country = null;
-                            let currencyCode = null;
+      window.dispatchEvent(new CustomEvent('welcomeModalToggle', {
+        detail: { state: savedState, enabled: savedState === 'on' }
+      }));
 
-                            // 1) Prefer reading directly from DOM (hidden input created by Start Country dropdown)
-                            const hidden = document.getElementById('StartCountry');
-                            if (hidden && hidden.value) {
-                                country = String(hidden.value).toLowerCase();
-                            } else {
-                                // 2) If a WebUI instance already exists, read via it (do NOT instantiate)
-                                const existingWebUI = (typeof window !== 'undefined' && window.WebUI_instance) ? window.WebUI_instance : null;
-                                if (existingWebUI && typeof existingWebUI.getValue === 'function') {
-                                    const v = existingWebUI.getValue('StartCountry');
-                                    if (v) country = String(v).toLowerCase();
-                                }
-                            }
+      toggle.addEventListener('click', function () {
+        const currentState = toggle.getAttribute('data-toggle-state');
+        const newState = currentState === 'on' ? 'off' : 'on';
+        toggle.setAttribute('data-toggle-state', newState);
 
-                            // 3) Fallback to Config default country
-                            if (!country && typeof Config !== 'undefined' && typeof Config.getInstance === 'function') {
-                                try { country = String(Config.getInstance().getDefaultCountry() || '').toLowerCase(); } catch (_) {}
-                            }
+        if (toggleSwitch) {
+          if (newState === 'on') {
+            toggleSwitch.classList.add('active');
+          } else {
+            toggleSwitch.classList.remove('active');
+          }
+        }
 
-                            // 4) Resolve currency via cached tax rule set
-                            if (country && typeof Config !== 'undefined' && typeof Config.getInstance === 'function') {
-                                try {
-                                    const rs = Config.getInstance().getCachedTaxRuleSet(country);
-                                    if (rs && typeof rs.getCurrencyCode === 'function') {
-                                        currencyCode = rs.getCurrencyCode();
-                                    }
-                                } catch (_) {}
-                            }
+        localStorage.setItem('welcomeModalState', newState);
 
-                            const cc = currencyCode || 'currency';
-                            return "Show all values in today's " + cc + " (adjusted for inflation)";
-                        } catch (_) {
-                            return "Show all values in today's currency (adjusted for inflation)";
-                        }
-                    });
-                }
-                attachToggleTooltip(toggle, 'Toggle to always show the intro window on start-up or only through the Help button.');
-            }
-
-            window.dispatchEvent(new CustomEvent('welcomeModalToggle', {
-                detail: { state: savedState, enabled: savedState === 'on' }
-            }));
-
-            toggle.addEventListener('click', function() {
-                const currentState = toggle.getAttribute('data-toggle-state');
-                const newState = currentState === 'on' ? 'off' : 'on';
-                toggle.setAttribute('data-toggle-state', newState);
-
-                if (toggleSwitch) {
-                    if (newState === 'on') {
-                        toggleSwitch.classList.add('active');
-                    } else {
-                        toggleSwitch.classList.remove('active');
-                    }
-                }
-
-                localStorage.setItem('welcomeModalState', newState);
-
-                window.dispatchEvent(new CustomEvent('welcomeModalToggle', {
-                    detail: { state: newState, enabled: newState === 'on' }
-                }));
-            });
-        });
-        </script>
+        window.dispatchEvent(new CustomEvent('welcomeModalToggle', {
+          detail: { state: newState, enabled: newState === 'on' }
+        }));
+      });
+    });
+  </script>
 </body>
-</html> 
+
+</html>

@@ -248,8 +248,6 @@ class UIManager {
       targetAge: this.ui.getValue("TargetAge"),
       initialSavings: this.ui.getValue("InitialSavings"),
       initialPension: this.ui.getValue("InitialPension"),
-      initialFunds: this.ui.getValue("InitialFunds"),
-      initialShares: this.ui.getValue("InitialShares"),
       retirementAge: this.ui.getValue("RetirementAge"),
       emergencyStash: this.ui.getValue("EmergencyStash"),
       pensionPercentage: this.ui.getValue("PensionContributionPercentage"),
@@ -257,13 +255,7 @@ class UIManager {
       statePensionWeekly: this.ui.getValue("StatePensionWeekly"),
       growthRatePension: this.ui.getValue("PensionGrowthRate"),
       growthDevPension: this.ui.getValue("PensionGrowthStdDev"),
-      growthRateFunds: this.ui.getValue("FundsGrowthRate"),
-      growthDevFunds: this.ui.getValue("FundsGrowthStdDev"),
-      growthRateShares: this.ui.getValue("SharesGrowthRate"),
-      growthDevShares: this.ui.getValue("SharesGrowthStdDev"),
       inflation: this.ui.getValue("Inflation"),
-      FundsAllocation: this.ui.getValue("FundsAllocation"),
-      SharesAllocation: this.ui.getValue("SharesAllocation"),
       priorityCash: this.ui.getValue("PriorityCash"),
       priorityPension: this.ui.getValue("PriorityPension"),
       priorityFunds: this.ui.getValue("PriorityFunds"),
@@ -286,12 +278,34 @@ class UIManager {
     // StartCountry is always required
     params.StartCountry = this.ui.getValue('StartCountry');
 
+    // Dynamic investment parameters from ruleset
+    const cfg = Config.getInstance();
+    const ruleset = cfg.getCachedTaxRuleSet(params.StartCountry || cfg.getDefaultCountry());
+    const investmentTypes = ruleset.getInvestmentTypes() || [];
+    const initialCapitalByKey = {};
+    const investmentAllocationsByKey = {};
+    const investmentGrowthRatesByKey = {};
+    const investmentVolatilitiesByKey = {};
+    for (let i = 0; i < investmentTypes.length; i++) {
+      const type = investmentTypes[i];
+      const key = type.key;
+      initialCapitalByKey[key] = this.ui.getValue(`InitialCapital_${key}`);
+      investmentAllocationsByKey[key] = this.ui.getValue(`InvestmentAllocation_${key}`);
+      investmentGrowthRatesByKey[key] = this.ui.getValue(`${key}GrowthRate`);
+      investmentVolatilitiesByKey[key] = this.ui.getValue(`${key}GrowthStdDev`);
+    }
+    params.initialCapitalByKey = initialCapitalByKey;
+    params.investmentAllocationsByKey = investmentAllocationsByKey;
+    params.investmentGrowthRatesByKey = investmentGrowthRatesByKey;
+    params.investmentVolatilitiesByKey = investmentVolatilitiesByKey;
+
     // In deterministic mode, override volatility parameters to 0 to ensure fixed growth rates
-    // This ensures equity classes receive 0 standard deviation and use only the mean growth rate
     if (params.economyMode === 'deterministic') {
       params.growthDevPension = 0;
-      params.growthDevFunds = 0;
-      params.growthDevShares = 0;
+      const volKeys = Object.keys(params.investmentVolatilitiesByKey);
+      for (let i = 0; i < volKeys.length; i++) {
+        params.investmentVolatilitiesByKey[volKeys[i]] = 0;
+      }
     }
     
     if (validate) {
@@ -375,21 +389,18 @@ class UIManager {
         }
       }
 
-      if (params.FundsAllocation + params.SharesAllocation > 1.0001) {
-        // Derive labels from ruleset if available for better UX
-        let fundsLabel = 'Index Funds', sharesLabel = 'Individual Shares';
-        try {
-          const cfg = Config.getInstance();
-          const rs = cfg.getCachedTaxRuleSet(cfg.getDefaultCountry());
-          if (rs && rs.findInvestmentTypeByKey) {
-            const f = rs.findInvestmentTypeByKey('indexFunds');
-            const s = rs.findInvestmentTypeByKey('shares');
-            if (f && f.label) fundsLabel = f.label;
-            if (s && s.label) sharesLabel = s.label;
-          }
-        } catch (_) {}
-        this.ui.setWarning("FundsAllocation", `${fundsLabel} + ${sharesLabel} allocations can't exceed 100%`);
-        this.ui.setWarning("SharesAllocation", `${fundsLabel} + ${sharesLabel} allocations can't exceed 100%`);
+      // Dynamic investment allocations sum ≤100%
+      let allocSum = 0;
+      const allocKeys = Object.keys(params.investmentAllocationsByKey);
+      for (let i = 0; i < allocKeys.length; i++) {
+        allocSum += parseFloat(params.investmentAllocationsByKey[allocKeys[i]]) || 0;
+      }
+      if (allocSum > 1.0001) {
+        const labels = investmentTypes.map(function(t) { return t.label || t.key; }).join(' + ');
+        for (let i = 0; i < investmentTypes.length; i++) {
+          const inputId = `InvestmentAllocation_${investmentTypes[i].key}`;
+          this.ui.setWarning(inputId, `${labels} allocations can't exceed 100%`);
+        }
         errors = true;
       }
       
@@ -398,22 +409,19 @@ class UIManager {
 
       // Validate volatility parameters for variable rate mode
       if (params.economyMode === 'montecarlo') {
-        if (params.growthDevPension === 0 && params.growthDevFunds === 0 && params.growthDevShares === 0) {
-          // Use dynamic labels for more helpful messages
-          let fundsLabel = 'Index Funds', sharesLabel = 'Shares';
-          try {
-            const cfg = Config.getInstance();
-            const rs = cfg.getCachedTaxRuleSet(cfg.getDefaultCountry());
-            if (rs && rs.findInvestmentTypeByKey) {
-              const f = rs.findInvestmentTypeByKey('indexFunds');
-              const s = rs.findInvestmentTypeByKey('shares');
-              if (f && f.label) fundsLabel = f.label;
-              if (s && s.label) sharesLabel = s.label;
-            }
-          } catch (_) {}
+        // Check if any volatility is > 0 (pension + dynamic investment types)
+        let hasNonZeroVol = params.growthDevPension > 0;
+        const volKeys = Object.keys(params.investmentVolatilitiesByKey);
+        for (let i = 0; i < volKeys.length && !hasNonZeroVol; i++) {
+          if (parseFloat(params.investmentVolatilitiesByKey[volKeys[i]]) > 0) hasNonZeroVol = true;
+        }
+        if (!hasNonZeroVol) {
+          const labels = investmentTypes.map(function(t) { return t.label || t.key; }).join(', ');
           this.ui.setWarning("PensionGrowthStdDev", "At least one volatility rate must be greater than 0% in variable growth mode");
-          this.ui.setWarning("FundsGrowthStdDev", `At least one of Pension, ${fundsLabel}, or ${sharesLabel} volatility must be > 0% in variable growth mode`);
-          this.ui.setWarning("SharesGrowthStdDev", `At least one of Pension, ${fundsLabel}, or ${sharesLabel} volatility must be > 0% in variable growth mode`);
+          for (let i = 0; i < investmentTypes.length; i++) {
+            const volId = `${investmentTypes[i].key}GrowthStdDev`;
+            this.ui.setWarning(volId, `At least one of Pension, ${labels} volatility must be > 0% in variable growth mode`);
+          }
           errors = true;
         }
       }

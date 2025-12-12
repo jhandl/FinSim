@@ -14,7 +14,7 @@ var RelocationImpactDetector = {
    * @param {string} startCountry - Starting country code (optional, uses default if missing)
    * @returns {Object} Summary: { totalImpacted }
    */
-  analyzeEvents: function(events, startCountry) {
+  analyzeEvents: function (events, startCountry, investmentContext) {
     try {
       if (!Config.getInstance().isRelocationEnabled()) {
         this.clearAllImpacts(events);
@@ -39,6 +39,12 @@ var RelocationImpactDetector = {
         var mvFromAge = Number(mvEvent.fromAge);
         var nextMvFromAge = nextMvEvent ? Number(nextMvEvent.fromAge) : NaN;
 
+        // Determine origin country (the country being left)
+        var originCountry = startCountry;
+        if (idx > 0) {
+          originCountry = mvEvents[idx - 1].type.substring(3).toLowerCase();
+        }
+
         // Check if destination country ruleset is missing
         var destinationRuleset = Config.getInstance().getCachedTaxRuleSet(destinationCountry);
         if (!destinationRuleset) {
@@ -54,7 +60,7 @@ var RelocationImpactDetector = {
           // Skip events explicitly overridden or parts of a split chain
           if (event.resolutionOverride) continue;
           if (event.linkedEventId) continue;
-          
+
           // Check if event crosses THIS MV's boundary (not the next one)
           var eFrom = Number(event.fromAge);
           var eTo = Number(event.toAge);
@@ -70,11 +76,41 @@ var RelocationImpactDetector = {
           // Skip MV events and Stock Market events
           if (event.type && (event.type.indexOf('MV-') === 0 || event.type === 'SM')) continue;
           if (event.resolutionOverride) continue;
-          
+
           var eFrom2 = Number(event.fromAge);
           if (!isNaN(eFrom2) && eFrom2 >= mvFromAge && (!nextMvEvent || eFrom2 < nextMvFromAge)) {
             var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry);
             this.addImpact(event, 'simple', message, mvEvent.id, true);
+          }
+        }
+
+        // Detect local investment holdings for each MV event
+        if (investmentContext) {
+          var localHoldings = [];
+          for (var i = 0; i < investmentContext.investmentAssets.length; i++) {
+            var invAsset = investmentContext.investmentAssets[i];
+            var capital = investmentContext.capsByKey[invAsset.key];
+            if (invAsset.residenceScope === 'local' &&
+              invAsset.assetCountry === originCountry &&
+              capital > 0) {
+              localHoldings.push({
+                key: invAsset.key,
+                label: invAsset.label,
+                currency: invAsset.baseCurrency,
+                capital: capital
+              });
+            }
+          }
+
+          if (localHoldings.length > 0) {
+            var localHoldingsMessage = this.generateLocalHoldingsMessage(localHoldings, mvEvent, destinationCountry);
+            var serializedLocalHoldings = '';
+            try {
+              serializedLocalHoldings = JSON.stringify(localHoldings);
+            } catch (_) {
+              serializedLocalHoldings = '';
+            }
+            this.addImpact(mvEvent, 'local_holdings', localHoldingsMessage, mvEvent.id, false, serializedLocalHoldings || undefined);
           }
         }
       }
@@ -104,7 +140,7 @@ var RelocationImpactDetector = {
    * @param {Array} events - Array of SimEvent objects
    * @returns {Array} Sorted array of MV-* events
    */
-  buildRelocationTimeline: function(events) {
+  buildRelocationTimeline: function (events) {
     var mvEvents = [];
     for (var i = 0; i < events.length; i++) {
       var event = events[i];
@@ -117,7 +153,7 @@ var RelocationImpactDetector = {
         }
       }
     }
-    mvEvents.sort(function(a, b) { return Number(a.fromAge) - Number(b.fromAge); });
+    mvEvents.sort(function (a, b) { return Number(a.fromAge) - Number(b.fromAge); });
     return mvEvents;
   },
 
@@ -128,7 +164,7 @@ var RelocationImpactDetector = {
    * @param {number} mvAge - Age of the move
    * @returns {boolean}
    */
-  checkPensionConflict: function(event, destinationCountry, mvAge) {
+  checkPensionConflict: function (event, destinationCountry, mvAge) {
     if ((event.type === 'SI' || event.type === 'SI2') && event.fromAge >= mvAge) {
       var taxRuleSet = Config.getInstance().getCachedTaxRuleSet(destinationCountry);
       return taxRuleSet && taxRuleSet.getPensionSystemType() === 'state_only';
@@ -143,7 +179,7 @@ var RelocationImpactDetector = {
    * @param {string} destinationCountry - Destination country code
    * @returns {string}
    */
-  generateImpactMessage: function(category, event, mvEvent, destinationCountry) {
+  generateImpactMessage: function (category, event, mvEvent, destinationCountry) {
     var destinationCountryName = Config.getInstance().getCountryNameByCode(destinationCountry);
     var noun;
     switch (event.type) {
@@ -171,10 +207,30 @@ var RelocationImpactDetector = {
   },
 
   /**
+   * Generates a user-friendly message for local investment holdings impact.
+   * @param {Array} localHoldings - Array of affected local holdings
+   * @param {Object} mvEvent - The MV event
+   * @param {string} destinationCountry - Destination country code
+   * @returns {string}
+   */
+  generateLocalHoldingsMessage: function (localHoldings, mvEvent, destinationCountry) {
+    var destinationCountryName = Config.getInstance().getCountryNameByCode(destinationCountry);
+    var holdingsList = localHoldings.map(function (h) {
+      return h.label + ' (' + h.currency + ')';
+    }).join(', ');
+
+    if (localHoldings.length === 1) {
+      return 'You hold ' + localHoldings[0].label + ' tied to your current country. What would you like to do after moving to ' + destinationCountryName + '?';
+    } else {
+      return 'You hold local investments (' + holdingsList + ') tied to your current country. What would you like to do after moving to ' + destinationCountryName + '?';
+    }
+  },
+
+  /**
    * Removes relocationImpact if the event is resolved.
    * @param {Object} event - SimEvent object
    */
-  clearResolvedImpacts: function(event) {
+  clearResolvedImpacts: function (event) {
     if (!event || !event.relocationImpact) return;
     if (event.resolutionOverride) { delete event.relocationImpact; return; }
     var resolved = false;
@@ -185,6 +241,10 @@ var RelocationImpactDetector = {
     } else if (event.relocationImpact.category === 'simple') {
       // Consider simple resolved if currency or linked country is set or converted type acknowledged
       resolved = !!(event.currency || event.linkedCountry || event.type === 'SInp' || event.type === 'SI2np');
+    } else if (event.relocationImpact.category === 'local_holdings') {
+      // Consider resolved if user has marked as reviewed
+      // (Keep/sell/reinvest actions will be handled via custom resolution, not field changes)
+      resolved = !!(event.resolutionOverride);
     }
     if (resolved) delete event.relocationImpact;
   },
@@ -196,22 +256,28 @@ var RelocationImpactDetector = {
    * @param {string} message - Message
    * @param {string} mvEventId - ID of the MV event
    * @param {boolean} autoResolvable - Whether auto-resolvable
+   * @param {*} details - Optional payload to persist with the impact
    */
-  addImpact: function(event, category, message, mvEventId, autoResolvable) {
-    if (event.relocationImpact && event.relocationImpact.category === 'boundary') return;
-    event.relocationImpact = {
+  addImpact: function (event, category, message, mvEventId, autoResolvable, details) {
+    // Do not overwrite higher-priority impacts (boundary, missing_ruleset)
+    if (event.relocationImpact && (event.relocationImpact.category === 'boundary' || event.relocationImpact.category === 'missing_ruleset')) return;
+    var impact = {
       category: category,
       message: message,
       mvEventId: mvEventId,
       autoResolvable: autoResolvable
     };
+    if (details != null) {
+      impact.details = details;
+    }
+    event.relocationImpact = impact;
   },
 
   /**
    * Clears all relocationImpact properties from events.
    * @param {Array} events - Array of SimEvent objects
    */
-  clearAllImpacts: function(events) {
+  clearAllImpacts: function (events) {
     for (var i = 0; i < events.length; i++) {
       if (events[i].relocationImpact) delete events[i].relocationImpact;
     }

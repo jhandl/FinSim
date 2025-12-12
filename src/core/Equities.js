@@ -26,32 +26,71 @@ class Equity {
     }
   }
 
+  // Protected helper methods for currency conversion - override in subclasses
+  _getBaseCurrency() {
+    return null; // Base class returns null; subclasses override with asset currency
+  }
+
+  _getAssetCountry() {
+    return null; // Base class returns null; subclasses override with asset country
+  }
+
   sell(amountToSell) {
     let sold = 0;
     let gains = 0;
-    while ((amountToSell > 0) && (this.portfolio.length > 0)) {
-      let sale = 0;
-      // Sell the oldest holding (index 0) following the FIFO rule.
-      if (amountToSell >= this.portfolio[0].amount + this.portfolio[0].interest) {
-        // sell the whole holding
-        sale = this.portfolio[0].amount + this.portfolio[0].interest;
-        sold += sale;
-        gains += this.portfolio[0].interest;
-        this.portfolio.shift();
+    let remaining = (typeof amountToSell === 'number') ? amountToSell : 0;
+    let fullySoldHoldings = 0;
+    let partialFraction = null;
+
+    for (let i = 0; i < this.portfolio.length && remaining > 0; i++) {
+      const holding = this.portfolio[i];
+      const holdingCapital = holding.amount + holding.interest;
+      if (remaining >= holdingCapital) {
+        sold += holdingCapital;
+        gains += holding.interest;
+        remaining -= holdingCapital;
+        fullySoldHoldings++;
       } else {
-        // sell a fraction of the holding
-        sale = amountToSell;
-        sold += amountToSell;
-        let fraction = amountToSell / (this.portfolio[0].amount + this.portfolio[0].interest);
-        gains += fraction * this.portfolio[0].interest;
-        this.portfolio[0].amount = (1 - fraction) * this.portfolio[0].amount;
-        this.portfolio[0].interest = (1 - fraction) * this.portfolio[0].interest;
+        const fraction = holdingCapital > 0 ? (remaining / holdingCapital) : 0;
+        sold += remaining;
+        gains += fraction * holding.interest;
+        partialFraction = fraction;
+        remaining = 0;
       }
-      amountToSell -= sale;
     }
+
+    // Convert sale proceeds and gains from asset's tracking currency to residence currency
+    // at sale time (asset-plan.md §6.2). Cost basis remains in asset currency.
+    // Strict: no truthiness fallback; falsy config → conversion fail → null return (asset-plan.md §9)
+    var baseCurrency = this._getBaseCurrency();
+    var assetCountry = this._getAssetCountry();
+    var soldConverted = sold;
+    var gainsConverted = gains;
+    if (baseCurrency !== residenceCurrency) {
+      soldConverted = convertCurrencyAmount(sold, baseCurrency, assetCountry, residenceCurrency, currentCountry, year, true);
+      gainsConverted = convertCurrencyAmount(gains, baseCurrency, assetCountry, residenceCurrency, currentCountry, year, true);
+      // In strict mode, conversion failures return null - propagate to caller
+      if (soldConverted === null || gainsConverted === null) {
+        return null;
+      }
+    }
+
+    // Apply planned mutations only after conversions succeed
+    if (fullySoldHoldings > 0) {
+      for (let removed = 0; removed < fullySoldHoldings && this.portfolio.length > 0; removed++) {
+        this.portfolio.shift();
+      }
+    }
+    if (partialFraction !== null && this.portfolio.length > 0) {
+      const remainingHolding = this.portfolio[0];
+      const keepRatio = 1 - partialFraction;
+      remainingHolding.amount = keepRatio * remainingHolding.amount;
+      remainingHolding.interest = keepRatio * remainingHolding.interest;
+    }
+
     this.yearlySold += sold;
-    this.declareRevenue(sold, gains);
-    return sold;
+    this.declareRevenue(soldConverted, gainsConverted);
+    return soldConverted;
   }
 
   capital() {
@@ -115,9 +154,25 @@ class Equity {
       totalGains += holding.interest;
     }
 
+    // Convert sale proceeds and gains from asset's tracking currency to residence currency
+    // at sale time (asset-plan.md §6.2). Cost basis remains in asset currency.
+    // Strict: no truthiness fallback; falsy config → conversion fail → null return (asset-plan.md §9)
+    var baseCurrency = this._getBaseCurrency();
+    var assetCountry = this._getAssetCountry();
+    var totalCapitalConverted = totalCapital;
+    var totalGainsConverted = totalGains;
+    if (baseCurrency !== residenceCurrency) {
+      totalCapitalConverted = convertCurrencyAmount(totalCapital, baseCurrency, assetCountry, residenceCurrency, currentCountry, year, true);
+      totalGainsConverted = convertCurrencyAmount(totalGains, baseCurrency, assetCountry, residenceCurrency, currentCountry, year, true);
+      // In strict mode, conversion failures return null - avoid incorrect nominal values in withdraw planning
+      if (totalCapitalConverted === null || totalGainsConverted === null) {
+        return null;
+      }
+    }
+
     // Use simulation method instead of real one
-    this.simulateDeclareRevenue(totalCapital, totalGains, testRevenue);
-    return totalCapital;
+    this.simulateDeclareRevenue(totalCapitalConverted, totalGainsConverted, testRevenue);
+    return totalCapitalConverted;
   }
 
   simulateDeclareRevenue(income, gains, testRevenue) {
@@ -189,6 +244,15 @@ class IndexFunds extends Equity {
       }
       return 0;
     })();
+  }
+
+  // Override currency methods for IE defaults
+  _getBaseCurrency() {
+    return 'EUR'; // IE legacy default
+  }
+
+  _getAssetCountry() {
+    return 'ie'; // IE legacy default
   }
 
   // Ensure exit-tax classification for gains from Index Funds
@@ -294,6 +358,15 @@ class Shares extends Equity {
     }
   }
 
+  // Override currency methods for IE defaults
+  _getBaseCurrency() {
+    return 'EUR'; // IE legacy default
+  }
+
+  _getAssetCountry() {
+    return 'ie'; // IE legacy default
+  }
+
 }
 
 
@@ -307,6 +380,15 @@ class Pension extends Equity {
       var cfg = Config.getInstance();
       this._ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
     } catch (e) { this._ruleset = null; }
+  }
+
+  // Override currency methods: pension tracks residence currency (domestic semantics)
+  _getBaseCurrency() {
+    return residenceCurrency;
+  }
+
+  _getAssetCountry() {
+    return currentCountry;
   }
 
   declareRevenue(income, gains) {

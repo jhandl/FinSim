@@ -2,7 +2,7 @@
 var RelocationImpactAssistant = {
 
   // Public API
-  renderPanelForTableRow: function(rowEl, event, env) {
+  renderPanelForTableRow: function (rowEl, event, env) {
     if (!rowEl || !event || !event.relocationImpact) return;
     const existingPanel = rowEl.nextElementSibling;
     if (existingPanel && existingPanel.classList && existingPanel.classList.contains('resolution-panel-row')) return;
@@ -22,18 +22,18 @@ var RelocationImpactAssistant = {
     if (panelCell) this.attachSplitTooltip(panelCell);
   },
 
-  collapsePanelForTableRow: function(rowEl) {
+  collapsePanelForTableRow: function (rowEl) {
     if (!rowEl) return;
     const panelRow = rowEl.nextElementSibling;
     if (!panelRow || !panelRow.classList || !panelRow.classList.contains('resolution-panel-row')) return;
     const expander = panelRow.querySelector('.resolution-panel-expander');
     const container = panelRow.querySelector('.resolution-panel-container');
-    if (container) { try { container.classList.remove('visible'); } catch(_) {} }
+    if (container) { try { container.classList.remove('visible'); } catch (_) { } }
     if (expander) {
       const current = expander.scrollHeight; expander.style.height = current + 'px';
       // eslint-disable-next-line no-unused-expressions
-      expander.offsetHeight; requestAnimationFrame(function(){ expander.style.height = '0px'; });
-      const onClosed = function(e){ if (e.target !== expander) return; expander.removeEventListener('transitionend', onClosed); if (panelRow.parentNode) panelRow.remove(); };
+      expander.offsetHeight; requestAnimationFrame(function () { expander.style.height = '0px'; });
+      const onClosed = function (e) { if (e.target !== expander) return; expander.removeEventListener('transitionend', onClosed); if (panelRow.parentNode) panelRow.remove(); };
       expander.addEventListener('transitionend', onClosed);
     } else {
       if (panelRow.parentNode) panelRow.remove();
@@ -41,20 +41,20 @@ var RelocationImpactAssistant = {
     this._teardownCollapseTriggers(panelRow);
   },
 
-  collapseAllPanels: function() {
+  collapseAllPanels: function () {
     // Table
     try {
       const panelRows = document.querySelectorAll('.resolution-panel-row');
       panelRows.forEach((panelRow) => { const eventRow = panelRow.previousElementSibling; if (eventRow) this.collapsePanelForTableRow(eventRow); });
-    } catch(_) {}
+    } catch (_) { }
     // Accordion
     try {
       const items = document.querySelectorAll('.events-accordion-item');
       items.forEach((item) => { const expander = item.querySelector('.resolution-panel-expander'); if (expander) this._collapseAccordionPanel(item); });
-    } catch(_) {}
+    } catch (_) { }
   },
 
-  renderPanelInAccordion: function(itemEl, event, env) {
+  renderPanelInAccordion: function (itemEl, event, env) {
     if (!itemEl || !event || !event.relocationImpact) return;
     const content = itemEl.querySelector('.accordion-item-content');
     if (!content) return;
@@ -73,16 +73,16 @@ var RelocationImpactAssistant = {
 
   // Public API: collapse inline resolution panel within an accordion item
   // Delegates to the internal implementation to keep animations consistent
-  collapsePanelInAccordion: function(itemEl) {
+  collapsePanelInAccordion: function (itemEl) {
     this._collapseAccordionPanel(itemEl);
   },
 
-  createPanelHtml: function(event, rowId, env) {
+  createPanelHtml: function (event, rowId, env) {
     // Based on table manager implementation
     const events = (env && env.webUI && typeof env.webUI.readEvents === 'function') ? env.webUI.readEvents(false) : [];
     const mvEventId = event && event.relocationImpact ? event.relocationImpact.mvEventId : null;
     // If readEvents returns 0 events, try to find mvEvent from DOM directly
-    let mvEvent = events.find(function(e){ return e && e.id === mvEventId; });
+    let mvEvent = events.find(function (e) { return e && e.id === mvEventId; });
     if (!mvEvent && mvEventId) {
       // Fallback: find mvEvent from DOM by looking for the row with matching event name/id
       try {
@@ -117,27 +117,27 @@ var RelocationImpactAssistant = {
 
     let content = '';
     const econ = Config.getInstance().getEconomicData();
-    const baseAmountSanitized = (function(a){ var s = (a == null) ? '' : String(a); s = s.replace(/[^0-9.\-]/g, ''); var n = Number(s); return isNaN(n) ? Number(a) : n; })(event.amount);
+    const baseAmountSanitized = (function (a) { var s = (a == null) ? '' : String(a); s = s.replace(/[^0-9.\-]/g, ''); var n = Number(s); return isNaN(n) ? Number(a) : n; })(event.amount);
     const fxRate = econ && econ.ready ? econ.getFX(originCountry, destCountry) : null;
     const pppRatio = econ && econ.ready ? econ.getPPP(originCountry, destCountry) : null;
     const fxAmount = (fxRate != null && !isNaN(baseAmountSanitized)) ? Math.round(baseAmountSanitized * fxRate) : null;
     const pppAmount = (pppRatio != null && !isNaN(baseAmountSanitized)) ? Math.round(baseAmountSanitized * pppRatio) : null;
-    let fxDate = null; try { if (econ && econ.data) { var toEntry = econ.data[String(destCountry).toUpperCase()]; fxDate = toEntry && toEntry.fx_date ? toEntry.fx_date : null; } } catch(_) {}
+    let fxDate = null; try { if (econ && econ.data) { var toEntry = econ.data[String(destCountry).toUpperCase()]; fxDate = toEntry && toEntry.fx_date ? toEntry.fx_date : null; } } catch (_) { }
 
     function getSymbolAndLocaleByCountry(countryCode) {
       try {
         const rs = Config.getInstance().getCachedTaxRuleSet(countryCode);
         const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
         return { symbol: rs && rs.getCurrencySymbol ? rs.getCurrencySymbol() : (ls.currencySymbol || ''), locale: rs && rs.getNumberLocale ? rs.getNumberLocale() : (ls.numberLocale || 'en-US') };
-      } catch(_) { const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' }; return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' }; }
+      } catch (_) { const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' }; return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' }; }
     }
     function fmtWithSymbol(symbol, locale, value) {
       if (value == null || value === '' || isNaN(Number(value))) return '';
       const num = Number(value);
-      try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch(_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+      try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch (_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
     }
 
-    const addAction = function(arr, cfg){ if (!cfg || !cfg.action) return; cfg.tabId = 'resolution-tab-' + rowId + '-' + cfg.action; cfg.detailId = 'resolution-detail-' + rowId + '-' + cfg.action; arr.push(cfg); };
+    const addAction = function (arr, cfg) { if (!cfg || !cfg.action) return; cfg.tabId = 'resolution-tab-' + rowId + '-' + cfg.action; cfg.detailId = 'resolution-detail-' + rowId + '-' + cfg.action; arr.push(cfg); };
     const actions = [];
     let containerAttributes = '';
 
@@ -167,9 +167,9 @@ var RelocationImpactAssistant = {
       if ((event.type === 'R' || event.type === 'M') && !event.linkedCountry) {
         const countries = Config.getInstance().getAvailableCountries();
         const detectedCountry = (env && env.eventsTableManager && env.eventsTableManager.detectPropertyCountry) ? env.eventsTableManager.detectPropertyCountry(event.fromAge, startCountry) : startCountry;
-        const detectedCountryObj = countries.find(function(c){ return c.code.toLowerCase() === detectedCountry; });
+        const detectedCountryObj = countries.find(function (c) { return c.code.toLowerCase() === detectedCountry; });
         const detectedCountryName = detectedCountryObj ? detectedCountryObj.name : (detectedCountry ? detectedCountry.toUpperCase() : '');
-        
+
         // Find the original country from the event's currency
         const eventCurrency = event.currency ? String(event.currency).toUpperCase().trim() : null;
         let originalCountry = null;
@@ -184,22 +184,22 @@ var RelocationImpactAssistant = {
         }
         // Fallback: if no currency or country found, use startCountry
         if (!originalCountry) originalCountry = startCountry;
-        
+
         const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originalCountry);
         const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
         const fromMeta = getSymbolAndLocaleByCountry(originalCountry);
         const currentAmountNum = Number(baseAmountSanitized);
         const currentFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, currentAmountNum);
-        
+
         // Calculate conversion from original country to detected country (initially selected)
         const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originalCountry, detectedCountry));
         const toRuleSet = Config.getInstance().getCachedTaxRuleSet(detectedCountry);
         const toCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
         const toMeta = getSymbolAndLocaleByCountry(detectedCountry);
         const suggestedFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : '';
-        
+
         let optionsHTML = '';
-        countries.forEach(function(country){ const selected = country.code.toLowerCase() === detectedCountry ? 'selected' : ''; optionsHTML += '<option value="' + country.code.toLowerCase() + '" ' + selected + '>' + country.name + '</option>'; });
+        countries.forEach(function (country) { const selected = country.code.toLowerCase() === detectedCountry ? 'selected' : ''; optionsHTML += '<option value="' + country.code.toLowerCase() + '" ' + selected + '>' + country.name + '</option>'; });
         containerAttributes = ' data-from-country="' + originalCountry + '" data-to-country="' + detectedCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + toCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
         addAction(actions, { action: 'link', tabLabel: 'Link To Country', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<p class="micro-note">Detected country: ' + detectedCountryName + '. Change if the property belongs to a different jurisdiction.</p><div class="country-selector-inline"><label for="country-select-' + rowId + '">Country</label><select class="country-selector link-country-selector" id="country-select-' + rowId + '" data-row-id="' + rowId + '" data-from-country="' + originalCountry + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '">' + optionsHTML + '</select></div><div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-label">Current</div><div class="part-detail">' + currentFormatted + ' (read-only)</div></div><div class="split-part-info"><div class="part-label">Converted Amount</div><div class="part-detail"><input type="text" class="link-amount-input" value="' + suggestedFormatted + '" placeholder="Amount"></div><div class="ppp-hint">PPP suggestion</div></div></div><p class="micro-note">Apply links this property to the selected country, converts the amount using purchasing power parity, and updates the currency to match.</p>' });
       } else {
@@ -219,19 +219,73 @@ var RelocationImpactAssistant = {
         containerAttributes = ' data-from-country="' + originCountry + '" data-to-country="' + destCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
         addAction(actions, { action: 'accept', tabLabel: 'Apply Suggested Amount', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-suggested-amount="' + (isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum)) + '" data-suggested-currency="' + destCurrency + '"', bodyHtml: '<div class="suggestion-comparison compact"><div class="comparison-row"><span class="comparison-label">Current</span><span class="comparison-value">' + currentFormatted + '</span></div><div class="comparison-row"><span class="comparison-label">Suggested</span><span class="comparison-value">' + suggestedFormatted + '</span></div><div class="difference">Δ ' + percentage + '%</div></div><p class="micro-note">Apply updates the amount to ' + suggestedFormatted + ' (' + (destCurrencyCode || destCurrency) + ') so it reflects purchasing power in ' + destCountryLabel + '.</p>' });
         addAction(actions, { action: 'peg', tabLabel: 'Keep Original Currency', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion to ' + (destCurrencyCode || destCurrency || 'the destination currency') + ' will occur.</p></div>' });
-        addAction(actions, { action: 'review', tabLabel: 'Mark As Reviewed', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply records this relocation impact as reviewed without changing the event’s amount or currency.</p></div>' });
+        addAction(actions, { action: 'review', tabLabel: 'Mark As Reviewed', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply records this relocation impact as reviewed without changing the amount or currency.</p></div>' });
       }
+    } else if (event.relocationImpact.category === 'local_holdings') {
+      // Local investment holdings resolution panel
+      const localHoldingsDetails = (function parseLocalHoldings(detailsPayload) {
+        if (!detailsPayload) return [];
+        let parsed = detailsPayload;
+        if (typeof parsed === 'string') {
+          try {
+            parsed = JSON.parse(parsed);
+          } catch (_) {
+            return [];
+          }
+        }
+        if (Array.isArray(parsed)) return parsed;
+        if (parsed && Array.isArray(parsed.holdings)) return parsed.holdings;
+        if (parsed && Array.isArray(parsed.localHoldings)) return parsed.localHoldings;
+        return [];
+      })(event.relocationImpact.details);
+      const holdingsContextHtml = (function renderLocalHoldingsSummary(items) {
+        if (!items || !items.length) return '';
+        const listItems = items.map(function (item) {
+          const label = item && item.label ? String(item.label) : 'Holding';
+          const currency = item && item.currency ? String(item.currency).toUpperCase() : '';
+          const currencySuffix = currency ? ' (' + currency + ')' : '';
+          return '<li>' + label + currencySuffix + '</li>';
+        }).join('');
+        return '<div class="local-holdings-summary"><p class="micro-note">Local holdings detected:</p><ul class="micro-note local-holdings-list">' + listItems + '</ul></div>';
+      })(localHoldingsDetails);
+
+      addAction(actions, {
+        action: 'keep_holdings',
+        tabLabel: 'Keep Holdings',
+        buttonLabel: 'Mark as Reviewed',
+        buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
+        buttonAttrs: ' data-row-id="' + rowId + '"',
+        bodyHtml: holdingsContextHtml + '<div class="resolution-quick-action"><p class="micro-note">Keep your local investment holdings as-is. You can continue to hold these investments after relocation, though they remain tied to the origin country\'s market and currency.</p><p class="micro-note">Note: Tax treatment will follow your new country of residence.</p></div>'
+      });
+
+      addAction(actions, {
+        action: 'plan_sale',
+        tabLabel: 'Plan to Sell',
+        buttonLabel: 'Mark as Reviewed',
+        buttonClass: 'event-wizard-button resolution-apply',
+        buttonAttrs: ' data-row-id="' + rowId + '"',
+        bodyHtml: holdingsContextHtml + '<div class="resolution-quick-action"><p class="micro-note">Plan to sell these holdings around the time of relocation. You can model the sale by adding a stock market event (SM) at the relocation age with negative growth to simulate liquidation.</p><p class="micro-note">Proceeds will be converted to your new residence currency.</p></div>'
+      });
+
+      addAction(actions, {
+        action: 'plan_reinvest',
+        tabLabel: 'Plan to Reinvest',
+        buttonLabel: 'Mark as Reviewed',
+        buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply',
+        buttonAttrs: ' data-row-id="' + rowId + '"',
+        bodyHtml: holdingsContextHtml + '<div class="resolution-quick-action"><p class="micro-note">Plan to sell local holdings and reinvest in global or destination-country investments. Model this by:</p><ol class="micro-note"><li>Add a stock market event (SM) at relocation age to simulate sale</li><li>Adjust your investment mix parameters to reflect new allocation</li></ol><p class="micro-note">The simulator will automatically invest surplus in your configured mix.</p></div>'
+      });
     }
 
     if (!actions.length) return content;
     const impactCause = (event.relocationImpact.message || '').trim() || 'Relocation impact detected for this event.';
-    const tabsHtml = actions.map(function(ac){ return '<button type="button" class="resolution-tab" id="' + ac.tabId + '" role="tab" aria-selected="false" aria-controls="' + ac.detailId + '" data-action="' + ac.action + '" tabindex="0">' + ac.tabLabel + '</button>'; }).join('');
-    const detailsHtml = actions.map(function(ac){ const btnClass = ac.buttonClass || 'event-wizard-button resolution-apply'; const attrs = ac.buttonAttrs || ''; return '<div class="resolution-detail" id="' + ac.detailId + '" role="tabpanel" aria-labelledby="' + ac.tabId + '" data-action="' + ac.action + '" hidden aria-hidden="true"><div class="resolution-detail-content">' + ac.bodyHtml + '</div><div class="resolution-detail-footer"><button type="button" class="' + btnClass + '" data-action="' + ac.action + '"' + attrs + '>' + ac.buttonLabel + '</button></div></div>'; }).join('');
+    const tabsHtml = actions.map(function (ac) { return '<button type="button" class="resolution-tab" id="' + ac.tabId + '" role="tab" aria-selected="false" aria-controls="' + ac.detailId + '" data-action="' + ac.action + '" tabindex="0">' + ac.tabLabel + '</button>'; }).join('');
+    const detailsHtml = actions.map(function (ac) { const btnClass = ac.buttonClass || 'event-wizard-button resolution-apply'; const attrs = ac.buttonAttrs || ''; return '<div class="resolution-detail" id="' + ac.detailId + '" role="tabpanel" aria-labelledby="' + ac.tabId + '" data-action="' + ac.action + '" hidden aria-hidden="true"><div class="resolution-detail-content">' + ac.bodyHtml + '</div><div class="resolution-detail-footer"><button type="button" class="' + btnClass + '" data-action="' + ac.action + '"' + attrs + '>' + ac.buttonLabel + '</button></div></div>'; }).join('');
     content = '<div class="resolution-panel-expander"><div class="resolution-panel-container"' + containerAttributes + '><div class="resolution-panel-header"><h4>' + impactCause + '</h4><button class="panel-close-btn">×</button></div><div class="resolution-panel-body"><div class="resolution-tab-strip" role="tablist" aria-label="Resolution actions" aria-orientation="horizontal">' + tabsHtml + '</div><div class="resolution-details">' + detailsHtml + '</div></div></div></div>';
     return content;
   },
 
-  handlePanelAction: function(event, action, payload, env) {
+  handlePanelAction: function (event, action, payload, env) {
     if (!env || !env.eventsTableManager) return;
     const etm = env.eventsTableManager;
     const rowId = payload && payload.rowId;
@@ -267,11 +321,18 @@ var RelocationImpactAssistant = {
         break;
       }
       case 'keep_property': {
-        try { this._keepProperty(event, payload, env); } catch(_) {}
+        try { this._keepProperty(event, payload, env); } catch (_) { }
         break;
       }
       case 'sell_property': {
-        try { this._sellProperty(event, payload, env); } catch(_) {}
+        try { this._sellProperty(event, payload, env); } catch (_) { }
+        break;
+      }
+      case 'keep_holdings':
+      case 'plan_sale':
+      case 'plan_reinvest': {
+        // All three actions simply mark the impact as reviewed
+        if (typeof etm.markAsReviewed === 'function') etm.markAsReviewed(rowId);
         break;
       }
       default:
@@ -279,7 +340,7 @@ var RelocationImpactAssistant = {
     }
   },
 
-  calculatePPPSuggestion: function(amount, fromCountry, toCountry) {
+  calculatePPPSuggestion: function (amount, fromCountry, toCountry) {
     var raw = (amount == null) ? '' : String(amount);
     var sanitized = raw.replace(/[^0-9.\-]/g, '');
     var numeric = Number(sanitized);
@@ -295,7 +356,7 @@ var RelocationImpactAssistant = {
   },
 
   // Internal helpers
-  attachSplitTooltip: function(rootEl) {
+  attachSplitTooltip: function (rootEl) {
     try {
       const container = (rootEl.closest && rootEl.closest('.resolution-panel-container')) || (rootEl.querySelector && rootEl.querySelector('.resolution-panel-container')) || rootEl;
       if (!container) return;
@@ -306,14 +367,14 @@ var RelocationImpactAssistant = {
           const rs = Config.getInstance().getCachedTaxRuleSet(countryCode);
           const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
           return { symbol: rs && rs.getCurrencySymbol ? rs.getCurrencySymbol() : (ls.currencySymbol || ''), locale: rs && rs.getNumberLocale ? rs.getNumberLocale() : (ls.numberLocale || 'en-US') };
-        } catch(_) { const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' }; return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' }; }
+        } catch (_) { const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' }; return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' }; }
       }
       function fmtWithSymbol(symbol, locale, value) {
         if (value == null || value === '' || isNaN(Number(value))) return '';
         const num = Number(value);
-        try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch(_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+        try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch (_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
       }
-      const provider = function(){
+      const provider = function () {
         const baseAmt = container.getAttribute('data-base-amount');
         const fromCountry = container.getAttribute('data-from-country');
         const toCountry = container.getAttribute('data-to-country');
@@ -326,7 +387,7 @@ var RelocationImpactAssistant = {
         const fxAmt = fmtWithSymbol(toMeta.symbol, toMeta.locale, fxAmtStr);
         const pppAmt = fmtWithSymbol(toMeta.symbol, toMeta.locale, pppAmtStr);
         const amtBase = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmt);
-        const fxD = fxDate ? new Date(fxDate).toISOString().substring(0,10) : 'latest';
+        const fxD = fxDate ? new Date(fxDate).toISOString().substring(0, 10) : 'latest';
         try {
           const cfg = Config.getInstance();
           const econ = cfg && cfg.getEconomicData ? cfg.getEconomicData() : null;
@@ -351,50 +412,50 @@ var RelocationImpactAssistant = {
             details += '• Forward projections beyond available data use a ' + projectionWindow + '-year weighted average.';
           }
           return amtBase + ' in ' + toCur + ' is ' + fxAmt + ' as of ' + fxD + '.\nAdjusting for purchasing power it\'s ≈ ' + pppAmt + '.' + details;
-        } catch(_) {
+        } catch (_) {
           return amtBase + ' in ' + toCur + ' is ' + fxAmt + ' as of ' + fxD + '.\nAdjusting for purchasing power it\'s ≈ ' + pppAmt + '.';
         }
       };
       TooltipUtils.attachTooltip(input, provider, { hoverDelay: 300, touchDelay: 400, showOnFocus: true, persistWhileFocused: true, hideOnWizard: true });
-    } catch(_) {}
+    } catch (_) { }
   },
 
-  _animateOpen: function(expanderContainer) {
+  _animateOpen: function (expanderContainer) {
     if (!expanderContainer) return;
     const expander = (expanderContainer.classList && expanderContainer.classList.contains('resolution-panel-expander')) ? expanderContainer : (expanderContainer.querySelector && expanderContainer.querySelector('.resolution-panel-expander'));
     const containerEl = (expanderContainer.querySelector && expanderContainer.querySelector('.resolution-panel-container')) || (expanderContainer.classList && expanderContainer.classList.contains('resolution-panel-container') ? expanderContainer : null);
     if (expander) {
       expander.style.height = '0px'; expander.style.overflow = 'hidden';
-      if (containerEl) { try { containerEl.classList.add('panel-anim'); } catch(_) {} }
-      requestAnimationFrame(function(){
+      if (containerEl) { try { containerEl.classList.add('panel-anim'); } catch (_) { } }
+      requestAnimationFrame(function () {
         const fullHeight = expander.scrollHeight;
-        if (containerEl) { try { containerEl.classList.add('visible'); } catch(_) {} }
+        if (containerEl) { try { containerEl.classList.add('visible'); } catch (_) { } }
         expander.style.height = fullHeight + 'px';
-        const onOpened = function(e){ if (e.target !== expander) return; expander.style.height = 'auto'; expander.removeEventListener('transitionend', onOpened); };
+        const onOpened = function (e) { if (e.target !== expander) return; expander.style.height = 'auto'; expander.removeEventListener('transitionend', onOpened); };
         expander.addEventListener('transitionend', onOpened);
       });
     } else if (containerEl) {
-      try { containerEl.classList.add('visible'); } catch(_) {}
+      try { containerEl.classList.add('visible'); } catch (_) { }
     }
   },
 
-  _bindPanelInteractions: function(root, ctx) {
+  _bindPanelInteractions: function (root, ctx) {
     if (!root) return;
     const closeBtn = root.querySelector('.panel-close-btn');
     if (closeBtn) {
       const self = this;
-      closeBtn.addEventListener('click', function(){
+      closeBtn.addEventListener('click', function () {
         if (ctx.context === 'table') self.collapsePanelForTableRow(document.querySelector('tr[data-row-id="' + ctx.rowId + '"]'));
         else if (ctx.context === 'accordion') self._collapseAccordionPanel(ctx.accordionItem);
       });
     }
     const interactionRoot = (root.closest && root.closest('.resolution-panel-container')) || root;
     const self = this;
-    
+
     // Handle country selector changes for link action to update conversion preview
     const linkCountrySelector = interactionRoot.querySelector('.link-country-selector');
     if (linkCountrySelector) {
-      linkCountrySelector.addEventListener('change', function(){
+      linkCountrySelector.addEventListener('change', function () {
         const fromCountry = linkCountrySelector.getAttribute('data-from-country');
         const toCountry = linkCountrySelector.value;
         const baseAmount = linkCountrySelector.getAttribute('data-base-amount');
@@ -405,12 +466,12 @@ var RelocationImpactAssistant = {
             const rs = Config.getInstance().getCachedTaxRuleSet(countryCode);
             const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
             return { symbol: rs && rs.getCurrencySymbol ? rs.getCurrencySymbol() : (ls.currencySymbol || ''), locale: rs && rs.getNumberLocale ? rs.getNumberLocale() : (ls.numberLocale || 'en-US') };
-          } catch(_) { const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' }; return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' }; }
+          } catch (_) { const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' }; return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' }; }
         }
         function fmtWithSymbol(symbol, locale, value) {
           if (value == null || value === '' || isNaN(Number(value))) return '';
           const num = Number(value);
-          try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch(_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+          try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch (_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
         }
         const toMeta = getSymbolAndLocale(toCountry);
         const suggestedFormatted = !isNaN(pppSuggestion) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestion) : '';
@@ -418,8 +479,8 @@ var RelocationImpactAssistant = {
         if (amountInput) amountInput.value = suggestedFormatted;
       });
     }
-    
-    interactionRoot.addEventListener('click', function(e){
+
+    interactionRoot.addEventListener('click', function (e) {
       const tab = e.target && e.target.closest && e.target.closest('.resolution-tab');
       if (tab) { e.preventDefault(); self._handleTabSelection(interactionRoot, tab); return; }
       const btn = e.target && e.target.closest && e.target.closest('.resolution-apply');
@@ -433,46 +494,47 @@ var RelocationImpactAssistant = {
     this._bindTabKeyboard(interactionRoot);
   },
 
-  _handleTabSelection: function(rootEl, tabButton) {
+  _handleTabSelection: function (rootEl, tabButton) {
     if (!rootEl || !tabButton) return;
     const action = tabButton.getAttribute('data-action'); if (!action) return;
     const tabs = rootEl.querySelectorAll('.resolution-tab');
-    tabs.forEach(function(tab){ const isActive = (tab === tabButton); tab.classList.toggle('resolution-tab-active', isActive); tab.setAttribute('aria-selected', isActive ? 'true' : 'false'); tab.setAttribute('tabindex', isActive ? '0' : '-1'); });
+    tabs.forEach(function (tab) { const isActive = (tab === tabButton); tab.classList.toggle('resolution-tab-active', isActive); tab.setAttribute('aria-selected', isActive ? 'true' : 'false'); tab.setAttribute('tabindex', isActive ? '0' : '-1'); });
     const details = rootEl.querySelectorAll('.resolution-detail');
     let selectedDetail = null; const self = this;
-    details.forEach(function(detail){ const matches = detail.getAttribute('data-action') === action; if (matches) { selectedDetail = detail; if (!detail.classList.contains('resolution-detail-active') || detail.hasAttribute('hidden')) { self._animateOpenResolutionDetail(detail); } else { detail.setAttribute('aria-hidden', 'false'); detail.style.pointerEvents = ''; } } else if (!detail.hasAttribute('hidden') || detail.classList.contains('resolution-detail-active')) { self._animateCloseResolutionDetail(detail); } });
+    details.forEach(function (detail) { const matches = detail.getAttribute('data-action') === action; if (matches) { selectedDetail = detail; if (!detail.classList.contains('resolution-detail-active') || detail.hasAttribute('hidden')) { self._animateOpenResolutionDetail(detail); } else { detail.setAttribute('aria-hidden', 'false'); detail.style.pointerEvents = ''; } } else if (!detail.hasAttribute('hidden') || detail.classList.contains('resolution-detail-active')) { self._animateCloseResolutionDetail(detail); } });
   },
 
-  _bindTabKeyboard: function(rootEl) {
+  _bindTabKeyboard: function (rootEl) {
     if (!rootEl || rootEl._resolutionTabKeyboardBound) return;
     const self = this;
-    const keyHandler = function(event){
-      const tab = event.target && event.target.closest && event.target.closest('.resolution-tab'); if (!tab) return; const key = event.key; if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return; const tabs = Array.from(rootEl.querySelectorAll('.resolution-tab')); if (!tabs.length) return; const currentIndex = tabs.indexOf(tab); if (currentIndex === -1) return; let nextIndex = currentIndex; if (key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length; else if (key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length; else if (key === 'Home') nextIndex = 0; else if (key === 'End') nextIndex = tabs.length - 1; if (nextIndex === currentIndex) return; event.preventDefault(); const nextTab = tabs[nextIndex]; if (nextTab) { try { if (typeof nextTab.focus === 'function') nextTab.focus(); } catch(_) {} self._handleTabSelection(rootEl, nextTab); } };
+    const keyHandler = function (event) {
+      const tab = event.target && event.target.closest && event.target.closest('.resolution-tab'); if (!tab) return; const key = event.key; if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return; const tabs = Array.from(rootEl.querySelectorAll('.resolution-tab')); if (!tabs.length) return; const currentIndex = tabs.indexOf(tab); if (currentIndex === -1) return; let nextIndex = currentIndex; if (key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length; else if (key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length; else if (key === 'Home') nextIndex = 0; else if (key === 'End') nextIndex = tabs.length - 1; if (nextIndex === currentIndex) return; event.preventDefault(); const nextTab = tabs[nextIndex]; if (nextTab) { try { if (typeof nextTab.focus === 'function') nextTab.focus(); } catch (_) { } self._handleTabSelection(rootEl, nextTab); }
+    };
     rootEl.addEventListener('keydown', keyHandler);
     rootEl._resolutionTabKeyboardBound = true;
   },
 
-  _animateOpenResolutionDetail: function(detail) {
+  _animateOpenResolutionDetail: function (detail) {
     if (!detail) return; this._clearResolutionDetailTransition(detail); detail.classList.add('resolution-detail-active'); detail.removeAttribute('hidden'); detail.setAttribute('aria-hidden', 'false'); detail.style.pointerEvents = 'auto'; const targetHeight = detail.scrollHeight; detail.style.overflow = 'hidden'; detail.style.transition = 'none'; detail.style.height = '0px'; detail.style.opacity = '0'; // eslint-disable-next-line no-unused-expressions
     detail.offsetHeight; detail.style.transition = 'height 0.24s ease, opacity 0.18s ease'; detail.style.height = targetHeight + 'px'; detail.style.opacity = '1';
-    const onEnd = function(evt){ if (evt && evt.target !== detail) return; if (detail._resolutionDetailTimer) { clearTimeout(detail._resolutionDetailTimer); detail._resolutionDetailTimer = null; } detail.style.transition = ''; detail.style.height = 'auto'; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; detail.removeEventListener('transitionend', onEnd); };
-    detail._resolutionDetailHandler = onEnd; detail.addEventListener('transitionend', onEnd); detail._resolutionDetailTimer = setTimeout(function(){ if (detail._resolutionDetailHandler) { onEnd({ target: detail }); } }, 320);
+    const onEnd = function (evt) { if (evt && evt.target !== detail) return; if (detail._resolutionDetailTimer) { clearTimeout(detail._resolutionDetailTimer); detail._resolutionDetailTimer = null; } detail.style.transition = ''; detail.style.height = 'auto'; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; detail.removeEventListener('transitionend', onEnd); };
+    detail._resolutionDetailHandler = onEnd; detail.addEventListener('transitionend', onEnd); detail._resolutionDetailTimer = setTimeout(function () { if (detail._resolutionDetailHandler) { onEnd({ target: detail }); } }, 320);
   },
 
-  _animateCloseResolutionDetail: function(detail) {
+  _animateCloseResolutionDetail: function (detail) {
     if (!detail) return; this._clearResolutionDetailTransition(detail); detail.style.pointerEvents = 'none'; detail.setAttribute('aria-hidden', 'true'); const startHeight = detail.scrollHeight; if (!startHeight) { detail.classList.remove('resolution-detail-active'); detail.setAttribute('hidden', 'hidden'); detail.style.transition = ''; detail.style.height = ''; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; return; } const computedStyle = (typeof window !== 'undefined' && window.getComputedStyle) ? window.getComputedStyle(detail) : null; detail.style.overflow = 'hidden'; detail.style.transition = 'none'; detail.style.height = startHeight + 'px'; detail.style.opacity = computedStyle ? computedStyle.opacity || '1' : '1'; // eslint-disable-next-line no-unused-expressions
-    detail.offsetHeight; detail.style.transition = 'height 0.24s ease, opacity 0.18s ease'; detail.style.height = '0px'; detail.style.opacity = '0'; const onEnd = function(evt){ if (evt && evt.target !== detail) return; if (detail._resolutionDetailTimer) { clearTimeout(detail._resolutionDetailTimer); detail._resolutionDetailTimer = null; } detail.classList.remove('resolution-detail-active'); detail.setAttribute('hidden', 'hidden'); detail.style.transition = ''; detail.style.height = ''; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; detail.removeEventListener('transitionend', onEnd); }; detail._resolutionDetailHandler = onEnd; detail.addEventListener('transitionend', onEnd); detail._resolutionDetailTimer = setTimeout(function(){ if (detail._resolutionDetailHandler) { onEnd({ target: detail }); } }, 320);
+    detail.offsetHeight; detail.style.transition = 'height 0.24s ease, opacity 0.18s ease'; detail.style.height = '0px'; detail.style.opacity = '0'; const onEnd = function (evt) { if (evt && evt.target !== detail) return; if (detail._resolutionDetailTimer) { clearTimeout(detail._resolutionDetailTimer); detail._resolutionDetailTimer = null; } detail.classList.remove('resolution-detail-active'); detail.setAttribute('hidden', 'hidden'); detail.style.transition = ''; detail.style.height = ''; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; detail.removeEventListener('transitionend', onEnd); }; detail._resolutionDetailHandler = onEnd; detail.addEventListener('transitionend', onEnd); detail._resolutionDetailTimer = setTimeout(function () { if (detail._resolutionDetailHandler) { onEnd({ target: detail }); } }, 320);
   },
 
-  _clearResolutionDetailTransition: function(detail) {
-    if (!detail) return; if (detail._resolutionDetailTimer) { try { clearTimeout(detail._resolutionDetailTimer); } catch(_) {} detail._resolutionDetailTimer = null; } if (detail._resolutionDetailHandler) { try { detail.removeEventListener('transitionend', detail._resolutionDetailHandler); } catch(_) {} detail._resolutionDetailHandler = null; }
+  _clearResolutionDetailTransition: function (detail) {
+    if (!detail) return; if (detail._resolutionDetailTimer) { try { clearTimeout(detail._resolutionDetailTimer); } catch (_) { } detail._resolutionDetailTimer = null; } if (detail._resolutionDetailHandler) { try { detail.removeEventListener('transitionend', detail._resolutionDetailHandler); } catch (_) { } detail._resolutionDetailHandler = null; }
   },
 
-  _setupCollapseTriggers: function(opts) {
+  _setupCollapseTriggers: function (opts) {
     if (!opts || !opts.anchorEl) return;
     const anchor = opts.anchorEl;
     const self = this;
-    const clickOutsideHandler = function(e){
+    const clickOutsideHandler = function (e) {
       try {
         if (opts.context === 'table') {
           const row = anchor.previousElementSibling;
@@ -480,61 +542,61 @@ var RelocationImpactAssistant = {
         } else if (opts.context === 'accordion') {
           if (!anchor.contains(e.target)) self._collapseAccordionPanel(anchor);
         }
-      } catch(_) {}
+      } catch (_) { }
     };
     document.addEventListener('click', clickOutsideHandler);
     anchor._panelClickOutsideHandler = clickOutsideHandler;
-    const escHandler = function(e){ if (e && e.key === 'Escape') { if (opts.context === 'table') { const row = anchor.previousElementSibling; if (row) self.collapsePanelForTableRow(row); } else if (opts.context === 'accordion') { self._collapseAccordionPanel(anchor); } } };
+    const escHandler = function (e) { if (e && e.key === 'Escape') { if (opts.context === 'table') { const row = anchor.previousElementSibling; if (row) self.collapsePanelForTableRow(row); } else if (opts.context === 'accordion') { self._collapseAccordionPanel(anchor); } } };
     document.addEventListener('keydown', escHandler);
     anchor._panelEscHandler = escHandler;
   },
 
-  _teardownCollapseTriggers: function(anchor) {
+  _teardownCollapseTriggers: function (anchor) {
     if (!anchor) return;
-    try { if (anchor._panelClickOutsideHandler) { document.removeEventListener('click', anchor._panelClickOutsideHandler); anchor._panelClickOutsideHandler = null; } } catch(_) {}
-    try { if (anchor._panelEscHandler) { document.removeEventListener('keydown', anchor._panelEscHandler); anchor._panelEscHandler = null; } } catch(_) {}
+    try { if (anchor._panelClickOutsideHandler) { document.removeEventListener('click', anchor._panelClickOutsideHandler); anchor._panelClickOutsideHandler = null; } } catch (_) { }
+    try { if (anchor._panelEscHandler) { document.removeEventListener('keydown', anchor._panelEscHandler); anchor._panelEscHandler = null; } } catch (_) { }
   },
 
-  _collapseAccordionPanel: function(item) {
+  _collapseAccordionPanel: function (item) {
     if (!item) return;
     const expander = item.querySelector('.resolution-panel-expander');
     const container = item.querySelector('.resolution-panel-container');
     if (!expander && !container) return;
-    if (container) { try { container.classList.remove('visible'); } catch(_) {} }
+    if (container) { try { container.classList.remove('visible'); } catch (_) { } }
     if (expander) {
       const current = expander.scrollHeight; expander.style.height = current + 'px';
       // eslint-disable-next-line no-unused-expressions
-      expander.offsetHeight; requestAnimationFrame(function(){ expander.style.height = '0px'; });
-      const onClosed = function(e){ if (e.target !== expander) return; expander.removeEventListener('transitionend', onClosed); const wrapperToRemove = expander; if (wrapperToRemove && wrapperToRemove.parentNode) { wrapperToRemove.remove(); } };
+      expander.offsetHeight; requestAnimationFrame(function () { expander.style.height = '0px'; });
+      const onClosed = function (e) { if (e.target !== expander) return; expander.removeEventListener('transitionend', onClosed); const wrapperToRemove = expander; if (wrapperToRemove && wrapperToRemove.parentNode) { wrapperToRemove.remove(); } };
       expander.addEventListener('transitionend', onClosed);
     } else if (container) {
-      setTimeout(function(){ if (container.parentNode) container.parentNode.remove(); }, 300);
+      setTimeout(function () { if (container.parentNode) container.parentNode.remove(); }, 300);
     }
     this._teardownCollapseTriggers(item);
   },
 
   // Legacy property helpers (used by keep/sell actions)
-  _keepProperty: function(event, payload, env) {
+  _keepProperty: function (event, payload, env) {
     try {
       var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
       var etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
       if (!etm) return;
       var rowId = payload && payload.rowId;
       var baseRow = null;
-      try { if (rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]'); } catch(_) {}
+      try { if (rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]'); } catch (_) { }
       var startCountry = typeof etm.getStartCountry === 'function' ? etm.getStartCountry() : Config.getInstance().getDefaultCountry();
       var origin = typeof etm.detectPropertyCountry === 'function' ? etm.detectPropertyCountry(Number(event.fromAge), startCountry) : startCountry;
-      var rs = null; try { rs = Config.getInstance().getCachedTaxRuleSet(origin); } catch(_) {}
+      var rs = null; try { rs = Config.getInstance().getCachedTaxRuleSet(origin); } catch (_) { }
       var originCurrency = rs && typeof rs.getCurrencyCode === 'function' ? rs.getCurrencyCode() : null;
       function findRowsByIdAndType(id, type) {
         var rows = Array.from(document.querySelectorAll('#Events tbody tr'));
-        return rows.filter(function(r){ var t = r.querySelector('.event-type'); var n = r.querySelector('.event-name'); return t && n && t.value === type && n.value === id; });
+        return rows.filter(function (r) { var t = r.querySelector('.event-type'); var n = r.querySelector('.event-name'); return t && n && t.value === type && n.value === id; });
       }
       var propRows = [];
       var mortRows = [];
       if (baseRow && typeof etm._applyToRealEstatePair === 'function') {
         // Use the row context to update both R and M with the same name/id
-        etm._applyToRealEstatePair(baseRow, function(r){
+        etm._applyToRealEstatePair(baseRow, function (r) {
           var t = r && r.querySelector ? (r.querySelector('.event-type') && r.querySelector('.event-type').value) : '';
           if (t === 'R') propRows.push(r); else if (t === 'M') mortRows.push(r);
           etm.getOrCreateHiddenInput(r, 'event-linked-country', origin);
@@ -554,25 +616,25 @@ var RelocationImpactAssistant = {
         }
       }
       RelocationImpactAssistant._refreshImpacts();
-    } catch(e) { try { console.error('Error in _keepProperty:', e); } catch(_) {} }
+    } catch (e) { try { console.error('Error in _keepProperty:', e); } catch (_) { } }
   },
 
-  _sellProperty: function(event, payload, env) {
+  _sellProperty: function (event, payload, env) {
     try {
       var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
       var etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
       if (!etm) return;
       var events = webUI.readEvents(false) || [];
-      var mv = events.find(function(e){ return e && e.id === (event.relocationImpact && event.relocationImpact.mvEventId); });
+      var mv = events.find(function (e) { return e && e.id === (event.relocationImpact && event.relocationImpact.mvEventId); });
       if (!mv) return;
       var relocationAge = Number(mv.fromAge);
       var rowId = payload && payload.rowId;
       var baseRow = null;
-      try { if (rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]'); } catch(_) {}
+      try { if (rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]'); } catch (_) { }
 
       function findRowsByIdAndType(id, type) {
         var rows = Array.from(document.querySelectorAll('#Events tbody tr'));
-        return rows.filter(function(r){ var t = r.querySelector('.event-type'); var n = r.querySelector('.event-name'); return t && n && t.value === type && n.value === id; });
+        return rows.filter(function (r) { var t = r.querySelector('.event-type'); var n = r.querySelector('.event-name'); return t && n && t.value === type && n.value === id; });
       }
       function setToAgeGuarded(row, age) {
         var toAgeInput = row.querySelector('.event-to-age');
@@ -585,7 +647,7 @@ var RelocationImpactAssistant = {
       }
 
       if (baseRow && typeof etm._applyToRealEstatePair === 'function') {
-        etm._applyToRealEstatePair(baseRow, function(r){ setToAgeGuarded(r, relocationAge); });
+        etm._applyToRealEstatePair(baseRow, function (r) { setToAgeGuarded(r, relocationAge); });
       } else {
         var propRows = findRowsByIdAndType(event.id, 'R');
         for (var i = 0; i < propRows.length; i++) setToAgeGuarded(propRows[i], relocationAge);
@@ -593,10 +655,10 @@ var RelocationImpactAssistant = {
         for (var j = 0; j < mortRows.length; j++) setToAgeGuarded(mortRows[j], relocationAge);
       }
       RelocationImpactAssistant._refreshImpacts();
-    } catch(e) { try { console.error('Error in _sellProperty:', e); } catch(_) {} }
+    } catch (e) { try { console.error('Error in _sellProperty:', e); } catch (_) { } }
   },
 
-  _refreshImpacts: function() {
+  _refreshImpacts: function () {
     try {
       var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
       var etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
@@ -607,7 +669,7 @@ var RelocationImpactAssistant = {
       etm.updateRelocationImpactIndicators(events);
       if (typeof webUI.updateStatusForRelocationImpacts === 'function') { webUI.updateStatusForRelocationImpacts(events); }
       if (webUI.eventAccordionManager && typeof webUI.eventAccordionManager.refresh === 'function') { webUI.eventAccordionManager.refresh(); }
-    } catch(e) { try { console.error('Error refreshing relocation impacts:', e); } catch(_) {} }
+    } catch (e) { try { console.error('Error refreshing relocation impacts:', e); } catch (_) { } }
   }
 };
 

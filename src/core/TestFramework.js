@@ -14,7 +14,7 @@ const vm = require('vm');
 // Test assertion types
 const AssertionTypes = {
   EXACT_VALUE: 'exact_value',
-  RANGE: 'range', 
+  RANGE: 'range',
   COMPARISON: 'comparison',
   TREND: 'trend'
 };
@@ -27,7 +27,7 @@ const TargetTypes = {
 };
 
 class TestFramework {
-  
+
   constructor() {
     this.testResults = [];
     this.currentTest = null;
@@ -90,7 +90,7 @@ class TestFramework {
     if (this.simulationContext) {
       const singletonNames = [
         'Config_instance',
-        'WebUI_instance', 
+        'WebUI_instance',
         'GasUI_instance',
         'wizard_instance'
       ];
@@ -144,7 +144,7 @@ class TestFramework {
     // Comprehensive module cache clearing for core directory
     let modulesClearedCount = 0;
     const coreModulePath = path.join(__dirname);
-    
+
     for (const modulePath in require.cache) {
       // Clear all modules from the core directory
       if (modulePath.startsWith(coreModulePath)) {
@@ -180,21 +180,21 @@ class TestFramework {
         JSON: JSON,
         require: require,
         __dirname: __dirname,
-        
+
         // Simple localStorage polyfill for Config.getTaxRuleSet() persistence
         localStorage: {
           _storage: {},
-          getItem: function(key) { return this._storage[key] || null; },
-          setItem: function(key, value) { this._storage[key] = String(value); }
+          getItem: function (key) { return this._storage[key] || null; },
+          setItem: function (key, value) { this._storage[key] = String(value); }
         },
-        
+
         // Variables that will be populated by the core files
         SimEvent: null,
         adjust: null,
         gaussian: null,
         getRateForKey: null,
         Config_instance: null,
-        
+
         // Simulation state variables
         uiManager: null,
         params: null,
@@ -203,7 +203,7 @@ class TestFramework {
         dataSheet: null,
         row: 0,
         errors: false,
-        
+
         // Core simulation variables
         age: 0,
         year: 0,
@@ -215,7 +215,7 @@ class TestFramework {
         revenue: null,
         realEstate: null,
         stockGrowthOverride: undefined,
-        
+
         // Financial variables
         netIncome: 0,
         expenses: 0,
@@ -231,7 +231,7 @@ class TestFramework {
         cash: 0,
         indexFunds: null,
         shares: null,
-        
+
         // More income variables
         incomeSalaries: 0,
         incomeShares: 0,
@@ -239,11 +239,11 @@ class TestFramework {
         incomeDefinedBenefit: 0,
         incomeTaxFree: 0,
         pensionContribution: 0,
-        
+
         // Person objects for two-person simulation
         person1: null,
         person2: null,
-        
+
         // Phases enum needed by Person class
         Phases: {
           growth: 'growth',
@@ -260,7 +260,8 @@ class TestFramework {
         'Attribution.js',
         'AttributionManager.js',
         'Taxman.js',
-        'Equities.js', 
+        'Equities.js',
+        'InvestmentTypeFactory.js',
         'RealEstate.js',
         'Person.js',
         'InflationService.js',
@@ -278,13 +279,13 @@ class TestFramework {
         }
 
         const code = fs.readFileSync(filepath, 'utf8');
-        
+
         try {
           vm.runInContext(code, this.simulationContext, {
             filename: filename,
             displayErrors: true
           });
-          
+
           if (this.verbose) {
             console.log(`✓ Loaded core module: ${filename}`);
           }
@@ -295,11 +296,11 @@ class TestFramework {
       }
 
       this.coreModulesLoaded = true;
-      
+
       if (this.verbose) {
         console.log('✓ All core modules loaded successfully');
       }
-      
+
       return true;
     } catch (error) {
       console.error(`Error loading core modules: ${error.message}`);
@@ -394,7 +395,7 @@ class TestFramework {
 
     try {
       this.currentTest.startTime = Date.now();
-      
+
       if (this.verbose) {
         console.log(`Running simulation: ${this.currentTest.name}`);
       }
@@ -404,7 +405,7 @@ class TestFramework {
         this.currentTest.scenario.parameters,
         this.currentTest.scenario.events
       );
-      
+
       this.currentTest.endTime = Date.now();
       this.currentTest.results = results;
 
@@ -483,7 +484,7 @@ class TestFramework {
           console.log(`🔧 DEBUG: Final config version loaded: ${configVersion}`);
           console.log(`🔧 DEBUG: Config default country: ${configDefaultCountry}`);
           console.log(`🔧 DEBUG: Config application name: ${configAppName}`);
-          
+
           // Show some key config properties if they exist
           const simulationRuns = vm.runInContext('Config.getInstance().simulationRuns || "not set"', this.simulationContext);
           console.log(`🔧 DEBUG: Config simulation runs: ${simulationRuns}`);
@@ -500,11 +501,11 @@ class TestFramework {
           const vmEvents = vm.runInContext('testEvents', this.simulationContext);
           console.log(`🔧 DEBUG: Parameters loaded: ${vmParams ? Object.keys(vmParams).length + ' keys' : 'null'}`);
           console.log(`🔧 DEBUG: Events loaded: ${vmEvents ? vmEvents.length + ' events' : 'null'}`);
-          
+
           if (vmParams) {
             console.log(`🔧 DEBUG: Key parameters - startingAge: ${vmParams.startingAge}, targetAge: ${vmParams.targetAge}, initialSavings: ${vmParams.initialSavings}`);
           }
-          
+
           // Verify we're using the real Simulator.js run() function
           const runFunctionExists = vm.runInContext('typeof run === "function"', this.simulationContext);
           const runFunctionSource = vm.runInContext('run.toString().substring(0, 100)', this.simulationContext);
@@ -531,12 +532,12 @@ class TestFramework {
         console.log(`🔧 DEBUG: Simulation success: ${results.success}`);
         console.log(`🔧 DEBUG: Simulation failed at age: ${results.failedAt || 'N/A'}`);
         console.log(`🔧 DEBUG: Execution time: ${results.executionTime}ms`);
-        
+
         if (results.dataSheet && Array.isArray(results.dataSheet)) {
           const validRows = results.dataSheet.filter(r => r && typeof r === 'object');
           console.log(`🔧 DEBUG: DataSheet total rows: ${results.dataSheet.length}`);
           console.log(`🔧 DEBUG: DataSheet valid rows: ${validRows.length}`);
-          
+
           if (validRows.length > 0) {
             const firstRow = validRows[0];
             const lastRow = validRows[validRows.length - 1];
@@ -545,7 +546,7 @@ class TestFramework {
             console.log(`🔧 DEBUG: Final net worth: €${lastRow.worth ? lastRow.worth.toLocaleString() : 'N/A'}`);
             console.log(`🔧 DEBUG: Final cash: €${lastRow.cash ? lastRow.cash.toLocaleString() : 'N/A'}`);
             console.log(`🔧 DEBUG: Final pension fund: €${lastRow.pensionFund ? lastRow.pensionFund.toLocaleString() : 'N/A'}`);
-            
+
             // Dump first few and last few rows for debugging
             this.dumpDataSheetRows(validRows, 'DEBUG');
           } else {
@@ -565,18 +566,18 @@ class TestFramework {
       } catch (e) {
         // ignore if VM variable isn't present
       }
-      
+
       // Check if Monte Carlo was used and apply averaging
       const montecarlo = vm.runInContext('montecarlo', this.simulationContext);
       if (montecarlo) {
         const config = vm.runInContext('config', this.simulationContext);
         const runs = config.simulationRuns;
-        
+
         // Add Monte Carlo metadata to results (median conversion already done in Simulator)
         results.montecarlo = true;
         results.runs = runs;
       }
-      
+
       return results;
 
     } catch (error) {
@@ -603,7 +604,7 @@ class TestFramework {
     }
 
     console.log(`🔧 ${prefix}: Dumping dataSheet rows (${validRows.length} total valid rows)`);
-    
+
     // Show first 3 rows
     const firstRowsCount = Math.min(3, validRows.length);
     console.log(`🔧 ${prefix}: First ${firstRowsCount} rows:`);
@@ -727,7 +728,25 @@ class TestFramework {
         } catch (e) { throw new Error('Failed to load scenario file: ' + (e && e.message ? e.message : e)); }
       };
       MockUIManager.prototype.updateDataRow = function(row, progress) {};
-      MockUIManager.prototype.readParameters = function(validate) { return testParams; };
+      MockUIManager.prototype.readParameters = function(validate) {
+        // Transform legacy parameter names to new dynamic structure
+        if (testParams && !testParams.investmentGrowthRatesByKey) {
+          testParams.investmentGrowthRatesByKey = {};
+          testParams.investmentVolatilitiesByKey = {};
+          testParams.investmentAllocationsByKey = {};
+          testParams.initialCapitalByKey = {};
+          // Map legacy names to dynamic maps
+          if (testParams.growthRateFunds !== undefined) testParams.investmentGrowthRatesByKey.indexFunds = testParams.growthRateFunds;
+          if (testParams.growthRateShares !== undefined) testParams.investmentGrowthRatesByKey.shares = testParams.growthRateShares;
+          if (testParams.growthDevFunds !== undefined) testParams.investmentVolatilitiesByKey.indexFunds = testParams.growthDevFunds;
+          if (testParams.growthDevShares !== undefined) testParams.investmentVolatilitiesByKey.shares = testParams.growthDevShares;
+          if (testParams.FundsAllocation !== undefined) testParams.investmentAllocationsByKey.indexFunds = testParams.FundsAllocation;
+          if (testParams.SharesAllocation !== undefined) testParams.investmentAllocationsByKey.shares = testParams.SharesAllocation;
+          if (testParams.initialFunds !== undefined) testParams.initialCapitalByKey.indexFunds = testParams.initialFunds;
+          if (testParams.initialShares !== undefined) testParams.initialCapitalByKey.shares = testParams.initialShares;
+        }
+        return testParams;
+      };
       MockUIManager.prototype.readEvents = function(validate) { return testEvents; };
       MockUIManager.prototype.flush = function() {};
 
@@ -778,7 +797,7 @@ class TestFramework {
     for (const assertion of assertions) {
       try {
         const assertionResult = this.validateSingleAssertion(assertion, results);
-        
+
         if (assertionResult.success) {
           validationResults.passedAssertions++;
           validationResults.details.push({
@@ -824,10 +843,10 @@ class TestFramework {
    */
   validateSingleAssertion(assertion, results) {
     const { type, target, field, expected, tolerance = 0.01 } = assertion;
-    
+
     // Get the actual value based on target type
     let actualValue;
-    
+
     switch (target) {
       case TargetTypes.FINAL:
         actualValue = this.getFinalValue(results.dataSheet, field);
@@ -955,7 +974,7 @@ class TestFramework {
   validateExactValue(actual, expected, tolerance) {
     const diff = Math.abs(actual - expected);
     const success = diff <= tolerance;
-    
+
     return {
       success: success,
       actual: actual,
@@ -970,7 +989,7 @@ class TestFramework {
    */
   validateRange(actual, min, max) {
     const success = actual >= min && actual <= max;
-    
+
     return {
       success: success,
       actual: actual,
@@ -985,7 +1004,7 @@ class TestFramework {
    */
   validateComparison(actual, operator, value) {
     let success = false;
-    
+
     switch (operator) {
       case '>':
         success = actual > value;
@@ -1008,7 +1027,7 @@ class TestFramework {
       default:
         throw new Error(`Unknown comparison operator: ${operator}`);
     }
-    
+
     return {
       success: success,
       actual: actual,
@@ -1027,10 +1046,10 @@ class TestFramework {
       const key = this._resolveFieldAlias(row, field);
       return row ? row[key] : undefined;
     });
-    
+
     let success = false;
     let message = '';
-    
+
     switch (expected.direction) {
       case 'increasing':
         success = this.isIncreasing(values);
@@ -1047,7 +1066,7 @@ class TestFramework {
       default:
         throw new Error(`Unknown trend direction: ${expected.direction}`);
     }
-    
+
     return {
       success: success,
       actual: values,
@@ -1063,7 +1082,7 @@ class TestFramework {
   isIncreasing(values) {
     let increasing = 0;
     for (let i = 1; i < values.length; i++) {
-      if (values[i] > values[i-1]) increasing++;
+      if (values[i] > values[i - 1]) increasing++;
     }
     return increasing > values.length * 0.7; // 70% should be increasing
   }
@@ -1074,7 +1093,7 @@ class TestFramework {
   isDecreasing(values) {
     let decreasing = 0;
     for (let i = 1; i < values.length; i++) {
-      if (values[i] < values[i-1]) decreasing++;
+      if (values[i] < values[i - 1]) decreasing++;
     }
     return decreasing > values.length * 0.7; // 70% should be decreasing
   }
@@ -1135,7 +1154,7 @@ class TestFramework {
     report += `Description: ${reportData.description}\n`;
     report += `Execution Time: ${reportData.executionTime}ms\n`;
     report += `Overall Success: ${reportData.success ? '✓ PASS' : '✗ FAIL'}\n`;
-    
+
     if (reportData.errors && reportData.errors.length > 0) {
       report += '\nERRORS:\n';
       reportData.errors.forEach(error => {
@@ -1146,7 +1165,7 @@ class TestFramework {
     if (reportData.assertionResults) {
       const ar = reportData.assertionResults;
       report += `\nASSERTIONS: ${ar.passedAssertions}/${ar.totalAssertions} passed\n`;
-      
+
       if (ar.failures.length > 0) {
         report += '\nFAILED ASSERTIONS:\n';
         ar.failures.forEach((failure, index) => {

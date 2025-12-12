@@ -58,6 +58,15 @@ async function run() {
   uiManager.updateStatusCell(successes, runs);
 }
 
+function flagSimulationFailure(age) {
+  success = false;
+  if (typeof age === 'number') {
+    failedAt = age;
+  } else if (person1 && typeof person1.age === 'number') {
+    failedAt = person1.age;
+  }
+}
+
 function normalizeCountry(code) {
   if (code === null || code === undefined) throw new Error('normalizeCountry: code is null/undefined');
   return String(code).trim().toLowerCase();
@@ -353,35 +362,41 @@ function loadFromFile(file) {
 }
 
 function initializeSimulationVariables() {
-  // Initialize investment instruments (rates sourced inside from ruleset when available)
-  indexFunds = new IndexFunds(params.growthRateFunds, params.growthDevFunds);
-  shares = new Shares(params.growthRateShares, params.growthDevShares);
+  // Get growth rates and volatilities from dynamic maps
+  var growthByKey = params.investmentGrowthRatesByKey || {};
+  var volByKey = params.investmentVolatilitiesByKey || {};
+  // Initialize investment instruments using dynamic growth/vol maps
+  indexFunds = new IndexFunds(growthByKey.indexFunds || 0, volByKey.indexFunds || 0);
+  shares = new Shares(growthByKey.shares || 0, volByKey.shares || 0);
   // Also create generic assets array (compat path: map first two to existing ones for IE)
+  // Per strictness §9: investmentAssets must always be a valid, non-empty array
   try {
     var rs = (function () { try { return Config.getInstance().getCachedTaxRuleSet(params.StartCountry || config.getDefaultCountry()); } catch (_) { return null; } })();
     if (rs && typeof InvestmentTypeFactory !== 'undefined') {
-      var growthMap = {
-        indexFunds: params.growthRateFunds,
-        shares: params.growthRateShares
-      };
-      var stdevMap = {
-        indexFunds: params.growthDevFunds,
-        shares: params.growthDevShares
-      };
-      investmentAssets = InvestmentTypeFactory.createAssets(rs, growthMap, stdevMap);
-      // Bridge: ensure first two assets align to legacy objects if present
-      if (investmentAssets && investmentAssets.length > 0) {
-        if (investmentAssets[0].key === 'indexFunds') investmentAssets[0].asset = indexFunds;
-        if (investmentAssets.length > 1 && investmentAssets[1].key === 'shares') investmentAssets[1].asset = shares;
-      }
-    } else {
-      investmentAssets = [];
+      investmentAssets = InvestmentTypeFactory.createAssets(rs, growthByKey, volByKey);
+      // NOTE: Do NOT replace GenericInvestmentAsset objects with legacy IndexFunds/Shares.
+      // The factory creates assets with proper baseCurrency metadata for currency conversion.
+      // Legacy indexFunds/shares objects are still maintained separately for backward compat
+      // in data display, but investmentAssets should use the factory-created objects.
     }
   } catch (e) {
-    investmentAssets = [];
+    // Catch silently - fallback below will populate investmentAssets
   }
-  if (params.initialFunds > 0) indexFunds.buy(params.initialFunds);
-  if (params.initialShares > 0) shares.buy(params.initialShares);
+  // Fallback: if investmentAssets is empty or undefined, create minimal array with legacy assets
+  // This ensures withdraw() and liquidateAll() can always iterate over investmentAssets
+  if (!investmentAssets || investmentAssets.length === 0) {
+    investmentAssets = [
+      { key: 'indexFunds', asset: indexFunds },
+      { key: 'shares', asset: shares }
+    ];
+  }
+  // Initialize investment assets with initial capital from dynamic map
+  var initialCapitalByKey = params.initialCapitalByKey || {};
+  for (var i = 0; i < investmentAssets.length; i++) {
+    var entry = investmentAssets[i];
+    var initialCapital = initialCapitalByKey[entry.key];
+    if (initialCapital > 0) entry.asset.buy(initialCapital);
+  }
 
   // Initialize stable tax ids from ruleset for consistent Tax__ columns
   try {
@@ -608,9 +623,17 @@ function runSimulation() {
 function calculatePensionIncome() {
   // Calculate pension income for Person 1
   const p1CalcResults = person1.calculateYearlyPensionIncome(config, currentCountry, residenceCurrency, year);
+  if (p1CalcResults && p1CalcResults.lumpSumAmount === null) {
+    flagSimulationFailure(person1.age);
+    return;
+  }
   if (p1CalcResults.lumpSumAmount > 0) {
     cash += p1CalcResults.lumpSumAmount;
     // Note: Lump sum tax is already declared in Pension.declareRevenue() when getLumpsum() calls sell()
+  }
+  if (person1.yearlyIncomePrivatePension === null) {
+    flagSimulationFailure(person1.age);
+    return;
   }
   if (person1.yearlyIncomePrivatePension > 0) {
     attributionManager.record('incomeprivatepension', 'Your Private Pension', person1.yearlyIncomePrivatePension);
@@ -628,9 +651,17 @@ function calculatePensionIncome() {
   // Calculate pension income for Person 2 (if exists)
   if (person2) {
     const p2CalcResults = person2.calculateYearlyPensionIncome(config, currentCountry, residenceCurrency, year);
+    if (p2CalcResults && p2CalcResults.lumpSumAmount === null) {
+      flagSimulationFailure(person2.age);
+      return;
+    }
     if (p2CalcResults.lumpSumAmount > 0) {
       cash += p2CalcResults.lumpSumAmount;
       // Note: Lump sum tax is already declared in Pension.declareRevenue() when getLumpsum() calls sell()
+    }
+    if (person2.yearlyIncomePrivatePension === null) {
+      flagSimulationFailure(person2.age);
+      return;
     }
     if (person2.yearlyIncomePrivatePension > 0) {
       attributionManager.record('incomeprivatepension', 'Their Private Pension', person2.yearlyIncomePrivatePension);
@@ -1317,15 +1348,18 @@ function processEvents() {
                 cash = convertedCash;
               }
 
-              // Convert target cash (emergency stash) to new currency to maintain purchasing power
-              // This must happen regardless of allowCashConversion, as the target is a policy goal in the local currency
-              var convertedTargetCash = convertCurrencyAmount(targetCash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
-              if (convertedTargetCash === null) {
-                success = false;
-                failedAt = person1.age;
-                return; // Abort processing this year
+              // Optionally convert target cash (emergency stash) to new currency.
+              // When convertCashOnRelocation is enabled, both the pooled cash and the
+              // emergency stash target follow the user into the new currency.
+              if (params && params.convertCashOnRelocation === true) {
+                var convertedTargetCash = convertCurrencyAmount(targetCash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
+                if (convertedTargetCash === null) {
+                  success = false;
+                  failedAt = person1.age;
+                  return; // Abort processing this year
+                }
+                targetCash = convertedTargetCash;
               }
-              targetCash = convertedTargetCash;
             }
             currentCountry = destCountry;
             residenceCurrency = newResidenceCurrency;
@@ -1369,7 +1403,25 @@ function handleInvestments() {
   if (cash < targetCash) {
     cashDeficit = targetCash - cash;
   }
-  let capitalPreWithdrawal = indexFunds.capital() + shares.capital() + person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+  // Compute capsByKey inline for capital calculations
+  var capsByKey = {};
+  capsByKey['indexFunds'] = indexFunds.capital();
+  capsByKey['shares'] = shares.capital();
+  if (investmentAssets && investmentAssets.length > 0) {
+    for (var ci = 0; ci < investmentAssets.length; ci++) {
+      var centry = investmentAssets[ci];
+      if (!centry || !centry.asset || typeof centry.asset.capital !== 'function') continue;
+      var assetObj = centry.asset;
+      if (assetObj === indexFunds || assetObj === shares) continue;
+      var c = assetObj.capital();
+      capsByKey[centry.key] = (capsByKey[centry.key] || 0) + c;
+    }
+  }
+  let totalInvestmentCaps = 0;
+  for (var k in capsByKey) {
+    totalInvestmentCaps += capsByKey[k];
+  }
+  let capitalPreWithdrawal = totalInvestmentCaps + person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
   if (expenses > netIncome) {
     switch (person1.phase) {
       case Phases.growth:
@@ -1389,8 +1441,19 @@ function handleInvestments() {
   if (cash > targetCash + 0.001) {
     let surplus = cash - targetCash;
     let usedDynamic = false;
-    // Dynamic distribution across generic investment assets only if there are more than the two legacy assets
+    // Dynamic distribution across generic investment assets when they are defined
+    // via InvestmentTypeFactory (entries carry baseCurrency/assetCountry metadata).
+    var supportsContributionModes = false;
     if (investmentAssets && investmentAssets.length > 0) {
+      for (var mi = 0; mi < investmentAssets.length; mi++) {
+        var metaEntry = investmentAssets[mi];
+        if (metaEntry && metaEntry.baseCurrency) {
+          supportsContributionModes = true;
+          break;
+        }
+      }
+    }
+    if (investmentAssets && supportsContributionModes) {
       var allocations = getAllocationsByKey();
       var sumInvested = 0;
       for (var i = 0; i < investmentAssets.length; i++) {
@@ -1399,7 +1462,31 @@ function handleInvestments() {
         if (alloc > 0 && entry.asset && entry.asset.buy) {
           var amount = surplus * alloc;
           if (amount > 0) {
-            entry.asset.buy(amount);
+            // Apply currency conversion based on contributionCurrencyMode:
+            // - 'asset': convert contribution from residence currency to asset's base currency
+            // - 'residence': invest directly in residence currency (no conversion)
+            if (entry.contributionCurrencyMode === 'asset') {
+              var amountInAssetCurrency = convertCurrencyAmount(
+                amount,
+                residenceCurrency,
+                currentCountry,
+                entry.baseCurrency,
+                entry.assetCountry,
+                year
+              );
+              if (amountInAssetCurrency === null) {
+                // Conversion failed - log error and skip this investment type
+                if (uiManager && typeof uiManager.setStatus === 'function') {
+                  uiManager.setStatus('Currency conversion failed for investment type: ' + entry.key, STATUS_COLORS.ERROR);
+                }
+                continue;
+              }
+              entry.asset.buy(amountInAssetCurrency);
+            } else {
+              // contributionCurrencyMode === 'residence': invest directly in residence currency
+              entry.asset.buy(amount);
+            }
+            // Track invested amount in residence currency for cash deduction
             sumInvested += amount;
             usedDynamic = true;
           }
@@ -1410,11 +1497,12 @@ function handleInvestments() {
         cash -= invested;
       }
     }
-    // Legacy two-asset investing path
+    // Legacy two-asset investing path - use dynamic allocations
     if (!usedDynamic) {
-      indexFunds.buy(surplus * params.FundsAllocation);
-      shares.buy(surplus * params.SharesAllocation);
-      invested = surplus * (params.FundsAllocation + params.SharesAllocation);
+      var allocByKey = getAllocationsByKey();
+      indexFunds.buy(surplus * (allocByKey.indexFunds || 0));
+      shares.buy(surplus * (allocByKey.shares || 0));
+      invested = surplus * ((allocByKey.indexFunds || 0) + (allocByKey.shares || 0));
       cash -= invested;
     }
   }
@@ -1442,199 +1530,112 @@ function handleInvestments() {
 }
 
 
-// Get more money from: cash, pension, Index Funds, Shares, 
-// in the specified order of priority:
-// - fromX = 0 (don't use X)
-// - fromX = 1 (use X first)
-// - fromX = 2 (use X if first option not enough)
-// - fromX = 3 (use X if first and second options not enough)
-//
+// Withdraw funds from available sources (cash, pension, investments) based on priority.
+// Priorities: 0 = don't use, 1 = first, 2 = second, 3 = third, 4 = fourth.
+// Iterates through investmentAssets array using getDrawdownPrioritiesByKey() for dynamic allocation.
+// Per strictness §9: assumes investmentAssets is a valid, non-empty array (initialized via InvestmentTypeFactory).
 function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) {
-  // Dynamic generic path only when we have additional assets beyond legacy two
-  if (investmentAssets && investmentAssets.length > 2) {
-    const clonedRevenue = revenue.clone();
-    // Simulate selling all investment assets to estimate total availability after taxes
-    for (let si = 0; si < investmentAssets.length; si++) {
-      let simAsset = investmentAssets[si].asset;
-      if (simAsset && simAsset.simulateSellAll) simAsset.simulateSellAll(clonedRevenue);
-    }
-    let needed = expenses + cashDeficit - netIncome;
-    let totalPensionCapital = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
-    let totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome());
-    if (needed > totalAvailable + 0.01) {
-      liquidateAll();
-      return;
-    }
-
-    cashWithdraw = 0;
-    let totalWithdraw = 0;
-    const prioritiesByKey = getDrawdownPrioritiesByKey();
-    // Determine max priority rank across assets and special buckets
-    let maxRank = 0;
-    for (let k in prioritiesByKey) { if (prioritiesByKey.hasOwnProperty(k)) { maxRank = Math.max(maxRank, prioritiesByKey[k] || 0); } }
-    maxRank = Math.max(maxRank, cashPriority || 0, pensionPriority || 0, 4);
-
-    for (let priority = 1; priority <= maxRank; priority++) {
-      let loopCount = 0;
-      while (expenses + cashDeficit - netIncome >= 1) {
-        loopCount++;
-        if (loopCount > 50) { break; }
-        needed = expenses + cashDeficit - netIncome;
-        let keepTrying = false;
-
-        // Cash bucket
-        if (priority === cashPriority) {
-          if (cash > 0.5) {
-            cashWithdraw = Math.min(cash, needed);
-            totalWithdraw += cashWithdraw;
-            cash -= cashWithdraw;
-            attributionManager.record('incomecash', 'Cash Withdrawal', cashWithdraw);
-          }
-        }
-
-        // Pension bucket (P1 then P2)
-        if (priority === pensionPriority) {
-          let p1Cap = person1.pension.capital();
-          let p2Cap = person2 ? person2.pension.capital() : 0;
-          if (p1Cap > 0.5 && (person1.phase === Phases.retired || person1.age >= person1.retirementAgeParam)) {
-            let w1 = Math.min(p1Cap, needed);
-            totalWithdraw += w1;
-            let sold1 = person1.pension.sell(w1);
-            incomePrivatePension += sold1;
-            attributionManager.record('incomeprivatepension', 'Pension Drawdown P1', sold1);
-            keepTrying = true;
-          } else if (p2Cap > 0.5 && person2 && (person2.phase === Phases.retired || person2.age >= person2.retirementAgeParam)) {
-            let w2 = Math.min(p2Cap, needed);
-            totalWithdraw += w2;
-            let sold2 = person2.pension.sell(w2);
-            incomePrivatePension += sold2;
-            attributionManager.record('incomeprivatepension', 'Pension Drawdown P2', sold2);
-            keepTrying = true;
-          }
-        }
-
-        // Investment assets at this priority
-        for (let ai = 0; ai < investmentAssets.length; ai++) {
-          let entry = investmentAssets[ai];
-          let rank = prioritiesByKey[entry.key] || 0;
-          if (rank !== priority) continue;
-          let assetObj = entry.asset;
-          if (!assetObj || !assetObj.capital) continue;
-          let cap = assetObj.capital();
-          if (cap > 0.5) {
-            let w = Math.min(cap, needed);
-            totalWithdraw += w;
-            let sold = assetObj.sell(w);
-            // Maintain legacy income buckets for the two legacy assets
-            if (assetObj === indexFunds || entry.key === 'indexFunds') {
-              incomeFundsRent += sold;
-            } else if (assetObj === shares || entry.key === 'shares') {
-              incomeSharesRent += sold;
-            }
-            // Record dynamic income for this investment type
-            if (entry && entry.key) {
-              if (!investmentIncomeByKey) investmentIncomeByKey = {};
-              if (!investmentIncomeByKey[entry.key]) investmentIncomeByKey[entry.key] = 0;
-              investmentIncomeByKey[entry.key] += sold;
-            }
-            keepTrying = true;
-          }
-        }
-
-        netIncome = cashWithdraw + revenue.netIncome();
-        if (keepTrying == false) { break; }
-      }
-    }
-    return;
+  var clonedRevenue = revenue.clone();
+  // Simulate selling all investment assets to estimate total availability after taxes
+  for (var si = 0; si < investmentAssets.length; si++) {
+    var simAsset = investmentAssets[si].asset;
+    simAsset.simulateSellAll(clonedRevenue);
   }
-
-  // Legacy two-asset path (default for IE compatibility)
-  const clonedRevenue = revenue.clone();
-  indexFunds.simulateSellAll(clonedRevenue);
-  shares.simulateSellAll(clonedRevenue);
-  let needed = expenses + cashDeficit - netIncome;
-
+  var needed = expenses + cashDeficit - netIncome;
   // NOTE: Pension capital should only be available for withdrawal during retirement phase.
   // Including it in totalAvailable during growth phase causes premature liquidation.
-  let totalPensionCapital = 0;
+  var totalPensionCapital = 0;
   if (person1.phase === Phases.retired) {
     totalPensionCapital += person1.pension.capital();
   }
   if (person2 && person2.phase === Phases.retired) {
     totalPensionCapital += person2.pension.capital();
   }
-
-  let totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome());
+  var totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome());
   if (needed > totalAvailable + 0.01) {
     liquidateAll();
     return;
   }
 
   cashWithdraw = 0;
-  let totalWithdraw = 0;
-  for (let priority = 1; priority <= 4; priority++) {
-    let loopCount = 0;
+  var prioritiesByKey = getDrawdownPrioritiesByKey();
+  // Determine max priority rank across assets and special buckets
+  var maxRank = 0;
+  for (var k in prioritiesByKey) { if (prioritiesByKey.hasOwnProperty(k)) { maxRank = Math.max(maxRank, prioritiesByKey[k] || 0); } }
+  maxRank = Math.max(maxRank, cashPriority || 0, pensionPriority || 0, 4);
+
+  for (var priority = 1; priority <= maxRank; priority++) {
+    var loopCount = 0;
     while (expenses + cashDeficit - netIncome >= 1) {
       loopCount++;
       if (loopCount > 50) { break; }
       needed = expenses + cashDeficit - netIncome;
-      let keepTrying = false;
-      let indexFundsCapital = indexFunds.capital();
-      let sharesCapital = shares.capital();
-      let person1PensionCapital = person1.pension.capital();
-      let person2PensionCapital = person2 ? person2.pension.capital() : 0;
-      switch (priority) {
-        case cashPriority:
-          if (cash > 0.5) {
-            cashWithdraw = Math.min(cash, needed);
-            totalWithdraw += cashWithdraw;
-            cash -= cashWithdraw;
-            attributionManager.record('incomecash', 'Cash Withdrawal', cashWithdraw);
-          }
-          break;
-        case pensionPriority:
-          if (person1PensionCapital > 0.5 && (person1.phase === Phases.retired || person1.age >= person1.retirementAgeParam)) {
-            let withdraw = Math.min(person1PensionCapital, needed);
-            totalWithdraw += withdraw;
-            const soldAmount = person1.pension.sell(withdraw);
-            incomePrivatePension += soldAmount;
-            attributionManager.record('incomeprivatepension', 'Pension Drawdown P1', soldAmount);
-            keepTrying = true;
-          } else if (person2PensionCapital > 0.5 && person2 && (person2.phase === Phases.retired || person2.age >= person2.retirementAgeParam)) {
-            let withdraw = Math.min(person2PensionCapital, needed);
-            totalWithdraw += withdraw;
-            const soldAmount = person2.pension.sell(withdraw);
-            incomePrivatePension += soldAmount;
-            attributionManager.record('incomeprivatepension', 'Pension Drawdown P2', soldAmount);
-            keepTrying = true;
-          }
-          break;
-        case FundsPriority:
-          if (indexFundsCapital > 0.5) {
-            let withdraw = Math.min(indexFundsCapital, needed);
-            totalWithdraw += withdraw;
-            let soldAmt = indexFunds.sell(withdraw);
-            incomeFundsRent += soldAmt;
-            if (!investmentIncomeByKey) investmentIncomeByKey = {};
-            if (!investmentIncomeByKey['indexFunds']) investmentIncomeByKey['indexFunds'] = 0;
-            investmentIncomeByKey['indexFunds'] += soldAmt;
-            keepTrying = true;
-          }
-          break;
-        case SharesPriority:
-          if (sharesCapital > 0.5) {
-            let withdraw = Math.min(sharesCapital, needed);
-            totalWithdraw += withdraw;
-            let soldAmt = shares.sell(withdraw);
-            incomeSharesRent += soldAmt;
-            if (!investmentIncomeByKey) investmentIncomeByKey = {};
-            if (!investmentIncomeByKey['shares']) investmentIncomeByKey['shares'] = 0;
-            investmentIncomeByKey['shares'] += soldAmt;
-            keepTrying = true;
-          }
-          break;
-        default:
+      var keepTrying = false;
+
+      // Cash bucket
+      if (priority === cashPriority) {
+        if (cash > 0.5) {
+          cashWithdraw = Math.min(cash, needed);
+          cash -= cashWithdraw;
+          attributionManager.record('incomecash', 'Cash Withdrawal', cashWithdraw);
+        }
       }
+
+      // Pension bucket (P1 then P2)
+      if (priority === pensionPriority) {
+        var p1Cap = person1.pension.capital();
+        var p2Cap = person2 ? person2.pension.capital() : 0;
+        if (p1Cap > 0.5 && (person1.phase === Phases.retired || person1.age >= person1.retirementAgeParam)) {
+          var w1 = Math.min(p1Cap, needed);
+          var sold1 = person1.pension.sell(w1);
+          if (sold1 === null) {
+            flagSimulationFailure(person1.age);
+            return;
+          }
+          incomePrivatePension += sold1;
+          attributionManager.record('incomeprivatepension', 'Pension Drawdown P1', sold1);
+          keepTrying = true;
+        } else if (p2Cap > 0.5 && person2 && (person2.phase === Phases.retired || person2.age >= person2.retirementAgeParam)) {
+          var w2 = Math.min(p2Cap, needed);
+          var sold2 = person2.pension.sell(w2);
+          if (sold2 === null) {
+            flagSimulationFailure(person2.age);
+            return;
+          }
+          incomePrivatePension += sold2;
+          attributionManager.record('incomeprivatepension', 'Pension Drawdown P2', sold2);
+          keepTrying = true;
+        }
+      }
+
+      // Investment assets at this priority - unified loop using prioritiesByKey
+      for (var ai = 0; ai < investmentAssets.length; ai++) {
+        var entry = investmentAssets[ai];
+        var rank = prioritiesByKey[entry.key] || 0;
+        if (rank !== priority) continue;
+        var assetObj = entry.asset;
+        var cap = assetObj.capital();
+        if (cap > 0.5) {
+          var w = Math.min(cap, needed);
+          var sold = assetObj.sell(w);
+          if (sold === null) {
+            flagSimulationFailure(person1.age);
+            return;
+          }
+          // Populate legacy income buckets for backward compatibility
+          if (entry.key === 'indexFunds') {
+            incomeFundsRent += sold;
+          } else if (entry.key === 'shares') {
+            incomeSharesRent += sold;
+          }
+          // Record dynamic income for this investment type
+          if (!investmentIncomeByKey) investmentIncomeByKey = {};
+          if (!investmentIncomeByKey[entry.key]) investmentIncomeByKey[entry.key] = 0;
+          investmentIncomeByKey[entry.key] += sold;
+          keepTrying = true;
+        }
+      }
+
       netIncome = cashWithdraw + revenue.netIncome();
       if (keepTrying == false) { break; }
     }
@@ -1647,58 +1648,75 @@ function liquidateAll() {
 
   // Only liquidate pension if retired - pension should not be touched during growth phase
   if (person1.phase === Phases.retired && person1.pension.capital() > 0) {
-    const soldAmount = person1.pension.sell(person1.pension.capital());
+    var soldAmount = person1.pension.sell(person1.pension.capital());
+    if (soldAmount === null) {
+      flagSimulationFailure(person1.age);
+      return;
+    }
     incomePrivatePension += soldAmount;
     attributionManager.record('incomeprivatepension', 'Pension Withdrawal P1', soldAmount);
   }
   if (person2 && person2.phase === Phases.retired && person2.pension.capital() > 0) {
-    const soldAmount = person2.pension.sell(person2.pension.capital());
+    var soldAmount = person2.pension.sell(person2.pension.capital());
+    if (soldAmount === null) {
+      flagSimulationFailure(person2.age);
+      return;
+    }
     incomePrivatePension += soldAmount;
     attributionManager.record('incomeprivatepension', 'Pension Withdrawal P2', soldAmount);
   }
-  if (indexFunds.capital() > 0) {
-    var soldIdx = indexFunds.sell(indexFunds.capital());
-    incomeFundsRent += soldIdx;
-    if (!investmentIncomeByKey) investmentIncomeByKey = {};
-    if (!investmentIncomeByKey['indexFunds']) investmentIncomeByKey['indexFunds'] = 0;
-    investmentIncomeByKey['indexFunds'] += soldIdx;
-  }
-  if (shares.capital() > 0) {
-    var soldSh = shares.sell(shares.capital());
-    incomeSharesRent += soldSh;
-    if (!investmentIncomeByKey) investmentIncomeByKey = {};
-    if (!investmentIncomeByKey['shares']) investmentIncomeByKey['shares'] = 0;
-    investmentIncomeByKey['shares'] += soldSh;
-  }
-  // Also liquidate any additional generic investment assets (avoid double-selling legacy ones)
-  if (investmentAssets && investmentAssets.length > 2) {
-    for (var li = 0; li < investmentAssets.length; li++) {
-      var ent = investmentAssets[li];
-      if (!ent || !ent.asset || !ent.asset.capital) continue;
-      var assetObj = ent.asset;
-      if (assetObj === indexFunds || assetObj === shares) continue; // already liquidated above
-      var cap = assetObj.capital();
-      if (cap > 0) {
-        assetObj.sell(cap);
+
+  // Unified investment asset liquidation - single loop over investmentAssets
+  for (var i = 0; i < investmentAssets.length; i++) {
+    var entry = investmentAssets[i];
+    var assetObj = entry.asset;
+    var cap = assetObj.capital();
+    if (cap > 0) {
+      var sold = assetObj.sell(cap);
+      if (sold === null) {
+        flagSimulationFailure(person1.age);
+        return;
       }
+      // Populate legacy income buckets for backward compatibility
+      if (entry.key === 'indexFunds') {
+        incomeFundsRent += sold;
+      } else if (entry.key === 'shares') {
+        incomeSharesRent += sold;
+      }
+      // Populate dynamic income map
+      if (!investmentIncomeByKey) investmentIncomeByKey = {};
+      if (!investmentIncomeByKey[entry.key]) investmentIncomeByKey[entry.key] = 0;
+      investmentIncomeByKey[entry.key] += sold;
     }
   }
+
   netIncome = cashWithdraw + revenue.netIncome();
 }
 
 // Returns an allocation map keyed by investment type key.
-// Backward-compat: map legacy Funds/Shares allocations to 'indexFunds' and 'shares'.
+// Uses dynamic investmentAllocationsByKey from UI; legacy fallback for backward compat.
 function getAllocationsByKey() {
-  var map = {};
-  try {
-    // Bridge only; UI dynamic allocations to be wired in later phases
-    map['indexFunds'] = (typeof params.FundsAllocation === 'number') ? params.FundsAllocation : 0;
-    map['shares'] = (typeof params.SharesAllocation === 'number') ? params.SharesAllocation : 0;
-  } catch (e) {
-    map['indexFunds'] = 0;
-    map['shares'] = 0;
+  // Prefer dynamic map from params
+  if (params.investmentAllocationsByKey) {
+    return params.investmentAllocationsByKey;
   }
+  // Legacy fallback
+  var map = {};
+  map['indexFunds'] = (typeof params.FundsAllocation === 'number') ? params.FundsAllocation : 0;
+  map['shares'] = (typeof params.SharesAllocation === 'number') ? params.SharesAllocation : 0;
   return map;
+}
+
+// Returns a growth rate map keyed by investment type key.
+// Uses dynamic investmentGrowthRatesByKey from UI.
+function getGrowthRatesByKey() {
+  return params.investmentGrowthRatesByKey || {};
+}
+
+// Returns a volatility map keyed by investment type key.
+// Uses dynamic investmentVolatilitiesByKey from UI.
+function getVolatilitiesByKey() {
+  return params.investmentVolatilitiesByKey || {};
 }
 
 // Returns a priority map keyed by investment type key.
@@ -1777,8 +1795,6 @@ function computePreAggregateValues() {
   if (realEstateConverted === null) {
     throw new Error('Real estate value conversion failed: cannot convert total value to ' + residenceCurrency + ' for country ' + currentCountry + ' at year ' + year);
   }
-  var indexFundsCap = indexFunds.capital();
-  var sharesCap = shares.capital();
   // Compute capitals by key while avoiding double-counting legacy assets
   var capsByKey = {};
   capsByKey['indexFunds'] = indexFunds.capital();
@@ -1795,8 +1811,6 @@ function computePreAggregateValues() {
   }
   return {
     realEstateConverted: realEstateConverted,
-    indexFundsCap: indexFundsCap,
-    sharesCap: sharesCap,
     capsByKey: capsByKey
   };
 }
@@ -1828,8 +1842,6 @@ function buildPVContext(preComputedValues) {
 
     // Pre-computed values
     realEstateConverted: preComputedValues.realEstateConverted,
-    indexFundsCap: preComputedValues.indexFundsCap,
-    sharesCap: preComputedValues.sharesCap,
     capsByKey: preComputedValues.capsByKey,
 
     // Income/expense flows
@@ -1884,7 +1896,7 @@ function updateYearlyData() {
     dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
     incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
     expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
-    investmentAssets, realEstate, preComputedValues.realEstateConverted, preComputedValues.indexFundsCap, preComputedValues.sharesCap, preComputedValues.capsByKey,
+    investmentAssets, realEstate, preComputedValues.realEstateConverted, preComputedValues.capsByKey,
     investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
   );
 
@@ -1907,3 +1919,26 @@ function updateYearlyData() {
     uiManager.updateDataRow(row, (person1.age - params.startingAge) / (100 - params.startingAge));
   }
 }
+
+/**
+ * Returns investment context for UI components like RelocationImpactDetector.
+ * Provides investmentAssets array and current capital by investment key.
+ * Per §9 strictness: assumes investmentAssets is initialized and each entry has
+ * a valid asset with capital() method.
+ * @returns {Object} { investmentAssets, capsByKey }
+ */
+function getInvestmentContext() {
+  // Build capsByKey map from current asset capitals
+  var capsByKey = {};
+  for (var i = 0; i < investmentAssets.length; i++) {
+    capsByKey[investmentAssets[i].key] = investmentAssets[i].asset.capital();
+  }
+
+  return {
+    investmentAssets: investmentAssets,
+    capsByKey: capsByKey
+  };
+}
+
+// Expose getInvestmentContext globally for UI access
+this.getInvestmentContext = getInvestmentContext;

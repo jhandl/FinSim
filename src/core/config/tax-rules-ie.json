@@ -1,112 +1,201 @@
 {
   "country": "IE",
   "countryName": "Ireland",
-  "version": "26.4",
+  "version": "2025.12",
   "updateMessage": "Incorporates Budget 2026 changes and PRSI increased to 4.2%",
-
-  "locale": { "numberLocale": "en-IE", "currencyCode": "EUR", "currencySymbol": "€" },
-
-  "economicData": {
-    "inflation": { "cpi": 1.0499, "year": 2025 },
-    "purchasingPowerParity": { "value": 0.755848, "year": 2024 },
-    "exchangeRate": { "perEur": 1.0, "asOf": "2025-11-22" }
+  "locale": {
+    "numberLocale": "en-IE",
+    "currencyCode": "EUR",
+    "currencySymbol": "€"
   },
-
+  "economicData": {
+    "inflation": {
+      "cpi": 1.0499,
+      "year": 2025
+    },
+    "purchasingPowerParity": {
+      "value": 0.755848,
+      "year": 2024
+    },
+    "exchangeRate": {
+      "perEur": 1.0,
+      "asOf": "2025-11-22"
+    }
+  },
   "incomeTax": {
     "name": "IT",
     "tooltip": "Income Tax paid on taxable income",
     "personalAllowance": 0,
     "taxCredits": {
       "employee": {
-        "min": { "amount": 2000, "rate": 0.2 }
+        "min": {
+          "amount": 2000,
+          "rate": 0.2
+        }
       },
-      "age": { "0": 0, "65": 245 }
+      "age": {
+        "0": 0,
+        "65": 245
+      }
     },
     "ageExemptionAge": 65,
     "ageExemptionLimit": 18000,
     "jointFilingAllowed": true,
     "jointBandIncreaseMax": 35000,
     "bracketsByStatus": {
-      "single": { "0": 0.2, "44000": 0.4 },
-      "singleWithDependents": { "0": 0.2, "48000": 0.4 },
-      "married": { "0": 0.2, "53000": 0.4 }
+      "single": {
+        "0": 0.2,
+        "44000": 0.4
+      },
+      "singleWithDependents": {
+        "0": 0.2,
+        "48000": 0.4
+      },
+      "married": {
+        "0": 0.2,
+        "53000": 0.4
+      }
     }
   },
-
   "socialContributions": [
     {
       "name": "PRSI",
       "tooltip": "Pay Related Social Insurance contributions",
       "rate": 0.042,
       "incomeCap": null,
-      "ageAdjustments": { "70": 0 },
-      "applicableIncomeTypes": [ "employment", "self" ]
+      "ageAdjustments": {
+        "70": 0
+      },
+      "applicableIncomeTypes": [
+        "employment",
+        "self"
+      ]
     }
   ],
-
   "additionalTaxes": [
     {
       "name": "USC",
       "tooltip": "Universal Social Charge paid",
-      "brackets": { "0": 0.005, "12012": 0.02, "28700": 0.03, "70044": 0.08, "100000": 0.11 },
+      "brackets": {
+        "0": 0.005,
+        "12012": 0.02,
+        "28700": 0.03,
+        "70044": 0.08,
+        "100000": 0.11
+      },
       "incomeExemptionThreshold": 13000,
       "reducedRateAge": 70,
       "reducedRateMaxIncome": 60000,
       "ageBasedBrackets": {
-        "70": { "0": 0.005, "12012": 0.02 }
+        "70": {
+          "0": 0.005,
+          "12012": 0.02
+        }
       },
       "base": "income"
     }
   ],
-
-  "capitalGainsTax": { "name": "CGT", "tooltip": "Capital Gains Tax (and Exit Tax) paid on investment gains.", "rate": 0.33, "annualExemption": 1270, "allowLossOffset": true, "deemedDisposalYears": 8 },
-
-  "dividendTax": { "rate": 0.33, "annualExemption": 0, "withholding": false },
-
-  "interestTax": { "rate": 0.33, "withholding": false },
-
+  "capitalGainsTax": {
+    "name": "CGT",
+    "tooltip": "Capital Gains Tax (and Exit Tax) paid on investment gains.",
+    "rate": 0.33,
+    "annualExemption": 1270,
+    "allowLossOffset": true,
+    "deemedDisposalYears": 8
+  },
+  "dividendTax": {
+    "rate": 0.33,
+    "annualExemption": 0,
+    "withholding": false
+  },
+  "interestTax": {
+    "rate": 0.33,
+    "withholding": false
+  },
   "wealthTax": {
-    "brackets": {  },
+    "brackets": {},
     "exemptions": []
   },
-
-  "inheritanceTax": { "threshold": 0, "rate": 0 },
-
+  "inheritanceTax": {
+    "threshold": 0,
+    "rate": 0
+  },
   "pensionRules": {
     "minRetirementAgePrivate": 60,
     "minRetirementAgeOccupational": 60,
     "minRetirementAgeState": 66,
     "contributionLimits": {
-      "ageBandsPercent": { "0": 0.15, "30": 0.2, "40": 0.25, "50": 0.3, "55": 0.35, "60": 0.4 },
+      "ageBandsPercent": {
+        "0": 0.15,
+        "30": 0.2,
+        "40": 0.25,
+        "50": 0.3,
+        "55": 0.35,
+        "60": 0.4
+      },
       "annualCap": 115000
     },
-    "lumpSumTaxBands": { "0": 0, "200000": 0.2, "500000": 0.4 },
+    "lumpSumTaxBands": {
+      "0": 0,
+      "200000": 0.2,
+      "500000": 0.4
+    },
     "lumpSumMaxPercent": 0.25,
-    "minDrawdownRates": { "61": 0.04, "71": 0.05 },
+    "minDrawdownRates": {
+      "61": 0.04,
+      "71": 0.05
+    },
     "statePensionAge": 66,
-    "statePensionIncreaseBands": { "80": 10 },
-    "pensionSystem": { "type": "mixed" },
-    "definedBenefit": { "treatment": "privatePension" }
+    "statePensionIncreaseBands": {
+      "80": 10
+    },
+    "pensionSystem": {
+      "type": "mixed"
+    },
+    "definedBenefit": {
+      "treatment": "privatePension"
+    }
   },
-
-  "residencyRules": { "postEmigrationTaxYears": 3, "taxesForeignIncome": true },
-
+  "residencyRules": {
+    "postEmigrationTaxYears": 3,
+    "taxesForeignIncome": true
+  },
   "investmentTypes": [
     {
       "key": "indexFunds",
       "label": "Index Funds",
+      "baseCurrency": "EUR",
+      "assetCountry": "ie",
+      "contributionCurrencyMode": "residence",
+      "residenceScope": "local",
       "taxation": {
-        "exitTax": { "rate": 0.38, "deemedDisposalYears": 8, "allowLossOffset": false, "eligibleForAnnualExemption": false }
+        "exitTax": {
+          "rate": 0.38,
+          "deemedDisposalYears": 8,
+          "allowLossOffset": false,
+          "eligibleForAnnualExemption": false
+        }
       }
     },
     {
       "key": "shares",
       "label": "Shares",
+      "baseCurrency": "EUR",
+      "assetCountry": "ie",
+      "contributionCurrencyMode": "residence",
+      "residenceScope": "local",
       "taxation": {
-        "capitalGains": { "rateRef": "capitalGainsTax.rate", "annualExemptionRef": "capitalGainsTax.annualExemption", "allowLossOffset": true }
+        "capitalGains": {
+          "rateRef": "capitalGainsTax.rate",
+          "annualExemptionRef": "capitalGainsTax.annualExemption",
+          "allowLossOffset": true
+        }
       }
     }
   ],
-
-  "pinnedIncomeTypes": [ "incomeSalaries", "incomeStatePension", "incomeCash" ]
+  "pinnedIncomeTypes": [
+    "incomeSalaries",
+    "incomeStatePension",
+    "incomeCash"
+  ]
 }

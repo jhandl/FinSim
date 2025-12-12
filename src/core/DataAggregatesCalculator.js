@@ -26,7 +26,7 @@
  * - currentCountry, residenceCurrency: Context for multi-country support.
  */
 
-function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension, incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome, expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares, investmentAssets, realEstate, realEstateConverted, indexFundsCap, sharesCap, capsByKey, investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency) {
+function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension, incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome, expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares, investmentAssets, realEstate, realEstateConverted, capsByKey, investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency) {
   // This is used below to hide the deemed disposal tax payments, otherwise they're shown as income.
   let FundsTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeFundsRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
   let SharesTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeSharesRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
@@ -115,8 +115,8 @@ function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, 
   dataSheet[row].expenses += expenses;
   dataSheet[row].pensionFund += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
   dataSheet[row].cash += cash;
-  dataSheet[row].indexFundsCapital += indexFundsCap;
-  dataSheet[row].sharesCapital += sharesCap;
+  dataSheet[row].indexFundsCapital += capsByKey['indexFunds'];
+  dataSheet[row].sharesCapital += capsByKey['shares'];
   // Accumulate per-type income and capital for dynamic UI columns
   // Ensure investmentIncomeByKey exists even if row was pre-initialized
   if (!dataSheet[row].investmentIncomeByKey) dataSheet[row].investmentIncomeByKey = {};
@@ -143,16 +143,12 @@ function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, 
     dataSheet[row][taxColumnName] += revenue.getTaxByType(taxId);
   }
 
-  // Calculate worth: include all asset capitals
-  // Note: capsByKey includes 'indexFunds' and 'shares' keys, but we exclude them here
-  // since they're already included via indexFundsCap and sharesCap to avoid double-counting
-  let dynamicCapsSum = 0;
+  // Calculate worth: include all asset capitals from capsByKey (the canonical source)
+  let totalInvestmentCaps = 0;
   for (var key in capsByKey) {
-    if (key !== 'indexFunds' && key !== 'shares') {
-      dynamicCapsSum += capsByKey[key];
-    }
+    totalInvestmentCaps += capsByKey[key];
   }
-  dataSheet[row].worth += realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + indexFundsCap + sharesCap + cash + dynamicCapsSum;
+  dataSheet[row].worth += realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + totalInvestmentCaps + cash;
 }
 
 var DataAggregatesCalculator = { computeNominalAggregates: computeNominalAggregates };

@@ -3,6 +3,8 @@
 - Add a feedback form
 - Use a build pipeline and close the repo 
 - Add monetisation
+- Improve architecture
+  - Enforce AI architectural patterns (MCP): https://agiflow.io/blog/enforce-ai-architectural-patterns-mcp#technical-deep-dive
 
 # Issues
 - Real Estate equity is possibly not being computed correctly.
@@ -29,6 +31,9 @@
 
 ### Improvements
 - Add a target of "money I want to leave to my children". The scenario fails if the money at the end is not enough.
+- Architecture review
+  - Analysis tools: https://chatgpt.com/share/693745d8-fee8-8004-b722-29c6576853bd
+  - Enforce AI architectural patterns (MCP): https://agiflow.io/blog/enforce-ai-architectural-patterns-mcp#technical-deep-dive
 - Move to WASM
    - Set up build process
    - Move code to new private repo (or rename repo and create new finsim repo for prod)

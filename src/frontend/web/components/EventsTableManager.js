@@ -37,59 +37,59 @@ class EventsTableManager {
    * Attach tooltip to Part 2 suggestion input explaining PPP vs FX basis.
    */
   attachSplitTooltip(rootEl) {
-      const container = rootEl.closest('.resolution-panel-container') || rootEl.querySelector('.resolution-panel-container') || rootEl;
-      if (!container) return;
-      const input = container.querySelector('.part2-amount-input');
-      if (!input || typeof TooltipUtils === 'undefined' || !TooltipUtils.attachTooltip) return;
+    const container = rootEl.closest('.resolution-panel-container') || rootEl.querySelector('.resolution-panel-container') || rootEl;
+    if (!container) return;
+    const input = container.querySelector('.part2-amount-input');
+    if (!input || typeof TooltipUtils === 'undefined' || !TooltipUtils.attachTooltip) return;
 
-      const baseAmt = container.getAttribute('data-base-amount');
-      const fromCur = container.getAttribute('data-from-currency') || '';
-      const toCur = container.getAttribute('data-to-currency') || '';
-      const fxStr = container.getAttribute('data-fx');
-      const fxAmtStr = container.getAttribute('data-fx-amount');
-      const fxDate = container.getAttribute('data-fx-date');
-      const pppStr = container.getAttribute('data-ppp');
-      const pppAmtStr = container.getAttribute('data-ppp-amount');
+    const baseAmt = container.getAttribute('data-base-amount');
+    const fromCur = container.getAttribute('data-from-currency') || '';
+    const toCur = container.getAttribute('data-to-currency') || '';
+    const fxStr = container.getAttribute('data-fx');
+    const fxAmtStr = container.getAttribute('data-fx-amount');
+    const fxDate = container.getAttribute('data-fx-date');
+    const pppStr = container.getAttribute('data-ppp');
+    const pppAmtStr = container.getAttribute('data-ppp-amount');
 
-      function getSymbolAndLocale(countryCode) {
-        try {
-          const rs = Config.getInstance().getCachedTaxRuleSet(countryCode);
-          const ls = (FormatUtils && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
-          return {
-            symbol: rs && typeof rs.getCurrencySymbol === 'function' ? rs.getCurrencySymbol() : (ls.currencySymbol || ''),
-            locale: rs && typeof rs.getNumberLocale === 'function' ? rs.getNumberLocale() : (ls.numberLocale || 'en-US')
-          };
-        } catch (_) {
-          const ls = (FormatUtils && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
-          return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' };
-        }
+    function getSymbolAndLocale(countryCode) {
+      try {
+        const rs = Config.getInstance().getCachedTaxRuleSet(countryCode);
+        const ls = (FormatUtils && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
+        return {
+          symbol: rs && typeof rs.getCurrencySymbol === 'function' ? rs.getCurrencySymbol() : (ls.currencySymbol || ''),
+          locale: rs && typeof rs.getNumberLocale === 'function' ? rs.getNumberLocale() : (ls.numberLocale || 'en-US')
+        };
+      } catch (_) {
+        const ls = (FormatUtils && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
+        return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' };
       }
+    }
 
-      function fmtWithSymbol(symbol, locale, value) {
-        if (value == null || value === '' || isNaN(Number(value))) return '';
-        const num = Number(value);
-        try {
-          const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num);
-          return `${symbol || ''}${formatted}`;
-        } catch (_) {
-          return `${symbol || ''}${String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
-        }
+    function fmtWithSymbol(symbol, locale, value) {
+      if (value == null || value === '' || isNaN(Number(value))) return '';
+      const num = Number(value);
+      try {
+        const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num);
+        return `${symbol || ''}${formatted}`;
+      } catch (_) {
+        return `${symbol || ''}${String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
       }
+    }
 
-      const provider = () => {
-        const fromCountry = container.getAttribute('data-from-country');
-        const toCountry = container.getAttribute('data-to-country');
-        const fromMeta = getSymbolAndLocale(fromCountry);
-        const toMeta = getSymbolAndLocale(toCountry);
+    const provider = () => {
+      const fromCountry = container.getAttribute('data-from-country');
+      const toCountry = container.getAttribute('data-to-country');
+      const fromMeta = getSymbolAndLocale(fromCountry);
+      const toMeta = getSymbolAndLocale(toCountry);
 
-        const fxAmt = fmtWithSymbol(toMeta.symbol, toMeta.locale, fxAmtStr);
-        const pppAmt = fmtWithSymbol(toMeta.symbol, toMeta.locale, pppAmtStr);
-        const amtBase = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmt);
-        const fxD = fxDate ? new Date(fxDate).toISOString().substring(0,10) : 'latest';
-        return `${amtBase} in ${toCur} is ${fxAmt} as of ${fxD}.\nAdjusting for purchasing power it's ≈ ${pppAmt}.`;
-      };
+      const fxAmt = fmtWithSymbol(toMeta.symbol, toMeta.locale, fxAmtStr);
+      const pppAmt = fmtWithSymbol(toMeta.symbol, toMeta.locale, pppAmtStr);
+      const amtBase = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmt);
+      const fxD = fxDate ? new Date(fxDate).toISOString().substring(0, 10) : 'latest';
+      return `${amtBase} in ${toCur} is ${fxAmt} as of ${fxD}.\nAdjusting for purchasing power it's ≈ ${pppAmt}.`;
+    };
 
-      TooltipUtils.attachTooltip(input, provider, { hoverDelay: 300, touchDelay: 400, showOnFocus: true, persistWhileFocused: true, hideOnWizard: true });
+    TooltipUtils.attachTooltip(input, provider, { hoverDelay: 300, touchDelay: 400, showOnFocus: true, persistWhileFocused: true, hideOnWizard: true });
   }
 
   /**
@@ -367,17 +367,24 @@ class EventsTableManager {
 
   // Single recomputation call used post-deletion regardless of row position/animation path
   recomputeRelocationImpacts() {
-      const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
-      if (!cfg || !cfg.isRelocationEnabled || !cfg.isRelocationEnabled()) return;
-      const events = this.webUI.readEvents(false);
-      const startCountry = this.getStartCountry();
-      if (typeof RelocationImpactDetector !== 'undefined') {
-        RelocationImpactDetector.analyzeEvents(events, startCountry);
-      }
-      this.updateRelocationImpactIndicators(events);
-      this.webUI.updateStatusForRelocationImpacts(events);
-      // Ensure accordion view reflects latest table state
-      if (this.webUI.eventAccordionManager) this.webUI.eventAccordionManager.refresh();
+    const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
+    if (!cfg || !cfg.isRelocationEnabled || !cfg.isRelocationEnabled()) return;
+    const events = this.webUI.readEvents(false);
+    const startCountry = this.getStartCountry();
+
+    // Gather investment context from simulator if available
+    var investmentContext = null;
+    if (typeof Simulator !== 'undefined' && Simulator.getInvestmentContext) {
+      investmentContext = Simulator.getInvestmentContext();
+    }
+
+    if (typeof RelocationImpactDetector !== 'undefined') {
+      RelocationImpactDetector.analyzeEvents(events, startCountry, investmentContext);
+    }
+    this.updateRelocationImpactIndicators(events);
+    this.webUI.updateStatusForRelocationImpacts(events);
+    // Ensure accordion view reflects latest table state
+    if (this.webUI.eventAccordionManager) this.webUI.eventAccordionManager.refresh();
   }
 
   setupEventTypeChangeHandler() {
@@ -430,36 +437,43 @@ class EventsTableManager {
   }
 
   _scheduleRelocationReanalysis() {
-      const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
-      if (!cfg || !cfg.isRelocationEnabled || !cfg.isRelocationEnabled()) return;
-      // Debounce
-      if (this._detectorTimeout) clearTimeout(this._detectorTimeout);
-      this._detectorTimeout = setTimeout(() => {
-        try {
-          var events = this.webUI.readEvents(false);
-          var startCountry = this.getStartCountry();
-          if (typeof RelocationImpactDetector !== 'undefined') {
-            RelocationImpactDetector.analyzeEvents(events, startCountry);
-          }
-          this.updateRelocationImpactIndicators(events);
-          this.webUI.updateStatusForRelocationImpacts(events);
-          // Keep charts in sync with relocation changes (country timeline + markers)
-          if (this.webUI && this.webUI.chartManager) {
-            RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
-            this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
-            this.webUI.chartManager.refreshChartsWithCurrency();
-          }
-          // Refresh table currency controls
-          if (this.webUI && this.webUI.tableManager) {
-            RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
-            this.webUI.tableManager.setupTableCurrencyControls();
-          }
-          // Intentionally avoid refreshing the accordion here to preserve focus/expansion after edit + outside click.
-          // Accordion will refresh through explicit actions (sorting, deletions, wizard actions) and on initial load.
-        } catch (err) {
-          console.error('Error analyzing relocation impacts:', err);
+    const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
+    if (!cfg || !cfg.isRelocationEnabled || !cfg.isRelocationEnabled()) return;
+    // Debounce
+    if (this._detectorTimeout) clearTimeout(this._detectorTimeout);
+    this._detectorTimeout = setTimeout(() => {
+      try {
+        var events = this.webUI.readEvents(false);
+        var startCountry = this.getStartCountry();
+
+        // Gather investment context from simulator if available
+        var investmentContext = null;
+        if (typeof Simulator !== 'undefined' && Simulator.getInvestmentContext) {
+          investmentContext = Simulator.getInvestmentContext();
         }
-      }, 400);
+
+        if (typeof RelocationImpactDetector !== 'undefined') {
+          RelocationImpactDetector.analyzeEvents(events, startCountry, investmentContext);
+        }
+        this.updateRelocationImpactIndicators(events);
+        this.webUI.updateStatusForRelocationImpacts(events);
+        // Keep charts in sync with relocation changes (country timeline + markers)
+        if (this.webUI && this.webUI.chartManager) {
+          RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+          this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+          this.webUI.chartManager.refreshChartsWithCurrency();
+        }
+        // Refresh table currency controls
+        if (this.webUI && this.webUI.tableManager) {
+          RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
+          this.webUI.tableManager.setupTableCurrencyControls();
+        }
+        // Intentionally avoid refreshing the accordion here to preserve focus/expansion after edit + outside click.
+        // Accordion will refresh through explicit actions (sorting, deletions, wizard actions) and on initial load.
+      } catch (err) {
+        console.error('Error analyzing relocation impacts:', err);
+      }
+    }, 400);
   }
 
   setupSimulationModeChangeHandler() {
@@ -817,7 +831,7 @@ class EventsTableManager {
     if (!tbody) return;
     // Align DOM rows with events array by considering only visible DATA rows (exclude inline panels),
     // since readEvents skips hidden rows and ignores resolution panel rows
-    var rows = Array.from(tbody.querySelectorAll('tr')).filter(function(r){
+    var rows = Array.from(tbody.querySelectorAll('tr')).filter(function (r) {
       return r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row'));
     });
     var events = Array.isArray(analyzedEvents) ? analyzedEvents : this.webUI.readEvents(false);
@@ -825,7 +839,7 @@ class EventsTableManager {
     rows.forEach((row, index) => {
       if (index >= events.length) return;
       var event = events[index];
-      
+
       // Reset category-specific classes
       row.classList.remove('relocation-impact-boundary', 'relocation-impact-simple', 'relocation-impact-property', 'relocation-impact-pension');
 
@@ -848,6 +862,7 @@ class EventsTableManager {
       delete row.dataset.relocationImpactMessage;
       delete row.dataset.relocationImpactAuto;
       delete row.dataset.relocationImpactMvId;
+      delete row.dataset.relocationImpactDetails;
 
       // Add/update indicator if event has impact
       if (event && event.relocationImpact) {
@@ -860,6 +875,19 @@ class EventsTableManager {
         row.dataset.relocationImpactAuto = event.relocationImpact.autoResolvable ? '1' : '0';
         // Also persist the associated MV event id to support panel rendering across views
         row.dataset.relocationImpactMvId = event.relocationImpact.mvEventId || '';
+        if (event.relocationImpact.details != null) {
+          var detailValue = event.relocationImpact.details;
+          if (typeof detailValue === 'object') {
+            try { detailValue = JSON.stringify(detailValue); } catch (_) { detailValue = ''; }
+          }
+          if (detailValue) {
+            row.dataset.relocationImpactDetails = detailValue;
+          } else {
+            delete row.dataset.relocationImpactDetails;
+          }
+        } else {
+          delete row.dataset.relocationImpactDetails;
+        }
 
         // NEW: Create badge and insert before dropdown
         var badge = document.createElement('button');
@@ -876,7 +904,7 @@ class EventsTableManager {
         dropdown.classList.add('has-impact-badge');
 
         // Attach or refresh tooltip
-        TooltipUtils.attachTooltip(badge, event.relocationImpact.message, {hoverDelay: 300, touchDelay: 400});
+        TooltipUtils.attachTooltip(badge, event.relocationImpact.message, { hoverDelay: 300, touchDelay: 400 });
 
         // Click handler: toggle resolution panel (open/close)
         badge.addEventListener('click', (e) => {
@@ -905,21 +933,21 @@ class EventsTableManager {
   expandResolutionPanel(rowId) {
     const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
     if (!row) return;
-    
+
     // Check if row has impact dataset - if not, no panel needed
     if (row.dataset.relocationImpact !== '1') return;
-    
+
     const tableRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
     const rowIndex = tableRows.indexOf(row);
     if (rowIndex === -1) return;
-    
+
     // Try to get event from readEvents, but reconstruct from row if needed
     let event = null;
     const events = this.webUI.readEvents(false);
     if (events && events.length > rowIndex) {
       event = events[rowIndex];
     }
-    
+
     // If readEvents didn't return the event, reconstruct it from the row DOM
     if (!event) {
       try {
@@ -930,7 +958,7 @@ class EventsTableManager {
         const toAgeInput = row.querySelector('.event-to-age');
         const rateInput = row.querySelector('.event-rate');
         const matchInput = row.querySelector('.event-match');
-        
+
         if (typeInput && nameInput) {
           // Create a plain object (SimEvent-like) with required properties
           event = {
@@ -942,7 +970,7 @@ class EventsTableManager {
             rate: rateInput ? rateInput.value : undefined,
             match: matchInput ? matchInput.value : undefined
           };
-          
+
           // Read hidden fields
           const currencyInput = row.querySelector('.event-currency');
           if (currencyInput && currencyInput.value) event.currency = currencyInput.value;
@@ -954,9 +982,9 @@ class EventsTableManager {
         return;
       }
     }
-    
+
     if (!event) return;
-    
+
     // Reconstruct relocationImpact from row dataset if readEvents didn't preserve it
     if (!event.relocationImpact && row.dataset.relocationImpact === '1') {
       event.relocationImpact = {
@@ -965,8 +993,11 @@ class EventsTableManager {
         mvEventId: row.dataset.relocationImpactMvId || '',
         autoResolvable: row.dataset.relocationImpactAuto === '1'
       };
+      if (row.dataset.relocationImpactDetails) {
+        event.relocationImpact.details = row.dataset.relocationImpactDetails;
+      }
     }
-    
+
     if (!event.relocationImpact) return;
     const env = { webUI: this.webUI, eventsTableManager: this, config: (typeof Config !== 'undefined' ? Config.getInstance() : null), formatUtils: this.webUI && this.webUI.formatUtils };
     RelocationImpactAssistant.renderPanelForTableRow(row, event, env);
@@ -1185,7 +1216,7 @@ class EventsTableManager {
 
     // Economic data for tooltip context
     const econ = Config.getInstance().getEconomicData();
-    const baseAmountSanitized = (function(a){
+    const baseAmountSanitized = (function (a) {
       var s = (a == null) ? '' : String(a);
       s = s.replace(/[^0-9.\-]/g, '');
       var n = Number(s);
@@ -1433,33 +1464,33 @@ class EventsTableManager {
       } else {
         // Else: Accept (PPP), Peg, Review
         const pppSuggestionRaw = this.calculatePPPSuggestion(event.amount, originCountry, destCountry);
-      const pppSuggestionNum = Number(pppSuggestionRaw);
-      const pppSuggestion = isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum);
-      const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
-      const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
-      const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
-      const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
-      const fromMeta = getSymbolAndLocaleByCountry(originCountry);
-      const toMeta = getSymbolAndLocaleByCountry(destCountry);
-      const currentAmountNum = Number(baseAmountSanitized);
-      const percentage = (!isNaN(pppSuggestionNum) && !isNaN(currentAmountNum) && currentAmountNum !== 0)
-        ? (((pppSuggestionNum / currentAmountNum - 1) * 100).toFixed(1))
-        : '0.0';
-      const currentFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, currentAmountNum);
-      const suggestedFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : pppSuggestion;
-      const originCountryCode = originCountry ? originCountry.toUpperCase() : '';
-      const destCountryCode = destCountry ? destCountry.toUpperCase() : '';
-      const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
-      const destCountryLabel = destCountryCode || 'destination country';
-      containerAttributes = ` data-from-country="${originCountry}" data-to-country="${destCountry}" data-from-currency="${originCurrency}" data-to-currency="${destCurrency}" data-base-amount="${isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)}" data-fx="${fxRate != null ? fxRate : ''}" data-fx-date="${fxDate || ''}" data-ppp="${pppRatio != null ? pppRatio : ''}" data-fx-amount="${fxAmount != null ? fxAmount : ''}" data-ppp-amount="${pppAmount != null ? pppAmount : ''}"`;
+        const pppSuggestionNum = Number(pppSuggestionRaw);
+        const pppSuggestion = isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum);
+        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
+        const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
+        const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
+        const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
+        const fromMeta = getSymbolAndLocaleByCountry(originCountry);
+        const toMeta = getSymbolAndLocaleByCountry(destCountry);
+        const currentAmountNum = Number(baseAmountSanitized);
+        const percentage = (!isNaN(pppSuggestionNum) && !isNaN(currentAmountNum) && currentAmountNum !== 0)
+          ? (((pppSuggestionNum / currentAmountNum - 1) * 100).toFixed(1))
+          : '0.0';
+        const currentFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, currentAmountNum);
+        const suggestedFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : pppSuggestion;
+        const originCountryCode = originCountry ? originCountry.toUpperCase() : '';
+        const destCountryCode = destCountry ? destCountry.toUpperCase() : '';
+        const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
+        const destCountryLabel = destCountryCode || 'destination country';
+        containerAttributes = ` data-from-country="${originCountry}" data-to-country="${destCountry}" data-from-currency="${originCurrency}" data-to-currency="${destCurrency}" data-base-amount="${isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)}" data-fx="${fxRate != null ? fxRate : ''}" data-fx-date="${fxDate || ''}" data-ppp="${pppRatio != null ? pppRatio : ''}" data-fx-amount="${fxAmount != null ? fxAmount : ''}" data-ppp-amount="${pppAmount != null ? pppAmount : ''}"`;
 
-      addAction({
-        action: 'accept',
-        tabLabel: 'Apply Suggested Amount',
-        buttonLabel: 'Apply',
-        buttonClass: 'event-wizard-button resolution-apply',
-        buttonAttrs: ` data-row-id="${rowId}" data-suggested-amount="${pppSuggestion}" data-suggested-currency="${destCurrency}"`,
-        bodyHtml: `
+        addAction({
+          action: 'accept',
+          tabLabel: 'Apply Suggested Amount',
+          buttonLabel: 'Apply',
+          buttonClass: 'event-wizard-button resolution-apply',
+          buttonAttrs: ` data-row-id="${rowId}" data-suggested-amount="${pppSuggestion}" data-suggested-currency="${destCurrency}"`,
+          bodyHtml: `
           <div class="suggestion-comparison compact">
             <div class="comparison-row">
               <span class="comparison-label">Current</span>
@@ -1473,36 +1504,36 @@ class EventsTableManager {
           </div>
           <p class="micro-note">Apply updates the amount to ${suggestedFormatted} (${destCurrencyCode || destCurrency}) so it reflects purchasing power in ${destCountryLabel}.</p>
           `
-      });
+        });
 
-      addAction({
-        action: 'peg',
-        tabLabel: 'Keep Original Currency',
-        buttonLabel: 'Apply',
-        buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
-        buttonAttrs: ` data-row-id="${rowId}" data-currency="${originCurrency}"`,
-        bodyHtml: `
+        addAction({
+          action: 'peg',
+          tabLabel: 'Keep Original Currency',
+          buttonLabel: 'Apply',
+          buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
+          buttonAttrs: ` data-row-id="${rowId}" data-currency="${originCurrency}"`,
+          bodyHtml: `
           <div class="resolution-quick-action">
             <p class="micro-note">Apply keeps the current value (${currentFormatted || originCurrency}) in ${originCurrency}. No conversion to ${destCurrencyCode || destCurrency || 'the destination currency'} will occur.</p>
             <p class="micro-note">Use this when you prefer to adjust the amount manually later but still clear the warning.</p>
           </div>
         `
-      });
+        });
 
-      addAction({
-        action: 'review',
-        tabLabel: 'Mark As Reviewed',
-        buttonLabel: 'Apply',
-        buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply',
-        buttonAttrs: ` data-row-id="${rowId}"`,
-        bodyHtml: `
+        addAction({
+          action: 'review',
+          tabLabel: 'Mark As Reviewed',
+          buttonLabel: 'Apply',
+          buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply',
+          buttonAttrs: ` data-row-id="${rowId}"`,
+          bodyHtml: `
           <div class="resolution-quick-action">
             <p class="micro-note">Apply records this relocation impact as reviewed without changing the event’s amount or currency. Only use this if you have reconciled the numbers elsewhere.</p>
             <p class="micro-note">Current value remains ${currentFormatted || originCurrency}.</p>
           </div>
         `
-      });
-    }
+        });
+      }
     }
 
     if (!actions.length) return content;
@@ -1645,7 +1676,7 @@ class EventsTableManager {
         try {
           const n = FormatUtils.parseCurrency(s);
           return (typeof n === 'number' && !isNaN(n)) ? n : undefined;
-        } catch(__) { return undefined; }
+        } catch (__) { return undefined; }
       }
     };
 
@@ -1683,7 +1714,7 @@ class EventsTableManager {
     this.getOrCreateHiddenInput(part2Row, 'event-linked-event-id', linkedEventId);
     this.getOrCreateHiddenInput(part2Row, 'event-currency', destCurrency);
     if (toCountryHint) this.getOrCreateHiddenInput(part2Row, 'event-country', String(toCountryHint).toLowerCase());
-    
+
     row.insertAdjacentElement('afterend', part1Row);
     part1Row.insertAdjacentElement('afterend', part2Row);
 
@@ -1839,7 +1870,7 @@ class EventsTableManager {
     const targetRows = [...rowsBy(idVal, 'R'), ...rowsBy(idVal, 'M')];
     const ruleSet = Config.getInstance().getCachedTaxRuleSet(selectedCountry);
     const currency = ruleSet ? ruleSet.getCurrencyCode() : null;
-    
+
     // Parse converted amount using locale-aware parser (similar to splitEventAtRelocation)
     const parseByCountry = (val, countryCode) => {
       if (val == null) return undefined;
@@ -1865,12 +1896,12 @@ class EventsTableManager {
         try {
           const n = FormatUtils.parseCurrency(s);
           return (typeof n === 'number' && !isNaN(n)) ? n : undefined;
-        } catch(__) { return undefined; }
+        } catch (__) { return undefined; }
       }
     };
-    
+
     const convertedAmountNum = parseByCountry(convertedAmountRaw, selectedCountry);
-    
+
     for (let i = 0; i < targetRows.length; i++) {
       this.getOrCreateHiddenInput(targetRows[i], 'event-linked-country', selectedCountry);
       if (currency) this.getOrCreateHiddenInput(targetRows[i], 'event-currency', currency);
@@ -2458,7 +2489,7 @@ class EventsTableManager {
             this.updateFieldVisibility(typeInput);
             this.applyTypeColouring(row);
             typeInput.dispatchEvent(new Event('change', { bubbles: true }));
-            
+
             // Sync tax rulesets
             var currentEvents = null;
             var startCountry = null;
@@ -2476,7 +2507,7 @@ class EventsTableManager {
             } catch (err) {
               console.error('Error syncing tax rulesets:', err);
             }
-            
+
             // Call detector after MV-* event selection
             if (Config.getInstance().isRelocationEnabled()) {
               try {
@@ -2492,7 +2523,7 @@ class EventsTableManager {
                 console.error('Error analyzing relocation impacts:', err);
               }
             }
-            
+
             // If wizard mode is OFF, finish here (type set, other fields remain blank)
             if (!this.isEventsWizardEnabled()) {
               return;
@@ -3528,7 +3559,7 @@ class EventsTableManager {
           emptyStateEl.innerHTML = `
             <p>No events yet. Add events with the wizard or using the Add Event button.</p>
           `;
-          
+
           // Position it properly within the table container
           const table = tableContainer.querySelector('#Events');
           if (table) {

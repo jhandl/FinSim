@@ -114,9 +114,7 @@ module.exports = {
       const investmentAssets = [];
       const realEstate = {};
       const realEstateConverted = 0;
-      const indexFundsCap = 150000;
-      const sharesCap = 50000;
-      const capsByKey = {};
+      const capsByKey = { indexFunds: 150000, shares: 50000 };
       const investmentIncomeByKey = {};
       const revenue = { taxTotals: {} };
       const stableTaxIds = [];
@@ -129,7 +127,7 @@ module.exports = {
         dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
         incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
         expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
-        investmentAssets, realEstate, realEstateConverted, indexFundsCap, sharesCap, capsByKey,
+        investmentAssets, realEstate, realEstateConverted, capsByKey,
         investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
       );
 
@@ -169,9 +167,7 @@ module.exports = {
       const investmentAssets = [];
       const realEstate = {};
       const realEstateConverted = 0;
-      const indexFundsCap = 0;
-      const sharesCap = 0;
-      const capsByKey = {};
+      const capsByKey = { indexFunds: 0, shares: 0 };
       const investmentIncomeByKey = {};
       const revenue = { taxTotals: {} };
       const stableTaxIds = [];
@@ -184,7 +180,7 @@ module.exports = {
         dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
         incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
         expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
-        investmentAssets, realEstate, realEstateConverted, indexFundsCap, sharesCap, capsByKey,
+        investmentAssets, realEstate, realEstateConverted, capsByKey,
         investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
       );
 
@@ -218,9 +214,7 @@ module.exports = {
       const investmentAssets = [];
       const realEstate = {};
       const realEstateConverted = 0;
-      const indexFundsCap = 0;
-      const sharesCap = 0;
-      const capsByKey = { bond: 50000, crypto: 20000 };
+      const capsByKey = { indexFunds: 0, shares: 0, bond: 50000, crypto: 20000 };
       const investmentIncomeByKey = { bond: 5000, crypto: 2000 };
       const revenue = { taxTotals: {} };
       const stableTaxIds = [];
@@ -233,7 +227,7 @@ module.exports = {
         dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
         incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
         expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
-        investmentAssets, realEstate, realEstateConverted, indexFundsCap, sharesCap, capsByKey,
+        investmentAssets, realEstate, realEstateConverted, capsByKey,
         investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
       );
 
@@ -269,9 +263,7 @@ module.exports = {
       const investmentAssets = [];
       const realEstate = {};
       const realEstateConverted = 200000;
-      const indexFundsCap = 0;
-      const sharesCap = 0;
-      const capsByKey = {};
+      const capsByKey = { indexFunds: 0, shares: 0 };
       const investmentIncomeByKey = {};
       const revenue = { taxTotals: {} };
       const stableTaxIds = [];
@@ -284,7 +276,7 @@ module.exports = {
         dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
         incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
         expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
-        investmentAssets, realEstate, realEstateConverted, indexFundsCap, sharesCap, capsByKey,
+        investmentAssets, realEstate, realEstateConverted, capsByKey,
         investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
       );
 
@@ -318,9 +310,7 @@ module.exports = {
       const investmentAssets = [];
       const realEstate = {};
       const realEstateConverted = 0;
-      const indexFundsCap = 0;
-      const sharesCap = 0;
-      const capsByKey = {};
+      const capsByKey = { indexFunds: 0, shares: 0 };
       const investmentIncomeByKey = {};
       const revenue = {
         taxTotals: { incomeTax: 10000, prsi: 3000, usc: 2000 },
@@ -336,7 +326,7 @@ module.exports = {
         dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
         incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
         expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
-        investmentAssets, realEstate, realEstateConverted, indexFundsCap, sharesCap, capsByKey,
+        investmentAssets, realEstate, realEstateConverted, capsByKey,
         investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
       );
 
