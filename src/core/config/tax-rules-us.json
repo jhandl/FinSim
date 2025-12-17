@@ -1,0 +1,89 @@
+{
+  "country": "US",
+  "countryName": "United States",
+  "version": "2025.12",
+  "updateMessage": "Adds experimental support for US-style federal taxes (income tax + FICA + CGT) within FinSim.",
+
+  "locale": { "numberLocale": "en-US", "currencyCode": "USD", "currencySymbol": "$" },
+
+  "economicData": {
+    "inflation": { "cpi": 2.2499, "year": 2025 },
+    "purchasingPowerParity": { "value": 1.0, "year": 2024 },
+    "exchangeRate": { "perEur": 1.18, "asOf": "2025-12-16" }
+  },
+
+  "incomeTax": {
+    "name": "Federal Income Tax",
+    "tooltip": "US federal income tax on ordinary income (approximation with standard deduction embedded in brackets).",
+    "personalAllowance": 0,
+    "taxCredits": {  },
+    "ageExemptionAge": 65,
+    "ageExemptionLimit": 0,
+    "jointFilingAllowed": true,
+    "jointBandIncreaseMax": 0,
+    "bracketsByStatus": {
+      "single": { "0": 0.0, "14600": 0.1, "26200": 0.12, "61750": 0.22, "115125": 0.24, "206550": 0.32, "258325": 0.35, "623950": 0.37 },
+      "singleWithDependents": { "0": 0.0, "21900": 0.1, "38450": 0.12, "85000": 0.22, "122400": 0.24, "213850": 0.32, "265600": 0.35, "631250": 0.37 },
+      "married": { "0": 0.0, "29200": 0.1, "52400": 0.12, "123500": 0.22, "230250": 0.24, "413100": 0.32, "516650": 0.35, "760400": 0.37 }
+    }
+  },
+
+  "socialContributions": [
+    {
+      "name": "FICA",
+      "tooltip": "Combined Social Security + Medicare employee payroll tax (approximate flat 7.65% with no wage cap).",
+      "rate": 0.0765,
+      "incomeCap": null,
+      "ageAdjustments": {  },
+      "applicableIncomeTypes": [ "employment" ]
+    }
+  ],
+
+  "additionalTaxes": [],
+
+  "capitalGainsTax": { "name": "CGT", "tooltip": "Approximate long-term capital gains tax on investments (single blended rate).", "rate": 0.15, "annualExemption": 0, "allowLossOffset": true },
+
+  "pensionRules": {
+    "minRetirementAgePrivate": 59,
+    "minRetirementAgeOccupational": 59,
+    "minRetirementAgeState": 62,
+    "contributionLimits": {
+      "ageBandsPercent": { "0": 1.0 },
+      "annualCap": 345000
+    },
+    "lumpSumTaxBands": {  },
+    "lumpSumMaxPercent": 0,
+    "minDrawdownRates": { "59": 0.04, "72": 0.05 },
+    "statePensionAge": 67,
+    "statePensionIncreaseBands": {  },
+    "pensionSystem": { "type": "mixed" },
+    "definedBenefit": { "treatment": "privatePension" }
+  },
+
+  "residencyRules": { "postEmigrationTaxYears": 0, "taxesForeignIncome": false },
+
+  "investmentTypes": [
+    {
+      "key": "usIndexFunds",
+      "label": "US Index Funds",
+      "baseCurrency": "USD",
+      "assetCountry": "us",
+      "residenceScope": "global",
+      "taxation": {
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
+      }
+    },
+    {
+      "key": "usShares",
+      "label": "US Shares",
+      "baseCurrency": "USD",
+      "assetCountry": "us",
+      "residenceScope": "global",
+      "taxation": {
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
+      }
+    }
+  ],
+
+  "pinnedIncomeTypes": [ "incomeSalaries", "incomeStatePension", "incomeCash" ]
+}
