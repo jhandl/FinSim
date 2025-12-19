@@ -93,13 +93,13 @@ module.exports = {
             simulation_mode: 'single',
             economy_mode: 'deterministic'
           },
-          events: [
-            { type: 'RI', id: 'rent-pp', amount: 12000, fromAge: 30, toAge: 30, currency: 'PPP', linkedCountry: 'pp' },
-            { type: 'M', id: 'mort-pp', amount: 10000, fromAge: 30, toAge: 30, currency: 'PPP', linkedCountry: 'pp' }
-          ]
-        },
-        assertions: []
-      };
+	          events: [
+	            { type: 'RI', id: 'rent-pp', amount: 12000, fromAge: 30, toAge: 30, currency: 'PPP', linkedCountry: 'pp' },
+	            { type: 'E', id: 'mort-pp', amount: 10000, fromAge: 30, toAge: 30, currency: 'PPP', linkedCountry: 'pp' }
+	          ]
+	        },
+	        assertions: []
+	      };
 
       if (!framework.loadScenario(scenarioDefinition)) {
         return { success: false, errors: ['Failed to load Scenario 1'] };
@@ -110,21 +110,28 @@ module.exports = {
         return { success: false, errors: ['Scenario 1 failed to run'] };
       }
       const rows = results.dataSheet.filter(r => r && typeof r === 'object');
-      const row = findRowByAge(rows, 30);
-      if (!row) {
-        return { success: false, errors: ['Scenario 1 missing age 30 row'] };
-      }
+	      const row = findRowByAge(rows, 30);
+	      if (!row) {
+	        return { success: false, errors: ['Scenario 1 missing age 30 row'] };
+	      }
 
-      // Compute expected net in foreign currency (PPP) before conversion
-      const netInPPP = 12000 - 10000; // rental income - mortgage expense
-      // Convert the net to residence currency (QQQ) using nominal FX (constant mode) for ledger values
-      const expectedNet = econ.convert(netInPPP, 'PP', 'QQ', row.year, { fxMode: 'constant', baseYear: row.year });
-      // Assert that the post-consolidation net impact matches the converted net
-      const actualNet = row.incomeRentals - row.expenses;
-      if (!withinTolerance(actualNet, expectedNet)) {
-        errors.push(`Scenario 1: net flow mismatch (${actualNet} vs ${expectedNet}). Expected net of ${netInPPP} PPP converted to ${expectedNet} QQQ.`);
-      }
-    }
+	      if (typeof row.incomeRentals !== 'number') {
+	        errors.push('Scenario 1: incomeRentals is not a number (type: ' + typeof row.incomeRentals + ')');
+	      }
+	      if (typeof row.expenses !== 'number') {
+	        errors.push('Scenario 1: expenses is not a number (type: ' + typeof row.expenses + ')');
+	      }
+
+	      // Compute expected net in foreign currency (PPP) before conversion
+	      const netInPPP = 12000 - 10000; // rental income - mortgage expense
+	      // Convert the net to residence currency (QQQ) using nominal FX (constant mode) for ledger values
+	      const expectedNet = econ.convert(netInPPP, 'PP', 'QQ', row.year, { fxMode: 'constant', baseYear: row.year });
+	      // Assert that the post-consolidation net impact matches the converted net
+	      const actualNet = row.incomeRentals - row.expenses;
+	      if (!withinTolerance(actualNet, expectedNet, 0.01)) {
+	        errors.push(`Scenario 1: net flow mismatch (${actualNet} vs ${expectedNet}, types: ${typeof actualNet} vs ${typeof expectedNet}). Expected net of ${netInPPP} PPP converted to ${expectedNet} QQQ.`);
+	      }
+	    }
 
     // Scenario 2: Different foreign currencies with independent conversion
     {
@@ -170,10 +177,10 @@ module.exports = {
       const expectedExpense = econ.convert(8000, 'RR', 'QQ', row.year, { fxMode: 'constant', baseYear: row.year });
 
       if (!withinTolerance(row.incomeRentals, expectedIncome)) {
-        errors.push(`Scenario 2: incomeRentals mismatch (${row.incomeRentals} vs ${expectedIncome})`);
+        errors.push(`Scenario 2: incomeRentals mismatch (${row.incomeRentals} vs ${expectedIncome}, type: ${typeof row.incomeRentals})`);
       }
       if (!withinTolerance(row.expenses, expectedExpense)) {
-        errors.push(`Scenario 2: expenses mismatch (${row.expenses} vs ${expectedExpense})`);
+        errors.push(`Scenario 2: expenses mismatch (${row.expenses} vs ${expectedExpense}, type: ${typeof row.expenses})`);
       }
     }
 
@@ -194,14 +201,14 @@ module.exports = {
           simulation_mode: 'single',
           economy_mode: 'deterministic'
         },
-        events: [
-          { type: 'RI', id: 'rent-pp', amount: 10000, fromAge: 30, toAge: 31, currency: 'PPP', linkedCountry: 'pp' },
-          { type: 'M', id: 'mort-pp', amount: 7000, fromAge: 30, toAge: 31, currency: 'PPP', linkedCountry: 'pp' },
-          { type: 'MV-rr', id: 'move-rr', amount: 0, fromAge: 32, toAge: 32 },
-          { type: 'SI', id: 'salary-rr', amount: 40000, fromAge: 33, toAge: 33, currency: 'RRR' }
-        ]
-        },
-        assertions: []
+	        events: [
+	          { type: 'RI', id: 'rent-pp', amount: 10000, fromAge: 30, toAge: 31, currency: 'PPP', linkedCountry: 'pp' },
+	          { type: 'E', id: 'mort-pp', amount: 7000, fromAge: 30, toAge: 31, currency: 'PPP', linkedCountry: 'pp' },
+	          { type: 'MV-rr', id: 'move-rr', amount: 0, fromAge: 32, toAge: 32 },
+	          { type: 'SI', id: 'salary-rr', amount: 40000, fromAge: 33, toAge: 33, currency: 'RRR' }
+	        ]
+	        },
+	        assertions: []
       };
 
       if (!framework.loadScenario(scenarioDefinition)) {

@@ -16,6 +16,8 @@
  */
 
 function computePresentValueAggregates(ctx) {
+  // Dual-track contract: All asset values in ctx are numeric.
+  // PV deflation operates on numbers; Money objects remain in asset classes.
   // Extract all variables from ctx
   var dataRow = ctx.dataRow;
   var ageNum = ctx.ageNum;

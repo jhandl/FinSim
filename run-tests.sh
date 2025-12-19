@@ -222,8 +222,15 @@ main() {
     # Check prerequisites
     check_prerequisites
 
+    # Optional: enable Money parity checks for verification runs.
+    # Parity checks add overhead and should remain disabled by default.
+    if [ "$ENABLE_PARITY_CHECKS" = "true" ]; then
+        export FINSIM_MONEY_PARITY_CHECKS=true
+    fi
+
     if [ $# -eq 0 ]; then
         # Run all tests
+        export FINSIM_TEST_RUN_CONTEXT=all
         local test_files=($(find_test_files))
         if [ ${#test_files[@]} -eq 0 ]; then
             echo -e "${YELLOW}No test files found in $TESTS_DIR${NC}"
@@ -345,13 +352,13 @@ main() {
 
             for name in "${names[@]}"; do
                 if [ ${#extra_args[@]} -gt 0 ]; then
-                    if FINSIM_SUPPRESS_SUMMARY=1 "$0" "$name" --args "${extra_args[@]}"; then
+                    if FINSIM_SUPPRESS_SUMMARY=1 FINSIM_TEST_RUN_CONTEXT=batch "$0" "$name" --args "${extra_args[@]}"; then
                         ((total_passed++))
                     else
                         ((total_failed++))
                     fi
                 else
-                    if FINSIM_SUPPRESS_SUMMARY=1 "$0" "$name"; then
+                    if FINSIM_SUPPRESS_SUMMARY=1 FINSIM_TEST_RUN_CONTEXT=batch "$0" "$name"; then
                         ((total_passed++))
                     else
                         ((total_failed++))
@@ -372,6 +379,13 @@ main() {
 
         # Run specific test or group of tests with the same base name
         local input_name="${names[0]}"
+        if [ -z "$FINSIM_TEST_RUN_CONTEXT" ]; then
+            if [ -z "$FINSIM_SUPPRESS_SUMMARY" ]; then
+                export FINSIM_TEST_RUN_CONTEXT=single
+            else
+                export FINSIM_TEST_RUN_CONTEXT=batch
+            fi
+        fi
 
         # ------------------------------------------------------------------
         # Umbrella aliases (e.g. JestUITests) so users can re-run summary labels

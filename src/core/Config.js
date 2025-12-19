@@ -183,11 +183,12 @@ class Config {
   }
 
   getEconomicData() {
+    // Fast path: return cached instance if available
+    if (this._economicData) return this._economicData;
+    // Slow path: create and initialize (only happens once)
     ensureEconomicDataClass();
     if (!EconomicDataClass) return null;
-    if (!this._economicData) {
-      this._economicData = new EconomicDataClass();
-    }
+    this._economicData = new EconomicDataClass();
     if (this._economicData && typeof this._economicData.refreshFromConfig === 'function') {
       this._economicData.refreshFromConfig(this);
     }

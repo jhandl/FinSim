@@ -41,8 +41,9 @@ class Person {
    * Initialize/reset person-specific yearly income accumulators
    */
   resetYearlyVariables() {
-    this.yearlyIncomeStatePension = 0;
     this.yearlyIncomePrivatePension = 0;
+    this.yearlyIncomeStatePension = null; // Money
+    this.yearlyIncomeStatePensionBaseCurrency = null; // Money
   }
 
   /**
@@ -62,8 +63,9 @@ class Person {
     let lumpSumAmount = 0;
 
     // Reset yearly income accumulators
-    this.yearlyIncomeStatePension = 0;
     this.yearlyIncomePrivatePension = 0;
+    this.yearlyIncomeStatePension = null;
+    this.yearlyIncomeStatePensionBaseCurrency = null;
 
     // Lump Sum: Check if retirement age is reached and still in growth phase
     if (this.age === this.retirementAgeParam && this.phase === Phases.growth) {
@@ -88,11 +90,12 @@ class Person {
     } catch (_) { _rs = null; }
     var statePensionAge = (_rs && typeof _rs.getPensionMinRetirementAgeState === 'function') ? _rs.getPensionMinRetirementAgeState() : 0;
     var spIncreases = (_rs && typeof _rs.getStatePensionIncreaseBands === 'function') ? _rs.getStatePensionIncreaseBands() : null;
+    var yearlyStatePensionBase = 0;
+    var spCountry = this.statePensionCountryParam || activeCountry;
     if (this.statePensionWeeklyParam && this.statePensionWeeklyParam > 0 &&
       this.age >= statePensionAge) {
 
       // Resolve inflation rate for the State Pension country (not necessarily residence country)
-      var spCountry = this.statePensionCountryParam || activeCountry;
       var spInflationRate = null;
       if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function') {
         try {
@@ -111,7 +114,7 @@ class Person {
       }
 
       // Calculate yearly state pension (52 weeks) using the specific inflation rate
-      this.yearlyIncomeStatePension = 52 * adjust(this.statePensionWeeklyParam, spInflationRate);
+      yearlyStatePensionBase = 52 * adjust(this.statePensionWeeklyParam, spInflationRate);
 
       // Add increase(s) if age qualifies for state pension increase
       if (spIncreases && typeof spIncreases === 'object') {
@@ -119,16 +122,36 @@ class Person {
         for (var i = 0; i < thresholds.length; i++) {
           var t = thresholds[i];
           if (this.age >= t) {
-            this.yearlyIncomeStatePension += 52 * adjust(spIncreases[String(t)], spInflationRate);
+            yearlyStatePensionBase += 52 * adjust(spIncreases[String(t)], spInflationRate);
           }
         }
       }
     }
 
-    // Track the base currency amount (before conversion) for PV calculations
-    this.yearlyIncomeStatePensionBaseCurrency = this.yearlyIncomeStatePension;
+    // Create base-currency Money object (pre-conversion) for PV calculations
+    var spCurrency = this.statePensionCurrencyParam || null;
+    if (!spCurrency && typeof getCurrencyForCountry === 'function') {
+      spCurrency = getCurrencyForCountry(spCountry);
+    }
+    if (typeof normalizeCurrency === 'function') {
+      spCurrency = spCurrency ? normalizeCurrency(spCurrency) : spCurrency;
+    }
+    var spCountryNormalized = spCountry ? String(spCountry).toLowerCase() : null;
 
-    if (this.yearlyIncomeStatePension > 0 && typeof convertCurrencyAmount === 'function') {
+    if (yearlyStatePensionBase > 0 && spCurrency && spCountryNormalized) {
+      this.yearlyIncomeStatePensionBaseCurrency = Money.create(
+        yearlyStatePensionBase,
+        spCurrency,
+        spCountryNormalized
+      );
+    } else {
+      this.yearlyIncomeStatePensionBaseCurrency = null;
+    }
+
+    // Default to base-currency value unless we successfully convert to the target currency.
+    this.yearlyIncomeStatePension = this.yearlyIncomeStatePensionBaseCurrency;
+
+    if (yearlyStatePensionBase > 0 && typeof convertCurrencyAmount === 'function') {
       var baseCurrency = this.statePensionCurrencyParam || null;
       if (typeof normalizeCurrency === 'function') {
         baseCurrency = baseCurrency ? normalizeCurrency(baseCurrency) : baseCurrency;
@@ -148,16 +171,16 @@ class Person {
         if (!baseCountry && typeof findCountryForCurrency === 'function') {
           baseCountry = findCountryForCurrency(baseCurrency, currentCountry);
         }
-        var convertedStatePension = convertCurrencyAmount(this.yearlyIncomeStatePension, baseCurrency, baseCountry, targetCurrency, currentCountry, currentYear, true);
+        var convertedStatePension = convertCurrencyAmount(yearlyStatePensionBase, baseCurrency, baseCountry, targetCurrency, currentCountry, currentYear, true);
         if (convertedStatePension === null) {
           // Strict mode failure: set to 0 and let errors flag abort simulation
-          this.yearlyIncomeStatePension = 0;
+          this.yearlyIncomeStatePension = Money.create(0, targetCurrency, String(currentCountry).toLowerCase());
         } else if (typeof convertedStatePension === 'number' && !isNaN(convertedStatePension)) {
-          this.yearlyIncomeStatePension = convertedStatePension;
+          this.yearlyIncomeStatePension = Money.create(convertedStatePension, targetCurrency, String(currentCountry).toLowerCase());
         }
       }
     }
 
     return { lumpSumAmount: lumpSumAmount };
   }
-} 
+}

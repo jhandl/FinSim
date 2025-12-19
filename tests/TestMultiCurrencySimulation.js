@@ -1,6 +1,7 @@
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { EconomicData } = require('../src/core/EconomicData.js');
 const { TaxRuleSet } = require('../src/core/TaxRuleSet.js');
+const vm = require('vm');
 
 function findRowByAge(rows, age) {
   for (let i = 0; i < rows.length; i++) {
@@ -144,6 +145,52 @@ module.exports = {
       return { success: false, errors: ['Simulation failed to run successfully'] };
     }
 
+    const moneyStructure = vm.runInContext(`
+      (function() {
+        var errors = [];
+        
+        // Validate IndexFunds portfolio structure (Money-only)
+        if (!indexFunds.portfolio || !Array.isArray(indexFunds.portfolio)) {
+          errors.push('indexFunds.portfolio must be an array');
+        } else {
+          indexFunds.portfolio.forEach(function(holding, idx) {
+            if (!holding.principal || typeof holding.principal.amount !== 'number') {
+              errors.push('Holding ' + idx + ' principal.amount must be a number');
+            }
+            if (!holding.principal.currency || typeof holding.principal.currency !== 'string') {
+              errors.push('Holding ' + idx + ' principal.currency must be a string');
+            }
+            if (!holding.principal.country || typeof holding.principal.country !== 'string') {
+              errors.push('Holding ' + idx + ' principal.country must be a string');
+            }
+            if (!holding.interest || typeof holding.interest.amount !== 'number') {
+              errors.push('Holding ' + idx + ' interest.amount must be a number');
+            }
+          });
+        }
+        
+        // Validate Shares portfolio structure (Money-only)
+        if (!shares.portfolio || !Array.isArray(shares.portfolio)) {
+          errors.push('shares.portfolio must be an array');
+        } else {
+          shares.portfolio.forEach(function(holding, idx) {
+            if (!holding.principal || typeof holding.principal.amount !== 'number') {
+              errors.push('Shares holding ' + idx + ' principal.amount must be a number');
+            }
+            if (!holding.principal.currency || typeof holding.principal.currency !== 'string') {
+              errors.push('Shares holding ' + idx + ' principal.currency must be a string');
+            }
+          });
+        }
+        
+        return errors.length > 0 ? errors.join('; ') : null;
+      })()
+    `, framework.simulationContext);
+    
+    if (moneyStructure) {
+      return { success: false, errors: [moneyStructure] };
+    }
+
     const rows = Array.isArray(results.dataSheet) ? results.dataSheet.filter(r => r && typeof r === 'object') : [];
     const errors = [];
 
@@ -204,6 +251,39 @@ module.exports = {
 
     if (!Number.isFinite(rowAge36.cash)) {
       errors.push('Age 36 cash balance is not a finite number');
+    }
+
+    // Verify currency metadata persists across relocation
+    const currencyMetadata = vm.runInContext(`
+      (function() {
+        var errors = [];
+
+        if (!indexFunds || !indexFunds.portfolio || indexFunds.portfolio.length === 0) {
+          return null;
+        }
+        
+        // Check EUR holdings maintain EUR currency
+        var eurHoldings = indexFunds.portfolio.filter(function(h) {
+          return h.principal.currency === 'EUR';
+        });
+        if (eurHoldings.length === 0) {
+          errors.push('Expected at least one EUR holding in indexFunds');
+        }
+        
+        // Check ARS holdings maintain ARS currency
+        var arsHoldings = indexFunds.portfolio.filter(function(h) {
+          return h.principal.currency === 'ARS';
+        });
+        if (arsHoldings.length === 0) {
+          errors.push('Expected at least one ARS holding in indexFunds after relocation');
+        }
+        
+        return errors.length > 0 ? errors.join('; ') : null;
+      })()
+    `, framework.simulationContext);
+    
+    if (currencyMetadata) {
+      errors.push(currencyMetadata);
     }
 
     return {

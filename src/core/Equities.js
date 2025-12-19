@@ -14,8 +14,15 @@ class Equity {
     this.yearlyGrowth = 0;
   }
 
-  buy(amountToBuy) {
-    this.portfolio.push({ amount: amountToBuy, interest: 0, age: 0 });
+  buy(amountToBuy, currency, country) {
+    if (!currency || !country) {
+      throw new Error('Equity.buy() requires currency and country parameters');
+    }
+    this.portfolio.push({
+      principal: Money.create(amountToBuy, currency, country),
+      interest: Money.create(0, currency, country),
+      age: 0
+    });
     this.yearlyBought += amountToBuy;
   }
 
@@ -44,16 +51,17 @@ class Equity {
 
     for (let i = 0; i < this.portfolio.length && remaining > 0; i++) {
       const holding = this.portfolio[i];
-      const holdingCapital = holding.amount + holding.interest;
+      const holdingCapital = holding.principal.amount + holding.interest.amount;
+      const isFullSale = remaining >= holdingCapital;
       if (remaining >= holdingCapital) {
         sold += holdingCapital;
-        gains += holding.interest;
+        gains += holding.interest.amount;
         remaining -= holdingCapital;
         fullySoldHoldings++;
       } else {
         const fraction = holdingCapital > 0 ? (remaining / holdingCapital) : 0;
         sold += remaining;
-        gains += fraction * holding.interest;
+        gains += fraction * holding.interest.amount;
         partialFraction = fraction;
         remaining = 0;
       }
@@ -77,15 +85,13 @@ class Equity {
 
     // Apply planned mutations only after conversions succeed
     if (fullySoldHoldings > 0) {
-      for (let removed = 0; removed < fullySoldHoldings && this.portfolio.length > 0; removed++) {
-        this.portfolio.shift();
-      }
+      this.portfolio.splice(0, fullySoldHoldings);
     }
     if (partialFraction !== null && this.portfolio.length > 0) {
       const remainingHolding = this.portfolio[0];
       const keepRatio = 1 - partialFraction;
-      remainingHolding.amount = keepRatio * remainingHolding.amount;
-      remainingHolding.interest = keepRatio * remainingHolding.interest;
+      remainingHolding.principal.amount = keepRatio * remainingHolding.principal.amount;
+      remainingHolding.interest.amount = keepRatio * remainingHolding.interest.amount;
     }
 
     this.yearlySold += sold;
@@ -96,7 +102,7 @@ class Equity {
   capital() {
     let sum = 0;
     for (let i = 0; i < this.portfolio.length; i++) {
-      sum += this.portfolio[i].amount + this.portfolio[i].interest;
+      sum += this.portfolio[i].principal.amount + this.portfolio[i].interest.amount;
     }
     return sum;
   }
@@ -107,8 +113,8 @@ class Equity {
     let totalGain = 0;
 
     for (let holding of this.portfolio) {
-      principal += holding.amount;
-      totalGain += holding.interest;
+      principal += holding.principal.amount;
+      totalGain += holding.interest.amount;
     }
 
     return {
@@ -133,14 +139,15 @@ class Equity {
       const holding = this.portfolio[i];
       // Maintain legacy behavior: always use gaussian(mean, stdev) for growth sampling
       const growthRate = gaussian(this.growth, this.stdev);
-      const growthAmount = (holding.amount + holding.interest) * growthRate;
-      holding.interest += growthAmount;
+      const holdingTotal = holding.principal.amount + holding.interest.amount;
+      const growthAmount = holdingTotal * growthRate;
+      holding.interest.amount += growthAmount;
       this.yearlyGrowth += growthAmount;
       holding.age++;
       // Floor holding at zero if it goes negative
-      if (holding.amount + holding.interest < 0) {
-        holding.amount = 0;
-        holding.interest = 0;
+      if (holding.principal.amount + holding.interest.amount < 0) {
+        holding.principal.amount = 0;
+        holding.interest.amount = 0;
       }
     }
   }
@@ -151,7 +158,7 @@ class Equity {
 
     // Calculate total gains without modifying portfolio
     for (let holding of this.portfolio) {
-      totalGains += holding.interest;
+      totalGains += holding.interest.amount;
     }
 
     // Convert sale proceeds and gains from asset's tracking currency to residence currency
@@ -305,9 +312,9 @@ class IndexFunds extends Equity {
     for (let i = 0; i < this.portfolio.length; i++) {
       const dd = activeDeemedDisposalYears;
       if ((dd > 0) && (this.portfolio[i].age % dd === 0)) {
-        let gains = this.portfolio[i].interest;
-        this.portfolio[i].amount += gains;
-        this.portfolio[i].interest = 0;
+        let gains = this.portfolio[i].interest.amount;
+        this.portfolio[i].principal.amount += gains;
+        this.portfolio[i].interest.amount = 0;
         this.portfolio[i].age = 0;
         if (gains > 0 || this.canOffsetLosses) {
           revenue.declareInvestmentGains(gains, this.taxRate, 'Deemed Disposal', {
@@ -382,13 +389,14 @@ class Pension extends Equity {
     } catch (e) { this._ruleset = null; }
   }
 
-  // Override currency methods: pension tracks residence currency (domestic semantics)
+  // Override currency methods: pension tracks StartCountry currency (domestic semantics)
   _getBaseCurrency() {
-    return residenceCurrency;
+    var startCountry = normalizeCountry(params.StartCountry || config.getDefaultCountry());
+    return getCurrencyForCountry(startCountry);
   }
 
   _getAssetCountry() {
-    return currentCountry;
+    return normalizeCountry(params.StartCountry || config.getDefaultCountry());
   }
 
   declareRevenue(income, gains) {

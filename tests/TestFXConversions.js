@@ -1,5 +1,7 @@
 const { EconomicData } = require('../src/core/EconomicData.js');
 const { TaxRuleSet } = require('../src/core/TaxRuleSet.js');
+const { TestFramework } = require('../src/core/TestFramework.js');
+const vm = require('vm');
 
 const BASE_YEAR = 2025;
 
@@ -163,6 +165,32 @@ module.exports = {
         if (!withinTolerance(back, amount, 0.01, 0.5)) {
           errors.push(`Round-trip drift (${label}): expected ${amount}, got ${back}`);
         }
+      }
+
+      // 6. Money portfolio integration sanity check
+      try {
+        const framework = new TestFramework();
+        if (!framework.loadCoreModules()) {
+          errors.push('Money portfolio test failed: core modules did not load');
+        } else {
+          framework.ensureVMUIManagerMocks(null, null);
+          await vm.runInContext('Config.initialize(WebUI.getInstance())', framework.simulationContext);
+          const moneyError = vm.runInContext(`
+            (function() {
+              var asset = new IndexFunds(0.04, 0);
+              asset.buy(1000, 'EUR', 'ie');
+              if (!asset.portfolio || asset.portfolio.length !== 1) return 'portfolio missing after buy';
+              var holding = asset.portfolio[0];
+              if (holding.principal.currency !== 'EUR' || holding.principal.country !== 'ie') return 'Money holding currency mismatch';
+              return null;
+            })()
+          `, framework.simulationContext);
+          if (moneyError) {
+            errors.push('Money portfolio test failed: ' + moneyError);
+          }
+        }
+      } catch (err) {
+        errors.push('Money portfolio test failed: ' + err.message);
       }
 
       assertRoundTrip(100000, 'IE', 'AR', BASE_YEAR, constantOptions, 'constant/base');
@@ -402,4 +430,3 @@ module.exports = {
     return { success: errors.length === 0, errors };
   }
 };
-

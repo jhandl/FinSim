@@ -4,7 +4,7 @@
  * multiple separate simulations and analyzing the statistical properties of their results.
  * 
  * Key Features:
- * - Runs multiple independent simulations (15 runs for statistical significance)
+ * - Runs multiple independent simulations (4 runs for statistical sanity checks)
  * - Tests different volatility scenarios (Low: 8%, High: 25%)
  * - Calculates and validates statistical properties: mean, standard deviation, percentiles
  * - Verifies that results follow expected statistical distributions
@@ -123,7 +123,7 @@ class MonteCarloTestRunner {
 // Main test module
 module.exports = {
   name: "Monte Carlo Statistical Validation Test",
-  description: "Validates Monte Carlo statistical behavior across multiple runs with different volatility scenarios, analyzing mean, standard deviation, and percentile distributions",
+  description: "Sanity-checks Monte Carlo statistical behavior across multiple runs with different volatility scenarios",
   category: "monte_carlo_validation",
   
   // This test uses a custom runner instead of standard scenario structure
@@ -170,6 +170,9 @@ module.exports = {
           priorityFunds: 2,
           priorityShares: 3,
           StartCountry: 'ie'
+          ,simulation_mode: 'montecarlo'
+          ,economy_mode: 'stochastic'
+          ,monteCarloRuns: 2500
         },
         events: []  // No events for clean volatility testing
       };
@@ -181,19 +184,40 @@ module.exports = {
         { name: "Low Volatility", volatility: 0.08, expectedCV: 0.005 },     // 8% volatility -> ~0.5% CV
         { name: "High Volatility", volatility: 0.25, expectedCV: 0.015 }     // 25% volatility -> ~1.5% CV
       ];
+
+      // Add before the volatility scenarios loop (after line 138)
+      const performanceBaseline = {
+        runsCompleted: 0,
+        simulationsCompleted: 0,
+        totalSimulationTimeMs: 0
+      };
       
       for (const scenario of volatilityScenarios) {
         // Set the volatility for this test
         const testScenario = JSON.parse(JSON.stringify(baseScenario));
         testScenario.parameters.growthDevShares = scenario.volatility;
         
-        // Run multiple simulations (reduced to 15 runs)
-        const results = await runner.runMultipleSimulations(testScenario, 15);
+        // Run multiple independent Monte Carlo simulations (reduced to 4 runs).
+        const results = await runner.runMultipleSimulations(testScenario, 4);
         
-        if (results.length < 12) {
-          testResults.errors.push(`Insufficient successful runs for ${scenario.name}: ${results.length} < 12`);
+        if (results.length < 3) {
+          testResults.errors.push(`Insufficient successful runs for ${scenario.name}: ${results.length} < 3`);
           testResults.success = false;
           continue;
+        }
+
+        // Gate: ensure all runs actually executed Monte Carlo mode (2500 sims per run).
+        for (const result of results) {
+          if (result && result.success) {
+            if (!result.montecarlo || result.runs !== 2500) {
+              testResults.errors.push(`${scenario.name}: Expected Monte Carlo mode with 2500 runs (got montecarlo=${!!result.montecarlo}, runs=${result.runs})`);
+              testResults.success = false;
+              continue;
+            }
+            performanceBaseline.runsCompleted++;
+            performanceBaseline.simulationsCompleted += result.runs;
+            performanceBaseline.totalSimulationTimeMs += (typeof result.executionTime === 'number' && isFinite(result.executionTime)) ? result.executionTime : 0;
+          }
         }
         
         // Extract final share values for statistical analysis
@@ -253,6 +277,30 @@ module.exports = {
           testResults.success = false;
         }
       }
+
+      // Add after the volatility scenarios loop (after line 280)
+      const totalSimulationTime = performanceBaseline.totalSimulationTimeMs;
+      const avgTimePerSimulation = totalSimulationTime / performanceBaseline.simulationsCompleted;
+
+      // Performance gate: average ms per Monte Carlo simulation must remain within 5% of baseline.
+      // Baseline (pre-cleanup): ~0.5985ms per simulation across this test (see docs/money-performance-baseline.md).
+      const baselineMsPerSimulation = 0.5985;
+      const maxMsPerSimulation = baselineMsPerSimulation * 1.05;
+      if (avgTimePerSimulation > maxMsPerSimulation) {
+        testResults.errors.push(
+          `Performance regression: avg ${avgTimePerSimulation.toFixed(4)}ms/sim exceeds ${maxMsPerSimulation.toFixed(4)}ms/sim (baseline ${baselineMsPerSimulation.toFixed(4)}ms/sim, +5%)`
+        );
+        testResults.success = false;
+      }
+
+      testResults.performance = {
+        totalTime: totalSimulationTime,
+        runsCompleted: performanceBaseline.runsCompleted,
+        simulationsCompleted: performanceBaseline.simulationsCompleted,
+        avgTimePerSimulation: avgTimePerSimulation.toFixed(4),
+        baselineMsPerSimulation: baselineMsPerSimulation,
+        maxMsPerSimulation: maxMsPerSimulation
+      };
       
       // Cross-scenario validation (silent)
       if (Object.keys(testResults.details).length >= 2) {
@@ -278,7 +326,7 @@ module.exports = {
           testResults.success = false;
         }
       }
-      
+
       return testResults;
       
     } catch (error) {

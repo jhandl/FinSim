@@ -2,6 +2,7 @@ const { TestFramework } = require('../src/core/TestFramework.js');
 const { EconomicData } = require('../src/core/EconomicData.js');
 const { TaxRuleSet } = require('../src/core/TaxRuleSet.js');
 const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelpers.js');
+const vm = require('vm');
 
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
 const AR_RULES = require('../src/core/config/tax-rules-ar.json');
@@ -181,6 +182,73 @@ module.exports = {
     const results = await framework.runSimulation();
     if (!results || !results.success) {
       return { success: false, errors: ['Simulation did not complete successfully'] };
+    }
+
+    const moneyDetails = vm.runInContext(`
+      (function() {
+        var errors = [];
+        
+        // Validate pension portfolio maintains StartCountry currency
+        params = params || {};
+        params.StartCountry = 'ie';
+        currentCountry = 'ar';
+        residenceCurrency = 'ARS';
+        var pension = new Pension(0, 0, { name: 'P1' });
+        pension.buy(10000, 'EUR', 'ie');
+        if (pension.portfolio && pension.portfolio.length > 0) {
+          pension.portfolio.forEach(function(holding, idx) {
+            if (holding.principal.currency !== 'EUR') {
+              errors.push('Pension holding ' + idx + ' should maintain EUR currency (StartCountry)');
+            }
+            if (holding.principal.country !== 'ie') {
+              errors.push('Pension holding ' + idx + ' should maintain ie country (StartCountry)');
+            }
+          });
+        } else {
+          errors.push('Pension portfolio missing or empty');
+        }
+        
+        // Validate indexFunds/shares have proper Money structure (Money-only)
+        [indexFunds, shares].forEach(function(asset, assetIdx) {
+          var name = assetIdx === 0 ? 'indexFunds' : 'shares';
+          if (!asset.portfolio || !Array.isArray(asset.portfolio)) {
+            errors.push(name + '.portfolio must be an array');
+            return;
+          }
+          asset.portfolio.forEach(function(holding, idx) {
+            if (typeof holding.principal.amount !== 'number' || !isFinite(holding.principal.amount)) {
+              errors.push(name + ' holding ' + idx + ' principal.amount must be finite');
+            }
+            if (typeof holding.interest.amount !== 'number' || !isFinite(holding.interest.amount)) {
+              errors.push(name + ' holding ' + idx + ' interest.amount must be finite');
+            }
+          });
+        });
+        
+        return errors.length > 0 ? errors.join('; ') : null;
+      })()
+    `, framework.simulationContext);
+    
+    if (moneyDetails) {
+      errors.push(moneyDetails);
+    }
+
+    try {
+      const pensionCurrency = vm.runInContext(`
+        (function() {
+          params = params || {};
+          params.StartCountry = 'ie';
+          currentCountry = 'ar';
+          residenceCurrency = 'ARS';
+          var pension = new Pension(0, 0, { name: 'P1' });
+          return { currency: pension._getBaseCurrency(), country: pension._getAssetCountry() };
+        })()
+      `, framework.simulationContext);
+      if (!pensionCurrency || pensionCurrency.currency !== 'EUR' || pensionCurrency.country !== 'ie') {
+        errors.push('Pension base currency should remain StartCountry after relocation');
+      }
+    } catch (err) {
+      errors.push('Pension currency check failed: ' + err.message);
     }
 
     const rows = Array.isArray(results.dataSheet)

@@ -19,34 +19,20 @@ class UIManager {
 
   // Constants
   updateDataSheet(runs, perRunResults) {
-    // Average the attributions over all runs
-    for (let i = 1; i <= row; i++) {
-        const totalAttributions = {};
-        for (let j = 0; j < runs; j++) {
-            if (perRunResults[j] && perRunResults[j][i-1]) {
-                const runAttributions = perRunResults[j][i-1].attributions;
-                for (const metric in runAttributions) {
-                    if (!totalAttributions[metric]) {
-                        totalAttributions[metric] = {};
-                    }
-                    const breakdown = runAttributions[metric].slices;
-                    for (const source in breakdown) {
-                        if (!totalAttributions[metric][source]) {
-                            totalAttributions[metric][source] = 0;
-                        }
-                        totalAttributions[metric][source] += breakdown[source];
-                    }
-                }
-            }
+    // In Monte Carlo mode, core accumulates attribution totals directly into dataSheet rows.
+    // Divide once here to present averages (avoid storing per-run attribution snapshots).
+    if (montecarlo && runs > 1) {
+      for (let i = 1; i <= row; i++) {
+        const attributions = (dataSheet[i] && dataSheet[i].attributions) ? dataSheet[i].attributions : null;
+        if (!attributions) continue;
+        for (const metric in attributions) {
+          const metricObj = attributions[metric];
+          if (!metricObj) continue;
+          for (const source in metricObj) {
+            metricObj[source] = metricObj[source] / runs;
+          }
         }
-
-        // Divide by number of runs to get the average
-        for (const metric in totalAttributions) {
-            for (const source in totalAttributions[metric]) {
-                totalAttributions[metric][source] /= runs;
-            }
-        }
-        dataSheet[i].attributions = totalAttributions;
+      }
     }
 
     let rowColors = {};

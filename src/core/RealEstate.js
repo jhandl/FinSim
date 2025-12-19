@@ -61,11 +61,11 @@ class RealEstate {
   
   getTotalValue() {
     let sum = 0;
-   for (let id of Object.keys(this.properties)) {
-     sum += this.properties[id].getValue();
-   }
-   return sum;
- }
+    for (let id of Object.keys(this.properties)) {
+      sum += this.properties[id].getValue();
+    }
+    return sum;
+  }
 
   getTotalValueConverted(targetCurrency, currentCountry, currentYear) {
     if (typeof convertCurrencyAmount !== 'function') {
@@ -74,11 +74,11 @@ class RealEstate {
     let sum = 0;
     const currency = (typeof normalizeCurrency === 'function') ? normalizeCurrency : function(code){ return (code || '').toString().trim().toUpperCase(); };
     const country = (typeof normalizeCountry === 'function') ? normalizeCountry : function(code){ return (code || '').toString().trim().toLowerCase(); };
-    for (let id of Object.keys(this.properties)) {
-      const property = this.properties[id];
-      const value = property.getValue();
-      const fromCurrency = currency(property.getCurrency());
-      let fromCountry = country(property.getLinkedCountry());
+	    for (let id of Object.keys(this.properties)) {
+	      const property = this.properties[id];
+	      const value = property.getValue();
+	      const fromCurrency = currency(property.getCurrency());
+	      let fromCountry = country(property.getLinkedCountry());
       if (!fromCountry) {
         fromCountry = country(currentCountry);
       }
@@ -87,10 +87,10 @@ class RealEstate {
         // Strict mode failure: return null to signal error
         return null;
       }
-      sum += converted;
-    }
-    return sum;
-  }
+	      sum += converted;
+	    }
+	    return sum;
+	  }
   
   addYear() {
     for (let id of Object.keys(this.properties)) {
@@ -98,49 +98,44 @@ class RealEstate {
     }
   }
   
-}
+	}
 
 
-class Property {
+	class Property {
 
   constructor() {
-    this.paid = 0;
     this.appreciation = 0;
     this.periods = 0;
-    this.borrowed = 0;
     this.terms = 1;
-    this.payment = 0;
     this.paymentsMade = 0;
     this.fractionRepaid = 0;
-    this.currency = null;
-    this.linkedCountry = null;
+    this.paid = null;
+    this.borrowed = null;
+    this.payment = null;
   }
   
   buy(paid, appreciation, currency, linkedCountry) {
-    this.paid = paid;
     this.appreciation = appreciation;
-    if (currency !== undefined && currency !== null && currency !== '') {
-      this.currency = String(currency).toUpperCase();
-    }
-    if (linkedCountry !== undefined && linkedCountry !== null && linkedCountry !== '') {
-      this.linkedCountry = String(linkedCountry).toLowerCase();
-    }
+    var normalizedCurrency = (currency !== undefined && currency !== null && currency !== '') ? String(currency).toUpperCase() : 'EUR';
+    var normalizedCountry = (linkedCountry !== undefined && linkedCountry !== null && linkedCountry !== '') ? String(linkedCountry).toLowerCase() : 'ie';
+    this.paid = Money.create(paid, normalizedCurrency, normalizedCountry);
   }
   
   mortgage(years, rate, payment, currency, linkedCountry) {
     const n = years * 12;
     const r = rate / 12;
     const c = Math.pow(1 + r, n);
-    this.borrowed = payment/12 * (c - 1) / (r * c);
+    var borrowedAmount = payment/12 * (c - 1) / (r * c);
     this.terms = years;
-    this.payment = payment;
     this.paymentsMade = 0;
-    if (currency !== undefined && currency !== null && currency !== '') {
-      this.currency = String(currency).toUpperCase();
+    this.fractionRepaid = 0;
+    var normalizedCurrency = (currency !== undefined && currency !== null && currency !== '') ? String(currency).toUpperCase() : 'EUR';
+    var normalizedCountry = (linkedCountry !== undefined && linkedCountry !== null && linkedCountry !== '') ? String(linkedCountry).toLowerCase() : 'ie';
+    if (!this.paid) {
+      this.paid = Money.create(0, normalizedCurrency, normalizedCountry);
     }
-    if (linkedCountry !== undefined && linkedCountry !== null && linkedCountry !== '') {
-      this.linkedCountry = String(linkedCountry).toLowerCase();
-    }
+    this.payment = Money.create(payment, normalizedCurrency, normalizedCountry);
+    this.borrowed = Money.create(borrowedAmount, normalizedCurrency, normalizedCountry);
   }
   
   addYear() {
@@ -152,87 +147,95 @@ class Property {
   }
 
   getPayment() {
-    return this.payment;
+    return this.payment ? this.payment.amount : 0;
   }
   
   getValue() {
-    var baseValue = this.paid + this.borrowed * this.fractionRepaid;
+    var baseValue = (this.paid ? this.paid.amount : 0) +
+      ((this.borrowed && this.fractionRepaid > 0) ? (this.borrowed.amount * this.fractionRepaid) : 0);
+
+    var resolvedRate = null;
 
     // Preserve legacy behaviour when an explicit appreciation rate is set.
     if (this.appreciation !== null && this.appreciation !== undefined && this.appreciation !== '') {
-      return adjust(baseValue, this.appreciation, this.periods);
-    }
+      resolvedRate = this.appreciation;
+    } else {
+      // When no explicit rate is provided, resolve an inflation rate for the
+      // asset's country so that nominal growth is pegged to the property's
+      // own country, not the simulator's current residency.
+      try {
+        if (typeof InflationService !== 'undefined' &&
+            InflationService &&
+            typeof InflationService.resolveInflationRate === 'function') {
 
-    // When no explicit rate is provided, resolve an inflation rate for the
-    // asset's country so that nominal growth is pegged to the property's
-    // own country, not the simulator's current residency.
-    var resolvedRate = null;
+          // Determine the asset country: linkedCountry -> params.StartCountry -> '' (let service decide).
+          var assetCountry = '';
+          var derivedCountry = this.getLinkedCountry();
+          if (derivedCountry !== null && derivedCountry !== undefined && derivedCountry !== '') {
+            assetCountry = derivedCountry;
+          } else {
+            try {
+              if (typeof params !== 'undefined' && params && params.StartCountry) {
+                assetCountry = params.StartCountry;
+              }
+            } catch (_) {
+              assetCountry = '';
+            }
+          }
 
-    try {
-      if (typeof InflationService !== 'undefined' &&
-          InflationService &&
-          typeof InflationService.resolveInflationRate === 'function') {
-
-        // Determine the asset country: linkedCountry -> params.StartCountry -> '' (let service decide).
-        var assetCountry = '';
-        if (this.linkedCountry !== null && this.linkedCountry !== undefined && this.linkedCountry !== '') {
-          assetCountry = this.linkedCountry;
-        } else {
+          // Prefer the current simulation year when available; otherwise let the
+          // service fall back to its own defaults.
+          var currentYear = null;
           try {
-            if (typeof params !== 'undefined' && params && params.StartCountry) {
-              assetCountry = params.StartCountry;
+            if (typeof year === 'number') {
+              currentYear = year;
             }
           } catch (_) {
-            assetCountry = '';
+            currentYear = null;
           }
-        }
 
-        // Prefer the current simulation year when available; otherwise let the
-        // service fall back to its own defaults.
-        var currentYear = null;
-        try {
-          if (typeof year === 'number') {
-            currentYear = year;
-          }
-        } catch (_) {
-          currentYear = null;
-        }
-
-        resolvedRate = InflationService.resolveInflationRate(assetCountry, currentYear, {
-          params: (function () {
-            try { return (typeof params !== 'undefined') ? params : null; } catch (_) { return null; }
-          })(),
-          countryInflationOverrides: (function () {
-            try { return (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null; } catch (_) { return null; }
-          })()
-        });
-      }
-    } catch (_) {
-      resolvedRate = null;
-    }
-
-    // Fallback for environments without InflationService (legacy tests/GAS).
-    if (resolvedRate === null || resolvedRate === undefined) {
-      var fallbackRate = 0;
-      try {
-        if (typeof params !== 'undefined' && params && typeof params.inflation === 'number') {
-          fallbackRate = params.inflation;
+          resolvedRate = InflationService.resolveInflationRate(assetCountry, currentYear, {
+            params: (function () {
+              try { return (typeof params !== 'undefined') ? params : null; } catch (_) { return null; }
+            })(),
+            countryInflationOverrides: (function () {
+              try { return (typeof countryInflationOverrides !== 'undefined') ? countryInflationOverrides : null; } catch (_) { return null; }
+            })()
+          });
         }
       } catch (_) {
-        fallbackRate = 0;
+        resolvedRate = null;
       }
-      resolvedRate = fallbackRate;
+
+      // Fallback for environments without InflationService (legacy tests/GAS).
+      if (resolvedRate === null || resolvedRate === undefined) {
+        var fallbackRate = 0;
+        try {
+          if (typeof params !== 'undefined' && params && typeof params.inflation === 'number') {
+            fallbackRate = params.inflation;
+          }
+        } catch (_) {
+          fallbackRate = 0;
+        }
+        resolvedRate = fallbackRate;
+      }
     }
 
     return adjust(baseValue, resolvedRate, this.periods);
   }
 
   getCurrency() {
-    return this.currency;
+    if (this.paid) return this.paid.currency;
+    if (this.borrowed) return this.borrowed.currency;
+    if (this.payment) return this.payment.currency;
+    return null;
   }
 
   getLinkedCountry() {
-    return this.linkedCountry;
+    if (this.paid) return this.paid.country;
+    if (this.borrowed) return this.borrowed.country;
+    if (this.payment) return this.payment.country;
+    return null;
   }
   
 }

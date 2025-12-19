@@ -233,6 +233,15 @@ When the repo is reset to a clean state and a new session starts:
      - No trillions.
      - Assets behaving intuitively relative to properties/pensions.
 
+---
+
+## 5. Money Refactor Performance Notes (Dec 2025)
+
+- Keep hot paths on direct `.amount` access (no helper calls inside loops).
+- Prefer `Money.create()` for plain-object structs (avoid `new Money()` in loops).
+- Avoid currency/country validation in tight loops; enforce at boundaries (buy/sell/convert).
+- Use microbenchmarks + MC regression tests as a hard contract (`docs/money-performance-baseline.md`).
+
 This document should be read **before** making any new changes along the
 multi‑country assets axis, so that the next implementation can be deliberate,
 incremental, and test‑driven rather than exploratory and brittle.*** End Patch ***!

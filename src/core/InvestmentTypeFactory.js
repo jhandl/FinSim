@@ -24,15 +24,41 @@ class GenericInvestmentAsset extends Equity {
     this._deemedDisposalYears = GenericInvestmentAsset._resolveDeemedDisposalYears(investmentTypeDef);
     this.canOffsetLosses = GenericInvestmentAsset._resolveAllowLossOffset(investmentTypeDef);
     this.eligibleForAnnualExemption = GenericInvestmentAsset._resolveAnnualExemptionEligibility(investmentTypeDef);
+    
+    // Resolve currency/country defaults from ruleset if type definition omits them
+    if (this.baseCurrency === undefined && this._ruleset && typeof this._ruleset.getCurrencyCode === 'function') {
+      this.baseCurrency = this._ruleset.getCurrencyCode();
+    }
+    if (this.assetCountry === undefined && this._ruleset && typeof this._ruleset.getCountryCode === 'function') {
+      var countryCode = this._ruleset.getCountryCode();
+      if (countryCode) {
+        this.assetCountry = countryCode.toLowerCase();
+      }
+    }
+  }
+
+  // Override buy() to capture currency/country from first call if still undefined
+  buy(amountToBuy, currency, country) {
+    if (!currency || !country) {
+      throw new Error('Equity.buy() requires currency and country parameters');
+    }
+    // Capture currency/country from first buy() call if not yet resolved
+    if (this.baseCurrency === undefined) {
+      this.baseCurrency = currency;
+    }
+    if (this.assetCountry === undefined) {
+      this.assetCountry = country;
+    }
+    super.buy(amountToBuy, currency, country);
   }
 
   // Override currency methods for multi-country assets
   _getBaseCurrency() {
-    return this.baseCurrency; // From investmentTypeDef
+    return this.baseCurrency;
   }
 
   _getAssetCountry() {
-    return this.assetCountry; // From investmentTypeDef
+    return this.assetCountry;
   }
 
   static _resolveTaxCategory(typeDef) {
@@ -130,9 +156,9 @@ class GenericInvestmentAsset extends Equity {
       if (dd && dd > 0) {
         for (var i = 0; i < this.portfolio.length; i++) {
           if (this.portfolio[i].age % dd === 0) {
-            var gains = this.portfolio[i].interest;
-            this.portfolio[i].amount += gains;
-            this.portfolio[i].interest = 0;
+            var gains = this.portfolio[i].interest.amount;
+            this.portfolio[i].principal.amount += gains;
+            this.portfolio[i].interest.amount = 0;
             this.portfolio[i].age = 0;
             if (gains > 0 || this.canOffsetLosses) {
               revenue.declareInvestmentGains(gains, this.taxRate, 'Deemed Disposal', {
@@ -186,5 +212,3 @@ class InvestmentTypeFactory {
 // Make available in global context
 this.GenericInvestmentAsset = GenericInvestmentAsset;
 this.InvestmentTypeFactory = InvestmentTypeFactory;
-
-

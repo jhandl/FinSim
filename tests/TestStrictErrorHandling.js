@@ -122,7 +122,8 @@ module.exports = {
       `, ctx);
 
       try {
-        const result = vm.runInContext('convertNominal(1000, "ie", "ie", 2020)', ctx);
+        // Use different countries to avoid same-country fast path (which correctly skips EconomicData)
+        const result = vm.runInContext('convertNominal(1000, "ie", "ar", 2020)', ctx);
         // If it didn't throw, the test failed
         testResults.success = false;
         testResults.errors.push(`convertNominal should throw when EconomicData not ready but returned: ${result}`);

@@ -27,6 +27,8 @@
  */
 
 function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension, incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome, expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares, investmentAssets, realEstate, realEstateConverted, capsByKey, investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency) {
+  // Dual-track contract: All inputs are numeric values extracted from asset classes.
+  // Money objects never enter this aggregation layer.
   // This is used below to hide the deemed disposal tax payments, otherwise they're shown as income.
   let FundsTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeFundsRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
   let SharesTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeSharesRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;

@@ -257,6 +257,7 @@ class TestFramework {
         'Utils.js',
         'Config.js',
         'TaxRuleSet.js',
+        'Money.js',
         'Attribution.js',
         'AttributionManager.js',
         'Taxman.js',
