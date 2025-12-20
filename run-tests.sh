@@ -25,11 +25,22 @@ show_usage() {
     echo -e "${BLUE}=================${NC}"
     echo ""
     echo "USAGE:"
-    echo "  ./run-tests.sh [test-name ...] [--runAll]"
+    echo "  ./run-tests.sh [options] [test-name ...] [--runAll]"
+    echo ""
+    echo "OPTIONS:"
+    echo -e "  ${YELLOW}-t, --type TYPE${NC}   Run only tests of the specified type:"
+    echo -e "                      ${GREEN}core${NC}       - Custom Node tests (TestFramework.js)"
+    echo -e "                      ${GREEN}jest${NC}       - Jest UI unit tests (*.test.js)"
+    echo -e "                      ${GREEN}e2e${NC}        - Playwright browser tests (*.spec.js)"
+    echo -e "                      ${GREEN}all${NC}        - All test types (default)"
     echo ""
     echo "EXAMPLES:"
     echo -e "  ${GREEN}./run-tests.sh${NC}                    # Run all tests"
+    echo -e "  ${GREEN}./run-tests.sh --type core${NC}        # Run only core tests"
+    echo -e "  ${GREEN}./run-tests.sh -t jest${NC}            # Run only Jest tests"
+    echo -e "  ${GREEN}./run-tests.sh --type e2e${NC}         # Run only Playwright tests"
     echo -e "  ${GREEN}./run-tests.sh TestBasicTax${NC}       # Run specific test"
+    echo -e "  ${GREEN}./run-tests.sh 'TestMoney*'${NC}       # Run tests matching pattern"
     echo -e "  ${GREEN}./run-tests.sh TestFXConversions TestRelocationCurrency${NC}  # Run multiple tests"
     echo -e "  ${GREEN}./run-tests.sh --list${NC}             # List available tests"
     echo -e "  ${GREEN}./run-tests.sh --help${NC}             # Show this help"
@@ -188,25 +199,50 @@ list_tests() {
 main() {
     # Detect optional --runAll flag anywhere in args and export env for Playwright
     local RUN_ALL=false
-    for arg in "$@"; do
-        if [ "$arg" == "--runAll" ]; then
-            RUN_ALL=true
-            break
-        fi
+    # Test type filter: core, jest, e2e, all (default)
+    local TEST_TYPE="all"
+    local new_args=()
+
+    # Parse flags from arguments
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --runAll)
+                RUN_ALL=true
+                shift
+                ;;
+            -t|--type)
+                if [ -z "$2" ] || [[ "$2" == -* ]]; then
+                    echo -e "${RED}Error: --type requires an argument (core, jest, e2e, all)${NC}"
+                    exit 1
+                fi
+                TEST_TYPE="$2"
+                # Validate test type
+                case "$TEST_TYPE" in
+                    core|jest|e2e|playwright|all)
+                        # Valid type - normalize playwright to e2e
+                        [ "$TEST_TYPE" == "playwright" ] && TEST_TYPE="e2e"
+                        ;;
+                    *)
+                        echo -e "${RED}Error: Invalid test type '$TEST_TYPE'. Use: core, jest, e2e, all${NC}"
+                        exit 1
+                        ;;
+                esac
+                shift 2
+                ;;
+            *)
+                new_args+=("$1")
+                shift
+                ;;
+        esac
     done
+
+    # Restore positional arguments
+    set -- "${new_args[@]}"
 
     if [ "$RUN_ALL" == true ]; then
         export FINSIM_RUN_ALL=1
-        # Rebuild positional args array excluding --runAll while preserving
-        # original argument quoting and whitespace.
-        local new_args=()
-        for a in "$@"; do
-            if [ "$a" != "--runAll" ]; then
-                new_args+=("$a")
-            fi
-        done
-        set -- "${new_args[@]}"
     fi
+
     case "$1" in
         -h|--help|--help-script)
             show_usage
@@ -229,75 +265,85 @@ main() {
     fi
 
     if [ $# -eq 0 ]; then
-        # Run all tests
+        # Run all tests (or filtered by type)
         export FINSIM_TEST_RUN_CONTEXT=all
-        local test_files=($(find_test_files))
-        if [ ${#test_files[@]} -eq 0 ]; then
-            echo -e "${YELLOW}No test files found in $TESTS_DIR${NC}"
-            exit 0
-        fi
         local passed=0
         local failed=0
         local failed_tests=()
+
+        # Run core tests if type is 'all' or 'core'
+        if [ "$TEST_TYPE" == "all" ] || [ "$TEST_TYPE" == "core" ]; then
+            local test_files=($(find_test_files))
+            if [ ${#test_files[@]} -eq 0 ]; then
+                echo -e "${YELLOW}No core test files found in $TESTS_DIR${NC}"
+            else
+                for test_file in "${test_files[@]}"; do
+                    local test_name=$(basename "$test_file" .js)
+                    if run_test "$test_file"; then
+                        ((passed++))
+                    else
+                        ((failed++))
+                        failed_tests+=("$test_name")
+                    fi
+                done
+            fi
+        fi
         
-        for test_file in "${test_files[@]}"; do
-            local test_name=$(basename "$test_file" .js)
-            if run_test "$test_file"; then
+        # Run Jest-powered UI tests if type is 'all' or 'jest'
+        if [ "$TEST_TYPE" == "all" ] || [ "$TEST_TYPE" == "jest" ]; then
+            cd "$ROOT_DIR"
+
+            # Run Jest with JSON output to capture pass/fail counts
+            TEMP_JSON=$(mktemp)
+            if JEST_OUTPUT=$(npx jest --runInBand --json --outputFile "$TEMP_JSON" 2>&1); then
+                echo -e "✅ PASSED: JestUITests"
                 ((passed++))
             else
+                echo "$JEST_OUTPUT"
+                echo -e "❌ FAILED: JestUITests"
                 ((failed++))
-                failed_tests+=("$test_name")
+                failed_tests+=("JestUITests")
             fi
-        done
-        
-        # Run Jest-powered UI tests
-        cd "$ROOT_DIR"
-
-        # Run Jest with JSON output to capture pass/fail counts
-        TEMP_JSON=$(mktemp)
-        if JEST_OUTPUT=$(npx jest --runInBand --json --outputFile "$TEMP_JSON" 2>&1); then
-            echo -e "✅ PASSED: JestUITests"
-            ((passed++))
-        else
-            echo "$JEST_OUTPUT"
-            echo -e "❌ FAILED: JestUITests"
-            ((failed++))
-            failed_tests+=("JestUITests")
         fi
 
         # -----------------------------
-        # Run Playwright end-to-end tests
+        # Run Playwright end-to-end tests if type is 'all' or 'e2e'
         # -----------------------------
+        if [ "$TEST_TYPE" == "all" ] || [ "$TEST_TYPE" == "e2e" ]; then
+            for test_file in `find "$TESTS_DIR" -maxdepth 1 -name "*.spec.js" -type f`; do
 
-        for test_file in `find "$TESTS_DIR" -maxdepth 1 -name "*.spec.js" -type f`; do
+                TEST_NAME=$(basename "$test_file" .spec.js)
+                PLAYWRIGHT_OUTPUT=`npx playwright test "$test_file"`
+                if [ $? -eq 0 ]; then
+                    echo -e "✅ PASSED: $TEST_NAME"
+                    ((passed++))
+                else
+                    echo "$PLAYWRIGHT_OUTPUT"
+                    echo -e "❌ FAILED: $TEST_NAME"
+                    ((failed++))
+                    failed_tests+=("$TEST_NAME")
+                fi
 
-            TEST_NAME=$(basename "$test_file" .spec.js)
-            PLAYWRIGHT_OUTPUT=`npx playwright test "$test_file"`
-            if [ $? -eq 0 ]; then
-                echo -e "✅ PASSED: $TEST_NAME"
-                ((passed++))
-            else
-                echo "$PLAYWRIGHT_OUTPUT"
-                echo -e "❌ FAILED: $TEST_NAME"
-                ((failed++))
-                failed_tests+=("$TEST_NAME")
-            fi
-
-    done
+            done
+        fi
 
         # Final summary counts
 
-        # Cleanup temporary files
-        if [ -n "$TEMP_JSON" ] && [ -f "$TEMP_JSON" ]; then
-            rm -f "$TEMP_JSON"
+        # Cleanup temporary files (only if Jest was run)
+        if [ "$TEST_TYPE" == "all" ] || [ "$TEST_TYPE" == "jest" ]; then
+            if [ -n "$TEMP_JSON" ] && [ -f "$TEMP_JSON" ]; then
+                rm -f "$TEMP_JSON"
+            fi
         fi
 
-        # Cleanup Playwright artifacts (test-results/, playwright-report/)
-        for dir in "test-results" "playwright-report"; do
-            if [ -d "$ROOT_DIR/$dir" ]; then
-                rm -rf "$ROOT_DIR/$dir"
-            fi
-        done
+        # Cleanup Playwright artifacts (only if e2e was run)
+        if [ "$TEST_TYPE" == "all" ] || [ "$TEST_TYPE" == "e2e" ]; then
+            for dir in "test-results" "playwright-report"; do
+                if [ -d "$ROOT_DIR/$dir" ]; then
+                    rm -rf "$ROOT_DIR/$dir"
+                fi
+            done
+        fi
 
         echo
         echo -e " Results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
@@ -423,7 +469,41 @@ main() {
         # If the user already supplied an extension (e.g., .js / .test.js / .spec.js),
         # treat the argument as an explicit file name. Otherwise, gather all matching
         # files that share the same base name.
-        if [[ "$input_name" == *.js ]]; then
+        if [[ "$input_name" == *\** ]]; then
+            # Glob pattern provided (contains *)
+            # Find all matching test files
+            local pattern="$input_name"
+            
+            # If pattern doesn't end with .js, match all extensions
+            if [[ "$pattern" != *.js ]]; then
+                # Find .js files (excluding .test.js and .spec.js)
+                while IFS= read -r -d '' f; do
+                    test_files+=("$f")
+                done < <(find "$TESTS_DIR" -maxdepth 1 -name "${pattern}.js" ! -name "*.test.js" ! -name "*.spec.js" -type f -print0 2>/dev/null | sort -z)
+                
+                # Find .test.js files
+                while IFS= read -r -d '' f; do
+                    test_files+=("$f")
+                done < <(find "$TESTS_DIR" -maxdepth 1 -name "${pattern}.test.js" -type f -print0 2>/dev/null | sort -z)
+                
+                # Find .spec.js files
+                while IFS= read -r -d '' f; do
+                    test_files+=("$f")
+                done < <(find "$TESTS_DIR" -maxdepth 1 -name "${pattern}.spec.js" -type f -print0 2>/dev/null | sort -z)
+            else
+                # Pattern already has .js extension
+                while IFS= read -r -d '' f; do
+                    test_files+=("$f")
+                done < <(find "$TESTS_DIR" -maxdepth 1 -name "$pattern" -type f -print0 2>/dev/null | sort -z)
+            fi
+
+            if [ ${#test_files[@]} -eq 0 ]; then
+                echo -e "${RED}Error: No test files found matching pattern: $input_name${NC}"
+                exit 1
+            fi
+            
+            echo -e "${BLUE}Pattern '$input_name' matched ${#test_files[@]} test file(s)${NC}"
+        elif [[ "$input_name" == *.js ]]; then
             # Explicit filename provided
             if [ -f "$TESTS_DIR/$input_name" ]; then
                 test_files+=("$TESTS_DIR/$input_name")
