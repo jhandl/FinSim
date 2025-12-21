@@ -246,6 +246,7 @@ function computePresentValueAggregates(ctx) {
     dataRow.netIncomePV += netIncome;
     dataRow.expensesPV += expenses;
     dataRow.pensionFundPV += pensionFundNominal * pensionDeflator;
+    dataRow.pensionContributionPV += personalPensionContribution;
     dataRow.cashPV += cash;
     dataRow.indexFundsCapitalPV += (dataRow.investmentCapitalByKeyPV['indexFunds'] || 0);
     dataRow.sharesCapitalPV += (dataRow.investmentCapitalByKeyPV['shares'] || 0);
@@ -270,6 +271,7 @@ function computePresentValueAggregates(ctx) {
     dataRow.netIncomePV += netIncome * deflationFactor;
     dataRow.expensesPV += expenses * deflationFactor;
     dataRow.pensionFundPV += pensionFundNominal * pensionDeflator;
+    dataRow.pensionContributionPV += personalPensionContribution * deflationFactor;
     dataRow.cashPV += cash * deflationFactor;
     dataRow.indexFundsCapitalPV += (dataRow.investmentCapitalByKeyPV['indexFunds'] || 0);
     dataRow.sharesCapitalPV += (dataRow.investmentCapitalByKeyPV['shares'] || 0);
@@ -291,6 +293,23 @@ function computePresentValueAggregates(ctx) {
         dataRow.investmentIncomeByKeyPV[ik] += investmentIncomeByKey[ik];
       } else {
         dataRow.investmentIncomeByKeyPV[ik] += investmentIncomeByKey[ik] * deflationFactor;
+      }
+    }
+  }
+
+  // Tax PV computation for deduction columns (Tax__*).
+  // Taxes are flow-based deductions, so we use residency deflation (same as income flows).
+  // The revenue object (Taxman instance) provides getTaxByType() for per-tax-ID amounts.
+  var revenue = ctx.revenue;
+  if (revenue && revenue.taxTotals) {
+    for (var taxId in revenue.taxTotals) {
+      var taxColPV = 'Tax__' + taxId + 'PV';
+      if (!dataRow[taxColPV]) dataRow[taxColPV] = 0;
+      var taxAmount = revenue.getTaxByType(taxId);
+      if (deflationFactor === 1) {
+        dataRow[taxColPV] += taxAmount;
+      } else {
+        dataRow[taxColPV] += taxAmount * deflationFactor;
       }
     }
   }

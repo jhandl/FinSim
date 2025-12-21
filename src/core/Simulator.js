@@ -1974,6 +1974,9 @@ function buildPVContext(preComputedValues) {
     // Dynamic maps
     investmentIncomeByKey: investmentIncomeByKey,
 
+    // Taxman instance for tax PV calculation (deduction columns)
+    revenue: revenue,
+
     // Helper function references (to avoid global coupling)
     getDeflationFactor: getDeflationFactor,
     getDeflationFactorForCountry: getDeflationFactorForCountry,

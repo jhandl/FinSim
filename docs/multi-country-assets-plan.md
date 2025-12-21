@@ -110,7 +110,7 @@
 
 ### 5. Tests and regression checks
 
-- Extend / add core tests under `tests/`:
+- Extend / add core tests under `tests/` (they can be run with `./run-tests.sh -t core`):
 - A focused test (e.g. `TestRelocationAssetPV.js`) that:
 - Creates a scenario with an IE house + pension + funds, relocates to AR, and asserts:
 - Nominal asset values match existing behaviour.

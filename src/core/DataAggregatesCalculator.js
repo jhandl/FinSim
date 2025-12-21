@@ -114,6 +114,7 @@ function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, 
       "cashPV": 0,
       "indexFundsCapitalPV": 0,
       "sharesCapitalPV": 0,
+      "pensionContributionPV": 0,
       "worthPV": 0,
       // Attribution and dynamic per-key maps (nominal and PV)
       "attributions": {},
@@ -128,6 +129,9 @@ function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, 
       for (var ti = 0; ti < stableTaxIds.length; ti++) {
         var tcol = 'Tax__' + stableTaxIds[ti];
         if (dataSheet[row][tcol] === undefined) dataSheet[row][tcol] = 0;
+        // Initialize PV counterpart for deduction PV support
+        var tcolPV = tcol + 'PV';
+        if (dataSheet[row][tcolPV] === undefined) dataSheet[row][tcolPV] = 0;
       }
     }
 
@@ -135,6 +139,8 @@ function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, 
     for (const taxId in revenue.taxTotals) {
       const taxColumnName = `Tax__${taxId}`;
       dataSheet[row][taxColumnName] = 0;
+      // Initialize PV counterpart for deduction PV support
+      dataSheet[row][taxColumnName + 'PV'] = 0;
     }
   }
   // Set age and year (don't accumulate - these represent the current simulation state)

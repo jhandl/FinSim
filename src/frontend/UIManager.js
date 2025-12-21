@@ -36,19 +36,19 @@ class UIManager {
     }
 
     let rowColors = {};
-    
+
     // Store simulation results for later visualization changes (web UI only)
     if (this.ui.storeSimulationResults && perRunResults && perRunResults.length > 0) {
       this.ui.storeSimulationResults(runs, perRunResults);
     }
-    
+
     // Calculate pinch point colors if we have per-run results
     if (perRunResults && perRunResults.length > 0) {
       // Use PinchPointVisualizer if available (web UI only)
       if (typeof PinchPointVisualizer !== 'undefined') {
         // Get selected configuration from UI
         const selectedPreset = this.getSelectedVisualizationPreset();
-        
+
         // Skip color calculation for "Plain" color scheme to allow CSS zebra striping
         if (selectedPreset !== 'default') {
           const config = this.createVisualizationConfig(selectedPreset);
@@ -57,7 +57,7 @@ class UIManager {
         }
       }
     }
-    
+
     // Apply income visibility before rendering rows so header and data align
     try {
       if (this.ui && this.ui.tableManager && typeof this.ui.tableManager.applyIncomeVisibilityAfterSimulation === 'function') {
@@ -176,6 +176,7 @@ class UIManager {
       CashPV: dataSheet[row].cashPV / scale,
       FundsCapitalPV: dataSheet[row].indexFundsCapitalPV / scale,
       SharesCapitalPV: dataSheet[row].sharesCapitalPV / scale,
+      PensionContributionPV: dataSheet[row].pensionContributionPV / scale,
       WorthPV: dataSheet[row].worthPV / scale,
       Attributions: dataSheet[row].attributions
     };
@@ -206,25 +207,32 @@ class UIManager {
       for (const tId in taxMap) {
         data['Tax__' + tId] = taxMap[tId] / scale;
       }
-      
+      // Add Tax PV fields for present-value mode support on deduction columns
+      // These are computed by PresentValueCalculator and stored directly on dataSheet[row]
+      const taxPvKeys = Object.keys(dataSheet[row]).filter(k => k.startsWith('Tax__') && k.endsWith('PV'));
+      for (let ti = 0; ti < taxPvKeys.length; ti++) {
+        const pvKey = taxPvKeys[ti];
+        data[pvKey] = dataSheet[row][pvKey] / scale;
+      }
+
       // Also add legacy hardcoded tax fields for backward compatibility with existing UI components
       // These will be dynamically populated from the taxByKey map
       if (taxMap.incomeTax !== undefined) data.IT = taxMap.incomeTax / scale;
       if (taxMap.prsi !== undefined) data.PRSI = taxMap.prsi / scale;
       if (taxMap.usc !== undefined) data.USC = taxMap.usc / scale;
       if (taxMap.capitalGains !== undefined) data.CGT = taxMap.capitalGains / scale;
-    } catch (_) {}
+    } catch (_) { }
 
     this.ui.setDataRow(row, data);
     this.ui.setChartsRow(row, data);
-    
+
     // Apply background color if provided
     if (backgroundColor) {
       this.ui.setDataRowBackgroundColor(row, backgroundColor);
     }
-    
+
     if (row % 5 === 0) {
-      this.updateProgress("Updating "+Math.round(100 * progress) + "%");
+      this.updateProgress("Updating " + Math.round(100 * progress) + "%");
     }
   }
 
@@ -293,14 +301,14 @@ class UIManager {
         params.investmentVolatilitiesByKey[volKeys[i]] = 0;
       }
     }
-    
+
     if (validate) {
       // Check mandatory fields first
       this.validateRequiredFields(params);
-      
+
       // Validate age fields - basic range validation
       this.validateParameterAgeFields(params);
-      
+
       // Pension retirement age validation using TaxRuleSet where available
       try {
         const cfg = Config.getInstance();
@@ -310,17 +318,17 @@ class UIManager {
           : config.minOccupationalPensionRetirementAge;
         const minPriv = (rs && typeof rs.getPensionMinRetirementAgePrivate === 'function') ? rs.getPensionMinRetirementAgePrivate() : config.minPrivatePensionRetirementAge;
         if (params.retirementAge < minOcc) {
-          this.ui.setWarning("RetirementAge", "Only occupational pension schemes allow retirement before age "+minOcc+".");
+          this.ui.setWarning("RetirementAge", "Only occupational pension schemes allow retirement before age " + minOcc + ".");
         }
         if (params.retirementAge < minPriv) {
-          this.ui.setWarning("RetirementAge", "Private pensions don't normally allow retirement before age "+minPriv+".");
+          this.ui.setWarning("RetirementAge", "Private pensions don't normally allow retirement before age " + minPriv + ".");
         }
       } catch (_) {
         if (params.retirementAge < config.minOccupationalPensionRetirementAge) {
-          this.ui.setWarning("RetirementAge", "Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
+          this.ui.setWarning("RetirementAge", "Only occupational pension schemes allow retirement before age " + config.minOccupationalPensionRetirementAge + ".");
         }
         if (params.retirementAge < config.minPrivatePensionRetirementAge) {
-          this.ui.setWarning("RetirementAge", "Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
+          this.ui.setWarning("RetirementAge", "Private pensions don't normally allow retirement before age " + config.minPrivatePensionRetirementAge + ".");
         }
       }
 
@@ -333,17 +341,17 @@ class UIManager {
           : config.minOccupationalPensionRetirementAge;
         const minPriv = (rs && typeof rs.getPensionMinRetirementAgePrivate === 'function') ? rs.getPensionMinRetirementAgePrivate() : config.minPrivatePensionRetirementAge;
         if (params.p2RetirementAge < minOcc) {
-          this.ui.setWarning("P2RetirementAge", "Only occupational pension schemes allow retirement before age "+minOcc+".");
+          this.ui.setWarning("P2RetirementAge", "Only occupational pension schemes allow retirement before age " + minOcc + ".");
         }
         if (params.p2RetirementAge < minPriv) {
-          this.ui.setWarning("P2RetirementAge", "Private pensions don't normally allow retirement before age "+minPriv+".");
+          this.ui.setWarning("P2RetirementAge", "Private pensions don't normally allow retirement before age " + minPriv + ".");
         }
       } catch (_) {
         if (params.p2RetirementAge < config.minOccupationalPensionRetirementAge) {
-          this.ui.setWarning("P2RetirementAge", "Only occupational pension schemes allow retirement before age "+config.minOccupationalPensionRetirementAge+".");
+          this.ui.setWarning("P2RetirementAge", "Only occupational pension schemes allow retirement before age " + config.minOccupationalPensionRetirementAge + ".");
         }
         if (params.p2RetirementAge < config.minPrivatePensionRetirementAge) {
-          this.ui.setWarning("P2RetirementAge", "Private pensions don't normally allow retirement before age "+config.minPrivatePensionRetirementAge+".");
+          this.ui.setWarning("P2RetirementAge", "Private pensions don't normally allow retirement before age " + config.minPrivatePensionRetirementAge + ".");
         }
       }
 
@@ -358,11 +366,11 @@ class UIManager {
       }
 
       // Person 2 Validation: If any P2 field provided, p2StartingAge and p2RetirementAge become required.
-      const anyP2FieldProvided = params.p2StartingAge !== 0 || 
-                                 params.p2RetirementAge !== 0 || 
-                                 params.p2StatePensionWeekly !== 0 || 
-                                 params.initialPensionP2 !== 0 || 
-                                 params.pensionPercentageP2 !== 0;
+      const anyP2FieldProvided = params.p2StartingAge !== 0 ||
+        params.p2RetirementAge !== 0 ||
+        params.p2StatePensionWeekly !== 0 ||
+        params.initialPensionP2 !== 0 ||
+        params.pensionPercentageP2 !== 0;
 
       if (anyP2FieldProvided) {
         if (params.p2StartingAge === 0) {
@@ -382,14 +390,14 @@ class UIManager {
         allocSum += parseFloat(params.investmentAllocationsByKey[allocKeys[i]]) || 0;
       }
       if (allocSum > 1.0001) {
-        const labels = investmentTypes.map(function(t) { return t.label || t.key; }).join(' + ');
+        const labels = investmentTypes.map(function (t) { return t.label || t.key; }).join(' + ');
         for (let i = 0; i < investmentTypes.length; i++) {
           const inputId = `InvestmentAllocation_${investmentTypes[i].key}`;
           this.ui.setWarning(inputId, `${labels} allocations can't exceed 100%`);
         }
         errors = true;
       }
-      
+
       // Validate percentage fields
       this.validateParameterPercentageFields(params);
 
@@ -402,7 +410,7 @@ class UIManager {
           if (parseFloat(params.investmentVolatilitiesByKey[volKeys[i]]) > 0) hasNonZeroVol = true;
         }
         if (!hasNonZeroVol) {
-          const labels = investmentTypes.map(function(t) { return t.label || t.key; }).join(', ');
+          const labels = investmentTypes.map(function (t) { return t.label || t.key; }).join(', ');
           this.ui.setWarning("PensionGrowthStdDev", "At least one volatility rate must be greater than 0% in variable growth mode");
           for (let i = 0; i < investmentTypes.length; i++) {
             const volId = `${investmentTypes[i].key}GrowthStdDev`;
@@ -448,7 +456,7 @@ class UIManager {
     }
   }
 
-  readEvents(validate=true) {
+  readEvents(validate = true) {
     const events = [];
     const rows = this.ui.getTableData("Events", 6);
 
@@ -457,7 +465,7 @@ class UIManager {
     try {
       if (typeof document !== 'undefined') {
         __visibleEventRows = Array.from(document.querySelectorAll('#Events tbody tr'))
-          .filter(function(row) { return row && row.style.display !== 'none'; });
+          .filter(function (row) { return row && row.style.display !== 'none'; });
       }
     } catch (_) { /* Non-DOM environments (GAS) */ }
 
@@ -515,23 +523,23 @@ class UIManager {
       }
 
       const id = name.substr(pos + 1);
-      
+
       // Convert years to ages if we're in year mode
       let processedFromAge = fromAge;
       let processedToAge = toAge;
-      
+
       // Check if EventsTableManager exists and is in year mode
       const eventsTableManager = this.ui.eventsTableManager;
       if (eventsTableManager && eventsTableManager.ageYearMode === 'year') {
         const startingAge = parseInt(this.ui.getValue('StartingAge')) || 0;
         const p2StartingAge = parseInt(this.ui.getValue('P2StartingAge')) || 0;
-        
+
         // Convert fromAge from year to age
         if (fromAge !== "" && !isNaN(fromAge)) {
           const birthYear = this.calculateBirthYear(type, startingAge, p2StartingAge);
           processedFromAge = this.convertEventYearToAge(parseInt(fromAge), birthYear);
         }
-        
+
         // Convert toAge from year to age
         if (toAge !== "" && !isNaN(toAge)) {
           const birthYear = this.calculateBirthYear(type, startingAge, p2StartingAge);
@@ -598,7 +606,7 @@ class UIManager {
   calculateBirthYear(eventType, startingAge, p2StartingAge) {
     const currentYear = new Date().getFullYear();
     const eventPerson = this.determineEventPerson(eventType);
-    
+
     if (eventPerson === 'P2') {
       return currentYear - p2StartingAge;
     } else {
@@ -654,7 +662,7 @@ class UIManager {
 
       UIManager.getFields().forEach(field => {
         let value = undefined;
-        switch(field) {
+        switch (field) {
           case 'name':
             value = event.id;
             break;
@@ -687,17 +695,17 @@ class UIManager {
   validateAgeYearFields(events) {
     const startingAge = parseInt(this.ui.getValue('StartingAge')) || 0;
     const p2StartingAge = parseInt(this.ui.getValue('P2StartingAge')) || 0;
-    
+
     // Get current UI mode for appropriate error messages
     const eventsTableManager = this.ui.eventsTableManager;
     const currentMode = eventsTableManager?.ageYearMode || 'age';
-    
+
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
-      
+
       // Skip validation for NOP events as they ignore all fields
       if (event.type === 'NOP') continue;
-      
+
       // Validate From Age (events always contain ages after conversion)
       if (event.fromAge !== undefined && event.fromAge !== '') {
         const validation = this.validateAgeValue(event.fromAge, event.type, startingAge, p2StartingAge, currentMode);
@@ -706,7 +714,7 @@ class UIManager {
           errors = true;
         }
       }
-      
+
       // Validate To Age (events always contain ages after conversion)
       if (event.toAge !== undefined && event.toAge !== '' && event.toAge !== 999) {
         const validation = this.validateAgeValue(event.toAge, event.type, startingAge, p2StartingAge, currentMode);
@@ -715,7 +723,7 @@ class UIManager {
           errors = true;
         }
       }
-      
+
       // Validate that toAge is not smaller than fromAge
       if (event.fromAge && event.toAge && event.toAge !== 999) {
         if (event.toAge < event.fromAge) {
@@ -747,7 +755,7 @@ class UIManager {
         return { isValid: false, message: `${capModeWord} seems very far in the past (${relevantStartingAge - numValue} years ago)` };
       }
     }
-    
+
     return { isValid: true };
   }
 
@@ -771,7 +779,7 @@ class UIManager {
 
     // Determine which fields to validate
     const shouldValidateP2 = (params.simulation_mode === 'couple');
-    const fieldsToValidate = allAgeFields.filter(field => 
+    const fieldsToValidate = allAgeFields.filter(field =>
       field.person === 'P1' || field.person === 'shared' || shouldValidateP2
     );
 
@@ -834,18 +842,18 @@ class UIManager {
     // r=required, o=optional, -=hidden
     const patterns = {
       'NOP': 'oooooo',
-      'RI':  'rrrro-',
-      'SI':  'rrrroo',
-      'SInp':'rrrro-',
+      'RI': 'rrrro-',
+      'SI': 'rrrroo',
+      'SInp': 'rrrro-',
       'SI2': 'rrrroo',    // Added for Person 2 Pensionable Salary
-      'SI2np':'rrrro-',  // Added for Person 2 Non-Pensionable Salary
-      'UI':  'rrrro-',
+      'SI2np': 'rrrro-',  // Added for Person 2 Non-Pensionable Salary
+      'UI': 'rrrro-',
       'DBI': 'rrroo-',
-      'FI':  'rrrro-',
-      'E':   'rrrro-',
-      'R':   'rrroo-',
-      'M':   'rrrrr-',
-      'SM':  'r-rrr-'
+      'FI': 'rrrro-',
+      'E': 'rrrro-',
+      'R': 'rrroo-',
+      'M': 'rrrrr-',
+      'SM': 'r-rrr-'
     };
     const fields = UIManager.getFields();
     const pattern = patterns[eventType]?.split('') || [];
@@ -858,53 +866,53 @@ class UIManager {
   validateParameterPercentageFields(params) {
     // Define percentage fields with their validation rules
     const percentageFields = [
-      { 
-        value: params.FundsAllocation, 
-        fieldId: 'FundsAllocation', 
-        name: (function(){
+      {
+        value: params.FundsAllocation,
+        fieldId: 'FundsAllocation',
+        name: (function () {
           try {
             const cfg = Config.getInstance();
             const rs = cfg.getCachedTaxRuleSet(cfg.getDefaultCountry());
             const f = rs && rs.findInvestmentTypeByKey ? rs.findInvestmentTypeByKey('indexFunds') : null;
             if (f && f.label) return `${f.label} Allocation`;
-          } catch(_) {}
+          } catch (_) { }
           return 'Index Funds Allocation';
         })(),
-        min: 0, 
+        min: 0,
         max: 1,
         unit: '%'
       },
-      { 
-        value: params.SharesAllocation, 
-        fieldId: 'SharesAllocation', 
-        name: (function(){
+      {
+        value: params.SharesAllocation,
+        fieldId: 'SharesAllocation',
+        name: (function () {
           try {
             const cfg = Config.getInstance();
             const rs = cfg.getCachedTaxRuleSet(cfg.getDefaultCountry());
             const s = rs && rs.findInvestmentTypeByKey ? rs.findInvestmentTypeByKey('shares') : null;
             if (s && s.label) return `${s.label} Allocation`;
-          } catch(_) {}
+          } catch (_) { }
           return 'Individual Shares Allocation';
         })(),
-        min: 0, 
+        min: 0,
         max: 1,
         unit: '%'
       },
-      { 
-        value: params.pensionPercentage, 
-        fieldId: 'PensionContributionPercentage', 
+      {
+        value: params.pensionPercentage,
+        fieldId: 'PensionContributionPercentage',
         name: 'Pension Contribution Percentage',
-        min: 0, 
+        min: 0,
         max: 1,
         unit: '%',
         allowExceedMax: true,
         exceedMaxMessage: "You can contribute more than 100% but you won't get tax relief on the excess"
       },
-      { 
-        value: params.pensionPercentageP2, 
-        fieldId: 'PensionContributionPercentageP2', 
+      {
+        value: params.pensionPercentageP2,
+        fieldId: 'PensionContributionPercentageP2',
         name: 'Partner Pension Contribution Percentage',
-        min: 0, 
+        min: 0,
         max: 1,
         unit: '%',
         allowExceedMax: true,
@@ -914,7 +922,7 @@ class UIManager {
 
     // Filter fields based on simulation mode
     const shouldValidateP2 = (params.simulation_mode === 'couple');
-    const fieldsToValidate = percentageFields.filter(field => 
+    const fieldsToValidate = percentageFields.filter(field =>
       !field.fieldId.includes('P2') || shouldValidateP2
     );
 
