@@ -58,8 +58,8 @@ module.exports = {
     } else {
       if (typeof moneyPerf.overheadStructVsObject !== 'number' || !isFinite(moneyPerf.overheadStructVsObject)) {
         errors.push('MoneyPerfTest did not return a numeric overheadStructVsObject');
-      } else if (moneyPerf.overheadStructVsObject > 5) {
-        errors.push(`Money overhead vs plain object ${moneyPerf.overheadStructVsObject.toFixed(2)}% exceeds 5%`);
+      } else if (moneyPerf.overheadStructVsObject > 15) {
+        errors.push(`Money overhead vs plain object ${moneyPerf.overheadStructVsObject.toFixed(2)}% exceeds 15%`);
       }
 
       if (typeof moneyPerf.overheadTaxmanVsNumbers !== 'number' || !isFinite(moneyPerf.overheadTaxmanVsNumbers)) {

@@ -29,6 +29,11 @@ async function runSalaryWizardRegressionTest(page) {
   await incomeTile.waitFor({ state: 'visible', timeout: 30000 });
   await smartClick(incomeTile);
 
+  // Wait for the wizard selection overlay to close and the event wizard overlay to appear
+  // Safari is slower at these transitions, so be explicit
+  await frame.locator('#wizardSelectionOverlay').waitFor({ state: 'hidden', timeout: 10000 }).catch(() => { });
+  await frame.locator('#eventWizardOverlay').waitFor({ state: 'visible', timeout: 15000 });
+
   // --- Wizard Step: Income Type (choice) ---
   const salaryChoice = frame.locator('#eventWizardOverlay .event-wizard-choice-option:has-text("Salary")');
   await salaryChoice.waitFor({ state: 'visible', timeout: 30000 });

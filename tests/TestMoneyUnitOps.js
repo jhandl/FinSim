@@ -244,7 +244,8 @@ module.exports = {
 		            varianceNumbers += delta * delta;
 		          }
 		          varianceNumbers = varianceNumbers / timesNumbers.length;
-		          var cvNumbers = varianceNumbers / medianNumbers;
+		          // CV = standard deviation / mean (not variance / mean)
+		          var cvNumbers = Math.sqrt(varianceNumbers) / medianNumbers;
 
 		          return {
 		            iterationsNumbers: iterationsNumbers,

@@ -364,8 +364,18 @@ test('Mini tour in table view highlights each first-row field', async ({ page })
   // Iterate through the tour steps until the tour finishes. Wait for first popover explicitly.
   await frame.locator('.driver-popover').first().waitFor({ state: 'visible', timeout: 6000 });
   for (let guard = 0; guard < 50; guard++) { // safety guard (mobile can be slower)
-    // Wait for pop-over to appear
-    await frame.locator('.driver-popover').first().waitFor({ state: 'visible', timeout: 4000 });
+    // Wait for pop-over to appear; tolerate brief disappearance during step transitions
+    try {
+      await frame.locator('.driver-popover').first().waitFor({ state: 'visible', timeout: 4000 });
+    } catch (e) {
+      // Popover may have disappeared if tour finished; check tour state
+      const tourActive = await frame.locator('body').evaluate(() => {
+        const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+        return wiz && wiz.tour && typeof wiz.tour.isActive === 'function' ? wiz.tour.isActive() : false;
+      });
+      if (!tourActive) break; // Tour finished, exit loop
+      throw e; // Re-throw if tour is still active but popover didn't appear
+    }
     // On some overview steps there might be no highlighted element – only check when present
     const highlightLocator = frame.locator('.driver-highlighted-element');
     if (await highlightLocator.count() > 0) {
@@ -437,7 +447,17 @@ test('Mini tour in accordion view auto-expands and collapses first event', async
   // Iterate through tour steps and ensure they point to first accordion item
   for (let guard = 0; guard < 50; guard++) {
     // Be tolerant on slower mobile emulation; wait up to 2s for the popover each step
-    await frame.locator('.driver-popover').waitFor({ state: 'visible', timeout: 2000 });
+    try {
+      await frame.locator('.driver-popover').waitFor({ state: 'visible', timeout: 2000 });
+    } catch (e) {
+      // Popover may have disappeared if tour finished; check tour state
+      const tourActive = await frame.locator('body').evaluate(() => {
+        const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+        return wiz && wiz.tour && typeof wiz.tour.isActive === 'function' ? wiz.tour.isActive() : false;
+      });
+      if (!tourActive) break; // Tour finished, exit loop
+      throw e; // Re-throw if tour is still active but popover didn't appear
+    }
     const highlightLocator = frame.locator('.driver-highlighted-element');
     if (await highlightLocator.count() > 0) {
       await expect(highlightLocator).toBeVisible();
@@ -539,7 +559,17 @@ test('Mini tour in accordion view uses pre-expanded second event', async ({ page
   });
 
   for (let guard = 0; guard < 40; guard++) {
-    await frame.locator('.driver-popover').waitFor({ state: 'visible' });
+    try {
+      await frame.locator('.driver-popover').waitFor({ state: 'visible' });
+    } catch (e) {
+      // Popover may have disappeared if tour finished; check tour state
+      const tourActive = await frame.locator('body').evaluate(() => {
+        const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+        return wiz && wiz.tour && typeof wiz.tour.isActive === 'function' ? wiz.tour.isActive() : false;
+      });
+      if (!tourActive) break; // Tour finished, exit loop
+      throw e; // Re-throw if tour is still active but popover didn't appear
+    }
     const highlightLocator = frame.locator('.driver-highlighted-element');
     if ((await highlightLocator.count()) > 0) {
       await expect(highlightLocator).toBeVisible();
@@ -597,7 +627,17 @@ test('Mini tour in accordion view shows only visible fields for EXPENSE event', 
   const encountered = new Set();
 
   for (let guard = 0; guard < 40; guard++) {
-    await frame.locator('.driver-popover').waitFor({ state: 'visible' });
+    try {
+      await frame.locator('.driver-popover').waitFor({ state: 'visible' });
+    } catch (e) {
+      // Popover may have disappeared if tour finished; check tour state
+      const tourActive = await frame.locator('body').evaluate(() => {
+        const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+        return wiz && wiz.tour && typeof wiz.tour.isActive === 'function' ? wiz.tour.isActive() : false;
+      });
+      if (!tourActive) break; // Tour finished, exit loop
+      throw e; // Re-throw if tour is still active but popover didn't appear
+    }
     const sel = await frame.locator('body').evaluate(() => {
       const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
       return (() => {
