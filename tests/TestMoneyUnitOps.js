@@ -126,9 +126,9 @@ module.exports = {
       errors.push('Money.clone failed: ' + err.message);
     }
 
-	    // Test 9: 1M ops benchmark with numeric baseline comparison
-	    try {
-	      const bench = vm.runInContext(`
+    // Test 9: 1M ops benchmark with numeric baseline comparison
+    try {
+      const bench = vm.runInContext(`
 	        (function() {
 	          function nowMs() { return Date.now(); }
 
@@ -263,58 +263,47 @@ module.exports = {
 		        })()
 		      `, ctx);
 
-	      // Sanity: operations executed (all variants should increase from 1000).
-	      if (bench.finalNumbers <= 1000 || bench.finalObject <= 1000 || bench.finalMoneyHot <= 1000 || bench.finalMoneyHelpers <= 1000) {
-	        errors.push('Benchmark did not modify amounts correctly');
-	      }
+      // Sanity: operations executed (all variants should increase from 1000).
+      if (bench.finalNumbers <= 1000 || bench.finalObject <= 1000 || bench.finalMoneyHot <= 1000 || bench.finalMoneyHelpers <= 1000) {
+        errors.push('Benchmark did not modify amounts correctly');
+      }
 
-		      if (typeof bench.cvNumbers === 'number' && bench.cvNumbers > 0.5) {
-		        errors.push('Timing too unstable (CV=' + (bench.cvNumbers * 100).toFixed(1) + '%), results unreliable');
-		      }
+      if (typeof bench.cvNumbers === 'number' && bench.cvNumbers > 0.5) {
+        errors.push('Timing too unstable (CV=' + (bench.cvNumbers * 100).toFixed(1) + '%), results unreliable');
+      }
 
-		      // Assertions: compare per-iteration timings (iterations differ per path).
-		      var numbersPerIter = bench.medianNumbersMs / bench.iterationsNumbers;
-		      var objectPerIter = bench.medianObjectMs / bench.iterationsNumbers;
-		      var hotPerIter = bench.medianMoneyHotMs / bench.iterationsNumbers;
-		      var helpersPerIter = bench.medianMoneyHelpersMs / bench.iterationsHelpers;
+      // Assertions: compare per-iteration timings (iterations differ per path).
+      var numbersPerIter = bench.medianNumbersMs / bench.iterationsNumbers;
+      var objectPerIter = bench.medianObjectMs / bench.iterationsNumbers;
+      var hotPerIter = bench.medianMoneyHotMs / bench.iterationsNumbers;
+      var helpersPerIter = bench.medianMoneyHelpersMs / bench.iterationsHelpers;
 
-	      var objectOverhead = objectPerIter / numbersPerIter;
-	      var helpersVsHotOverhead = helpersPerIter / hotPerIter;
+      var objectOverhead = objectPerIter / numbersPerIter;
+      var helpersVsHotOverhead = helpersPerIter / hotPerIter;
 
-		      if (objectOverhead > 5.0) {
-		        errors.push(
-		          'Benchmark regression: object .amount loop too slow vs numbers: ' +
-		          bench.medianObjectMs + 'ms vs ' + bench.medianNumbersMs + 'ms (' +
-		          (objectOverhead * 100).toFixed(1) + '% of baseline per-iter, expected <= 500%).'
-		        );
-		      }
+      if (objectOverhead > 5.0) {
+        errors.push(
+          'Benchmark regression: object .amount loop too slow vs numbers: ' +
+          bench.medianObjectMs + 'ms vs ' + bench.medianNumbersMs + 'ms (' +
+          (objectOverhead * 100).toFixed(1) + '% of baseline per-iter, expected <= 500%).'
+        );
+      }
 
-	      // Money helper overhead is expected to be large (function calls + mismatch checks).
-	      // This guard is only intended to catch catastrophic slowdowns.
-	      if (helpersVsHotOverhead > 500.0) {
-	        errors.push(
-	          'Benchmark regression: Money.add/multiply too slow vs Money hot-path: ' +
-	          bench.medianMoneyHelpersMs + 'ms (' + bench.iterationsHelpers + ' iters) vs ' +
-	          bench.medianMoneyHotMs + 'ms (' + bench.iterationsNumbers + ' iters), overhead=' +
-	          (helpersVsHotOverhead * 100).toFixed(1) + '% per-iter (expected <= 50000%).'
-	        );
-	      }
+      // Money helper overhead is expected to be large (function calls + mismatch checks).
+      // This guard is only intended to catch catastrophic slowdowns.
+      if (helpersVsHotOverhead > 500.0) {
+        errors.push(
+          'Benchmark regression: Money.add/multiply too slow vs Money hot-path: ' +
+          bench.medianMoneyHelpersMs + 'ms (' + bench.iterationsHelpers + ' iters) vs ' +
+          bench.medianMoneyHotMs + 'ms (' + bench.iterationsNumbers + ' iters), overhead=' +
+          (helpersVsHotOverhead * 100).toFixed(1) + '% per-iter (expected <= 50000%).'
+        );
+      }
 
-	      if (typeof process !== 'undefined' &&
-	          process &&
-	          process.env &&
-	          process.env.FINSIM_TEST_RUN_CONTEXT === 'single') {
-	        console.log(
-	          '✓ Benchmark medians (trials=' + bench.trials + '): ' +
-	          'numbers=' + bench.medianNumbersMs + 'ms (' + bench.iterationsNumbers + ' iters), ' +
-	          'object=' + bench.medianObjectMs + 'ms (' + bench.iterationsNumbers + ' iters), ' +
-	          'moneyHot=' + bench.medianMoneyHotMs + 'ms (' + bench.iterationsNumbers + ' iters), ' +
-	          'moneyHelpers=' + bench.medianMoneyHelpersMs + 'ms (' + bench.iterationsHelpers + ' iters)'
-	        );
-	      }
-	    } catch (err) {
-	      errors.push('1M ops benchmark failed: ' + err.message);
-	    }
+      // Benchmark results are validated via assertions above, no output needed
+    } catch (err) {
+      errors.push('1M ops benchmark failed: ' + err.message);
+    }
 
     return { success: errors.length === 0, errors: errors };
   }

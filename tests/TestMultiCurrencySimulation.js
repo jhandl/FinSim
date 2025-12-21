@@ -21,10 +21,12 @@ function withinTolerance(actual, expected, relTol, absTol) {
 
 module.exports = {
   name: 'MultiCurrencySimulation',
-  description: 'Validates currency conversions across relocation with foreign income and expenses.',
+  description: 'Validates currency conversions across relocation with foreign income and expenses (parity enabled).',
   isCustomTest: true,
   async runCustomTest() {
     const framework = new TestFramework();
+    framework.loadCoreModules();
+    const ctx = framework.simulationContext;
     const scenarioDefinition = {
       name: 'MultiCurrencyScenario',
       description: 'Relocation with mixed-currency salary, rental income, and mortgage expenses',
@@ -186,7 +188,7 @@ module.exports = {
         return errors.length > 0 ? errors.join('; ') : null;
       })()
     `, framework.simulationContext);
-    
+
     if (moneyStructure) {
       return { success: false, errors: [moneyStructure] };
     }
@@ -281,7 +283,7 @@ module.exports = {
         return errors.length > 0 ? errors.join('; ') : null;
       })()
     `, framework.simulationContext);
-    
+
     if (currencyMetadata) {
       errors.push(currencyMetadata);
     }

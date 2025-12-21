@@ -88,7 +88,7 @@ module.exports = {
       (function(){
         __pensionContributionLog = [];
         var original = Taxman.prototype.declareSalaryIncome;
-        Taxman.prototype.declareSalaryIncome = function(amount, contribRate, person, description) {
+        Taxman.prototype.declareSalaryIncome = function(money, contribRate, person, description) {
           var before = this.pensionContribAmountP1;
           var result = original.apply(this, arguments);
           var after = this.pensionContribAmountP1;

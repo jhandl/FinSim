@@ -24,7 +24,7 @@ class GenericInvestmentAsset extends Equity {
     this._deemedDisposalYears = GenericInvestmentAsset._resolveDeemedDisposalYears(investmentTypeDef);
     this.canOffsetLosses = GenericInvestmentAsset._resolveAllowLossOffset(investmentTypeDef);
     this.eligibleForAnnualExemption = GenericInvestmentAsset._resolveAnnualExemptionEligibility(investmentTypeDef);
-    
+
     // Resolve currency/country defaults from ruleset if type definition omits them
     if (this.baseCurrency === undefined && this._ruleset && typeof this._ruleset.getCurrencyCode === 'function') {
       this.baseCurrency = this._ruleset.getCurrencyCode();
@@ -104,13 +104,15 @@ class GenericInvestmentAsset extends Equity {
 
   // Override to attribute sales using the configured label instead of class name
   declareRevenue(income, gains) {
-    revenue.declareInvestmentIncome(income, this.label + ' Income');
+    var incomeMoney = Money.from(income, residenceCurrency, currentCountry);
+    revenue.declareInvestmentIncome(incomeMoney, this.label + ' Income');
     if (gains > 0 || this.canOffsetLosses) {
       // Determine flags from type definition
       var isExit = (this._taxCategory === 'exitTax');
       var eligible = !!this.eligibleForAnnualExemption;
       var allowOffset = !!this.canOffsetLosses;
-      revenue.declareInvestmentGains(gains, this.taxRate, this.label + ' Sale', {
+      var gainsMoney = Money.from(gains, residenceCurrency, currentCountry);
+      revenue.declareInvestmentGains(gainsMoney, this.taxRate, this.label + ' Sale', {
         category: isExit ? 'exitTax' : 'cgt',
         eligibleForAnnualExemption: eligible,
         allowLossOffset: allowOffset
@@ -120,10 +122,12 @@ class GenericInvestmentAsset extends Equity {
 
   // Mirror classification in simulation path for withdraw planning
   simulateDeclareRevenue(income, gains, testRevenue) {
-    testRevenue.declareInvestmentIncome(income, this.label + ' Income');
+    var incomeMoney = Money.from(income, residenceCurrency, currentCountry);
+    testRevenue.declareInvestmentIncome(incomeMoney, this.label + ' Income');
     if (gains > 0 || this.canOffsetLosses) {
       var isExit = (this._taxCategory === 'exitTax');
-      testRevenue.declareInvestmentGains(gains, this.taxRate, this.label + ' Sim', {
+      var gainsMoney = Money.from(gains, residenceCurrency, currentCountry);
+      testRevenue.declareInvestmentGains(gainsMoney, this.taxRate, this.label + ' Sim', {
         category: isExit ? 'exitTax' : 'cgt',
         eligibleForAnnualExemption: !!this.eligibleForAnnualExemption,
         allowLossOffset: !!this.canOffsetLosses
@@ -152,16 +156,37 @@ class GenericInvestmentAsset extends Equity {
         // Fallback to initial value if resolution fails
         activeDeemedDisposalYears = this._deemedDisposalYears;
       }
+      /**
+       * Apply deemed disposal for exit tax assets.
+       * 
+       * @assumes Homogeneous holding currency - gains are in the same currency as holding.principal.
+       *          Money.add() enforces currency match; direct .amount = 0 is safe for zeroing.
+       * @performance Rare operation (every N years per holding), Money methods acceptable overhead.
+       */
       var dd = activeDeemedDisposalYears;
       if (dd && dd > 0) {
         for (var i = 0; i < this.portfolio.length; i++) {
           if (this.portfolio[i].age % dd === 0) {
             var gains = this.portfolio[i].interest.amount;
-            this.portfolio[i].principal.amount += gains;
+
+            // Money path: safe currency-aware addition
+            var gainsMoney = Money.create(gains, this.portfolio[i].principal.currency, this.portfolio[i].principal.country);
+            Money.add(this.portfolio[i].principal, gainsMoney);
+
             this.portfolio[i].interest.amount = 0;
             this.portfolio[i].age = 0;
             if (gains > 0 || this.canOffsetLosses) {
-              revenue.declareInvestmentGains(gains, this.taxRate, 'Deemed Disposal', {
+              var gainsConverted = gains;
+              var baseCurrency = this._getBaseCurrency();
+              var assetCountry = this._getAssetCountry();
+              if (baseCurrency !== residenceCurrency) {
+                gainsConverted = convertCurrencyAmount(gains, baseCurrency, assetCountry, residenceCurrency, currentCountry, year, true);
+                if (gainsConverted === null) {
+                  throw new Error('Deemed disposal FX conversion failed');
+                }
+              }
+              var gainsMoney = Money.from(gainsConverted, residenceCurrency, currentCountry);
+              revenue.declareInvestmentGains(gainsMoney, this.taxRate, 'Deemed Disposal', {
                 category: 'exitTax',
                 eligibleForAnnualExemption: !!this.eligibleForAnnualExemption,
                 allowLossOffset: !!this.canOffsetLosses

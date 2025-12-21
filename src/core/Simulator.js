@@ -4,7 +4,14 @@ var revenue, realEstate, stockGrowthOverride, attributionManager;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var incomeStatePension, incomePrivatePension, incomeFundsRent, incomeSharesRent, withdrawalRate;
 var incomeSalaries, incomeShares, incomeRentals, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
-var cash, indexFunds, shares;
+/**
+ * Cash tracking architecture:
+ * - cash (number): Primary numeric value for performance-critical operations
+ * - cashMoney (Money): Money object for currency context (used at boundaries)
+ *
+ * Cash operations update both to maintain invariant: cash === cashMoney.amount
+ */
+var cash, cashMoney, indexFunds, shares;
 // Generic investment array (future replacement for specific variables)
 var investmentAssets; // [{ key, label, asset }]
 // Track per-investment-type flows to support dynamic UI columns
@@ -507,6 +514,7 @@ function initializeSimulationVariables() {
 
   year = new Date().getFullYear() - 1;
   cash = params.initialSavings;
+  cashMoney = Money.from(params.initialSavings, residenceCurrency, currentCountry);
   targetCash = params.emergencyStash; // Initialize target cash (emergency stash) in starting currency
   failedAt = 0;
   row = 0;
@@ -657,8 +665,13 @@ function calculatePensionIncome() {
     flagSimulationFailure(person1.age);
     return;
   }
+  /**
+   * @assumes residenceCurrency - Pension lump sums are pre-converted by Person.calculateYearlyPensionIncome().
+   * @performance Hot path - direct .amount access for zero overhead in yearly simulation loop.
+   */
   if (p1CalcResults.lumpSumAmount > 0) {
     cash += p1CalcResults.lumpSumAmount;
+    cashMoney.amount += p1CalcResults.lumpSumAmount;
     // Note: Lump sum tax is already declared in Pension.declareRevenue() when getLumpsum() calls sell()
   }
   if (person1.yearlyIncomePrivatePension === null) {
@@ -687,8 +700,13 @@ function calculatePensionIncome() {
       flagSimulationFailure(person2.age);
       return;
     }
+    /**
+     * @assumes residenceCurrency - P2 pension lump sums are pre-converted by Person.calculateYearlyPensionIncome().
+     * @performance Hot path - direct .amount access for zero overhead.
+     */
     if (p2CalcResults.lumpSumAmount > 0) {
       cash += p2CalcResults.lumpSumAmount;
+      cashMoney.amount += p2CalcResults.lumpSumAmount;
       // Note: Lump sum tax is already declared in Pension.declareRevenue() when getLumpsum() calls sell()
     }
     if (person2.yearlyIncomePrivatePension === null) {
@@ -712,7 +730,8 @@ function calculatePensionIncome() {
   }
 
   // Declare total state pension to revenue
-  revenue.declareStatePensionIncome(incomeStatePension);
+  const statePensionMoney = Money.from(incomeStatePension, residenceCurrency, currentCountry);
+  revenue.declareStatePensionIncome(statePensionMoney);
 }
 
 function processEvents() {
@@ -944,8 +963,13 @@ function processEvents() {
       var entryKey = entry.eventId ? String(entry.eventId) : (entryCategory + '_' + i);
 
       switch (entry.type) {
+        /**
+         * @assumes residenceCurrency - Property sale amounts are pre-converted via getConversionFactor().
+         * @performance Hot path - direct .amount access for zero overhead.
+         */
         case 'sale':
           cash += entryConvertedAmount;
+          cashMoney.amount += entryConvertedAmount;
           attributionManager.record('realestatecapital', entry.label || ('Sale (' + entry.eventId + ')'), -entryConvertedAmount);
           break;
 
@@ -1005,15 +1029,16 @@ function processEvents() {
               if (personalAmount > 0) {
                 attributionManager.record('pensioncontribution', entry.eventId, personalAmount);
               }
-              // Dual-track: buy() receives numeric amount + currency/country metadata.
-              // Asset classes track Money internally for parity; Simulator works with numbers only.
+              // buy() receives numeric amount + currency/country metadata.
+              // Asset classes track Money internally; Simulator works with numbers only.
               salaryPerson.pension.buy(totalContrib, startCountryCurrency, startCountry);
             }
             declaredRate = baseRate;
           }
 
           if (!declaredEntries[entryKey]) {
-            revenue.declareSalaryIncome(entryConvertedAmount, declaredRate, salaryPerson, entry.eventId);
+            const salaryMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
+            revenue.declareSalaryIncome(salaryMoney, declaredRate, salaryPerson, entry.eventId);
             declaredEntries[entryKey] = true;
           }
           break;
@@ -1027,7 +1052,8 @@ function processEvents() {
           }
           attributionManager.record('incomersus', entry.eventId, entryConvertedAmount);
           if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
-            revenue.declareNonEuSharesIncome(entryConvertedAmount, entry.eventId);
+            const rsuMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
+            revenue.declareNonEuSharesIncome(rsuMoney, entry.eventId);
             declaredEntries[entryKey] = true;
           }
           break;
@@ -1040,7 +1066,8 @@ function processEvents() {
           }
           attributionManager.record('incomerentals', entry.eventId, entryConvertedAmount);
           if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
-            revenue.declareOtherIncome(entryConvertedAmount, entry.eventId);
+            const otherIncomeMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
+            revenue.declareOtherIncome(otherIncomeMoney, entry.eventId);
             declaredEntries[entryKey] = true;
           }
           break;
@@ -1063,11 +1090,13 @@ function processEvents() {
             } else {
               switch (dbiSpec.treatment) {
                 case 'privatePension':
-                  revenue.declarePrivatePensionIncome(entryConvertedAmount, person1, entry.eventId);
+                  const dbiPensionMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
+                  revenue.declarePrivatePensionIncome(dbiPensionMoney, person1, entry.eventId);
                   break;
                 case 'salary':
                   var contrib = (dbiSpec.salary && typeof dbiSpec.salary.contribRate === 'number') ? dbiSpec.salary.contribRate : 0;
-                  revenue.declareSalaryIncome(entryConvertedAmount, contrib, person1, entry.eventId);
+                  const dbiSalaryMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
+                  revenue.declareSalaryIncome(dbiSalaryMoney, contrib, person1, entry.eventId);
                   break;
                 default:
                   errors = true;
@@ -1113,6 +1142,7 @@ function processEvents() {
           var purchaseTotal = categoryTotalsByType['purchase'] || entryConvertedAmount;
           var cashUsed = Math.min(cash, purchaseTotal);
           cash -= cashUsed;
+          cashMoney.amount -= cashUsed;
           var shortfall = purchaseTotal - cashUsed;
           if (shortfall > 0) {
             expenses += shortfall;
@@ -1150,7 +1180,7 @@ function processEvents() {
         currency: propertyCurrency || saleInfo.currency,
         country: propertyCountry || saleInfo.country
       };
-      // Dual-track: sell() returns numeric amount in residence currency.
+      // sell() returns numeric amount in residence currency.
       // Internal Money conversion happens inside asset class; Simulator receives number only.
       var saleProceeds = realEstate.sell(event.id);
       recordIncomeEntry(saleState, saleEntryInfo, saleProceeds, {
@@ -1296,8 +1326,8 @@ function processEvents() {
       case 'M': {
         var mortgageInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
         if (person1.age == event.fromAge) {
-          // Dual-track: mortgage() receives numeric principal + currency/country metadata.
-          // Asset classes track Money internally for parity; Simulator works with numbers only.
+          // mortgage() receives numeric principal + currency/country metadata.
+          // Asset classes track Money internally; Simulator works with numbers only.
           realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount, mortgageInfo.currency, mortgageInfo.country);
         }
         if (inScope) {
@@ -1320,8 +1350,8 @@ function processEvents() {
       case 'R':
         if (person1.age === event.fromAge) {
           var purchaseInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
-          // Dual-track: buy() receives numeric amount + currency/country metadata.
-          // Asset classes track Money internally for parity; Simulator works with numbers only.
+          // buy() receives numeric amount + currency/country metadata.
+          // Asset classes track Money internally; Simulator works with numbers only.
           realEstate.buy(event.id, amount, event.rate, purchaseInfo.currency, purchaseInfo.country);
           recordExpenseEntry(flowState, purchaseInfo, amount, {
             type: 'purchase',
@@ -1382,6 +1412,12 @@ function processEvents() {
                   return; // Abort processing this year
                 }
                 cash = convertedCash;
+                // Convert cashMoney to new currency
+                cashMoney = Money.convertTo(cashMoney, newResidenceCurrency, destCountry, year, economicData);
+              } else {
+                // When pooled cash conversion is disabled, Simulator still changes residenceCurrency/currentCountry.
+                // Retag cashMoney to match the numeric cash semantics (legacy behavior).
+                cashMoney = Money.from(cash, newResidenceCurrency, destCountry);
               }
 
               // Optionally convert target cash (emergency stash) to new currency.
@@ -1430,9 +1466,14 @@ function handleInvestments() {
     householdPhase = 'retired';
   }
 
+  /**
+   * @assumes residenceCurrency - netIncome and expenses are already in residence currency.
+   * @performance Hot path - direct .amount access for net savings accumulation.
+   */
   if (netIncome > expenses) {
     savings = netIncome - expenses;
     cash += savings;
+    cashMoney.amount += savings;
   }
 
 
@@ -1517,15 +1558,15 @@ function handleInvestments() {
                 }
                 continue;
               }
-	              // Dual-track: Equity.buy() receives numeric amount + currency/country.
-	              // Asset classes track Money internally for parity; capital() returns sum of numeric amounts.
-	              entry.asset.buy(amountInAssetCurrency, entry.baseCurrency, entry.assetCountry);
-	            } else {
-	              // contributionCurrencyMode === 'residence': invest directly in residence currency
-	              // Dual-track: Equity.buy() receives numeric amount + currency/country.
-	              // Asset classes track Money internally for parity; capital() returns sum of numeric amounts.
-	              entry.asset.buy(amount, residenceCurrency, currentCountry);
-	            }
+              // Equity.buy() receives numeric amount + currency/country.
+              // Asset classes track Money internally; capital() returns sum of numeric amounts.
+              entry.asset.buy(amountInAssetCurrency, entry.baseCurrency, entry.assetCountry);
+            } else {
+              // contributionCurrencyMode === 'residence': invest directly in residence currency
+              // Equity.buy() receives numeric amount + currency/country.
+              // Asset classes track Money internally; capital() returns sum of numeric amounts.
+              entry.asset.buy(amount, residenceCurrency, currentCountry);
+            }
             // Track invested amount in residence currency for cash deduction
             sumInvested += amount;
             usedDynamic = true;
@@ -1535,19 +1576,29 @@ function handleInvestments() {
       if (usedDynamic) {
         invested = sumInvested;
         cash -= invested;
+        cashMoney.amount -= invested;
       }
     }
     // Legacy two-asset investing path - use dynamic allocations
     if (!usedDynamic) {
       var allocByKey = getAllocationsByKey();
-	      // Dual-track: buy() receives numeric amount + currency/country metadata.
-	      // Asset classes track Money internally for parity; Simulator works with numbers only.
-	      indexFunds.buy(surplus * (allocByKey.indexFunds || 0), residenceCurrency, currentCountry);
-	      shares.buy(surplus * (allocByKey.shares || 0), residenceCurrency, currentCountry);
-	      invested = surplus * ((allocByKey.indexFunds || 0) + (allocByKey.shares || 0));
-	      cash -= invested;
-	    }
-	  }
+      // buy() receives numeric amount + currency/country metadata.
+      // Asset classes track Money internally; Simulator works with numbers only.
+      indexFunds.buy(surplus * (allocByKey.indexFunds || 0), residenceCurrency, currentCountry);
+      shares.buy(surplus * (allocByKey.shares || 0), residenceCurrency, currentCountry);
+      invested = surplus * ((allocByKey.indexFunds || 0) + (allocByKey.shares || 0));
+      /**
+       * @assumes residenceCurrency - Investment amounts are in residence currency.
+       * @performance Hot path - direct .amount access for investment deduction.
+       */
+      cash -= invested;
+      cashMoney.amount -= invested;
+    }
+  }
+  /**
+   * @assumes residenceCurrency - Emergency cash top-up uses residence currency amounts.
+   * @performance Hot path - direct .amount access for cash top-up.
+   */
   // If cash is below targetCash (inflated emergency stash), top it up from surplus income
   // This ensures cash grows to match the inflated target over time
   if (cash < targetCash && netIncome > expenses + invested) {
@@ -1556,6 +1607,7 @@ function handleInvestments() {
     let topUp = Math.min(needed, availableSurplus);
     if (topUp > 0) {
       cash += topUp;
+      cashMoney.amount += topUp;
     }
   }
 
@@ -1614,11 +1666,16 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
       needed = expenses + cashDeficit - netIncome;
       var keepTrying = false;
 
+      /**
+       * @assumes residenceCurrency - Cash withdrawals are in residence currency.
+       * @performance Hot path - direct .amount access for withdrawal operations.
+       */
       // Cash bucket
       if (priority === cashPriority) {
         if (cash > 0.5) {
           cashWithdraw = Math.min(cash, needed);
           cash -= cashWithdraw;
+          cashMoney.amount -= cashWithdraw;
           attributionManager.record('incomecash', 'Cash Withdrawal', cashWithdraw);
         }
       }
@@ -1629,13 +1686,13 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
         var p2Cap = person2 ? person2.pension.capital() : 0;
         if (p1Cap > 0.5 && (person1.phase === Phases.retired || person1.age >= person1.retirementAgeParam)) {
           var w1 = Math.min(p1Cap, needed);
-	          // Dual-track: sell() returns numeric amount in residence currency.
-	          // Internal Money conversion happens inside asset class; Simulator receives number only.
-	          var sold1 = person1.pension.sell(w1);
-	          if (sold1 === null) {
-	            flagSimulationFailure(person1.age);
-	            return;
-	          }
+          // sell() returns numeric amount in residence currency.
+          // Internal Money conversion happens inside asset class; Simulator receives number only.
+          var sold1 = person1.pension.sell(w1);
+          if (sold1 === null) {
+            flagSimulationFailure(person1.age);
+            return;
+          }
           incomePrivatePension += sold1;
           attributionManager.record('incomeprivatepension', 'Pension Drawdown P1', sold1);
           keepTrying = true;
@@ -1661,13 +1718,13 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
         var cap = assetObj.capital();
         if (cap > 0.5) {
           var w = Math.min(cap, needed);
-	          // Dual-track: sell() returns numeric amount in residence currency.
-	          // Internal Money conversion happens inside asset class; Simulator receives number only.
-	          var sold = assetObj.sell(w);
-	          if (sold === null) {
-	            flagSimulationFailure(person1.age);
-	            return;
-	          }
+          // sell() returns numeric amount in residence currency.
+          // Internal Money conversion happens inside asset class; Simulator receives number only.
+          var sold = assetObj.sell(w);
+          if (sold === null) {
+            flagSimulationFailure(person1.age);
+            return;
+          }
           // Populate legacy income buckets for backward compatibility
           if (entry.key === 'indexFunds') {
             incomeFundsRent += sold;
@@ -1691,6 +1748,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
 function liquidateAll() {
   cashWithdraw = cash;
   cash = 0;
+  cashMoney = Money.zero(residenceCurrency, currentCountry);
 
   // Only liquidate pension if retired - pension should not be touched during growth phase
   if (person1.phase === Phases.retired && person1.pension.capital() > 0) {
@@ -1789,10 +1847,10 @@ function getDrawdownPrioritiesByKey() {
   return map;
 }
 
-	function initializeRealEstate() {
-	  realEstate = new RealEstate();
-	  // buy properties that were bought before the startingAge
-	  let props = new Map();
+function initializeRealEstate() {
+  realEstate = new RealEstate();
+  // buy properties that were bought before the startingAge
+  let props = new Map();
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
     switch (event.type) {
@@ -1803,31 +1861,31 @@ function getDrawdownPrioritiesByKey() {
               "fromAge": event.fromAge,
               "property": null
             });
-	          } else {
-	            props.get(event.id).fromAge = event.fromAge;
-	          }
-	          var prePurchaseInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
-	          // Dual-track: buy() receives numeric amount + currency/country metadata.
-	          // Asset classes track Money internally for parity; Simulator works with numbers only.
-	          props.get(event.id).property = realEstate.buy(event.id, event.amount, event.rate, prePurchaseInfo.currency, prePurchaseInfo.country);
-	        }
-	        break;
-	      case 'M':
+          } else {
+            props.get(event.id).fromAge = event.fromAge;
+          }
+          var prePurchaseInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
+          // buy() receives numeric amount + currency/country metadata.
+          // Asset classes track Money internally; Simulator works with numbers only.
+          props.get(event.id).property = realEstate.buy(event.id, event.amount, event.rate, prePurchaseInfo.currency, prePurchaseInfo.country);
+        }
+        break;
+      case 'M':
         if (event.fromAge < params.startingAge) {
           if (!props.has(event.id)) {
             props.set(event.id, {
               "fromAge": event.fromAge,
               "property": null
             });
-	          } else {
-	            props.get(event.id).fromAge = event.fromAge;
-	          }
-	          var preMortgageInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
-	          // Dual-track: mortgage() receives numeric principal + currency/country metadata.
-	          // Asset classes track Money internally for parity; Simulator works with numbers only.
-	          props.get(event.id).property = realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount, preMortgageInfo.currency, preMortgageInfo.country);
-	        }
-	        break;
+          } else {
+            props.get(event.id).fromAge = event.fromAge;
+          }
+          var preMortgageInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
+          // mortgage() receives numeric principal + currency/country metadata.
+          // Asset classes track Money internally; Simulator works with numbers only.
+          props.get(event.id).property = realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount, preMortgageInfo.currency, preMortgageInfo.country);
+        }
+        break;
       default:
         break;
     }
@@ -1838,15 +1896,15 @@ function getDrawdownPrioritiesByKey() {
       data.property.addYear();
     }
   }
-	}
+}
 
-	function computePreAggregateValues() {
-	  // Dual-track: All capital() / getValue() methods return numeric sums of holdings.
-	  // Money objects remain internal to asset classes for parity verification.
-	  var realEstateConverted = realEstate.getTotalValueConverted(residenceCurrency, currentCountry, year);
-	  if (realEstateConverted === null) {
-	    throw new Error('Real estate value conversion failed: cannot convert total value to ' + residenceCurrency + ' for country ' + currentCountry + ' at year ' + year);
-	  }
+function computePreAggregateValues() {
+  // All capital() / getValue() methods return numeric sums of holdings.
+  // Money objects remain internal to asset classes for currency safety.
+  var realEstateConverted = realEstate.getTotalValueConverted(residenceCurrency, currentCountry, year);
+  if (realEstateConverted === null) {
+    throw new Error('Real estate value conversion failed: cannot convert total value to ' + residenceCurrency + ' for country ' + currentCountry + ' at year ' + year);
+  }
   // Compute capitals by key while avoiding double-counting legacy assets
   var capsByKey = {};
   capsByKey['indexFunds'] = indexFunds.capital();
@@ -1924,24 +1982,24 @@ function buildPVContext(preComputedValues) {
     convertCurrencyAmount: convertCurrencyAmount,
     getCurrencyForCountry: getCurrencyForCountry
   };
-	}
+}
 
-	function updateYearlyData() {
-	  // Dual-track: dataSheet stores numeric aggregates only.
-	  // Money objects never leave asset class boundaries.
-	  // Capture per-run data for pinch point visualization
-	  if (capturePerRunResults) {
-	    if (!perRunResults[currentRun]) {
-	      perRunResults[currentRun] = [];
-	    }
-	    perRunResults[currentRun].push({
-	      netIncome: netIncome,
-	      earnedNetIncome: earnedNetIncome,
-	      householdPhase: householdPhase,
-	      expenses: expenses,
-	      success: success
-	    });
-	  }
+function updateYearlyData() {
+  // dataSheet stores numeric aggregates only.
+  // Money objects never leave asset class boundaries.
+  // Capture per-run data for pinch point visualization
+  if (capturePerRunResults) {
+    if (!perRunResults[currentRun]) {
+      perRunResults[currentRun] = [];
+    }
+    perRunResults[currentRun].push({
+      netIncome: netIncome,
+      earnedNetIncome: earnedNetIncome,
+      householdPhase: householdPhase,
+      expenses: expenses,
+      success: success
+    });
+  }
 
   // Pre-compute values needed by aggregates and PV calculators
   var preComputedValues = computePreAggregateValues();

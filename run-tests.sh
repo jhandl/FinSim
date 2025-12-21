@@ -149,7 +149,7 @@ run_test() {
 # Function to find all test files
 find_test_files() {
     # Exclude Jest tests (*.test.js) and Playwright tests (*.spec.js)
-    find "$TESTS_DIR" -maxdepth 1 -name "*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort
+find "$TESTS_DIR" -maxdepth 1 -name "*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort
 }
 
 # Function to list available tests
@@ -242,6 +242,7 @@ main() {
     if [ "$RUN_ALL" == true ]; then
         export FINSIM_RUN_ALL=1
     fi
+
 
     case "$1" in
         -h|--help|--help-script)

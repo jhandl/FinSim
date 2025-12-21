@@ -15,8 +15,40 @@
  * This file has to work on both the website and Google Sheets.
  */
 
+/**
+ * Compute present-value (PV) aggregates for a simulation data row.
+ * 
+ * Numeric boundary contract: All asset values in ctx are numeric (pre-extracted .amount from Money objects).
+ * PV deflation operates on numbers; Money objects remain in asset classes for currency safety.
+ * 
+ * PV Semantics:
+ * - Flows (income/expenses): Use residency-country deflation (current country CPI)
+ * - Stocks (assets): Use asset-origin-country deflation (birth country CPI)
+ * 
+ * @param {Object} ctx - Context object containing:
+ *   @param {Object} ctx.dataRow - Data row to populate with PV values
+ *   @param {number} ctx.ageNum - Current age
+ *   @param {number} ctx.startYear - Simulation start year
+ *   @param {Object} ctx.person1 - Person 1 object
+ *   @param {Object} ctx.person2 - Person 2 object (nullable)
+ *   @param {Object} ctx.params - Simulation parameters
+ *   @param {Object} ctx.cfg - Config instance
+ *   @param {Object} ctx.countryInflationOverrides - Country inflation overrides
+ *   @param {number} ctx.year - Current simulation year
+ *   @param {string} ctx.currentCountry - Current country code
+ *   @param {string} ctx.residenceCurrency - Current residence currency
+ *   @param {Object} ctx.realEstate - RealEstate object
+ *   @param {Object} ctx.indexFunds - IndexFunds asset
+ *   @param {Object} ctx.shares - Shares asset
+ *   @param {Array} ctx.investmentAssets - Array of investment assets
+ *   @param {number} ctx.realEstateConverted - Pre-extracted .amount from converted real estate
+ *   @param {Object} ctx.capsByKey - Map of investment capitals (pre-extracted .amount values)
+ *   @param {number} ctx.incomeSalaries - Pre-extracted .amount from salary Money objects
+ *   @param {number} ctx.incomeShares - Pre-extracted .amount from RSU Money objects
+ *   ... (all other numeric income/expense fields are pre-extracted .amount values)
+ */
 function computePresentValueAggregates(ctx) {
-  // Dual-track contract: All asset values in ctx are numeric.
+  // Numeric boundary contract: All asset values in ctx are numeric.
   // PV deflation operates on numbers; Money objects remain in asset classes.
   // Extract all variables from ctx
   var dataRow = ctx.dataRow;

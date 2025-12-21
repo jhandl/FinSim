@@ -14,10 +14,29 @@ class Taxman {
     }
   }
 
-  declareSalaryIncome(amount, contribRate, person, description) {
+  declareSalaryIncome(money, contribRate, person, description) {
+    // Validate Money object
+    if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
+      throw new Error('declareSalaryIncome requires a Money object');
+    }
+
+    // Validate currency matches residence currency
+    var residenceCurrency = this.residenceCurrency;
+    if (money.currency !== residenceCurrency) {
+      throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
+    }
+
+    // Legacy numeric accumulation (primary path)
+    const amount = money.amount;
     this.income += amount; // Total gross income
     this.attributionManager.record('income', description, amount);
 
+    // Money accumulation
+    Money.add(this.incomeMoney, money);
+
+    /**
+     * @assumes residenceCurrency - All salary amounts validated at input boundary
+     */
     const contribution = contribRate * amount;
     // Use ruleset annual cap for pension relief exclusively
     var reliefAnnualCap = (this.ruleset && typeof this.ruleset.getPensionContributionAnnualCap === 'function')
@@ -38,56 +57,148 @@ class Taxman {
     }
   };
 
-  declareNonEuSharesIncome(amount, description) {
+  declareNonEuSharesIncome(money, description) {
+    if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
+      throw new Error('declareNonEuSharesIncome requires a Money object');
+    }
+    var residenceCurrency = this.residenceCurrency;
+    if (money.currency !== residenceCurrency) {
+      throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
+    }
+
+    const amount = money.amount;
     this.nonEuShares += amount;
     this.attributionManager.record('nonEuShares', description, amount);
+
+    Money.add(this.nonEuSharesMoney, money);
   };
 
-  declarePrivatePensionIncome(amount, person, description) {
+  declarePrivatePensionIncome(money, person, description) {
+    if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
+      throw new Error('declarePrivatePensionIncome requires a Money object');
+    }
+    var residenceCurrency = this.residenceCurrency;
+    if (money.currency !== residenceCurrency) {
+      throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
+    }
+
+    const amount = money.amount;
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
       this.privatePensionP1 += amount;
       this.attributionManager.record('privatepensionp1', description, amount);
+
+      Money.add(this.privatePensionP1Money, money);
     } else if (person && this.person2Ref && person.id === this.person2Ref.id) {
       this.privatePensionP2 += amount;
       this.attributionManager.record('privatepensionp2', description, amount);
+
+      Money.add(this.privatePensionP2Money, money);
     }
   };
 
-  declarePrivatePensionLumpSum(amount, person) {
-    const description = `Pension Lump Sum P${person.id}`;
+  declarePrivatePensionLumpSum(money, person) {
+    if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
+      throw new Error('declarePrivatePensionLumpSum requires a Money object');
+    }
+    var residenceCurrency = this.residenceCurrency;
+    if (money.currency !== residenceCurrency) {
+      throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
+    }
+
+    const amount = money.amount;
+    const description = 'Pension Lump Sum P' + person.id;
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
       this.privatePensionLumpSumP1 += amount;
       this.privatePensionLumpSumCountP1++;
       this.attributionManager.record('privatepensionlumpsum', description, amount);
+
+      Money.add(this.privatePensionLumpSumP1Money, money);
     } else if (person && this.person2Ref && person.id === this.person2Ref.id) {
       this.privatePensionLumpSumP2 += amount;
       this.privatePensionLumpSumCountP2++;
       this.attributionManager.record('privatepensionlumpsum', description, amount);
+
+      Money.add(this.privatePensionLumpSumP2Money, money);
     }
   };
 
-  declareStatePensionIncome(amount) {
+  declareStatePensionIncome(money) {
+    if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
+      throw new Error('declareStatePensionIncome requires a Money object');
+    }
+    var residenceCurrency = this.residenceCurrency;
+    if (money.currency !== residenceCurrency) {
+      throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
+    }
+
+    const amount = money.amount;
     this.statePension += amount;
+
+    Money.add(this.statePensionMoney, money);
     // Attribution for state pension is handled in Simulator.js
   };
 
-  declareInvestmentIncome(amount, description) {
+  declareInvestmentIncome(money, description) {
+    if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
+      throw new Error('declareInvestmentIncome requires a Money object');
+    }
+    var residenceCurrency = this.residenceCurrency;
+    if (money.currency !== residenceCurrency) {
+      throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
+    }
+
+    const amount = money.amount;
     this.investmentIncome += amount;
     this.attributionManager.record('investmentincome', description, amount);
+
+    Money.add(this.investmentIncomeMoney, money);
   };
 
-  declareOtherIncome(amount, description) {
+  declareOtherIncome(money, description) {
+    if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
+      throw new Error('declareOtherIncome requires a Money object');
+    }
+    var residenceCurrency = this.residenceCurrency;
+    if (money.currency !== residenceCurrency) {
+      throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
+    }
+
+    const amount = money.amount;
     this.income += amount;
     this.attributionManager.record('income', description, amount);
+
+    Money.add(this.incomeMoney, money);
   };
 
-  declareInvestmentGains(amount, taxRate, description, options) {
-    // Backward-compatible API with optional options object for per-gain flags
+  declareInvestmentGains(money, taxRate, description, options) {
     // options: { category: 'cgt'|'exitTax', eligibleForAnnualExemption: boolean, allowLossOffset: boolean }
+    if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
+      throw new Error('declareInvestmentGains requires a Money object');
+    }
+    var residenceCurrency = this.residenceCurrency;
+    if (money.currency !== residenceCurrency) {
+      throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
+    }
+
+    const amount = money.amount;
+    var currentCountry = money.country;
     if (!this.gains.hasOwnProperty(taxRate)) {
-      this.gains[taxRate] = { amount: 0, sources: {}, entries: [] };
+      this.gains[taxRate] = {
+        amount: 0,
+        amountMoney: Money.zero(residenceCurrency, currentCountry),
+        sources: {},
+        entries: []
+      };
     }
     const rateBucket = this.gains[taxRate];
+
+    // Validate currency before accumulation, mirroring other declare* methods
+    Money.add(rateBucket.amountMoney, money);
+
+    /**
+     * @assumes residenceCurrency - amount validated via Money.add() above.
+     * @performance Hot path - direct .amount access for gains accumulation.
+     */
     rateBucket.amount += amount;
     if (!rateBucket.sources[description]) {
       rateBucket.sources[description] = 0;
@@ -96,12 +207,14 @@ class Taxman {
     // Store detailed entry for precise CGT/Exit Tax handling
     const entry = {
       amount: amount,
+      amountMoney: Money.create(money.amount, money.currency, money.country),
       description: description,
       category: (options && (options.category === 'exitTax' || options.category === 'cgt')) ? options.category : 'cgt',
       eligibleForAnnualExemption: options && typeof options.eligibleForAnnualExemption === 'boolean' ? options.eligibleForAnnualExemption : true,
       allowLossOffset: options && typeof options.allowLossOffset === 'boolean' ? options.allowLossOffset : true
     };
     rateBucket.entries.push(entry);
+
   };
 
   computeTaxes() {
@@ -172,6 +285,24 @@ class Taxman {
     if (!this.ruleset) {
       console.error(`TaxRuleSet not found for ${countryCode}`);
     }
+    // Residence currency is defined by Simulator and is the canonical currency for all Taxman declarations.
+    // Use the global `residenceCurrency` when available; fall back to ruleset locale currency.
+    if (typeof residenceCurrency !== 'undefined' && residenceCurrency) {
+      this.residenceCurrency = String(residenceCurrency).trim().toUpperCase();
+    } else {
+      this.residenceCurrency = (this.ruleset && typeof this.ruleset.getCurrencyCode === 'function')
+        ? String(this.ruleset.getCurrencyCode()).trim().toUpperCase()
+        : null;
+    }
+    // Money accumulators (maintained alongside numeric fields for currency context)
+    this.incomeMoney = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
+    this.nonEuSharesMoney = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
+    this.statePensionMoney = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
+    this.privatePensionP1Money = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
+    this.privatePensionP2Money = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
+    this.privatePensionLumpSumP1Money = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
+    this.privatePensionLumpSumP2Money = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
+    this.investmentIncomeMoney = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
     // Track country history for cross-border taxation
     if (!this.countryHistory) this.countryHistory = [];
     if (currentCountry && (typeof this.currentYear === 'number')) {
@@ -239,6 +370,13 @@ class Taxman {
     }
   };
 
+  /**
+   * Compute progressive income tax using ruleset bands.
+   * 
+   * @assumes residenceCurrency - All income amounts validated at declaration boundaries.
+   *          Tax bands and rates are in residence currency. Scalar arithmetic on .amount is safe.
+   * @performance Hot path - direct numeric operations for tax calculation efficiency.
+   */
   computeProgressiveTax(bands, incomeAttribution, taxType, multiplier = 1, limitShift = 0) {
     // bands is a map in the form {"limit1": rate1, "limit2": rate2, ...}
     // The limits are shifted by "limitShift" and multiplied by "multiplier".
@@ -493,7 +631,8 @@ class Taxman {
   };
 
   /**
-   * Generic calculation of social contributions based on ruleset socialContributions[]
+   * Generic calculation for social contributions (e.g., PRSI) using ruleset socialContributions[]
+   * @assumes residenceCurrency - All income amounts validated at input boundaries
    */
   computeSocialContributionsGeneric() {
     const contributions = this.ruleset && typeof this.ruleset.getSocialContributions === 'function'
@@ -556,6 +695,10 @@ class Taxman {
 
   /**
    * Generic calculation for additional progressive taxes (e.g., USC) using ruleset additionalTaxes[]
+   * 
+   * @assumes residenceCurrency - All income amounts validated at declaration boundaries.
+   *          USC/additional tax scalar multiplies on .amount values are currency-safe.
+   * @performance Hot path - direct numeric operations for tax calculation efficiency.
    */
   computeAdditionalTaxesGeneric() {
     const extras = this.ruleset && typeof this.ruleset.getAdditionalTaxes === 'function'
@@ -698,6 +841,7 @@ class Taxman {
     let totalTax = 0;
     const annualExemption = adjust(this.ruleset.getCapitalGainsAnnualExemption());
     let remainingExemption = annualExemption;
+    let remainingExemptionMoney = remainingExemption;
 
     // Aggregate allowable losses from CGT entries that explicitly allow loss offset
     let remainingAllowableLosses = 0;
@@ -710,6 +854,7 @@ class Taxman {
         }
       }
     }
+    let remainingAllowableLossesMoney = remainingAllowableLosses;
 
     // Process gains in descending tax rate order to preserve previous behavior
     const sortedByRate = Object.keys(this.gains)
@@ -812,6 +957,7 @@ class Taxman {
     copy.taxTotals = this.taxTotals ? { ...this.taxTotals } : {};
 
     copy.ruleset = this.ruleset;
+    copy.residenceCurrency = this.residenceCurrency;
 
     copy.married = this.married;
     copy.dependentChildren = this.dependentChildren;
@@ -825,6 +971,36 @@ class Taxman {
       getAttribution: function () { return null; },
       yearlyAttributions: {}
     };
+
+    var cloneCountry = null;
+    if (this.countryHistory && this.countryHistory.length) {
+      cloneCountry = this.countryHistory[this.countryHistory.length - 1].country;
+    } else if (this.ruleset && typeof this.ruleset.getCountryCode === 'function') {
+      cloneCountry = this.ruleset.getCountryCode();
+    }
+    var cloneCurrency = this.residenceCurrency;
+    if (!cloneCurrency && this.ruleset && typeof this.ruleset.getCurrencyCode === 'function') {
+      cloneCurrency = this.ruleset.getCurrencyCode();
+    }
+    cloneCurrency = cloneCurrency || 'EUR';
+    cloneCountry = cloneCountry || 'ie';
+
+    copy.incomeMoney = Money.from(this.income, cloneCurrency, cloneCountry);
+    copy.nonEuSharesMoney = Money.from(this.nonEuShares, cloneCurrency, cloneCountry);
+    copy.statePensionMoney = Money.from(this.statePension, cloneCurrency, cloneCountry);
+    copy.privatePensionP1Money = Money.from(this.privatePensionP1, cloneCurrency, cloneCountry);
+    copy.privatePensionP2Money = Money.from(this.privatePensionP2, cloneCurrency, cloneCountry);
+    copy.privatePensionLumpSumP1Money = Money.from(this.privatePensionLumpSumP1, cloneCurrency, cloneCountry);
+    copy.privatePensionLumpSumP2Money = Money.from(this.privatePensionLumpSumP2, cloneCurrency, cloneCountry);
+    copy.investmentIncomeMoney = Money.from(this.investmentIncome, cloneCurrency, cloneCountry);
+    if (copy.gains) {
+      for (let rateKey of Object.keys(copy.gains)) {
+        var bucket = copy.gains[rateKey];
+        if (bucket) {
+          bucket.amountMoney = Money.from(bucket.amount, cloneCurrency, cloneCountry);
+        }
+      }
+    }
 
     return copy;
   };

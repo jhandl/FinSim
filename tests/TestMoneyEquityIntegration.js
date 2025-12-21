@@ -1,11 +1,14 @@
 const { TestFramework } = require('../src/core/TestFramework.js');
+const { installTestTaxRules } = require('./helpers/RelocationTestHelpers.js');
 const vm = require('vm');
+
+const AR_RULES = require('../src/core/config/tax-rules-ar.json');
 
 module.exports = {
   name: 'MoneyEquityIntegration',
   description: 'Validates Money holdings for equity portfolios.',
   isCustomTest: true,
-  runCustomTest: async function() {
+  runCustomTest: async function () {
     const framework = new TestFramework();
     const errors = [];
 
@@ -16,6 +19,15 @@ module.exports = {
     const ctx = framework.simulationContext;
     framework.ensureVMUIManagerMocks(null, null);
     await vm.runInContext('Config.initialize(WebUI.getInstance())', ctx);
+
+    // Install AR rules for FX conversion tests
+    installTestTaxRules(framework, { ar: AR_RULES });
+
+    // Set up economicData global for FX conversions
+    vm.runInContext(`
+      config = Config.getInstance();
+      economicData = config.getEconomicData();
+    `, ctx);
 
     vm.runInContext(`
       revenue = {
@@ -30,6 +42,8 @@ module.exports = {
     try {
       const result = vm.runInContext(`
         (function() {
+          currentCountry = 'ie';
+          residenceCurrency = 'EUR';
           var asset = new IndexFunds(0.05, 0);
           asset.buy(10000, 'EUR', 'ie');
           asset.addYear();
@@ -165,7 +179,7 @@ module.exports = {
     } catch (err) {
       errors.push('Amount parity test failed: ' + err.message);
     }
-    
+
     // Test 6: Verify currency metadata persists through addYear()
     try {
       const currencyPersistence = vm.runInContext(`
@@ -190,6 +204,158 @@ module.exports = {
       }
     } catch (err) {
       errors.push('Currency persistence test failed: ' + err.message);
+    }
+
+    // Test 7: Homogeneous portfolio conversion (relocation scenario)
+    // Portfolio is all the same currency (EUR) but residence is different (ARS)
+    try {
+      const homogConvResult = vm.runInContext(`
+        (function() {
+          // Setup: Start in Ireland, buy EUR holdings
+          currentCountry = 'ie';
+          residenceCurrency = 'EUR';
+          year = 2024;
+          
+          var asset = new IndexFunds(0.05, 0);
+          asset.buy(10000, 'EUR', 'ie');
+          asset.addYear(); // Grows to ~10500
+          asset.buy(5000, 'EUR', 'ie');
+          
+          // Relocate to Argentina - portfolio stays EUR but residence is now ARS
+          currentCountry = 'ar';
+          residenceCurrency = 'ARS';
+          
+          // Get stats - should convert EUR holdings to ARS
+          var stats = asset.getPortfolioStats();
+          
+          return {
+            principal: stats.principal,
+            totalGain: stats.totalGain,
+            portfolioMixed: asset._portfolioMixed,
+            holdingCount: asset.portfolio.length
+          };
+        })()
+      `, ctx);
+
+      // Portfolio is NOT mixed (all EUR/ie), but should still convert to ARS
+      if (homogConvResult && homogConvResult.portfolioMixed) {
+        errors.push('Homogeneous conversion test: portfolio should NOT be marked as mixed');
+      }
+      if (!homogConvResult || homogConvResult.holdingCount !== 2) {
+        errors.push('Homogeneous conversion test: expected 2 holdings');
+      }
+      // Stats should be in ARS (converted), not raw EUR sum
+      // EUR ~15000 * ARS/EUR rate (typically >900) = principal should be >100,000
+      if (homogConvResult && homogConvResult.principal < 100000) {
+        errors.push('Homogeneous conversion test: principal ' + homogConvResult.principal + ' appears to be in EUR, not converted to ARS');
+      }
+    } catch (err) {
+      errors.push('Homogeneous conversion test failed: ' + err.message);
+    }
+
+    // Test 8: Homogeneous portfolio stats (fast path)
+    try {
+      const homogeneousStatsResult = vm.runInContext(`
+        (function() {
+          currentCountry = 'ie';
+          residenceCurrency = 'EUR';
+          
+          var asset = new Shares(0, 0);
+          asset.buy(10000, 'EUR', 'ie');
+          asset.buy(5000, 'EUR', 'ie');
+          
+          var stats = asset.getPortfolioStats();
+          
+          return {
+            principal: stats.principal,
+            totalGain: stats.totalGain,
+            portfolioMixed: asset._portfolioMixed
+          };
+        })()
+      `, ctx);
+
+      if (homogeneousStatsResult && homogeneousStatsResult.portfolioMixed) {
+        errors.push('Homogeneous stats: portfolio should not be marked as mixed');
+      }
+      if (!homogeneousStatsResult || homogeneousStatsResult.principal !== 15000) {
+        errors.push('Homogeneous stats: expected principal 15000, got ' + homogeneousStatsResult.principal);
+      }
+      if (!homogeneousStatsResult || homogeneousStatsResult.totalGain !== 0) {
+        errors.push('Homogeneous stats: expected totalGain 0, got ' + homogeneousStatsResult.totalGain);
+      }
+    } catch (err) {
+      errors.push('Homogeneous portfolio stats test failed: ' + err.message);
+    }
+
+    // Test 9: Mixed-currency portfolio stats (true mixed portfolio)
+    // Portfolio has holdings in different currencies, _portfolioMixed is true
+    try {
+      const mixedStatsResult = vm.runInContext(`
+        (function() {
+          // Setup: Start in Ireland with EUR residence
+          currentCountry = 'ie';
+          residenceCurrency = 'EUR';
+          year = 2024;
+          
+          var asset = new IndexFunds(0.05, 0);
+          asset.buy(10000, 'EUR', 'ie');  // EUR holding
+          asset.addYear(); // Grows to ~10500 (with ~500 gain)
+          
+          // Relocate to Argentina
+          currentCountry = 'ar';
+          residenceCurrency = 'ARS';
+          
+          // Buy more in ARS (different currency creates mixed portfolio)
+          asset.buy(50000, 'ARS', 'ar');
+          
+          // Verify portfolio is mixed
+          if (!asset._portfolioMixed) {
+            throw new Error('Portfolio should be marked as mixed');
+          }
+          
+          // Get stats - should convert both EUR and ARS holdings to ARS residence currency
+          var stats = asset.getPortfolioStats();
+          
+          // Get FX rate to calculate expected values
+          var eurToArs = convertCurrencyAmount(1, 'EUR', 'ie', 'ARS', 'ar', year, true);
+          var expectedEurPrincipalInArs = 10000 * eurToArs;
+          var expectedEurGainInArs = (asset.portfolio[0].interest.amount) * eurToArs;
+          var expectedArsPrincipal = 50000; // Already in ARS
+          var expectedTotalPrincipal = expectedEurPrincipalInArs + expectedArsPrincipal;
+          var expectedTotalGain = expectedEurGainInArs; // ARS holding has no gain yet
+          
+          return {
+            principal: stats.principal,
+            totalGain: stats.totalGain,
+            expectedPrincipal: expectedTotalPrincipal,
+            expectedGain: expectedTotalGain,
+            portfolioMixed: asset._portfolioMixed,
+            holdingCount: asset.portfolio.length,
+            eurToArs: eurToArs
+          };
+        })()
+      `, ctx);
+
+      if (!mixedStatsResult || !mixedStatsResult.portfolioMixed) {
+        errors.push('Mixed-currency stats: portfolio should be marked as mixed');
+      }
+      if (!mixedStatsResult || mixedStatsResult.holdingCount !== 2) {
+        errors.push('Mixed-currency stats: expected 2 holdings, got ' + (mixedStatsResult ? mixedStatsResult.holdingCount : 'null'));
+      }
+      // Verify principal is in ARS (should be much larger than raw sum of 10000+50000)
+      if (mixedStatsResult && mixedStatsResult.principal < 1000000) {
+        errors.push('Mixed-currency stats: principal ' + mixedStatsResult.principal + ' appears not to be fully converted to ARS');
+      }
+      // Verify principal matches expected (within tolerance for FX rounding)
+      if (mixedStatsResult && Math.abs(mixedStatsResult.principal - mixedStatsResult.expectedPrincipal) > 1) {
+        errors.push('Mixed-currency stats: principal mismatch, got=' + mixedStatsResult.principal + ' expected=' + mixedStatsResult.expectedPrincipal);
+      }
+      // Verify totalGain is reasonable (converted EUR gains)
+      if (mixedStatsResult && mixedStatsResult.totalGain < 0) {
+        errors.push('Mixed-currency stats: totalGain should not be negative');
+      }
+    } catch (err) {
+      errors.push('Mixed-currency portfolio stats test failed: ' + err.message);
     }
 
     return { success: errors.length === 0, errors: errors };

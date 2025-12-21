@@ -22,13 +22,12 @@
 - Keep **unified-currency EUR charts** converting PV values via **nominal FX**, not PPP, staying aligned with ledger semantics.
 - Avoid double-deflation or double-conversion; keep nominal paths unchanged as far as possible.
 
-## Money-Tracked Equity Holdings (Dual Track)
+## Money-Tracked Equity Holdings
 
-- Equity portfolios now store holdings in parallel as legacy numeric records and `Money` structs (`portfolio` + `portfolioMoney`).
-- The dual-track flow asserts parity at each hot path (buy, addYear, sell, capital, stats) while preserving direct `.amount` access for performance.
+- Equity portfolios store holdings as `Money` structs with explicit currency/country tags.
+- Hot paths (buy, addYear, sell, capital, stats) use direct `.amount` access for performance.
 - Pension holdings are pegged to **StartCountry** currency (not residence currency) to prevent mixed-currency contributions after relocation.
 - Call sites supply explicit currency/country to `buy()` so holdings remain tagged and conversions only happen at sale time.
-- Migration path: keep parity assertions during stabilization, then remove legacy arrays once the Money track is validated.
 
 ## Design Decisions
 

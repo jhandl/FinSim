@@ -2,10 +2,10 @@ const { TestFramework } = require('../src/core/TestFramework.js');
 const vm = require('vm');
 
 module.exports = {
-  name: "Money Person Integration - State Pension Dual Track",
-  description: "Verify Person state pension dual-track (numeric + Money) with parity checks",
+  name: "Money Person Integration - State Pension",
+  description: "Verify Person state pension Money tracking works correctly",
   isCustomTest: true,
-  runCustomTest: async function() {
+  runCustomTest: async function () {
     const framework = new TestFramework();
     const errors = [];
 
@@ -50,36 +50,36 @@ module.exports = {
       { type: "SI", id: "salary", amount: 30000, fromAge: 64, toAge: 65, rate: 0, match: 0 }
     ];
 
-	    const results = await framework.executeCoreSimulation(params, events);
-	    if (!results || !results.success || !results.dataSheet) {
-	      errors.push('Simulation failed or returned no dataSheet');
-	      return { success: false, errors: errors };
-	    }
+    const results = await framework.executeCoreSimulation(params, events);
+    if (!results || !results.success || !results.dataSheet) {
+      errors.push('Simulation failed or returned no dataSheet');
+      return { success: false, errors: errors };
+    }
 
-	    const ctx = framework.simulationContext;
-	    const personExists = vm.runInContext('typeof person1 !== "undefined" && person1 !== null', ctx);
-	    if (!personExists) {
-	      errors.push('person1 not initialized in simulation context');
-	      return { success: false, errors: errors };
-	    }
+    const ctx = framework.simulationContext;
+    const personExists = vm.runInContext('typeof person1 !== "undefined" && person1 !== null', ctx);
+    if (!personExists) {
+      errors.push('person1 not initialized in simulation context');
+      return { success: false, errors: errors };
+    }
 
-	    const row66 = results.dataSheet.find(r => r && r.age === 66);
-	    if (!row66) {
-	      errors.push('Missing age 66 data row');
-	    } else if (row66.incomeStatePension === 0) {
-	      errors.push('State pension is zero at age 66 (expected positive value)');
-	    } else if (!(typeof row66.incomeStatePension === 'number' && row66.incomeStatePension > 0)) {
-	      errors.push('Expected state pension > 0 at age 66 (got: ' + row66.incomeStatePension + ', type: ' + typeof row66.incomeStatePension + ')');
-	    }
+    const row66 = results.dataSheet.find(r => r && r.age === 66);
+    if (!row66) {
+      errors.push('Missing age 66 data row');
+    } else if (row66.incomeStatePension === 0) {
+      errors.push('State pension is zero at age 66 (expected positive value)');
+    } else if (!(typeof row66.incomeStatePension === 'number' && row66.incomeStatePension > 0)) {
+      errors.push('Expected state pension > 0 at age 66 (got: ' + row66.incomeStatePension + ', type: ' + typeof row66.incomeStatePension + ')');
+    }
 
-	    const snapshot = vm.runInContext(
-	      '(function(){ return { ' +
-	      '  statePension: (person1.yearlyIncomeStatePension && typeof person1.yearlyIncomeStatePension.amount === "number") ? person1.yearlyIncomeStatePension.amount : null, ' +
-	      '  baseCurrency: person1.yearlyIncomeStatePensionBaseCurrency ? person1.yearlyIncomeStatePensionBaseCurrency.amount : null, ' +
-	      '  currency: person1.yearlyIncomeStatePension ? person1.yearlyIncomeStatePension.currency : null ' +
-	      '}; })()',
-	      ctx
-	    );
+    const snapshot = vm.runInContext(
+      '(function(){ return { ' +
+      '  statePension: (person1.yearlyIncomeStatePension && typeof person1.yearlyIncomeStatePension.amount === "number") ? person1.yearlyIncomeStatePension.amount : null, ' +
+      '  baseCurrency: person1.yearlyIncomeStatePensionBaseCurrency ? person1.yearlyIncomeStatePensionBaseCurrency.amount : null, ' +
+      '  currency: person1.yearlyIncomeStatePension ? person1.yearlyIncomeStatePension.currency : null ' +
+      '}; })()',
+      ctx
+    );
     if (snapshot && snapshot.statePension !== null && snapshot.statePension <= 0) {
       errors.push('Expected positive state pension amount at age 66, got: ' + snapshot.statePension);
     }

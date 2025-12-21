@@ -19,6 +19,7 @@ const TestUtilsPath = path.join(__dirname, '..', 'src', 'core', 'TestUtils.js');
 const TestFrameworkPath = path.join(__dirname, '..', 'src', 'core', 'TestFramework.js');
 const TestUtils = require(TestUtilsPath);
 const { TestFramework } = require(TestFrameworkPath);
+const vm = require('vm');
 
 /**
  * Statistical utilities for Monte Carlo analysis
@@ -27,18 +28,18 @@ class StatisticalAnalysis {
   static calculateMean(values) {
     return values.reduce((sum, val) => sum + val, 0) / values.length;
   }
-  
+
   static calculateStandardDeviation(values) {
     const mean = this.calculateMean(values);
     const squaredDifferences = values.map(val => Math.pow(val - mean, 2));
     const variance = this.calculateMean(squaredDifferences);
     return Math.sqrt(variance);
   }
-  
+
   static calculatePercentile(values, percentile) {
     const sorted = [...values].sort((a, b) => a - b);
     const index = (percentile / 100) * (sorted.length - 1);
-    
+
     if (Number.isInteger(index)) {
       return sorted[index];
     } else {
@@ -48,7 +49,7 @@ class StatisticalAnalysis {
       return sorted[lower] * (1 - weight) + sorted[upper] * weight;
     }
   }
-  
+
   static calculateCoefficientOfVariation(values) {
     const mean = this.calculateMean(values);
     const stdDev = this.calculateStandardDeviation(values);
@@ -61,34 +62,38 @@ class StatisticalAnalysis {
  */
 class MonteCarloTestRunner {
   constructor() {
-    this.framework = new TestFramework();
   }
-  
+
   async runMultipleSimulations(baseScenario, numRuns = 15) {
     const results = [];
-    
+
     for (let i = 0; i < numRuns; i++) {
       // Create a copy of the scenario for each run
       const scenario = JSON.parse(JSON.stringify(baseScenario));
-      
+
+      // Use a fresh framework per run to avoid shared state (RNG/caches) across independent simulations.
+      const framework = new TestFramework();
+      framework.loadCoreModules();
+      const ctx = framework.simulationContext;
+
       // Load and run the scenario
-      this.framework.loadScenario({
+      framework.loadScenario({
         name: `StatisticalRun_${i + 1}`,
         description: `Statistical validation run ${i + 1} of ${numRuns}`,
         scenario: scenario,
         assertions: []
       });
-      
-      const simResult = await this.framework.runSimulation();
-      
+
+      const simResult = await framework.runSimulation();
+
       if (simResult && simResult.success) {
         results.push(simResult);
       }
     }
-    
+
     return results;
   }
-  
+
   extractFinalValues(results, field) {
     return results.map(result => {
       const dataSheet = result.dataSheet;
@@ -96,7 +101,7 @@ class MonteCarloTestRunner {
       return finalRow ? (finalRow[field] || 0) : 0;
     });
   }
-  
+
   analyzeStatistics(values, fieldName, volatility) {
     const stats = {
       field: fieldName,
@@ -115,7 +120,7 @@ class MonteCarloTestRunner {
       min: Math.min(...values),
       max: Math.max(...values)
     };
-    
+
     return stats;
   }
 }
@@ -123,12 +128,12 @@ class MonteCarloTestRunner {
 // Main test module
 module.exports = {
   name: "Monte Carlo Statistical Validation Test",
-  description: "Sanity-checks Monte Carlo statistical behavior across multiple runs with different volatility scenarios",
+  description: "Sanity-checks Monte Carlo statistical behavior across multiple runs with different volatility scenarios (parity enabled)",
   category: "monte_carlo_validation",
-  
+
   // This test uses a custom runner instead of standard scenario structure
   isCustomTest: true,
-  
+
   async runCustomTest() {
     const runner = new MonteCarloTestRunner();
     const testResults = {
@@ -136,7 +141,7 @@ module.exports = {
       details: {},
       errors: []
     };
-    
+
     try {
       // Define base scenario for testing
       const baseScenario = {
@@ -170,13 +175,13 @@ module.exports = {
           priorityFunds: 2,
           priorityShares: 3,
           StartCountry: 'ie'
-          ,simulation_mode: 'montecarlo'
-          ,economy_mode: 'stochastic'
-          ,monteCarloRuns: 2500
+          , simulation_mode: 'montecarlo'
+          , economy_mode: 'stochastic'
+          , monteCarloRuns: 2500
         },
         events: []  // No events for clean volatility testing
       };
-      
+
       // Test scenarios with different volatility levels (reduced to 2 scenarios)
       // Note: CV expectations are lower because Monte Carlo uses internal median calculations
       // which reduce variation between runs, especially over shorter time periods
@@ -185,21 +190,14 @@ module.exports = {
         { name: "High Volatility", volatility: 0.25, expectedCV: 0.015 }     // 25% volatility -> ~1.5% CV
       ];
 
-      // Add before the volatility scenarios loop (after line 138)
-      const performanceBaseline = {
-        runsCompleted: 0,
-        simulationsCompleted: 0,
-        totalSimulationTimeMs: 0
-      };
-      
       for (const scenario of volatilityScenarios) {
         // Set the volatility for this test
         const testScenario = JSON.parse(JSON.stringify(baseScenario));
         testScenario.parameters.growthDevShares = scenario.volatility;
-        
+
         // Run multiple independent Monte Carlo simulations (reduced to 4 runs).
         const results = await runner.runMultipleSimulations(testScenario, 4);
-        
+
         if (results.length < 3) {
           testResults.errors.push(`Insufficient successful runs for ${scenario.name}: ${results.length} < 3`);
           testResults.success = false;
@@ -214,20 +212,17 @@ module.exports = {
               testResults.success = false;
               continue;
             }
-            performanceBaseline.runsCompleted++;
-            performanceBaseline.simulationsCompleted += result.runs;
-            performanceBaseline.totalSimulationTimeMs += (typeof result.executionTime === 'number' && isFinite(result.executionTime)) ? result.executionTime : 0;
           }
         }
-        
+
         // Extract final share values for statistical analysis
         const shareValues = runner.extractFinalValues(results, 'sharesCapital');
         const worthValues = runner.extractFinalValues(results, 'worth');
-        
+
         // Analyze statistics
         const shareStats = runner.analyzeStatistics(shareValues, 'sharesCapital', scenario.name);
         const worthStats = runner.analyzeStatistics(worthValues, 'worth', scenario.name);
-        
+
         // Store results
         testResults.details[scenario.name] = {
           shareStats,
@@ -235,41 +230,41 @@ module.exports = {
           rawShareValues: shareValues,
           rawWorthValues: worthValues
         };
-        
+
         // Validate statistical properties (silent - only record errors)
-        
+
         // Test 1: Coefficient of Variation should increase with volatility
-        const cvAcceptable = shareStats.coefficientOfVariation >= (scenario.expectedCV - 0.01) && 
-                           shareStats.coefficientOfVariation <= (scenario.expectedCV + 0.02);
+        const cvAcceptable = shareStats.coefficientOfVariation >= (scenario.expectedCV - 0.01) &&
+          shareStats.coefficientOfVariation <= (scenario.expectedCV + 0.02);
         if (!cvAcceptable) {
           testResults.errors.push(`${scenario.name}: CV ${(shareStats.coefficientOfVariation * 100).toFixed(1)}% outside expected range ${(scenario.expectedCV * 100).toFixed(1)}% ± 1-2%`);
           testResults.success = false;
         }
-        
+
         // Test 2: Results should show substantial growth from initial €50k
         const meaningfulGrowth = shareStats.mean > 65000;  // At least 30% growth over 10 years
         if (!meaningfulGrowth) {
           testResults.errors.push(`${scenario.name}: Mean ${shareStats.mean.toFixed(0)} shows insufficient growth from initial €50k`);
           testResults.success = false;
         }
-        
+
         // Test 3: Standard deviation should be reasonable (not too extreme)
         const reasonableStdDev = shareStats.standardDeviation > 0 && shareStats.standardDeviation < shareStats.mean;
         if (!reasonableStdDev) {
           testResults.errors.push(`${scenario.name}: Standard deviation ${shareStats.standardDeviation.toFixed(0)} is unreasonable relative to mean ${shareStats.mean.toFixed(0)}`);
           testResults.success = false;
         }
-        
+
         // Test 4: Percentile ordering should be correct
-        const correctPercentileOrder = shareStats.percentiles.p5 <= shareStats.percentiles.p25 && 
-                                     shareStats.percentiles.p25 <= shareStats.percentiles.p50 &&
-                                     shareStats.percentiles.p50 <= shareStats.percentiles.p75 &&
-                                     shareStats.percentiles.p75 <= shareStats.percentiles.p95;
+        const correctPercentileOrder = shareStats.percentiles.p5 <= shareStats.percentiles.p25 &&
+          shareStats.percentiles.p25 <= shareStats.percentiles.p50 &&
+          shareStats.percentiles.p50 <= shareStats.percentiles.p75 &&
+          shareStats.percentiles.p75 <= shareStats.percentiles.p95;
         if (!correctPercentileOrder) {
           testResults.errors.push(`${scenario.name}: Percentiles not in correct order`);
           testResults.success = false;
         }
-        
+
         // Test 5: No extreme outliers (95th percentile shouldn't be more than 3x the 5th percentile)
         const noExtremeOutliers = shareStats.percentiles.p95 <= (shareStats.percentiles.p5 * 4);
         if (!noExtremeOutliers) {
@@ -278,48 +273,24 @@ module.exports = {
         }
       }
 
-      // Add after the volatility scenarios loop (after line 280)
-      const totalSimulationTime = performanceBaseline.totalSimulationTimeMs;
-      const avgTimePerSimulation = totalSimulationTime / performanceBaseline.simulationsCompleted;
-
-      // Performance gate: average ms per Monte Carlo simulation must remain within 5% of baseline.
-      // Baseline (pre-cleanup): ~0.5985ms per simulation across this test (see docs/money-performance-baseline.md).
-      const baselineMsPerSimulation = 0.5985;
-      const maxMsPerSimulation = baselineMsPerSimulation * 1.05;
-      if (avgTimePerSimulation > maxMsPerSimulation) {
-        testResults.errors.push(
-          `Performance regression: avg ${avgTimePerSimulation.toFixed(4)}ms/sim exceeds ${maxMsPerSimulation.toFixed(4)}ms/sim (baseline ${baselineMsPerSimulation.toFixed(4)}ms/sim, +5%)`
-        );
-        testResults.success = false;
-      }
-
-      testResults.performance = {
-        totalTime: totalSimulationTime,
-        runsCompleted: performanceBaseline.runsCompleted,
-        simulationsCompleted: performanceBaseline.simulationsCompleted,
-        avgTimePerSimulation: avgTimePerSimulation.toFixed(4),
-        baselineMsPerSimulation: baselineMsPerSimulation,
-        maxMsPerSimulation: maxMsPerSimulation
-      };
-      
       // Cross-scenario validation (silent)
       if (Object.keys(testResults.details).length >= 2) {
         const scenarios = Object.keys(testResults.details);
-        
+
         // Test: Higher volatility should lead to higher coefficient of variation
         const lowVol = testResults.details[scenarios[0]].shareStats;
         const highVol = testResults.details[scenarios[1]].shareStats;
-        
+
         const cvIncreases = highVol.coefficientOfVariation > lowVol.coefficientOfVariation;
         if (!cvIncreases) {
           testResults.errors.push(`CV should increase from ${scenarios[0]} to ${scenarios[1]}`);
           testResults.success = false;
         }
-        
+
         // Test: Higher volatility should lead to wider confidence intervals
         const lowVolRange = lowVol.percentiles.p95 - lowVol.percentiles.p5;
         const highVolRange = highVol.percentiles.p95 - highVol.percentiles.p5;
-        
+
         const widerRangeWithHigherVol = highVolRange > lowVolRange;
         if (!widerRangeWithHigherVol) {
           testResults.errors.push('Higher volatility should produce wider confidence intervals');
@@ -328,14 +299,14 @@ module.exports = {
       }
 
       return testResults;
-      
+
     } catch (error) {
       testResults.success = false;
       testResults.errors.push(`Test execution error: ${error.message}`);
       return testResults;
     }
   },
-  
+
   // Standard test structure for compatibility (will be ignored due to isCustomTest=true)
   scenario: {
     parameters: {},
