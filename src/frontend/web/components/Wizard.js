@@ -1388,14 +1388,12 @@ class Wizard {
     }
 
     // Find all original steps that match this field type
-    const dbgMatches = [];
     const matchingOriginalSteps = this.originalConfig.steps.filter(originalStep => {
       if (!originalStep.element) return false;
 
       // Check if this step is for the same field type
       const originalFieldType = originalStep.element.replace(/#(Event[A-Za-z]+)(_.*)?$/, '$1');
       const isMatch = originalFieldType === stepFieldType;
-      if (isMatch) dbgMatches.push({ element: originalStep.element, eventTypes: originalStep.eventTypes });
       return isMatch;
     });
 

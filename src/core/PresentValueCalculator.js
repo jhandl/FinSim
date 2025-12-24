@@ -154,17 +154,30 @@ function computePresentValueAggregates(ctx) {
     }
   }
 
-  // Pension PV: Use origin-country (StartCountry) deflation, not residency deflation
-  // Pensions should be deflated using the country where contributions were made
-  if (!params.StartCountry) throw new Error('PresentValueCalculator: params.StartCountry is required for pension PV calculation');
-  var pensionOriginCountry = params.StartCountry.toLowerCase();
-  var pensionDeflator = getDeflationFactorForCountry(pensionOriginCountry, ageNum, startYear, {
-    params: params,
-    config: cfg,
-    countryInflationOverrides: countryInflationOverrides,
-    year: year
-  });
-  var pensionFundNominal = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+  // Pension PV: Iterate over all pension pots and use each pot's country for deflation
+  // This ensures contributions to each country are deflated by that country's inflation
+  var pensionFundNominal = 0;
+  var pensionFundPVTotal = 0;
+
+  function sumPensionPots(person) {
+    if (!person || !person.pensions) return;
+    for (var potCountry in person.pensions) {
+      if (!Object.prototype.hasOwnProperty.call(person.pensions, potCountry)) continue;
+      var pot = person.pensions[potCountry];
+      var potCapital = pot.capital();
+      pensionFundNominal += potCapital;
+      // Use the pot's country for deflation, not StartCountry
+      var potDeflator = getDeflationFactorForCountry(potCountry, ageNum, startYear, {
+        params: params,
+        config: cfg,
+        countryInflationOverrides: countryInflationOverrides,
+        year: year
+      });
+      pensionFundPVTotal += potCapital * potDeflator;
+    }
+  }
+  sumPensionPots(person1);
+  sumPensionPots(person2);
 
   // State Pension PV: Calculate PV in base currency (EUR) using Ireland's inflation, then convert to residence currency
   // This ensures State Pension purchasing power is measured in the paying country's terms
@@ -245,7 +258,7 @@ function computePresentValueAggregates(ctx) {
     dataRow.realEstateCapitalPV += realEstateCapitalPV;
     dataRow.netIncomePV += netIncome;
     dataRow.expensesPV += expenses;
-    dataRow.pensionFundPV += pensionFundNominal * pensionDeflator;
+    dataRow.pensionFundPV += pensionFundPVTotal;
     dataRow.pensionContributionPV += personalPensionContribution;
     dataRow.cashPV += cash;
     dataRow.indexFundsCapitalPV += (dataRow.investmentCapitalByKeyPV['indexFunds'] || 0);
@@ -254,7 +267,7 @@ function computePresentValueAggregates(ctx) {
     for (var wk in dataRow.investmentCapitalByKeyPV) {
       investmentsPV += dataRow.investmentCapitalByKeyPV[wk];
     }
-    dataRow.worthPV += realEstateCapitalPV + (pensionFundNominal * pensionDeflator) + investmentsPV + cash;
+    dataRow.worthPV += realEstateCapitalPV + pensionFundPVTotal + investmentsPV + cash;
   } else {
     dataRow.incomeSalariesPV += incomeSalaries * deflationFactor;
     dataRow.incomeRSUsPV += incomeShares * deflationFactor;
@@ -270,7 +283,7 @@ function computePresentValueAggregates(ctx) {
     dataRow.realEstateCapitalPV += realEstateCapitalPV;
     dataRow.netIncomePV += netIncome * deflationFactor;
     dataRow.expensesPV += expenses * deflationFactor;
-    dataRow.pensionFundPV += pensionFundNominal * pensionDeflator;
+    dataRow.pensionFundPV += pensionFundPVTotal;
     dataRow.pensionContributionPV += personalPensionContribution * deflationFactor;
     dataRow.cashPV += cash * deflationFactor;
     dataRow.indexFundsCapitalPV += (dataRow.investmentCapitalByKeyPV['indexFunds'] || 0);
@@ -279,7 +292,7 @@ function computePresentValueAggregates(ctx) {
     for (var wk in dataRow.investmentCapitalByKeyPV) {
       investmentsPV += dataRow.investmentCapitalByKeyPV[wk];
     }
-    dataRow.worthPV += realEstateCapitalPV + (pensionFundNominal * pensionDeflator) + investmentsPV + cash * deflationFactor;
+    dataRow.worthPV += realEstateCapitalPV + pensionFundPVTotal + investmentsPV + cash * deflationFactor;
   }
 
   // Dynamic PV maps for per-investment-type income and capital. These mirror

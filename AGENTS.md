@@ -78,6 +78,11 @@ graph TD
 *   **[`TaxRuleSet.js`](src/core/TaxRuleSet.js:1):** Wraps country tax JSON and exposes getters consumed by `Taxman`.
 *   **[`Equities.js`](src/core/Equities.js:1):** The base class for core investment assets (`IndexFunds`, `Shares`, `Pension`).
 *   **[`RealEstate.js`](src/core/RealEstate.js:1):** Manages real estate properties and mortgages.
+*   **[`Money.js`](src/core/Money.js:1):** Currency-aware value wrapper enforcing explicit currency tracking throughout calculations.
+*   **[`EconomicData.js`](src/core/EconomicData.js:1):** Exposes CPI, FX rates, and PPP profiles from tax rules for inflation and currency conversions.
+*   **[`PresentValueCalculator.js`](src/core/PresentValueCalculator.js:1):** Computes present values using country-specific inflation rates.
+*   **[`InflationService.js`](src/core/InflationService.js:1):** Provides inflation data and deflation factor calculations for multi-currency scenarios.
+*   **[`DataAggregatesCalculator.js`](src/core/DataAggregatesCalculator.js:1):** Calculates aggregate statistics from simulation data for charts and summaries.
 *   **[`Attribution.js`](src/core/Attribution.js:1):** Primitive used to capture and aggregate per‑source contributions (income, taxes, gains).
 *   **[`AttributionManager.js`](src/core/AttributionManager.js:1):** Orchestrates yearly attribution tracking used across `Taxman` and the simulator.
 *   **[`InvestmentTypeFactory.js`](src/core/InvestmentTypeFactory.js:1):** Builds generic investment assets from tax‑rule `investmentTypes`, enabling dynamic per‑type assets beyond the legacy two (Funds/Shares).
@@ -86,10 +91,14 @@ graph TD
 
 *   **[`UIManager.js`](src/frontend/UIManager.js:1):** An abstraction layer that sits between the core simulator and the UI, allowing the core to remain UI-agnostic.
 *   **[`WebUI.js`](src/frontend/web/WebUI.js:1):** The web-based implementation of the UI. It manages all the DOM elements and orchestrates the various frontend components.
-*   **Event Management:** The web UI provides a sophisticated dual-view event management system with three integrated components:
+*   **Event Management:** The web UI provides a sophisticated dual-view event management system with integrated components:
     *   **[`EventsTableManager.js`](src/frontend/web/components/EventsTableManager.js:1):** Manages the traditional table view for events and serves as the primary data source. Provides view toggle functionality, sorting, validation, and direct table editing capabilities.
     *   **[`EventAccordionManager.js`](src/frontend/web/components/EventAccordionManager.js:1):** Provides a mobile-friendly collapsible accordion view with in-situ editing capabilities. Features include real-time field validation, event type changes that trigger wizards with pre-populated data, automatic expansion of new events, and bidirectional synchronization with the table view.
-    *   **[`EventWizardManager.js`](src/frontend/web/components/EventWizardManager.js:1):** Manages step-by-step wizards for creating and editing events. Supports pre-population of existing event data, handles complex event types (like property purchases with mortgages), and integrates seamlessly with both table and accordion views.
+    *   **[`EventsWizard.js`](src/frontend/web/components/EventsWizard.js:1):** Event-specific wizard logic for creating and editing events with step-by-step guidance.
+    *   **[`WizardManager.js`](src/frontend/web/components/WizardManager.js:1):** Orchestrates wizard lifecycle, handles pre-population of existing event data, complex event types (like property purchases with mortgages), and integration with both table and accordion views.
+*   **Relocation Components:**
+    *   **[`RelocationImpactDetector.js`](src/frontend/web/components/RelocationImpactDetector.js:1):** Flags relocation-sensitive events that may need user attention after country changes.
+    *   **[`RelocationImpactAssistant.js`](src/frontend/web/components/RelocationImpactAssistant.js:1):** Provides inline resolution panels for guided fixes (split, peg, link, convert) for affected events.
 
 #### Utils & Help Systems
 
@@ -153,7 +162,11 @@ The premium relocation system (see [`docs/relocation-system.md`](docs/relocation
 
 The project uses a custom Node.js testing framework for core simulation logic, plus Jest for UI/unit tests and Playwright e2e tests. All are orchestrated by the top‑level `run-tests.sh` script.
 
-If you want to call the run-tests.sh script all you need to do is run './run-tests.sh <params>'. No need to call a shell to run it. Just run the command directly.
+To run the tests all you need to do is run './run-tests.sh <params>' <list-of-test-names>. No need to call a shell to run it. Just run the command directly. The <params> are optional and can be any of the following:
+
+- -h --help: show help
+- -t --type <type>: run all tests of type <type>. <type> can be core, jest, e2e or all.
+- --list: list all tests
 
 ### 4.1. Kinds of Tests
 
@@ -193,4 +206,4 @@ npm install
 npx serve -s . -l 8080
 ```
 
-Open http://localhost:8080 in your browser. The root `index.html` loads the SPA and you should see the FinSim interface. For optional testing, run `npm test` to execute unit tests or `npx playwright install` once before running e2e tests.
+Open http://localhost:8080 in your browser. The root `index.html` loads the SPA and you should see the FinSim interface. For testing, `npx playwright install` once before running e2e tests, and `./run-tests.sh` to run all tests, `./run-tests.sh <test-name>` to run a specific test, or `./run-tests.sh -t code` to run all core tests. 

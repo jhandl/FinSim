@@ -22,8 +22,10 @@ class Person {
     // Initialize phase to growth phase
     this.phase = Phases.growth;
 
-    // Create and store pension instance, passing the Person instance itself
-    this.pension = new Pension(commonPensionConfig.growthRatePension, commonPensionConfig.growthDevPension, this);
+    // Per-country pension pots map (countryCode → Pension instance)
+    // Pensions are created lazily via getPensionForCountry()
+    this.pensions = {};
+    this._pensionConfig = commonPensionConfig;  // Store for lazy creation
 
     // Store essential person-specific parameters
     this.retirementAgeParam = personSpecificUIParams.retirementAge;
@@ -38,6 +40,36 @@ class Person {
   }
 
   /**
+   * Get or create a pension pot for a specific country.
+   * Each country with a private pension system can have its own pension pot.
+   * @param {string} countryCode - Country code (e.g., 'ie', 'us')
+   * @returns {Pension|null} Pension instance for the country, or null if invalid
+   */
+  getPensionForCountry(countryCode) {
+    var key = countryCode ? String(countryCode).toLowerCase() : null;
+    if (!key) return null;
+    if (!this.pensions[key]) {
+      this.pensions[key] = new Pension(
+        this._pensionConfig.growthRatePension,
+        this._pensionConfig.growthDevPension,
+        this,
+        key  // Country code for this pension pot
+      );
+    }
+    return this.pensions[key];
+  }
+
+  /**
+   * Backward-compatible getter for the primary pension pot (StartCountry).
+   * Returns the pension pot for the StartCountry.
+   * @returns {Pension} Primary pension pot
+   */
+  get pension() {
+    var startCountry = normalizeCountry(this.params.StartCountry || Config.getInstance().getDefaultCountry());
+    return this.getPensionForCountry(startCountry);
+  }
+
+  /**
    * Initialize/reset person-specific yearly income accumulators
    */
   resetYearlyVariables() {
@@ -47,11 +79,16 @@ class Person {
   }
 
   /**
-   * Add one year to the person's age and pension
+   * Add one year to the person's age and all pension pots
    */
   addYear() {
     this.age++;
-    this.pension.addYear();
+    // Iterate over all pension pots for multi-country support
+    for (var countryCode in this.pensions) {
+      if (Object.prototype.hasOwnProperty.call(this.pensions, countryCode)) {
+        this.pensions[countryCode].addYear();
+      }
+    }
   }
 
   /**

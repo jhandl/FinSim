@@ -989,51 +989,64 @@ function processEvents() {
 
           if (isPensionable && entryConvertedAmount > 0) {
             var rsSalary = (function () { try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch (_) { return null; } })();
-            var bands = (rsSalary && typeof rsSalary.getPensionContributionAgeBands === 'function') ? rsSalary.getPensionContributionAgeBands() : {};
-            var baseRate = (salaryPerson.pensionContributionPercentageParam || 0) * getRateForKey(salaryPerson.age, bands);
-            // Pensions should always use StartCountry currency (EUR), not residence currency
-            // Convert salary amount to StartCountry currency for pension contributions
-            var startCountry = normalizeCountry(params.StartCountry || config.getDefaultCountry());
-            var startCountryCurrency = getCurrencyForCountry(startCountry);
-            var pensionBaseAmount = entry.amount;
-            // Convert to StartCountry currency if bucket currency differs
-            if (bucketCurrency !== startCountryCurrency && typeof convertCurrencyAmount === 'function') {
-              var convertedToStartCurrency = convertCurrencyAmount(entry.amount, bucketCurrency, bucketCountry, startCountryCurrency, startCountry, year, false);
-              if (convertedToStartCurrency !== null && isFinite(convertedToStartCurrency) && convertedToStartCurrency > 0) {
-                pensionBaseAmount = convertedToStartCurrency;
-              }
-            }
-            if (params.pensionCapped === "Yes") {
-              var cap = (rsSalary && typeof rsSalary.getPensionContributionAnnualCap === 'function') ? rsSalary.getPensionContributionAnnualCap() : 0;
-              var capValue = adjust(cap);
-              // Convert cap to StartCountry currency for comparison
-              if (capValue > 0 && typeof convertCurrencyAmount === 'function') {
-                var capInStartCurrency = convertCurrencyAmount(capValue, resCurrencyNorm, currentCountry, startCountryCurrency, startCountry, year, false);
-                if (capInStartCurrency !== null && isFinite(capInStartCurrency) && capInStartCurrency > 0) {
-                  capValue = capInStartCurrency;
+
+            // Check if current country has private pension system
+            var pensionSystemType = (rsSalary && typeof rsSalary.getPensionSystemType === 'function')
+              ? rsSalary.getPensionSystemType() : 'mixed';
+
+            // State-only countries don't allow private pension contributions
+            if (pensionSystemType === 'state_only') {
+              // No private pension contributions in this country
+              // declaredRate stays 0, salary processing continues without pension
+            } else {
+              // Country has private pension - use current country's pension pot
+              var bands = (rsSalary && typeof rsSalary.getPensionContributionAgeBands === 'function') ? rsSalary.getPensionContributionAgeBands() : {};
+              var baseRate = (salaryPerson.pensionContributionPercentageParam || 0) * getRateForKey(salaryPerson.age, bands);
+
+              // Use current country's currency for pension contributions
+              var pensionCountry = currentCountry;
+              var pensionCurrency = getCurrencyForCountry(pensionCountry);
+              var pensionBaseAmount = entry.amount;
+
+              // Convert to pension country currency if bucket currency differs
+              if (bucketCurrency !== pensionCurrency && typeof convertCurrencyAmount === 'function') {
+                var convertedToPensionCurrency = convertCurrencyAmount(entry.amount, bucketCurrency, bucketCountry, pensionCurrency, pensionCountry, year, false);
+                if (convertedToPensionCurrency !== null && isFinite(convertedToPensionCurrency) && convertedToPensionCurrency > 0) {
+                  pensionBaseAmount = convertedToPensionCurrency;
                 }
               }
-              if (capValue > 0 && pensionBaseAmount > capValue) {
-                baseRate = baseRate * capValue / pensionBaseAmount;
+              if (params.pensionCapped === "Yes") {
+                var cap = (rsSalary && typeof rsSalary.getPensionContributionAnnualCap === 'function') ? rsSalary.getPensionContributionAnnualCap() : 0;
+                var capValue = adjust(cap);
+                // Convert cap to pension country currency for comparison
+                if (capValue > 0 && typeof convertCurrencyAmount === 'function') {
+                  var capInPensionCurrency = convertCurrencyAmount(capValue, resCurrencyNorm, currentCountry, pensionCurrency, pensionCountry, year, false);
+                  if (capInPensionCurrency !== null && isFinite(capInPensionCurrency) && capInPensionCurrency > 0) {
+                    capValue = capInPensionCurrency;
+                  }
+                }
+                if (capValue > 0 && pensionBaseAmount > capValue) {
+                  baseRate = baseRate * capValue / pensionBaseAmount;
+                }
+              } else if (params.pensionCapped === "Match") {
+                baseRate = Math.min(entry.match || 0, baseRate);
               }
-            } else if (params.pensionCapped === "Match") {
-              baseRate = Math.min(entry.match || 0, baseRate);
-            }
-            var employerRate = Math.min(entry.match || 0, baseRate);
-            var personalAmount = baseRate * pensionBaseAmount;
-            var employerAmount = employerRate * pensionBaseAmount;
-            var totalContrib = personalAmount + employerAmount;
-            if (totalContrib > 0) {
-              pensionContribution += totalContrib;
-              personalPensionContribution += personalAmount;
-              if (personalAmount > 0) {
-                attributionManager.record('pensioncontribution', entry.eventId, personalAmount);
+              var employerRate = Math.min(entry.match || 0, baseRate);
+              var personalAmount = baseRate * pensionBaseAmount;
+              var employerAmount = employerRate * pensionBaseAmount;
+              var totalContrib = personalAmount + employerAmount;
+              if (totalContrib > 0) {
+                pensionContribution += totalContrib;
+                personalPensionContribution += personalAmount;
+                if (personalAmount > 0) {
+                  attributionManager.record('pensioncontribution', entry.eventId, personalAmount);
+                }
+                // buy() receives numeric amount + currency/country metadata.
+                // Use getPensionForCountry to get/create the correct country's pension pot.
+                salaryPerson.getPensionForCountry(pensionCountry).buy(totalContrib, pensionCurrency, pensionCountry);
               }
-              // buy() receives numeric amount + currency/country metadata.
-              // Asset classes track Money internally; Simulator works with numbers only.
-              salaryPerson.pension.buy(totalContrib, startCountryCurrency, startCountry);
+              declaredRate = baseRate;
             }
-            declaredRate = baseRate;
           }
 
           if (!declaredEntries[entryKey]) {

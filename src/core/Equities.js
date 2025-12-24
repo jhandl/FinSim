@@ -182,16 +182,16 @@ class Equity {
       }
     }
 
-    // Convert sale proceeds and gains from asset's tracking currency to residence currency
-    // at sale time (asset-plan.md §6.2). Cost basis remains in asset currency.
-    // Strict: no truthiness fallback; falsy config → conversion fail → null return (asset-plan.md §9)
-    var baseCurrency = this._getBaseCurrency();
-    var assetCountry = this._getAssetCountry();
+    // Convert sale proceeds and gains from portfolio's ACTUAL currency to residence currency.
+    // BUG FIX: Use _portfolioCurrency (actual holdings currency) not _getBaseCurrency() (asset config).
+    // When holdings are in ARS but asset's baseCurrency is EUR, we must convert from ARS not EUR.
+    var portfolioCurrency = this._portfolioCurrency || this._getBaseCurrency();
+    var portfolioCountry = this._portfolioCountry || this._getAssetCountry();
     var soldConverted = sold;
     var gainsConverted = gains;
-    if (baseCurrency !== residenceCurrency) {
-      soldConverted = convertCurrencyAmount(sold, baseCurrency, assetCountry, residenceCurrency, currentCountry, year, true);
-      gainsConverted = convertCurrencyAmount(gains, baseCurrency, assetCountry, residenceCurrency, currentCountry, year, true);
+    if (portfolioCurrency !== residenceCurrency || portfolioCountry !== currentCountry) {
+      soldConverted = convertCurrencyAmount(sold, portfolioCurrency, portfolioCountry, residenceCurrency, currentCountry, year, true);
+      gainsConverted = convertCurrencyAmount(gains, portfolioCurrency, portfolioCountry, residenceCurrency, currentCountry, year, true);
       // In strict mode, conversion failures return null - propagate to caller
       if (soldConverted === null || gainsConverted === null) {
         return null;
@@ -247,7 +247,6 @@ class Equity {
         const holdingMoney = Money.create(holdingConverted, residenceCurrency, currentCountry);
         Money.add(moneyTotal, holdingMoney);
       }
-
       return moneyTotal.amount;
     }
 
@@ -257,7 +256,6 @@ class Equity {
       const holding = portfolio[i];
       moneyTotal.amount += holding.principal.amount + holding.interest.amount;
     }
-
     return moneyTotal.amount;
   }
 
@@ -676,24 +674,34 @@ class Shares extends Equity {
 
 class Pension extends Equity {
 
-  constructor(growth, stdev = 0, person) {
+  /**
+   * Create a Pension instance for a specific country
+   * @param {number} growth - Expected growth rate
+   * @param {number} stdev - Standard deviation for Monte Carlo
+   * @param {Object} person - Person instance this pension belongs to
+   * @param {string} countryCode - Country code for this pension pot (e.g., 'ie', 'us')
+   */
+  constructor(growth, stdev = 0, person, countryCode) {
     super(0, growth, stdev);
     this.lumpSum = false;
     this.person = person;
+    this.countryCode = countryCode ? String(countryCode).toLowerCase() : null;
     try {
       var cfg = Config.getInstance();
-      this._ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
+      // Load ruleset for THIS pension's country, not the default country
+      var rulesetCountry = this.countryCode || cfg.getDefaultCountry();
+      this._ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(rulesetCountry) : null;
     } catch (e) { this._ruleset = null; }
   }
 
-  // Override currency methods: pension tracks StartCountry currency (domestic semantics)
+  // Override currency methods: pension tracks its own country's currency
   _getBaseCurrency() {
-    var startCountry = normalizeCountry(params.StartCountry || config.getDefaultCountry());
-    return getCurrencyForCountry(startCountry);
+    var country = this.countryCode || normalizeCountry(params.StartCountry || config.getDefaultCountry());
+    return getCurrencyForCountry(country);
   }
 
   _getAssetCountry() {
-    return normalizeCountry(params.StartCountry || config.getDefaultCountry());
+    return this.countryCode || normalizeCountry(params.StartCountry || config.getDefaultCountry());
   }
 
   declareRevenue(income, gains) {
