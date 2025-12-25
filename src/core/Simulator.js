@@ -1208,7 +1208,6 @@ function processEvents() {
 
   // Second pass: aggregate all other flows
   var flowState = createFlowState();
-  var allowCashConversion = (params && params.convertCashOnRelocation === true);
 
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
@@ -1417,27 +1416,29 @@ function processEvents() {
             var prevCountryNormalized = prevCountry;
             var newResidenceCurrency = getCurrencyForCountry(destCountry) || prevCurrency || 'EUR';
             if (prevCurrency && newResidenceCurrency && prevCurrency !== newResidenceCurrency) {
-              if (allowCashConversion) {
-                // TODO(financial-engine): convert pooled cash once multi-currency cash tracking lands.
-                var convertedCash = convertCurrencyAmount(cash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
-                if (convertedCash === null) {
-                  success = false;
-                  failedAt = person1.age;
-                  return; // Abort processing this year
-                }
-                cash = convertedCash;
-                // Convert cashMoney to new currency
-                cashMoney = Money.convertTo(cashMoney, newResidenceCurrency, destCountry, year, economicData);
-              } else {
-                // When pooled cash conversion is disabled, Simulator still changes residenceCurrency/currentCountry.
-                // Retag cashMoney to match the numeric cash semantics (legacy behavior).
-                cashMoney = Money.from(cash, newResidenceCurrency, destCountry);
+              // Convert pooled cash to new residence currency.
+              // TODO(financial-engine): expand once multi-currency cash tracking lands.
+              var convertedCash = convertCurrencyAmount(cash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
+              if (convertedCash === null) {
+                success = false;
+                failedAt = person1.age;
+                return; // Abort processing this year
               }
+              cash = convertedCash;
+              // Convert cashMoney to new currency
+              cashMoney = Money.convertTo(cashMoney, newResidenceCurrency, destCountry, year, economicData);
 
-              // Optionally convert target cash (emergency stash) to new currency.
-              // When convertCashOnRelocation is enabled, both the pooled cash and the
-              // emergency stash target follow the user into the new currency.
-              if (params && params.convertCashOnRelocation === true) {
+              // Convert target cash (emergency stash) to new currency using PPP.
+              // PPP is used because the emergency stash covers local expenses, and
+              // PPP reflects the relative cost of goods/services between countries.
+              // This matches how RelocationImpactAssistant suggests salary amounts.
+              var pppRatio = (economicData && economicData.ready)
+                ? economicData.getPPP(prevCountryNormalized, destCountry)
+                : null;
+              if (pppRatio !== null) {
+                targetCash = targetCash * pppRatio;
+              } else {
+                // Fall back to FX conversion if PPP not available
                 var convertedTargetCash = convertCurrencyAmount(targetCash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
                 if (convertedTargetCash === null) {
                   success = false;
