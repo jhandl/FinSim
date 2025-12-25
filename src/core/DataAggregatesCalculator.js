@@ -1,29 +1,14 @@
 /**
  * DataAggregatesCalculator.js
  * 
- * Purpose: Extracts and modularizes the computation of nominal financial aggregates
- * from the monolithic Simulator.js::updateYearlyData() function. This module handles
- * the initialization and accumulation of yearly data rows, including income flows,
- * expenses, asset capitals, dynamic investment maps, and tax columns.
+ * Purpose: Computes nominal financial aggregates for the simulation data sheet.
+ * Extracted from Simulator.js::updateYearlyData() for testability.
  * 
- * GAS Compatibility: Designed to run in Google Apps Script environment. Uses plain
- * functions and global object access, avoiding modern JS features like modules.
+ * GAS Compatibility: Uses plain functions and global object access, avoiding ES6 modules.
  * 
- * Parameter Semantics:
- * - dataSheet: Array of data rows, mutated in-place to store aggregates.
- * - row: Index in dataSheet to update (initializes if not present).
- * - incomeSalaries, incomeShares, etc.: Yearly income/expense flows to accumulate.
- * - person1, person2: Person objects for pension capital calculation.
- * - indexFunds, shares, investmentAssets: Asset managers for capital computation.
- * - realEstateConverted: Pre-computed real estate value in residence currency.
- * - indexFundsCap, sharesCap: Pre-computed legacy asset capitals.
- * - capsByKey: Pre-computed map of investment capitals by key (avoids double-counting legacy assets).
- * - investmentIncomeByKey: Map of income by investment type for dynamic columns.
- * - revenue: Taxman instance for tax column population.
- * - stableTaxIds: Array of stable tax IDs for consistent Tax__ columns.
- * - cash: Current cash balance.
- * - year: Simulation year.
- * - currentCountry, residenceCurrency: Context for multi-country support.
+ * Context Object Pattern:
+ * All inputs are passed via a single context object (ctx) for clarity and maintainability.
+ * This matches the pattern used by PresentValueCalculator.js.
  */
 
 /**
@@ -32,42 +17,61 @@
  * Numeric boundary contract: All monetary inputs are numeric values (pre-extracted .amount from Money objects).
  * Money objects never enter this aggregation layer—currency safety is enforced upstream in asset classes.
  * 
- * @param {Array} dataSheet - Array of data rows, mutated in-place
- * @param {number} row - Index in dataSheet to update
- * @param {number} incomeSalaries - Pre-extracted .amount from salary Money objects
- * @param {number} incomeShares - Pre-extracted .amount from RSU Money objects
- * @param {number} incomeRentals - Pre-extracted .amount from rental Money objects
- * @param {number} incomePrivatePension - Pre-extracted .amount from pension Money objects
- * @param {number} incomeStatePension - Pre-extracted .amount from state pension Money objects
- * @param {number} incomeFundsRent - Pre-extracted .amount from fund income Money objects
- * @param {number} incomeSharesRent - Pre-extracted .amount from share income Money objects
- * @param {number} cashWithdraw - Pre-extracted .amount from cash withdrawal Money objects
- * @param {number} incomeDefinedBenefit - Pre-extracted .amount from DB pension Money objects
- * @param {number} incomeTaxFree - Pre-extracted .amount from tax-free income Money objects
- * @param {number} netIncome - Pre-extracted .amount (post-tax income)
- * @param {number} expenses - Pre-extracted .amount from expense Money objects
- * @param {number} personalPensionContribution - Pre-extracted .amount from contribution Money objects
- * @param {number} withdrawalRate - Numeric withdrawal rate
- * @param {number} pensionCap - Pre-computed total pension capital (person1 + person2) in residence currency
- * @param {Object} person1 - Person object (for pension capital extraction)
- * @param {Object} person2 - Person object (for pension capital extraction)
- * @param {Object} indexFunds - IndexFunds asset (for capital extraction)
- * @param {Object} shares - Shares asset (for capital extraction)
- * @param {Array} investmentAssets - Array of investment assets (for capital extraction)
- * @param {Object} realEstate - RealEstate object (for property capital)
- * @param {number} realEstateConverted - Pre-extracted .amount from converted real estate Money objects
- * @param {Object} capsByKey - Map of investment capitals by key (pre-extracted .amount values)
- * @param {Object} investmentIncomeByKey - Map of income by investment type (pre-extracted .amount values)
- * @param {Object} revenue - Taxman instance (for tax column population)
- * @param {Array} stableTaxIds - Array of stable tax IDs for consistent Tax__ columns
- * @param {number} cash - Pre-extracted .amount from cash Money object
- * @param {number} year - Simulation year
- * @param {string} currentCountry - Current country code
- * @param {string} residenceCurrency - Current residence currency code
+ * @param {Object} ctx - Context object containing all inputs:
+ *   @param {Array} ctx.dataSheet - Array of data rows, mutated in-place
+ *   @param {number} ctx.row - Index in dataSheet to update
+ *   @param {number} ctx.incomeSalaries - Pre-extracted .amount from salary Money objects
+ *   @param {number} ctx.incomeShares - Pre-extracted .amount from RSU Money objects
+ *   @param {number} ctx.incomeRentals - Pre-extracted .amount from rental Money objects
+ *   @param {number} ctx.incomePrivatePension - Pre-extracted .amount from pension Money objects
+ *   @param {number} ctx.incomeStatePension - Pre-extracted .amount from state pension Money objects
+ *   @param {number} ctx.incomeFundsRent - Pre-extracted .amount from fund income Money objects
+ *   @param {number} ctx.incomeSharesRent - Pre-extracted .amount from share income Money objects
+ *   @param {number} ctx.cashWithdraw - Pre-extracted .amount from cash withdrawal Money objects
+ *   @param {number} ctx.incomeDefinedBenefit - Pre-extracted .amount from DB pension Money objects
+ *   @param {number} ctx.incomeTaxFree - Pre-extracted .amount from tax-free income Money objects
+ *   @param {number} ctx.netIncome - Pre-extracted .amount (post-tax income)
+ *   @param {number} ctx.expenses - Pre-extracted .amount from expense Money objects
+ *   @param {number} ctx.personalPensionContribution - Pre-extracted .amount from contribution Money objects
+ *   @param {number} ctx.withdrawalRate - Numeric withdrawal rate
+ *   @param {number} ctx.pensionCap - Pre-computed total pension capital in residence currency
+ *   @param {Object} ctx.person1 - Person object (for age extraction)
+ *   @param {number} ctx.realEstateConverted - Pre-extracted .amount from converted real estate
+ *   @param {Object} ctx.capsByKey - Map of investment capitals by key
+ *   @param {Object} ctx.investmentIncomeByKey - Map of income by investment type
+ *   @param {Object} ctx.revenue - Taxman instance (for tax column population)
+ *   @param {Array} ctx.stableTaxIds - Array of stable tax IDs for consistent Tax__ columns
+ *   @param {number} ctx.cash - Pre-extracted .amount from cash
+ *   @param {number} ctx.year - Simulation year
  */
-function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension, incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome, expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares, investmentAssets, realEstate, realEstateConverted, capsByKey, investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency) {
-  // Numeric boundary contract: All inputs are numeric values extracted from asset classes.
-  // Money objects never enter this aggregation layer.
+function computeNominalAggregates(ctx) {
+  // Extract from context
+  var dataSheet = ctx.dataSheet;
+  var row = ctx.row;
+  var incomeSalaries = ctx.incomeSalaries;
+  var incomeShares = ctx.incomeShares;
+  var incomeRentals = ctx.incomeRentals;
+  var incomePrivatePension = ctx.incomePrivatePension;
+  var incomeStatePension = ctx.incomeStatePension;
+  var incomeFundsRent = ctx.incomeFundsRent;
+  var incomeSharesRent = ctx.incomeSharesRent;
+  var cashWithdraw = ctx.cashWithdraw;
+  var incomeDefinedBenefit = ctx.incomeDefinedBenefit;
+  var incomeTaxFree = ctx.incomeTaxFree;
+  var netIncome = ctx.netIncome;
+  var expenses = ctx.expenses;
+  var personalPensionContribution = ctx.personalPensionContribution;
+  var withdrawalRate = ctx.withdrawalRate;
+  var pensionCap = ctx.pensionCap;
+  var person1 = ctx.person1;
+  var realEstateConverted = ctx.realEstateConverted;
+  var capsByKey = ctx.capsByKey;
+  var investmentIncomeByKey = ctx.investmentIncomeByKey;
+  var revenue = ctx.revenue;
+  var stableTaxIds = ctx.stableTaxIds;
+  var cash = ctx.cash;
+  var year = ctx.year;
+
   // This is used below to hide the deemed disposal tax payments, otherwise they're shown as income.
   let FundsTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeFundsRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
   let SharesTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeSharesRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;

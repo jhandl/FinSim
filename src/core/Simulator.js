@@ -1912,13 +1912,21 @@ function initializeRealEstate() {
   }
 }
 
-function computePreAggregateValues() {
-  // All capital() / getValue() methods return numeric sums of holdings.
-  // Money objects remain internal to asset classes for currency safety.
+/**
+ * Build unified context object for aggregate calculators.
+ * Consolidates pre-computation and context building into a single function.
+ * Both DataAggregatesCalculator and PresentValueCalculator use this context.
+ */
+function buildAggregateContext() {
+  var cfg = Config.getInstance();
+  var startYear = cfg.getSimulationStartYear();
+
+  // Pre-compute values that require method calls on asset classes
   var realEstateConverted = realEstate.getTotalValueConverted(residenceCurrency, currentCountry, year);
   if (realEstateConverted === null) {
     throw new Error('Real estate value conversion failed: cannot convert total value to ' + residenceCurrency + ' for country ' + currentCountry + ' at year ' + year);
   }
+
   // Compute capitals by key while avoiding double-counting legacy assets
   var capsByKey = {};
   capsByKey['indexFunds'] = indexFunds.capital();
@@ -1933,20 +1941,19 @@ function computePreAggregateValues() {
       capsByKey[centry.key] = (capsByKey[centry.key] || 0) + c;
     }
   }
+
   var pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+
   return {
+    // Output targets
+    dataSheet: dataSheet,
+    row: row,
+    dataRow: dataSheet[row],
+
+    // Pre-computed values
     realEstateConverted: realEstateConverted,
     capsByKey: capsByKey,
-    pensionCap: pensionCap
-  };
-}
-
-function buildPVContext(preComputedValues) {
-  var cfg = Config.getInstance();
-  var startYear = cfg.getSimulationStartYear();
-  return {
-    // Output target
-    dataRow: dataSheet[row],
+    pensionCap: pensionCap,
 
     // Core simulation state
     person1: person1,
@@ -1966,10 +1973,6 @@ function buildPVContext(preComputedValues) {
     shares: shares,
     investmentAssets: investmentAssets,
 
-    // Pre-computed values
-    realEstateConverted: preComputedValues.realEstateConverted,
-    capsByKey: preComputedValues.capsByKey,
-
     // Income/expense flows
     incomeSalaries: incomeSalaries,
     incomeShares: incomeShares,
@@ -1986,12 +1989,14 @@ function buildPVContext(preComputedValues) {
     expenses: expenses,
     cash: cash,
     personalPensionContribution: personalPensionContribution,
+    withdrawalRate: withdrawalRate,
 
     // Dynamic maps
     investmentIncomeByKey: investmentIncomeByKey,
 
-    // Taxman instance for tax PV calculation (deduction columns)
+    // Taxman instance for tax column population
     revenue: revenue,
+    stableTaxIds: stableTaxIds,
 
     // Helper function references (to avoid global coupling)
     getDeflationFactor: getDeflationFactor,
@@ -2020,23 +2025,14 @@ function updateYearlyData() {
     });
   }
 
-  // Pre-compute values needed by aggregates and PV calculators
-  var preComputedValues = computePreAggregateValues();
+  // Build unified context for all aggregate calculators
+  var ctx = buildAggregateContext();
 
   // Compute nominal aggregates (extracted to DataAggregatesCalculator.js for testability)
-  DataAggregatesCalculator.computeNominalAggregates(
-    dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
-    incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-    expenses, personalPensionContribution, withdrawalRate, preComputedValues.pensionCap, person1, person2, indexFunds, shares,
-    investmentAssets, realEstate, preComputedValues.realEstateConverted, preComputedValues.capsByKey,
-    investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
-  );
-
-  // Build context for PV calculation
-  var pvContext = buildPVContext(preComputedValues);
+  DataAggregatesCalculator.computeNominalAggregates(ctx);
 
   // Compute present-value aggregates (extracted to PresentValueCalculator.js for testability)
-  PresentValueCalculator.computePresentValueAggregates(pvContext);
+  PresentValueCalculator.computePresentValueAggregates(ctx);
 
   // Populate attribution fields (extracted to AttributionPopulator.js for testability)
   AttributionPopulator.populateAttributionFields(

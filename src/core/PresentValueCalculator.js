@@ -51,7 +51,9 @@ function computePresentValueAggregates(ctx) {
   // Numeric boundary contract: All asset values in ctx are numeric.
   // PV deflation operates on numbers; Money objects remain in asset classes.
   // Extract all variables from ctx
-  var dataRow = ctx.dataRow;
+  // Note: dataRow is fetched from dataSheet[row] rather than ctx.dataRow because
+  // the row is created by computeNominalAggregates() which runs before this function.
+  var dataRow = ctx.dataSheet[ctx.row];
   var ageNum = ctx.ageNum;
   var startYear = ctx.startYear;
   var person1 = ctx.person1;

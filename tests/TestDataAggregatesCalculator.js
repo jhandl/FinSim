@@ -147,6 +147,40 @@ function parseDemoCsvScenario(filePath) {
   return { parameters: params, events };
 }
 
+/**
+ * Build a context object for computeNominalAggregates from test parameters.
+ * This helper keeps the test file self-contained without polluting core code.
+ */
+function buildTestContext(opts) {
+  return {
+    dataSheet: opts.dataSheet,
+    row: opts.row,
+    incomeSalaries: opts.incomeSalaries,
+    incomeShares: opts.incomeShares,
+    incomeRentals: opts.incomeRentals,
+    incomePrivatePension: opts.incomePrivatePension,
+    incomeStatePension: opts.incomeStatePension,
+    incomeFundsRent: opts.incomeFundsRent,
+    incomeSharesRent: opts.incomeSharesRent,
+    cashWithdraw: opts.cashWithdraw,
+    incomeDefinedBenefit: opts.incomeDefinedBenefit,
+    incomeTaxFree: opts.incomeTaxFree,
+    netIncome: opts.netIncome,
+    expenses: opts.expenses,
+    personalPensionContribution: opts.personalPensionContribution,
+    withdrawalRate: opts.withdrawalRate,
+    pensionCap: opts.pensionCap,
+    person1: opts.person1,
+    realEstateConverted: opts.realEstateConverted,
+    capsByKey: opts.capsByKey,
+    investmentIncomeByKey: opts.investmentIncomeByKey,
+    revenue: opts.revenue,
+    stableTaxIds: opts.stableTaxIds,
+    cash: opts.cash,
+    year: opts.year
+  };
+}
+
 
 module.exports = {
   name: 'TestDataAggregatesCalculator',
@@ -159,45 +193,39 @@ module.exports = {
     {
       const dataSheet = [];
       const row = 0;
-      const incomeSalaries = 50000;
-      const incomeShares = 0;
-      const incomeRentals = 10000;
-      const incomePrivatePension = 0;
-      const incomeStatePension = 0;
-      const incomeFundsRent = 0;
-      const incomeSharesRent = 0;
-      const cashWithdraw = 0;
-      const incomeDefinedBenefit = 0;
-      const incomeTaxFree = 0;
-      const netIncome = 60000;
-      const expenses = 30000;
-      const personalPensionContribution = 0;
-      const withdrawalRate = 0;
       const person1 = { age: 30, pension: { capital: () => 100000 } };
       const person2 = null;
-      const indexFunds = { capital: () => 150000 };
-      const shares = { capital: () => 50000 };
-      const investmentAssets = [];
-      const realEstate = {};
-      const realEstateConverted = 0;
-      const capsByKey = { indexFunds: 150000, shares: 50000 };
-      const investmentIncomeByKey = {};
-      const revenue = { taxTotals: {} };
-      const stableTaxIds = [];
-      const cash = 20000;
-      const year = 2023;
-      const currentCountry = 'ie';
-      const residenceCurrency = 'EUR';
-
       const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
 
-      DataAggregatesCalculator.computeNominalAggregates(
-        dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
-        incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-        expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares,
-        investmentAssets, realEstate, realEstateConverted, capsByKey,
-        investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
-      );
+      const ctx = buildTestContext({
+        dataSheet,
+        row,
+        incomeSalaries: 50000,
+        incomeShares: 0,
+        incomeRentals: 10000,
+        incomePrivatePension: 0,
+        incomeStatePension: 0,
+        incomeFundsRent: 0,
+        incomeSharesRent: 0,
+        cashWithdraw: 0,
+        incomeDefinedBenefit: 0,
+        incomeTaxFree: 0,
+        netIncome: 60000,
+        expenses: 30000,
+        personalPensionContribution: 0,
+        withdrawalRate: 0,
+        pensionCap,
+        person1,
+        realEstateConverted: 0,
+        capsByKey: { indexFunds: 150000, shares: 50000 },
+        investmentIncomeByKey: {},
+        revenue: { taxTotals: {}, getTaxTotal: () => 0 },
+        stableTaxIds: [],
+        cash: 20000,
+        year: 2023
+      });
+
+      DataAggregatesCalculator.computeNominalAggregates(ctx);
 
       const dataRow = dataSheet[row];
       if (Math.abs(dataRow.incomeSalaries - 50000) > 1e-6) errors.push('Scenario 1: incomeSalaries mismatch');
@@ -214,45 +242,39 @@ module.exports = {
     {
       const dataSheet = [];
       const row = 0;
-      const incomeSalaries = 0;
-      const incomeShares = 0;
-      const incomeRentals = 0;
-      const incomePrivatePension = 0;
-      const incomeStatePension = 0;
-      const incomeFundsRent = 0;
-      const incomeSharesRent = 0;
-      const cashWithdraw = 0;
-      const incomeDefinedBenefit = 0;
-      const incomeTaxFree = 0;
-      const netIncome = 0;
-      const expenses = 0;
-      const personalPensionContribution = 0;
-      const withdrawalRate = 0;
       const person1 = { age: 30, pension: { capital: () => 100000 } };
       const person2 = { age: 28, pension: { capital: () => 80000 } };
-      const indexFunds = { capital: () => 0 };
-      const shares = { capital: () => 0 };
-      const investmentAssets = [];
-      const realEstate = {};
-      const realEstateConverted = 0;
-      const capsByKey = { indexFunds: 0, shares: 0 };
-      const investmentIncomeByKey = {};
-      const revenue = { taxTotals: {} };
-      const stableTaxIds = [];
-      const cash = 0;
-      const year = 2023;
-      const currentCountry = 'ie';
-      const residenceCurrency = 'EUR';
-
       const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
 
-      DataAggregatesCalculator.computeNominalAggregates(
-        dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
-        incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-        expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares,
-        investmentAssets, realEstate, realEstateConverted, capsByKey,
-        investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
-      );
+      const ctx = buildTestContext({
+        dataSheet,
+        row,
+        incomeSalaries: 0,
+        incomeShares: 0,
+        incomeRentals: 0,
+        incomePrivatePension: 0,
+        incomeStatePension: 0,
+        incomeFundsRent: 0,
+        incomeSharesRent: 0,
+        cashWithdraw: 0,
+        incomeDefinedBenefit: 0,
+        incomeTaxFree: 0,
+        netIncome: 0,
+        expenses: 0,
+        personalPensionContribution: 0,
+        withdrawalRate: 0,
+        pensionCap,
+        person1,
+        realEstateConverted: 0,
+        capsByKey: { indexFunds: 0, shares: 0 },
+        investmentIncomeByKey: {},
+        revenue: { taxTotals: {}, getTaxTotal: () => 0 },
+        stableTaxIds: [],
+        cash: 0,
+        year: 2023
+      });
+
+      DataAggregatesCalculator.computeNominalAggregates(ctx);
 
       const dataRow = dataSheet[row];
       if (Math.abs(dataRow.pensionFund - 180000) > 1e-6) errors.push('Scenario 2: pensionFund mismatch');
@@ -263,45 +285,39 @@ module.exports = {
     {
       const dataSheet = [];
       const row = 0;
-      const incomeSalaries = 0;
-      const incomeShares = 0;
-      const incomeRentals = 0;
-      const incomePrivatePension = 0;
-      const incomeStatePension = 0;
-      const incomeFundsRent = 0;
-      const incomeSharesRent = 0;
-      const cashWithdraw = 0;
-      const incomeDefinedBenefit = 0;
-      const incomeTaxFree = 0;
-      const netIncome = 0;
-      const expenses = 0;
-      const personalPensionContribution = 0;
-      const withdrawalRate = 0;
       const person1 = { age: 30, pension: { capital: () => 0 } };
       const person2 = null;
-      const indexFunds = { capital: () => 0 };
-      const shares = { capital: () => 0 };
-      const investmentAssets = [];
-      const realEstate = {};
-      const realEstateConverted = 0;
-      const capsByKey = { indexFunds: 0, shares: 0, bond: 50000, crypto: 20000 };
-      const investmentIncomeByKey = { bond: 5000, crypto: 2000 };
-      const revenue = { taxTotals: {} };
-      const stableTaxIds = [];
-      const cash = 0;
-      const year = 2023;
-      const currentCountry = 'ie';
-      const residenceCurrency = 'EUR';
+      const pensionCap = person1.pension.capital();
 
-      const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+      const ctx = buildTestContext({
+        dataSheet,
+        row,
+        incomeSalaries: 0,
+        incomeShares: 0,
+        incomeRentals: 0,
+        incomePrivatePension: 0,
+        incomeStatePension: 0,
+        incomeFundsRent: 0,
+        incomeSharesRent: 0,
+        cashWithdraw: 0,
+        incomeDefinedBenefit: 0,
+        incomeTaxFree: 0,
+        netIncome: 0,
+        expenses: 0,
+        personalPensionContribution: 0,
+        withdrawalRate: 0,
+        pensionCap,
+        person1,
+        realEstateConverted: 0,
+        capsByKey: { indexFunds: 0, shares: 0, bond: 50000, crypto: 20000 },
+        investmentIncomeByKey: { bond: 5000, crypto: 2000 },
+        revenue: { taxTotals: {}, getTaxTotal: () => 0 },
+        stableTaxIds: [],
+        cash: 0,
+        year: 2023
+      });
 
-      DataAggregatesCalculator.computeNominalAggregates(
-        dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
-        incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-        expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares,
-        investmentAssets, realEstate, realEstateConverted, capsByKey,
-        investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
-      );
+      DataAggregatesCalculator.computeNominalAggregates(ctx);
 
       const dataRow = dataSheet[row];
       if (Math.abs(dataRow.investmentIncomeByKey.bond - 5000) > 1e-6) errors.push('Scenario 3: investmentIncomeByKey.bond mismatch');
@@ -314,45 +330,39 @@ module.exports = {
     {
       const dataSheet = [];
       const row = 0;
-      const incomeSalaries = 0;
-      const incomeShares = 0;
-      const incomeRentals = 0;
-      const incomePrivatePension = 0;
-      const incomeStatePension = 0;
-      const incomeFundsRent = 0;
-      const incomeSharesRent = 0;
-      const cashWithdraw = 0;
-      const incomeDefinedBenefit = 0;
-      const incomeTaxFree = 0;
-      const netIncome = 0;
-      const expenses = 0;
-      const personalPensionContribution = 0;
-      const withdrawalRate = 0;
       const person1 = { age: 30, pension: { capital: () => 0 } };
       const person2 = null;
-      const indexFunds = { capital: () => 0 };
-      const shares = { capital: () => 0 };
-      const investmentAssets = [];
-      const realEstate = {};
-      const realEstateConverted = 200000;
-      const capsByKey = { indexFunds: 0, shares: 0 };
-      const investmentIncomeByKey = {};
-      const revenue = { taxTotals: {} };
-      const stableTaxIds = [];
-      const cash = 0;
-      const year = 2023;
-      const currentCountry = 'ie';
-      const residenceCurrency = 'EUR';
+      const pensionCap = person1.pension.capital();
 
-      const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+      const ctx = buildTestContext({
+        dataSheet,
+        row,
+        incomeSalaries: 0,
+        incomeShares: 0,
+        incomeRentals: 0,
+        incomePrivatePension: 0,
+        incomeStatePension: 0,
+        incomeFundsRent: 0,
+        incomeSharesRent: 0,
+        cashWithdraw: 0,
+        incomeDefinedBenefit: 0,
+        incomeTaxFree: 0,
+        netIncome: 0,
+        expenses: 0,
+        personalPensionContribution: 0,
+        withdrawalRate: 0,
+        pensionCap,
+        person1,
+        realEstateConverted: 200000,
+        capsByKey: { indexFunds: 0, shares: 0 },
+        investmentIncomeByKey: {},
+        revenue: { taxTotals: {}, getTaxTotal: () => 0 },
+        stableTaxIds: [],
+        cash: 0,
+        year: 2023
+      });
 
-      DataAggregatesCalculator.computeNominalAggregates(
-        dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
-        incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-        expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares,
-        investmentAssets, realEstate, realEstateConverted, capsByKey,
-        investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
-      );
+      DataAggregatesCalculator.computeNominalAggregates(ctx);
 
       const dataRow = dataSheet[row];
       if (Math.abs(dataRow.realEstateCapital - 200000) > 1e-6) errors.push('Scenario 4: realEstateCapital mismatch');
@@ -363,48 +373,43 @@ module.exports = {
     {
       const dataSheet = [];
       const row = 0;
-      const incomeSalaries = 0;
-      const incomeShares = 0;
-      const incomeRentals = 0;
-      const incomePrivatePension = 0;
-      const incomeStatePension = 0;
-      const incomeFundsRent = 0;
-      const incomeSharesRent = 0;
-      const cashWithdraw = 0;
-      const incomeDefinedBenefit = 0;
-      const incomeTaxFree = 0;
-      const netIncome = 0;
-      const expenses = 0;
-      const personalPensionContribution = 0;
-      const withdrawalRate = 0;
       const person1 = { age: 30, pension: { capital: () => 0 } };
       const person2 = null;
-      const indexFunds = { capital: () => 0 };
-      const shares = { capital: () => 0 };
-      const investmentAssets = [];
-      const realEstate = {};
-      const realEstateConverted = 0;
-      const capsByKey = { indexFunds: 0, shares: 0 };
-      const investmentIncomeByKey = {};
-      const revenue = {
-        taxTotals: { incomeTax: 10000, prsi: 3000, usc: 2000 },
-        getTaxByType: (id) => ({ incomeTax: 10000, prsi: 3000, usc: 2000 }[id] || 0)
-      };
-      const stableTaxIds = ['incomeTax', 'prsi'];
-      const cash = 0;
-      const year = 2023;
-      const currentCountry = 'ie';
-      const residenceCurrency = 'EUR';
+      const pensionCap = person1.pension.capital();
 
-      const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+      const ctx = buildTestContext({
+        dataSheet,
+        row,
+        incomeSalaries: 0,
+        incomeShares: 0,
+        incomeRentals: 0,
+        incomePrivatePension: 0,
+        incomeStatePension: 0,
+        incomeFundsRent: 0,
+        incomeSharesRent: 0,
+        cashWithdraw: 0,
+        incomeDefinedBenefit: 0,
+        incomeTaxFree: 0,
+        netIncome: 0,
+        expenses: 0,
+        personalPensionContribution: 0,
+        withdrawalRate: 0,
+        pensionCap,
+        person1,
+        realEstateConverted: 0,
+        capsByKey: { indexFunds: 0, shares: 0 },
+        investmentIncomeByKey: {},
+        revenue: {
+          taxTotals: { incomeTax: 10000, prsi: 3000, usc: 2000 },
+          getTaxByType: (id) => ({ incomeTax: 10000, prsi: 3000, usc: 2000 }[id] || 0),
+          getTaxTotal: () => 0
+        },
+        stableTaxIds: ['incomeTax', 'prsi'],
+        cash: 0,
+        year: 2023
+      });
 
-      DataAggregatesCalculator.computeNominalAggregates(
-        dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
-        incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-        expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares,
-        investmentAssets, realEstate, realEstateConverted, capsByKey,
-        investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
-      );
+      DataAggregatesCalculator.computeNominalAggregates(ctx);
 
       const dataRow = dataSheet[row];
       if (Math.abs(dataRow['Tax__incomeTax'] - 10000) > 1e-6) errors.push('Scenario 5: Tax__incomeTax mismatch');
