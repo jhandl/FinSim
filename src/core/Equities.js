@@ -7,9 +7,6 @@ class Equity {
     this.growth = growth;
     this.stdev = stdev;
     this.portfolio = [];
-    this._portfolioCurrency = null;
-    this._portfolioCountry = null;
-    this._portfolioMixed = false;
     this.canOffsetLosses = true;
     // Track yearly statistics for attribution
     this.yearlyBought = 0;
@@ -17,39 +14,11 @@ class Equity {
     this.yearlyGrowth = 0;
   }
 
-  _refreshPortfolioCurrencyState() {
-    if (this.portfolio.length === 0) {
-      this._portfolioCurrency = null;
-      this._portfolioCountry = null;
-      this._portfolioMixed = false;
-      return;
-    }
-    const first = this.portfolio[0];
-    this._portfolioCurrency = first.principal.currency;
-    this._portfolioCountry = first.principal.country;
-    this._portfolioMixed = false;
-    for (let i = 0; i < this.portfolio.length; i++) {
-      const holding = this.portfolio[i];
-      if (holding.principal.currency !== this._portfolioCurrency ||
-        holding.principal.country !== this._portfolioCountry ||
-        holding.interest.currency !== this._portfolioCurrency ||
-        holding.interest.country !== this._portfolioCountry) {
-        this._portfolioMixed = true;
-        break;
-      }
-    }
-  }
+
 
   buy(amountToBuy, currency, country) {
     if (!currency || !country) {
       throw new Error('Equity.buy() requires currency and country parameters');
-    }
-    if (this.portfolio.length === 0) {
-      this._portfolioCurrency = currency;
-      this._portfolioCountry = country;
-      this._portfolioMixed = false;
-    } else if (!this._portfolioMixed && (currency !== this._portfolioCurrency || country !== this._portfolioCountry)) {
-      this._portfolioMixed = true;
     }
     this.portfolio.push({
       principal: Money.create(amountToBuy, currency, country),
@@ -78,123 +47,73 @@ class Equity {
   }
 
   sell(amountToSell) {
+    // Early return for empty portfolio
+    if (this.portfolio.length === 0) {
+      return 0;
+    }
+
     let sold = 0;
     let gains = 0;
     let remaining = (typeof amountToSell === 'number') ? amountToSell : 0;
     let fullySoldHoldings = 0;
     let partialFraction = null;
 
-    // Mixed-currency/country portfolios: convert per holding to residence currency before accumulation.
-    // Partial-sale scaling must happen in the holding's own currency before conversion.
-    if (this._portfolioMixed) {
-      var soldConvertedMixed = 0;
-      var gainsConvertedMixed = 0;
-      var remainingResidence = remaining;
-      var mixedFullySoldHoldings = 0;
-      var mixedPartialFraction = null;
-
-      for (let i = 0; i < this.portfolio.length && remainingResidence > 0; i++) {
-        const holding = this.portfolio[i];
-        const holdingCurrency = holding.principal.currency;
-        const holdingCountry = holding.principal.country;
-        const holdingCapital = holding.principal.amount + holding.interest.amount;
-        let holdingCapitalConverted = holdingCapital;
-        if (holdingCurrency !== residenceCurrency || holdingCountry !== currentCountry) {
-          holdingCapitalConverted = convertCurrencyAmount(holdingCapital, holdingCurrency, holdingCountry, residenceCurrency, currentCountry, year, true);
-          if (holdingCapitalConverted === null) {
-            return null;
-          }
-        }
-
-        if (remainingResidence >= holdingCapitalConverted) {
-          sold += holdingCapital;
-          gains += holding.interest.amount;
-          soldConvertedMixed += holdingCapitalConverted;
-
-          let holdingGainsConverted = holding.interest.amount;
-          if (holding.interest.currency !== residenceCurrency || holding.interest.country !== currentCountry) {
-            holdingGainsConverted = convertCurrencyAmount(holding.interest.amount, holding.interest.currency, holding.interest.country, residenceCurrency, currentCountry, year, true);
-            if (holdingGainsConverted === null) {
-              return null;
-            }
-          }
-          gainsConvertedMixed += holdingGainsConverted;
-
-          remainingResidence -= holdingCapitalConverted;
-          mixedFullySoldHoldings++;
-        } else {
-          const fraction = holdingCapitalConverted > 0 ? (remainingResidence / holdingCapitalConverted) : 0;
-          const soldHolding = fraction * holdingCapital;
-          const gainsHolding = fraction * holding.interest.amount;
-
-          sold += soldHolding;
-          gains += gainsHolding;
-
-          let soldHoldingConverted = soldHolding;
-          let gainsHoldingConverted = gainsHolding;
-          if (holdingCurrency !== residenceCurrency || holdingCountry !== currentCountry) {
-            soldHoldingConverted = convertCurrencyAmount(soldHolding, holdingCurrency, holdingCountry, residenceCurrency, currentCountry, year, true);
-            gainsHoldingConverted = convertCurrencyAmount(gainsHolding, holding.interest.currency, holding.interest.country, residenceCurrency, currentCountry, year, true);
-            if (soldHoldingConverted === null || gainsHoldingConverted === null) {
-              return null;
-            }
-          }
-          soldConvertedMixed += soldHoldingConverted;
-          gainsConvertedMixed += gainsHoldingConverted;
-
-          mixedPartialFraction = fraction;
-          remainingResidence = 0;
-        }
-      }
-
-      // Apply planned mutations only after conversions succeed
-      if (mixedFullySoldHoldings > 0) {
-        this.portfolio.splice(0, mixedFullySoldHoldings);
-      }
-      if (mixedPartialFraction !== null && this.portfolio.length > 0) {
-        const remainingHolding = this.portfolio[0];
-        const keepRatio = 1 - mixedPartialFraction;
-        remainingHolding.principal.amount = keepRatio * remainingHolding.principal.amount;
-        remainingHolding.interest.amount = keepRatio * remainingHolding.interest.amount;
-      }
-
-      this._refreshPortfolioCurrencyState();
-      this.yearlySold += soldConvertedMixed;
-      this.declareRevenue(soldConvertedMixed, gainsConvertedMixed);
-      return soldConvertedMixed;
-    }
+    // Convert each holding to residence currency before accumulation.
+    // Partial-sale scaling happens in the holding's own currency before conversion.
+    var soldConverted = 0;
+    var gainsConverted = 0;
 
     for (let i = 0; i < this.portfolio.length && remaining > 0; i++) {
       const holding = this.portfolio[i];
+      const holdingCurrency = holding.principal.currency;
+      const holdingCountry = holding.principal.country;
       const holdingCapital = holding.principal.amount + holding.interest.amount;
-      const isFullSale = remaining >= holdingCapital;
-      if (remaining >= holdingCapital) {
+      let holdingCapitalConverted = holdingCapital;
+      if (holdingCurrency !== residenceCurrency || holdingCountry !== currentCountry) {
+        holdingCapitalConverted = convertCurrencyAmount(holdingCapital, holdingCurrency, holdingCountry, residenceCurrency, currentCountry, year, true);
+        if (holdingCapitalConverted === null) {
+          return null;
+        }
+      }
+
+      if (remaining >= holdingCapitalConverted) {
         sold += holdingCapital;
         gains += holding.interest.amount;
-        remaining -= holdingCapital;
+        soldConverted += holdingCapitalConverted;
+
+        let holdingGainsConverted = holding.interest.amount;
+        if (holding.interest.currency !== residenceCurrency || holding.interest.country !== currentCountry) {
+          holdingGainsConverted = convertCurrencyAmount(holding.interest.amount, holding.interest.currency, holding.interest.country, residenceCurrency, currentCountry, year, true);
+          if (holdingGainsConverted === null) {
+            return null;
+          }
+        }
+        gainsConverted += holdingGainsConverted;
+
+        remaining -= holdingCapitalConverted;
         fullySoldHoldings++;
       } else {
-        const fraction = holdingCapital > 0 ? (remaining / holdingCapital) : 0;
-        sold += remaining;
-        gains += fraction * holding.interest.amount;
+        const fraction = holdingCapitalConverted > 0 ? (remaining / holdingCapitalConverted) : 0;
+        const soldHolding = fraction * holdingCapital;
+        const gainsHolding = fraction * holding.interest.amount;
+
+        sold += soldHolding;
+        gains += gainsHolding;
+
+        let soldHoldingConverted = soldHolding;
+        let gainsHoldingConverted = gainsHolding;
+        if (holdingCurrency !== residenceCurrency || holdingCountry !== currentCountry) {
+          soldHoldingConverted = convertCurrencyAmount(soldHolding, holdingCurrency, holdingCountry, residenceCurrency, currentCountry, year, true);
+          gainsHoldingConverted = convertCurrencyAmount(gainsHolding, holding.interest.currency, holding.interest.country, residenceCurrency, currentCountry, year, true);
+          if (soldHoldingConverted === null || gainsHoldingConverted === null) {
+            return null;
+          }
+        }
+        soldConverted += soldHoldingConverted;
+        gainsConverted += gainsHoldingConverted;
+
         partialFraction = fraction;
         remaining = 0;
-      }
-    }
-
-    // Convert sale proceeds and gains from portfolio's ACTUAL currency to residence currency.
-    // BUG FIX: Use _portfolioCurrency (actual holdings currency) not _getBaseCurrency() (asset config).
-    // When holdings are in ARS but asset's baseCurrency is EUR, we must convert from ARS not EUR.
-    var portfolioCurrency = this._portfolioCurrency || this._getBaseCurrency();
-    var portfolioCountry = this._portfolioCountry || this._getAssetCountry();
-    var soldConverted = sold;
-    var gainsConverted = gains;
-    if (portfolioCurrency !== residenceCurrency || portfolioCountry !== currentCountry) {
-      soldConverted = convertCurrencyAmount(sold, portfolioCurrency, portfolioCountry, residenceCurrency, currentCountry, year, true);
-      gainsConverted = convertCurrencyAmount(gains, portfolioCurrency, portfolioCountry, residenceCurrency, currentCountry, year, true);
-      // In strict mode, conversion failures return null - propagate to caller
-      if (soldConverted === null || gainsConverted === null) {
-        return null;
       }
     }
 
@@ -209,20 +128,17 @@ class Equity {
       remainingHolding.interest.amount = keepRatio * remainingHolding.interest.amount;
     }
 
-    this._refreshPortfolioCurrencyState();
-    this.yearlySold += sold;
+    this.yearlySold += soldConverted;
     this.declareRevenue(soldConverted, gainsConverted);
     return soldConverted;
   }
 
   /**
    * Calculate total capital (principal + interest) across all holdings.
+   * Converts each holding to residence currency before summing.
    * 
    * @returns {number} Total capital in residence currency
-   * @assumes Homogeneous portfolio (fast path) - all holdings share currency/country.
-   *          Mixed portfolios are handled separately with per-holding conversion.
-   * @performance Hot path - direct .amount summation for homogeneous portfolios (<1% overhead).
-   *              Mixed portfolios use Money.add() with conversion (acceptable overhead, rare).
+   * @performance Iterates through all holdings with per-holding FX conversion when needed.
    */
   capital() {
     if (this.portfolio.length === 0) {
@@ -231,40 +147,30 @@ class Equity {
 
     const portfolio = this.portfolio;
 
-    // Mixed-currency/country portfolios: convert each holding to residence currency before summing.
-    if (this._portfolioMixed) {
-      let moneyTotal = Money.zero(residenceCurrency, currentCountry);
-      for (let j = 0; j < portfolio.length; j++) {
-        const hj = portfolio[j];
-        const holdingCapital = hj.principal.amount + hj.interest.amount;
-        let holdingConverted = holdingCapital;
-        if (hj.principal.currency !== residenceCurrency || hj.principal.country !== currentCountry) {
-          holdingConverted = convertCurrencyAmount(holdingCapital, hj.principal.currency, hj.principal.country, residenceCurrency, currentCountry, year, true);
-          if (holdingConverted === null) {
-            throw new Error('Equities.capital() FX conversion failed');
-          }
+    // Convert each holding to residence currency before summing
+    let moneyTotal = Money.zero(residenceCurrency, currentCountry);
+    for (let j = 0; j < portfolio.length; j++) {
+      const hj = portfolio[j];
+      const holdingCapital = hj.principal.amount + hj.interest.amount;
+      let holdingConverted = holdingCapital;
+      if (hj.principal.currency !== residenceCurrency || hj.principal.country !== currentCountry) {
+        holdingConverted = convertCurrencyAmount(holdingCapital, hj.principal.currency, hj.principal.country, residenceCurrency, currentCountry, year, true);
+        if (holdingConverted === null) {
+          throw new Error('Equities.capital() FX conversion failed');
         }
-        const holdingMoney = Money.create(holdingConverted, residenceCurrency, currentCountry);
-        Money.add(moneyTotal, holdingMoney);
       }
-      return moneyTotal.amount;
-    }
-
-    const first = portfolio[0];
-    let moneyTotal = Money.zero(first.principal.currency, first.principal.country);
-    for (let i = 0; i < portfolio.length; i++) {
-      const holding = portfolio[i];
-      moneyTotal.amount += holding.principal.amount + holding.interest.amount;
+      const holdingMoney = Money.create(holdingConverted, residenceCurrency, currentCountry);
+      Money.add(moneyTotal, holdingMoney);
     }
     return moneyTotal.amount;
   }
 
   /**
    * Get portfolio statistics for attribution tracking.
+   * Converts each holding to residence currency before aggregation.
    * 
    * @returns {Object} Statistics including principal, totalGain, yearly bought/sold/growth
-   * @performance Homogeneous portfolios use fast numeric summation.
-   *              Mixed portfolios convert each holding to residence currency.
+   * @performance Iterates through all holdings with per-holding FX conversion when needed.
    */
   getPortfolioStats() {
     if (this.portfolio.length === 0) {
@@ -277,118 +183,56 @@ class Equity {
       };
     }
 
-    // Mixed-currency portfolios: convert each holding to residence currency
-    if (this._portfolioMixed) {
-      let principalMoney = Money.zero(residenceCurrency, currentCountry);
-      let totalGainMoney = Money.zero(residenceCurrency, currentCountry);
-
-      for (let i = 0; i < this.portfolio.length; i++) {
-        const holding = this.portfolio[i];
-
-        // Convert principal
-        let principalConverted = holding.principal.amount;
-        if (holding.principal.currency !== residenceCurrency || holding.principal.country !== currentCountry) {
-          principalConverted = convertCurrencyAmount(
-            holding.principal.amount,
-            holding.principal.currency,
-            holding.principal.country,
-            residenceCurrency,
-            currentCountry,
-            year,
-            true
-          );
-          if (principalConverted === null) {
-            throw new Error('Equities.getPortfolioStats() principal FX conversion failed');
-          }
-        }
-
-        // Convert interest/gains
-        let gainConverted = holding.interest.amount;
-        if (holding.interest.currency !== residenceCurrency || holding.interest.country !== currentCountry) {
-          gainConverted = convertCurrencyAmount(
-            holding.interest.amount,
-            holding.interest.currency,
-            holding.interest.country,
-            residenceCurrency,
-            currentCountry,
-            year,
-            true
-          );
-          if (gainConverted === null) {
-            throw new Error('Equities.getPortfolioStats() gain FX conversion failed');
-          }
-        }
-
-        const principalHoldingMoney = Money.create(principalConverted, residenceCurrency, currentCountry);
-        const gainHoldingMoney = Money.create(gainConverted, residenceCurrency, currentCountry);
-        Money.add(principalMoney, principalHoldingMoney);
-        Money.add(totalGainMoney, gainHoldingMoney);
-      }
-
-      return {
-        principal: principalMoney.amount,
-        totalGain: totalGainMoney.amount,
-        yearlyBought: this.yearlyBought,
-        yearlySold: this.yearlySold,
-        yearlyGrowth: this.yearlyGrowth
-      };
-    }
-
-    // Fast path: homogeneous portfolio (same currency/country)
-    const first = this.portfolio[0];
-    let principalSum = 0;
-    let totalGainSum = 0;
+    // Convert each holding to residence currency before aggregation
+    let principalMoney = Money.zero(residenceCurrency, currentCountry);
+    let totalGainMoney = Money.zero(residenceCurrency, currentCountry);
 
     for (let i = 0; i < this.portfolio.length; i++) {
       const holding = this.portfolio[i];
-      principalSum += holding.principal.amount;
-      totalGainSum += holding.interest.amount;
-    }
 
-    // Check if homogeneous portfolio needs conversion to residence currency
-    const needsConversion = first.principal.currency !== residenceCurrency || first.principal.country !== currentCountry;
-
-    if (needsConversion) {
-      // Convert sums from portfolio currency to residence currency
-      let principalConverted = convertCurrencyAmount(
-        principalSum,
-        first.principal.currency,
-        first.principal.country,
-        residenceCurrency,
-        currentCountry,
-        year,
-        true
-      );
-      if (principalConverted === null) {
-        throw new Error('Equities.getPortfolioStats() principal FX conversion failed');
+      // Convert principal
+      let principalConverted = holding.principal.amount;
+      if (holding.principal.currency !== residenceCurrency || holding.principal.country !== currentCountry) {
+        principalConverted = convertCurrencyAmount(
+          holding.principal.amount,
+          holding.principal.currency,
+          holding.principal.country,
+          residenceCurrency,
+          currentCountry,
+          year,
+          true
+        );
+        if (principalConverted === null) {
+          throw new Error('Equities.getPortfolioStats() principal FX conversion failed');
+        }
       }
 
-      let gainConverted = convertCurrencyAmount(
-        totalGainSum,
-        first.interest.currency,
-        first.interest.country,
-        residenceCurrency,
-        currentCountry,
-        year,
-        true
-      );
-      if (gainConverted === null) {
-        throw new Error('Equities.getPortfolioStats() gain FX conversion failed');
+      // Convert interest/gains
+      let gainConverted = holding.interest.amount;
+      if (holding.interest.currency !== residenceCurrency || holding.interest.country !== currentCountry) {
+        gainConverted = convertCurrencyAmount(
+          holding.interest.amount,
+          holding.interest.currency,
+          holding.interest.country,
+          residenceCurrency,
+          currentCountry,
+          year,
+          true
+        );
+        if (gainConverted === null) {
+          throw new Error('Equities.getPortfolioStats() gain FX conversion failed');
+        }
       }
 
-      return {
-        principal: principalConverted,
-        totalGain: gainConverted,
-        yearlyBought: this.yearlyBought,
-        yearlySold: this.yearlySold,
-        yearlyGrowth: this.yearlyGrowth
-      };
+      const principalHoldingMoney = Money.create(principalConverted, residenceCurrency, currentCountry);
+      const gainHoldingMoney = Money.create(gainConverted, residenceCurrency, currentCountry);
+      Money.add(principalMoney, principalHoldingMoney);
+      Money.add(totalGainMoney, gainHoldingMoney);
     }
 
-    // No conversion needed - portfolio already in residence currency
     return {
-      principal: principalSum,
-      totalGain: totalGainSum,
+      principal: principalMoney.amount,
+      totalGain: totalGainMoney.amount,
       yearlyBought: this.yearlyBought,
       yearlySold: this.yearlySold,
       yearlyGrowth: this.yearlyGrowth

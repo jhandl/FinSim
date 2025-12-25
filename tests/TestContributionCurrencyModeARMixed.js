@@ -139,10 +139,10 @@ const TestContributionCurrencyModeARMixed = {
     // Split 50/50: 1.5M ARS to funds (residence mode, stays ARS), 1.5M ARS to shares (asset mode, converts to USD)
     const baseYear = rowAge30.year;
     const conversionOptions = { fxMode: 'evolution', baseYear: baseYear };
-    
+
     const testAmountARS = 1500000; // 1.5M ARS (half of surplus)
     const convertedToUSD = econ.convert(testAmountARS, 'AR', 'US', baseYear, conversionOptions);
-    
+
     if (!Number.isFinite(convertedToUSD) || convertedToUSD <= 0) {
       errors.push(`Currency conversion failed: ARS ${testAmountARS} -> USD`);
     }
@@ -167,31 +167,31 @@ const TestContributionCurrencyModeARMixed = {
       errors.push(`indexFundsCapital (${indexFundsCapital} ARS) outside expected range [${expectedARSMin}, ${expectedARSMax}]`);
     }
 
-    // Validate sharesCapital is in USD (asset mode - converted from ARS)
+    // Validate sharesCapital - after Phase 1 refactor, capital() now consistently returns
+    // residence currency. For Argentina residents, this means ARS, not USD.
     const sharesCapital = rowAge30.sharesCapital || 0;
     if (sharesCapital <= 0) {
-      errors.push(`sharesCapital should be positive (in USD), got ${sharesCapital}`);
+      errors.push(`sharesCapital should be positive (in ARS residence currency), got ${sharesCapital}`);
     }
 
-    // Shares capital should be in USD (much smaller than ARS amounts)
-    if (sharesCapital > 100000) {
-      errors.push(`sharesCapital (${sharesCapital}) seems too large - might be in ARS instead of USD. Expected USD amount should be roughly ${convertedToUSD}`);
+    // Shares capital should be in ARS (similar magnitude to indexFundsCapital)
+    if (sharesCapital < 100000) {
+      errors.push(`sharesCapital (${sharesCapital}) seems too small - should be in ARS (hundreds of thousands range). Expected ARS amount should be roughly ${testAmountARS}`);
     }
 
-    // Validate that sharesCapital is consistent with USD conversion
-    const expectedUSDMin = convertedToUSD * 0.3;  // At least 30% of expected
-    const expectedUSDMax = convertedToUSD * 2.0;   // At most 200% of expected
-    if (sharesCapital < expectedUSDMin || sharesCapital > expectedUSDMax) {
-      errors.push(`sharesCapital (${sharesCapital} USD) outside expected range [${expectedUSDMin}, ${expectedUSDMax}] based on FX conversion`);
+    // Validate that sharesCapital is consistent with ARS surplus (half of total, ~1.5M ARS)
+    const expectedSharesARSMin = testAmountARS * 0.3;  // At least 30% of expected
+    const expectedSharesARSMax = testAmountARS * 2.0;   // At most 200% of expected
+    if (sharesCapital < expectedSharesARSMin || sharesCapital > expectedSharesARSMax) {
+      errors.push(`sharesCapital (${sharesCapital} ARS) outside expected range [${expectedSharesARSMin}, ${expectedSharesARSMax}]`);
     }
 
-    // Key assertion: indexFundsCapital should be much larger than sharesCapital
-    // (because ARS amounts are much larger than USD amounts)
-    // Roughly: 1 ARS ≈ 0.00067 USD, so 1M ARS ≈ 670 USD
-    // Therefore indexFundsCapital (in ARS) should be roughly 1500x larger than sharesCapital (in USD)
+    // Key assertion: Both capitals should be in ARS (residence currency)
+    // With 50/50 allocation, they should be in similar magnitude (accounting for tax effects)
+    // Expect ratio between 0.2 and 5.0 to allow for allocation differences and tax effects
     const ratio = indexFundsCapital / sharesCapital;
-    if (ratio < 100) {
-      errors.push(`indexFundsCapital (${indexFundsCapital} ARS) / sharesCapital (${sharesCapital} USD) ratio (${ratio}) too low - suggests currency mismatch`);
+    if (ratio < 0.2 || ratio > 5.0) {
+      errors.push(`indexFundsCapital (${indexFundsCapital} ARS) / sharesCapital (${sharesCapital} ARS) ratio (${ratio.toFixed(2)}) outside expected range [0.2, 5.0] - both should be in ARS with similar magnitudes`);
     }
 
     return {

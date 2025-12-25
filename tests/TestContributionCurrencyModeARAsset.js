@@ -139,7 +139,7 @@ const TestContributionCurrencyModeARAsset = {
     // Convert 3M ARS to USD using FX
     const baseYear = rowAge30.year;
     const conversionOptions = { fxMode: 'evolution', baseYear: baseYear };
-    
+
     // ARS to USD conversion: AR -> US
     // First get ARS to EUR, then EUR to USD
     // AR perEur = 1631.72, so 1 EUR = 1631.72 ARS
@@ -147,7 +147,7 @@ const TestContributionCurrencyModeARAsset = {
     // Therefore: 1 USD = 1631.72 / 1.1 = 1483.38 ARS (approximately)
     const testAmountARS = 3000000; // 3M ARS
     const convertedToUSD = econ.convert(testAmountARS, 'AR', 'US', baseYear, conversionOptions);
-    
+
     if (!Number.isFinite(convertedToUSD) || convertedToUSD <= 0) {
       errors.push(`Currency conversion failed: ARS ${testAmountARS} -> USD`);
     }
@@ -158,29 +158,27 @@ const TestContributionCurrencyModeARAsset = {
       errors.push(`Cash expected ~1M ARS, got ${rowAge30.cash}`);
     }
 
-    // Validate sharesCapital - according to asset-plan.md section 3.2, capital should be 
-    // tracked in the asset's baseCurrency (USD) for asset mode with contributionCurrencyMode 'asset'.
-    // The capital is obtained via capsByKey['shares'] = shares.capital(), which should return USD.
+    // Validate sharesCapital - after Phase 1 refactor, capital() now consistently returns
+    // residence currency. For Argentina residents, this means ARS, not USD.
     const sharesCapital = rowAge30.sharesCapital || 0;
     if (sharesCapital <= 0) {
-      errors.push(`sharesCapital should be positive (in USD for asset mode), got ${sharesCapital}`);
+      errors.push(`sharesCapital should be positive (in ARS residence currency), got ${sharesCapital}`);
     }
 
-    // Key assertion: sharesCapital should be in USD (asset's baseCurrency), not ARS
-    // USD amounts should be much smaller than ARS amounts (roughly 1/1500th)
-    // Expected: approximately convertedToUSD (~2022 USD for ~3M ARS surplus)
-    // If sharesCapital is in the millions, it's likely incorrectly in ARS instead of USD
-    if (sharesCapital > 100000) {
-      errors.push(`sharesCapital (${sharesCapital}) seems too large - might be in ARS instead of USD. Expected USD amount should be roughly ${convertedToUSD} based on FX conversion of ARS surplus`);
+    // Key assertion: sharesCapital should be in ARS (residence currency)
+    // ARS amounts should be in the millions range (roughly 1500x larger than USD equivalent)
+    // Expected: approximately testAmountARS (~3M ARS surplus)
+    if (sharesCapital < 100000) {
+      errors.push(`sharesCapital (${sharesCapital}) seems too small - should be in ARS (millions range). Expected ARS amount should be roughly ${testAmountARS} based on surplus`);
     }
 
-    // Validate that sharesCapital is consistent with USD conversion
+    // Validate that sharesCapital is consistent with ARS surplus
     // Allow wide tolerance due to tax calculations affecting the exact surplus invested
     // The actual invested amount will be less than 3M ARS due to taxes
-    const expectedUSDMin = convertedToUSD * 0.3;  // At least 30% of expected (accounting for taxes reducing surplus)
-    const expectedUSDMax = convertedToUSD * 2.0;  // At most 200% of expected (to account for tax/calculation variations)
-    if (sharesCapital < expectedUSDMin || sharesCapital > expectedUSDMax) {
-      errors.push(`sharesCapital (${sharesCapital} USD) outside expected range [${expectedUSDMin.toFixed(2)}, ${expectedUSDMax.toFixed(2)}] based on FX conversion. Expected roughly ${convertedToUSD.toFixed(2)} USD for ~3M ARS surplus`);
+    const expectedARSMin = testAmountARS * 0.3;  // At least 30% of expected (accounting for taxes reducing surplus)
+    const expectedARSMax = testAmountARS * 2.0;  // At most 200% of expected (to account for tax/calculation variations)
+    if (sharesCapital < expectedARSMin || sharesCapital > expectedARSMax) {
+      errors.push(`sharesCapital (${sharesCapital} ARS) outside expected range [${expectedARSMin.toFixed(2)}, ${expectedARSMax.toFixed(2)}]. Expected roughly ${testAmountARS} ARS for ~3M ARS surplus`);
     }
 
     // Index funds should be 0 since allocation is 0%

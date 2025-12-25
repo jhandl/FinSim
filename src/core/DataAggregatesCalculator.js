@@ -48,6 +48,7 @@
  * @param {number} expenses - Pre-extracted .amount from expense Money objects
  * @param {number} personalPensionContribution - Pre-extracted .amount from contribution Money objects
  * @param {number} withdrawalRate - Numeric withdrawal rate
+ * @param {number} pensionCap - Pre-computed total pension capital (person1 + person2) in residence currency
  * @param {Object} person1 - Person object (for pension capital extraction)
  * @param {Object} person2 - Person object (for pension capital extraction)
  * @param {Object} indexFunds - IndexFunds asset (for capital extraction)
@@ -64,7 +65,7 @@
  * @param {string} currentCountry - Current country code
  * @param {string} residenceCurrency - Current residence currency code
  */
-function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension, incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome, expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares, investmentAssets, realEstate, realEstateConverted, capsByKey, investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency) {
+function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension, incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome, expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares, investmentAssets, realEstate, realEstateConverted, capsByKey, investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency) {
   // Numeric boundary contract: All inputs are numeric values extracted from asset classes.
   // Money objects never enter this aggregation layer.
   // This is used below to hide the deemed disposal tax payments, otherwise they're shown as income.
@@ -159,7 +160,7 @@ function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, 
   dataSheet[row].realEstateCapital += realEstateConverted;
   dataSheet[row].netIncome += netIncome;
   dataSheet[row].expenses += expenses;
-  dataSheet[row].pensionFund += person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+  dataSheet[row].pensionFund += pensionCap;
   dataSheet[row].cash += cash;
   dataSheet[row].indexFundsCapital += capsByKey['indexFunds'];
   dataSheet[row].sharesCapital += capsByKey['shares'];
@@ -194,7 +195,7 @@ function computeNominalAggregates(dataSheet, row, incomeSalaries, incomeShares, 
   for (var key in capsByKey) {
     totalInvestmentCaps += capsByKey[key];
   }
-  dataSheet[row].worth += realEstateConverted + person1.pension.capital() + (person2 ? person2.pension.capital() : 0) + totalInvestmentCaps + cash;
+  dataSheet[row].worth += realEstateConverted + pensionCap + totalInvestmentCaps + cash;
 }
 
 var DataAggregatesCalculator = { computeNominalAggregates: computeNominalAggregates };

@@ -102,9 +102,10 @@ function getCurrencyForCountry(code) {
   if (!normalized) throw new Error('getCurrencyForCountry: empty country code');
   var cfg = Config.getInstance();
   var rs = cfg.getCachedTaxRuleSet(normalized);
+  if (!rs) return null; // Ruleset not cached - return null instead of crashing
   var cur = rs.getCurrencyCode();
   if (cur) return normalizeCurrency(cur);
-  throw new Error('getCurrencyForCountry: no currency for ' + code);
+  return null; // No currency defined in ruleset
 }
 
 function ensureCurrencyCountryCache() {
@@ -1932,9 +1933,11 @@ function computePreAggregateValues() {
       capsByKey[centry.key] = (capsByKey[centry.key] || 0) + c;
     }
   }
+  var pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
   return {
     realEstateConverted: realEstateConverted,
-    capsByKey: capsByKey
+    capsByKey: capsByKey,
+    pensionCap: pensionCap
   };
 }
 
@@ -2024,7 +2027,7 @@ function updateYearlyData() {
   DataAggregatesCalculator.computeNominalAggregates(
     dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
     incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-    expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
+    expenses, personalPensionContribution, withdrawalRate, preComputedValues.pensionCap, person1, person2, indexFunds, shares,
     investmentAssets, realEstate, preComputedValues.realEstateConverted, preComputedValues.capsByKey,
     investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
   );

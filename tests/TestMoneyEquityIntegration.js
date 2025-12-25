@@ -231,16 +231,11 @@ module.exports = {
           return {
             principal: stats.principal,
             totalGain: stats.totalGain,
-            portfolioMixed: asset._portfolioMixed,
             holdingCount: asset.portfolio.length
           };
         })()
       `, ctx);
 
-      // Portfolio is NOT mixed (all EUR/ie), but should still convert to ARS
-      if (homogConvResult && homogConvResult.portfolioMixed) {
-        errors.push('Homogeneous conversion test: portfolio should NOT be marked as mixed');
-      }
       if (!homogConvResult || homogConvResult.holdingCount !== 2) {
         errors.push('Homogeneous conversion test: expected 2 holdings');
       }
@@ -253,7 +248,7 @@ module.exports = {
       errors.push('Homogeneous conversion test failed: ' + err.message);
     }
 
-    // Test 8: Homogeneous portfolio stats (fast path)
+    // Test 8: Homogeneous portfolio stats
     try {
       const homogeneousStatsResult = vm.runInContext(`
         (function() {
@@ -268,15 +263,11 @@ module.exports = {
           
           return {
             principal: stats.principal,
-            totalGain: stats.totalGain,
-            portfolioMixed: asset._portfolioMixed
+            totalGain: stats.totalGain
           };
         })()
       `, ctx);
 
-      if (homogeneousStatsResult && homogeneousStatsResult.portfolioMixed) {
-        errors.push('Homogeneous stats: portfolio should not be marked as mixed');
-      }
       if (!homogeneousStatsResult || homogeneousStatsResult.principal !== 15000) {
         errors.push('Homogeneous stats: expected principal 15000, got ' + homogeneousStatsResult.principal);
       }
@@ -288,7 +279,7 @@ module.exports = {
     }
 
     // Test 9: Mixed-currency portfolio stats (true mixed portfolio)
-    // Portfolio has holdings in different currencies, _portfolioMixed is true
+    // Portfolio has holdings in different currencies; per-holding conversion handles this correctly
     try {
       const mixedStatsResult = vm.runInContext(`
         (function() {
@@ -308,11 +299,6 @@ module.exports = {
           // Buy more in ARS (different currency creates mixed portfolio)
           asset.buy(50000, 'ARS', 'ar');
           
-          // Verify portfolio is mixed
-          if (!asset._portfolioMixed) {
-            throw new Error('Portfolio should be marked as mixed');
-          }
-          
           // Get stats - should convert both EUR and ARS holdings to ARS residence currency
           var stats = asset.getPortfolioStats();
           
@@ -329,16 +315,12 @@ module.exports = {
             totalGain: stats.totalGain,
             expectedPrincipal: expectedTotalPrincipal,
             expectedGain: expectedTotalGain,
-            portfolioMixed: asset._portfolioMixed,
             holdingCount: asset.portfolio.length,
             eurToArs: eurToArs
           };
         })()
       `, ctx);
 
-      if (!mixedStatsResult || !mixedStatsResult.portfolioMixed) {
-        errors.push('Mixed-currency stats: portfolio should be marked as mixed');
-      }
       if (!mixedStatsResult || mixedStatsResult.holdingCount !== 2) {
         errors.push('Mixed-currency stats: expected 2 holdings, got ' + (mixedStatsResult ? mixedStatsResult.holdingCount : 'null'));
       }
@@ -350,9 +332,9 @@ module.exports = {
       if (mixedStatsResult && Math.abs(mixedStatsResult.principal - mixedStatsResult.expectedPrincipal) > 1) {
         errors.push('Mixed-currency stats: principal mismatch, got=' + mixedStatsResult.principal + ' expected=' + mixedStatsResult.expectedPrincipal);
       }
-      // Verify totalGain is reasonable (converted EUR gains)
-      if (mixedStatsResult && mixedStatsResult.totalGain < 0) {
-        errors.push('Mixed-currency stats: totalGain should not be negative');
+      // Verify totalGain matches expected (within tolerance for FX rounding)
+      if (mixedStatsResult && Math.abs(mixedStatsResult.totalGain - mixedStatsResult.expectedGain) > 1) {
+        errors.push('Mixed-currency stats: totalGain mismatch, got=' + mixedStatsResult.totalGain + ' expected=' + mixedStatsResult.expectedGain);
       }
     } catch (err) {
       errors.push('Mixed-currency portfolio stats test failed: ' + err.message);

@@ -239,7 +239,7 @@ class EconomicData {
       // Evolution mode (default): use inflation-driven FX evolution.
       // Any unknown fxMode should be treated as unsupported and return null.
       if (fxMode !== 'evolution' && fxMode != null) {
-      return null;
+        return null;
       }
       fxY = this._fxCrossRateForYear(fromCountry, toCountry, year, { fxMode: 'evolution', baseYear: baseYear });
     }
@@ -251,7 +251,7 @@ class EconomicData {
         console.error('EconomicData.convert: Invalid FX rate (null/NaN) for ' + fromCountry + '->' + toCountry + ' at year ' + year + ', mode=' + fxMode);
       }
       return null;
-      }
+    }
 
     // FX directionality + magnitude validation
     if (fromCountry !== toCountry) {
@@ -314,7 +314,7 @@ class EconomicData {
 
     // Legacy / explicit constant mode: always use base FX cross-rate.
     if (opts.fxMode === 'constant') {
-    return this.getFX(fromCountry, toCountry);
+      return this.getFX(fromCountry, toCountry);
     }
 
     var baseYear = (opts.baseYear != null) ? opts.baseYear : this._currentYear();
@@ -349,8 +349,8 @@ class EconomicData {
     var perEurFrom = this._computePerEurFX(fromKey, baseYear, targetYear, options);
     var perEurTo = this._computePerEurFX(toKey, baseYear, targetYear, options);
     if (perEurFrom == null || perEurTo == null ||
-        !Number.isFinite(perEurFrom) || !Number.isFinite(perEurTo) ||
-        perEurFrom <= 0 || perEurTo <= 0) {
+      !Number.isFinite(perEurFrom) || !Number.isFinite(perEurTo) ||
+      perEurFrom <= 0 || perEurTo <= 0) {
       console.error('EconomicData._computeEvolvedFX: Invalid per-EUR FX for ' + fromKey + ' or ' + toKey +
         ' at year ' + targetYear + ' (from=' + perEurFrom + ', to=' + perEurTo + ')');
       return null;
@@ -389,21 +389,29 @@ class EconomicData {
     var cacheKey = countryKey + ':' + String(baseYear);
     var series = this._fxEvolutionCache[cacheKey];
     var offset = targetYear - baseYear;
+    // Cache semantics: series[n] = FX at start of year (baseYear + n)
+    // series[0] = baseFxPerEur (FX at start of baseYear, no inflation applied yet)
+    // series[1] = FX at start of baseYear+1 (after 1 year of inflation)
+    // series[n] = FX at start of baseYear+n (after n years of inflation)
     if (series && series[offset] != null && Number.isFinite(series[offset])) {
       return series[offset];
     }
     if (!series) {
       series = [];
+      // Store the base FX at index 0 (FX at start of baseYear)
+      series[0] = baseFxPerEur;
       this._fxEvolutionCache[cacheKey] = series;
     }
 
     var fxCurrent = baseFxPerEur;
     var startOffset = 0;
     // Reuse any cached prefix.
+    // series[i] = FX at start of year (baseYear + i), so to resume from that point,
+    // we need to apply inflation starting from year (baseYear + i).
     for (var i = series.length - 1; i >= 0; i--) {
       if (series[i] != null && Number.isFinite(series[i])) {
         fxCurrent = series[i];
-        startOffset = i + 1;
+        startOffset = i;  // Resume applying inflation from year (baseYear + i)
         break;
       }
     }
@@ -413,12 +421,14 @@ class EconomicData {
     var economicData = options && options.economicData;
     var countryInflationOverrides = options && options.countryInflationOverrides;
 
+    // Apply inflation for years [baseYear + startOffset, targetYear - 1]
+    // After each year y, store the result at series[y - baseYear + 1] = FX at start of year y+1
     for (var y = baseYear + startOffset; y < targetYear; y++) {
       var inflation = null;
 
       if (typeof InflationService !== 'undefined' &&
-          InflationService &&
-          typeof InflationService.resolveInflationRate === 'function') {
+        InflationService &&
+        typeof InflationService.resolveInflationRate === 'function') {
         try {
           inflation = InflationService.resolveInflationRate(countryKey.toLowerCase(), y, {
             params: params,
@@ -454,7 +464,8 @@ class EconomicData {
         return null;
       }
 
-      series[y - baseYear] = fxCurrent;
+      // Store at index (y - baseYear + 1) = FX at start of year (y + 1)
+      series[y - baseYear + 1] = fxCurrent;
     }
 
     return fxCurrent;

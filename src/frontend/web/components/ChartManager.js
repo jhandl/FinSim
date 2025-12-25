@@ -87,7 +87,7 @@ class ChartManager {
       // Capture previous dataset data for preservation
       const prev = {
         cashflow: { byLabel: {}, byKey: {} },
-        assets:   { byLabel: {}, byKey: {} }
+        assets: { byLabel: {}, byKey: {} }
       };
       if (this.cashflowChart && this.cashflowChart.data && Array.isArray(this.cashflowChart.data.datasets)) {
         const cds = this.cashflowChart.data.datasets;
@@ -129,8 +129,8 @@ class ChartManager {
       // ------------ Cashflow Chart (inflows/outflows + incomes stacked) ------------
       if (this.cashflowChart) {
         const baseDatasets = [
-          { label: 'Inflows', borderColor: '#4CAF50', backgroundColor: '#4CAF50', fill: false, data: [], stack: 'nostack1', borderDash: [5,5], pointRadius: 0, order: 0, _fieldKey: 'NetIncome' },
-          { label: 'Outflows', borderColor: '#f44336', backgroundColor: '#f44336', fill: false, data: [], stack: 'nostack2', borderDash: [5,5], pointRadius: 0, order: 1, _fieldKey: 'Expenses' },
+          { label: 'Inflows', borderColor: '#4CAF50', backgroundColor: '#4CAF50', fill: false, data: [], stack: 'nostack1', borderDash: [5, 5], pointRadius: 0, order: 0, _fieldKey: 'NetIncome' },
+          { label: 'Outflows', borderColor: '#f44336', backgroundColor: '#f44336', fill: false, data: [], stack: 'nostack2', borderDash: [5, 5], pointRadius: 0, order: 1, _fieldKey: 'Expenses' },
           { label: 'Salaries', borderColor: '#90A4AE', backgroundColor: '#CFD8DC', fill: true, data: [], stack: 'main', pointRadius: 0, order: 2, _fieldKey: 'IncomeSalaries' },
           { label: 'Rental', borderColor: '#A1887F', backgroundColor: '#D7CCC8', fill: true, data: [], stack: 'main', pointRadius: 0, order: 3, _fieldKey: 'IncomeRentals' },
           { label: 'RSUs', borderColor: '#F06292', backgroundColor: '#F8BBD0', fill: true, data: [], stack: 'main', pointRadius: 0, order: 4, _fieldKey: 'IncomeRSUs' },
@@ -242,7 +242,7 @@ class ChartManager {
 
       // Get current datasets and preserve non-income ones
       const currentDatasets = this.cashflowChart.data.datasets || [];
-      const nonIncomeDatasets = currentDatasets.filter(ds => 
+      const nonIncomeDatasets = currentDatasets.filter(ds =>
         ds.label === 'Inflows' || ds.label === 'Outflows'
       );
 
@@ -332,19 +332,19 @@ class ChartManager {
 
   setupCharts() {
     try {
-      
+
       // Setup Cashflow Chart
       const cashflowCtx = document.getElementById('cashflowGraph');
       if (!cashflowCtx) {
         throw new Error("Missing cashflowGraph element");
       }
-      
+
       // Make sure we can get a 2D context
       const cashflowCtx2D = cashflowCtx.getContext('2d');
       if (!cashflowCtx2D) {
         throw new Error("Failed to get 2D context for cashflowGraph");
       }
-      
+
       this.commonScaleOptions = {
         y: {
           stacked: true,
@@ -352,7 +352,7 @@ class ChartManager {
         },
         x: {
           ticks: {
-            callback: function(value, index, values) {
+            callback: function (value, index, values) {
               return this.chart.data.labels[index];
             },
             maxRotation: 0,
@@ -360,7 +360,7 @@ class ChartManager {
           }
         }
       };
-      
+
       // NEW: Define legend label sizing based on screen width
       const isSmallScreen = (typeof window !== 'undefined') ? window.innerWidth <= 600 : false;
       this.legendLabelsConfig = {
@@ -370,7 +370,7 @@ class ChartManager {
           size: isSmallScreen ? 12 : 13
         }
       };
-      
+
       // Add common tooltip configuration
       this.commonOptions = {
         responsive: true,
@@ -386,7 +386,7 @@ class ChartManager {
             enabled: true,
             position: 'nearest',
             callbacks: {
-              label: function(context) {
+              label: function (context) {
                 let label = context.dataset.label || '';
                 if (label) {
                   label += ': ';
@@ -436,7 +436,7 @@ class ChartManager {
         },
         scales: this.commonScaleOptions
       };
-      
+
       this.cashflowChart = new Chart(cashflowCtx.getContext('2d'), {
         type: 'line',
         data: {
@@ -557,7 +557,7 @@ class ChartManager {
             }
           ]
         },
-         options: {
+        options: {
           ...this.commonOptions,
           plugins: {
             ...this.commonOptions.plugins,
@@ -600,13 +600,13 @@ class ChartManager {
       this.cashflowCashDatasetIndex = 10;
       // Build initial index maps
       this.rebuildDatasetIndexMaps();
-      
+
       // Setup Assets Chart
       const assetsCtx = document.getElementById('assetsGraph');
       if (!assetsCtx) {
         throw new Error("Missing assetsGraph element");
       }
-      
+
       this.assetsChart = new Chart(assetsCtx.getContext('2d'), {
         type: 'line',
         data: {
@@ -665,7 +665,7 @@ class ChartManager {
             }
           ]
         },
-         options: {
+        options: {
           ...this.commonOptions,
           plugins: {
             ...this.commonOptions.plugins,
@@ -693,7 +693,7 @@ class ChartManager {
       // Default dynamic mapping for legacy two-types (shares then index funds)
       this.assetsCapitalStartIndex = 3;
       this.assetsCapitalKeys = ['shares', 'indexFunds'];
-      
+
       // Set flag indicating that charts were initialized correctly
       this.chartsInitialized = true;
     } catch (error) {
@@ -740,38 +740,38 @@ class ChartManager {
 
   updateCurrencyControlVisibility() {
     document.querySelectorAll('.chart-controls').forEach(controlsDiv => {
-        const naturalToggle = controlsDiv.querySelector(`#currencyModeNatural_${this.constructor.name}`);
-        const unifiedToggle = controlsDiv.querySelector(`#currencyModeUnified_${this.constructor.name}`);
-        const dropdownContainer = controlsDiv.querySelector('.currency-dropdown-container');
+      const naturalToggle = controlsDiv.querySelector(`#currencyModeNatural_${this.constructor.name}`);
+      const unifiedToggle = controlsDiv.querySelector(`#currencyModeUnified_${this.constructor.name}`);
+      const dropdownContainer = controlsDiv.querySelector('.currency-dropdown-container');
 
-        // Charts don't have mode toggles, so check currency count to determine visibility
-        if (!naturalToggle && !unifiedToggle) {
-            if (dropdownContainer) {
-                dropdownContainer.style.display = 'block';
-                const select = dropdownContainer.querySelector('select');
-                if (select && select.options.length <= 1) {
-                  try { select.disabled = true; } catch (_) {}
-                } else if (select) {
-                  try { select.disabled = false; } catch (_) {}
-                }
-            }
-            return;
+      // Charts don't have mode toggles, so check currency count to determine visibility
+      if (!naturalToggle && !unifiedToggle) {
+        if (dropdownContainer) {
+          dropdownContainer.style.display = 'block';
+          const select = dropdownContainer.querySelector('select');
+          if (select && select.options.length <= 1) {
+            try { select.disabled = true; } catch (_) { }
+          } else if (select) {
+            try { select.disabled = false; } catch (_) { }
+          }
         }
+        return;
+      }
 
-        // Only update toggles if they exist (should not happen for charts, but safe fallback)
-        if (this.currencyMode === 'natural') {
-            if (naturalToggle) naturalToggle.classList.add('mode-toggle-active');
-            if (unifiedToggle) unifiedToggle.classList.remove('mode-toggle-active');
-            if (dropdownContainer) dropdownContainer.style.display = 'none';
-        } else {
-            if (unifiedToggle) unifiedToggle.classList.add('mode-toggle-active');
-            if (naturalToggle) naturalToggle.classList.remove('mode-toggle-active');
-            if (dropdownContainer) {
-                const select = dropdownContainer.querySelector('select');
-                const optionCount = select ? select.options.length : 0;
-                dropdownContainer.style.display = optionCount > 1 ? 'block' : 'none';
-            }
+      // Only update toggles if they exist (should not happen for charts, but safe fallback)
+      if (this.currencyMode === 'natural') {
+        if (naturalToggle) naturalToggle.classList.add('mode-toggle-active');
+        if (unifiedToggle) unifiedToggle.classList.remove('mode-toggle-active');
+        if (dropdownContainer) dropdownContainer.style.display = 'none';
+      } else {
+        if (unifiedToggle) unifiedToggle.classList.add('mode-toggle-active');
+        if (naturalToggle) naturalToggle.classList.remove('mode-toggle-active');
+        if (dropdownContainer) {
+          const select = dropdownContainer.querySelector('select');
+          const optionCount = select ? select.options.length : 0;
+          dropdownContainer.style.display = optionCount > 1 ? 'block' : 'none';
         }
+      }
     });
   }
 
@@ -833,8 +833,8 @@ class ChartManager {
         // Store a deep clone of nominal data (before PV transformation)
         this.cachedRowData[rowIndex] = Object.assign({}, data);
       }
-      
-      const i = rowIndex-1;
+
+      const i = rowIndex - 1;
       /*
        * Present-value handling for charts:
        * - When PV mode is enabled, charts simply consume the core PV fields that
@@ -847,28 +847,28 @@ class ChartManager {
         try {
           // Fixed monetary fields – prefer core *PV fields when present
           const monetaryFields = [
-            'NetIncome','Expenses','IncomeSalaries','IncomeRentals','IncomeRSUs','IncomePrivatePension',
-            'IncomeStatePension','IncomeDefinedBenefit','IncomeTaxFree','IncomeCash','RealEstateCapital',
-            'PensionFund','Cash','FundsCapital','SharesCapital'
+            'NetIncome', 'Expenses', 'IncomeSalaries', 'IncomeRentals', 'IncomeRSUs', 'IncomePrivatePension',
+            'IncomeStatePension', 'IncomeDefinedBenefit', 'IncomeTaxFree', 'IncomeCash', 'RealEstateCapital',
+            'PensionFund', 'Cash', 'FundsCapital', 'SharesCapital'
           ];
           for (let mf = 0; mf < monetaryFields.length; mf++) {
             const field = monetaryFields[mf];
             if (data[field] === undefined) continue;
             const pvKey = field + 'PV';
             if (Object.prototype.hasOwnProperty.call(data, pvKey) &&
-                typeof data[pvKey] === 'number' && isFinite(data[pvKey])) {
+              typeof data[pvKey] === 'number' && isFinite(data[pvKey])) {
               data[field] = data[pvKey];
             }
           }
 
           // Dynamic investment fields (Income__*, Capital__*):
           // Prefer core PV mirrors (e.g. Income__indexFundsPV) when present.
-          Object.keys(data).forEach(function(key) {
+          Object.keys(data).forEach(function (key) {
             if (typeof key === 'string' && (key.indexOf('Income__') === 0 || key.indexOf('Capital__') === 0)) {
               if (data[key] === undefined) return;
               var dynPvKey = key + 'PV';
               if (Object.prototype.hasOwnProperty.call(data, dynPvKey) &&
-                  typeof data[dynPvKey] === 'number' && isFinite(data[dynPvKey])) {
+                typeof data[dynPvKey] === 'number' && isFinite(data[dynPvKey])) {
                 data[key] = data[dynPvKey];
               }
             }
@@ -981,7 +981,7 @@ class ChartManager {
           }
         }
       }
-      
+
       // Update Cashflow Chart
       this.cashflowChart.data.labels[i] = data.Age;
       // Inflows / Outflows by label
@@ -1004,7 +1004,7 @@ class ChartManager {
         const idx = incomeIdxByKey[key];
         if (idx !== undefined) {
           const val = (data['Income__' + key] !== undefined) ? data['Income__' + key]
-                      : (key === 'indexFunds' ? data.IncomeFundsRent : key === 'shares' ? data.IncomeSharesRent : 0);
+            : (key === 'indexFunds' ? data.IncomeFundsRent : key === 'shares' ? data.IncomeSharesRent : 0);
           this.cashflowChart.data.datasets[idx].data[i] = val;
         }
       }
@@ -1028,7 +1028,7 @@ class ChartManager {
         const idx = capIdxByKey[key];
         if (idx !== undefined) {
           const val = (data['Capital__' + key] !== undefined) ? data['Capital__' + key]
-                      : (key === 'shares' ? data.SharesCapital : key === 'indexFunds' ? data.FundsCapital : 0);
+            : (key === 'shares' ? data.SharesCapital : key === 'indexFunds' ? data.FundsCapital : 0);
           this.assetsChart.data.datasets[idx].data[i] = val;
         }
       }
@@ -1129,7 +1129,7 @@ class ChartManager {
     const keys = Object.keys(cached);
     if (keys.length === 0) return false;
 
-    const numericKeys = keys.map(function(k) { return parseInt(k, 10); }).filter(function(n) { return !isNaN(n); }).sort(function(a, b) { return a - b; });
+    const numericKeys = keys.map(function (k) { return parseInt(k, 10); }).filter(function (n) { return !isNaN(n); }).sort(function (a, b) { return a - b; });
     if (numericKeys.length === 0) return false;
 
     let prevAnimCF, prevAnimAS;
@@ -1162,7 +1162,7 @@ class ChartManager {
       if (!this.chartsInitialized) {
         return;
       }
-      
+
       if (this.cashflowChart) {
         const maxAgeIndex = this.cashflowChart.data.labels.findIndex(label => label === maxAge);
         if (maxAgeIndex !== -1) {

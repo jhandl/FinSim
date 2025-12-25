@@ -189,10 +189,12 @@ module.exports = {
       const currentCountry = 'ie';
       const residenceCurrency = 'EUR';
 
+      const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+
       DataAggregatesCalculator.computeNominalAggregates(
         dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
         incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-        expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
+        expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares,
         investmentAssets, realEstate, realEstateConverted, capsByKey,
         investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
       );
@@ -242,10 +244,12 @@ module.exports = {
       const currentCountry = 'ie';
       const residenceCurrency = 'EUR';
 
+      const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+
       DataAggregatesCalculator.computeNominalAggregates(
         dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
         incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-        expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
+        expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares,
         investmentAssets, realEstate, realEstateConverted, capsByKey,
         investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
       );
@@ -289,10 +293,12 @@ module.exports = {
       const currentCountry = 'ie';
       const residenceCurrency = 'EUR';
 
+      const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+
       DataAggregatesCalculator.computeNominalAggregates(
         dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
         incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-        expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
+        expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares,
         investmentAssets, realEstate, realEstateConverted, capsByKey,
         investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
       );
@@ -338,10 +344,12 @@ module.exports = {
       const currentCountry = 'ie';
       const residenceCurrency = 'EUR';
 
+      const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+
       DataAggregatesCalculator.computeNominalAggregates(
         dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
         incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-        expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
+        expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares,
         investmentAssets, realEstate, realEstateConverted, capsByKey,
         investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
       );
@@ -388,10 +396,12 @@ module.exports = {
       const currentCountry = 'ie';
       const residenceCurrency = 'EUR';
 
+      const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+
       DataAggregatesCalculator.computeNominalAggregates(
         dataSheet, row, incomeSalaries, incomeShares, incomeRentals, incomePrivatePension, incomeStatePension,
         incomeFundsRent, incomeSharesRent, cashWithdraw, incomeDefinedBenefit, incomeTaxFree, netIncome,
-        expenses, personalPensionContribution, withdrawalRate, person1, person2, indexFunds, shares,
+        expenses, personalPensionContribution, withdrawalRate, pensionCap, person1, person2, indexFunds, shares,
         investmentAssets, realEstate, realEstateConverted, capsByKey,
         investmentIncomeByKey, revenue, stableTaxIds, cash, year, currentCountry, residenceCurrency
       );
@@ -402,12 +412,12 @@ module.exports = {
       if (Math.abs(dataRow['Tax__usc'] - 2000) > 1e-6) errors.push('Scenario 5: Tax__usc mismatch');
     }
 
-	    // Scenario 6: demo3.csv Regression
-	    // Note: This scenario may fail if demo3.csv simulation doesn't populate dataSheet correctly
-	    {
-	      const parsed = parseDemoCsvScenario(DEMO3_PATH);
-	      parsed.parameters.targetAge = 49; // Run to age 49
-	      const framework = new TestFramework();
+    // Scenario 6: demo3.csv Regression
+    // Note: This scenario may fail if demo3.csv simulation doesn't populate dataSheet correctly
+    {
+      const parsed = parseDemoCsvScenario(DEMO3_PATH);
+      parsed.parameters.targetAge = 49; // Run to age 49
+      const framework = new TestFramework();
       if (!framework.loadScenario({
         name: 'Demo3Regression',
         description: 'demo3.csv regression to age 49',
@@ -415,22 +425,22 @@ module.exports = {
         assertions: []
       })) {
         errors.push('Failed to load demo3 scenario');
-	      } else {
-	        installTestTaxRules(framework, { ie: IE_RULES, ar: AR_RULES });
-	        const results = await framework.runSimulation();
-	        // Best-effort regression: skip if simulation doesn't complete cleanly (Scenarios 1-5 validate core logic).
-	        if (!results || !results.dataSheet || results.dataSheet.length === 0 || !results.success) {
-	          // Skip Scenario 6
-	        } else {
-	          // Baselines for demo3 are intentionally not enforced here (requires curated golden values).
-	          // Keep this scenario as a smoke-run only when it succeeds.
-	          const row = results.dataSheet.find(r => r && r.age === 49);
-	          if (!row) {
-	            // Skip if age 49 row is missing
-	          }
-	        }
-	      }
-	    }
+      } else {
+        installTestTaxRules(framework, { ie: IE_RULES, ar: AR_RULES });
+        const results = await framework.runSimulation();
+        // Best-effort regression: skip if simulation doesn't complete cleanly (Scenarios 1-5 validate core logic).
+        if (!results || !results.dataSheet || results.dataSheet.length === 0 || !results.success) {
+          // Skip Scenario 6
+        } else {
+          // Baselines for demo3 are intentionally not enforced here (requires curated golden values).
+          // Keep this scenario as a smoke-run only when it succeeds.
+          const row = results.dataSheet.find(r => r && r.age === 49);
+          if (!row) {
+            // Skip if age 49 row is missing
+          }
+        }
+      }
+    }
 
     return { success: errors.length === 0, errors };
   }

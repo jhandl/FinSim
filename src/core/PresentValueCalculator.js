@@ -159,13 +159,17 @@ function computePresentValueAggregates(ctx) {
   var pensionFundNominal = 0;
   var pensionFundPVTotal = 0;
 
+  // NOTE: pot.capital() returns residence currency (post-refactor).
+  // Must convert back to pot's currency before applying pot-country deflator.
   function sumPensionPots(person) {
     if (!person || !person.pensions) return;
     for (var potCountry in person.pensions) {
       if (!Object.prototype.hasOwnProperty.call(person.pensions, potCountry)) continue;
       var pot = person.pensions[potCountry];
-      var potCapital = pot.capital();
-      pensionFundNominal += potCapital;
+      var potCapital_res = pot.capital(); // residence currency
+      pensionFundNominal += potCapital_res;
+      // Skip zero-value pots entirely (0 * any_deflator = 0)
+      if (potCapital_res === 0) continue;
       // Use the pot's country for deflation, not StartCountry
       var potDeflator = getDeflationFactorForCountry(potCountry, ageNum, startYear, {
         params: params,
@@ -173,7 +177,21 @@ function computePresentValueAggregates(ctx) {
         countryInflationOverrides: countryInflationOverrides,
         year: year
       });
-      pensionFundPVTotal += potCapital * potDeflator;
+      // Back-convert from residence currency to pot's currency for PV calculation
+      var potCountry_norm = normalizeCountry(potCountry);
+      var potCur = getCurrencyForCountry(potCountry_norm);
+      var potCapital_asset;
+      // Skip conversion if pot currency matches residence currency (no FX needed)
+      if (potCur && potCur === residenceCurrency) {
+        potCapital_asset = potCapital_res;
+      } else if (potCur) {
+        potCapital_asset = convertCurrencyAmount(potCapital_res, residenceCurrency, currentCountry, potCur, potCountry_norm, year, true);
+        if (potCapital_asset === null) throw new Error('Pension PV back-conversion failed for pot in ' + potCountry);
+      } else {
+        // Cannot determine pot currency for non-zero value - fail loudly
+        throw new Error('Pension PV: cannot determine currency for pot in ' + potCountry + ' (ruleset not loaded?)');
+      }
+      pensionFundPVTotal += potCapital_asset * potDeflator;
     }
   }
   sumPensionPots(person1);
@@ -210,6 +228,9 @@ function computePresentValueAggregates(ctx) {
   // - Local assets (residenceScope='local'): deflate using residency CPI
   // This aligns investments with real estate/pension PV semantics.
   // NOTE: This must run BEFORE the legacy column updates below, which read from investmentCapitalByKeyPV
+  // NOTE: capsByKey values are in residence currency (post-refactor).
+  // Multi-asset path: convert back to asset currency before applying asset-country deflator.
+  // Legacy path: no conversion needed (both capital and deflator use residence currency).
   if (capsByKey) {
     for (var ck in capsByKey) {
       if (!dataRow.investmentCapitalByKeyPV[ck]) dataRow.investmentCapitalByKeyPV[ck] = 0;
@@ -219,6 +240,7 @@ function computePresentValueAggregates(ctx) {
       // Legacy fallback: when investmentAssets is empty (no investmentTypes in rules), use residency deflator
       var typeEntry = investmentTypeLookup[ck];
       var typeDeflator = deflationFactor; // default to residency deflator
+      var cap_res = capsByKey[ck]; // residence currency value
 
       if (investmentAssets && investmentAssets.length > 0) {
         // Multi-asset path: per asset-plan.md §9, typeEntry must exist
@@ -227,6 +249,11 @@ function computePresentValueAggregates(ctx) {
         }
         // Per asset-plan.md §4.1: global assets use assetCountry CPI, local use residency
         if (typeEntry.residenceScope === 'global') {
+          // Skip zero-value assets entirely (0 * any_deflator = 0)
+          if (cap_res === 0) {
+            dataRow.investmentCapitalByKeyPV[ck] = 0;
+            continue;
+          }
           var assetCountryNormalized = normalizeCountry(typeEntry.assetCountry);
           typeDeflator = getDeflationFactorForCountry(assetCountryNormalized, ageNum, startYear, {
             params: params,
@@ -234,12 +261,28 @@ function computePresentValueAggregates(ctx) {
             countryInflationOverrides: countryInflationOverrides,
             year: year
           });
+          // Back-convert from residence currency to asset currency for PV calculation
+          var assetCur = getCurrencyForCountry(assetCountryNormalized);
+          var cap_asset;
+          // Skip conversion if asset currency matches residence currency (no FX needed)
+          if (assetCur && assetCur === residenceCurrency) {
+            cap_asset = cap_res;
+          } else if (assetCur) {
+            cap_asset = convertCurrencyAmount(cap_res, residenceCurrency, currentCountry, assetCur, assetCountryNormalized, year, true);
+            if (cap_asset === null) throw new Error('Investment PV back-conversion failed for ' + ck);
+          } else {
+            // Cannot determine asset currency for non-zero value - fail loudly
+            throw new Error('Investment PV: cannot determine currency for ' + ck + ' in ' + assetCountryNormalized + ' (ruleset not loaded?)');
+          }
+          dataRow.investmentCapitalByKeyPV[ck] += cap_asset * typeDeflator;
+        } else {
+          // residenceScope === 'local' → no conversion needed, use residency deflationFactor
+          dataRow.investmentCapitalByKeyPV[ck] += cap_res * typeDeflator;
         }
-        // else: residenceScope === 'local' → use residency deflationFactor (already set)
+      } else {
+        // Legacy path (no investmentTypes) → no conversion needed, use residency deflationFactor
+        dataRow.investmentCapitalByKeyPV[ck] += cap_res * typeDeflator;
       }
-      // else: legacy path (no investmentTypes) → use residency deflationFactor
-
-      dataRow.investmentCapitalByKeyPV[ck] += capsByKey[ck] * typeDeflator;
     }
   }
 
