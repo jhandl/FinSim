@@ -11,7 +11,7 @@
   <title></title>
   <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico?v=2025-08-23-usc">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20251101-3">
+  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20251226-2">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=2025-10-28-1">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-23-usc">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-23-usc" />
@@ -536,7 +536,8 @@
   <script src="/src/frontend/web/utils/FieldLabelsManager.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/ValidationUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/RelocationUtils.js?v=20251104b"></script>
-  <script src="/src/frontend/web/components/TableManager.js?v=2025-11-26-1"></script>
+  <script src="/src/frontend/web/components/DynamicSectionManager.js?v=20251225-2"></script>
+  <script src="/src/frontend/web/components/TableManager.js?v=20251225-6"></script>
   <script src="/src/frontend/web/components/EventsTableManager.js?v=20251210-1"></script>
   <script src="/src/frontend/web/components/RelocationImpactDetector.js?v=20251210-1"></script>
   <script src="/src/frontend/web/components/RelocationImpactAssistant.js?v=20251210-1"></script>
@@ -1452,11 +1453,16 @@
       const dataTable = document.getElementById('Data');
       if (!dataTable) return;
 
-      const ageHeader = dataTable.querySelector('thead tr:last-child th:nth-child(1)');
-      if (!ageHeader) return;
+      // Read Age column width from first data row (not thead, which may be hidden)
+      // Fall back to thead if no data rows exist yet
+      let ageCell = dataTable.querySelector('tbody tr:not(.tax-header) td:nth-child(1)');
+      if (!ageCell) {
+        ageCell = dataTable.querySelector('thead tr:last-child th:nth-child(1)');
+      }
+      if (!ageCell) return;
 
       // Get the computed width of the Age column including borders and padding
-      const ageWidth = ageHeader.offsetWidth;
+      const ageWidth = ageCell.offsetWidth;
 
       // Set CSS custom property for dynamic positioning
       dataTable.style.setProperty('--age-column-width', `${ageWidth}px`);

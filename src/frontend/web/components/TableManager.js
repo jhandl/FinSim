@@ -4,8 +4,6 @@ class TableManager {
 
   constructor(webUI) {
     this.webUI = webUI;
-    // One-time tax header initialization flag per simulation
-    this._taxHeaderInitialized = false;
     // Flag to track if income visibility has been initialized
     this._incomeVisibilityInitialized = false;
     this.currencyMode = 'natural'; // 'natural' or 'unified'
@@ -15,6 +13,13 @@ class TableManager {
     this.conversionCache = {};
     this.storedCountryTimeline = null; // Persisted timeline from last simulation run
     this.presentValueMode = false; // Display monetary values in today's terms when enabled
+    // Dynamic section manager for elastic column layouts during relocations
+    this.dynamicSectionManager = null;
+    // Dynamic tax header management
+    this._taxHeaderObserver = null;
+    this._activeTaxHeader = null;
+    this._taxHeaders = [];
+    this._lastCountry = null;
   }
 
   setPresentValueMode(enabled) {
@@ -124,13 +129,24 @@ class TableManager {
 
     // Reset header init at the start of each simulation (first row)
     if (rowIndex === 0 || rowIndex === 1) {
-      this._taxHeaderInitialized = false;
       this.conversionCache = {}; // Clear cache for new simulation
       // Always clear stored timeline at start to force recomputation for current dataSheet
       this.storedCountryTimeline = null;
       RelocationUtils.extractRelocationTransitions(this.webUI, this);
       // Store the computed timeline for reuse during display of this dataSheet
       this.storedCountryTimeline = this.countryTimeline.slice();
+
+      // Initialize dynamic section manager for elastic Deductions section
+      if (Config.getInstance().isRelocationEnabled()) {
+        this.dynamicSectionManager = new DynamicSectionManager(DEDUCTIONS_SECTION_CONFIG);
+        this.dynamicSectionManager.calculateMaxWidth(this);
+      } else {
+        this.dynamicSectionManager = null;
+      }
+
+      // Cleanup previous tax headers for new simulation
+      this._cleanupTaxHeaders();
+      this._lastCountry = null;
     }
 
     // On initial page load, show only pinned income columns
@@ -150,140 +166,129 @@ class TableManager {
       this._incomeVisibilityInitialized = true;
     }
 
-    // Before building row, ensure headers exist for any new dynamic keys
+    // Detect relocation boundaries for dynamic tax headers
+    let needsNewTaxHeader = false;
+    let currentCountry = null;
+
+    if (Config.getInstance().isRelocationEnabled() && this.countryTimeline && this.countryTimeline.length > 0) {
+      currentCountry = RelocationUtils.getCountryForAge(data.Age, this);
+
+      // Check if this is the first data row or if country changed from previous row
+      if (rowIndex === 1) {
+        needsNewTaxHeader = true;
+        this._lastCountry = currentCountry;
+      } else if (this._lastCountry !== currentCountry) {
+        needsNewTaxHeader = true;
+        this._lastCountry = currentCountry;
+      }
+    } else if (!Config.getInstance().isRelocationEnabled()) {
+      // Fallback: create a single tax header row at the start for non-relocation scenarios
+      if (rowIndex === 1 && this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
+        const defaultCountry = Config.getInstance().getDefaultCountry() || 'ie';
+        currentCountry = defaultCountry;
+        needsNewTaxHeader = true;
+        this._lastCountry = currentCountry;
+      } else if (rowIndex === 1) {
+        // Even without dynamicSectionManager, insert a header for the default country
+        const defaultCountry = Config.getInstance().getDefaultCountry() || 'ie';
+        currentCountry = defaultCountry;
+        needsNewTaxHeader = true;
+        this._lastCountry = currentCountry;
+      }
+    }
+
+    // Insert country-specific tax header row when needed
+    if (needsNewTaxHeader && currentCountry) {
+      const taxHeaderRow = this._createTaxHeaderRow(currentCountry, data.Age);
+
+      // Insert before the current data row
+      const existingRow = document.getElementById(`data_row_${rowIndex}`);
+      if (existingRow) {
+        tbody.insertBefore(taxHeaderRow, existingRow);
+      } else {
+        tbody.appendChild(taxHeaderRow);
+      }
+
+      // Register with IntersectionObserver for sticky behavior
+      this._registerTaxHeader(taxHeaderRow);
+    }
+
+    // Before building row, update Deductions group header colspan
     const headerRow = document.querySelector('#Data thead tr:nth-child(2)');
     if (headerRow) {
-      const existingKeys = new Set(Array.from(headerRow.querySelectorAll('th[data-key]')).map(h => h.dataset.key));
       // Find the Deductions group header cell via data attribute for robustness
       let deductionsGroupTh = null;
       try {
         deductionsGroupTh = document.querySelector('#Data thead tr.header-groups th[data-group="deductions"]');
       } catch (_) { deductionsGroupTh = null; }
 
-      // Note: Pre-existing legacy tax headers (IT/PRSI/USC/CGT) should not exist in the DOM.
-      // Dynamic tax headers are created below solely from simulation data + ruleset.
-
-      // Add any new dynamic tax columns that don't already exist, ordered by stableTaxIds
-      if (!this._taxHeaderInitialized) {
-        // Build stable order list from global simulator or from ruleset/union as fallback
-        let order = [];
-        // 1) Prefer stableTaxIds exposed globally
-        try {
-          if (typeof window !== 'undefined' && Array.isArray(window.stableTaxIds) && window.stableTaxIds.length > 0) {
-            order = window.stableTaxIds.slice();
-          } else if (typeof stableTaxIds !== 'undefined' && Array.isArray(stableTaxIds) && stableTaxIds.length > 0) {
-            order = stableTaxIds.slice();
-          }
-        } catch (_) { }
-
-        // 2) If not available, attempt union of all Tax__* keys from existing dataSheet rows (if present)
-        if (!order || order.length === 0) {
-          try {
-            if (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) {
-              const union = {};
-              for (let ri = 0; ri < dataSheet.length; ri++) {
-                const rowObj = dataSheet[ri];
-                if (!rowObj) continue;
-                const keys = Object.keys(rowObj);
-                for (let ki = 0; ki < keys.length; ki++) {
-                  const k = keys[ki];
-                  if (k && k.indexOf('Tax__') === 0) {
-                    const id = k.substring(5);
-                    if (id) union[id] = true;
-                  }
-                }
-              }
-              order = Object.keys(union);
-            }
-          } catch (_) { }
-        }
-
-        // 3) If still empty, derive in exact file order from ruleset
-        if (!order || order.length === 0) {
-          try {
-            const cfg = Config.getInstance();
-            const rs = (cfg.getCachedTaxRuleSet ? (cfg.getCachedTaxRuleSet(cfg.getDefaultCountry && cfg.getDefaultCountry())) : null) || (cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet() : null);
-            if (rs && typeof rs.getTaxOrder === 'function') {
-              order = rs.getTaxOrder();
-            } else {
-              order = ['incomeTax', 'capitalGains'];
-            }
-          } catch (_) {
-            order = ['incomeTax', 'capitalGains'];
-          }
-        }
-
-        // Also include any Tax__ keys present in this first row's data that aren't in order
-        // Exclude PV keys (Tax__*PV) - those are for value lookup, not column headers
-        try {
-          const currentTaxKeys = Object.keys(data).filter(k => k.indexOf('Tax__') === 0 && !k.endsWith('PV')).map(k => k.substring(5));
-          const inOrder = {};
-          for (let i = 0; i < order.length; i++) inOrder[String(order[i]).toLowerCase()] = true;
-          for (let j = 0; j < currentTaxKeys.length; j++) {
-            const low = String(currentTaxKeys[j]).toLowerCase();
-            if (!inOrder[low]) order.push(currentTaxKeys[j]);
-          }
-        } catch (_) { }
-
-        // Determine insertion anchor: last existing tax th; fallback to PensionContribution before it
-        const taxThs = Array.from(headerRow.querySelectorAll('th[data-key^="Tax__"]'));
-        const pensionTh = headerRow.querySelector('th[data-key="PensionContribution"]');
-        let anchor = taxThs.length > 0 ? taxThs[taxThs.length - 1] : (pensionTh || null);
-
-        // Create th for each tax id in order if not present
-        for (let oi = 0; oi < order.length; oi++) {
-          const taxId = order[oi];
-          const key = 'Tax__' + taxId;
-          if (existingKeys.has(key)) continue;
-
-          const th = document.createElement('th');
-          th.setAttribute('data-key', key);
-          // Get display name from tax ruleset if available
-          let displayName = String(taxId).toUpperCase();
-          try {
-            const cfg2 = Config.getInstance();
-            const rs2 = cfg2.getCachedTaxRuleSet ? cfg2.getCachedTaxRuleSet() : null;
-            if (rs2 && typeof rs2.getDisplayNameForTax === 'function') {
-              displayName = rs2.getDisplayNameForTax(taxId);
-            }
-          } catch (_) { }
-          th.textContent = displayName;
-          let tip = displayName + ' tax paid'; try { const cfg3 = Config.getInstance(); const rs3 = cfg3.getCachedTaxRuleSet ? cfg3.getCachedTaxRuleSet() : null; const t = rs3 && rs3.getTooltipForTax && rs3.getTooltipForTax(taxId); if (t) tip = t; } catch (_) { }
-          TooltipUtils.attachTooltip(th, tip, { hoverDelay: 150, touchDelay: 250 });
-
-          if (anchor) {
-            if (anchor.nextSibling) {
-              headerRow.insertBefore(th, anchor.nextSibling);
-            } else {
-              headerRow.appendChild(th);
-            }
-          } else if (pensionTh) {
-            headerRow.insertBefore(th, pensionTh);
-          } else {
-            headerRow.appendChild(th);
-          }
-          anchor = th;
-          existingKeys.add(key);
-        }
-
-        // Mark headers initialized for this run
-        this._taxHeaderInitialized = true;
-      }
-
-      // Fix colspan calculation: count actual tax columns instead of adding to base
-      if (deductionsGroupTh) {
+      // Update Deductions colspan using dynamicSectionManager max column count
+      if (deductionsGroupTh && this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
+        const maxTaxColumns = this.dynamicSectionManager.getMaxColumnCount();
+        deductionsGroupTh.colSpan = Math.max(1, maxTaxColumns);
+      } else if (deductionsGroupTh) {
+        // Fallback: count actual rendered tax columns + PensionContribution
         const taxColumnCount = headerRow.querySelectorAll('th[data-key^="Tax__"]').length;
-        deductionsGroupTh.colSpan = taxColumnCount + 1; // +1 for PensionContribution
+        const pensionContribTh = headerRow.querySelector('th[data-key="PensionContribution"]');
+        const deductionsColspan = taxColumnCount + (pensionContribTh ? 1 : 0);
+        deductionsGroupTh.colSpan = Math.max(1, deductionsColspan);
       }
+
       // Refresh dynamic group border markers after potential header changes
       try { if (this.webUI && typeof this.webUI.updateGroupBorders === 'function') { this.webUI.updateGroupBorders(); } } catch (_) { }
     }
 
     // Get the order of columns from the table header, only visible ones with data-key attributes
-    const headers = Array.from(document.querySelectorAll('#Data thead th[data-key]')).filter(h => h.style.display !== 'none');
+    // Note: <thead> doesn't have Tax__ columns - we inject them dynamically per-country
+    const baseHeaders = Array.from(document.querySelectorAll('#Data thead th[data-key]')).filter(h => h.style.display !== 'none');
+
+    // Build a virtual headers list that includes country-specific tax columns
+    // Find PensionContribution - tax columns go AFTER it (PensionContribution comes first in deductions)
+    const pensionContribIndex = baseHeaders.findIndex(h => h.getAttribute('data-key') === 'PensionContribution');
+
+    // Get tax columns for the current country (excludes PensionContribution)
+    let taxColumns = [];
+    const rowCountry = currentCountry || RelocationUtils.getCountryForAge(data.Age, this) || Config.getInstance().getDefaultCountry() || 'ie';
+    if (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
+      const countryColumns = this.dynamicSectionManager.getColumnsForCountry(rowCountry) || [];
+      // Filter out PensionContribution since it's already in baseHeaders
+      taxColumns = countryColumns.filter(c => c.key !== 'PensionContribution');
+    } else {
+      // Fallback: get from DEDUCTIONS_SECTION_CONFIG
+      try {
+        const allCols = DEDUCTIONS_SECTION_CONFIG.getColumns(rowCountry);
+        taxColumns = allCols.filter(c => c.key !== 'PensionContribution');
+      } catch (_) {
+        taxColumns = [];
+      }
+    }
+
+    // Build virtual headers: baseHeaders with tax columns inserted AFTER PensionContribution
+    // Each tax column needs a virtual header object with dataset.key
+    const virtualTaxHeaders = taxColumns.map(col => ({
+      dataset: { key: col.key },
+      getAttribute: (attr) => attr === 'data-key' ? col.key : null,
+      textContent: col.label,
+      style: { display: '' }
+    }));
+
+    let headers;
+    if (pensionContribIndex >= 0) {
+      // Insert tax columns AFTER PensionContribution (it comes first in deductions)
+      headers = [
+        ...baseHeaders.slice(0, pensionContribIndex + 1),  // up to and including PensionContribution
+        ...virtualTaxHeaders,
+        ...baseHeaders.slice(pensionContribIndex + 1)      // rest of columns
+      ];
+    } else {
+      // PensionContribution not found - append tax columns at end
+      headers = [...baseHeaders, ...virtualTaxHeaders];
+    }
+
 
     // Create cells and format values in the order of the headers
     headers.forEach((header, headerIndex) => {
+
       const key = header.dataset.key;
       // Nominal and (optional) PV values from the core data sheet
       const nominalValue = (data[key] == null ? 0 : data[key]);
@@ -592,14 +597,28 @@ class TableManager {
         contentContainer.appendChild(infoIcon);
       }
 
-      // Apply dynamic group border alignment based on header markers
+      // Apply dynamic group border alignment based on data-key predicates
+      // (mirrors updateGroupBorders logic so borders work even without original thead attributes)
       try {
-        if (header.hasAttribute('data-group-end')) {
-          td.setAttribute('data-group-end', '1');
-          td.style.borderRight = '3px solid #666';
-        }
-        // Ensure last data cell closes the table with a right border
-        if (headerIndex === headers.length - 1) {
+        // Determine if this cell is at a group boundary
+        const isIncome = (k) => k && k.indexOf('Income') === 0;
+        const isTax = (k) => k && k.indexOf('Tax__') === 0;
+        const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
+          k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
+
+        // Find indices of group boundaries within the headers array
+        const allKeys = headers.map(h => h.dataset?.key || h.getAttribute?.('data-key'));
+        const yearBoundaryIdx = allKeys.indexOf('Year');
+        const incomeLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isIncome(allKeys[i])) return i; return -1; })();
+        let deductionsLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isTax(allKeys[i])) return i; return -1; })();
+        if (deductionsLastIdx === -1) deductionsLastIdx = allKeys.indexOf('PensionContribution');
+        const expensesBoundaryIdx = allKeys.indexOf('Expenses');
+        const assetsLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isAsset(allKeys[i])) return i; return -1; })();
+        const lastIdx = allKeys.length - 1;
+
+        const boundarySet = new Set([yearBoundaryIdx, incomeLastIdx, deductionsLastIdx, expensesBoundaryIdx, assetsLastIdx, lastIdx].filter(i => i >= 0));
+
+        if (boundarySet.has(headerIndex)) {
           td.setAttribute('data-group-end', '1');
           td.style.borderRight = '3px solid #666';
         }
@@ -623,7 +642,10 @@ class TableManager {
     if (ageColumnIndex === -1) {
       return;
     }
-    const dataRows = document.querySelectorAll('#Data tbody tr');
+    const tbody = document.querySelector('#Data tbody');
+    const allRows = document.querySelectorAll('#Data tbody tr');
+    // Filter to only data rows (exclude tax header rows)
+    const dataRows = Array.from(allRows).filter(row => !row.classList.contains('tax-header'));
     let maxAgeRowIndex = -1;
     dataRows.forEach((row, index) => {
       const ageCell = row.cells[ageColumnIndex];
@@ -635,12 +657,30 @@ class TableManager {
       }
     });
     if (maxAgeRowIndex !== -1) {
-      // Remove all rows starting after the first maxAge row
+      // Remove all data rows starting after the first maxAge row
       for (let i = dataRows.length - 1; i >= maxAgeRowIndex; i--) {
         dataRows[i].remove();
       }
     }
+
+    // Remove tax header rows beyond maxAge
+    const taxHeaders = tbody.querySelectorAll('tr.tax-header');
+    taxHeaders.forEach(header => {
+      const age = parseInt(header.getAttribute('data-age'), 10);
+      if (!isNaN(age) && age > maxAge) {
+        if (this._taxHeaderObserver) {
+          this._taxHeaderObserver.unobserve(header);
+        }
+        header.remove();
+        // Also remove from tracking array
+        const idx = this._taxHeaders.indexOf(header);
+        if (idx > -1) {
+          this._taxHeaders.splice(idx, 1);
+        }
+      }
+    });
   }
+
 
   exportDataTableAsCSV() {
     const table = document.getElementById('Data');
@@ -1049,5 +1089,176 @@ class TableManager {
 
   }
 
+  /**
+   * Creates a country-specific tax header row for insertion into tbody
+   * @param {string} country - Country code (lowercase)
+   * @param {number} age - The age at which this header starts
+   * @returns {HTMLTableRowElement} The created header row
+   */
+  _createTaxHeaderRow(country, age) {
+    const headerRow = document.createElement('tr');
+    headerRow.className = 'tax-header';
+    headerRow.setAttribute('data-country', country);
+    headerRow.setAttribute('data-age', age);
+
+    // Get column definitions from DynamicSectionManager (PensionContribution first, then taxes)
+    let deductionColumns = [];
+
+    if (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
+      deductionColumns = this.dynamicSectionManager.getColumnsForCountry(country) || [];
+    } else {
+      // Fallback: get columns directly from config
+      try {
+        deductionColumns = DEDUCTIONS_SECTION_CONFIG.getColumns(country);
+      } catch (_) {
+        deductionColumns = [{ key: 'PensionContribution', label: 'P.Contrib', tooltip: 'Amount contributed to private pensions' }];
+      }
+    }
+
+    // Get the main header row to understand column structure
+    const mainHeaderRow = document.querySelector('#Data thead tr:last-child');
+    if (!mainHeaderRow) {
+      console.warn('_createTaxHeaderRow: Main header row not found');
+      return headerRow;
+    }
+
+    // Get base headers from <thead>
+    const baseHeaders = Array.from(mainHeaderRow.querySelectorAll('th[data-key]')).filter(h => h.style.display !== 'none');
+
+    // Find PensionContribution position - deduction columns go AFTER it
+    const pensionContribIndex = baseHeaders.findIndex(h => h.getAttribute('data-key') === 'PensionContribution');
+
+    // Separate PensionContribution from tax columns
+    const pensionColumn = deductionColumns.find(c => c.key === 'PensionContribution');
+    const taxColumns = deductionColumns.filter(c => c.key !== 'PensionContribution');
+
+    // Build the complete list of cells we'll create with their data-keys
+    // This lets us determine group boundaries after all cells are defined
+    const cellDefs = [];
+
+    // Cells for headers before PensionContribution
+    for (let i = 0; i < pensionContribIndex && i < baseHeaders.length; i++) {
+      const th = baseHeaders[i];
+      cellDefs.push({
+        label: th.textContent,
+        key: th.getAttribute('data-key'),
+        tooltip: null,
+        originalTh: th
+      });
+    }
+
+    // PensionContribution cell (comes first in deductions)
+    if (pensionColumn) {
+      cellDefs.push({
+        label: pensionColumn.label,
+        key: 'PensionContribution',
+        tooltip: pensionColumn.tooltip,
+        originalTh: null
+      });
+    }
+
+    // Tax columns (country-specific)
+    taxColumns.forEach(col => {
+      cellDefs.push({
+        label: col.label,
+        key: col.key,
+        tooltip: col.tooltip,
+        originalTh: null
+      });
+    });
+
+    // Cells for headers after PensionContribution
+    for (let i = pensionContribIndex + 1; i < baseHeaders.length; i++) {
+      const th = baseHeaders[i];
+      cellDefs.push({
+        label: th.textContent,
+        key: th.getAttribute('data-key'),
+        tooltip: null,
+        originalTh: th
+      });
+    }
+
+    // Helper predicates for group identification (mirrors updateGroupBorders in WebUI.js)
+    const isIncome = (k) => k && k.indexOf('Income') === 0;
+    const isTax = (k) => k && k.indexOf('Tax__') === 0;
+    const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
+      k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
+
+    // Find group boundary indices
+    const yearIdx = cellDefs.findIndex(c => c.key === 'Year');
+    const incomeLastIdx = (() => { for (let i = cellDefs.length - 1; i >= 0; i--) if (isIncome(cellDefs[i].key)) return i; return -1; })();
+    let deductionsLastIdx = (() => { for (let i = cellDefs.length - 1; i >= 0; i--) if (isTax(cellDefs[i].key)) return i; return -1; })();
+    if (deductionsLastIdx === -1) deductionsLastIdx = cellDefs.findIndex(c => c.key === 'PensionContribution');
+    const expensesIdx = cellDefs.findIndex(c => c.key === 'Expenses');
+    const assetsLastIdx = (() => { for (let i = cellDefs.length - 1; i >= 0; i--) if (isAsset(cellDefs[i].key)) return i; return -1; })();
+
+    // Build set of boundary indices
+    const boundaryIdxs = new Set([yearIdx, incomeLastIdx, deductionsLastIdx, expensesIdx, assetsLastIdx, cellDefs.length - 1].filter(i => i >= 0));
+
+    // Create the actual th cells
+    cellDefs.forEach((def, idx) => {
+      const cell = document.createElement('th');
+      cell.textContent = def.label;
+      if (def.key) cell.setAttribute('data-key', def.key);
+
+      // Set group border if this is a boundary column
+      if (boundaryIdxs.has(idx)) {
+        cell.setAttribute('data-group-end', '1');
+        cell.style.borderRight = '3px solid #666';
+      }
+
+      // Attach tooltip if provided
+      if (def.tooltip) {
+        TooltipUtils.attachTooltip(cell, def.tooltip, { hoverDelay: 300, touchDelay: 400 });
+      }
+
+      headerRow.appendChild(cell);
+    });
+
+    return headerRow;
+  }
+
+
+
+
+
+  /**
+   * Initializes the IntersectionObserver for tracking tax header visibility
+   * Note: Sticky positioning is now handled entirely by CSS
+   */
+  _initializeTaxHeaderObserver() {
+    // CSS handles sticky positioning natively with `position: sticky; top: 38px`
+    // Observer is kept for potential future use (e.g., tracking active country)
+    if (this._taxHeaderObserver) return;
+    this._taxHeaderObserver = { observe: () => { }, disconnect: () => { } }; // No-op placeholder
+  }
+
+  /**
+   * Registers a tax header row (for tracking purposes)
+   * @param {HTMLTableRowElement} headerRow - The tax header row to track
+   */
+  _registerTaxHeader(headerRow) {
+    this._taxHeaders.push(headerRow);
+  }
+
+  /**
+   * Cleans up tax headers for a new simulation
+   */
+  _cleanupTaxHeaders() {
+    // Remove all tax header rows from DOM
+    const tbody = document.querySelector('#Data tbody');
+    if (tbody) {
+      const existingHeaders = tbody.querySelectorAll('tr.tax-header');
+      existingHeaders.forEach(header => header.remove());
+    }
+
+    // Reset tracking arrays
+    this._taxHeaders = [];
+    this._activeTaxHeader = null;
+    this._taxHeaderObserver = null;
+  }
+
 }
+
+
 
