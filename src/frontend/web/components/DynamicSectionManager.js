@@ -126,12 +126,130 @@ class DynamicSectionManager {
   }
 
   /**
+   * Gets the section name from the config
+   * 
+   * @returns {string} The section name (lowercase, suitable for data attributes)
+   */
+  getSectionName() {
+    return this.config.name ? this.config.name.toLowerCase() : 'unknown';
+  }
+
+  /**
    * Checks if the manager has been initialized with data
    * 
    * @returns {boolean} True if initialized
    */
   isInitialized() {
     return this.initialized;
+  }
+
+  /**
+   * Measures all dynamic section cells and applies proportional scaling so that:
+   * 1. All countries' sections have the same total width
+   * 2. Within each country, relative column proportions are preserved
+   * 
+   * Uses generic CSS classes: .dynamic-section-container and .dynamic-section-cell
+   * with data-section attribute to identify which section the cells belong to.
+   * 
+   * @param {Element} tbody - The tbody element to search within
+   */
+  finalizeSectionWidths(tbody) {
+    if (!tbody || !this.initialized) return;
+
+    const sectionName = this.getSectionName();
+    const containerSelector = `.dynamic-section-container[data-section="${sectionName}"]`;
+    const cellSelector = '.dynamic-section-cell';
+
+    // Group all containers by country
+    const countryMeasurements = new Map(); // country -> { maxPerColumn: [], cells: [] }
+
+    // Measure tax header rows (have data-country attribute)
+    const taxHeaders = tbody.querySelectorAll('tr.tax-header');
+    taxHeaders.forEach(headerRow => {
+      const country = headerRow.getAttribute('data-country');
+      if (!country) return;
+
+      const container = headerRow.querySelector(containerSelector);
+      if (!container) return;
+
+      const cells = container.querySelectorAll(cellSelector);
+      if (cells.length === 0) return;
+
+      // Initialize measurement for this country
+      if (!countryMeasurements.has(country)) {
+        countryMeasurements.set(country, { maxPerColumn: [], cells: [] });
+      }
+      const m = countryMeasurements.get(country);
+
+      // Measure each cell's natural width (scrollWidth)
+      cells.forEach((cell, i) => {
+        const naturalWidth = cell.scrollWidth;
+        if (!m.maxPerColumn[i] || naturalWidth > m.maxPerColumn[i]) {
+          m.maxPerColumn[i] = naturalWidth;
+        }
+        m.cells.push(cell);
+      });
+    });
+
+    // Measure data rows - determine country by finding which tax header precedes them
+    let currentCountry = null;
+    const allRows = tbody.querySelectorAll('tr');
+    allRows.forEach(row => {
+      if (row.classList.contains('tax-header')) {
+        currentCountry = row.getAttribute('data-country');
+      } else if (currentCountry) {
+        const container = row.querySelector(containerSelector);
+        if (!container) return;
+
+        const cells = container.querySelectorAll(cellSelector);
+        if (cells.length === 0) return;
+
+        const m = countryMeasurements.get(currentCountry);
+        if (!m) return;
+
+        cells.forEach((cell, i) => {
+          const naturalWidth = cell.scrollWidth;
+          if (!m.maxPerColumn[i] || naturalWidth > m.maxPerColumn[i]) {
+            m.maxPerColumn[i] = naturalWidth;
+          }
+          m.cells.push(cell);
+        });
+      }
+    });
+
+    // Calculate total natural width per country
+    countryMeasurements.forEach((m) => {
+      m.totalNaturalWidth = m.maxPerColumn.reduce((sum, w) => sum + (w || 0), 0);
+    });
+
+    // Find max total width across all countries
+    let maxTotalWidth = 0;
+    countryMeasurements.forEach(m => {
+      if (m.totalNaturalWidth > maxTotalWidth) {
+        maxTotalWidth = m.totalNaturalWidth;
+      }
+    });
+
+    if (maxTotalWidth === 0) return;
+
+    // Apply proportional scaling to each country
+    countryMeasurements.forEach((m) => {
+      if (m.totalNaturalWidth === 0) return;
+
+      const scaleFactor = maxTotalWidth / m.totalNaturalWidth;
+      const scaledWidths = m.maxPerColumn.map(w => Math.round((w || 0) * scaleFactor));
+
+      // Apply scaled widths to all cells for this country
+      let cellIndex = 0;
+      const numColumns = m.maxPerColumn.length;
+      m.cells.forEach(cell => {
+        const colIdx = cellIndex % numColumns;
+        cell.style.width = `${scaledWidths[colIdx]}px`;
+        cell.style.flexShrink = '0';
+        cell.style.flexGrow = '0';
+        cellIndex++;
+      });
+    });
   }
 
   /**

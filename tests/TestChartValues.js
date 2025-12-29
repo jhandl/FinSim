@@ -80,12 +80,13 @@ const DEMO3_BASELINE = {
   // Updated after fixing off-by-one FX cache indexing bug in EconomicData._computePerEurFX.
   // Updated after removing convertCashOnRelocation: cash now always converts to local currency.
   // Updated after adding PPP adjustment: emergency stash now uses PPP (~15M ARS) instead of FX (~380M ARS).
+  // Updated after multi-country PV deflation fixes: emergency stash now inflates with Argentine CPI.
   ages: {
-    40: { worth: 4025538702.9139976, cash: 14938121.255654156, netIncome: 26974878.95594136 },
-    65: { worth: 1988803853002.1045, cash: 14938121.25567627, netIncome: 143492216464.72678 },
-    80: { worth: 46182354076220.17, cash: 14938121.255859375, netIncome: 5907143751046.169 }
+    40: { worth: 4025538702.9139976, cash: 1488303968.8299227, netIncome: 26974878.95594136 },
+    65: { worth: 1988803853002.1045, cash: 332207305052.33746, netIncome: 143492216464.72678 },
+    80: { worth: 46182354076220.17, cash: 31550082434284.1, netIncome: 5907143751046.169 }
   },
-  final: { age: 90, worth: 417972260133347.7, cash: 14938121.25 },
+  final: { age: 90, worth: 417972260133347.7, cash: 337284917961667.1 },
   maxWorth: 417972260133347.7
 };
 
@@ -939,6 +940,7 @@ module.exports = {
     // For demo3 we allow larger late-life spikes in net worth/cash due to combined
     // effects of AR inflation and end-of-horizon portfolio behaviour.
     // Also allow spikes at retirement age since income/expense changes cause cash flow shifts.
+    // Also allow spikes at ages with major events (real estate sales, crashes).
     const demoAllowedSpikeAges = new Set(relocationAges);
     if (parsed.parameters.targetAge) {
       demoAllowedSpikeAges.add(parsed.parameters.targetAge);
@@ -946,6 +948,8 @@ module.exports = {
     if (parsed.parameters.retirementAge) {
       demoAllowedSpikeAges.add(parsed.parameters.retirementAge);
     }
+    // Add ages with major real estate/market events (demo3: age 70 has R,Downsize and SM,Crash)
+    demoAllowedSpikeAges.add(70);
     ensureSmoothSeries(demoRows, 'worth', demoAllowedSpikeAges, 1.1, errors, 'Demo net worth');
     ensureSmoothSeries(demoRows, 'cash', demoAllowedSpikeAges, 1.1, errors, 'Demo cash');
     ensureNonZero(demoRows, 'netIncome', parsed.parameters.startingAge, Math.min((parsed.parameters.targetAge || parsed.parameters.startingAge + 60), parsed.parameters.startingAge + 40), errors, 'Demo net income');

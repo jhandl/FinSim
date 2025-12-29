@@ -20,3 +20,5 @@ A local webserver is always running, so there's never need to start a new one to
 The user always has a browser window open on the UI. Do not run the "Open in Browser" command. It's always already open.
 
 If logging to the console, use console.log().
+
+The most critical rule of all: YOU WILL ALWAYS STOP AND ASK FOR THE USER'S INPUT BEFORE PROCEEDING. THE USER WILL TELL YOU WHICH HYPOTHESES TO PURSUE. IF YOU DON'T STOP, YOU FAIL AND EVERYTHING YOU DO WILL BE DELETED. 

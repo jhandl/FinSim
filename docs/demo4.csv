@@ -50,10 +50,10 @@ StartCountry,ie
 
 # Events
 Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta
-SI,You,40000,30,40,0.035,0.03,lei=split_1762624764068_cmuo82pdo
-SI2np,Your Partner,30000,30,40,0.02,0,lei=split_1762624772055_tlitwyl80
-E,Life,40000,30,40,,,lei=split_1762624789954_fgc7fmqve
-E,Kid,6000,32,40,,,lei=split_1762624796604_1zr4xkn8q
+SI,You,40000,30,39,0.035,0.03,lei=split_1762624764068_cmuo82pdo
+SI2np,Your Partner,30000,30,39,0.02,0,lei=split_1762624772055_tlitwyl80
+E,Life,40000,30,39,,,lei=split_1762624789954_fgc7fmqve
+E,Kid,6000,32,39,,,lei=split_1762624796604_1zr4xkn8q
 R,Family House,40000,35,70,,,cur=EUR;lc=ie
 M,Family House,18000,35,60,0.035,,cur=EUR;lc=ie
 MV-AR,hola,0,40,,,,

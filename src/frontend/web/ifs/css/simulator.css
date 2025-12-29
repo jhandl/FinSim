@@ -1496,23 +1496,74 @@ th {
 }
 
 /*
- * Dynamic Deductions Section Layout
- * Supports elastic column widths when relocations change the tax column count.
- * The table uses a standard layout with dynamic colspan management rather than
- * CSS Grid to maintain compatibility with existing sticky headers and group borders.
+ * Dynamic Section Layout (Generic)
+ * Uses flexbox container within a single colspan cell to allow cells to
+ * distribute evenly regardless of how many columns each country has.
+ * This ensures consistent total section width across all countries.
+ * Works with any dynamic section via data-section attribute.
  */
 
-/* Ensure Deductions section columns distribute evenly within the section */
-#Data th[data-key^="Tax__"],
-#Data td[data-key^="Tax__"] {
-  /* Uniform minimum width ensures tax columns don't collapse */
-  min-width: 80px;
+/* Dynamic section container cell - spans the entire section */
+#Data td.dynamic-section-container,
+#Data th.dynamic-section-container {
+  padding: 0;
+  /* Remove cell padding, flex items handle their own */
 }
 
-/* PensionContribution column maintains consistent width */
-#Data th[data-key="PensionContribution"],
-#Data td[data-key="PensionContribution"] {
-  min-width: 80px;
+/* Flexbox layout for dynamic sections - distributes items evenly */
+.dynamic-section-flex {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+/* Individual dynamic section cell (flex item) - styled to look like a normal table cell */
+/* Width is measured and applied by DynamicSectionManager.finalizeSectionWidths() after render */
+.dynamic-section-flex>.dynamic-section-cell {
+  flex: 0 0 auto;
+  /* Don't grow or shrink - width set after measurement */
+  padding: 0.5rem;
+  text-align: right;
+  border-right: 1px solid var(--border-color);
+  white-space: nowrap;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  position: relative;
+  box-sizing: border-box;
+  /* Prevent text selection like regular cells */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Last cell doesn't need right border (container td has group border) */
+.dynamic-section-flex>.dynamic-section-cell:last-child {
+  border-right: none;
+}
+
+/* Cell content within dynamic section flex item */
+.dynamic-section-flex>.dynamic-section-cell>.cell-content {
+  display: inline;
+}
+
+/* Info icon within dynamic section flex item */
+.dynamic-section-flex>.dynamic-section-cell .cell-info-icon {
+  /* Inherits existing .cell-info-icon styling from main table */
+  margin-left: 0.25rem;
+}
+
+/* Header-specific styling for dynamic section flex items in th containers */
+#Data th.dynamic-section-container .dynamic-section-cell {
+  font-weight: bold;
+  background-color: #f5f5f5;
+}
+
+/* Tax header row dynamic section cells need same background as tax headers */
+#Data tbody tr.tax-header th.dynamic-section-container .dynamic-section-cell {
+  background-color: #f5f5f5;
 }
 
 #Data th,

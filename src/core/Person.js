@@ -110,9 +110,20 @@ class Person {
       this.phase = Phases.retired;
     }
 
-    // Private Pension Drawdown: If retired, calculate drawdown
+    // Private Pension Drawdown: If retired, draw from all pension pots
+    var privatePensionByCountry = {};
     if (this.phase === Phases.retired) {
-      this.yearlyIncomePrivatePension = this.pension.drawdown(this.age);
+      for (var potCountry in this.pensions) {
+        if (!Object.prototype.hasOwnProperty.call(this.pensions, potCountry)) continue;
+        var pot = this.pensions[potCountry];
+        if (pot.capital() > 0) {
+          var drawdownAmount = pot.drawdown(this.age);
+          if (drawdownAmount > 0) {
+            privatePensionByCountry[potCountry] = drawdownAmount;
+            this.yearlyIncomePrivatePension += drawdownAmount;
+          }
+        }
+      }
     }
 
     // State Pension: Check if age qualifies for state pension
@@ -218,6 +229,6 @@ class Person {
       }
     }
 
-    return { lumpSumAmount: lumpSumAmount };
+    return { lumpSumAmount: lumpSumAmount, privatePensionByCountry: privatePensionByCountry };
   }
 }

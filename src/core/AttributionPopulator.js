@@ -22,17 +22,33 @@ function populateAttributionFields(dataRow, indexFunds, shares, attributionManag
 
   const currentAttributions = attributionManager.getAllAttributions();
   for (const metric in currentAttributions) {
-    if (!dataRow.attributions[metric]) {
-      dataRow.attributions[metric] = {};
+    // Extract base metric name (remove country suffix if present)
+    var baseMetric = metric;
+    var countryCode = null;
+    if (metric.indexOf(':') > 0) {
+      var parts = metric.split(':');
+      baseMetric = parts[0];
+      countryCode = parts[1];
     }
+
+    if (!dataRow.attributions[baseMetric]) {
+      dataRow.attributions[baseMetric] = {};
+    }
+
     try {
       const breakdown = currentAttributions[metric].getBreakdown();
       for (const source in breakdown) {
-        if (!dataRow.attributions[metric][source]) {
-          dataRow.attributions[metric][source] = 0;
+        // Qualify source with country code for display if present
+        var displaySource = source;
+        if (countryCode) {
+          displaySource = source + ' (' + countryCode.toUpperCase() + ')';
+        }
+
+        if (!dataRow.attributions[baseMetric][displaySource]) {
+          dataRow.attributions[baseMetric][displaySource] = 0;
         }
         // Direct accumulation of full breakdown values
-        dataRow.attributions[metric][source] += breakdown[source];
+        dataRow.attributions[baseMetric][displaySource] += breakdown[source];
       }
     } catch (error) {
       console.error(`Error getting breakdown for ${metric}:`, error);

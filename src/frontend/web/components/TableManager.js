@@ -285,8 +285,24 @@ class TableManager {
       headers = [...baseHeaders, ...virtualTaxHeaders];
     }
 
+    // ---- Flexbox Deductions Container Setup ----
+    // Identify deduction columns (PensionContribution + Tax__*) for flexbox layout
+    const isDeductionKey = (k) => k === 'PensionContribution' || (k && k.indexOf('Tax__') === 0);
+    const allKeys = headers.map(h => h.dataset?.key || h.getAttribute?.('data-key'));
+    const deductionIndices = allKeys.map((k, i) => isDeductionKey(k) ? i : -1).filter(i => i >= 0);
+    const firstDeductionIdx = deductionIndices.length > 0 ? deductionIndices[0] : -1;
+    const lastDeductionIdx = deductionIndices.length > 0 ? deductionIndices[deductionIndices.length - 1] : -1;
+
+    // Get max column count for colspan (if dynamicSectionManager available)
+    const maxDeductionColumns = (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized())
+      ? this.dynamicSectionManager.getMaxColumnCount()
+      : deductionIndices.length;
 
     // Create cells and format values in the order of the headers
+    // Deduction columns use flexbox layout for consistent section width
+    let deductionsContainerCell = null;
+    let deductionsFlexDiv = null;
+
     headers.forEach((header, headerIndex) => {
 
       const key = header.dataset.key;
@@ -351,11 +367,47 @@ class TableManager {
         }
       }
 
-      const td = document.createElement('td');
+      // Check if this is a deduction column
+      const isCurrentDeduction = isDeductionKey(key);
 
-      // Create a container for the cell content
-      const contentContainer = document.createElement('div');
-      contentContainer.className = 'cell-content';
+      // Determine the element to create (td for regular, div for deduction flex item)
+      let cellElement;
+      let contentContainer;
+
+      if (isCurrentDeduction && firstDeductionIdx >= 0) {
+        // === DYNAMIC SECTION: Use flexbox layout ===
+        const sectionName = this.dynamicSectionManager ? this.dynamicSectionManager.getSectionName() : 'deductions';
+
+        // Create container cell on first column
+        if (headerIndex === firstDeductionIdx) {
+          deductionsContainerCell = document.createElement('td');
+          deductionsContainerCell.className = 'dynamic-section-container';
+          deductionsContainerCell.setAttribute('data-section', sectionName);
+          deductionsContainerCell.colSpan = maxDeductionColumns;
+          // Apply group border to the container
+          deductionsContainerCell.setAttribute('data-group-end', '1');
+          deductionsContainerCell.style.borderRight = '3px solid #666';
+
+          deductionsFlexDiv = document.createElement('div');
+          deductionsFlexDiv.className = 'dynamic-section-flex';
+          deductionsContainerCell.appendChild(deductionsFlexDiv);
+        }
+
+        // Create flex item for this column
+        cellElement = document.createElement('div');
+        cellElement.className = 'dynamic-section-cell';
+        cellElement.setAttribute('data-key', key);
+        // Width will be set by DynamicSectionManager.finalizeSectionWidths() after simulation completes
+
+        contentContainer = document.createElement('span');
+        contentContainer.className = 'cell-content';
+      } else {
+        // === REGULAR COLUMN: Standard td ===
+        cellElement = document.createElement('td');
+
+        contentContainer = document.createElement('div');
+        contentContainer.className = 'cell-content';
+      }
 
       // Add the formatted value
       if (key === 'Age' || key === 'Year') {
@@ -570,21 +622,21 @@ class TableManager {
           // Only attach tooltip and show 'i' icon if there's meaningful content to display
           // Guard with non-zero check to allow tooltips for negative and small positive values
           if ((breakdown || originalValue !== undefined) && tooltipText.trim() !== '' && Math.abs(v) > 0) {
-            TooltipUtils.attachTooltip(td, tooltipText);
+            TooltipUtils.attachTooltip(cellElement, tooltipText);
             hasTooltip = true;
           }
         }
       }
 
       // Add the content container to the cell
-      td.appendChild(contentContainer);
+      cellElement.appendChild(contentContainer);
 
       // Store nominal (pre-deflation, pre-conversion) value on monetary cells for future refresh without re-simulating
       try {
         if (isMonetary) {
-          td.setAttribute('data-nominal-value', String(nominalValue));
+          cellElement.setAttribute('data-nominal-value', String(nominalValue));
           if (pvValue !== null && pvValue !== undefined && isFinite(pvValue)) {
-            td.setAttribute('data-pv-value', String(pvValue));
+            cellElement.setAttribute('data-pv-value', String(pvValue));
           }
         }
       } catch (_) { }
@@ -597,34 +649,42 @@ class TableManager {
         contentContainer.appendChild(infoIcon);
       }
 
-      // Apply dynamic group border alignment based on data-key predicates
-      // (mirrors updateGroupBorders logic so borders work even without original thead attributes)
-      try {
-        // Determine if this cell is at a group boundary
-        const isIncome = (k) => k && k.indexOf('Income') === 0;
-        const isTax = (k) => k && k.indexOf('Tax__') === 0;
-        const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
-          k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
+      // Handle appending the element
+      if (isCurrentDeduction && deductionsFlexDiv) {
+        // Append flex item to the flexbox container
+        deductionsFlexDiv.appendChild(cellElement);
 
-        // Find indices of group boundaries within the headers array
-        const allKeys = headers.map(h => h.dataset?.key || h.getAttribute?.('data-key'));
-        const yearBoundaryIdx = allKeys.indexOf('Year');
-        const incomeLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isIncome(allKeys[i])) return i; return -1; })();
-        let deductionsLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isTax(allKeys[i])) return i; return -1; })();
-        if (deductionsLastIdx === -1) deductionsLastIdx = allKeys.indexOf('PensionContribution');
-        const expensesBoundaryIdx = allKeys.indexOf('Expenses');
-        const assetsLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isAsset(allKeys[i])) return i; return -1; })();
-        const lastIdx = allKeys.length - 1;
-
-        const boundarySet = new Set([yearBoundaryIdx, incomeLastIdx, deductionsLastIdx, expensesBoundaryIdx, assetsLastIdx, lastIdx].filter(i => i >= 0));
-
-        if (boundarySet.has(headerIndex)) {
-          td.setAttribute('data-group-end', '1');
-          td.style.borderRight = '3px solid #666';
+        // After last deduction column, append the container cell to the row
+        if (headerIndex === lastDeductionIdx) {
+          row.appendChild(deductionsContainerCell);
         }
-      } catch (_) { }
+      } else {
+        // Regular cell: apply group border logic and append to row
+        try {
+          // Determine if this cell is at a group boundary
+          const isIncome = (k) => k && k.indexOf('Income') === 0;
+          const isTax = (k) => k && k.indexOf('Tax__') === 0;
+          const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
+            k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
 
-      row.appendChild(td);
+          // Find indices of group boundaries within the headers array
+          const yearBoundaryIdx = allKeys.indexOf('Year');
+          const incomeLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isIncome(allKeys[i])) return i; return -1; })();
+          // Skip deductions boundary check - handled by container cell
+          const expensesBoundaryIdx = allKeys.indexOf('Expenses');
+          const assetsLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isAsset(allKeys[i])) return i; return -1; })();
+          const lastIdx = allKeys.length - 1;
+
+          const boundarySet = new Set([yearBoundaryIdx, incomeLastIdx, expensesBoundaryIdx, assetsLastIdx, lastIdx].filter(i => i >= 0));
+
+          if (boundarySet.has(headerIndex)) {
+            cellElement.setAttribute('data-group-end', '1');
+            cellElement.style.borderRight = '3px solid #666';
+          }
+        } catch (_) { }
+
+        row.appendChild(cellElement);
+      }
     });
   }
 
@@ -679,6 +739,11 @@ class TableManager {
         }
       }
     });
+
+    // Finalize dynamic section column widths after all rows are rendered
+    if (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
+      this.dynamicSectionManager.finalizeSectionWidths(tbody);
+    }
   }
 
 
@@ -688,170 +753,187 @@ class TableManager {
       throw new Error('Data table not found');
     }
 
-    // Get headers from the second header row (the one with data-key attributes)
-    const headerRow = table.querySelector('thead tr:nth-child(2)');
-    if (!headerRow) {
-      throw new Error('Data table headers not found');
-    }
-
-    // Build a list of visible header keys only (exclude hidden columns)
-    // Note: Cells are created only for visible headers in setDataRow, so cells match visible header order
-    const allHeaderThs = Array.from(headerRow.querySelectorAll('th[data-key]'));
-    const headerThs = allHeaderThs.filter(th => {
-      // Include only visible headers (exclude those with display: none)
-      const style = window.getComputedStyle(th);
-      return style.display !== 'none';
-    });
-    const headerKeys = headerThs.map(th => th.getAttribute('data-key'));
-    const headerLabels = headerThs.map(th => (th.textContent || '').trim());
-
-    // Get data rows from the table
+    // Get all rows from tbody - these include both tax-header rows and data rows
     const dataRows = Array.from(table.querySelectorAll('tbody tr'));
-    const totalRows = dataRows.length;
-    if (totalRows === 0) {
+    if (dataRows.length === 0) {
       throw new Error('No data to export. Please run a simulation first.');
     }
 
-    // Determine scaling (Monte Carlo average) if available
-    let scale = 1;
-    try {
-      const runs = (this.webUI && this.webUI.lastSimulationResults && this.webUI.lastSimulationResults.runs) ? this.webUI.lastSimulationResults.runs : 1;
-      if (typeof runs === 'number' && runs > 0) scale = runs;
-    } catch (_) { }
+    // === PASS 1: Scan all rows to find max column count per dynamic section ===
+    // Map of section name -> max column count found across all rows
+    const maxSectionColumns = new Map();
 
-    // Helper to get age from a row (used for PV and currency calculations)
-    const getAgeFromRow = (row) => {
-      const cells = Array.from(row.querySelectorAll('td'));
-      // Cells are in the same order as visible headers, so we can use index directly
-      const ageKeyIndex = headerKeys.indexOf('Age');
-      if (ageKeyIndex >= 0 && ageKeyIndex < cells.length) {
-        const ageCell = cells[ageKeyIndex];
-        if (ageCell) {
-          const contentContainer = ageCell.querySelector('.cell-content');
-          const ageText = contentContainer ? contentContainer.textContent.trim() : ageCell.textContent.trim();
-          const age = parseInt(ageText, 10);
-          if (!isNaN(age)) return age;
+    dataRows.forEach(row => {
+      // Check both th and td elements for dynamic section containers
+      const containers = row.querySelectorAll('.dynamic-section-container');
+      containers.forEach(container => {
+        const sectionName = container.getAttribute('data-section') || 'default';
+        const sectionCells = container.querySelectorAll('.dynamic-section-cell');
+        const columnCount = sectionCells.length;
+
+        const currentMax = maxSectionColumns.get(sectionName) || 0;
+        if (columnCount > currentMax) {
+          maxSectionColumns.set(sectionName, columnCount);
         }
-      }
-      return null;
-    };
+      });
+    });
 
-    // Helper to get cell value from displayed table cell
-    // This respects present-value mode and currency mode by reading what's actually displayed
-    // Note: Cells are created only for visible headers, so cell index matches visible header index
-    const getCellValue = (row, visibleKeyIndex) => {
-      const cells = Array.from(row.querySelectorAll('td'));
-      // Cells are in the same order as visible headers, so we can use index directly
-      if (visibleKeyIndex >= cells.length) return '';
+    // === PASS 2: Extract values with padding for dynamic sections ===
 
-      const cell = cells[visibleKeyIndex];
-      if (!cell) return '';
+    /**
+     * Strip formatting from a value for CSV export.
+     * - Percentages: convert to decimal (e.g., "3.5%" → "0.035")
+     * - Currency values: filter to digits only (and minus sign for negatives)
+     * - Non-numeric values (text): return as-is
+     */
+    const stripFormatting = (text) => {
+      if (!text || text === '') return '';
 
-      const key = headerKeys[visibleKeyIndex];
-      if (!key) return '';
+      const trimmed = text.trim();
 
-      // Get the displayed text from the cell (already formatted with correct currency and PV mode)
-      // The .cell-content div contains the formatted value
-      const contentContainer = cell.querySelector('.cell-content');
-      let displayedText = contentContainer ? contentContainer.textContent.trim() : cell.textContent.trim();
-
-      // Remove the 'i' icon text if present (tooltip indicator)
-      displayedText = displayedText.replace(/i\s*$/, '').trim();
-
-      // If no displayed text, try to compute from stored nominal/PV values
-      if (!displayedText || displayedText === '') {
-        const nominalStr = cell.getAttribute('data-nominal-value');
-        const pvStr = cell.getAttribute('data-pv-value');
-        if (nominalStr) {
-          let value = parseFloat(nominalStr);
-          if (isNaN(value)) return '';
-
-          // Get age for PV and currency calculations
-          const age = getAgeFromRow(row);
-
-          // Apply present-value mode by preferring core-computed PV values when available.
-          if (this.presentValueMode && key !== 'Age' && key !== 'Year' && key !== 'WithdrawalRate' && age !== null) {
-            if (pvStr != null && pvStr !== '' && isFinite(Number(pvStr))) {
-              value = Number(pvStr);
-            }
-          }
-
-          // Apply currency conversion if in unified mode
-          if (Config.getInstance().isRelocationEnabled() && this.currencyMode === 'unified' && this.reportingCurrency && key !== 'Age' && key !== 'Year' && key !== 'WithdrawalRate' && age !== null) {
-            try {
-              const year = Config.getInstance().getSimulationStartYear() + age;
-              const fromCountry = RelocationUtils.getCountryForAge(age, this);
-              const toCountry = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
-              const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
-
-              if (fromCurrency !== this.reportingCurrency) {
-                const economicData = Config.getInstance().getEconomicData();
-                if (economicData && economicData.ready) {
-                  const cacheKey = `${year}-${fromCountry}-${toCountry}`;
-                  let fxMult = this.conversionCache[cacheKey];
-                  if (fxMult === undefined) {
-                    fxMult = economicData.convert(1, fromCountry, toCountry, year, {
-                      baseYear: Config.getInstance().getSimulationStartYear()
-                    });
-                    if (fxMult !== null) this.conversionCache[cacheKey] = fxMult;
-                  }
-                  if (fxMult !== null) {
-                    value = value * fxMult;
-                  }
-                }
-              }
-            } catch (_) { /* keep as is */ }
-          }
-
-          // Format the value with the correct currency
-          if (key === 'WithdrawalRate' || /rate$/i.test(key)) {
-            return FormatUtils.formatPercentage(value);
-          } else if (key === 'Age' || key === 'Year') {
-            return String(Math.round(value));
-          } else {
-            // Determine display currency
-            let displayCurrencyCode, displayCountryForLocale;
-            try {
-              const fromCountry = age != null ? RelocationUtils.getCountryForAge(age, this) : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
-
-              if (this.currencyMode === 'unified' && Config.getInstance().isRelocationEnabled()) {
-                displayCurrencyCode = this.reportingCurrency;
-                displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
-              } else {
-                const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
-                displayCurrencyCode = fromCurrency;
-                displayCountryForLocale = fromCountry;
-              }
-            } catch (_) {
-              // Fallback to default
-              displayCurrencyCode = null;
-              displayCountryForLocale = null;
-            }
-            return FormatUtils.formatCurrency(value, displayCurrencyCode, displayCountryForLocale);
-          }
+      // Check if it's a percentage (ends with %)
+      if (trimmed.endsWith('%')) {
+        // Extract numeric part, preserving decimal point and minus sign
+        const numericPart = trimmed.replace('%', '').replace(/[^\d.\-]/g, '');
+        const parsed = parseFloat(numericPart);
+        if (!isNaN(parsed)) {
+          // Convert percentage to decimal (e.g., 3.5 → 0.035)
+          // Round to 3 decimal places to avoid floating point precision issues
+          const decimal = parsed / 100;
+          return String(Math.round(decimal * 1000) / 1000);
         }
-        return '';
+        return trimmed; // Return as-is if parsing fails
       }
 
-      // Use the displayed text directly (it's already formatted correctly)
-      return displayedText;
+      // Check if it looks like a formatted number (contains digits)
+      if (/\d/.test(trimmed)) {
+        // Check if negative (has minus sign or parentheses for accounting format)
+        const isNegative = trimmed.includes('-') || (trimmed.startsWith('(') && trimmed.endsWith(')'));
+
+        // Filter to digits only
+        const digitsOnly = trimmed.replace(/[^\d]/g, '');
+
+        if (digitsOnly === '') return trimmed; // No digits found, return as-is
+
+        return isNegative ? '-' + digitsOnly : digitsOnly;
+      }
+
+      // Non-numeric value (text like column headers) - return as-is
+      return trimmed;
     };
 
-    // Build CSV header
-    let csvContent = headerLabels.join(',') + '\n';
+    /**
+     * Extract all cell values from a data row, handling the flexbox dynamic sections.
+     * For dynamic section container cells, extracts values from nested .dynamic-section-cell elements
+     * and pads to the max column count for that section.
+     * Strips formatting from values for spreadsheet compatibility.
+     */
+    const getDataRowValues = (row) => {
+      const values = [];
+      const cells = row.querySelectorAll(':scope > td');
 
-    // Build CSV rows from displayed table cells
-    for (let i = 0; i < totalRows; i++) {
-      const row = dataRows[i];
-      const rowValues = headerKeys.map((key, keyIndex) => {
-        const text = getCellValue(row, keyIndex);
-        // Ensure text is a string
-        const textStr = String(text || '');
-        // Quote if contains comma
+      cells.forEach(cell => {
+        // Check if this is a dynamic section container with nested flex cells
+        if (cell.classList.contains('dynamic-section-container')) {
+          const sectionName = cell.getAttribute('data-section') || 'default';
+          const sectionCells = cell.querySelectorAll('.dynamic-section-cell');
+          const maxColumns = maxSectionColumns.get(sectionName) || sectionCells.length;
+
+          // Extract actual values
+          sectionCells.forEach(sectionCell => {
+            const contentContainer = sectionCell.querySelector('.cell-content');
+            let text = contentContainer ? contentContainer.textContent.trim() : sectionCell.textContent.trim();
+            // Remove tooltip indicator ('i' icon)
+            text = text.replace(/i\s*$/, '').trim();
+            values.push(stripFormatting(text));
+          });
+
+          // Pad to max columns for this section
+          const padding = maxColumns - sectionCells.length;
+          for (let p = 0; p < padding; p++) {
+            values.push('');
+          }
+        } else {
+          // Regular cell
+          const contentContainer = cell.querySelector('.cell-content');
+          let text = contentContainer ? contentContainer.textContent.trim() : cell.textContent.trim();
+          // Remove tooltip indicator ('i' icon)
+          text = text.replace(/i\s*$/, '').trim();
+          values.push(stripFormatting(text));
+        }
+      });
+
+      return values;
+    };
+
+    /**
+     * Extract header labels from a tax-header row.
+     * Tax header rows have th elements for fixed columns and a flexbox container for dynamic sections.
+     * Processes cells in DOM order to maintain correct column positions.
+     * Pads dynamic sections to max column count.
+     * NOTE: Header labels are NOT stripped - they remain as human-readable text.
+     */
+    const getTaxHeaderValues = (row) => {
+      const values = [];
+
+      // Process all direct children (th and td) in DOM order
+      const cells = row.querySelectorAll(':scope > th, :scope > td');
+      cells.forEach(cell => {
+        // Check if this is a dynamic section container with nested flex cells
+        if (cell.classList.contains('dynamic-section-container')) {
+          const sectionName = cell.getAttribute('data-section') || 'default';
+          const sectionCells = cell.querySelectorAll('.dynamic-section-cell');
+          const maxColumns = maxSectionColumns.get(sectionName) || sectionCells.length;
+
+          // Extract actual values (headers - not stripped)
+          sectionCells.forEach(sectionCell => {
+            values.push(sectionCell.textContent.trim());
+          });
+
+          // Pad to max columns for this section
+          const padding = maxColumns - sectionCells.length;
+          for (let p = 0; p < padding; p++) {
+            values.push('');
+          }
+        } else if (cell.classList.contains('spacer')) {
+          // Skip empty spacer cells - don't add anything
+          values.push('');
+        } else {
+          values.push(cell.textContent.trim());
+        }
+      });
+
+      return values;
+    };
+
+    /**
+     * Format values for CSV output - quote values containing commas
+     */
+    const formatRowForCSV = (values) => {
+      return values.map(val => {
+        const textStr = String(val || '');
         if (textStr.indexOf(',') !== -1) return '"' + textStr + '"';
         return textStr;
-      });
-      csvContent += rowValues.join(',') + '\n';
+      }).join(',');
+    };
+
+    // Build CSV content by iterating through all rows
+    // Tax-header rows become section headers, data rows become data
+    let csvContent = '';
+
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      let rowValues;
+
+      if (row.classList.contains('tax-header')) {
+        // Tax header row - extract column headers for this country
+        rowValues = getTaxHeaderValues(row);
+      } else {
+        // Data row - extract values
+        rowValues = getDataRowValues(row);
+      }
+
+      csvContent += formatRowForCSV(rowValues) + '\n';
     }
 
     return csvContent;
@@ -1115,6 +1197,11 @@ class TableManager {
       }
     }
 
+    // Get max column count for colspan
+    const maxDeductionColumns = (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized())
+      ? this.dynamicSectionManager.getMaxColumnCount()
+      : deductionColumns.length;
+
     // Get the main header row to understand column structure
     const mainHeaderRow = document.querySelector('#Data thead tr:last-child');
     if (!mainHeaderRow) {
@@ -1132,8 +1219,13 @@ class TableManager {
     const pensionColumn = deductionColumns.find(c => c.key === 'PensionContribution');
     const taxColumns = deductionColumns.filter(c => c.key !== 'PensionContribution');
 
+    // Helper predicates for group identification
+    const isIncome = (k) => k && k.indexOf('Income') === 0;
+    const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
+      k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
+    const isDeductionKey = (k) => k === 'PensionContribution' || (k && k.indexOf('Tax__') === 0);
+
     // Build the complete list of cells we'll create with their data-keys
-    // This lets us determine group boundaries after all cells are defined
     const cellDefs = [];
 
     // Cells for headers before PensionContribution
@@ -1143,76 +1235,111 @@ class TableManager {
         label: th.textContent,
         key: th.getAttribute('data-key'),
         tooltip: null,
-        originalTh: th
+        isDeduction: false
       });
     }
 
-    // PensionContribution cell (comes first in deductions)
+    // Deduction cells (PensionContribution first, then tax columns)
     if (pensionColumn) {
       cellDefs.push({
         label: pensionColumn.label,
         key: 'PensionContribution',
         tooltip: pensionColumn.tooltip,
-        originalTh: null
+        isDeduction: true
       });
     }
-
-    // Tax columns (country-specific)
     taxColumns.forEach(col => {
       cellDefs.push({
         label: col.label,
         key: col.key,
         tooltip: col.tooltip,
-        originalTh: null
+        isDeduction: true
       });
     });
 
-    // Cells for headers after PensionContribution
+    // Cells for headers after PensionContribution (skip original PensionContribution in baseHeaders)
     for (let i = pensionContribIndex + 1; i < baseHeaders.length; i++) {
       const th = baseHeaders[i];
       cellDefs.push({
         label: th.textContent,
         key: th.getAttribute('data-key'),
         tooltip: null,
-        originalTh: th
+        isDeduction: false
       });
     }
 
-    // Helper predicates for group identification (mirrors updateGroupBorders in WebUI.js)
-    const isIncome = (k) => k && k.indexOf('Income') === 0;
-    const isTax = (k) => k && k.indexOf('Tax__') === 0;
-    const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
-      k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
+    // Find group boundary indices (excluding deductions - handled by container)
+    const allKeys = cellDefs.map(c => c.key);
+    const yearIdx = allKeys.indexOf('Year');
+    const incomeLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isIncome(allKeys[i])) return i; return -1; })();
+    const expensesIdx = allKeys.indexOf('Expenses');
+    const assetsLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isAsset(allKeys[i])) return i; return -1; })();
+    const boundaryIdxs = new Set([yearIdx, incomeLastIdx, expensesIdx, assetsLastIdx, cellDefs.length - 1].filter(i => i >= 0));
 
-    // Find group boundary indices
-    const yearIdx = cellDefs.findIndex(c => c.key === 'Year');
-    const incomeLastIdx = (() => { for (let i = cellDefs.length - 1; i >= 0; i--) if (isIncome(cellDefs[i].key)) return i; return -1; })();
-    let deductionsLastIdx = (() => { for (let i = cellDefs.length - 1; i >= 0; i--) if (isTax(cellDefs[i].key)) return i; return -1; })();
-    if (deductionsLastIdx === -1) deductionsLastIdx = cellDefs.findIndex(c => c.key === 'PensionContribution');
-    const expensesIdx = cellDefs.findIndex(c => c.key === 'Expenses');
-    const assetsLastIdx = (() => { for (let i = cellDefs.length - 1; i >= 0; i--) if (isAsset(cellDefs[i].key)) return i; return -1; })();
+    // Create the cells - using flexbox for dynamic sections
+    let sectionContainerCell = null;
+    let sectionFlexDiv = null;
+    let firstSectionCellProcessed = false;
+    const sectionName = this.dynamicSectionManager ? this.dynamicSectionManager.getSectionName() : 'deductions';
 
-    // Build set of boundary indices
-    const boundaryIdxs = new Set([yearIdx, incomeLastIdx, deductionsLastIdx, expensesIdx, assetsLastIdx, cellDefs.length - 1].filter(i => i >= 0));
-
-    // Create the actual th cells
     cellDefs.forEach((def, idx) => {
-      const cell = document.createElement('th');
-      cell.textContent = def.label;
-      if (def.key) cell.setAttribute('data-key', def.key);
+      if (def.isDeduction) {
+        // === DYNAMIC SECTION: Use flexbox layout ===
 
-      // Set group border if this is a boundary column
-      if (boundaryIdxs.has(idx)) {
-        cell.setAttribute('data-group-end', '1');
-        cell.style.borderRight = '3px solid #666';
+        // Create container cell on first dynamic section cell
+        if (!firstSectionCellProcessed) {
+          sectionContainerCell = document.createElement('th');
+          sectionContainerCell.className = 'dynamic-section-container';
+          sectionContainerCell.setAttribute('data-section', sectionName);
+          sectionContainerCell.colSpan = maxDeductionColumns;
+          sectionContainerCell.setAttribute('data-group-end', '1');
+          sectionContainerCell.style.borderRight = '3px solid #666';
+
+          sectionFlexDiv = document.createElement('div');
+          sectionFlexDiv.className = 'dynamic-section-flex';
+          sectionContainerCell.appendChild(sectionFlexDiv);
+
+          firstSectionCellProcessed = true;
+        }
+
+        // Create flex item for this header cell
+        const flexItem = document.createElement('div');
+        flexItem.className = 'dynamic-section-cell';
+        flexItem.setAttribute('data-key', def.key);
+        flexItem.textContent = def.label;
+        // Width will be set by DynamicSectionManager.finalizeSectionWidths() after simulation
+
+        // Attach tooltip if provided
+        if (def.tooltip) {
+          TooltipUtils.attachTooltip(flexItem, def.tooltip, { hoverDelay: 300, touchDelay: 400 });
+        }
+
+        sectionFlexDiv.appendChild(flexItem);
+
+        // Check if this is the last section cell - if so, append container to row
+        const isLastSectionCell = !cellDefs.slice(idx + 1).some(c => c.isDeduction);
+        if (isLastSectionCell) {
+          headerRow.appendChild(sectionContainerCell);
+        }
+      } else {
+        // === REGULAR COLUMN: Standard th ===
+        const cell = document.createElement('th');
+        cell.textContent = def.label;
+        if (def.key) cell.setAttribute('data-key', def.key);
+
+        // Set group border if this is a boundary column
+        if (boundaryIdxs.has(idx)) {
+          cell.setAttribute('data-group-end', '1');
+          cell.style.borderRight = '3px solid #666';
+        }
+
+        // Attach tooltip if provided
+        if (def.tooltip) {
+          TooltipUtils.attachTooltip(cell, def.tooltip, { hoverDelay: 300, touchDelay: 400 });
+        }
+
+        headerRow.appendChild(cell);
       }
-
-      // Attach tooltip if provided
-      if (def.tooltip) {
-        TooltipUtils.attachTooltip(cell, def.tooltip, { hoverDelay: 300, touchDelay: 400 });
-      }
-
-      headerRow.appendChild(cell);
     });
 
     return headerRow;

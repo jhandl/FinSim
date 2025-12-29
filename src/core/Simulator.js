@@ -4,6 +4,10 @@ var revenue, realEstate, stockGrowthOverride, attributionManager;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var incomeStatePension, incomePrivatePension, incomeFundsRent, incomeSharesRent, withdrawalRate;
 var incomeSalaries, incomeShares, incomeRentals, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
+var personalPensionContribution, personalPensionContributionByCountry;
+var incomePrivatePensionByCountry;
+var incomeSalariesByCountry;
+var incomeRentalsByCountry;
 /**
  * Cash tracking architecture:
  * - cash (number): Primary numeric value for performance-critical operations
@@ -548,6 +552,10 @@ function resetYearlyVariables() {
   // Reset per-type income map for the year
   investmentIncomeByKey = {};
   personalPensionContribution = 0;
+  personalPensionContributionByCountry = {};
+  incomePrivatePensionByCountry = {};
+  incomeSalariesByCountry = {};
+  incomeRentalsByCountry = {};
   withdrawalRate = 0;
   cashDeficit = 0;
   cashWithdraw = 0;
@@ -680,8 +688,31 @@ function calculatePensionIncome() {
     return;
   }
   if (person1.yearlyIncomePrivatePension > 0) {
-    attributionManager.record('incomeprivatepension', 'Your Private Pension', person1.yearlyIncomePrivatePension);
+    // Record per-country private pension income attributions
+    if (p1CalcResults && p1CalcResults.privatePensionByCountry) {
+      for (var p1AttrCountry in p1CalcResults.privatePensionByCountry) {
+        if (!Object.prototype.hasOwnProperty.call(p1CalcResults.privatePensionByCountry, p1AttrCountry)) continue;
+        var p1AttrAmount = p1CalcResults.privatePensionByCountry[p1AttrCountry];
+        if (p1AttrAmount > 0) {
+          var p1MetricKey = 'incomeprivatepension';
+          if (p1AttrCountry !== currentCountry) {
+            p1MetricKey = 'incomeprivatepension:' + p1AttrCountry;
+          }
+          attributionManager.record(p1MetricKey, 'Your Private Pension', p1AttrAmount);
+        }
+      }
+    } else {
+      // Fallback for single-country scenarios
+      attributionManager.record('incomeprivatepension', 'Your Private Pension', person1.yearlyIncomePrivatePension);
+    }
     incomePrivatePension += person1.yearlyIncomePrivatePension;
+  }
+  // Accumulate per-country private pension income for PV calculations
+  if (p1CalcResults && p1CalcResults.privatePensionByCountry) {
+    for (var p1Country in p1CalcResults.privatePensionByCountry) {
+      if (!Object.prototype.hasOwnProperty.call(p1CalcResults.privatePensionByCountry, p1Country)) continue;
+      incomePrivatePensionByCountry[p1Country] = (incomePrivatePensionByCountry[p1Country] || 0) + p1CalcResults.privatePensionByCountry[p1Country];
+    }
   }
   var person1StatePension = person1.yearlyIncomeStatePension ? person1.yearlyIncomeStatePension.amount : 0;
   if (person1StatePension > 0) {
@@ -715,8 +746,31 @@ function calculatePensionIncome() {
       return;
     }
     if (person2.yearlyIncomePrivatePension > 0) {
-      attributionManager.record('incomeprivatepension', 'Their Private Pension', person2.yearlyIncomePrivatePension);
+      // Record per-country private pension income attributions for person 2
+      if (p2CalcResults && p2CalcResults.privatePensionByCountry) {
+        for (var p2AttrCountry in p2CalcResults.privatePensionByCountry) {
+          if (!Object.prototype.hasOwnProperty.call(p2CalcResults.privatePensionByCountry, p2AttrCountry)) continue;
+          var p2AttrAmount = p2CalcResults.privatePensionByCountry[p2AttrCountry];
+          if (p2AttrAmount > 0) {
+            var p2MetricKey = 'incomeprivatepension';
+            if (p2AttrCountry !== currentCountry) {
+              p2MetricKey = 'incomeprivatepension:' + p2AttrCountry;
+            }
+            attributionManager.record(p2MetricKey, 'Their Private Pension', p2AttrAmount);
+          }
+        }
+      } else {
+        // Fallback for single-country scenarios
+        attributionManager.record('incomeprivatepension', 'Their Private Pension', person2.yearlyIncomePrivatePension);
+      }
       incomePrivatePension += person2.yearlyIncomePrivatePension;
+    }
+    // Accumulate per-country private pension income for PV calculations
+    if (p2CalcResults && p2CalcResults.privatePensionByCountry) {
+      for (var p2Country in p2CalcResults.privatePensionByCountry) {
+        if (!Object.prototype.hasOwnProperty.call(p2CalcResults.privatePensionByCountry, p2Country)) continue;
+        incomePrivatePensionByCountry[p2Country] = (incomePrivatePensionByCountry[p2Country] || 0) + p2CalcResults.privatePensionByCountry[p2Country];
+      }
     }
     var person2StatePension = person2.yearlyIncomeStatePension ? person2.yearlyIncomeStatePension.amount : 0;
     if (person2StatePension > 0) {
@@ -986,12 +1040,27 @@ function processEvents() {
             countedCategories[entryCategory] = true;
           }
 
-          attributionManager.record('incomesalaries', entry.eventId, entryConvertedAmount);
+          // Track salary by country for PV calculation
+          if (entryConvertedAmount > 0) {
+            var salaryCountry = normalizeCountry(bucketCountry);
+            if (!incomeSalariesByCountry[salaryCountry]) {
+              incomeSalariesByCountry[salaryCountry] = 0;
+            }
+            incomeSalariesByCountry[salaryCountry] += entryConvertedAmount;
+          }
+
+          // Determine if country qualification is needed for salary attribution
+          var salaryMetricKey = 'incomesalaries';
+          if (bucketCountry && bucketCountry !== currentCountry) {
+            salaryMetricKey = 'incomesalaries:' + bucketCountry;
+          }
+          attributionManager.record(salaryMetricKey, entry.eventId, entryConvertedAmount);
 
           if (isPensionable && entryConvertedAmount > 0) {
-            var rsSalary = (function () { try { return Config.getInstance().getCachedTaxRuleSet(currentCountry); } catch (_) { return null; } })();
+            // Use salary's origin country for pension rules (not current residence)
+            var rsSalary = (function () { try { return Config.getInstance().getCachedTaxRuleSet(bucketCountry); } catch (_) { return null; } })();
 
-            // Check if current country has private pension system
+            // Check if salary's origin country has private pension system
             var pensionSystemType = (rsSalary && typeof rsSalary.getPensionSystemType === 'function')
               ? rsSalary.getPensionSystemType() : 'mixed';
 
@@ -1004,8 +1073,8 @@ function processEvents() {
               var bands = (rsSalary && typeof rsSalary.getPensionContributionAgeBands === 'function') ? rsSalary.getPensionContributionAgeBands() : {};
               var baseRate = (salaryPerson.pensionContributionPercentageParam || 0) * getRateForKey(salaryPerson.age, bands);
 
-              // Use current country's currency for pension contributions
-              var pensionCountry = currentCountry;
+              // Use salary's origin country for pension pot (not current residence)
+              var pensionCountry = bucketCountry;
               var pensionCurrency = getCurrencyForCountry(pensionCountry);
               var pensionBaseAmount = entry.amount;
 
@@ -1037,10 +1106,27 @@ function processEvents() {
               var employerAmount = employerRate * pensionBaseAmount;
               var totalContrib = personalAmount + employerAmount;
               if (totalContrib > 0) {
-                pensionContribution += totalContrib;
-                personalPensionContribution += personalAmount;
+                // Convert to residence currency for display
+                var personalAmountForDisplay = personalAmount;
+                var totalContribForDisplay = totalContrib;
+                if (pensionCurrency !== residenceCurrency) {
+                  personalAmountForDisplay = convertCurrencyAmount(personalAmount, pensionCurrency, pensionCountry, residenceCurrency, currentCountry, year, true) || personalAmount;
+                  totalContribForDisplay = convertCurrencyAmount(totalContrib, pensionCurrency, pensionCountry, residenceCurrency, currentCountry, year, true) || totalContrib;
+                }
+                pensionContribution += totalContribForDisplay;
+                personalPensionContribution += personalAmountForDisplay;
+                // Track contributions by country in ORIGINAL currency for PV calculation
+                if (!personalPensionContributionByCountry[pensionCountry]) {
+                  personalPensionContributionByCountry[pensionCountry] = 0;
+                }
+                personalPensionContributionByCountry[pensionCountry] += personalAmount;
                 if (personalAmount > 0) {
-                  attributionManager.record('pensioncontribution', entry.eventId, personalAmount);
+                  // Determine if country qualification is needed for pension contribution
+                  var pensionMetricKey = 'pensioncontribution';
+                  if (pensionCountry && pensionCountry !== currentCountry) {
+                    pensionMetricKey = 'pensioncontribution:' + pensionCountry;
+                  }
+                  attributionManager.record(pensionMetricKey, entry.eventId, personalAmount);
                 }
                 // buy() receives numeric amount + currency/country metadata.
                 // Use getPensionForCountry to get/create the correct country's pension pot.
@@ -1078,7 +1164,20 @@ function processEvents() {
             incomeRentals += rentalTotal;
             countedCategories[entryCategory] = true;
           }
-          attributionManager.record('incomerentals', entry.eventId, entryConvertedAmount);
+          // Track rental income by country for PV calculation
+          if (entryConvertedAmount > 0) {
+            var rentalCountry = normalizeCountry(bucketCountry);
+            if (!incomeRentalsByCountry[rentalCountry]) {
+              incomeRentalsByCountry[rentalCountry] = 0;
+            }
+            incomeRentalsByCountry[rentalCountry] += entryConvertedAmount;
+          }
+          // Determine if country qualification is needed for rental attribution
+          var rentalMetricKey = 'incomerentals';
+          if (bucketCountry && bucketCountry !== currentCountry) {
+            rentalMetricKey = 'incomerentals:' + bucketCountry;
+          }
+          attributionManager.record(rentalMetricKey, entry.eventId, entryConvertedAmount);
           if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
             const otherIncomeMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
             revenue.declareOtherIncome(otherIncomeMoney, entry.eventId);
@@ -1174,6 +1273,81 @@ function processEvents() {
     state.incomeBuckets = {};
     state.expenseBuckets = {};
     state.orderedEntries = [];
+  }
+
+  // Zero pass: process relocation events FIRST so currency/country is updated
+  // before any income/expense processing (including pension contributions)
+  for (let i = 0; i < events.length; i++) {
+    let event = events[i];
+    if (typeof event.type === 'string' && event.type.indexOf('MV-') === 0) {
+      if (person1.age === event.fromAge) {
+        var prevCountry = currentCountry;
+        var destCountry = event.type.substring(3).toLowerCase();
+        var startCountry = (params.StartCountry || config.getDefaultCountry() || '').toLowerCase();
+        var infCountry = null;
+        if (event.currency) {
+          infCountry = findCountryForCurrency(event.currency, prevCountry);
+        }
+        if (!infCountry && event.linkedCountry) {
+          infCountry = normalizeCountry(event.linkedCountry);
+        }
+        if (!infCountry) {
+          infCountry = prevCountry || startCountry;
+        }
+        var reloRate = resolveCountryInflation(infCountry);
+        var relocationAmount = adjust(event.amount, reloRate);
+        var relocationInfo = getEventCurrencyInfo(event, prevCountry || startCountry || currentCountry);
+        if (relocationAmount > 0) {
+          var relocationConverted = convertCurrencyAmount(relocationAmount, relocationInfo.currency, relocationInfo.country, residenceCurrency, prevCountry, year, true);
+          if (relocationConverted === null) {
+            success = false;
+            failedAt = person1.age;
+            return; // Abort processing this year
+          }
+          expenses += relocationConverted;
+          attributionManager.record('expenses', 'Relocation (' + event.id + ')', relocationConverted);
+        }
+        var prevCurrency = residenceCurrency;
+        var prevCountryNormalized = prevCountry;
+        var newResidenceCurrency = getCurrencyForCountry(destCountry) || prevCurrency || 'EUR';
+        if (prevCurrency && newResidenceCurrency && prevCurrency !== newResidenceCurrency) {
+          // Convert pooled cash to new residence currency.
+          var convertedCash = convertCurrencyAmount(cash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
+          if (convertedCash === null) {
+            success = false;
+            failedAt = person1.age;
+            return; // Abort processing this year
+          }
+          cash = convertedCash;
+          cashMoney = Money.convertTo(cashMoney, newResidenceCurrency, destCountry, year, economicData);
+
+          // Convert target cash (emergency stash) to new currency using PPP.
+          var pppRatio = (economicData && economicData.ready)
+            ? economicData.getPPP(prevCountryNormalized, destCountry)
+            : null;
+          if (pppRatio !== null) {
+            targetCash = targetCash * pppRatio;
+          } else {
+            var convertedTargetCash = convertCurrencyAmount(targetCash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
+            if (convertedTargetCash === null) {
+              success = false;
+              failedAt = person1.age;
+              return; // Abort processing this year
+            }
+            targetCash = convertedTargetCash;
+          }
+        }
+        currentCountry = destCountry;
+        residenceCurrency = newResidenceCurrency;
+        conversionFactorCache = {};
+        if (event.rate !== null && event.rate !== undefined && event.rate !== '') {
+          if (!countryInflationOverrides) countryInflationOverrides = {};
+          countryInflationOverrides[currentCountry] = event.rate;
+        }
+        // Reset Taxman with the new country to ensure correct ruleset is loaded
+        revenue.reset(person1, person2, attributionManager, currentCountry, year);
+      }
+    }
   }
 
   // First pass: process property sales so proceeds are consolidated before purchases
@@ -1383,83 +1557,7 @@ function processEvents() {
         break;
 
       default:
-        if (typeof event.type === 'string' && event.type.indexOf('MV-') === 0) {
-          if (person1.age === event.fromAge) {
-            var prevCountry = currentCountry;
-            var destCountry = event.type.substring(3).toLowerCase();
-            var startCountry = (params.StartCountry || config.getDefaultCountry() || '').toLowerCase();
-            var infCountry = null;
-            if (event.currency) {
-              infCountry = findCountryForCurrency(event.currency, prevCountry);
-            }
-            if (!infCountry && event.linkedCountry) {
-              infCountry = normalizeCountry(event.linkedCountry);
-            }
-            if (!infCountry) {
-              infCountry = prevCountry || startCountry;
-            }
-            var reloRate = resolveCountryInflation(infCountry);
-            var relocationAmount = adjust(event.amount, reloRate);
-            var relocationInfo = getEventCurrencyInfo(event, prevCountry || startCountry || currentCountry);
-            if (relocationAmount > 0) {
-              var relocationConverted = convertCurrencyAmount(relocationAmount, relocationInfo.currency, relocationInfo.country, residenceCurrency, prevCountry, year, true);
-              if (relocationConverted === null) {
-                success = false;
-                failedAt = person1.age;
-                return; // Abort processing this year
-              }
-              expenses += relocationConverted;
-              attributionManager.record('expenses', 'Relocation (' + event.id + ')', relocationConverted);
-            }
-            flushFlowState(flowState);
-            var prevCurrency = residenceCurrency;
-            var prevCountryNormalized = prevCountry;
-            var newResidenceCurrency = getCurrencyForCountry(destCountry) || prevCurrency || 'EUR';
-            if (prevCurrency && newResidenceCurrency && prevCurrency !== newResidenceCurrency) {
-              // Convert pooled cash to new residence currency.
-              // TODO(financial-engine): expand once multi-currency cash tracking lands.
-              var convertedCash = convertCurrencyAmount(cash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
-              if (convertedCash === null) {
-                success = false;
-                failedAt = person1.age;
-                return; // Abort processing this year
-              }
-              cash = convertedCash;
-              // Convert cashMoney to new currency
-              cashMoney = Money.convertTo(cashMoney, newResidenceCurrency, destCountry, year, economicData);
-
-              // Convert target cash (emergency stash) to new currency using PPP.
-              // PPP is used because the emergency stash covers local expenses, and
-              // PPP reflects the relative cost of goods/services between countries.
-              // This matches how RelocationImpactAssistant suggests salary amounts.
-              var pppRatio = (economicData && economicData.ready)
-                ? economicData.getPPP(prevCountryNormalized, destCountry)
-                : null;
-              if (pppRatio !== null) {
-                targetCash = targetCash * pppRatio;
-              } else {
-                // Fall back to FX conversion if PPP not available
-                var convertedTargetCash = convertCurrencyAmount(targetCash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
-                if (convertedTargetCash === null) {
-                  success = false;
-                  failedAt = person1.age;
-                  return; // Abort processing this year
-                }
-                targetCash = convertedTargetCash;
-              }
-            }
-            currentCountry = destCountry;
-            residenceCurrency = newResidenceCurrency;
-            conversionFactorCache = {};
-            if (event.rate !== null && event.rate !== undefined && event.rate !== '') {
-              if (!countryInflationOverrides) countryInflationOverrides = {};
-              countryInflationOverrides[currentCountry] = event.rate;
-            }
-            // Reset Taxman with the new country to ensure correct ruleset is loaded
-            revenue.reset(person1, person2, attributionManager, currentCountry, year);
-            flowState = createFlowState();
-          }
-        }
+        // MV-* relocation events are handled in zero pass above
         break;
     }
   }
@@ -1990,6 +2088,10 @@ function buildAggregateContext() {
     expenses: expenses,
     cash: cash,
     personalPensionContribution: personalPensionContribution,
+    personalPensionContributionByCountry: personalPensionContributionByCountry,
+    incomePrivatePensionByCountry: incomePrivatePensionByCountry,
+    incomeSalariesByCountry: incomeSalariesByCountry,
+    incomeRentalsByCountry: incomeRentalsByCountry,
     withdrawalRate: withdrawalRate,
 
     // Dynamic maps

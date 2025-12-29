@@ -88,6 +88,10 @@ function computePresentValueAggregates(ctx) {
   var expenses = ctx.expenses;
   var cash = ctx.cash;
   var personalPensionContribution = ctx.personalPensionContribution;
+  var personalPensionContributionByCountry = ctx.personalPensionContributionByCountry;
+  var incomePrivatePensionByCountry = ctx.incomePrivatePensionByCountry;
+  var incomeSalariesByCountry = ctx.incomeSalariesByCountry;
+  var incomeRentalsByCountry = ctx.incomeRentalsByCountry;
   var investmentIncomeByKey = ctx.investmentIncomeByKey;
   var getDeflationFactor = ctx.getDeflationFactor;
   var getDeflationFactorForCountry = ctx.getDeflationFactorForCountry;
@@ -290,10 +294,77 @@ function computePresentValueAggregates(ctx) {
 
   if (deflationFactor === 1 && (statePensionPVInResidenceCurrency === 0 || statePensionPVInResidenceCurrency === incomeStatePension)) {
     // Still initialise PV fields so downstream consumers can assume presence.
-    dataRow.incomeSalariesPV += incomeSalaries;
+    // Salary income PV: Use per-country deflation (similar to pension contribution PV logic)
+    if (incomeSalariesByCountry && typeof incomeSalariesByCountry === 'object') {
+      for (var salCountry in incomeSalariesByCountry) {
+        if (!Object.prototype.hasOwnProperty.call(incomeSalariesByCountry, salCountry)) continue;
+        var salAmount = incomeSalariesByCountry[salCountry];
+        if (salAmount === 0) continue;  // Skip zero salaries
+        var salDeflator = getDeflationFactorForCountry(salCountry, ageNum, startYear, {
+          params: params,
+          config: cfg,
+          countryInflationOverrides: countryInflationOverrides,
+          year: year
+        });
+        dataRow.incomeSalariesPV += salAmount * salDeflator;
+      }
+    } else {
+      // Fallback for backward compatibility (if map not provided)
+      dataRow.incomeSalariesPV += incomeSalaries;
+    }
     dataRow.incomeRSUsPV += incomeShares;
-    dataRow.incomeRentalsPV += incomeRentals;
-    dataRow.incomePrivatePensionPV += incomePrivatePension;
+    // Rental income PV: Use per-country deflation (similar to salary logic)
+    if (incomeRentalsByCountry && typeof incomeRentalsByCountry === 'object') {
+      for (var rentCountry in incomeRentalsByCountry) {
+        if (!Object.prototype.hasOwnProperty.call(incomeRentalsByCountry, rentCountry)) continue;
+        var rentAmount = incomeRentalsByCountry[rentCountry];
+        if (rentAmount === 0) continue;  // Skip zero rentals
+        var rentDeflator = getDeflationFactorForCountry(rentCountry, ageNum, startYear, {
+          params: params,
+          config: cfg,
+          countryInflationOverrides: countryInflationOverrides,
+          year: year
+        });
+        dataRow.incomeRentalsPV += rentAmount * rentDeflator;
+      }
+    } else {
+      // Fallback for backward compatibility (if map not provided)
+      dataRow.incomeRentalsPV += incomeRentals;
+    }
+    // Private pension income PV: Use per-country deflation (similar to pension fund PV logic)
+    // NOTE: incomePrivatePensionByCountry values are in residence currency (from pot.drawdown())
+    // Must convert back to pot's currency before applying pot-country deflator.
+    if (incomePrivatePensionByCountry && typeof incomePrivatePensionByCountry === 'object') {
+      for (var ppCountry in incomePrivatePensionByCountry) {
+        if (!Object.prototype.hasOwnProperty.call(incomePrivatePensionByCountry, ppCountry)) continue;
+        var ppAmount_res = incomePrivatePensionByCountry[ppCountry];  // residence currency
+        if (ppAmount_res === 0) continue;  // Skip zero income
+        var ppDeflator = getDeflationFactorForCountry(ppCountry, ageNum, startYear, {
+          params: params,
+          config: cfg,
+          countryInflationOverrides: countryInflationOverrides,
+          year: year
+        });
+        // Back-convert from residence currency to pot's currency for PV calculation
+        var ppCountry_norm = normalizeCountry(ppCountry);
+        var ppCur = getCurrencyForCountry(ppCountry_norm);
+        var ppAmount_asset;
+        // Skip conversion if pot currency matches residence currency (no FX needed)
+        if (ppCur && ppCur === residenceCurrency) {
+          ppAmount_asset = ppAmount_res;
+        } else if (ppCur) {
+          ppAmount_asset = convertCurrencyAmount(ppAmount_res, residenceCurrency, currentCountry, ppCur, ppCountry_norm, year, true);
+          if (ppAmount_asset === null) throw new Error('Private pension income PV back-conversion failed for pot in ' + ppCountry);
+        } else {
+          // Cannot determine pot currency - fail loudly
+          throw new Error('Private pension income PV: cannot determine currency for pot in ' + ppCountry + ' (ruleset not loaded?)');
+        }
+        dataRow.incomePrivatePensionPV += ppAmount_asset * ppDeflator;
+      }
+    } else {
+      // Fallback for backward compatibility (if map not provided)
+      dataRow.incomePrivatePensionPV += incomePrivatePension;
+    }
     dataRow.incomeStatePensionPV += (statePensionPVInResidenceCurrency > 0) ? statePensionPVInResidenceCurrency : incomeStatePension;
     dataRow.incomeFundsRentPV += incomeFundsRent;
     dataRow.incomeSharesRentPV += incomeSharesRent;
@@ -304,7 +375,24 @@ function computePresentValueAggregates(ctx) {
     dataRow.netIncomePV += netIncome;
     dataRow.expensesPV += expenses;
     dataRow.pensionFundPV += pensionFundPVTotal;
-    dataRow.pensionContributionPV += personalPensionContribution;
+    // Pension contribution PV: Use per-country deflation (similar to pension fund PV logic)
+    if (personalPensionContributionByCountry && typeof personalPensionContributionByCountry === 'object') {
+      for (var contribCountry in personalPensionContributionByCountry) {
+        if (!Object.prototype.hasOwnProperty.call(personalPensionContributionByCountry, contribCountry)) continue;
+        var contribAmount = personalPensionContributionByCountry[contribCountry];
+        if (contribAmount === 0) continue;  // Skip zero contributions
+        var contribDeflator = getDeflationFactorForCountry(contribCountry, ageNum, startYear, {
+          params: params,
+          config: cfg,
+          countryInflationOverrides: countryInflationOverrides,
+          year: year
+        });
+        dataRow.pensionContributionPV += contribAmount * contribDeflator;
+      }
+    } else {
+      // Fallback for backward compatibility (if map not provided)
+      dataRow.pensionContributionPV += personalPensionContribution;
+    }
     dataRow.cashPV += cash;
     dataRow.indexFundsCapitalPV += (dataRow.investmentCapitalByKeyPV['indexFunds'] || 0);
     dataRow.sharesCapitalPV += (dataRow.investmentCapitalByKeyPV['shares'] || 0);
@@ -314,10 +402,77 @@ function computePresentValueAggregates(ctx) {
     }
     dataRow.worthPV += realEstateCapitalPV + pensionFundPVTotal + investmentsPV + cash;
   } else {
-    dataRow.incomeSalariesPV += incomeSalaries * deflationFactor;
+    // Salary income PV: Use per-country deflation (similar to pension contribution PV logic)
+    if (incomeSalariesByCountry && typeof incomeSalariesByCountry === 'object') {
+      for (var salCountry in incomeSalariesByCountry) {
+        if (!Object.prototype.hasOwnProperty.call(incomeSalariesByCountry, salCountry)) continue;
+        var salAmount = incomeSalariesByCountry[salCountry];
+        if (salAmount === 0) continue;  // Skip zero salaries
+        var salDeflator = getDeflationFactorForCountry(salCountry, ageNum, startYear, {
+          params: params,
+          config: cfg,
+          countryInflationOverrides: countryInflationOverrides,
+          year: year
+        });
+        dataRow.incomeSalariesPV += salAmount * salDeflator;
+      }
+    } else {
+      // Fallback for backward compatibility (if map not provided)
+      dataRow.incomeSalariesPV += incomeSalaries * deflationFactor;
+    }
     dataRow.incomeRSUsPV += incomeShares * deflationFactor;
-    dataRow.incomeRentalsPV += incomeRentals * deflationFactor;
-    dataRow.incomePrivatePensionPV += incomePrivatePension * deflationFactor;
+    // Rental income PV: Use per-country deflation (similar to salary logic)
+    if (incomeRentalsByCountry && typeof incomeRentalsByCountry === 'object') {
+      for (var rentCountry in incomeRentalsByCountry) {
+        if (!Object.prototype.hasOwnProperty.call(incomeRentalsByCountry, rentCountry)) continue;
+        var rentAmount = incomeRentalsByCountry[rentCountry];
+        if (rentAmount === 0) continue;  // Skip zero rentals
+        var rentDeflator = getDeflationFactorForCountry(rentCountry, ageNum, startYear, {
+          params: params,
+          config: cfg,
+          countryInflationOverrides: countryInflationOverrides,
+          year: year
+        });
+        dataRow.incomeRentalsPV += rentAmount * rentDeflator;
+      }
+    } else {
+      // Fallback for backward compatibility (if map not provided)
+      dataRow.incomeRentalsPV += incomeRentals * deflationFactor;
+    }
+    // Private pension income PV: Use per-country deflation (similar to pension fund PV logic)
+    // NOTE: incomePrivatePensionByCountry values are in residence currency (from pot.drawdown())
+    // Must convert back to pot's currency before applying pot-country deflator.
+    if (incomePrivatePensionByCountry && typeof incomePrivatePensionByCountry === 'object') {
+      for (var ppCountry in incomePrivatePensionByCountry) {
+        if (!Object.prototype.hasOwnProperty.call(incomePrivatePensionByCountry, ppCountry)) continue;
+        var ppAmount_res = incomePrivatePensionByCountry[ppCountry];  // residence currency
+        if (ppAmount_res === 0) continue;  // Skip zero income
+        var ppDeflator = getDeflationFactorForCountry(ppCountry, ageNum, startYear, {
+          params: params,
+          config: cfg,
+          countryInflationOverrides: countryInflationOverrides,
+          year: year
+        });
+        // Back-convert from residence currency to pot's currency for PV calculation
+        var ppCountry_norm = normalizeCountry(ppCountry);
+        var ppCur = getCurrencyForCountry(ppCountry_norm);
+        var ppAmount_asset;
+        // Skip conversion if pot currency matches residence currency (no FX needed)
+        if (ppCur && ppCur === residenceCurrency) {
+          ppAmount_asset = ppAmount_res;
+        } else if (ppCur) {
+          ppAmount_asset = convertCurrencyAmount(ppAmount_res, residenceCurrency, currentCountry, ppCur, ppCountry_norm, year, true);
+          if (ppAmount_asset === null) throw new Error('Private pension income PV back-conversion failed for pot in ' + ppCountry);
+        } else {
+          // Cannot determine pot currency - fail loudly
+          throw new Error('Private pension income PV: cannot determine currency for pot in ' + ppCountry + ' (ruleset not loaded?)');
+        }
+        dataRow.incomePrivatePensionPV += ppAmount_asset * ppDeflator;
+      }
+    } else {
+      // Fallback for backward compatibility (if map not provided)
+      dataRow.incomePrivatePensionPV += incomePrivatePension * deflationFactor;
+    }
     // State Pension PV: Use the pre-calculated statePensionPVInResidenceCurrency (calculated above before the if/else)
     dataRow.incomeStatePensionPV += statePensionPVInResidenceCurrency;
     dataRow.incomeFundsRentPV += incomeFundsRent * deflationFactor;
@@ -329,7 +484,24 @@ function computePresentValueAggregates(ctx) {
     dataRow.netIncomePV += netIncome * deflationFactor;
     dataRow.expensesPV += expenses * deflationFactor;
     dataRow.pensionFundPV += pensionFundPVTotal;
-    dataRow.pensionContributionPV += personalPensionContribution * deflationFactor;
+    // Pension contribution PV: Use per-country deflation (similar to pension fund PV logic)
+    if (personalPensionContributionByCountry && typeof personalPensionContributionByCountry === 'object') {
+      for (var contribCountry in personalPensionContributionByCountry) {
+        if (!Object.prototype.hasOwnProperty.call(personalPensionContributionByCountry, contribCountry)) continue;
+        var contribAmount = personalPensionContributionByCountry[contribCountry];
+        if (contribAmount === 0) continue;  // Skip zero contributions
+        var contribDeflator = getDeflationFactorForCountry(contribCountry, ageNum, startYear, {
+          params: params,
+          config: cfg,
+          countryInflationOverrides: countryInflationOverrides,
+          year: year
+        });
+        dataRow.pensionContributionPV += contribAmount * contribDeflator;
+      }
+    } else {
+      // Fallback for backward compatibility (if map not provided)
+      dataRow.pensionContributionPV += personalPensionContribution * deflationFactor;
+    }
     dataRow.cashPV += cash * deflationFactor;
     dataRow.indexFundsCapitalPV += (dataRow.investmentCapitalByKeyPV['indexFunds'] || 0);
     dataRow.sharesCapitalPV += (dataRow.investmentCapitalByKeyPV['shares'] || 0);
