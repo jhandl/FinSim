@@ -38,7 +38,7 @@ class DynamicSectionManager {
     if (instance.webUI) {
       const uiManager = new UIManager(instance.webUI);
       const events = uiManager.readEvents(false);
-      const startCountry = instance.webUI.getValue('StartCountry');
+      const startCountry = Config.getInstance().getStartCountry();
       uniqueCountries = getUniqueCountries(events, startCountry);
     }
 

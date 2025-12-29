@@ -85,7 +85,8 @@ module.exports = {
         getCountryNameByCode: code => (code || '').toUpperCase(),
         listCachedRuleSets: () => ({ aa: fakeRuleSet, bb: fakeRuleSet }),
         getCachedTaxRuleSet: () => fakeRuleSet,
-        getDefaultCountry: () => 'aa'
+        getDefaultCountry: () => 'aa',
+        getStartCountry: () => 'aa'
       };
 
       global.Config = {

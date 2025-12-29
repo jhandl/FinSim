@@ -98,7 +98,7 @@ class EventsWizard {
   getCurrentAge() {
     try {
       if (window.webUI && window.webUI.simulator && window.webUI.simulator.currentAge) return parseInt(window.webUI.simulator.currentAge);
-    } catch (_) {}
+    } catch (_) { }
     return null;
   }
 
@@ -218,7 +218,7 @@ class EventsRenderer extends WizardRenderer {
             if (wizardManager) wizardManager.clearWizardFieldValidation(rateEl);
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     });
 
     toInput.addEventListener('input', () => {
@@ -238,7 +238,7 @@ class EventsRenderer extends WizardRenderer {
             if (wizardManager) wizardManager.clearWizardFieldValidation(rateEl);
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     });
 
     fromInput.addEventListener('blur', () => {
@@ -432,14 +432,14 @@ class EventsRenderer extends WizardRenderer {
           } catch (_) { return false; }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     return false;
   }
 
   processTextVariablesWithGrowth(text, wizardState, growthRequested) {
     if (!text) return text;
     const data = wizardState.data || {};
-    const isProperty = (wizardState && wizardState.eventType) ? ['R','M'].includes(wizardState.eventType) : false;
+    const isProperty = (wizardState && wizardState.eventType) ? ['R', 'M'].includes(wizardState.eventType) : false;
     const derived = this.computeDerivedVariables(data, growthRequested, isProperty);
     const variables = { ...data, ...derived };
     return text.replace(/\{([^}]+)\}/g, (match, key) => {
@@ -478,7 +478,7 @@ class EventsRenderer extends WizardRenderer {
       // eslint-disable-next-line no-new-func
       return !!(new Function('return (' + expr + ');'))();
     } catch (err) {
-      try { console.warn('Failed to evaluate condition:', condition, err); } catch (_) {}
+      try { console.warn('Failed to evaluate condition:', condition, err); } catch (_) { }
       return false;
     }
   }
@@ -525,7 +525,7 @@ class EventsRenderer extends WizardRenderer {
           if (rs) {
             if (typeof rs.getCurrencyCode === 'function') derived.destCurrency = rs.getCurrencyCode() || code.toUpperCase();
           }
-        } catch (_) {}
+        } catch (_) { }
         try {
           const cfg = (typeof Config !== 'undefined' && typeof Config.getInstance === 'function') ? Config.getInstance() : null;
           const econ = cfg && typeof cfg.getEconomicData === 'function' ? cfg.getEconomicData() : null;
@@ -545,10 +545,7 @@ class EventsRenderer extends WizardRenderer {
             }
           }
           let start = null;
-          try { if (this.context && typeof this.context.getValue === 'function') start = this.context.getValue('StartCountry'); } catch (_) {}
-          if (!start) {
-            try { const cfg2 = (typeof Config !== 'undefined' && typeof Config.getInstance === 'function') ? Config.getInstance() : null; start = cfg2 && typeof cfg2.getDefaultCountry === 'function' ? cfg2.getDefaultCountry() : null; } catch (_) {}
-          }
+          try { start = Config.getInstance().getStartCountry(); } catch (_) { }
           if (start && econ && typeof econ.getPPP === 'function') {
             const from = String(start).toLowerCase();
             const to = code;
@@ -560,9 +557,9 @@ class EventsRenderer extends WizardRenderer {
               derived.destCoL = `${colRatio.toFixed(2)}x`;
             }
           }
-        } catch (_) {}
+        } catch (_) { }
       }
-    } catch (_) {}
+    } catch (_) { }
     if (data.mortgageRate !== undefined) derived.mortgageRate = `${data.mortgageRate}%`;
     if (data.mortgageAnnualPayment !== undefined) derived.mortgageAnnualPayment = this.formatCurrency(toNumber(data.mortgageAnnualPayment));
     if (data.mortgageMonthlyPayment !== undefined) derived.mortgageMonthlyPayment = this.formatCurrency(toNumber(data.mortgageMonthlyPayment));
@@ -572,7 +569,7 @@ class EventsRenderer extends WizardRenderer {
       const pv = toNumber(data.propertyValue); const dp = toNumber(data.amount);
       if (pv > 0 && dp >= 0) { const pct = Math.round((dp / pv) * 100); derived.downPaymentPct = `${pct}%`; } else { derived.downPaymentPct = ''; }
     } else { derived.downPaymentPct = ''; }
-    if (data.incomeType) derived.incomeType = String(data.incomeType).replace('_',' ');
+    if (data.incomeType) derived.incomeType = String(data.incomeType).replace('_', ' ');
     if (data.fromAge !== undefined && data.fromAge !== null && data.fromAge !== '') {
       const from = parseInt(data.fromAge); const to = parseInt(data.toAge);
       const mode = this.context?.eventsTableManager?.ageYearMode || 'age';

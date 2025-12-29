@@ -339,8 +339,7 @@ function isBetween(num, min, max) {
 
 function serializeSimulation(ui) {
   var config = Config.getInstance();
-  var startCountryEl = document.getElementById('StartCountry');
-  var startCountry = (startCountryEl && startCountryEl.value) || config.getDefaultCountry();
+  var startCountry = config.getStartCountry();
   var startRuleset = config.getCachedTaxRuleSet(startCountry);
   var investmentTypes = startRuleset.getInvestmentTypes() || [];
 

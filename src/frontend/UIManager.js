@@ -270,11 +270,11 @@ class UIManager {
     };
 
     // StartCountry is always required
-    params.StartCountry = this.ui.getValue('StartCountry');
+    const cfg = Config.getInstance();
+    params.StartCountry = cfg.getStartCountry();
 
     // Dynamic investment parameters from ruleset
-    const cfg = Config.getInstance();
-    const ruleset = cfg.getCachedTaxRuleSet(params.StartCountry || cfg.getDefaultCountry());
+    const ruleset = cfg.getCachedTaxRuleSet(params.StartCountry);
     const investmentTypes = ruleset.getInvestmentTypes() || [];
     const initialCapitalByKey = {};
     const investmentAllocationsByKey = {};

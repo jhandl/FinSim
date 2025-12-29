@@ -2485,7 +2485,7 @@ class EventsTableManager {
             var startCountry = null;
             try {
               const config = Config.getInstance();
-              startCountry = (config.isRelocationEnabled && config.isRelocationEnabled()) ? this.webUI.getValue('StartCountry') : config.getDefaultCountry();
+              startCountry = config.getStartCountry();
               if (this.webUI && typeof this.webUI.readEvents === 'function') {
                 currentEvents = this.webUI.readEvents(false);
               } else if (typeof uiManager !== 'undefined' && uiManager && typeof uiManager.readEvents === 'function') {
@@ -2536,7 +2536,7 @@ class EventsTableManager {
         if (val && typeof val === 'string' && val.indexOf('MV-') === 0) {
           try {
             const config = Config.getInstance();
-            const startCountry = (config.isRelocationEnabled && config.isRelocationEnabled()) ? this.webUI.getValue('StartCountry') : config.getDefaultCountry();
+            const startCountry = config.getStartCountry();
             let currentEvents = null;
             if (this.webUI && typeof this.webUI.readEvents === 'function') {
               currentEvents = this.webUI.readEvents(false);
