@@ -34,13 +34,13 @@ const RELOCATION_BASELINE = {
   },
   35: {
     incomeSalaries: 68453009.7984,
-    incomeRentals: 10058703.410121787,
-    expenses: 65919558.17485923,
+    incomeRentals: 90530803.21404755,
+    expenses: 153382830.32380742,
     cash: 0,
     worth: 511440549, // Updated for evolution FX mode
     attributions: {
       incomesalaries: { AR_Salary: 68453009.7984 },
-      incomerentals: { IE_Rent: 16561.212048, AR_Rent: 4751397.788353366 }
+      incomerentals: { 'IE_Rent (IE)': 80488661.01597376, AR_Rent: 10042142.198073788 }
     }
   },
   36: {
@@ -306,7 +306,7 @@ module.exports = {
       errors.push('Pre-move IE rent attribution missing or invalid');
     }
 
-    const moveYearIERent = readAttribution(row35, 'incomerentals', 'IE_Rent');
+    const moveYearIERent = readAttribution(row35, 'incomerentals', 'IE_Rent (IE)');
     const moveYearARRent = readAttribution(row35, 'incomerentals', 'AR_Rent');
     if (!Number.isFinite(moveYearARRent) || moveYearARRent <= 0) {
       errors.push('AR rent should contribute immediately after relocation');
@@ -314,7 +314,14 @@ module.exports = {
     if (!Number.isFinite(moveYearIERent) || moveYearIERent <= 0) {
       errors.push('Converted IE rent contribution missing after relocation');
     }
-    if (percentDelta(moveYearIERent, preMoveRent) > 0.2) {
+    // Converted IE rent in the residence currency should match:
+    // (pre-move EUR rent inflated one year by IE CPI) converted to AR at move year FX.
+    const ieCpi = econ.getInflation('IE');
+    const expectedMoveIERentEUR = preMoveRent * Math.pow(1 + (ieCpi / 100), row35.year - row34.year);
+    const expectedMoveIERentAR = econ.convert(expectedMoveIERentEUR, 'IE', 'AR', row35.year, evolutionOptions);
+    if (!Number.isFinite(expectedMoveIERentAR) || expectedMoveIERentAR <= 0) {
+      errors.push('Expected IE rent conversion produced invalid value after relocation');
+    } else if (percentDelta(moveYearIERent, expectedMoveIERentAR) > 0.15) {
       errors.push('Converted IE rent drifted unexpectedly after relocation');
     }
 

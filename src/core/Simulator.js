@@ -988,9 +988,9 @@ function processEvents() {
       }
     }
 
-    // Track which categories have been counted/declared (aggregate across all currencies)
-    var countedCategories = {};
-    var declaredEntries = {};
+      // Track which categories have been counted/declared (aggregate across all currencies)
+      var countedCategories = {};
+      var declaredEntries = {};
 
     // Post entries for attribution and declarations using consolidated amounts
     for (var i = 0; i < state.orderedEntries.length; i++) {
@@ -1015,7 +1015,13 @@ function processEvents() {
 
       // Use entry type for category tracking (aggregate across all currencies)
       var entryCategory = entry.type || 'unknown';
-      var entryKey = entry.eventId ? String(entry.eventId) : (entryCategory + '_' + i);
+      // IMPORTANT: event IDs are not unique across the scenario (e.g., split events before/after relocation
+      // can share the same id like "You"). Declaration de-duping must therefore be keyed per entry instance,
+      // not per eventId, otherwise we under-declare income to Taxman and under-tax (see TestChartValues).
+      var entryKey = (entry.eventId ? String(entry.eventId) : entryCategory) +
+        '::' + String(entry.kind || '') +
+        '::' + String(entry.bucketKey || '') +
+        '::' + String(i);
 
       switch (entry.type) {
         /**
@@ -2084,7 +2090,11 @@ function buildAggregateContext() {
     cashWithdraw: cashWithdraw,
     incomeDefinedBenefit: incomeDefinedBenefit,
     incomeTaxFree: incomeTaxFree,
-    netIncome: netIncome,
+    // Data sheet / chart semantics:
+    // - Use earned post-tax income (exclude withdrawals), but add back personal pension
+    //   contributions so "NetIncome" reflects net earnings including pension savings.
+    // - Internal `netIncome` may be temporarily increased by withdrawals for solvency.
+    netIncome: earnedNetIncome + personalPensionContribution,
     expenses: expenses,
     cash: cash,
     personalPensionContribution: personalPensionContribution,
