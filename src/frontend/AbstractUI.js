@@ -1,5 +1,5 @@
 class AbstractUI {
-  
+
   constructor() {
     if (this.constructor === AbstractUI) {
       throw new Error("Abstract class cannot be instantiated");
@@ -28,7 +28,7 @@ class AbstractUI {
 
   setChartsRow(rowIndex, data) {
     throw new Error("Method 'setChartsRow' must be implemented");
-  } 
+  }
 
   setStatus(message, color) {
     throw new Error("Method 'setStatus' must be implemented");
@@ -116,6 +116,10 @@ class AbstractUI {
 
   clearExtraDataRows(maxAge) {
     throw new Error("Method 'clearExtraDataRows' must be implemented");
+  }
+
+  getStartCountryRaw() {
+    throw new Error("Method 'getStartCountryRaw' must be implemented");
   }
 
 } 

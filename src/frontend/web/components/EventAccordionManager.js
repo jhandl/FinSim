@@ -1456,7 +1456,7 @@ class EventAccordionManager {
           try {
             if (Config.getInstance().isRelocationEnabled()) {
               var events = this.webUI.readEvents(false);
-              var startCountry = this.webUI.eventsTableManager && this.webUI.eventsTableManager.getStartCountry ? this.webUI.eventsTableManager.getStartCountry() : undefined;
+              var startCountry = Config.getInstance().getStartCountry();
               RelocationImpactDetector.analyzeEvents(events, startCountry);
               if (this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.updateRelocationImpactIndicators === 'function') {
                 this.webUI.eventsTableManager.updateRelocationImpactIndicators(events);

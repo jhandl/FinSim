@@ -9,7 +9,6 @@ class ChartManager {
     this.relocationTransitions = []; // Array of {age, fromCountry, toCountry} for visual markers
     this.countryInflationOverrides = {}; // MV event rate overrides: country -> inflation rate (decimal)
     this.originalValues = {}; // Cache of unconverted values for tooltip display
-    this.countryTimeline = []; // Array tracking which country is active at each age
     this.currencyMode = 'unified'; // Charts always use unified mode (no mode selector in charts)
     this.presentValueMode = false; // Display monetary values in today's terms when enabled
     this.latestRelocationAnnotations = {};
@@ -776,7 +775,7 @@ class ChartManager {
   }
 
   getCountryForAge(age) {
-    return RelocationUtils.getCountryForAge(age, this);
+    return RelocationUtils.getCountryForAge(age, this.webUI);
   }
 
   getRepresentativeCountryForCurrency(code) {

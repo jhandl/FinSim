@@ -111,7 +111,7 @@ var RelocationImpactAssistant = {
     }
     if (!mvEvent) return '';
     const destCountry = mvEvent.type.substring(3).toLowerCase();
-    const startCountry = (env && env.eventsTableManager && typeof env.eventsTableManager.getStartCountry === 'function') ? env.eventsTableManager.getStartCountry() : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
+    const startCountry = Config.getInstance().getStartCountry();
     const originCountry = (env && env.eventsTableManager && typeof env.eventsTableManager.getOriginCountry === 'function') ? env.eventsTableManager.getOriginCountry(mvEvent, startCountry) : startCountry;
     const relocationAge = mvEvent.fromAge;
 
@@ -584,7 +584,7 @@ var RelocationImpactAssistant = {
       var rowId = payload && payload.rowId;
       var baseRow = null;
       try { if (rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]'); } catch (_) { }
-      var startCountry = typeof etm.getStartCountry === 'function' ? etm.getStartCountry() : Config.getInstance().getDefaultCountry();
+      var startCountry = Config.getInstance().getStartCountry();
       var origin = typeof etm.detectPropertyCountry === 'function' ? etm.detectPropertyCountry(Number(event.fromAge), startCountry) : startCountry;
       var rs = null; try { rs = Config.getInstance().getCachedTaxRuleSet(origin); } catch (_) { }
       var originCurrency = rs && typeof rs.getCurrencyCode === 'function' ? rs.getCurrencyCode() : null;
@@ -664,7 +664,7 @@ var RelocationImpactAssistant = {
       var etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
       if (!etm) return;
       var events = webUI.readEvents(false);
-      var startCountry = typeof etm.getStartCountry === 'function' ? etm.getStartCountry() : Config.getInstance().getDefaultCountry();
+      var startCountry = Config.getInstance().getStartCountry();
       if (typeof RelocationImpactDetector !== 'undefined') { RelocationImpactDetector.analyzeEvents(events, startCountry); }
       etm.updateRelocationImpactIndicators(events);
       if (typeof webUI.updateStatusForRelocationImpacts === 'function') { webUI.updateStatusForRelocationImpacts(events); }

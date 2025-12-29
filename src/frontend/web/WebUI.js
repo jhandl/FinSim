@@ -204,6 +204,10 @@ class WebUI extends AbstractUI {
     return this.tableManager.getTableData(groupId, columnCount, includeHiddenEventTypes);
   }
 
+  getStartCountryRaw() {
+    return this.getValue('StartCountry');
+  }
+
   setDataRow(rowIndex, data) {
     this.tableManager.setDataRow(rowIndex, data);
   }
@@ -848,7 +852,7 @@ class WebUI extends AbstractUI {
         if (Config.getInstance().isRelocationEnabled()) {
           // Ensure relocation impacts are freshly analyzed before gating
           const events = this.readEvents(false);
-          const startCountry = this.eventsTableManager.getStartCountry();
+          const startCountry = Config.getInstance().getStartCountry();
           const summary = RelocationImpactDetector.analyzeEvents(events, startCountry);
           // Ensure relocation impact badges/indicators are refreshed immediately after analysis
           if (this.eventsTableManager && typeof this.eventsTableManager.updateRelocationImpactIndicators === 'function') {

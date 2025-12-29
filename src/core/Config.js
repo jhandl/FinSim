@@ -6,7 +6,7 @@ if (!EconomicDataClass) {
     if (typeof require === 'function') {
       EconomicDataClass = require('./EconomicData.js').EconomicData;
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function ensureEconomicDataClass() {
@@ -70,7 +70,7 @@ class Config {
 
           // Warn if latestVersion is missing to aid versioning diagnostics (used by tests as well)
           if (!hasLatest) {
-            try { console.error('Config update check: latestVersion missing in loaded config for version ' + currentVersion); } catch (_) {}
+            try { console.error('Config update check: latestVersion missing in loaded config for version ' + currentVersion); } catch (_) { }
           }
 
           // If no latest or already at latest, stop
@@ -156,6 +156,18 @@ class Config {
   }
 
   /**
+   * Get the start country from UI, falling back to defaultCountry.
+   * Always returns a valid lowercase country code.
+   */
+  getStartCountry() {
+    if (Config.getInstance().isRelocationEnabled()) {
+      const raw = this.ui.getStartCountryRaw();
+      if (raw) return raw.trim().toLowerCase();
+    }
+    return this.getDefaultCountry();
+  }
+
+  /**
    * Return the application name configured in the loaded app config.
    * Falls back to 'Financial Simulator' if not set.
    */
@@ -179,7 +191,7 @@ class Config {
    * Falls back to a default array with the default country if not set.
    */
   getAvailableCountries() {
-    return Array.isArray(this.availableCountries) ? this.availableCountries : [{code: this.getDefaultCountry(), name: 'Default'}];
+    return Array.isArray(this.availableCountries) ? this.availableCountries : [{ code: this.getDefaultCountry(), name: 'Default' }];
   }
 
   getEconomicData() {
@@ -333,7 +345,7 @@ class Config {
     var countryCodes = [];
     required.forEach(function (code) {
       if (!this._taxRuleSets[code]) {
-        toLoad.push(this.getTaxRuleSet(code).catch(function(err) {
+        toLoad.push(this.getTaxRuleSet(code).catch(function (err) {
           return { error: err, countryCode: code };
         }));
         countryCodes.push(code);
@@ -365,7 +377,7 @@ class Config {
       if (msg && this.ui && typeof this.ui.showToast === 'function') {
         this.ui.showToast(msg, 'App Updated', 10);
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   clearVersionAlert() {

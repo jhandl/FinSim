@@ -8,10 +8,8 @@ class TableManager {
     this._incomeVisibilityInitialized = false;
     this.currencyMode = 'natural'; // 'natural' or 'unified'
     this.reportingCurrency = null;
-    this.countryTimeline = [];
     this.countryInflationOverrides = {}; // MV event rate overrides: country -> inflation rate (decimal)
     this.conversionCache = {};
-    this.storedCountryTimeline = null; // Persisted timeline from last simulation run
     this.presentValueMode = false; // Display monetary values in today's terms when enabled
     // Dynamic section manager for elastic column layouts during relocations
     this.dynamicSectionManager = null;
@@ -130,11 +128,7 @@ class TableManager {
     // Reset header init at the start of each simulation (first row)
     if (rowIndex === 0 || rowIndex === 1) {
       this.conversionCache = {}; // Clear cache for new simulation
-      // Always clear stored timeline at start to force recomputation for current dataSheet
-      this.storedCountryTimeline = null;
       RelocationUtils.extractRelocationTransitions(this.webUI, this);
-      // Store the computed timeline for reuse during display of this dataSheet
-      this.storedCountryTimeline = this.countryTimeline.slice();
 
       // Initialize dynamic section manager for elastic Deductions section
       if (Config.getInstance().isRelocationEnabled()) {
@@ -170,8 +164,8 @@ class TableManager {
     let needsNewTaxHeader = false;
     let currentCountry = null;
 
-    if (Config.getInstance().isRelocationEnabled() && this.countryTimeline && this.countryTimeline.length > 0) {
-      currentCountry = RelocationUtils.getCountryForAge(data.Age, this);
+    if (Config.getInstance().isRelocationEnabled()) {
+      currentCountry = RelocationUtils.getCountryForAge(data.Age, this.webUI);
 
       // Check if this is the first data row or if country changed from previous row
       if (rowIndex === 1) {
@@ -248,7 +242,7 @@ class TableManager {
 
     // Get tax columns for the current country (excludes PensionContribution)
     let taxColumns = [];
-    const rowCountry = currentCountry || RelocationUtils.getCountryForAge(data.Age, this) || Config.getInstance().getDefaultCountry() || 'ie';
+    const rowCountry = currentCountry || RelocationUtils.getCountryForAge(data.Age, this.webUI) || Config.getInstance().getDefaultCountry() || 'ie';
     if (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
       const countryColumns = this.dynamicSectionManager.getColumnsForCountry(rowCountry) || [];
       // Filter out PensionContribution since it's already in baseHeaders
@@ -337,7 +331,7 @@ class TableManager {
       if (isMonetary && Config.getInstance().isRelocationEnabled() && this.currencyMode === 'unified' && this.reportingCurrency) {
         const age = data.Age;
         const year = Config.getInstance().getSimulationStartYear() + age;
-        const fromCountry = RelocationUtils.getCountryForAge(age, this);
+        const fromCountry = RelocationUtils.getCountryForAge(age, this.webUI);
         const toCountry = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
 
         const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
@@ -416,7 +410,7 @@ class TableManager {
         contentContainer.textContent = FormatUtils.formatPercentage(v);
       } else {
         const age = data.Age;
-        const fromCountry = RelocationUtils.getCountryForAge(age, this);
+        const fromCountry = RelocationUtils.getCountryForAge(age, this.webUI);
         const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
 
         if (this.currencyMode === 'unified' && Config.getInstance().isRelocationEnabled()) {
@@ -508,7 +502,7 @@ class TableManager {
           // Determine display currency and locale exactly as used for the cell
           if (!displayCurrencyCode || !displayCountryForLocale) {
             const age = data.Age;
-            const fromCountry = RelocationUtils.getCountryForAge(age, this);
+            const fromCountry = RelocationUtils.getCountryForAge(age, this.webUI);
             const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
 
             if (this.currencyMode === 'unified') {
@@ -615,7 +609,7 @@ class TableManager {
 
           if (originalValue !== undefined) {
             const age = data.Age;
-            const originalCountry = RelocationUtils.getCountryForAge(age, this);
+            const originalCountry = RelocationUtils.getCountryForAge(age, this.webUI);
             tooltipText += `\n\nOriginal: ${FormatUtils.formatCurrency(originalValue, originalCurrency, originalCountry)}`;
           }
 
@@ -1102,7 +1096,7 @@ class TableManager {
         // Compute present-value in source currency when enabled:
         // prefer core-computed PV stored on the cell; otherwise stay nominal.
         let value = nominal;
-        let fromCountry = age != null && isFinite(age) ? RelocationUtils.getCountryForAge(age, this) : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
+        let fromCountry = age != null && isFinite(age) ? RelocationUtils.getCountryForAge(age, this.webUI) : (Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
         let displayCurrencyCode, displayCountryForLocale;
         if (this.presentValueMode) {
           if (pvStr != null && pvStr !== '' && isFinite(Number(pvStr))) {

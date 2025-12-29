@@ -29,6 +29,7 @@ module.exports = {
         return this.availableCountries[normalized] || normalized.toUpperCase();
       },
       getDefaultCountry() { return 'aa'; },
+      getStartCountry() { return 'aa'; },
       getAvailableCountries() {
         return [
           { code: 'AA', name: 'Country A' },
@@ -76,7 +77,7 @@ module.exports = {
 
     try {
       // Test 1: Boundary crossing detection.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv1', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_pre', type: 'SI', fromAge: 30, toAge: 40 });
         const expense = makeEvent({ id: 'expense_pre', type: 'E', fromAge: 32, toAge: 37 });
@@ -98,7 +99,7 @@ module.exports = {
       })();
 
       // Test 2: Simple event classification for same-country range.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv_simple', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const expense = makeEvent({ id: 'expense_post', type: 'E', fromAge: 36, toAge: 37 });
         const salary = makeEvent({ id: 'salary_post', type: 'SI', fromAge: 37, toAge: 38 });
@@ -112,7 +113,7 @@ module.exports = {
       })();
 
       // Test 3: Property boundary detection retains message specificity.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv_property', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const rental = makeEvent({ id: 'rent', type: 'RI', fromAge: 30, toAge: 50 });
         const mortgage = makeEvent({ id: 'mortgage', type: 'M', fromAge: 32, toAge: 60 });
@@ -126,7 +127,7 @@ module.exports = {
       })();
 
       // Test 4: Pension conflict detection when destination is state-only.
-      (function() {
+      (function () {
         pensionSystems.bb = 'state_only';
         const mv = makeEvent({ id: 'mv_state', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const pensionableSalary = makeEvent({ id: 'si_event', type: 'SI', fromAge: 36, toAge: 45 });
@@ -138,7 +139,7 @@ module.exports = {
       })();
 
       // Test 5: Multiple relocations respect nearest boundary.
-      (function() {
+      (function () {
         const mv1 = makeEvent({ id: 'mv_bb', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const mv2 = makeEvent({ id: 'mv_cc', type: 'MV-cc', fromAge: 45, toAge: 45 });
         const salary = makeEvent({ id: 'salary_multi', type: 'SI', fromAge: 30, toAge: 50 });
@@ -149,7 +150,7 @@ module.exports = {
       })();
 
       // Test 6: Stock market events ignored.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv_ignore', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const stock = makeEvent({ id: 'stock_evt', type: 'SM', fromAge: 36, toAge: 36 });
         const result = runDetector([stock, mv], 'aa');
@@ -157,7 +158,7 @@ module.exports = {
       })();
 
       // Test 7: Resolution detection via currency peg clears impact.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv_currency', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_currency', type: 'SI', fromAge: 30, toAge: 40 });
         const flagged = runDetector([salary, mv], 'aa');
@@ -167,7 +168,7 @@ module.exports = {
       })();
 
       // Test 8: Resolution detection via split linkage clears boundary impact.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv_split', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_split', type: 'SI', fromAge: 30, toAge: 40 });
         const flagged = runDetector([salary, mv], 'aa');
@@ -178,7 +179,7 @@ module.exports = {
       })();
 
       // Test 9: Resolution detection via property linking.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv_prop_res', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const property = makeEvent({ id: 'property_link', type: 'R', fromAge: 30, toAge: 50 });
         const flagged = runDetector([property, mv], 'aa');
@@ -189,7 +190,7 @@ module.exports = {
       })();
 
       // Test 10: Resolution detection via pension conversion.
-      (function() {
+      (function () {
         pensionSystems.bb = 'state_only';
         const mv = makeEvent({ id: 'mv_pension', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_convert', type: 'SI', fromAge: 36, toAge: 45 });
@@ -201,7 +202,7 @@ module.exports = {
       })();
 
       // Test 11: Manual override skips analysis.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv_override', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const expense = makeEvent({ id: 'expense_override', type: 'E', fromAge: 36, toAge: 38, resolutionOverride: '1' });
         const result = runDetector([expense, mv], 'aa');
@@ -209,14 +210,14 @@ module.exports = {
       })();
 
       // Negative case: No MV events clears impacts.
-      (function() {
+      (function () {
         const salary = makeEvent({ id: 'no_mv_salary', type: 'SI', fromAge: 30, toAge: 40 });
         const result = runDetector([salary], 'aa');
         assert(!result.find(e => e.id === 'no_mv_salary').relocationImpact, 'Without MV events nothing should be flagged');
       })();
 
       // Negative case: Relocation disabled clears impacts.
-      (function() {
+      (function () {
         configStub.relocationEnabled = false;
         const mv = makeEvent({ id: 'mv_disabled', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_disabled', type: 'SI', fromAge: 30, toAge: 40 });
@@ -226,7 +227,7 @@ module.exports = {
       })();
 
       // Edge case: MV event at age 0.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv_zero', type: 'MV-bb', fromAge: 0, toAge: 0 });
         const salary = makeEvent({ id: 'salary_zero', type: 'SI', fromAge: -1, toAge: 1 });
         const result = runDetector([salary, mv], 'aa');
@@ -234,7 +235,7 @@ module.exports = {
       })();
 
       // Edge case: Event ending exactly at relocation age - should not be flagged as boundary.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv_edge', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_edge', type: 'SI', fromAge: 30, toAge: 35 });
         const result = runDetector([salary, mv], 'aa');
@@ -242,7 +243,7 @@ module.exports = {
       })();
 
       // Edge case: Event starting exactly at relocation age - treated as simple.
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv_start', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_start', type: 'SI', fromAge: 35, toAge: 40 });
         const result = runDetector([salary, mv], 'aa');
@@ -260,7 +261,7 @@ module.exports = {
       })();
 
       // Test 12: PPP calculation independence from FX.
-      (function() {
+      (function () {
         const base = 50000;
         const pppRatio = econ.getPPP('aa', 'bb'); // 2.0
         const fxRate = econ.getFX('aa', 'bb');    // 1.5
@@ -271,17 +272,17 @@ module.exports = {
       })();
 
       // Test 12b: Direct unit test for EventsTableManager.calculatePPPSuggestion() uses PPP.
-      (function() {
+      (function () {
         const amount = 50000;
         // Minimal stubbed instance with no-op webUI.readEvents
-        const etm = Object.create((EventsTableManager || function(){}).prototype);
+        const etm = Object.create((EventsTableManager || function () { }).prototype);
         etm.webUI = { readEvents: () => [] };
         const result = etm.calculatePPPSuggestion(amount, 'aa', 'bb');
         assert.strictEqual(result, Math.round(amount * 2.0), 'EventsTableManager PPP suggestion should use PPP ratio');
       })();
 
       // Test 13: PPP vs FX divergence appears in panel data attributes (boundary split).
-      (function() {
+      (function () {
         const mv = makeEvent({ id: 'mv1', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const evt = makeEvent({
           id: 'salary_ppp_fx', type: 'SI', amount: 10000, fromAge: 30, toAge: 40,
@@ -308,7 +309,7 @@ module.exports = {
       })();
 
       // Test 14: PPP fallback to FX when PPP unavailable.
-      (function() {
+      (function () {
         // Rebuild economic data where BB PPP is missing
         econ = new EconomicData({
           AA: { country: 'AA', currency: 'AAA', cpi: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
@@ -320,16 +321,16 @@ module.exports = {
       })();
 
       // Test 14b: EventsTableManager.calculatePPPSuggestion() falls back to FX when PPP is missing.
-      (function() {
+      (function () {
         const amount = 10000;
-        const etm = Object.create((EventsTableManager || function(){}).prototype);
+        const etm = Object.create((EventsTableManager || function () { }).prototype);
         etm.webUI = { readEvents: () => [] };
         const result = etm.calculatePPPSuggestion(amount, 'aa', 'bb');
         assert.strictEqual(result, Math.round(amount * 1.5), 'EventsTableManager should fall back to FX when PPP missing');
       })();
 
       // Test 15: Economic context numbers (FX, PPP, COL) are correct from EconomicData.
-      (function() {
+      (function () {
         // Restore full economic data
         econ = new EconomicData({
           AA: { country: 'AA', currency: 'AAA', cpi: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
@@ -344,7 +345,7 @@ module.exports = {
       })();
 
       // Test 16: Regression guard – PPP suggestion remains stable irrespective of FX mode changes.
-      (function() {
+      (function () {
         const base = 12345;
         const expected = Math.round(base * 2.0);
         const v = RelocationImpactAssistant.calculatePPPSuggestion(base, 'aa', 'bb');

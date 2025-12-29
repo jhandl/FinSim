@@ -28,20 +28,18 @@ class DynamicSectionManager {
    * Scans the dataSheet to calculate the maximum column count across all countries
    * visited during the simulation.
    * 
-   * @param {Object} instance - The TableManager or ChartManager instance with countryTimeline
+   * @param {Object} instance - The TableManager or ChartManager instance with webUI
    * @returns {number} The maximum column count needed for the section
    */
   calculateMaxWidth(instance) {
-    // Get unique countries from the timeline
-    const uniqueCountries = new Set();
+    // Get unique countries using core utility
+    let uniqueCountries = new Set();
 
-    if (instance.countryTimeline && Array.isArray(instance.countryTimeline)) {
-      for (let i = 0; i < instance.countryTimeline.length; i++) {
-        const entry = instance.countryTimeline[i];
-        if (entry && entry.country) {
-          uniqueCountries.add(entry.country.toLowerCase());
-        }
-      }
+    if (instance.webUI) {
+      const uiManager = new UIManager(instance.webUI);
+      const events = uiManager.readEvents(false);
+      const startCountry = instance.webUI.getValue('StartCountry');
+      uniqueCountries = getUniqueCountries(events, startCountry);
     }
 
     // If no countries in timeline, use the default country

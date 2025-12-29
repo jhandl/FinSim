@@ -140,16 +140,6 @@ class EventsTableManager {
     }
   }
 
-  getStartCountry() {
-    const cfg = typeof Config !== 'undefined' ? Config.getInstance() : null;
-    const relocationOn = cfg && typeof cfg.isRelocationEnabled === 'function' ? cfg.isRelocationEnabled() : false;
-    if (relocationOn && this.webUI && typeof this.webUI.getValue === 'function') {
-      return this.webUI.getValue('StartCountry');
-    }
-    if (cfg && typeof cfg.getDefaultCountry === 'function') return cfg.getDefaultCountry();
-    return undefined;
-  }
-
   setupAddEventButton() {
     const addEventButton = document.getElementById('addEventRow');
     if (addEventButton) {
@@ -370,7 +360,7 @@ class EventsTableManager {
     const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
     if (!cfg || !cfg.isRelocationEnabled || !cfg.isRelocationEnabled()) return;
     const events = this.webUI.readEvents(false);
-    const startCountry = this.getStartCountry();
+    const startCountry = Config.getInstance().getStartCountry();
 
     // Gather investment context from simulator if available
     var investmentContext = null;
@@ -444,7 +434,7 @@ class EventsTableManager {
     this._detectorTimeout = setTimeout(() => {
       try {
         var events = this.webUI.readEvents(false);
-        var startCountry = this.getStartCountry();
+        var startCountry = Config.getInstance().getStartCountry();
 
         // Gather investment context from simulator if available
         var investmentContext = null;
@@ -1207,7 +1197,7 @@ class EventsTableManager {
     const mvEvent = this.webUI.readEvents(false).find(e => e.id === event.relocationImpact.mvEventId);
     if (!mvEvent) return '';
     const destCountry = mvEvent.type.substring(3).toLowerCase();
-    const startCountry = this.getStartCountry();
+    const startCountry = Config.getInstance().getStartCountry();
     const originCountry = this.getOriginCountry(mvEvent, startCountry);
     const relocationAge = mvEvent.fromAge;
     // Economic context removed for compact layout
@@ -1646,7 +1636,7 @@ class EventsTableManager {
     let fromCountryHint = panelContainer ? panelContainer.getAttribute('data-from-country') : null;
     if (!toCountryHint) toCountryHint = destCountry;
     if (!fromCountryHint) {
-      fromCountryHint = this.getOriginCountry(mvEvent, this.getStartCountry());
+      fromCountryHint = this.getOriginCountry(mvEvent, Config.getInstance().getStartCountry());
     }
 
     // Locale-aware parser using a specific country's number formatting
@@ -1966,7 +1956,7 @@ class EventsTableManager {
   _afterResolutionAction(rowId) {
     this.collapseResolutionPanel(rowId);
     const events = this.webUI.readEvents(false);
-    const startCountry = this.getStartCountry();
+    const startCountry = Config.getInstance().getStartCountry();
     RelocationImpactDetector.analyzeEvents(events, startCountry);
     this.updateRelocationImpactIndicators(events);
     this.webUI.updateStatusForRelocationImpacts(events);
@@ -2318,7 +2308,7 @@ class EventsTableManager {
     if (Config.getInstance().isRelocationEnabled()) {
       try {
         var events = this.webUI.readEvents(false);
-        var startCountry = this.getStartCountry();
+        var startCountry = Config.getInstance().getStartCountry();
         RelocationImpactDetector.analyzeEvents(events, startCountry);
         this.updateRelocationImpactIndicators(events);
         this.webUI.updateStatusForRelocationImpacts(events);
@@ -2654,7 +2644,7 @@ class EventsTableManager {
     if (Config.getInstance().isRelocationEnabled()) {
       try {
         var events = this.webUI.readEvents(false);
-        var startCountry = this.getStartCountry();
+        var startCountry = Config.getInstance().getStartCountry();
         RelocationImpactDetector.analyzeEvents(events, startCountry);
         this.updateRelocationImpactIndicators(events);
         // Update currency selector when relocation events are added

@@ -778,3 +778,44 @@ function getRateForKey(key, rateBands) {
   // Ensure we return a valid number, default to 1.0 if undefined
   return (typeof defaultRate === 'number' && !isNaN(defaultRate)) ? defaultRate : 1.0;
 }
+
+// ============================================================
+// Relocation Lookup Functions
+// ============================================================
+
+/**
+ * Get country for a given age by scanning MV-* events.
+ * @param {number} age - The age to look up
+ * @param {Array} events - Full events array
+ * @param {string} startCountry - Starting country code
+ * @returns {string} Country code (lowercase)
+ */
+function getCountryForAge(age, events, startCountry) {
+  var country = (startCountry || 'ie').toLowerCase();
+  for (var i = 0; i < events.length; i++) {
+    var e = events[i];
+    if (e && e.type && e.type.indexOf('MV-') === 0 && age >= e.fromAge) {
+      country = e.type.substring(3).toLowerCase();
+    }
+  }
+  return country;
+}
+
+/**
+ * Get unique countries from MV-* events.
+ * @param {Array} events - Full events array
+ * @param {string} startCountry - Starting country code
+ * @returns {Set} Set of country codes (lowercase)
+ */
+function getUniqueCountries(events, startCountry) {
+  var country = (startCountry || 'ie').toLowerCase();
+  var countries = new Set();
+  countries.add(country);
+  for (var i = 0; i < events.length; i++) {
+    var e = events[i];
+    if (e && e.type && e.type.indexOf('MV-') === 0) {
+      countries.add(e.type.substring(3).toLowerCase());
+    }
+  }
+  return countries;
+}

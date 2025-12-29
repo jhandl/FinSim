@@ -6,19 +6,18 @@ class RelocationUtils {
 
     const uiManager = new UIManager(webUI);
     const events = uiManager.readEvents(false);
-    let startCountry = webUI.getValue('StartCountry') || cfg.getDefaultCountry() || 'ie';
+    const startCountry = cfg.getStartCountry();
 
-    instance.countryTimeline = [{ fromAge: 0, country: startCountry.toLowerCase() }];
     instance.relocationTransitions = [];
     // Store MV event rate overrides: country -> inflation rate (decimal)
     instance.countryInflationOverrides = {};
 
     const mvEvents = events.filter(e => e.type && e.type.indexOf('MV-') === 0).sort((a, b) => a.fromAge - b.fromAge);
+    let prevCountry = startCountry.toLowerCase();
     mvEvents.forEach(ev => {
       const destCountry = ev.type.substring(3).toLowerCase();
-      const prevCountry = instance.countryTimeline[instance.countryTimeline.length - 1].country;
       instance.relocationTransitions.push({ age: ev.fromAge, fromCountry: prevCountry, toCountry: destCountry });
-      instance.countryTimeline.push({ fromAge: ev.fromAge, country: destCountry });
+      prevCountry = destCountry;
 
       // Store MV event rate as inflation override for destination country (if provided)
       // event.rate is already a decimal (parsePercentage divides by 100)
@@ -31,20 +30,17 @@ class RelocationUtils {
     });
   }
 
-  static getCountryForAge(age, instance) {
-    if (!instance.countryTimeline) return 'ie';
-    for (let i = instance.countryTimeline.length - 1; i >= 0; i--) {
-      if (age >= instance.countryTimeline[i].fromAge) {
-        return instance.countryTimeline[i].country;
-      }
-    }
-    return instance.countryTimeline[0] ? instance.countryTimeline[0].country : 'ie';
+  static getCountryForAge(age, webUI) {
+    const uiManager = new UIManager(webUI);
+    const events = uiManager.readEvents(false);
+    const startCountry = Config.getInstance().getStartCountry();
+    return getCountryForAge(age, events, startCountry);
   }
 
   static getCurrencyOptions(webUI) {
     const cfg = Config.getInstance();
     const currencySet = new Set();
-    let startCountry = webUI.getValue('StartCountry') || cfg.getDefaultCountry() || 'ie';
+    const startCountry = cfg.getStartCountry();
 
     const startRs = cfg.getCachedTaxRuleSet(String(startCountry).toLowerCase());
     const startCur = startRs && startRs.getCurrencyCode ? startRs.getCurrencyCode() : null;
@@ -83,14 +79,14 @@ class RelocationUtils {
 
   static getDefaultReportingCurrency(webUI) {
     const cfg = Config.getInstance();
-    let startCountry = webUI.getValue('StartCountry') || cfg.getDefaultCountry() || 'ie';
+    const startCountry = cfg.getStartCountry();
     const rs = cfg.getCachedTaxRuleSet(String(startCountry).toLowerCase());
     return rs && rs.getCurrencyCode ? (rs.getCurrencyCode() || 'EUR') : 'EUR';
   }
 
   static getRepresentativeCountryForCurrency(code) {
     const cfg = Config.getInstance();
-    const startCountry = cfg.getDefaultCountry();
+    const startCountry = cfg.getStartCountry();
     const countries = cfg.getAvailableCountries();
     for (let i = 0; i < countries.length; i++) {
       const country = countries[i];

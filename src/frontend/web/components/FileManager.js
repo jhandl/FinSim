@@ -397,20 +397,8 @@ class FileManager {
     // Preload tax rulesets for any relocation events in the loaded scenario
     try {
       var config = Config.getInstance();
-      // Guard StartCountry access: only read when relocation is enabled; else use default
-      var startCountry;
-      try {
-        if (config && typeof config.isRelocationEnabled === 'function' && config.isRelocationEnabled()) {
-          startCountry = this.webUI.getValue('StartCountry');
-        } else {
-          startCountry = config.getDefaultCountry && config.getDefaultCountry();
-        }
-      } catch (_) {
-        startCountry = config.getDefaultCountry && config.getDefaultCountry();
-      }
-      var loadedEvents = (this.webUI && typeof this.webUI.readEvents === 'function')
-        ? this.webUI.readEvents(false)
-        : (new UIManager(this.webUI)).readEvents(false);
+      var startCountry = config.getStartCountry();
+      var loadedEvents = this.webUI.readEvents(false);
       await config.syncTaxRuleSetsWithEvents(loadedEvents, startCountry);
     } catch (err) {
       console.error('Error preloading tax rulesets:', err);
@@ -424,9 +412,7 @@ class FileManager {
       const events = uiManager.readEvents(false);
       // Analyze impacts immediately after load so badges/status reflect current state
       try {
-        const startCountry = (this.webUI && this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.getStartCountry === 'function')
-          ? this.webUI.eventsTableManager.getStartCountry()
-          : (Config.getInstance && Config.getInstance().getDefaultCountry && Config.getInstance().getDefaultCountry());
+        const startCountry = Config.getInstance().getStartCountry();
         if (typeof RelocationImpactDetector !== 'undefined' && Config.getInstance().isRelocationEnabled()) {
           RelocationImpactDetector.analyzeEvents(events, startCountry);
           // Refresh badges from analyzed events
