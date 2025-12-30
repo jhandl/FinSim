@@ -134,6 +134,12 @@ class UIManager {
   }
 
   updateDataRow(row, progress, scale = 1, backgroundColor = null) {
+    // Data sheet semantics:
+    // - core `netIncome` includes personal pension contributions (pension savings)
+    // - UI "Inflows" should reflect cash inflows, excluding pension contributions
+    const cashInflows = dataSheet[row].netIncome - dataSheet[row].pensionContribution;
+    const cashInflowsPV = dataSheet[row].netIncomePV - dataSheet[row].pensionContributionPV;
+
     const data = {
       // Age and year are state values, not accumulated - don't divide by scale
       Age: dataSheet[row].age,
@@ -149,7 +155,7 @@ class UIManager {
       IncomeDefinedBenefit: dataSheet[row].incomeDefinedBenefit / scale,
       IncomeTaxFree: dataSheet[row].incomeTaxFree / scale,
       RealEstateCapital: dataSheet[row].realEstateCapital / scale,
-      NetIncome: dataSheet[row].netIncome / scale,
+      NetIncome: cashInflows / scale,
       Expenses: dataSheet[row].expenses / scale,
       PensionFund: dataSheet[row].pensionFund / scale,
       Cash: dataSheet[row].cash / scale,
@@ -170,7 +176,7 @@ class UIManager {
       IncomeDefinedBenefitPV: dataSheet[row].incomeDefinedBenefitPV / scale,
       IncomeTaxFreePV: dataSheet[row].incomeTaxFreePV / scale,
       RealEstateCapitalPV: dataSheet[row].realEstateCapitalPV / scale,
-      NetIncomePV: dataSheet[row].netIncomePV / scale,
+      NetIncomePV: cashInflowsPV / scale,
       ExpensesPV: dataSheet[row].expensesPV / scale,
       PensionFundPV: dataSheet[row].pensionFundPV / scale,
       CashPV: dataSheet[row].cashPV / scale,
