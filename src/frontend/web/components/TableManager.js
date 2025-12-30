@@ -1187,7 +1187,7 @@ class TableManager {
       try {
         deductionColumns = DEDUCTIONS_SECTION_CONFIG.getColumns(country);
       } catch (_) {
-        deductionColumns = [{ key: 'PensionContribution', label: 'P.Contrib', tooltip: 'Amount contributed to private pensions' }];
+        deductionColumns = [{ key: 'PensionContribution', label: 'P.Contrib', tooltip: 'Amount contributed to private pensions (excluding employer match)' }];
       }
     }
 
@@ -1228,7 +1228,7 @@ class TableManager {
       cellDefs.push({
         label: th.textContent,
         key: th.getAttribute('data-key'),
-        tooltip: null,
+        tooltip: th.getAttribute('data-tooltip') || th.getAttribute('title') || null,
         isDeduction: false
       });
     }
@@ -1257,7 +1257,7 @@ class TableManager {
       cellDefs.push({
         label: th.textContent,
         key: th.getAttribute('data-key'),
-        tooltip: null,
+        tooltip: th.getAttribute('data-tooltip') || th.getAttribute('title') || null,
         isDeduction: false
       });
     }
@@ -1380,6 +1380,5 @@ class TableManager {
   }
 
 }
-
 
 

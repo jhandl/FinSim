@@ -161,6 +161,21 @@ class DynamicSectionManager {
     // Group all containers by country
     const countryMeasurements = new Map(); // country -> { maxPerColumn: [], cells: [] }
 
+    // Helper to measure cells and update country measurements
+    const measureCells = (cells, country) => {
+      if (!countryMeasurements.has(country)) {
+        countryMeasurements.set(country, { maxPerColumn: [], cells: [] });
+      }
+      const m = countryMeasurements.get(country);
+      cells.forEach((cell, i) => {
+        const naturalWidth = cell.scrollWidth;
+        if (!m.maxPerColumn[i] || naturalWidth > m.maxPerColumn[i]) {
+          m.maxPerColumn[i] = naturalWidth;
+        }
+        m.cells.push(cell);
+      });
+    };
+
     // Measure tax header rows (have data-country attribute)
     const taxHeaders = tbody.querySelectorAll('tr.tax-header');
     taxHeaders.forEach(headerRow => {
@@ -173,20 +188,7 @@ class DynamicSectionManager {
       const cells = container.querySelectorAll(cellSelector);
       if (cells.length === 0) return;
 
-      // Initialize measurement for this country
-      if (!countryMeasurements.has(country)) {
-        countryMeasurements.set(country, { maxPerColumn: [], cells: [] });
-      }
-      const m = countryMeasurements.get(country);
-
-      // Measure each cell's natural width (scrollWidth)
-      cells.forEach((cell, i) => {
-        const naturalWidth = cell.scrollWidth;
-        if (!m.maxPerColumn[i] || naturalWidth > m.maxPerColumn[i]) {
-          m.maxPerColumn[i] = naturalWidth;
-        }
-        m.cells.push(cell);
-      });
+      measureCells(cells, country);
     });
 
     // Measure data rows - determine country by finding which tax header precedes them
@@ -202,16 +204,8 @@ class DynamicSectionManager {
         const cells = container.querySelectorAll(cellSelector);
         if (cells.length === 0) return;
 
-        const m = countryMeasurements.get(currentCountry);
-        if (!m) return;
-
-        cells.forEach((cell, i) => {
-          const naturalWidth = cell.scrollWidth;
-          if (!m.maxPerColumn[i] || naturalWidth > m.maxPerColumn[i]) {
-            m.maxPerColumn[i] = naturalWidth;
-          }
-          m.cells.push(cell);
-        });
+        if (!countryMeasurements.has(currentCountry)) return;
+        measureCells(cells, currentCountry);
       }
     });
 
@@ -265,21 +259,23 @@ class DynamicSectionManager {
  * Configuration for the Deductions section
  * Includes PensionContribution (fixed) and tax columns (dynamic per country)
  */
+const PENSION_CONTRIBUTION_COLUMN = {
+  key: 'PensionContribution',
+  label: 'P.Contrib',
+  tooltip: 'Amount contributed to private pensions (excluding employer match)'
+};
+
 const DEDUCTIONS_SECTION_CONFIG = {
   name: 'Deductions',
   getColumns: (countryCode) => {
     try {
       const taxRuleSet = Config.getInstance().getCachedTaxRuleSet(countryCode);
       if (!taxRuleSet) {
-        return [{ key: 'PensionContribution', label: 'P.Contrib', tooltip: 'Amount contributed to private pensions' }];
+        return [PENSION_CONTRIBUTION_COLUMN];
       }
 
       // PensionContribution comes first in the deductions section
-      const columns = [{
-        key: 'PensionContribution',
-        label: 'P.Contrib',
-        tooltip: 'Amount contributed to private pensions'
-      }];
+      const columns = [PENSION_CONTRIBUTION_COLUMN];
 
       // Then add tax columns
       const taxOrder = taxRuleSet.getTaxOrder ? taxRuleSet.getTaxOrder() : [];
@@ -294,7 +290,7 @@ const DEDUCTIONS_SECTION_CONFIG = {
       return columns;
     } catch (err) {
       console.warn(`DEDUCTIONS_SECTION_CONFIG: Error getting columns for ${countryCode}:`, err);
-      return [{ key: 'PensionContribution', label: 'P.Contrib', tooltip: 'Amount contributed to private pensions' }];
+      return [PENSION_CONTRIBUTION_COLUMN];
     }
   }
 };

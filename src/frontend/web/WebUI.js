@@ -2105,10 +2105,13 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
       if (temp && temp.parentNode) temp.parentNode.removeChild(temp);
     }
 
-    // Attach TooltipUtils to static data table headers (replace native title tooltips)
+    // Capture static header tooltip text for reuse in dynamic tax headers, then
+    // attach TooltipUtils to static data table headers (replace native title tooltips).
     document.querySelectorAll('#Data thead th[title]').forEach(th => {
       const txt = th.getAttribute('title');
       if (!txt) return;
+      // Persist tooltip text for TableManager-generated sticky tax headers
+      try { th.setAttribute('data-tooltip', txt); } catch (_) {}
       th.removeAttribute('title');
       TooltipUtils.attachTooltip(th, txt, { hoverDelay: 150, touchDelay: 250 });
     });
