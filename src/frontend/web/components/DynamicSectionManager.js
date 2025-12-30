@@ -6,7 +6,7 @@
  * the maximum column count needed for each dynamic section across all countries
  * visited during the simulation.
  * 
- * The Deductions section maintains constant width based on the maximum column
+ * The dynamic section maintains constant width based on the maximum column
  * count, with individual columns expanding to fill available space when fewer
  * columns are needed.
  */
@@ -237,8 +237,12 @@ class DynamicSectionManager {
       m.cells.forEach(cell => {
         const colIdx = cellIndex % numColumns;
         cell.style.width = `${scaledWidths[colIdx]}px`;
+        // Override any empty-state flex-fill styles so fixed pixel widths apply.
+        cell.style.minWidth = '';
+        cell.style.flexBasis = 'auto';
         cell.style.flexShrink = '0';
         cell.style.flexGrow = '0';
+        cell.style.flex = '0 0 auto';
         cellIndex++;
       });
     });

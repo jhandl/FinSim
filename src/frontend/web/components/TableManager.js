@@ -130,7 +130,7 @@ class TableManager {
       this.conversionCache = {}; // Clear cache for new simulation
       RelocationUtils.extractRelocationTransitions(this.webUI, this);
 
-      // Initialize dynamic section manager for elastic Deductions section
+      // Initialize dynamic section manager for elastic dynamic sections
       if (Config.getInstance().isRelocationEnabled()) {
         this.dynamicSectionManager = new DynamicSectionManager(DEDUCTIONS_SECTION_CONFIG);
         this.dynamicSectionManager.calculateMaxWidth(this);
@@ -203,29 +203,38 @@ class TableManager {
         tbody.appendChild(taxHeaderRow);
       }
 
+      // Empty table (pre-simulation): distribute dynamic header cells across
+      // the full dynamic section width so they don't bunch to the left.
+      try {
+        const age = data ? data.Age : null;
+        if (age === null || age === undefined || !isFinite(age)) {
+          this._applyEmptyStateFlexLayoutToDynamicSectionHeaderRow(taxHeaderRow, currentCountry);
+        }
+      } catch (_) { }
+
       // Register with IntersectionObserver for sticky behavior
       this._registerTaxHeader(taxHeaderRow);
     }
 
-    // Before building row, update Deductions group header colspan
+    // Before building row, update dynamic section group header colspan
     const headerRow = document.querySelector('#Data thead tr:nth-child(2)');
     if (headerRow) {
-      // Find the Deductions group header cell via data attribute for robustness
-      let deductionsGroupTh = null;
+      // Find the dynamic section group header cell via data attribute for robustness
+      let sectionGroupTh = null;
       try {
-        deductionsGroupTh = document.querySelector('#Data thead tr.header-groups th[data-group="deductions"]');
-      } catch (_) { deductionsGroupTh = null; }
+        sectionGroupTh = document.querySelector('#Data thead tr.header-groups th[data-group="deductions"]');
+      } catch (_) { sectionGroupTh = null; }
 
-      // Update Deductions colspan using dynamicSectionManager max column count
-      if (deductionsGroupTh && this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
+      // Update group colspan using dynamicSectionManager max column count
+      if (sectionGroupTh && this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
         const maxTaxColumns = this.dynamicSectionManager.getMaxColumnCount();
-        deductionsGroupTh.colSpan = Math.max(1, maxTaxColumns);
-      } else if (deductionsGroupTh) {
+        sectionGroupTh.colSpan = Math.max(1, maxTaxColumns);
+      } else if (sectionGroupTh) {
         // Fallback: count actual rendered tax columns + PensionContribution
         const taxColumnCount = headerRow.querySelectorAll('th[data-key^="Tax__"]').length;
         const pensionContribTh = headerRow.querySelector('th[data-key="PensionContribution"]');
-        const deductionsColspan = taxColumnCount + (pensionContribTh ? 1 : 0);
-        deductionsGroupTh.colSpan = Math.max(1, deductionsColspan);
+        const sectionColspan = taxColumnCount + (pensionContribTh ? 1 : 0);
+        sectionGroupTh.colSpan = Math.max(1, sectionColspan);
       }
 
       // Refresh dynamic group border markers after potential header changes
@@ -237,7 +246,7 @@ class TableManager {
     const baseHeaders = Array.from(document.querySelectorAll('#Data thead th[data-key]')).filter(h => h.style.display !== 'none');
 
     // Build a virtual headers list that includes country-specific tax columns
-    // Find PensionContribution - tax columns go AFTER it (PensionContribution comes first in deductions)
+    // Find PensionContribution - tax columns go AFTER it
     const pensionContribIndex = baseHeaders.findIndex(h => h.getAttribute('data-key') === 'PensionContribution');
 
     // Get tax columns for the current country (excludes PensionContribution)
@@ -268,7 +277,7 @@ class TableManager {
 
     let headers;
     if (pensionContribIndex >= 0) {
-      // Insert tax columns AFTER PensionContribution (it comes first in deductions)
+      // Insert tax columns AFTER PensionContribution
       headers = [
         ...baseHeaders.slice(0, pensionContribIndex + 1),  // up to and including PensionContribution
         ...virtualTaxHeaders,
@@ -279,23 +288,23 @@ class TableManager {
       headers = [...baseHeaders, ...virtualTaxHeaders];
     }
 
-    // ---- Flexbox Deductions Container Setup ----
-    // Identify deduction columns (PensionContribution + Tax__*) for flexbox layout
-    const isDeductionKey = (k) => k === 'PensionContribution' || (k && k.indexOf('Tax__') === 0);
+    // ---- Flexbox Dynamic Section Container Setup ----
+    // Identify dynamic section columns (PensionContribution + Tax__*) for flexbox layout
+    const isDynamicSectionKey = (k) => k === 'PensionContribution' || (k && k.indexOf('Tax__') === 0);
     const allKeys = headers.map(h => h.dataset?.key || h.getAttribute?.('data-key'));
-    const deductionIndices = allKeys.map((k, i) => isDeductionKey(k) ? i : -1).filter(i => i >= 0);
-    const firstDeductionIdx = deductionIndices.length > 0 ? deductionIndices[0] : -1;
-    const lastDeductionIdx = deductionIndices.length > 0 ? deductionIndices[deductionIndices.length - 1] : -1;
+    const sectionIndices = allKeys.map((k, i) => isDynamicSectionKey(k) ? i : -1).filter(i => i >= 0);
+    const firstSectionIdx = sectionIndices.length > 0 ? sectionIndices[0] : -1;
+    const lastSectionIdx = sectionIndices.length > 0 ? sectionIndices[sectionIndices.length - 1] : -1;
 
     // Get max column count for colspan (if dynamicSectionManager available)
-    const maxDeductionColumns = (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized())
+    const maxSectionColumns = (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized())
       ? this.dynamicSectionManager.getMaxColumnCount()
-      : deductionIndices.length;
+      : sectionIndices.length;
 
     // Create cells and format values in the order of the headers
-    // Deduction columns use flexbox layout for consistent section width
-    let deductionsContainerCell = null;
-    let deductionsFlexDiv = null;
+    // Dynamic section columns use flexbox layout for consistent section width
+    let sectionContainerCell = null;
+    let sectionFlexDiv = null;
 
     headers.forEach((header, headerIndex) => {
 
@@ -361,30 +370,30 @@ class TableManager {
         }
       }
 
-      // Check if this is a deduction column
-      const isCurrentDeduction = isDeductionKey(key);
+      // Check if this is a dynamic section column
+      const isDynamicSectionCell = isDynamicSectionKey(key);
 
-      // Determine the element to create (td for regular, div for deduction flex item)
+      // Determine the element to create (td for regular, div for dynamic section flex item)
       let cellElement;
       let contentContainer;
 
-      if (isCurrentDeduction && firstDeductionIdx >= 0) {
+      if (isDynamicSectionCell && firstSectionIdx >= 0) {
         // === DYNAMIC SECTION: Use flexbox layout ===
         const sectionName = this.dynamicSectionManager ? this.dynamicSectionManager.getSectionName() : 'deductions';
 
         // Create container cell on first column
-        if (headerIndex === firstDeductionIdx) {
-          deductionsContainerCell = document.createElement('td');
-          deductionsContainerCell.className = 'dynamic-section-container';
-          deductionsContainerCell.setAttribute('data-section', sectionName);
-          deductionsContainerCell.colSpan = maxDeductionColumns;
+        if (headerIndex === firstSectionIdx) {
+          sectionContainerCell = document.createElement('td');
+          sectionContainerCell.className = 'dynamic-section-container';
+          sectionContainerCell.setAttribute('data-section', sectionName);
+          sectionContainerCell.colSpan = maxSectionColumns;
           // Apply group border to the container
-          deductionsContainerCell.setAttribute('data-group-end', '1');
-          deductionsContainerCell.style.borderRight = '3px solid #666';
+          sectionContainerCell.setAttribute('data-group-end', '1');
+          sectionContainerCell.style.borderRight = '3px solid #666';
 
-          deductionsFlexDiv = document.createElement('div');
-          deductionsFlexDiv.className = 'dynamic-section-flex';
-          deductionsContainerCell.appendChild(deductionsFlexDiv);
+          sectionFlexDiv = document.createElement('div');
+          sectionFlexDiv.className = 'dynamic-section-flex';
+          sectionContainerCell.appendChild(sectionFlexDiv);
         }
 
         // Create flex item for this column
@@ -644,13 +653,13 @@ class TableManager {
       }
 
       // Handle appending the element
-      if (isCurrentDeduction && deductionsFlexDiv) {
+      if (isDynamicSectionCell && sectionFlexDiv) {
         // Append flex item to the flexbox container
-        deductionsFlexDiv.appendChild(cellElement);
+        sectionFlexDiv.appendChild(cellElement);
 
-        // After last deduction column, append the container cell to the row
-        if (headerIndex === lastDeductionIdx) {
-          row.appendChild(deductionsContainerCell);
+        // After last dynamic section column, append the container cell to the row
+        if (headerIndex === lastSectionIdx) {
+          row.appendChild(sectionContainerCell);
         }
       } else {
         // Regular cell: apply group border logic and append to row
@@ -664,7 +673,7 @@ class TableManager {
           // Find indices of group boundaries within the headers array
           const yearBoundaryIdx = allKeys.indexOf('Year');
           const incomeLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isIncome(allKeys[i])) return i; return -1; })();
-          // Skip deductions boundary check - handled by container cell
+          // Skip dynamic section boundary check - handled by container cell
           const expensesBoundaryIdx = allKeys.indexOf('Expenses');
           const assetsLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isAsset(allKeys[i])) return i; return -1; })();
           const lastIdx = allKeys.length - 1;
@@ -1178,23 +1187,23 @@ class TableManager {
     headerRow.setAttribute('data-age', age);
 
     // Get column definitions from DynamicSectionManager (PensionContribution first, then taxes)
-    let deductionColumns = [];
+    let sectionColumns = [];
 
     if (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
-      deductionColumns = this.dynamicSectionManager.getColumnsForCountry(country) || [];
+      sectionColumns = this.dynamicSectionManager.getColumnsForCountry(country) || [];
     } else {
       // Fallback: get columns directly from config
       try {
-        deductionColumns = DEDUCTIONS_SECTION_CONFIG.getColumns(country);
+        sectionColumns = DEDUCTIONS_SECTION_CONFIG.getColumns(country);
       } catch (_) {
-        deductionColumns = [{ key: 'PensionContribution', label: 'P.Contrib', tooltip: 'Amount contributed to private pensions (excluding employer match)' }];
+        sectionColumns = [{ key: 'PensionContribution', label: 'P.Contrib', tooltip: 'Amount contributed to private pensions (excluding employer match)' }];
       }
     }
 
     // Get max column count for colspan
-    const maxDeductionColumns = (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized())
+    const maxSectionColumns = (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized())
       ? this.dynamicSectionManager.getMaxColumnCount()
-      : deductionColumns.length;
+      : sectionColumns.length;
 
     // Get the main header row to understand column structure
     const mainHeaderRow = document.querySelector('#Data thead tr:last-child');
@@ -1206,18 +1215,18 @@ class TableManager {
     // Get base headers from <thead>
     const baseHeaders = Array.from(mainHeaderRow.querySelectorAll('th[data-key]')).filter(h => h.style.display !== 'none');
 
-    // Find PensionContribution position - deduction columns go AFTER it
+    // Find PensionContribution position - dynamic section columns go AFTER it
     const pensionContribIndex = baseHeaders.findIndex(h => h.getAttribute('data-key') === 'PensionContribution');
 
     // Separate PensionContribution from tax columns
-    const pensionColumn = deductionColumns.find(c => c.key === 'PensionContribution');
-    const taxColumns = deductionColumns.filter(c => c.key !== 'PensionContribution');
+    const pensionColumn = sectionColumns.find(c => c.key === 'PensionContribution');
+    const taxColumns = sectionColumns.filter(c => c.key !== 'PensionContribution');
 
     // Helper predicates for group identification
     const isIncome = (k) => k && k.indexOf('Income') === 0;
     const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
       k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
-    const isDeductionKey = (k) => k === 'PensionContribution' || (k && k.indexOf('Tax__') === 0);
+    const isDynamicSectionKey = (k) => k === 'PensionContribution' || (k && k.indexOf('Tax__') === 0);
 
     // Build the complete list of cells we'll create with their data-keys
     const cellDefs = [];
@@ -1229,17 +1238,17 @@ class TableManager {
         label: th.textContent,
         key: th.getAttribute('data-key'),
         tooltip: th.getAttribute('data-tooltip') || th.getAttribute('title') || null,
-        isDeduction: false
+        isDynamicSection: false
       });
     }
 
-    // Deduction cells (PensionContribution first, then tax columns)
+    // Dynamic section cells (PensionContribution first, then tax columns)
     if (pensionColumn) {
       cellDefs.push({
         label: pensionColumn.label,
         key: 'PensionContribution',
         tooltip: pensionColumn.tooltip,
-        isDeduction: true
+        isDynamicSection: true
       });
     }
     taxColumns.forEach(col => {
@@ -1247,7 +1256,7 @@ class TableManager {
         label: col.label,
         key: col.key,
         tooltip: col.tooltip,
-        isDeduction: true
+        isDynamicSection: true
       });
     });
 
@@ -1258,11 +1267,11 @@ class TableManager {
         label: th.textContent,
         key: th.getAttribute('data-key'),
         tooltip: th.getAttribute('data-tooltip') || th.getAttribute('title') || null,
-        isDeduction: false
+        isDynamicSection: false
       });
     }
 
-    // Find group boundary indices (excluding deductions - handled by container)
+    // Find group boundary indices (excluding dynamic section - handled by container)
     const allKeys = cellDefs.map(c => c.key);
     const yearIdx = allKeys.indexOf('Year');
     const incomeLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isIncome(allKeys[i])) return i; return -1; })();
@@ -1277,7 +1286,7 @@ class TableManager {
     const sectionName = this.dynamicSectionManager ? this.dynamicSectionManager.getSectionName() : 'deductions';
 
     cellDefs.forEach((def, idx) => {
-      if (def.isDeduction) {
+      if (def.isDynamicSection) {
         // === DYNAMIC SECTION: Use flexbox layout ===
 
         // Create container cell on first dynamic section cell
@@ -1285,7 +1294,7 @@ class TableManager {
           sectionContainerCell = document.createElement('th');
           sectionContainerCell.className = 'dynamic-section-container';
           sectionContainerCell.setAttribute('data-section', sectionName);
-          sectionContainerCell.colSpan = maxDeductionColumns;
+          sectionContainerCell.colSpan = maxSectionColumns;
           sectionContainerCell.setAttribute('data-group-end', '1');
           sectionContainerCell.style.borderRight = '3px solid #666';
 
@@ -1311,7 +1320,7 @@ class TableManager {
         sectionFlexDiv.appendChild(flexItem);
 
         // Check if this is the last section cell - if so, append container to row
-        const isLastSectionCell = !cellDefs.slice(idx + 1).some(c => c.isDeduction);
+        const isLastSectionCell = !cellDefs.slice(idx + 1).some(c => c.isDynamicSection);
         if (isLastSectionCell) {
           headerRow.appendChild(sectionContainerCell);
         }
@@ -1339,9 +1348,68 @@ class TableManager {
     return headerRow;
   }
 
+  /**
+   * Pre-simulation empty-state layout for dynamic (flexbox) section headers.
+   * When the table has no data rows yet, DynamicSectionManager.finalizeSectionWidths()
+   * hasn't run, so flex items have no explicit widths and can bunch up visually.
+   *
+   * finalizeSectionWidths() will override these styles once real data exists.
+   *
+   * @param {HTMLTableRowElement} headerRow
+   * @param {string} country
+   */
+  _applyEmptyStateFlexLayoutToDynamicSectionHeaderRow(headerRow, country) {
+    if (!headerRow) return;
 
+    const container = headerRow.querySelector('th.dynamic-section-container');
+    if (!container) return;
 
+    const flex = container.querySelector('.dynamic-section-flex');
+    if (!flex) return;
 
+    const cells = Array.from(flex.querySelectorAll('.dynamic-section-cell'));
+    if (cells.length === 0) return;
+
+    // Flex-fill the available dynamic section width without imposing large
+    // content-driven minimums (which can blow out the table width on load).
+    // Use proportional grow based on label width so longer tax names get more space.
+    const weights = [];
+    const labelWidths = [];
+    for (let i = 0; i < cells.length; i++) {
+      const w = cells[i].scrollWidth || 0;
+      weights.push(Math.max(1, Math.round(w)));
+      labelWidths.push(w);
+    }
+
+    // Ensure PensionContribution doesn't get a "just-fit" allocation (it tends to be the
+    // shortest label), so it visually matches the whitespace of other headers.
+    let avgWeight = 0;
+    for (let i = 0; i < weights.length; i++) avgWeight += weights[i];
+    avgWeight = weights.length ? (avgWeight / weights.length) : 0;
+
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      const key = cell.getAttribute('data-key');
+      let weight = weights[i] || 1;
+      if (key === 'PensionContribution' && avgWeight) {
+        weight = Math.max(weight, Math.round(avgWeight * 0.85));
+      }
+      try { cell.style.width = ''; } catch (_) { }
+      // IMPORTANT: flex items default min-width:auto; force 0 so they can shrink
+      // and the table can fit within the viewport.
+      if (key === 'PensionContribution') {
+        const labelWidth = labelWidths[i] || 0;
+        try { cell.style.minWidth = labelWidth ? `${labelWidth}px` : '0px'; } catch (_) { }
+      } else {
+        try { cell.style.minWidth = '0px'; } catch (_) { }
+      }
+      try { cell.style.flexGrow = String(weight); } catch (_) { }
+      try { cell.style.flexShrink = '1'; } catch (_) { }
+      try { cell.style.flexBasis = '0px'; } catch (_) { }
+      try { cell.style.overflow = 'hidden'; } catch (_) { }
+      try { cell.style.textOverflow = 'ellipsis'; } catch (_) { }
+    }
+  }
 
   /**
    * Initializes the IntersectionObserver for tracking tax header visibility
@@ -1380,5 +1448,3 @@ class TableManager {
   }
 
 }
-
-
