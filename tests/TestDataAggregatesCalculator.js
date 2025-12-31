@@ -130,8 +130,8 @@ function parseDemoCsvScenario(filePath) {
         toAge,
         rate,
         match: extra,
-        currency: meta.includes('cur=') ? meta.split('cur=')[1].split(';')[0].toUpperCase() : null,
-        linkedCountry: meta.includes('lc=') ? meta.split('lc=')[1].split(';')[0].toLowerCase() : null
+        currency: meta.includes('currency=') ? meta.split('currency=')[1].split(';')[0].toUpperCase() : null,
+        linkedCountry: meta.includes('linkedCountry=') ? meta.split('linkedCountry=')[1].split(';')[0].toLowerCase() : null
       });
       continue;
     }

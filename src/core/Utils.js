@@ -410,7 +410,6 @@ function serializeSimulation(ui) {
 
   // Collect Meta per-row from DOM when running in web UI (GAS-safe guard)
   var metaByRow = [];
-  var metaDetails = [];
   try {
     // Build a parallel list of event table rows in the same order as getTableData (skip resolution rows)
     var table = (typeof document !== 'undefined') ? document.getElementById('Events') : null;
@@ -425,43 +424,43 @@ function serializeSimulation(ui) {
         // so we do not filter by display here.
         // Extract hidden inputs
         var metaPairs = [];
-        var metaInfo = {};
         try {
-          var cur = rowEl.querySelector ? rowEl.querySelector('.event-currency') : null;
-          if (cur && cur.value) {
-            metaPairs.push('cur=' + encodeURIComponent(cur.value));
-            metaInfo.cur = cur.value;
+          var currencyInput = rowEl.querySelector ? rowEl.querySelector('.event-currency') : null;
+          if (currencyInput && currencyInput.value) {
+            metaPairs.push('currency=' + encodeURIComponent(currencyInput.value));
           }
         } catch (_e1) { }
         try {
-          var lc = rowEl.querySelector ? rowEl.querySelector('.event-linked-country') : null;
-          if (lc && lc.value) {
-            metaPairs.push('lc=' + encodeURIComponent(lc.value));
-            metaInfo.lc = lc.value;
+          var linkedCountryInput = rowEl.querySelector ? rowEl.querySelector('.event-linked-country') : null;
+          if (linkedCountryInput && linkedCountryInput.value) {
+            metaPairs.push('linkedCountry=' + encodeURIComponent(linkedCountryInput.value));
           }
         } catch (_e2) { }
         try {
-          var lei = rowEl.querySelector ? rowEl.querySelector('.event-linked-event-id') : null;
-          if (lei && lei.value) {
-            metaPairs.push('lei=' + encodeURIComponent(lei.value));
-            metaInfo.lei = lei.value;
+          var linkedEventIdInput = rowEl.querySelector ? rowEl.querySelector('.event-linked-event-id') : null;
+          if (linkedEventIdInput && linkedEventIdInput.value) {
+            metaPairs.push('linkedEventId=' + encodeURIComponent(linkedEventIdInput.value));
           }
         } catch (_e3) { }
+        var resolvedMeta = null;
         try {
-          var ro = rowEl.querySelector ? rowEl.querySelector('.event-resolution-override') : null;
-          if (ro && ro.value) {
-            metaPairs.push('ro=' + encodeURIComponent(ro.value));
-            metaInfo.ro = ro.value;
+          var resolutionOverrideInput = rowEl.querySelector ? rowEl.querySelector('.event-resolution-override') : null;
+          if (resolutionOverrideInput && resolutionOverrideInput.value) {
+            resolvedMeta = '1';
+            metaPairs.push('resolved=1');
           }
         } catch (_e4) { }
+        try {
+          if (resolvedMeta !== '1' && rowEl && rowEl.dataset && rowEl.dataset.relocationImpact === '1') {
+            metaPairs.push('resolved=0');
+          }
+        } catch (_e5) { }
         metaByRow.push(metaPairs.join(';'));
-        metaDetails.push(metaInfo);
       }
     }
   } catch (_err) {
     // Non-web environments (e.g., GAS) won't have a DOM; leave meta arrays empty
     metaByRow = [];
-    metaDetails = [];
   }
 
   // Create CSV content (always save with FinSim header for forward compatibility)
@@ -476,117 +475,6 @@ function serializeSimulation(ui) {
   csvContent += "\n";
 
   var isRelocationEnabled = config && typeof config.isRelocationEnabled === 'function' && config.isRelocationEnabled();
-
-  try {
-    if (isRelocationEnabled) {
-      var scenarioCountrySet = {};
-      var scenarioCountryOrder = [];
-      var addCountry = function (code) {
-        if (!code && code !== 0) return;
-        var normalized = String(code).trim().toLowerCase();
-        if (!normalized) return;
-        if (scenarioCountrySet[normalized]) return;
-        scenarioCountrySet[normalized] = true;
-        scenarioCountryOrder.push(normalized);
-      };
-
-      var startCountryCode = parameters.StartCountry || (typeof config.getDefaultCountry === 'function' ? config.getDefaultCountry() : null);
-      addCountry(startCountryCode);
-
-      for (var md = 0; md < metaDetails.length; md++) {
-        var metaInfo = metaDetails[md] || {};
-        if (metaInfo.lc) {
-          addCountry(metaInfo.lc);
-        }
-      }
-
-      var relocations = [];
-      for (var ei = 0; ei < events.length; ei++) {
-        var eventRow = events[ei] || [];
-        var typeName = eventRow[0] || '';
-        var colonIdx = typeName.indexOf(':');
-        var typeOnly = colonIdx >= 0 ? typeName.substring(0, colonIdx) : typeName;
-        if (typeOnly && typeOnly.indexOf('MV-') === 0 && typeOnly.length > 3) {
-          var relocationCode = typeOnly.substring(3);
-          addCountry(relocationCode);
-          var fromAge = '';
-          if (eventRow.length > 2 && eventRow[2] !== undefined && eventRow[2] !== null) {
-            fromAge = String(eventRow[2]);
-          }
-          var parsedAge = parseFloat(fromAge);
-          var sortAge = isNaN(parsedAge) ? Number.MAX_VALUE : parsedAge;
-          relocations.push({
-            code: relocationCode,
-            ageText: fromAge,
-            sortAge: sortAge
-          });
-        }
-      }
-
-      var cachedRuleSets = {};
-      if (config && typeof config.listCachedRuleSets === 'function') {
-        cachedRuleSets = config.listCachedRuleSets() || {};
-      }
-
-      var commentLines = [];
-      commentLines.push("# Multi-Currency Context");
-      for (var ci = 0; ci < scenarioCountryOrder.length; ci++) {
-        var countryCode = scenarioCountryOrder[ci];
-        var displayCode = (countryCode || '').toString().trim().toUpperCase();
-        var displayName = (typeof config.getCountryNameByCode === 'function') ? config.getCountryNameByCode(countryCode) : displayCode;
-        var ruleset = cachedRuleSets[countryCode] || (typeof config.getCachedTaxRuleSet === 'function' ? config.getCachedTaxRuleSet(countryCode) : null);
-        var currencyCode = '';
-        var currencySymbol = '';
-        if (ruleset) {
-          try {
-            var cc = ruleset.getCurrencyCode ? ruleset.getCurrencyCode() : null;
-            if (cc) currencyCode = String(cc).trim().toUpperCase();
-          } catch (_cce) { }
-          try {
-            var cs = ruleset.getCurrencySymbol ? ruleset.getCurrencySymbol() : null;
-            if (cs) currencySymbol = String(cs);
-          } catch (_cse) { }
-        }
-        if (!currencyCode) {
-          currencyCode = "UNKNOWN";
-        }
-        var symbolText = '';
-        if (currencySymbol && currencySymbol !== '') {
-          symbolText = " (" + currencySymbol + ")";
-        }
-        commentLines.push("# Country: " + displayName + " (" + displayCode + ") - Currency: " + currencyCode + symbolText);
-      }
-
-      if (relocations.length > 0) {
-        relocations.sort(function (a, b) {
-          if (a.sortAge === b.sortAge) return 0;
-          return a.sortAge < b.sortAge ? -1 : 1;
-        });
-        for (var ri = 0; ri < relocations.length; ri++) {
-          var relocation = relocations[ri];
-          var relCode = (relocation.code || '').toString().trim().toLowerCase();
-          var relDisplayCode = relCode ? relCode.toUpperCase() : '';
-          var relName = (typeof config.getCountryNameByCode === 'function') ? config.getCountryNameByCode(relCode) : relDisplayCode;
-          var ageText = relocation.ageText;
-          if (ageText === undefined || ageText === null || ageText === '') {
-            ageText = '?';
-          }
-          commentLines.push("# Relocations: Age " + ageText + " -> " + relName + " (" + relDisplayCode + ")");
-        }
-      }
-
-      commentLines.push("#");
-      commentLines.push("# Meta Column Format: cur=currency;lc=linkedCountry;lei=linkedEventId;ro=resolutionOverride");
-      commentLines.push("# - cur: Currency code - event amount is in this currency");
-      commentLines.push("# - lc: Linked country code - for location-tied inflation");
-      commentLines.push("# - lei: Linked event ID - for split events that share a common origin");
-      commentLines.push("# - ro: Resolution override flag - user has manually reviewed this event");
-
-      csvContent += commentLines.join("\n") + "\n\n";
-    }
-  } catch (_commentErr) {
-    // Comments are optional; proceed without them on failure
-  }
 
   csvContent += "# Events\n";
   // Use conditional header based on relocation enabled state

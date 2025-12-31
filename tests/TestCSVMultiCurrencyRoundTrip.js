@@ -14,6 +14,7 @@ function createFakeDocument(metaRows) {
     getElementById(id) {
       if (id !== 'Events') return null;
       const rows = metaRows.map(meta => ({
+        dataset: meta.resolved === '0' ? { relocationImpact: '1' } : {},
         classList: { contains: () => false },
         getElementsByTagName: () => ([{}, {}]),
         querySelector(selector) {
@@ -25,7 +26,7 @@ function createFakeDocument(metaRows) {
             case '.event-linked-event-id':
               return meta.linkedEventId ? { value: meta.linkedEventId } : null;
             case '.event-resolution-override':
-              return meta.resolutionOverride ? { value: meta.resolutionOverride } : null;
+              return meta.resolved === '1' ? { value: '1' } : null;
             default:
               return null;
           }
@@ -44,7 +45,7 @@ function createFakeDocument(metaRows) {
 
 module.exports = {
   name: 'CSVMultiCurrencyRoundTrip',
-  description: 'Ensures serialize/deserialize preserve multi-currency metadata and comments.',
+  description: 'Ensures serialize/deserialize preserve multi-currency metadata and unresolved flags.',
   isCustomTest: true,
   async runCustomTest() {
     const originalDocument = global.document;
@@ -94,16 +95,16 @@ module.exports = {
       };
 
       const metaRows = [
-        { currency: 'AAA', linkedCountry: '', linkedEventId: '', resolutionOverride: '' },
-        { currency: 'BBB', linkedCountry: 'bb', linkedEventId: 'split_1', resolutionOverride: '' },
-        { currency: '', linkedCountry: '', linkedEventId: '', resolutionOverride: '1' }
+        { currency: 'AAA', linkedCountry: '', linkedEventId: '', resolved: '' },
+        { currency: 'BBB', linkedCountry: 'bb', linkedEventId: 'split_1', resolved: '0' },
+        { currency: '', linkedCountry: '', linkedEventId: '', resolved: '1' }
       ];
 
       global.document = createFakeDocument(metaRows);
 
       const csv = serializeSimulation(fakeUI);
-      if (typeof csv !== 'string' || csv.indexOf('# Multi-Currency Context') === -1) {
-        errors.push('Serialized CSV missing relocation metadata comments');
+      if (typeof csv !== 'string' || csv.indexOf('Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta') === -1) {
+        errors.push('Serialized CSV missing events header with Meta column');
       }
 
       const sinkValues = {};
@@ -116,12 +117,15 @@ module.exports = {
         errors.push('Deserialized event rows count mismatch');
       } else {
         const metaColumn = eventRows[1] && eventRows[1][eventRows[1].length - 1];
-        if (!metaColumn || metaColumn.indexOf('cur=BBB') === -1 || metaColumn.indexOf('lc=bb') === -1 || metaColumn.indexOf('lei=split_1') === -1) {
+        if (!metaColumn || metaColumn.indexOf('currency=BBB') === -1 || metaColumn.indexOf('linkedCountry=bb') === -1 || metaColumn.indexOf('linkedEventId=split_1') === -1) {
           errors.push('Meta column did not preserve currency/country/linkage data');
         }
+        if (metaColumn.indexOf('resolved=0') === -1) {
+          errors.push('Resolved=0 flag not preserved in Meta column');
+        }
         const overrideMeta = eventRows[2][eventRows[2].length - 1] || '';
-        if (overrideMeta.indexOf('ro=1') === -1) {
-          errors.push('Resolution override flag not preserved in Meta column');
+        if (overrideMeta.indexOf('resolved=1') === -1) {
+          errors.push('Resolved=1 flag not preserved in Meta column');
         }
       }
 
@@ -131,15 +135,15 @@ module.exports = {
 
       // Test idempotence: re-serialize the deserialized scenario and compare CSVs
       function parseMetaColumn(metaStr) {
-        const meta = { currency: '', linkedCountry: '', linkedEventId: '', resolutionOverride: '' };
+        const meta = { currency: '', linkedCountry: '', linkedEventId: '', resolved: '' };
         if (!metaStr || metaStr.trim() === '') return meta;
         const pairs = metaStr.split(';');
         for (const pair of pairs) {
           const [key, value] = pair.split('=');
-          if (key === 'cur') meta.currency = decodeURIComponent(value || '');
-          if (key === 'lc') meta.linkedCountry = decodeURIComponent(value || '');
-          if (key === 'lei') meta.linkedEventId = decodeURIComponent(value || '');
-          if (key === 'ro') meta.resolutionOverride = decodeURIComponent(value || '');
+          if (key === 'currency') meta.currency = decodeURIComponent(value || '');
+          if (key === 'linkedCountry') meta.linkedCountry = decodeURIComponent(value || '');
+          if (key === 'linkedEventId') meta.linkedEventId = decodeURIComponent(value || '');
+          if (key === 'resolved') meta.resolved = decodeURIComponent(value || '');
         }
         return meta;
       }

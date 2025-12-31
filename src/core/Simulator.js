@@ -385,7 +385,26 @@ async function initializeSimulator() {
     return false;
   }
 
+  // Pre-run in-memory completion: ensure events have linkedCountry/currency when missing.
+  // This happens after the UI relocation-impact gate; it does not persist to disk.
+  completeMissingCurrencyAndLinkedCountry(events, startCountry);
+
   return true;
+}
+
+function completeMissingCurrencyAndLinkedCountry(events, startCountry) {
+  for (var i = 0; i < events.length; i++) {
+    var evt = events[i];
+    if (!evt || !evt.type) continue;
+    if (evt.type.indexOf('MV-') === 0) continue;
+    var eventCountry = getCountryForAge(Number(evt.fromAge), events, startCountry);
+    if (!evt.linkedCountry) {
+      evt.linkedCountry = eventCountry;
+    }
+    if (!evt.currency) {
+      evt.currency = getCurrencyForCountry(evt.linkedCountry);
+    }
+  }
 }
 
 function saveToFile() {

@@ -263,29 +263,29 @@ class FileManager {
           const row = this.webUI.eventsTableManager.createEventRow(type, name, amount, fromAge || '', toAge || '', displayRate, displayMatch);
           tbody.appendChild(row);
 
-          // Parse optional Meta column to restore hidden fields (currency, linkedCountry, linkedEventId, resolutionOverride)
+          // Parse optional Meta column to restore hidden fields (currency, linkedCountry, linkedEventId, resolved)
           try {
             if (meta && typeof meta === 'string') {
               // Meta format: key=value;key=value (values URL-encoded)
               const parts = meta.split(';').filter(Boolean);
-              const kv = {};
+              const metaValues = {};
               for (let i = 0; i < parts.length; i++) {
-                const p = parts[i];
-                const eq = p.indexOf('=');
-                if (eq > 0) {
-                  const k = p.substring(0, eq);
-                  const v = decodeURIComponent(p.substring(eq + 1));
-                  kv[k] = v;
+                const part = parts[i];
+                const equalsIndex = part.indexOf('=');
+                if (equalsIndex > 0) {
+                  const key = part.substring(0, equalsIndex);
+                  const value = decodeURIComponent(part.substring(equalsIndex + 1));
+                  metaValues[key] = value;
                 }
               }
               // Apply to hidden inputs when present
-              if (kv.lc) {
-                this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-country', kv.lc);
+              if (metaValues.linkedCountry) {
+                this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-country', metaValues.linkedCountry);
                 // Provide direct country hint for per-row formatting
-                this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-country', String(kv.lc).toLowerCase());
+                this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-country', String(metaValues.linkedCountry).toLowerCase());
                 if (shouldValidateCurrencyMeta && configForMetaValidation) {
                   try {
-                    const normalizedLc = String(kv.lc).trim().toLowerCase();
+                    const normalizedLc = String(metaValues.linkedCountry).trim().toLowerCase();
                     if (normalizedLc) {
                       let lcRuleset = cachedRuleSetsForValidation[normalizedLc];
                       if (!lcRuleset && typeof configForMetaValidation.getCachedTaxRuleSet === 'function') {
@@ -301,8 +301,8 @@ class FileManager {
                   } catch (_) { }
                 }
               }
-              if (kv.cur) {
-                this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-currency', kv.cur);
+              if (metaValues.currency) {
+                this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-currency', metaValues.currency);
                 if (shouldValidateCurrencyMeta) {
                   try {
                     let hasKnownCurrency = false;
@@ -313,7 +313,7 @@ class FileManager {
                       }
                     }
                     if (hasKnownCurrency) {
-                      const currencyCode = String(kv.cur).trim().toUpperCase();
+                      const currencyCode = String(metaValues.currency).trim().toUpperCase();
                       if (currencyCode) {
                         if (!knownCurrencyCodes[currencyCode]) {
                           let matched = false;
@@ -357,7 +357,7 @@ class FileManager {
                               } catch (_) { }
                             }
                             if (!foundInAvailable && !warnedCurrencyCodes[currencyCode]) {
-                              console.warn('Unknown currency code in Meta:', kv.cur, '- Event may not display correctly');
+                              console.warn('Unknown currency code in Meta:', metaValues.currency, '- Event may not display correctly');
                               warnedCurrencyCodes[currencyCode] = true;
                             }
                           }
@@ -367,8 +367,19 @@ class FileManager {
                   } catch (_) { }
                 }
               }
-              if (kv.lei) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-event-id', kv.lei);
-              if (kv.ro) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-resolution-override', kv.ro);
+              if (metaValues.linkedEventId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-event-id', metaValues.linkedEventId);
+              if (metaValues.resolved === '1') {
+                this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-resolution-override', '1');
+              }
+              if (metaValues.resolved === '0') {
+                try {
+                  row.dataset.relocationImpact = '1';
+                  row.dataset.relocationImpactCategory = 'unresolved';
+                  row.dataset.relocationImpactMessage = 'This event is marked as unresolved. Resolve the relocation impact warnings before running.';
+                  row.dataset.relocationImpactAuto = '0';
+                  row.dataset.relocationImpactMvId = '';
+                } catch (_) { }
+              }
             }
           } catch (_) { /* Non-fatal: loading continues without meta */ }
         }

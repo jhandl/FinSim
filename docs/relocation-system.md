@@ -241,20 +241,11 @@ Inline selectors in amount inputs with symbol (€) and caret (▼). Chart contr
 
 ### CSV Meta Column
 
-Meta column stores URL-encoded key=value pairs: `cur=EUR;lc=ie;lei=split_123;ro=1`.
-- `cur`: Currency code.
-- `lc`: Linked country.
-- `lei`: Linked event ID.
-- `ro`: Resolution override.
-
-### Currency Context Comments
-
-Conditional comments when relocation enabled: currency mappings and relocation timeline. Example:
-
-```
-# Country: Ireland (IE) - Currency: EUR (€)
-# Relocations: Age 35 -> Argentina (AR)
-```
+Meta column stores URL-encoded key=value pairs: `currency=EUR;linkedCountry=ie;linkedEventId=split_123;resolved=1`.
+- `currency`: Currency code.
+- `linkedCountry`: Linked country.
+- `linkedEventId`: Linked event ID.
+- `resolved`: `1` for user override, `0` for unresolved relocation impact.
 
 ### Backward Compatibility
 

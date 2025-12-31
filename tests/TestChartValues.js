@@ -75,19 +75,17 @@ const PARAM_KEY_MAP = {
 };
 
 const DEMO3_BASELINE = {
-  // Baselines aligned with residenceScope: "local" and contributionCurrencyMode: "residence".
-  // Investments now stay in residence currency (ARS when in Argentina) without EUR conversion.
-  // Updated after fixing off-by-one FX cache indexing bug in EconomicData._computePerEurFX.
-  // Updated after removing convertCashOnRelocation: cash now always converts to local currency.
-  // Updated after adding PPP adjustment: emergency stash now uses PPP (~15M ARS) instead of FX (~380M ARS).
-  // Updated after multi-country PV deflation fixes: emergency stash now inflates with Argentine CPI.
+  // Baselines updated after completeMissingCurrencyAndLinkedCountry fix.
+  // Events now correctly get currency from source country at fromAge, so Irish salary
+  // ending at relocation age 40 is now properly converted EUR→ARS instead of being
+  // treated as ARS income.
   ages: {
-    40: { worth: 4025538702.9139976, cash: 1488303968.8299227, netIncome: 26974878.95594136 },
-    65: { worth: 1988803853002.1045, cash: 332207305052.33746, netIncome: 143492216464.72678 },
-    80: { worth: 46182354076220.17, cash: 31550082434284.1, netIncome: 5907143751046.169 }
+    40: { worth: 3531689698.3288803, cash: 1288868167.2259612, netIncome: 755455527.8897383 },
+    65: { worth: 1921462900279.685, cash: 313863858212.2804, netIncome: 155819956333.49774 },
+    80: { worth: 39291176509203.65, cash: 31383030865996.523, netIncome: 6177677872065.23 }
   },
-  final: { age: 90, worth: 417972260133347.7, cash: 337284917961667.1 },
-  maxWorth: 417972260133347.7
+  final: { age: 90, worth: 404389743698679.5, cash: 335969410725761.4 },
+  maxWorth: 404389743698679.5
 };
 
 // Tolerances for evolution FX mode (inflation-driven FX rates)

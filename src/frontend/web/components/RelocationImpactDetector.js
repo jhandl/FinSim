@@ -64,7 +64,7 @@ var RelocationImpactDetector = {
           // Check if event crosses THIS MV's boundary (not the next one)
           var eFrom = Number(event.fromAge);
           var eTo = Number(event.toAge);
-          if (!isNaN(eTo) && !isNaN(eFrom) && eFrom < mvFromAge && eTo > mvFromAge) {
+          if (!isNaN(eTo) && !isNaN(eFrom) && eFrom < mvFromAge && eTo >= mvFromAge) {
             var message = this.generateImpactMessage('boundary', event, mvEvent, destinationCountry);
             this.addImpact(event, 'boundary', message, mvEvent.id, false);
           }
@@ -237,10 +237,10 @@ var RelocationImpactDetector = {
     if (event.relocationImpact.category === 'boundary') {
       // Consider boundary resolved if the event was explicitly split/linked, pegged to a currency,
       // or for real-estate events if a linked country has been set (indicating jurisdiction is tied).
-      resolved = !!(event.linkedEventId || event.currency || ((event.type === 'R' || event.type === 'M') && event.linkedCountry));
+      resolved = !!(event.linkedEventId || (event.currency && event.linkedCountry) || ((event.type === 'R' || event.type === 'M') && event.linkedCountry));
     } else if (event.relocationImpact.category === 'simple') {
-      // Consider simple resolved if currency or linked country is set or converted type acknowledged
-      resolved = !!(event.currency || event.linkedCountry || event.type === 'SInp' || event.type === 'SI2np');
+      // Consider simple resolved if linked country is set or converted type acknowledged
+      resolved = !!(event.linkedCountry || event.type === 'SInp' || event.type === 'SI2np');
     } else if (event.relocationImpact.category === 'local_holdings') {
       // Consider resolved if user has marked as reviewed
       // (Keep/sell/reinvest actions will be handled via custom resolution, not field changes)

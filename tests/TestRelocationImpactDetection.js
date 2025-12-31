@@ -162,7 +162,9 @@ module.exports = {
         const mv = makeEvent({ id: 'mv_currency', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_currency', type: 'SI', fromAge: 30, toAge: 40 });
         const flagged = runDetector([salary, mv], 'aa');
-        flagged.find(e => e.id === 'salary_currency').currency = 'AAA';
+        const salaryEvt = flagged.find(e => e.id === 'salary_currency');
+        salaryEvt.currency = 'AAA';
+        salaryEvt.linkedCountry = 'aa';
         RelocationImpactDetector.clearResolvedImpacts(flagged.find(e => e.id === 'salary_currency'));
         assert(!flagged.find(e => e.id === 'salary_currency').relocationImpact, 'Currency peg should resolve impact');
       })();
@@ -174,6 +176,8 @@ module.exports = {
         const flagged = runDetector([salary, mv], 'aa');
         const salaryEvt = flagged.find(e => e.id === 'salary_split');
         salaryEvt.linkedEventId = 'split_123';
+        salaryEvt.currency = 'AAA';
+        salaryEvt.linkedCountry = 'aa';
         RelocationImpactDetector.clearResolvedImpacts(salaryEvt);
         assert(!salaryEvt.relocationImpact, 'Linked split should resolve boundary impact');
       })();
@@ -185,6 +189,7 @@ module.exports = {
         const flagged = runDetector([property, mv], 'aa');
         const propertyEvt = flagged.find(e => e.id === 'property_link');
         propertyEvt.linkedCountry = 'aa';
+        propertyEvt.currency = 'AAA';
         RelocationImpactDetector.clearResolvedImpacts(propertyEvt);
         assert(!propertyEvt.relocationImpact, 'Linking property to country should clear impact');
       })();
@@ -234,12 +239,12 @@ module.exports = {
         assert(result.find(e => e.id === 'salary_zero').relocationImpact, 'Boundary at age 0 should be detected');
       })();
 
-      // Edge case: Event ending exactly at relocation age - should not be flagged as boundary.
+      // Edge case: Event ending exactly at relocation age - should be flagged as boundary.
       (function () {
         const mv = makeEvent({ id: 'mv_edge', type: 'MV-bb', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_edge', type: 'SI', fromAge: 30, toAge: 35 });
         const result = runDetector([salary, mv], 'aa');
-        assert(!result.find(e => e.id === 'salary_edge').relocationImpact, 'Event ending at relocation age should not cross boundary');
+        assert(result.find(e => e.id === 'salary_edge').relocationImpact, 'Event ending at relocation age should cross boundary');
       })();
 
       // Edge case: Event starting exactly at relocation age - treated as simple.
