@@ -37,29 +37,18 @@ sharesGrowthRate,6%
 sharesGrowthStdDev,15%
 StartCountry,ie
 
-# Multi-Currency Context
-# Country: Ireland (IE) - Currency: EUR (€)
-# Country: Argentina (AR) - Currency: ARS ($)
-# Relocations: Age 40 -> Argentina (AR)
-#
-# Meta Column Format: cur=currency;lc=linkedCountry;lei=linkedEventId;ro=resolutionOverride
-# - cur: Currency code - event amount is in this currency
-# - lc: Linked country code - for location-tied inflation
-# - lei: Linked event ID - for split events that share a common origin
-# - ro: Resolution override flag - user has manually reviewed this event
-
 # Events
 Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta
-SI,You,40000,30,40,0.035,0.03,lei=split_1762624764068_cmuo82pdo
-SI2np,Your Partner,30000,30,40,0.02,0,lei=split_1762624772055_tlitwyl80
-E,Life,40000,30,40,,,lei=split_1762624789954_fgc7fmqve
-E,Kid,6000,32,40,,,lei=split_1762624796604_1zr4xkn8q
-R,Family House,40000,35,70,,,cur=EUR;lc=ie
-M,Family House,18000,35,60,0.035,,cur=EUR;lc=ie
+SI,You,40000,30,40,0.035,0.03,linkedEventId=split_1762624764068_cmuo82pdo
+SI2np,Your Partner,30000,30,40,0.02,0,linkedEventId=split_1762624772055_tlitwyl80
+E,Life,40000,30,40,,,linkedEventId=split_1762624789954_fgc7fmqve
+E,Kid,6000,32,40,,,linkedEventId=split_1762624796604_1zr4xkn8q
+R,Family House,40000,35,70,,,currency=EUR;linkedCountry=ie
+M,Family House,18000,35,60,0.035,,currency=EUR;linkedCountry=ie
 MV-AR,hola,0,40,,,,
-E,Kid,3334610,40,52,,,cur=ARS;lei=split_1762624796604_1zr4xkn8q
-E,Life,22230730,40,100,,,cur=ARS;lei=split_1762624789954_fgc7fmqve
-SI2np,Your Partner,20673048,40,64,,0,cur=ARS;lei=split_1762624772055_tlitwyl80
-SI,You,30230730,40,64,,0.03,cur=ARS;lei=split_1762624764068_cmuo82pdo
-R,Downsize,255615112,70,100,,,cur=ARS;lc=ar
+E,Kid,3334610,40,52,,,currency=ARS;linkedEventId=split_1762624796604_1zr4xkn8q
+E,Life,22230730,40,100,,,currency=ARS;linkedEventId=split_1762624789954_fgc7fmqve
+SI2np,Your Partner,20673048,40,64,,0,currency=ARS;linkedEventId=split_1762624772055_tlitwyl80
+SI,You,30230730,40,64,,0.03,currency=ARS;linkedEventId=split_1762624764068_cmuo82pdo
+R,Downsize,255615112,70,100,,,currency=ARS;linkedCountry=ar
 SM,Crash,,70,72,-0.25,,

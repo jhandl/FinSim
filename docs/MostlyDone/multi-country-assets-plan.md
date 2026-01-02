@@ -81,7 +81,7 @@
 - Keep current logic for flow PV fields (`income...PV`, `expensesPV`, `netIncomePV`) using `deflationFactorFlows`.
 - Change **asset PV fields** to use their asset-country factor instead:
 - `realEstateCapitalPV` and the real estate component of `worthPV` should use the property’s country factor:
-- As a first iteration, use `startCountry` for demo3 (since the house is `lc=ie`), i.e. `defFactorAssetHome`.
+- As a first iteration, use `startCountry` for demo3 (since the house is `linkedCountry=ie`), i.e. `defFactorAssetHome`.
 - Leave room to refine later using per-property country info if needed.
 - `pensionFundPV` and the pension component of `worthPV` should use the pension country factor (startCountry for current rulesets).
 - `indexFundsCapitalPV`, `sharesCapitalPV` and their contribution to `worthPV` should use `defFactorAssetHome` (startCountry) initially.
