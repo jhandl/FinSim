@@ -2,3 +2,5 @@
 node_modules/
 .vscode
 .smart-coding-cache
+.codex/
+.specify/
