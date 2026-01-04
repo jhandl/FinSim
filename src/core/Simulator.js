@@ -486,7 +486,7 @@ function initializeSimulationVariables() {
     growthRatePension: params.growthRatePension,
     growthDevPension: params.growthDevPension
   });
-  if (params.initialPension > 0) person1.pension.buy(params.initialPension, baseStateCurrency, baseStateCountry);
+  if (params.initialPension > 0) person1.getPensionForCountry(baseStateCountry).buy(params.initialPension, baseStateCurrency, baseStateCountry);
 
   // Initialize Person 2 (P2) if the mode is 'couple'
   if (params.simulation_mode === 'couple') {
@@ -512,7 +512,7 @@ function initializeSimulationVariables() {
       growthRatePension: params.growthRatePension,
       growthDevPension: params.growthDevPension
     });
-    if (params.initialPensionP2 > 0) person2.pension.buy(params.initialPensionP2, baseStateCurrency, baseStateCountry);
+    if (params.initialPensionP2 > 0) person2.getPensionForCountry(baseStateCountry).buy(params.initialPensionP2, baseStateCurrency, baseStateCountry);
   } else {
     person2 = null;
   }
@@ -1055,7 +1055,7 @@ function processEvents() {
 
         case 'salary': {
           var salaryPerson = entry.personRef || person1;
-          var isPensionable = entry.pensionable && salaryPerson && salaryPerson.pension;
+          var isPensionable = entry.pensionable && salaryPerson && typeof salaryPerson.getPensionForCountry === 'function';
           var declaredRate = 0;
 
           // Use consolidated total for incomeSalaries accumulation (only once per currency bucket)
@@ -1636,7 +1636,7 @@ function handleInvestments() {
   for (var k in capsByKey) {
     totalInvestmentCaps += capsByKey[k];
   }
-  let capitalPreWithdrawal = totalInvestmentCaps + person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+  let capitalPreWithdrawal = totalInvestmentCaps + person1.getTotalPensionCapital() + (person2 ? person2.getTotalPensionCapital() : 0);
   if (expenses > netIncome) {
     switch (person1.phase) {
       case Phases.growth:
@@ -1778,10 +1778,10 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
   // Including it in totalAvailable during growth phase causes premature liquidation.
   var totalPensionCapital = 0;
   if (person1.phase === Phases.retired) {
-    totalPensionCapital += person1.pension.capital();
+    totalPensionCapital += person1.getTotalPensionCapital();
   }
   if (person2 && person2.phase === Phases.retired) {
-    totalPensionCapital += person2.pension.capital();
+    totalPensionCapital += person2.getTotalPensionCapital();
   }
   var totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome());
   if (needed > totalAvailable + 0.01) {
@@ -1820,13 +1820,13 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
 
       // Pension bucket (P1 then P2)
       if (priority === pensionPriority) {
-        var p1Cap = person1.pension.capital();
-        var p2Cap = person2 ? person2.pension.capital() : 0;
+        var p1Cap = person1.getTotalPensionCapital();
+        var p2Cap = person2 ? person2.getTotalPensionCapital() : 0;
         if (p1Cap > 0.5 && (person1.phase === Phases.retired || person1.age >= person1.retirementAgeParam)) {
           var w1 = Math.min(p1Cap, needed);
           // sell() returns numeric amount in residence currency.
           // Internal Money conversion happens inside asset class; Simulator receives number only.
-          var sold1 = person1.pension.sell(w1);
+          var sold1 = person1.sellPension(w1);
           if (sold1 === null) {
             flagSimulationFailure(person1.age);
             return;
@@ -1836,7 +1836,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
           keepTrying = true;
         } else if (p2Cap > 0.5 && person2 && (person2.phase === Phases.retired || person2.age >= person2.retirementAgeParam)) {
           var w2 = Math.min(p2Cap, needed);
-          var sold2 = person2.pension.sell(w2);
+          var sold2 = person2.sellPension(w2);
           if (sold2 === null) {
             flagSimulationFailure(person2.age);
             return;
@@ -1889,8 +1889,8 @@ function liquidateAll() {
   cashMoney = Money.zero(residenceCurrency, currentCountry);
 
   // Only liquidate pension if retired - pension should not be touched during growth phase
-  if (person1.phase === Phases.retired && person1.pension.capital() > 0) {
-    var soldAmount = person1.pension.sell(person1.pension.capital());
+  if (person1.phase === Phases.retired && person1.getTotalPensionCapital() > 0) {
+    var soldAmount = person1.sellPension(person1.getTotalPensionCapital());
     if (soldAmount === null) {
       flagSimulationFailure(person1.age);
       return;
@@ -1898,8 +1898,8 @@ function liquidateAll() {
     incomePrivatePension += soldAmount;
     attributionManager.record('incomeprivatepension', 'Pension Withdrawal P1', soldAmount);
   }
-  if (person2 && person2.phase === Phases.retired && person2.pension.capital() > 0) {
-    var soldAmount = person2.pension.sell(person2.pension.capital());
+  if (person2 && person2.phase === Phases.retired && person2.getTotalPensionCapital() > 0) {
+    var soldAmount = person2.sellPension(person2.getTotalPensionCapital());
     if (soldAmount === null) {
       flagSimulationFailure(person2.age);
       return;
@@ -2066,7 +2066,7 @@ function buildAggregateContext() {
     }
   }
 
-  var pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+  var pensionCap = person1.getTotalPensionCapital() + (person2 ? person2.getTotalPensionCapital() : 0);
 
   return {
     // Output targets

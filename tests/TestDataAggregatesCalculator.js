@@ -193,9 +193,8 @@ module.exports = {
     {
       const dataSheet = [];
       const row = 0;
-      const person1 = { age: 30, pension: { capital: () => 100000 } };
-      const person2 = null;
-      const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+      const person1 = { age: 30 };
+      const pensionCap = 100000;
 
       const ctx = buildTestContext({
         dataSheet,
@@ -242,9 +241,9 @@ module.exports = {
     {
       const dataSheet = [];
       const row = 0;
-      const person1 = { age: 30, pension: { capital: () => 100000 } };
-      const person2 = { age: 28, pension: { capital: () => 80000 } };
-      const pensionCap = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
+      const person1 = { age: 30 };
+      const person2 = { age: 28 };
+      const pensionCap = 180000;
 
       const ctx = buildTestContext({
         dataSheet,
@@ -285,9 +284,8 @@ module.exports = {
     {
       const dataSheet = [];
       const row = 0;
-      const person1 = { age: 30, pension: { capital: () => 0 } };
-      const person2 = null;
-      const pensionCap = person1.pension.capital();
+      const person1 = { age: 30 };
+      const pensionCap = 0;
 
       const ctx = buildTestContext({
         dataSheet,
@@ -330,9 +328,8 @@ module.exports = {
     {
       const dataSheet = [];
       const row = 0;
-      const person1 = { age: 30, pension: { capital: () => 0 } };
-      const person2 = null;
-      const pensionCap = person1.pension.capital();
+      const person1 = { age: 30 };
+      const pensionCap = 0;
 
       const ctx = buildTestContext({
         dataSheet,
@@ -373,9 +370,8 @@ module.exports = {
     {
       const dataSheet = [];
       const row = 0;
-      const person1 = { age: 30, pension: { capital: () => 0 } };
-      const person2 = null;
-      const pensionCap = person1.pension.capital();
+      const person1 = { age: 30 };
+      const pensionCap = 0;
 
       const ctx = buildTestContext({
         dataSheet,

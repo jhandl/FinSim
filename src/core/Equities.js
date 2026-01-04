@@ -528,6 +528,7 @@ class Pension extends Equity {
   constructor(growth, stdev = 0, person, countryCode) {
     super(0, growth, stdev);
     this.lumpSum = false;
+    this.lumpSumTaken = false;
     this.person = person;
     this.countryCode = countryCode ? String(countryCode).toLowerCase() : null;
     try {
@@ -557,16 +558,39 @@ class Pension extends Equity {
     }
   }
 
-  getLumpsum() {
+  _getMinRetirementAgePrivate() {
+    var rs = this._ruleset;
+    if (rs && typeof rs.getPensionMinRetirementAgePrivate === 'function') {
+      return rs.getPensionMinRetirementAgePrivate() || 0;
+    }
+    return 0;
+  }
+
+  canWithdrawAtAge(currentAge) {
+    var minAge = this._getMinRetirementAgePrivate();
+    if (!minAge) return true;
+    return (typeof currentAge === 'number') ? (currentAge >= minAge) : false;
+  }
+
+  takeLumpSumIfEligible(currentAge) {
+    if (this.lumpSumTaken) return 0;
+    if (!this.canWithdrawAtAge(currentAge)) return 0;
     this.lumpSum = true;
     var rsValue = (this._ruleset && typeof this._ruleset.getPensionLumpSumMaxPercent === 'function') ? this._ruleset.getPensionLumpSumMaxPercent() : null;
     var maxPct = (typeof rsValue === 'number' && rsValue > 0) ? rsValue : 0;
+    if (maxPct <= 0) {
+      this.lumpSum = false;
+      return 0;
+    }
     let amount = this.sell(this.capital() * maxPct);
     this.lumpSum = false;
+    if (amount === null) return null;
+    this.lumpSumTaken = true;
     return amount;
   }
 
   drawdown(currentAge) {
+    if (!this.canWithdrawAtAge(currentAge)) return 0;
     var bands = (this._ruleset && typeof this._ruleset.getPensionMinDrawdownRates === 'function') ? this._ruleset.getPensionMinDrawdownRates() : { '0': 0 };
     let ageLimits = Object.keys(bands);
     let minimumDrawdown = ageLimits.reduce(

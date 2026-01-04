@@ -1,6 +1,82 @@
 /* This file has to work on both the website and Google Sheets */
 
 /**
+ * Facade over a person's per-country pension pots.
+ * Exposes the same methods as a single Pension, but operates across all pots.
+ */
+class PensionPortfolio {
+  constructor(person) {
+    this.person = person;
+  }
+
+  _getPotKeys() {
+    var pensions = (this.person && this.person.pensions) ? this.person.pensions : null;
+    if (!pensions) return [];
+    // Deterministic order
+    return Object.keys(pensions).sort();
+  }
+
+  capital() {
+    var pensions = (this.person && this.person.pensions) ? this.person.pensions : null;
+    if (!pensions) return 0;
+    var keys = this._getPotKeys();
+    var total = 0;
+    for (var i = 0; i < keys.length; i++) {
+      var pot = pensions[keys[i]];
+      if (!pot || typeof pot.capital !== 'function') continue;
+      total += pot.capital();
+    }
+    return total;
+  }
+
+  buy(amountToBuy, currency, country) {
+    if (!this.person || typeof this.person.getPensionForCountry !== 'function') {
+      throw new Error('PensionPortfolio.buy: invalid person');
+    }
+    return this.person.getPensionForCountry(country).buy(amountToBuy, currency, country);
+  }
+
+  sell(amountToSell) {
+    var pensions = (this.person && this.person.pensions) ? this.person.pensions : null;
+    if (!pensions) return 0;
+    var remaining = (typeof amountToSell === 'number') ? amountToSell : 0;
+    if (remaining <= 0) return 0;
+
+    var keys = this._getPotKeys();
+    var totalSold = 0;
+    var currentAge = (this.person && typeof this.person.age === 'number') ? this.person.age : null;
+    for (var i = 0; i < keys.length && remaining > 0; i++) {
+      var pot = pensions[keys[i]];
+      if (!pot || typeof pot.capital !== 'function' || typeof pot.sell !== 'function') continue;
+      if (typeof pot.canWithdrawAtAge === 'function' && !pot.canWithdrawAtAge(currentAge)) continue;
+      var cap = pot.capital();
+      if (cap <= 0) continue;
+      var w = Math.min(cap, remaining);
+      var sold = pot.sell(w);
+      if (sold === null) return null;
+      totalSold += sold;
+      remaining -= sold;
+    }
+    return totalSold;
+  }
+
+  getLumpsum(currentAge) {
+    var pensions = (this.person && this.person.pensions) ? this.person.pensions : null;
+    if (!pensions) return 0;
+    var keys = this._getPotKeys();
+    var total = 0;
+    for (var i = 0; i < keys.length; i++) {
+      var pot = pensions[keys[i]];
+      if (!pot || typeof pot.takeLumpSumIfEligible !== 'function') continue;
+      var amt = pot.takeLumpSumIfEligible(currentAge);
+      if (amt === null) return null;
+      total += amt;
+    }
+    return total;
+  }
+}
+
+/**
  * Person class to encapsulate person-specific data and logic for the financial simulator.
  * This class handles individual pension management, age tracking, and income calculations.
  */
@@ -26,6 +102,7 @@ class Person {
     // Pensions are created lazily via getPensionForCountry()
     this.pensions = {};
     this._pensionConfig = commonPensionConfig;  // Store for lazy creation
+    this._pensionPortfolio = new PensionPortfolio(this);
 
     // Store essential person-specific parameters
     this.retirementAgeParam = personSpecificUIParams.retirementAge;
@@ -60,13 +137,20 @@ class Person {
   }
 
   /**
-   * Backward-compatible getter for the primary pension pot (StartCountry).
-   * Returns the pension pot for the StartCountry.
-   * @returns {Pension} Primary pension pot
+   * Return a facade exposing Pension-like methods (capital/sell/buy/getLumpsum)
+   * across all per-country pension pots.
+   * @returns {PensionPortfolio}
    */
-  get pension() {
-    var startCountry = normalizeCountry(this.params.StartCountry || Config.getInstance().getDefaultCountry());
-    return this.getPensionForCountry(startCountry);
+  getPensionPortfolio() {
+    return this._pensionPortfolio;
+  }
+
+  getTotalPensionCapital() {
+    return this._pensionPortfolio.capital();
+  }
+
+  sellPension(amountToSell) {
+    return this._pensionPortfolio.sell(amountToSell);
   }
 
   /**
@@ -104,10 +188,14 @@ class Person {
     this.yearlyIncomeStatePension = null;
     this.yearlyIncomeStatePensionBaseCurrency = null;
 
-    // Lump Sum: Check if retirement age is reached and still in growth phase
-    if (this.age === this.retirementAgeParam && this.phase === Phases.growth) {
-      lumpSumAmount = this.pension.getLumpsum();
+    // Retirement: when the retirement age is reached, switch to retired phase.
+    // Lump sum is applied per-pot when (and only when) each pot is eligible.
+    if (this.phase === Phases.growth && this.age >= this.retirementAgeParam) {
       this.phase = Phases.retired;
+    }
+    if (this.phase === Phases.retired) {
+      lumpSumAmount = this._pensionPortfolio.getLumpsum(this.age);
+      if (lumpSumAmount === null) return { lumpSumAmount: null, privatePensionByCountry: {} };
     }
 
     // Private Pension Drawdown: If retired, draw from all pension pots
@@ -116,6 +204,7 @@ class Person {
       for (var potCountry in this.pensions) {
         if (!Object.prototype.hasOwnProperty.call(this.pensions, potCountry)) continue;
         var pot = this.pensions[potCountry];
+        if (pot && typeof pot.canWithdrawAtAge === 'function' && !pot.canWithdrawAtAge(this.age)) continue;
         if (pot.capital() > 0) {
           var drawdownAmount = pot.drawdown(this.age);
           if (drawdownAmount > 0) {
