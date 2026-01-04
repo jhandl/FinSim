@@ -132,12 +132,8 @@ class TableManager {
       RelocationUtils.extractRelocationTransitions(this.webUI, this);
 
       // Initialize dynamic section manager for elastic dynamic sections
-      if (Config.getInstance().isRelocationEnabled()) {
-        this.dynamicSectionManager = new DynamicSectionManager(DEDUCTIONS_SECTION_CONFIG);
-        this.dynamicSectionManager.calculateMaxWidth(this);
-      } else {
-        this.dynamicSectionManager = null;
-      }
+      this.dynamicSectionManager = new DynamicSectionManager(DEDUCTIONS_SECTION_CONFIG);
+      this.dynamicSectionManager.calculateMaxWidth(this);
 
       // Cleanup previous tax headers for new simulation
       this._cleanupTaxHeaders();
@@ -165,31 +161,18 @@ class TableManager {
     let needsNewTaxHeader = false;
     let currentCountry = null;
 
-    if (Config.getInstance().isRelocationEnabled()) {
-      currentCountry = RelocationUtils.getCountryForAge(data.Age, this.webUI);
+    currentCountry = RelocationUtils.getCountryForAge(data.Age, this.webUI);
+    if (!currentCountry) {
+      currentCountry = Config.getInstance().getDefaultCountry() || 'ie';
+    }
 
-      // Check if this is the first data row or if country changed from previous row
-      if (rowIndex === 1) {
-        needsNewTaxHeader = true;
-        this._lastCountry = currentCountry;
-      } else if (this._lastCountry !== currentCountry) {
-        needsNewTaxHeader = true;
-        this._lastCountry = currentCountry;
-      }
-    } else if (!Config.getInstance().isRelocationEnabled()) {
-      // Fallback: create a single tax header row at the start for non-relocation scenarios
-      if (rowIndex === 1 && this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
-        const defaultCountry = Config.getInstance().getDefaultCountry() || 'ie';
-        currentCountry = defaultCountry;
-        needsNewTaxHeader = true;
-        this._lastCountry = currentCountry;
-      } else if (rowIndex === 1) {
-        // Even without dynamicSectionManager, insert a header for the default country
-        const defaultCountry = Config.getInstance().getDefaultCountry() || 'ie';
-        currentCountry = defaultCountry;
-        needsNewTaxHeader = true;
-        this._lastCountry = currentCountry;
-      }
+    // Check if this is the first data row or if country changed from previous row
+    if (rowIndex === 1) {
+      needsNewTaxHeader = true;
+      this._lastCountry = currentCountry;
+    } else if (this._lastCountry !== currentCountry) {
+      needsNewTaxHeader = true;
+      this._lastCountry = currentCountry;
     }
 
     // Insert country-specific tax header row when needed

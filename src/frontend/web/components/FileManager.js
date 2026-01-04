@@ -139,12 +139,22 @@ class FileManager {
     } catch (error) {
       // Handle or propagate error, e.g., show a notification via webUI
       console.error(`Error in loadFromUrl for ${name}:`, error);
-      this.webUI.notificationUtils.showAlert(`Error loading demo scenario '${name}'. Please check console for details.`, 'Error');
+      await this.webUI.showAlert(`Error loading demo scenario '${name}'. Please check console for details.`, 'Error');
       // Optionally, re-throw if WebUI needs to react further
     }
   }
 
   async loadFromString(content, name) {
+    try {
+      const cfg = Config.getInstance();
+      if (cfg && typeof cfg.isRelocationEnabled === 'function' && !cfg.isRelocationEnabled()) {
+        if (this._csvHasRelocationEvents(content)) {
+          await this.webUI.showAlert('Invalid scenario file', 'Error');
+          return;
+        }
+      }
+    } catch (_) { }
+
     this.webUI.clearAllWarnings();
     this.webUI.tableManager.clearContent('Events');
     this.webUI.tableManager.clearExtraDataRows(0);
@@ -439,6 +449,26 @@ class FileManager {
       console.error('Error updating status for relocation impacts after loading:', error);
       // Scenario loading continues normally even if status update fails
     }
+  }
+
+  _csvHasRelocationEvents(content) {
+    if (!content) return false;
+    const lines = content.split('\n');
+    let inEvents = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      if (line.startsWith('#')) {
+        inEvents = line.indexOf('# Events') === 0;
+        continue;
+      }
+      if (!inEvents) continue;
+      if (line.indexOf('Type,') === 0) continue;
+      const parts = line.split(',');
+      const type = parts[0] ? parts[0].trim() : '';
+      if (type.indexOf('MV-') === 0) return true;
+    }
+    return false;
   }
 
   async fetchUrl(url) {
