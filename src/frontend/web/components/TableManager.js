@@ -124,6 +124,7 @@ class TableManager {
 
     // Clear existing cells
     row.innerHTML = '';
+    try { row.setAttribute('data-age', String(data.Age)); } catch (_) { }
 
     // Reset header init at the start of each simulation (first row)
     if (rowIndex === 0 || rowIndex === 1) {
@@ -407,6 +408,7 @@ class TableManager {
       } else {
         // === REGULAR COLUMN: Standard td ===
         cellElement = document.createElement('td');
+        cellElement.setAttribute('data-key', key);
 
         contentContainer = document.createElement('div');
         contentContainer.className = 'cell-content';
@@ -698,6 +700,16 @@ class TableManager {
     }
   }
 
+  finalizeDataTableLayout() {
+    try {
+      const tbody = document.querySelector('#Data tbody');
+      if (!tbody) return;
+      if (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized && this.dynamicSectionManager.isInitialized()) {
+        this.dynamicSectionManager.finalizeSectionWidths(tbody);
+      }
+    } catch (_) { }
+  }
+
   clearExtraDataRows(maxAge) {
     const headerRow = document.querySelector('#Data thead tr:nth-child(2)');
     const headers = Array.from(headerRow.cells);
@@ -744,9 +756,7 @@ class TableManager {
     });
 
     // Finalize dynamic section column widths after all rows are rendered
-    if (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
-      this.dynamicSectionManager.finalizeSectionWidths(tbody);
-    }
+    this.finalizeDataTableLayout();
   }
 
 
@@ -1028,62 +1038,42 @@ class TableManager {
   refreshDisplayedCurrencies() {
     const table = document.getElementById('Data');
     if (!table) return;
-    const headerRow = table.querySelector('thead tr:nth-child(2)');
-    if (!headerRow) return;
-    const headerCells = Array.from(headerRow.querySelectorAll('th[data-key]')).filter(h => h.style.display !== 'none');
     const isMonetaryKey = (key) => !(key === 'Age' || key === 'Year' || key === 'WithdrawalRate');
 
     const tbody = table.querySelector('tbody');
     if (!tbody) return;
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => !r.classList.contains('tax-header'));
     if (rows.length === 0) return;
 
-    // Pre-scan: if any monetary cell is missing its nominal value, trigger a single full rerender
-    // to ensure we never double-deflate by attempting to parse already-deflated display text.
+    // Pre-scan: if any monetary cell is missing its nominal value, trigger a single full rerender.
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r];
-      const cells = Array.from(row.querySelectorAll('td'));
-      for (let c = 0; c < headerCells.length && c < cells.length; c++) {
-        const key = headerCells[c].getAttribute('data-key');
-        if (!isMonetaryKey(key)) continue;
+      const cells = Array.from(row.querySelectorAll('[data-nominal-value]'));
+      for (let c = 0; c < cells.length; c++) {
+        const key = cells[c].getAttribute('data-key');
+        if (!key || !isMonetaryKey(key)) continue;
         const nominalStr = cells[c].getAttribute('data-nominal-value');
-        // Check for missing, null, or empty string values - these indicate the cell wasn't properly initialized
-        if (nominalStr == null || nominalStr === '') {
-          try { if (this.webUI && typeof this.webUI.rerenderData === 'function') { this.webUI.rerenderData(); } } catch (_) { }
-          return;
-        }
+        if (nominalStr == null || nominalStr === '') { try { this.webUI.rerenderData(); } catch (_) { } return; }
         const nominal = Number(nominalStr);
-        if (isNaN(nominal)) {
-          try { if (this.webUI && typeof this.webUI.rerenderData === 'function') { this.webUI.rerenderData(); } } catch (_) { }
-          return;
-        }
+        if (isNaN(nominal)) { try { this.webUI.rerenderData(); } catch (_) { } return; }
       }
     }
 
     for (let r = 0; r < rows.length; r++) {
       const row = rows[r];
-      const cells = Array.from(row.querySelectorAll('td'));
-      // Derive age from the first column (assumed Age) if present
-      let age = undefined;
-      try {
-        const ageIdx = headerCells.findIndex(h => h.getAttribute('data-key') === 'Age');
-        if (ageIdx >= 0 && cells[ageIdx]) {
-          const t = cells[ageIdx].querySelector('.cell-content')?.textContent || cells[ageIdx].textContent || '';
-          const parsedAge = parseInt(t, 10);
-          // Only use age if it's a valid number
-          if (!isNaN(parsedAge) && isFinite(parsedAge)) {
-            age = parsedAge;
-          }
-        }
-      } catch (_) { }
+      const age = (() => {
+        const a = parseInt(row.getAttribute('data-age') || '', 10);
+        return (isNaN(a) || !isFinite(a)) ? undefined : a;
+      })();
 
-      for (let c = 0; c < headerCells.length && c < cells.length; c++) {
-        const key = headerCells[c].getAttribute('data-key');
-        if (!isMonetaryKey(key)) continue;
-        const contentEl = cells[c].querySelector('.cell-content') || cells[c];
-        // Use the stored nominal value; pre-scan above guarantees presence here
-        const nominalStr = cells[c].getAttribute('data-nominal-value');
-        const pvStr = cells[c].getAttribute('data-pv-value');
+      const cells = Array.from(row.querySelectorAll('[data-nominal-value]'));
+      for (let c = 0; c < cells.length; c++) {
+        const cell = cells[c];
+        const key = cell.getAttribute('data-key');
+        if (!key || !isMonetaryKey(key)) continue;
+        const contentEl = cell.querySelector('.cell-content') || cell;
+        const nominalStr = cell.getAttribute('data-nominal-value');
+        const pvStr = cell.getAttribute('data-pv-value');
         let nominal = Number(nominalStr);
 
         // Guard: if nominal is invalid, skip this cell (shouldn't happen after pre-scan, but be safe)
@@ -1115,7 +1105,7 @@ class TableManager {
 
         // Unified mode: convert deflated source value to reporting currency using evolution FX
         // (inflation-driven cross-rates, not PPP) to preserve exchange-rate realities for display.
-        if (this.currencyMode === 'unified' && this.reportingCurrency) {
+        if (this.currencyMode === 'unified' && this.reportingCurrency && Config.getInstance().isRelocationEnabled()) {
           displayCurrencyCode = this.reportingCurrency;
           displayCountryForLocale = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
           try {

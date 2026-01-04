@@ -133,7 +133,9 @@ class UIManager {
     return new VisualizationConfig();
   }
 
-  updateDataRow(row, progress, scale = 1, backgroundColor = null) {
+  buildDisplayDataRow(row, scale = 1) {
+    if (!dataSheet || !dataSheet[row]) return null;
+
     // Data sheet semantics:
     // - core `netIncome` includes personal pension contributions (pension savings)
     // - UI "Inflows" should reflect cash inflows, excluding pension contributions
@@ -228,6 +230,13 @@ class UIManager {
       if (taxMap.usc !== undefined) data.USC = taxMap.usc / scale;
       if (taxMap.capitalGains !== undefined) data.CGT = taxMap.capitalGains / scale;
     } catch (_) { }
+
+    return data;
+  }
+
+  updateDataRow(row, progress, scale = 1, backgroundColor = null) {
+    const data = this.buildDisplayDataRow(row, scale);
+    if (!data) return;
 
     this.ui.setDataRow(row, data);
     this.ui.setChartsRow(row, data);

@@ -216,9 +216,17 @@ class WebUI extends AbstractUI {
     if (window.dataSheet && window.dataSheet.length > 0) {
       this.tableManager.conversionCache = {};
       this.tableManager.storedCountryTimeline = null; // Invalidate stored timeline before rerender
+      const uiMgr = (typeof uiManager !== 'undefined') ? uiManager : null;
+      const scale = runs;
       for (let i = 1; i < window.dataSheet.length; i++) {
-        this.tableManager.setDataRow(i, window.dataSheet[i]);
+        let rowData = window.dataSheet[i];
+        if (uiMgr && typeof uiMgr.buildDisplayDataRow === 'function') {
+          rowData = uiMgr.buildDisplayDataRow(i, scale);
+        }
+        if (!rowData) continue;
+        this.tableManager.setDataRow(i, rowData);
       }
+      try { this.tableManager.finalizeDataTableLayout(); } catch (_) { }
     } else if (this.tableManager && typeof this.tableManager.refreshDisplayedCurrencies === 'function') {
       // Fallback path for test/preview contexts where dataSheet isn't populated
       this.tableManager.refreshDisplayedCurrencies();
@@ -1158,9 +1166,17 @@ class WebUI extends AbstractUI {
   flush(rerender = false) {
     if (rerender) {
       if (window.dataSheet && window.dataSheet.length > 0) {
+        const uiMgr = (typeof uiManager !== 'undefined') ? uiManager : null;
+        const scale = runs;
         for (let i = 1; i < window.dataSheet.length; i++) {
-          this.setDataRow(i, window.dataSheet[i]);
+          let rowData = window.dataSheet[i];
+          if (uiMgr && typeof uiMgr.buildDisplayDataRow === 'function') {
+            rowData = uiMgr.buildDisplayDataRow(i, scale);
+          }
+          if (!rowData) continue;
+          this.setDataRow(i, rowData);
         }
+        try { this.tableManager.finalizeDataTableLayout(); } catch (_) { }
       }
       return;
     }
