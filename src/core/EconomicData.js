@@ -118,6 +118,7 @@ class EconomicData {
 
   // Year parameter ignored; returns base CPI for backward compatibility.
   getInflationForYear(countryCode, year) {
+    // TODO: when inflation-variation events are added, implement year-specific lookup here.
     return this.getInflation(countryCode);
   }
 
@@ -279,7 +280,7 @@ class EconomicData {
   // ===== Internals =====
 
   _currentYear() {
-    return new Date().getFullYear();
+    return Config.getInstance().getSimulationStartYear();
   }
 
   _getCPI(countryCode) {

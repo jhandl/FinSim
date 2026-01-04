@@ -712,7 +712,7 @@ class EventsTableManager {
 
     if (startingAge === 0) return;
 
-    const currentYear = new Date().getFullYear();
+    const currentYear = Config.getInstance().getSimulationStartYear();
     const tbody = document.querySelector('#Events tbody');
     if (!tbody) return;
 
@@ -2782,7 +2782,7 @@ class EventsTableManager {
   getAlternativeValue(inputValue, eventType) {
     const startingAge = parseInt(this.webUI.getValue('StartingAge')) || 0;
     const p2StartingAge = parseInt(this.webUI.getValue('P2StartingAge')) || 0;
-    const currentYear = new Date().getFullYear();
+    const currentYear = Config.getInstance().getSimulationStartYear();
 
     const isP2Event = eventType === 'SI2' || eventType === 'SI2np';
     const relevantStartingAge = isP2Event ? p2StartingAge : startingAge;

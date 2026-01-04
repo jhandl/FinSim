@@ -640,7 +640,7 @@ class EventsRenderer extends WizardRenderer {
   getAgeYearPlaceholder(type) {
     const mode = this.context?.eventsTableManager?.ageYearMode || 'age';
     if (mode === 'age') return type === 'from' ? '25' : '65';
-    const currentYear = new Date().getFullYear();
+    const currentYear = Config.getInstance().getSimulationStartYear();
     return type === 'from' ? currentYear.toString() : (currentYear + 40).toString();
   }
 
@@ -648,4 +648,3 @@ class EventsRenderer extends WizardRenderer {
     try { return FormatUtils.formatCurrency(value); } catch (err) { const num = parseFloat(value) || 0; return num.toString(); }
   }
 }
-

@@ -536,7 +536,7 @@ function initializeSimulationVariables() {
 
   initializeRealEstate();
 
-  year = new Date().getFullYear() - 1;
+  year = config.getSimulationStartYear() - 1;
   cash = params.initialSavings;
   cashMoney = Money.from(params.initialSavings, residenceCurrency, currentCountry);
   targetCash = params.emergencyStash; // Initialize target cash (emergency stash) in starting currency

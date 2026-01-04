@@ -1,16 +1,18 @@
 /* PresentValueCalculator.js
  * 
  * Computes present-value (PV) aggregates for a simulation data row.
- * Extracted from Simulator.js updateYearlyData() to improve testability
- * and maintainability. Must remain GAS-compatible (no ES6 modules).
+ * Must remain GAS-compatible (no ES6 modules).
  * 
- * PV Semantics:
- * - Flows (income/expenses): Use residency-country deflation (current country CPI)
- * - Stocks (assets): Use asset-origin-country deflation (birth country CPI)
- *   - Real estate: Per-property linkedCountry → StartCountry fallback
- *   - Pensions: StartCountry (contribution origin)
- *   - Investments: StartCountry (EUR brokerage origin)
- * - State pension: Special handling in base currency (EUR) with Ireland CPI
+ * PV Semantics (flows):
+ * - Residency-deflated: incomeRSUsPV, incomeFundsRentPV, incomeSharesRentPV,
+ *   incomeCashPV, incomeDefinedBenefitPV, incomeTaxFreePV, netIncomePV, expensesPV,
+ *   investmentIncomeByKeyPV[*], Tax__*PV
+ * - Source-deflated: incomeSalariesPV, incomeRentalsPV, incomePrivatePensionPV,
+ *   pensionContributionPV, incomeStatePensionPV
+ * PV Semantics (stocks/assets):
+ * - Source-deflated: realEstateCapitalPV, pensionFundPV, investmentCapitalByKeyPV[*],
+ *   indexFundsCapitalPV, sharesCapitalPV
+ * - Residency-deflated: cashPV; worthPV is mixed (source-deflated assets + residency cash)
  * 
  * This file has to work on both the website and Google Sheets.
  */
@@ -21,11 +23,7 @@
  * Numeric boundary contract: All asset values in ctx are numeric (pre-extracted .amount from Money objects).
  * PV deflation operates on numbers; Money objects remain in asset classes for currency safety.
  * 
- * PV Semantics:
- * - Flows (income/expenses): Use residency-country deflation (current country CPI)
- * - Stocks (assets): Use asset-origin-country deflation (birth country CPI)
- * 
- * @param {Object} ctx - Context object containing:
+ *   @param {Object} ctx - Context object containing:
  *   @param {Object} ctx.dataRow - Data row to populate with PV values
  *   @param {number} ctx.ageNum - Current age
  *   @param {number} ctx.startYear - Simulation start year

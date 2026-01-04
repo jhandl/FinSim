@@ -1537,7 +1537,7 @@ class WebUI extends AbstractUI {
   }
 
   getParameterAlternativeValue(inputValue, fieldId) {
-    const currentYear = new Date().getFullYear();
+    const currentYear = Config.getInstance().getSimulationStartYear();
 
     if (fieldId === 'StartingAge' || fieldId === 'P2StartingAge') {
       return currentYear - inputValue; // Birth year

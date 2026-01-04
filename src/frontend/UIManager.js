@@ -619,7 +619,7 @@ class UIManager {
 
   // Helper function to calculate birth year for a person based on event type
   calculateBirthYear(eventType, startingAge, p2StartingAge) {
-    const currentYear = new Date().getFullYear();
+    const currentYear = Config.getInstance().getSimulationStartYear();
     const eventPerson = this.determineEventPerson(eventType);
 
     if (eventPerson === 'P2') {
