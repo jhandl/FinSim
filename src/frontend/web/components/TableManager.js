@@ -1015,7 +1015,7 @@ class TableManager {
       this.reportingCurrency = RelocationUtils.getDefaultReportingCurrency(this.webUI);
     }
     this.updateCurrencyControlVisibility();
-    this.refreshDisplayedCurrencies();
+    this.refreshDisplayedCurrencies({ recomputeDynamicSectionWidths: true });
   }
 
   updateCurrencyControlVisibility() {
@@ -1035,7 +1035,8 @@ class TableManager {
   }
 
   // Reformat existing table cells to reflect current currency mode/reportingCurrency
-  refreshDisplayedCurrencies() {
+  refreshDisplayedCurrencies(options) {
+    const opts = options || {};
     const table = document.getElementById('Data');
     if (!table) return;
     const isMonetaryKey = (key) => !(key === 'Age' || key === 'Year' || key === 'WithdrawalRate');
@@ -1145,6 +1146,10 @@ class TableManager {
 
         contentEl.textContent = FormatUtils.formatCurrency(value, displayCurrencyCode, displayCountryForLocale);
       }
+    }
+
+    if (opts.recomputeDynamicSectionWidths) {
+      try { this.finalizeDataTableLayout(); } catch (_) { }
     }
   }
   applyIncomeVisibilityAfterSimulation() {

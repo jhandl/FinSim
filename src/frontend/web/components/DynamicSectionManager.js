@@ -158,6 +158,23 @@ class DynamicSectionManager {
     const containerSelector = `.dynamic-section-container[data-section="${sectionName}"]`;
     const cellSelector = '.dynamic-section-cell';
 
+    // Ensure re-running this method (e.g. after currency display changes) measures
+    // intrinsic content widths rather than previously-fixed pixel widths.
+    try {
+      const allCells = tbody.querySelectorAll(`${containerSelector} ${cellSelector}`);
+      allCells.forEach(cell => {
+        cell.style.width = '';
+        cell.style.minWidth = '';
+        cell.style.flexBasis = '';
+        cell.style.flexShrink = '';
+        cell.style.flexGrow = '';
+        cell.style.flex = '';
+        // Clear empty-state truncation styles if present
+        cell.style.overflow = '';
+        cell.style.textOverflow = '';
+      });
+    } catch (_) { }
+
     // Group all containers by country
     const countryMeasurements = new Map(); // country -> { maxPerColumn: [], cells: [] }
 

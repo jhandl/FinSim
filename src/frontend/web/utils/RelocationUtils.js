@@ -166,7 +166,7 @@ class RelocationUtils {
       }
       if (manager.currencyMode === 'unified') {
         if (manager.constructor.name === 'TableManager') {
-          manager.refreshDisplayedCurrencies();
+          manager.refreshDisplayedCurrencies({ recomputeDynamicSectionWidths: true });
         } else {
           manager.refreshChartsWithCurrency();
         }
