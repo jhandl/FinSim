@@ -46,9 +46,9 @@ E,Kid,6000,32,40,,,linkedEventId=split_1762624796604_1zr4xkn8q
 R,Family House,40000,35,70,,,currency=EUR;linkedCountry=ie
 M,Family House,18000,35,60,0.035,,currency=EUR;linkedCountry=ie
 MV-AR,hola,0,40,,,,
-E,Kid,3334610,40,52,,,currency=ARS;linkedEventId=split_1762624796604_1zr4xkn8q
-E,Life,22230730,40,100,,,currency=ARS;linkedEventId=split_1762624789954_fgc7fmqve
+E,Kid,3334610,40,52,,,currency=ARS;linkedEventId=split_1762624796604_1zr4xkn8q;resolved=1
+E,Life,22230730,40,100,,,currency=ARS;linkedEventId=split_1762624789954_fgc7fmqve;resolved=1
 SI2np,Your Partner,20673048,40,64,,0,currency=ARS;linkedEventId=split_1762624772055_tlitwyl80
-SI,You,30230730,40,64,,0.03,currency=ARS;linkedEventId=split_1762624764068_cmuo82pdo
+SI,You,30230730,40,64,,0.03,currency=ARS;linkedEventId=split_1762624764068_cmuo82pdo;resolved=1
 R,Downsize,255615112,70,100,,,currency=ARS;linkedCountry=ar
 SM,Crash,,70,72,-0.25,,

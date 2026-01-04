@@ -1066,12 +1066,15 @@ function processEvents() {
           }
 
           // Track salary by country for PV calculation
-          if (entryConvertedAmount > 0) {
+          // IMPORTANT: Track amounts in the salary's own currency (not residence currency).
+          // PV conversion happens later using start-year FX to avoid embedding evolved FX
+          // into PV results (critical for overlap years with multi-currency incomes).
+          if (entry.amount > 0) {
             var salaryCountry = normalizeCountry(bucketCountry);
             if (!incomeSalariesByCountry[salaryCountry]) {
               incomeSalariesByCountry[salaryCountry] = 0;
             }
-            incomeSalariesByCountry[salaryCountry] += entryConvertedAmount;
+            incomeSalariesByCountry[salaryCountry] += entry.amount;
           }
 
           // Determine if country qualification is needed for salary attribution
@@ -1190,12 +1193,14 @@ function processEvents() {
             countedCategories[entryCategory] = true;
           }
           // Track rental income by country for PV calculation
-          if (entryConvertedAmount > 0) {
+          // Track amounts in the rental's own currency (not residence currency) so PV
+          // can use start-year FX without double-counting FX evolution.
+          if (entry.amount > 0) {
             var rentalCountry = normalizeCountry(bucketCountry);
             if (!incomeRentalsByCountry[rentalCountry]) {
               incomeRentalsByCountry[rentalCountry] = 0;
             }
-            incomeRentalsByCountry[rentalCountry] += entryConvertedAmount;
+            incomeRentalsByCountry[rentalCountry] += entry.amount;
           }
           // Determine if country qualification is needed for rental attribution
           var rentalMetricKey = 'incomerentals';

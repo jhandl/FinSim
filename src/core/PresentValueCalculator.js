@@ -300,13 +300,25 @@ function computePresentValueAggregates(ctx) {
         if (!Object.prototype.hasOwnProperty.call(incomeSalariesByCountry, salCountry)) continue;
         var salAmount = incomeSalariesByCountry[salCountry];
         if (salAmount === 0) continue;  // Skip zero salaries
-        var salDeflator = getDeflationFactorForCountry(salCountry, ageNum, startYear, {
+        var salCountryNorm = normalizeCountry(salCountry);
+        var salDeflator = getDeflationFactorForCountry(salCountryNorm, ageNum, startYear, {
           params: params,
           config: cfg,
           countryInflationOverrides: countryInflationOverrides,
           year: year
         });
-        dataRow.incomeSalariesPV += salAmount * salDeflator;
+        var salCur = getCurrencyForCountry(salCountryNorm);
+        var salPv = salAmount * salDeflator;
+        var resCurNorm = normalizeCurrency(residenceCurrency);
+        if (salCur && resCurNorm && salCur !== resCurNorm) {
+          // PV conversion must use start-year FX (not evolved FX) to avoid embedding FX evolution into PV.
+          var convertedSalPv = convertCurrencyAmount(salPv, salCur, salCountryNorm, resCurNorm, currentCountry, startYear || year, true);
+          if (convertedSalPv === null) {
+            throw new Error('Salary PV conversion failed: cannot convert ' + salPv + ' from ' + salCur + ' to ' + resCurNorm + ' (salary country ' + salCountryNorm + ')');
+          }
+          salPv = convertedSalPv;
+        }
+        dataRow.incomeSalariesPV += salPv;
       }
     } else {
       // Fallback for backward compatibility (if map not provided)
@@ -319,13 +331,24 @@ function computePresentValueAggregates(ctx) {
         if (!Object.prototype.hasOwnProperty.call(incomeRentalsByCountry, rentCountry)) continue;
         var rentAmount = incomeRentalsByCountry[rentCountry];
         if (rentAmount === 0) continue;  // Skip zero rentals
-        var rentDeflator = getDeflationFactorForCountry(rentCountry, ageNum, startYear, {
+        var rentCountryNorm = normalizeCountry(rentCountry);
+        var rentDeflator = getDeflationFactorForCountry(rentCountryNorm, ageNum, startYear, {
           params: params,
           config: cfg,
           countryInflationOverrides: countryInflationOverrides,
           year: year
         });
-        dataRow.incomeRentalsPV += rentAmount * rentDeflator;
+        var rentCur = getCurrencyForCountry(rentCountryNorm);
+        var rentPv = rentAmount * rentDeflator;
+        var resCurNorm2 = normalizeCurrency(residenceCurrency);
+        if (rentCur && resCurNorm2 && rentCur !== resCurNorm2) {
+          var convertedRentPv = convertCurrencyAmount(rentPv, rentCur, rentCountryNorm, resCurNorm2, currentCountry, startYear || year, true);
+          if (convertedRentPv === null) {
+            throw new Error('Rental PV conversion failed: cannot convert ' + rentPv + ' from ' + rentCur + ' to ' + resCurNorm2 + ' (rental country ' + rentCountryNorm + ')');
+          }
+          rentPv = convertedRentPv;
+        }
+        dataRow.incomeRentalsPV += rentPv;
       }
     } else {
       // Fallback for backward compatibility (if map not provided)
@@ -408,13 +431,24 @@ function computePresentValueAggregates(ctx) {
         if (!Object.prototype.hasOwnProperty.call(incomeSalariesByCountry, salCountry)) continue;
         var salAmount = incomeSalariesByCountry[salCountry];
         if (salAmount === 0) continue;  // Skip zero salaries
-        var salDeflator = getDeflationFactorForCountry(salCountry, ageNum, startYear, {
+        var salCountryNorm = normalizeCountry(salCountry);
+        var salDeflator = getDeflationFactorForCountry(salCountryNorm, ageNum, startYear, {
           params: params,
           config: cfg,
           countryInflationOverrides: countryInflationOverrides,
           year: year
         });
-        dataRow.incomeSalariesPV += salAmount * salDeflator;
+        var salCur = getCurrencyForCountry(salCountryNorm);
+        var salPv = salAmount * salDeflator;
+        var resCurNorm = normalizeCurrency(residenceCurrency);
+        if (salCur && resCurNorm && salCur !== resCurNorm) {
+          var convertedSalPv = convertCurrencyAmount(salPv, salCur, salCountryNorm, resCurNorm, currentCountry, startYear || year, true);
+          if (convertedSalPv === null) {
+            throw new Error('Salary PV conversion failed: cannot convert ' + salPv + ' from ' + salCur + ' to ' + resCurNorm + ' (salary country ' + salCountryNorm + ')');
+          }
+          salPv = convertedSalPv;
+        }
+        dataRow.incomeSalariesPV += salPv;
       }
     } else {
       // Fallback for backward compatibility (if map not provided)
@@ -427,13 +461,24 @@ function computePresentValueAggregates(ctx) {
         if (!Object.prototype.hasOwnProperty.call(incomeRentalsByCountry, rentCountry)) continue;
         var rentAmount = incomeRentalsByCountry[rentCountry];
         if (rentAmount === 0) continue;  // Skip zero rentals
-        var rentDeflator = getDeflationFactorForCountry(rentCountry, ageNum, startYear, {
+        var rentCountryNorm = normalizeCountry(rentCountry);
+        var rentDeflator = getDeflationFactorForCountry(rentCountryNorm, ageNum, startYear, {
           params: params,
           config: cfg,
           countryInflationOverrides: countryInflationOverrides,
           year: year
         });
-        dataRow.incomeRentalsPV += rentAmount * rentDeflator;
+        var rentCur = getCurrencyForCountry(rentCountryNorm);
+        var rentPv = rentAmount * rentDeflator;
+        var resCurNorm2 = normalizeCurrency(residenceCurrency);
+        if (rentCur && resCurNorm2 && rentCur !== resCurNorm2) {
+          var convertedRentPv = convertCurrencyAmount(rentPv, rentCur, rentCountryNorm, resCurNorm2, currentCountry, startYear || year, true);
+          if (convertedRentPv === null) {
+            throw new Error('Rental PV conversion failed: cannot convert ' + rentPv + ' from ' + rentCur + ' to ' + resCurNorm2 + ' (rental country ' + rentCountryNorm + ')');
+          }
+          rentPv = convertedRentPv;
+        }
+        dataRow.incomeRentalsPV += rentPv;
       }
     } else {
       // Fallback for backward compatibility (if map not provided)
