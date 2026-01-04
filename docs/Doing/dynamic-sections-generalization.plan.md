@@ -13,6 +13,7 @@ This plan refactors the system so **multiple table sections** (e.g., Deductions 
   - Post-sim: widths are data-driven via `DynamicSectionManager.finalizeSectionWidths(...)`.
 - Add **residence-period-aware zero-column hiding** for selected dynamic columns (e.g., hide `P.Contrib` within a period when all values are zero in that period).
 - Make it easy to add a new dynamic section by adding config, not new plumbing.
+- **Single dynamic-path rule:** treat non-relocation scenarios as “relocation with one country.” Dynamic sections always run through the same code path, regardless of relocation being enabled. The only UI divergence remains the Natural/Unified currency toggle.
 
 ## Non-goals (for this refactor)
 - Changing tax column semantics or ordering rules.
@@ -23,6 +24,8 @@ This plan refactors the system so **multiple table sections** (e.g., Deductions 
 - Dynamic section key identification is Deductions-shaped (`PensionContribution` + `Tax__*`).
 - Column insertion and anchoring uses `PensionContribution` as the insertion pivot for taxes.
 - Empty-state layout has a `PensionContribution` special-case to avoid “just-fit” tightness.
+- `DynamicSectionManager` is always initialized during simulation rows and is constructed with `DEDUCTIONS_SECTION_CONFIG` (the primary source of deductions columns).
+- `TableManager` still contains defensive branches that fall back to `DEDUCTIONS_SECTION_CONFIG` when the manager isn’t initialized (not relocation-gated).
 
 ## Target Architecture
 
@@ -68,8 +71,9 @@ Refactor `TableManager` so:
 2. Add `src/frontend/web/components/DynamicSectionsManager.js`
    - Holds `Map<sectionId, DynamicSectionManager>`.
    - Initializes from `DYNAMIC_SECTIONS`.
-3. Wire `TableManager` to create `this.dynamicSectionsManager` (instead of a single `dynamicSectionManager`).
-   - For the first iteration, the manager wraps exactly one section (deductions) so behavior remains unchanged.
+3. Wire `TableManager` to create `this.dynamicSectionsManager` (instead of a single `dynamicSectionManager`) **unconditionally**.
+   - Always compute unique countries from the events table; when relocation is disabled this should resolve to a single start country.
+   - Remove defensive fallback paths to `DEDUCTIONS_SECTION_CONFIG` so there is only one dynamic path.
 
 ### Phase 2 — Generic Rendering in TableManager
 4. Refactor dynamic section identification and rendering:
@@ -80,6 +84,7 @@ Refactor `TableManager` so:
 5. Generalize the header-row builder:
    - Rename/refactor `_createTaxHeaderRow(country, age)` so it builds dynamic section header cells based on the registry.
    - Keep the `tr.tax-header` class if it still represents “sticky header per country” (that’s orthogonal to section generality).
+   - Do not branch on relocation enabled/disabled; the same header path applies in both cases.
 
 ### Phase 3 — Empty-state Sizing Policy (Config-driven)
 6. Move the empty-state logic to be section-generic:
@@ -99,6 +104,7 @@ Refactor `TableManager` so:
 ### Phase 5 — Remove Legacy Assumptions
 10. Delete/rename any remaining “deductions” variable/function names in generic code paths.
 11. Ensure `DynamicSectionManager.finalizeSectionWidths(...)` continues to override empty-state flex styles (as it does now).
+12. Remove defensive fallback paths that bypass the dynamic manager.
 
 ## Task List (Concrete Checklist)
 

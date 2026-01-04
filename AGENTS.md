@@ -22,10 +22,14 @@ Core goals and constraints:
 ## 2. Key Features
 
 *   **Detailed Financial Simulation:** Models income, expenses, investments, and taxes over a lifetime.
+*   **Single or Couple Mode:** Toggle between individual and couple scenarios with separate ages, pensions, and state pension settings (P1/P2) while sharing household cashflow.
 *   **Generic Tax Engine:** Country‑specific rule files (default: IE) loaded via `TaxRuleSet` for PAYE/PRSI/USC, CGT vs Exit Tax, pension rules, and investment type definitions.
 *   **Scenario Planning:** Users can define custom life events (e.g., salary changes, property purchases, market crashes) to see their impact.
 *   **Dual Event Management Interface:** Users can choose between table and accordion views for event management, with seamless switching and real-time synchronization. Both views support direct editing, wizard-based creation, and comprehensive event lifecycle management.
 *   **Monte Carlo Analysis:** In addition to deterministic projections, the simulator can run thousands of simulations with market volatility to assess the probability of success.
+*   **Economy Mode Toggle:** UI control switches deterministic vs Monte Carlo, showing volatility fields and enabling Monte Carlo only when volatility values are present.
+*   **Present Value Display:** A UI toggle deflates chart and data table values into today's terms using the core PV layer.
+*   **Data Table Visualization Presets:** Pinch-point highlighting overlays cashflow health/failure/survival color maps on the data table using per-run results.
 *   **Data Persistence:** Scenarios can be saved to and loaded from local CSV files (including legacy compatibility).
 
 ## 3. Project Architecture
@@ -47,6 +51,7 @@ Scenario model:
 *   A scenario consists of **parameters** (ages, inflation, growth rates, priorities, etc.) and a timeline of typed **events** (`SimEvent`).
 *   Events include basic fields like `type/id/name/amount/fromAge/toAge/rate/match`, plus relocation-aware fields like `currency`, `linkedCountry`, and `linkedEventId`.
 *   Scenarios round-trip via `serializeSimulation()` / `deserializeSimulation()` in `src/core/Utils.js` (including legacy field names and inferred modes when missing).
+*   Core parameters also include `simulation_mode` (`single|couple`) and `economy_mode` (`deterministic|montecarlo`), which drive P2 support and volatility runs.
 
 ```mermaid
 graph TD
@@ -116,6 +121,10 @@ graph TD
     *   **[`EventsTableManager.js`](src/frontend/web/components/EventsTableManager.js:1):** Manages the table view for events and serves as the canonical data source. Provides view toggles, sorting, validation, and direct editing.
     *   **[`EventAccordionManager.js`](src/frontend/web/components/EventAccordionManager.js:1):** Provides a collapsible accordion view with in-situ editing and bidirectional sync with the table view.
     *   **[`EventSummaryRenderer.js`](src/frontend/web/components/EventSummaryRenderer.js:1):** Defines accordion summaries, detail markup, and selectors used by the accordion editor.
+*   **Data + Visualization:**
+    *   **[`TableManager.js`](src/frontend/web/components/TableManager.js:1):** Builds the data table, handles natural/unified currency conversion, and applies present-value mode from the UI toggle.
+    *   **[`ChartManager.js`](src/frontend/web/components/ChartManager.js:1):** Renders charts and respects present-value mode without mutating cached nominal data.
+    *   **[`PinchPointVisualizer.js`](src/frontend/web/components/PinchPointVisualizer.js:1):** Computes per-row colors from Monte Carlo per-run results for cashflow/failure/survival presets.
 *   **Events Wizard (guided event creation/editing):**
     *   **[`EventsWizard.js`](src/frontend/web/components/EventsWizard.js:1):** Event-domain wrapper for wizard-driven create/edit flows (including special cases like mortgages creating a second event).
     *   **[`WizardManager.js`](src/frontend/web/components/WizardManager.js:1):** Modal lifecycle, navigation, and condition gating for wizards.
@@ -130,6 +139,7 @@ graph TD
 *   **[`src/core/Utils.js`](src/core/Utils.js:1):** Core utility functions, including `serializeSimulation()` and `deserializeSimulation()`.
 *   **[`src/frontend/web/components/FileManager.js`](src/frontend/web/components/FileManager.js:1):** Web-side CSV import/export (including legacy compatibility).
 *   **Dynamic table sections:** Table columns can include ruleset-driven dynamic sections (see `DynamicSectionManager.js` and `TableManager.js`) and should be verified both pre-simulation (empty table layout) and post-simulation (alignment).
+*   **Pinch-point rendering:** The web UI stores per-run results from the core and uses `PinchPointVisualizer` to color data table rows for visualization presets.
 
 ### 3.3. Generic Tax System
 
@@ -245,6 +255,7 @@ If there is no UI test for the feature you are changing, ask the user to test ma
 *   **Configuration over hardcoding:** Put constants in the right config files:
     *   Tax/country constants → `src/core/config/tax-rules-<country>.json`
     *   General simulator settings/versioning → `src/core/config/finsim-X.XX.json`
+*   **Hard rule: no defensive scaffolding.** You must not add guard clauses, optional checks, or fallback logic to paper over missing config/state. Assume required globals (e.g., `Config`) are initialized; if not, let it throw. Do not add "safe defaults," "just in case" checks, or protective `try/catch` unless the user explicitly asks for it. This is mandatory, not a suggestion.
 *   **Events table is the source of truth:** Table is canonical; accordion/wizards must round-trip through it.
 *   **Write tests for core changes:** Any core logic change should include a focused test under `tests/` and be run via `./run-tests.sh`.
 *   **Cache busting (web assets):** If you change any JS or CSS used by the web app, update cache-busting so browsers don’t serve stale assets:
