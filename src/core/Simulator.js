@@ -710,7 +710,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
           }
         }
 
-        netIncome = cashWithdraw + revenue.netIncome();
+        netIncome = cashWithdraw + revenue.netIncome() + incomeTaxFree;
         if (keepTrying == false) { break; }
       }
     }
@@ -798,7 +798,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
           break;
         default:
       }
-      netIncome = cashWithdraw + revenue.netIncome();
+      netIncome = cashWithdraw + revenue.netIncome() + incomeTaxFree;
       if (keepTrying == false) { break; }
     }
   }
@@ -849,7 +849,7 @@ function liquidateAll() {
       }
     }
   }
-  netIncome = cashWithdraw + revenue.netIncome();
+  netIncome = cashWithdraw + revenue.netIncome() + incomeTaxFree;
 }
 
 // Returns an allocation map keyed by investment type key.
