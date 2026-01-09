@@ -627,7 +627,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
     }
     let needed = expenses + cashDeficit - netIncome;
     let totalPensionCapital = person1.pension.capital() + (person2 ? person2.pension.capital() : 0);
-    let totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome());
+    let totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome()+incomeTaxFree);
     if (needed > totalAvailable + 0.01) {
       liquidateAll();
       return;
