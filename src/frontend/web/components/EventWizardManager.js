@@ -720,13 +720,27 @@ class EventWizardManager {
               return false;
             };
 
+            const ignoreOverlayClick = () => {
+              this._ignoreNextOverlayClick = true;
+              setTimeout(() => { this._ignoreNextOverlayClick = false; }, 350);
+            };
+
             if (isTextualInput(active)) {
-              const onBlur = () => {
+              let advanced = false;
+              let fallbackId = null;
+              const advance = () => {
+                if (advanced) return;
+                advanced = true;
+                if (fallbackId) clearTimeout(fallbackId);
+                ignoreOverlayClick();
                 this.nextStep('button');
               };
-              active.addEventListener('blur', onBlur, { once: true });
-              // Let natural focus shift blur the input (pointerdown on button triggers this)
+              active.addEventListener('blur', advance, { once: true });
+              try { active.blur(); } catch (_) { /* best-effort blur to trigger validation */ }
+              // Fallback: if blur doesn't fire on mobile, still advance shortly after.
+              fallbackId = setTimeout(advance, 120);
             } else {
+              ignoreOverlayClick();
               this.nextStep('button');
             }
 
