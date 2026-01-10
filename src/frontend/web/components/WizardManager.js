@@ -286,9 +286,25 @@ class WizardManager {
               }
               return false;
             };
+            const ignoreOverlayClick = () => {
+              this._ignoreNextOverlayClick = true;
+              setTimeout(() => { this._ignoreNextOverlayClick = false; }, 350);
+            };
             if (isTextual(active)) {
-              active.addEventListener('blur', () => { this.nextStep('button'); }, { once: true });
+              let advanced = false;
+              let fallbackId = null;
+              const advance = () => {
+                if (advanced) return;
+                advanced = true;
+                if (fallbackId) clearTimeout(fallbackId);
+                ignoreOverlayClick();
+                this.nextStep('button');
+              };
+              active.addEventListener('blur', advance, { once: true });
+              try { active.blur(); } catch (_) {}
+              fallbackId = setTimeout(advance, 120);
             } else {
+              ignoreOverlayClick();
               this.nextStep('button');
             }
             e.preventDefault();
@@ -610,5 +626,4 @@ class WizardManager {
     this._lastNextStep = 0;
   }
 }
-
 
