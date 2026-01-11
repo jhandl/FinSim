@@ -138,7 +138,7 @@ graph TD
 
 *   **[`src/core/Utils.js`](src/core/Utils.js:1):** Core utility functions, including `serializeSimulation()` and `deserializeSimulation()`.
 *   **[`src/frontend/web/components/FileManager.js`](src/frontend/web/components/FileManager.js:1):** Web-side CSV import/export (including legacy compatibility).
-*   **Dynamic table sections:** Table columns can include ruleset-driven dynamic sections (see `DynamicSectionManager.js` and `TableManager.js`) and should be verified both pre-simulation (empty table layout) and post-simulation (alignment).
+*   **Dynamic table sections:** Table columns can include ruleset-driven dynamic sections (see `DynamicSectionsConfig.js`, `DynamicSectionsManager.js`, `DynamicSectionManager.js`, and `TableManager.js`) and should be verified both pre-simulation (empty table layout) and post-simulation (alignment).
 *   **Pinch-point rendering:** The web UI stores per-run results from the core and uses `PinchPointVisualizer` to color data table rows for visualization presets.
 
 ### 3.3. Generic Tax System
