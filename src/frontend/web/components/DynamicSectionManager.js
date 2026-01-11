@@ -13,7 +13,7 @@
 class DynamicSectionManager {
   /**
    * @param {Object} sectionConfig - Configuration for the dynamic section
-   * @param {string} sectionConfig.name - Name of the section (e.g., 'Deductions')
+   * @param {string} sectionConfig.id - Stable section id (e.g., 'deductions')
    * @param {Function} sectionConfig.getColumns - Function that takes countryCode and returns column definitions
    */
   constructor(sectionConfig) {
@@ -25,52 +25,23 @@ class DynamicSectionManager {
   }
 
   /**
-   * Scans the dataSheet to calculate the maximum column count across all countries
-   * visited during the simulation.
-   * 
-   * @param {Object} instance - The TableManager or ChartManager instance with webUI
+   * Initialize caches for a known set of countries.
+   *
+   * @param {Set<string>|Array<string>} countryCodes
    * @returns {number} The maximum column count needed for the section
    */
-  calculateMaxWidth(instance) {
-    // Get unique countries using core utility
-    let uniqueCountries = new Set();
-
-    if (instance.webUI) {
-      const uiManager = new UIManager(instance.webUI);
-      const events = uiManager.readEvents(false);
-      const startCountry = Config.getInstance().getStartCountry();
-      uniqueCountries = getUniqueCountries(events, startCountry);
-    }
-
-    // If no countries in timeline, use the default country
-    if (uniqueCountries.size === 0) {
-      try {
-        const defaultCountry = Config.getInstance().getDefaultCountry();
-        if (defaultCountry) {
-          uniqueCountries.add(defaultCountry.toLowerCase());
-        }
-      } catch (_) {
-        uniqueCountries.add('ie'); // Fallback to Ireland
-      }
-    }
-
-    // Calculate column count for each country
+  initialize(countryCodes) {
     this.maxColumnCount = 0;
     this.countryColumnCounts.clear();
     this.countryColumns.clear();
 
-    uniqueCountries.forEach(countryCode => {
-      try {
-        const columns = this.config.getColumns(countryCode);
-        const count = columns ? columns.length : 0;
-        this.countryColumnCounts.set(countryCode, count);
-        this.countryColumns.set(countryCode, columns);
-        if (count > this.maxColumnCount) {
-          this.maxColumnCount = count;
-        }
-      } catch (err) {
-        console.warn(`DynamicSectionManager: Error getting columns for ${countryCode}:`, err);
-      }
+    countryCodes.forEach((rawCode) => {
+      const countryCode = String(rawCode || '').toLowerCase();
+      const columns = this.config.getColumns(countryCode);
+      const count = columns.length;
+      this.countryColumnCounts.set(countryCode, count);
+      this.countryColumns.set(countryCode, columns);
+      if (count > this.maxColumnCount) this.maxColumnCount = count;
     });
 
     this.initialized = true;
@@ -88,15 +59,9 @@ class DynamicSectionManager {
     if (this.countryColumns.has(code)) {
       return this.countryColumns.get(code);
     }
-    // If country not cached, calculate on demand
-    try {
-      const columns = this.config.getColumns(code);
-      this.countryColumns.set(code, columns);
-      return columns;
-    } catch (err) {
-      console.warn(`DynamicSectionManager: Error getting columns for ${code}:`, err);
-      return [];
-    }
+    const columns = this.config.getColumns(code);
+    this.countryColumns.set(code, columns);
+    return columns;
   }
 
   /**
@@ -129,7 +94,7 @@ class DynamicSectionManager {
    * @returns {string} The section name (lowercase, suitable for data attributes)
    */
   getSectionName() {
-    return this.config.name ? this.config.name.toLowerCase() : 'unknown';
+    return this.config.id;
   }
 
   /**
@@ -175,94 +140,80 @@ class DynamicSectionManager {
       });
     } catch (_) { }
 
-    // Group all containers by country
-    const countryMeasurements = new Map(); // country -> { maxPerColumn: [], cells: [] }
-
-    // Helper to measure cells and update country measurements
-    const measureCells = (cells, country) => {
-      if (!countryMeasurements.has(country)) {
-        countryMeasurements.set(country, { maxPerColumn: [], cells: [] });
-      }
-      const m = countryMeasurements.get(country);
-      cells.forEach((cell, i) => {
-        const naturalWidth = cell.scrollWidth;
-        if (!m.maxPerColumn[i] || naturalWidth > m.maxPerColumn[i]) {
-          m.maxPerColumn[i] = naturalWidth;
-        }
-        m.cells.push(cell);
+    const getVisibleCells = (container) => {
+      const all = Array.from(container.querySelectorAll(cellSelector));
+      return all.filter((cell) => {
+        const disp = (cell && cell.style) ? cell.style.display : '';
+        return disp !== 'none';
       });
     };
 
-    // Measure tax header rows (have data-country attribute)
-    const taxHeaders = tbody.querySelectorAll('tr.tax-header');
-    taxHeaders.forEach(headerRow => {
-      const country = headerRow.getAttribute('data-country');
-      if (!country) return;
-
-      const container = headerRow.querySelector(containerSelector);
-      if (!container) return;
-
-      const cells = container.querySelectorAll(cellSelector);
-      if (cells.length === 0) return;
-
-      measureCells(cells, country);
+    // "Period" = a tax-header row and the contiguous data rows until the next tax-header.
+    const periods = [];
+    let current = null;
+    const allRows = Array.from(tbody.querySelectorAll('tr'));
+    allRows.forEach((row) => {
+      if (row.classList && row.classList.contains('tax-header')) {
+        current = { rows: [] };
+        periods.push(current);
+      }
+      if (current) current.rows.push(row);
     });
 
-    // Measure data rows - determine country by finding which tax header precedes them
-    let currentCountry = null;
-    const allRows = tbody.querySelectorAll('tr');
-    allRows.forEach(row => {
-      if (row.classList.contains('tax-header')) {
-        currentCountry = row.getAttribute('data-country');
-      } else if (currentCountry) {
+    const periodMeasurements = [];
+    for (let p = 0; p < periods.length; p++) {
+      const period = periods[p];
+      const m = { maxPerColumn: [], cellsByColumn: [] };
+
+      for (let r = 0; r < period.rows.length; r++) {
+        const row = period.rows[r];
         const container = row.querySelector(containerSelector);
-        if (!container) return;
+        if (!container) continue;
 
-        const cells = container.querySelectorAll(cellSelector);
-        if (cells.length === 0) return;
-
-        if (!countryMeasurements.has(currentCountry)) return;
-        measureCells(cells, currentCountry);
+        const cells = getVisibleCells(container);
+        for (let i = 0; i < cells.length; i++) {
+          const cell = cells[i];
+          const naturalWidth = cell.scrollWidth;
+          if (!m.maxPerColumn[i] || naturalWidth > m.maxPerColumn[i]) {
+            m.maxPerColumn[i] = naturalWidth;
+          }
+          if (!m.cellsByColumn[i]) m.cellsByColumn[i] = [];
+          m.cellsByColumn[i].push(cell);
+        }
       }
-    });
 
-    // Calculate total natural width per country
-    countryMeasurements.forEach((m) => {
       m.totalNaturalWidth = m.maxPerColumn.reduce((sum, w) => sum + (w || 0), 0);
-    });
+      periodMeasurements.push(m);
+    }
 
-    // Find max total width across all countries
     let maxTotalWidth = 0;
-    countryMeasurements.forEach(m => {
-      if (m.totalNaturalWidth > maxTotalWidth) {
-        maxTotalWidth = m.totalNaturalWidth;
-      }
-    });
-
+    for (let i = 0; i < periodMeasurements.length; i++) {
+      const m = periodMeasurements[i];
+      if (m.totalNaturalWidth > maxTotalWidth) maxTotalWidth = m.totalNaturalWidth;
+    }
     if (maxTotalWidth === 0) return;
 
-    // Apply proportional scaling to each country
-    countryMeasurements.forEach((m) => {
-      if (m.totalNaturalWidth === 0) return;
+    for (let i = 0; i < periodMeasurements.length; i++) {
+      const m = periodMeasurements[i];
+      if (m.totalNaturalWidth === 0) continue;
 
       const scaleFactor = maxTotalWidth / m.totalNaturalWidth;
       const scaledWidths = m.maxPerColumn.map(w => Math.round((w || 0) * scaleFactor));
 
-      // Apply scaled widths to all cells for this country
-      let cellIndex = 0;
-      const numColumns = m.maxPerColumn.length;
-      m.cells.forEach(cell => {
-        const colIdx = cellIndex % numColumns;
-        cell.style.width = `${scaledWidths[colIdx]}px`;
-        // Override any empty-state flex-fill styles so fixed pixel widths apply.
-        cell.style.minWidth = '';
-        cell.style.flexBasis = 'auto';
-        cell.style.flexShrink = '0';
-        cell.style.flexGrow = '0';
-        cell.style.flex = '0 0 auto';
-        cellIndex++;
-      });
-    });
+      for (let colIdx = 0; colIdx < m.cellsByColumn.length; colIdx++) {
+        const width = scaledWidths[colIdx] || 0;
+        const cells = m.cellsByColumn[colIdx] || [];
+        for (let c = 0; c < cells.length; c++) {
+          const cell = cells[c];
+          cell.style.width = `${width}px`;
+          cell.style.minWidth = '';
+          cell.style.flexBasis = 'auto';
+          cell.style.flexShrink = '0';
+          cell.style.flexGrow = '0';
+          cell.style.flex = '0 0 auto';
+        }
+      }
+    }
   }
 
   /**
@@ -276,48 +227,6 @@ class DynamicSectionManager {
   }
 }
 
-/**
- * Configuration for the Deductions section
- * Includes PensionContribution (fixed) and tax columns (dynamic per country)
- */
-const PENSION_CONTRIBUTION_COLUMN = {
-  key: 'PensionContribution',
-  label: 'P.Contrib',
-  tooltip: 'Amount contributed to private pensions (excluding employer match)'
-};
-
-const DEDUCTIONS_SECTION_CONFIG = {
-  name: 'Deductions',
-  getColumns: (countryCode) => {
-    try {
-      const taxRuleSet = Config.getInstance().getCachedTaxRuleSet(countryCode);
-      if (!taxRuleSet) {
-        return [PENSION_CONTRIBUTION_COLUMN];
-      }
-
-      // PensionContribution comes first in the deductions section
-      const columns = [PENSION_CONTRIBUTION_COLUMN];
-
-      // Then add tax columns
-      const taxOrder = taxRuleSet.getTaxOrder ? taxRuleSet.getTaxOrder() : [];
-      taxOrder.forEach(taxId => {
-        columns.push({
-          key: `Tax__${taxId}`,
-          label: taxRuleSet.getDisplayNameForTax ? taxRuleSet.getDisplayNameForTax(taxId) : taxId.toUpperCase(),
-          tooltip: taxRuleSet.getTooltipForTax ? taxRuleSet.getTooltipForTax(taxId) : `${taxId} tax paid`
-        });
-      });
-
-      return columns;
-    } catch (err) {
-      console.warn(`DEDUCTIONS_SECTION_CONFIG: Error getting columns for ${countryCode}:`, err);
-      return [PENSION_CONTRIBUTION_COLUMN];
-    }
-  }
-};
-
-
-// Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { DynamicSectionManager, DEDUCTIONS_SECTION_CONFIG };
+  module.exports = { DynamicSectionManager };
 }

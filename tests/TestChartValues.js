@@ -75,17 +75,16 @@ const PARAM_KEY_MAP = {
 };
 
 const DEMO3_BASELINE = {
-  // Baselines updated after completeMissingCurrencyAndLinkedCountry fix.
-  // Events now correctly get currency from source country at fromAge, so Irish salary
-  // ending at relocation age 40 is now properly converted EUR→ARS instead of being
-  // treated as ARS income.
+  // Baselines updated after emergency-stash (targetCash) conversion switched to PPP
+  // at relocation time. This keeps the emergency stash purchasing-power consistent
+  // across countries (vs ballooning nominally under evolved FX).
   ages: {
-    40: { worth: 3531689698.3288803, cash: 1288868167.2259612, netIncome: 755455527.8897383 },
-    65: { worth: 1921462900279.685, cash: 313863858212.2804, netIncome: 155819956333.49774 },
-    80: { worth: 39291176509203.65, cash: 31383030865996.523, netIncome: 6177677872065.23 }
+    40: { worth: 2292223578.686624, cash: 14938121.255654156, netIncome: 833059779.5234649 },
+    65: { worth: 1826924404261.7158, cash: 4546507611.75827, netIncome: 82167802428.2647 },
+    80: { worth: 32285240708581.207, cash: 140509952772.85306, netIncome: 2419679637876.817 }
   },
-  final: { age: 90, worth: 404389743698679.5, cash: 335969410725761.4 },
-  maxWorth: 404389743698679.5
+  final: { age: 90, worth: 284990679944460.1, cash: 1383757107738.8225 },
+  maxWorth: 284990679944460.1
 };
 
 // Tolerances for evolution FX mode (inflation-driven FX rates)
@@ -192,7 +191,10 @@ function parseDemoCsvScenario(filePath) {
       const amount = parseNumeric(parts[2], false);
       const fromAge = Math.round(parseNumeric(parts[3], false));
       const toAge = Math.round(parseNumeric(parts[4], false));
-      const rate = parseNumeric(parts[5], true);
+      // IMPORTANT: Blank rate means "use country inflation" (adjust() rate omitted),
+      // not an explicit 0% growth rate.
+      const rateRaw = (parts[5] || '').trim();
+      const rate = rateRaw ? parseNumeric(rateRaw, true) : null;
       const extra = parseNumeric(parts[6], true);
       const meta = parseMeta(parts[7] || '');
       events.push({

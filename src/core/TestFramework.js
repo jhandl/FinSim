@@ -255,6 +255,7 @@ class TestFramework {
       const coreFiles = [
         'Events.js',
         'Utils.js',
+        'EconomicData.js',
         'Config.js',
         'TaxRuleSet.js',
         'Money.js',
@@ -736,6 +737,16 @@ class TestFramework {
           testParams.investmentVolatilitiesByKey = {};
           testParams.investmentAllocationsByKey = {};
           testParams.initialCapitalByKey = {};
+          var parsePercent = function(v) {
+            if (v === null || v === undefined || v === '') return null;
+            if (typeof v === 'number' && isFinite(v)) return v;
+            var s = String(v).trim();
+            if (!s) return null;
+            var isPct = s.indexOf('%') >= 0;
+            var n = parseFloat(s.replace('%', ''));
+            if (!isFinite(n)) return null;
+            return isPct ? (n / 100) : n;
+          };
           // Map legacy names to dynamic maps
           if (testParams.growthRateFunds !== undefined) testParams.investmentGrowthRatesByKey.indexFunds = testParams.growthRateFunds;
           if (testParams.growthRateShares !== undefined) testParams.investmentGrowthRatesByKey.shares = testParams.growthRateShares;
@@ -745,6 +756,41 @@ class TestFramework {
           if (testParams.SharesAllocation !== undefined) testParams.investmentAllocationsByKey.shares = testParams.SharesAllocation;
           if (testParams.initialFunds !== undefined) testParams.initialCapitalByKey.indexFunds = testParams.initialFunds;
           if (testParams.initialShares !== undefined) testParams.initialCapitalByKey.shares = testParams.initialShares;
+
+          // Also support v2.0 save-file dynamic parameter naming (demo3.csv).
+          // Examples: InitialCapital_indexFunds, InvestmentAllocation_indexFunds, indexFundsGrowthRate.
+          if (testParams.InitialCapital_indexFunds !== undefined) {
+            var ic = Number(testParams.InitialCapital_indexFunds);
+            if (isFinite(ic)) testParams.initialCapitalByKey.indexFunds = ic;
+          }
+          if (testParams.InitialCapital_shares !== undefined) {
+            var ic2 = Number(testParams.InitialCapital_shares);
+            if (isFinite(ic2)) testParams.initialCapitalByKey.shares = ic2;
+          }
+          if (testParams.InvestmentAllocation_indexFunds !== undefined) {
+            var a = parsePercent(testParams.InvestmentAllocation_indexFunds);
+            if (a !== null) testParams.investmentAllocationsByKey.indexFunds = a;
+          }
+          if (testParams.InvestmentAllocation_shares !== undefined) {
+            var a2 = parsePercent(testParams.InvestmentAllocation_shares);
+            if (a2 !== null) testParams.investmentAllocationsByKey.shares = a2;
+          }
+          if (testParams.indexFundsGrowthRate !== undefined) {
+            var gr = parsePercent(testParams.indexFundsGrowthRate);
+            if (gr !== null) testParams.investmentGrowthRatesByKey.indexFunds = gr;
+          }
+          if (testParams.sharesGrowthRate !== undefined) {
+            var gr2 = parsePercent(testParams.sharesGrowthRate);
+            if (gr2 !== null) testParams.investmentGrowthRatesByKey.shares = gr2;
+          }
+          if (testParams.indexFundsGrowthStdDev !== undefined) {
+            var sd = parsePercent(testParams.indexFundsGrowthStdDev);
+            if (sd !== null) testParams.investmentVolatilitiesByKey.indexFunds = sd;
+          }
+          if (testParams.sharesGrowthStdDev !== undefined) {
+            var sd2 = parsePercent(testParams.sharesGrowthStdDev);
+            if (sd2 !== null) testParams.investmentVolatilitiesByKey.shares = sd2;
+          }
         }
         return testParams;
       };

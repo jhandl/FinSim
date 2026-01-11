@@ -11,8 +11,8 @@ class TableManager {
     this.countryInflationOverrides = {}; // MV event rate overrides: country -> inflation rate (decimal)
     this.conversionCache = {};
     this.presentValueMode = false; // Display monetary values in today's terms when enabled
-    // Dynamic section manager for elastic column layouts during relocations
-    this.dynamicSectionManager = null;
+    // Dynamic sections manager for elastic column layouts during relocations
+    this.dynamicSectionsManager = new DynamicSectionsManager(DYNAMIC_SECTIONS);
     // Dynamic tax header management
     this._taxHeaderObserver = null;
     this._activeTaxHeader = null;
@@ -131,9 +131,8 @@ class TableManager {
       this.conversionCache = {}; // Clear cache for new simulation
       RelocationUtils.extractRelocationTransitions(this.webUI, this);
 
-      // Initialize dynamic section manager for elastic dynamic sections
-      this.dynamicSectionManager = new DynamicSectionManager(DEDUCTIONS_SECTION_CONFIG);
-      this.dynamicSectionManager.calculateMaxWidth(this);
+      // Initialize dynamic sections manager for elastic dynamic sections
+      this.dynamicSectionsManager.initialize(this);
 
       // Cleanup previous tax headers for new simulation
       this._cleanupTaxHeaders();
@@ -161,10 +160,7 @@ class TableManager {
     let needsNewTaxHeader = false;
     let currentCountry = null;
 
-    currentCountry = RelocationUtils.getCountryForAge(data.Age, this.webUI);
-    if (!currentCountry) {
-      currentCountry = Config.getInstance().getDefaultCountry() || 'ie';
-    }
+    currentCountry = RelocationUtils.getCountryForAge(data.Age, this.webUI) || Config.getInstance().getDefaultCountry();
 
     // Check if this is the first data row or if country changed from previous row
     if (rowIndex === 1) {
@@ -192,7 +188,7 @@ class TableManager {
       try {
         const age = data ? data.Age : null;
         if (age === null || age === undefined || !isFinite(age)) {
-          this._applyEmptyStateFlexLayoutToDynamicSectionHeaderRow(taxHeaderRow, currentCountry);
+          this._applyEmptyStateFlexLayoutToDynamicSectionHeaderRow(taxHeaderRow);
         }
       } catch (_) { }
 
@@ -200,99 +196,12 @@ class TableManager {
       this._registerTaxHeader(taxHeaderRow);
     }
 
-    // Before building row, update dynamic section group header colspan
-    const headerRow = document.querySelector('#Data thead tr:nth-child(2)');
-    if (headerRow) {
-      // Find the dynamic section group header cell via data attribute for robustness
-      let sectionGroupTh = null;
-      try {
-        sectionGroupTh = document.querySelector('#Data thead tr.header-groups th[data-group="deductions"]');
-      } catch (_) { sectionGroupTh = null; }
+    this._updateDynamicSectionGroupColSpans();
 
-      // Update group colspan using dynamicSectionManager max column count
-      if (sectionGroupTh && this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
-        const maxTaxColumns = this.dynamicSectionManager.getMaxColumnCount();
-        sectionGroupTh.colSpan = Math.max(1, maxTaxColumns);
-      } else if (sectionGroupTh) {
-        // Fallback: count actual rendered tax columns + PensionContribution
-        const taxColumnCount = headerRow.querySelectorAll('th[data-key^="Tax__"]').length;
-        const pensionContribTh = headerRow.querySelector('th[data-key="PensionContribution"]');
-        const sectionColspan = taxColumnCount + (pensionContribTh ? 1 : 0);
-        sectionGroupTh.colSpan = Math.max(1, sectionColspan);
-      }
+    const blueprint = this._buildRowBlueprint(currentCountry);
+    const boundarySet = this._computeGroupBoundarySet(blueprint);
 
-      // Refresh dynamic group border markers after potential header changes
-      try { if (this.webUI && typeof this.webUI.updateGroupBorders === 'function') { this.webUI.updateGroupBorders(); } } catch (_) { }
-    }
-
-    // Get the order of columns from the table header, only visible ones with data-key attributes
-    // Note: <thead> doesn't have Tax__ columns - we inject them dynamically per-country
-    const baseHeaders = Array.from(document.querySelectorAll('#Data thead th[data-key]')).filter(h => h.style.display !== 'none');
-
-    // Build a virtual headers list that includes country-specific tax columns
-    // Find PensionContribution - tax columns go AFTER it
-    const pensionContribIndex = baseHeaders.findIndex(h => h.getAttribute('data-key') === 'PensionContribution');
-
-    // Get tax columns for the current country (excludes PensionContribution)
-    let taxColumns = [];
-    const rowCountry = currentCountry || RelocationUtils.getCountryForAge(data.Age, this.webUI) || Config.getInstance().getDefaultCountry() || 'ie';
-    if (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
-      const countryColumns = this.dynamicSectionManager.getColumnsForCountry(rowCountry) || [];
-      // Filter out PensionContribution since it's already in baseHeaders
-      taxColumns = countryColumns.filter(c => c.key !== 'PensionContribution');
-    } else {
-      // Fallback: get from DEDUCTIONS_SECTION_CONFIG
-      try {
-        const allCols = DEDUCTIONS_SECTION_CONFIG.getColumns(rowCountry);
-        taxColumns = allCols.filter(c => c.key !== 'PensionContribution');
-      } catch (_) {
-        taxColumns = [];
-      }
-    }
-
-    // Build virtual headers: baseHeaders with tax columns inserted AFTER PensionContribution
-    // Each tax column needs a virtual header object with dataset.key
-    const virtualTaxHeaders = taxColumns.map(col => ({
-      dataset: { key: col.key },
-      getAttribute: (attr) => attr === 'data-key' ? col.key : null,
-      textContent: col.label,
-      style: { display: '' }
-    }));
-
-    let headers;
-    if (pensionContribIndex >= 0) {
-      // Insert tax columns AFTER PensionContribution
-      headers = [
-        ...baseHeaders.slice(0, pensionContribIndex + 1),  // up to and including PensionContribution
-        ...virtualTaxHeaders,
-        ...baseHeaders.slice(pensionContribIndex + 1)      // rest of columns
-      ];
-    } else {
-      // PensionContribution not found - append tax columns at end
-      headers = [...baseHeaders, ...virtualTaxHeaders];
-    }
-
-    // ---- Flexbox Dynamic Section Container Setup ----
-    // Identify dynamic section columns (PensionContribution + Tax__*) for flexbox layout
-    const isDynamicSectionKey = (k) => k === 'PensionContribution' || (k && k.indexOf('Tax__') === 0);
-    const allKeys = headers.map(h => h.dataset?.key || h.getAttribute?.('data-key'));
-    const sectionIndices = allKeys.map((k, i) => isDynamicSectionKey(k) ? i : -1).filter(i => i >= 0);
-    const firstSectionIdx = sectionIndices.length > 0 ? sectionIndices[0] : -1;
-    const lastSectionIdx = sectionIndices.length > 0 ? sectionIndices[sectionIndices.length - 1] : -1;
-
-    // Get max column count for colspan (if dynamicSectionManager available)
-    const maxSectionColumns = (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized())
-      ? this.dynamicSectionManager.getMaxColumnCount()
-      : sectionIndices.length;
-
-    // Create cells and format values in the order of the headers
-    // Dynamic section columns use flexbox layout for consistent section width
-    let sectionContainerCell = null;
-    let sectionFlexDiv = null;
-
-    headers.forEach((header, headerIndex) => {
-
-      const key = header.dataset.key;
+    const renderValueCell = (key, isDynamicSectionCell) => {
       // Nominal and (optional) PV values from the core data sheet
       const nominalValue = (data[key] == null ? 0 : data[key]);
       const pvKey = key + 'PV';
@@ -354,33 +263,12 @@ class TableManager {
         }
       }
 
-      // Check if this is a dynamic section column
-      const isDynamicSectionCell = isDynamicSectionKey(key);
-
       // Determine the element to create (td for regular, div for dynamic section flex item)
       let cellElement;
       let contentContainer;
 
-      if (isDynamicSectionCell && firstSectionIdx >= 0) {
+      if (isDynamicSectionCell) {
         // === DYNAMIC SECTION: Use flexbox layout ===
-        const sectionName = this.dynamicSectionManager ? this.dynamicSectionManager.getSectionName() : 'deductions';
-
-        // Create container cell on first column
-        if (headerIndex === firstSectionIdx) {
-          sectionContainerCell = document.createElement('td');
-          sectionContainerCell.className = 'dynamic-section-container';
-          sectionContainerCell.setAttribute('data-section', sectionName);
-          sectionContainerCell.colSpan = maxSectionColumns;
-          // Apply group border to the container
-          sectionContainerCell.setAttribute('data-group-end', '1');
-          sectionContainerCell.style.borderRight = '3px solid #666';
-
-          sectionFlexDiv = document.createElement('div');
-          sectionFlexDiv.className = 'dynamic-section-flex';
-          sectionContainerCell.appendChild(sectionFlexDiv);
-        }
-
-        // Create flex item for this column
         cellElement = document.createElement('div');
         cellElement.className = 'dynamic-section-cell';
         cellElement.setAttribute('data-key', key);
@@ -637,43 +525,42 @@ class TableManager {
         contentContainer.appendChild(infoIcon);
       }
 
-      // Handle appending the element
-      if (isDynamicSectionCell && sectionFlexDiv) {
-        // Append flex item to the flexbox container
-        sectionFlexDiv.appendChild(cellElement);
+      return cellElement;
+    };
 
-        // After last dynamic section column, append the container cell to the row
-        if (headerIndex === lastSectionIdx) {
-          row.appendChild(sectionContainerCell);
+    for (let i = 0; i < blueprint.length; i++) {
+      const seg = blueprint[i];
+      if (seg.type === 'section') {
+        const sectionId = seg.sectionId;
+        const columns = seg.columns || [];
+        const maxCols = Math.max(1, this.dynamicSectionsManager.getMaxColumnCount(sectionId));
+
+        const sectionContainerCell = document.createElement('td');
+        sectionContainerCell.className = 'dynamic-section-container';
+        sectionContainerCell.setAttribute('data-section', sectionId);
+        sectionContainerCell.colSpan = maxCols;
+        sectionContainerCell.setAttribute('data-group-end', '1');
+        sectionContainerCell.style.borderRight = '3px solid #666';
+
+        const sectionFlexDiv = document.createElement('div');
+        sectionFlexDiv.className = 'dynamic-section-flex';
+        sectionContainerCell.appendChild(sectionFlexDiv);
+
+        for (let c = 0; c < columns.length; c++) {
+          const flexItem = renderValueCell(columns[c].key, true);
+          sectionFlexDiv.appendChild(flexItem);
         }
+
+        row.appendChild(sectionContainerCell);
       } else {
-        // Regular cell: apply group border logic and append to row
-        try {
-          // Determine if this cell is at a group boundary
-          const isIncome = (k) => k && k.indexOf('Income') === 0;
-          const isTax = (k) => k && k.indexOf('Tax__') === 0;
-          const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
-            k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
-
-          // Find indices of group boundaries within the headers array
-          const yearBoundaryIdx = allKeys.indexOf('Year');
-          const incomeLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isIncome(allKeys[i])) return i; return -1; })();
-          // Skip dynamic section boundary check - handled by container cell
-          const expensesBoundaryIdx = allKeys.indexOf('Expenses');
-          const assetsLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isAsset(allKeys[i])) return i; return -1; })();
-          const lastIdx = allKeys.length - 1;
-
-          const boundarySet = new Set([yearBoundaryIdx, incomeLastIdx, expensesBoundaryIdx, assetsLastIdx, lastIdx].filter(i => i >= 0));
-
-          if (boundarySet.has(headerIndex)) {
-            cellElement.setAttribute('data-group-end', '1');
-            cellElement.style.borderRight = '3px solid #666';
-          }
-        } catch (_) { }
-
-        row.appendChild(cellElement);
+        const cell = renderValueCell(seg.key, false);
+        if (boundarySet.has(i)) {
+          cell.setAttribute('data-group-end', '1');
+          cell.style.borderRight = '3px solid #666';
+        }
+        row.appendChild(cell);
       }
-    });
+    }
   }
 
   setDataRowBackgroundColor(rowIndex, backgroundColor) {
@@ -687,9 +574,8 @@ class TableManager {
     try {
       const tbody = document.querySelector('#Data tbody');
       if (!tbody) return;
-      if (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized && this.dynamicSectionManager.isInitialized()) {
-        this.dynamicSectionManager.finalizeSectionWidths(tbody);
-      }
+      this._applyPeriodZeroHideToDynamicSections(tbody);
+      this.dynamicSectionsManager.finalizeSectionWidths(tbody);
     } catch (_) { }
   }
 
@@ -1152,6 +1038,134 @@ class TableManager {
 
   }
 
+  _updateDynamicSectionGroupColSpans() {
+    const sections = this.dynamicSectionsManager.getSections();
+    for (let i = 0; i < sections.length; i++) {
+      const cfg = sections[i];
+      const groupKey = cfg.groupKey;
+      const groupTh = document.querySelector(`#Data thead tr.header-groups th[data-group="${groupKey}"]`);
+      if (!groupTh) continue;
+      groupTh.colSpan = Math.max(1, this.dynamicSectionsManager.getMaxColumnCount(cfg.id));
+    }
+    try { if (this.webUI && typeof this.webUI.updateGroupBorders === 'function') { this.webUI.updateGroupBorders(); } } catch (_) { }
+  }
+
+  _buildRowBlueprint(countryCode) {
+    const mainHeaderRow = document.querySelector('#Data thead tr:last-child');
+    if (!mainHeaderRow) throw new Error('Data table header row not found');
+
+    const baseHeaders = Array.from(mainHeaderRow.querySelectorAll('th[data-key]')).filter(h => h.style.display !== 'none');
+    const sectionByAnchor = new Map();
+    const sections = this.dynamicSectionsManager.getSections();
+    for (let i = 0; i < sections.length; i++) {
+      sectionByAnchor.set(sections[i].anchorKey, sections[i].id);
+    }
+
+    const blueprint = [];
+    for (let i = 0; i < baseHeaders.length; i++) {
+      const th = baseHeaders[i];
+      const key = th.getAttribute('data-key');
+      const sectionId = sectionByAnchor.get(key);
+      if (sectionId) {
+        const columns = this.dynamicSectionsManager.getColumnsFor(sectionId, { countryCode });
+        blueprint.push({ type: 'section', sectionId, columns });
+      } else {
+        blueprint.push({
+          type: 'key',
+          key,
+          label: th.textContent,
+          tooltip: th.getAttribute('data-tooltip') || th.getAttribute('title') || null
+        });
+      }
+    }
+    return blueprint;
+  }
+
+  _computeGroupBoundarySet(blueprint) {
+    const isIncome = (k) => k && k.indexOf('Income') === 0;
+    const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
+      k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
+
+    let yearIdx = -1;
+    let incomeLastIdx = -1;
+    let expensesIdx = -1;
+    let assetsLastIdx = -1;
+
+    for (let i = 0; i < blueprint.length; i++) {
+      const seg = blueprint[i];
+      if (seg.type !== 'key') continue;
+      if (seg.key === 'Year') yearIdx = i;
+      if (seg.key === 'Expenses') expensesIdx = i;
+      if (isIncome(seg.key)) incomeLastIdx = i;
+      if (isAsset(seg.key)) assetsLastIdx = i;
+    }
+
+    const lastIdx = blueprint.length - 1;
+    return new Set([yearIdx, incomeLastIdx, expensesIdx, assetsLastIdx, lastIdx].filter(i => i >= 0));
+  }
+
+  _applyPeriodZeroHideToDynamicSections(tbody) {
+    const sections = this.dynamicSectionsManager.getSections();
+    if (sections.length === 0) return;
+
+    const periods = [];
+    let current = null;
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.classList && row.classList.contains('tax-header')) {
+        current = { headerRow: row, dataRows: [] };
+        periods.push(current);
+        continue;
+      }
+      if (current) current.dataRows.push(row);
+    }
+
+    for (let s = 0; s < sections.length; s++) {
+      const cfg = sections[s];
+      const keys = cfg.periodZeroHideKeys;
+      if (!keys.length) continue;
+
+      const sectionId = cfg.id;
+      const containerSelector = `.dynamic-section-container[data-section="${sectionId}"]`;
+
+      for (let p = 0; p < periods.length; p++) {
+        const period = periods[p];
+        const headerContainer = period.headerRow.querySelector(`th${containerSelector}`);
+        if (!headerContainer) continue;
+
+        for (let k = 0; k < keys.length; k++) {
+          const key = keys[k];
+          const headerCell = headerContainer.querySelector(`.dynamic-section-cell[data-key="${key}"]`);
+          if (!headerCell) continue;
+
+          let anyNonZero = false;
+          for (let r = 0; r < period.dataRows.length; r++) {
+            const row = period.dataRows[r];
+            const container = row.querySelector(`td${containerSelector}`);
+            if (!container) continue;
+            const cell = container.querySelector(`.dynamic-section-cell[data-key="${key}"]`);
+            if (!cell) continue;
+            const raw = cell.getAttribute('data-nominal-value');
+            const v = raw ? parseFloat(raw) : 0;
+            if (isFinite(v) && v !== 0) { anyNonZero = true; break; }
+          }
+
+          const display = anyNonZero ? '' : 'none';
+          try { headerCell.style.display = display; } catch (_) { }
+          for (let r = 0; r < period.dataRows.length; r++) {
+            const row = period.dataRows[r];
+            const container = row.querySelector(`td${containerSelector}`);
+            if (!container) continue;
+            const cell = container.querySelector(`.dynamic-section-cell[data-key="${key}"]`);
+            if (!cell) continue;
+            try { cell.style.display = display; } catch (_) { }
+          }
+        }
+      }
+    }
+  }
+
   /**
    * Creates a country-specific tax header row for insertion into tbody
    * @param {string} country - Country code (lowercase)
@@ -1164,164 +1178,58 @@ class TableManager {
     headerRow.setAttribute('data-country', country);
     headerRow.setAttribute('data-age', age);
 
-    // Get column definitions from DynamicSectionManager (PensionContribution first, then taxes)
-    let sectionColumns = [];
+    const blueprint = this._buildRowBlueprint(country);
+    const boundarySet = this._computeGroupBoundarySet(blueprint);
 
-    if (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized()) {
-      sectionColumns = this.dynamicSectionManager.getColumnsForCountry(country) || [];
-    } else {
-      // Fallback: get columns directly from config
-      try {
-        sectionColumns = DEDUCTIONS_SECTION_CONFIG.getColumns(country);
-      } catch (_) {
-        sectionColumns = [{ key: 'PensionContribution', label: 'P.Contrib', tooltip: 'Amount contributed to private pensions (excluding employer match)' }];
-      }
-    }
+    for (let i = 0; i < blueprint.length; i++) {
+      const seg = blueprint[i];
 
-    // Get max column count for colspan
-    const maxSectionColumns = (this.dynamicSectionManager && this.dynamicSectionManager.isInitialized())
-      ? this.dynamicSectionManager.getMaxColumnCount()
-      : sectionColumns.length;
+      if (seg.type === 'section') {
+        const sectionId = seg.sectionId;
+        const columns = seg.columns || [];
+        const maxCols = Math.max(1, this.dynamicSectionsManager.getMaxColumnCount(sectionId));
 
-    // Get the main header row to understand column structure
-    const mainHeaderRow = document.querySelector('#Data thead tr:last-child');
-    if (!mainHeaderRow) {
-      console.warn('_createTaxHeaderRow: Main header row not found');
-      return headerRow;
-    }
+        const sectionContainerCell = document.createElement('th');
+        sectionContainerCell.className = 'dynamic-section-container';
+        sectionContainerCell.setAttribute('data-section', sectionId);
+        sectionContainerCell.colSpan = maxCols;
+        sectionContainerCell.setAttribute('data-group-end', '1');
+        sectionContainerCell.style.borderRight = '3px solid #666';
 
-    // Get base headers from <thead>
-    const baseHeaders = Array.from(mainHeaderRow.querySelectorAll('th[data-key]')).filter(h => h.style.display !== 'none');
+        const sectionFlexDiv = document.createElement('div');
+        sectionFlexDiv.className = 'dynamic-section-flex';
+        sectionContainerCell.appendChild(sectionFlexDiv);
 
-    // Find PensionContribution position - dynamic section columns go AFTER it
-    const pensionContribIndex = baseHeaders.findIndex(h => h.getAttribute('data-key') === 'PensionContribution');
-
-    // Separate PensionContribution from tax columns
-    const pensionColumn = sectionColumns.find(c => c.key === 'PensionContribution');
-    const taxColumns = sectionColumns.filter(c => c.key !== 'PensionContribution');
-
-    // Helper predicates for group identification
-    const isIncome = (k) => k && k.indexOf('Income') === 0;
-    const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
-      k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
-    const isDynamicSectionKey = (k) => k === 'PensionContribution' || (k && k.indexOf('Tax__') === 0);
-
-    // Build the complete list of cells we'll create with their data-keys
-    const cellDefs = [];
-
-    // Cells for headers before PensionContribution
-    for (let i = 0; i < pensionContribIndex && i < baseHeaders.length; i++) {
-      const th = baseHeaders[i];
-      cellDefs.push({
-        label: th.textContent,
-        key: th.getAttribute('data-key'),
-        tooltip: th.getAttribute('data-tooltip') || th.getAttribute('title') || null,
-        isDynamicSection: false
-      });
-    }
-
-    // Dynamic section cells (PensionContribution first, then tax columns)
-    if (pensionColumn) {
-      cellDefs.push({
-        label: pensionColumn.label,
-        key: 'PensionContribution',
-        tooltip: pensionColumn.tooltip,
-        isDynamicSection: true
-      });
-    }
-    taxColumns.forEach(col => {
-      cellDefs.push({
-        label: col.label,
-        key: col.key,
-        tooltip: col.tooltip,
-        isDynamicSection: true
-      });
-    });
-
-    // Cells for headers after PensionContribution (skip original PensionContribution in baseHeaders)
-    for (let i = pensionContribIndex + 1; i < baseHeaders.length; i++) {
-      const th = baseHeaders[i];
-      cellDefs.push({
-        label: th.textContent,
-        key: th.getAttribute('data-key'),
-        tooltip: th.getAttribute('data-tooltip') || th.getAttribute('title') || null,
-        isDynamicSection: false
-      });
-    }
-
-    // Find group boundary indices (excluding dynamic section - handled by container)
-    const allKeys = cellDefs.map(c => c.key);
-    const yearIdx = allKeys.indexOf('Year');
-    const incomeLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isIncome(allKeys[i])) return i; return -1; })();
-    const expensesIdx = allKeys.indexOf('Expenses');
-    const assetsLastIdx = (() => { for (let i = allKeys.length - 1; i >= 0; i--) if (isAsset(allKeys[i])) return i; return -1; })();
-    const boundaryIdxs = new Set([yearIdx, incomeLastIdx, expensesIdx, assetsLastIdx, cellDefs.length - 1].filter(i => i >= 0));
-
-    // Create the cells - using flexbox for dynamic sections
-    let sectionContainerCell = null;
-    let sectionFlexDiv = null;
-    let firstSectionCellProcessed = false;
-    const sectionName = this.dynamicSectionManager ? this.dynamicSectionManager.getSectionName() : 'deductions';
-
-    cellDefs.forEach((def, idx) => {
-      if (def.isDynamicSection) {
-        // === DYNAMIC SECTION: Use flexbox layout ===
-
-        // Create container cell on first dynamic section cell
-        if (!firstSectionCellProcessed) {
-          sectionContainerCell = document.createElement('th');
-          sectionContainerCell.className = 'dynamic-section-container';
-          sectionContainerCell.setAttribute('data-section', sectionName);
-          sectionContainerCell.colSpan = maxSectionColumns;
-          sectionContainerCell.setAttribute('data-group-end', '1');
-          sectionContainerCell.style.borderRight = '3px solid #666';
-
-          sectionFlexDiv = document.createElement('div');
-          sectionFlexDiv.className = 'dynamic-section-flex';
-          sectionContainerCell.appendChild(sectionFlexDiv);
-
-          firstSectionCellProcessed = true;
+        for (let c = 0; c < columns.length; c++) {
+          const def = columns[c];
+          const flexItem = document.createElement('div');
+          flexItem.className = 'dynamic-section-cell';
+          flexItem.setAttribute('data-key', def.key);
+          flexItem.textContent = def.label;
+          if (def.tooltip) {
+            TooltipUtils.attachTooltip(flexItem, def.tooltip, { hoverDelay: 300, touchDelay: 400 });
+          }
+          sectionFlexDiv.appendChild(flexItem);
         }
 
-        // Create flex item for this header cell
-        const flexItem = document.createElement('div');
-        flexItem.className = 'dynamic-section-cell';
-        flexItem.setAttribute('data-key', def.key);
-        flexItem.textContent = def.label;
-        // Width will be set by DynamicSectionManager.finalizeSectionWidths() after simulation
-
-        // Attach tooltip if provided
-        if (def.tooltip) {
-          TooltipUtils.attachTooltip(flexItem, def.tooltip, { hoverDelay: 300, touchDelay: 400 });
-        }
-
-        sectionFlexDiv.appendChild(flexItem);
-
-        // Check if this is the last section cell - if so, append container to row
-        const isLastSectionCell = !cellDefs.slice(idx + 1).some(c => c.isDynamicSection);
-        if (isLastSectionCell) {
-          headerRow.appendChild(sectionContainerCell);
-        }
+        headerRow.appendChild(sectionContainerCell);
       } else {
-        // === REGULAR COLUMN: Standard th ===
         const cell = document.createElement('th');
-        cell.textContent = def.label;
-        if (def.key) cell.setAttribute('data-key', def.key);
+        cell.textContent = seg.label;
+        if (seg.key) cell.setAttribute('data-key', seg.key);
 
-        // Set group border if this is a boundary column
-        if (boundaryIdxs.has(idx)) {
+        if (boundarySet.has(i)) {
           cell.setAttribute('data-group-end', '1');
           cell.style.borderRight = '3px solid #666';
         }
 
-        // Attach tooltip if provided
-        if (def.tooltip) {
-          TooltipUtils.attachTooltip(cell, def.tooltip, { hoverDelay: 300, touchDelay: 400 });
+        if (seg.tooltip) {
+          TooltipUtils.attachTooltip(cell, seg.tooltip, { hoverDelay: 300, touchDelay: 400 });
         }
 
         headerRow.appendChild(cell);
       }
-    });
+    }
 
     return headerRow;
   }
@@ -1334,59 +1242,68 @@ class TableManager {
    * finalizeSectionWidths() will override these styles once real data exists.
    *
    * @param {HTMLTableRowElement} headerRow
-   * @param {string} country
    */
-  _applyEmptyStateFlexLayoutToDynamicSectionHeaderRow(headerRow, country) {
+  _applyEmptyStateFlexLayoutToDynamicSectionHeaderRow(headerRow) {
     if (!headerRow) return;
 
-    const container = headerRow.querySelector('th.dynamic-section-container');
-    if (!container) return;
+    const containers = Array.from(headerRow.querySelectorAll('th.dynamic-section-container'));
+    if (containers.length === 0) return;
 
-    const flex = container.querySelector('.dynamic-section-flex');
-    if (!flex) return;
+    containers.forEach((container) => {
+      const sectionId = container.getAttribute('data-section');
+      const sectionCfg = this.dynamicSectionsManager.getSectionConfig(sectionId);
+      const emptyState = (sectionCfg && sectionCfg.emptyState) ? sectionCfg.emptyState : {};
+      const minWidthByKey = emptyState.minWidthByKey || {};
+      const minWeightAvgFactorByKey = emptyState.minWeightAvgFactorByKey || {};
 
-    const cells = Array.from(flex.querySelectorAll('.dynamic-section-cell'));
-    if (cells.length === 0) return;
+      const flex = container.querySelector('.dynamic-section-flex');
+      if (!flex) return;
 
-    // Flex-fill the available dynamic section width without imposing large
-    // content-driven minimums (which can blow out the table width on load).
-    // Use proportional grow based on label width so longer tax names get more space.
-    const weights = [];
-    const labelWidths = [];
-    for (let i = 0; i < cells.length; i++) {
-      const w = cells[i].scrollWidth || 0;
-      weights.push(Math.max(1, Math.round(w)));
-      labelWidths.push(w);
-    }
+      const cells = Array.from(flex.querySelectorAll('.dynamic-section-cell')).filter((cell) => {
+        const disp = (cell && cell.style) ? cell.style.display : '';
+        return disp !== 'none';
+      });
+      if (cells.length === 0) return;
 
-    // Ensure PensionContribution doesn't get a "just-fit" allocation (it tends to be the
-    // shortest label), so it visually matches the whitespace of other headers.
-    let avgWeight = 0;
-    for (let i = 0; i < weights.length; i++) avgWeight += weights[i];
-    avgWeight = weights.length ? (avgWeight / weights.length) : 0;
-
-    for (let i = 0; i < cells.length; i++) {
-      const cell = cells[i];
-      const key = cell.getAttribute('data-key');
-      let weight = weights[i] || 1;
-      if (key === 'PensionContribution' && avgWeight) {
-        weight = Math.max(weight, Math.round(avgWeight * 0.85));
+      const weights = [];
+      const labelWidths = [];
+      for (let i = 0; i < cells.length; i++) {
+        const w = cells[i].scrollWidth || 0;
+        weights.push(Math.max(1, Math.round(w)));
+        labelWidths.push(w);
       }
-      try { cell.style.width = ''; } catch (_) { }
-      // IMPORTANT: flex items default min-width:auto; force 0 so they can shrink
-      // and the table can fit within the viewport.
-      if (key === 'PensionContribution') {
-        const labelWidth = labelWidths[i] || 0;
-        try { cell.style.minWidth = labelWidth ? `${labelWidth}px` : '0px'; } catch (_) { }
-      } else {
-        try { cell.style.minWidth = '0px'; } catch (_) { }
+
+      let avgWeight = 0;
+      for (let i = 0; i < weights.length; i++) avgWeight += weights[i];
+      avgWeight = weights.length ? (avgWeight / weights.length) : 0;
+
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        const key = cell.getAttribute('data-key');
+        let weight = weights[i] || 1;
+
+        const factor = minWeightAvgFactorByKey[key];
+        if (factor && avgWeight) {
+          weight = Math.max(weight, Math.round(avgWeight * factor));
+        }
+
+        try { cell.style.width = ''; } catch (_) { }
+
+        const minWidthPolicy = minWidthByKey[key];
+        if (minWidthPolicy === 'label') {
+          const labelWidth = labelWidths[i] || 0;
+          try { cell.style.minWidth = labelWidth ? `${labelWidth}px` : '0px'; } catch (_) { }
+        } else {
+          try { cell.style.minWidth = '0px'; } catch (_) { }
+        }
+
+        try { cell.style.flexGrow = String(weight); } catch (_) { }
+        try { cell.style.flexShrink = '1'; } catch (_) { }
+        try { cell.style.flexBasis = '0px'; } catch (_) { }
+        try { cell.style.overflow = 'hidden'; } catch (_) { }
+        try { cell.style.textOverflow = 'ellipsis'; } catch (_) { }
       }
-      try { cell.style.flexGrow = String(weight); } catch (_) { }
-      try { cell.style.flexShrink = '1'; } catch (_) { }
-      try { cell.style.flexBasis = '0px'; } catch (_) { }
-      try { cell.style.overflow = 'hidden'; } catch (_) { }
-      try { cell.style.textOverflow = 'ellipsis'; } catch (_) { }
-    }
+    });
   }
 
   /**

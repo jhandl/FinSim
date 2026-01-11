@@ -77,6 +77,7 @@ describe('Relocation local holdings panels', () => {
     const configStub = {
       isRelocationEnabled: () => true,
       getDefaultCountry: () => 'ar',
+      getStartCountry: () => 'ar',
       getCountryNameByCode: (code) => (code === 'us' ? 'United States' : 'Argentina'),
       getCachedTaxRuleSet: (code) => ({
         getCurrencySymbol: () => (code === 'us' ? '$' : '$'),
@@ -153,7 +154,6 @@ describe('Relocation local holdings panels', () => {
     expect(markSpy).toHaveBeenCalledWith('row-1');
   });
 });
-
 
 
 
