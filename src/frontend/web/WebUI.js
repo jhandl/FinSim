@@ -1657,14 +1657,19 @@ class WebUI extends AbstractUI {
       visibility[String(pinnedTypes[i]).toLowerCase()] = true;
     }
 
-    // Scan dataSheet for income columns with non-zero values
+    // Fixed asset columns should always remain visible
+    visibility.pensionfund = true;
+    visibility.cash = true;
+    visibility.realestatecapital = true;
+
+    // Scan dataSheet for income/capital columns with non-zero values
     try {
       const ds = (typeof dataSheet !== 'undefined') ? dataSheet : null;
       const length = Array.isArray(ds) ? ds.length : 0;
       if (length > 0) {
-        // Build union of ALL income keys across ALL rows (rows are 1-based)
+        // Build union of ALL income/capital keys across ALL rows (rows are 1-based)
         const visKeyToSourceKeys = {};
-        const visKeyToMapKey = {};
+        const visKeyToMapInfo = {};
         for (let r = 1; r < length; r++) {
           const rowObj = ds[r];
           if (!rowObj) continue;
@@ -1672,7 +1677,7 @@ class WebUI extends AbstractUI {
           for (let i = 0; i < keys.length; i++) {
             const k = keys[i];
             const lk = String(k).toLowerCase();
-            if (!lk.startsWith('income')) continue;
+            if (!lk.startsWith('income') && lk.indexOf('capital__') !== 0) continue;
             const vKey = lk;
             if (!visKeyToSourceKeys[vKey]) visKeyToSourceKeys[vKey] = [];
             if (visKeyToSourceKeys[vKey].indexOf(k) === -1) visKeyToSourceKeys[vKey].push(k);
@@ -1685,7 +1690,16 @@ class WebUI extends AbstractUI {
             for (const invKey in incMap) {
               const vKey = ('income__' + String(invKey)).toLowerCase();
               if (!visKeyToSourceKeys[vKey]) visKeyToSourceKeys[vKey] = [];
-              visKeyToMapKey[vKey] = invKey;
+              visKeyToMapInfo[vKey] = { map: 'income', key: invKey };
+            }
+          }
+
+          const capMap = rowObj.investmentCapitalByKey;
+          if (capMap && typeof capMap === 'object') {
+            for (const invKey in capMap) {
+              const vKey = ('capital__' + String(invKey)).toLowerCase();
+              if (!visKeyToSourceKeys[vKey]) visKeyToSourceKeys[vKey] = [];
+              visKeyToMapInfo[vKey] = { map: 'capital', key: invKey };
             }
           }
         }
@@ -1700,11 +1714,11 @@ class WebUI extends AbstractUI {
           for (let r = 1; r < length && !hasNonZeroValue; r++) {
             const rowObj = ds[r];
             if (!rowObj) continue;
-            const mapKey = visKeyToMapKey[vKey];
-            if (mapKey) {
-              const incMap = rowObj.investmentIncomeByKey;
-              if (incMap && typeof incMap === 'object') {
-                const value = incMap[mapKey];
+            const mapInfo = visKeyToMapInfo[vKey];
+            if (mapInfo) {
+              const srcMap = (mapInfo.map === 'capital') ? rowObj.investmentCapitalByKey : rowObj.investmentIncomeByKey;
+              if (srcMap && typeof srcMap === 'object') {
+                const value = srcMap[mapInfo.key];
                 if (typeof value === 'number' && Math.abs(value) > threshold) { hasNonZeroValue = true; break; }
               }
             }
@@ -1726,49 +1740,8 @@ class WebUI extends AbstractUI {
 
   // Dynamically add per-investment-type income and capital columns when >2 types exist
   applyDynamicColumns(types, incomeVisibility) {
-    const thead = document.querySelector('#Data thead');
-    const headerGroupsRow = thead ? thead.querySelector('tr.header-groups') : null;
-    const headerRow = thead ? thead.querySelector('tr:nth-child(2)') : null;
-    if (!thead || !headerGroupsRow || !headerRow) return;
-    const invTypes = Array.isArray(types) ? types : [];
-
-    // === CAPITAL COLUMNS ===
-    // Insert dynamic capitals after RealEstateCapital
-    // Remove any previously added dynamic capital columns to avoid duplicates
-    Array.from(headerRow.querySelectorAll('th[data-key^="Capital__"]')).forEach(th => th.remove());
-    let capitalAnchor = headerRow.querySelector('th[data-key="RealEstateCapital"]');
-    if (capitalAnchor) {
-      for (let i = 0; i < invTypes.length; i++) {
-        const type = invTypes[i];
-        const key = type && type.key ? type.key : `asset${i}`;
-        const label = type && type.label ? type.label : key;
-        const th = document.createElement('th');
-        th.setAttribute('data-key', `Capital__${key}`);
-        th.title = `Total value of your ${label} investments`;
-        th.textContent = label;
-        capitalAnchor.insertAdjacentElement('afterend', th);
-        capitalAnchor = th;
-      }
-    }
-
-    // Adjust header group colspans for Gross Income and Assets
-    const groupCells = Array.from(headerGroupsRow.querySelectorAll('th'));
-    const grossIncomeGroup = groupCells.find(th => (th.dataset && th.dataset.group === 'grossIncome') || ((th.textContent || '').trim() === 'Gross Income'));
-    const assetsGroup = groupCells.find(th => (th.dataset && th.dataset.group === 'assets') || ((th.textContent || '').trim() === 'Assets'));
-    if (grossIncomeGroup) {
-      if (this.tableManager && this.tableManager.dynamicSectionsManager) {
-        grossIncomeGroup.colSpan = Math.max(1, this.tableManager.dynamicSectionsManager.getMaxColumnCount('grossIncome'));
-      }
-    }
-    if (assetsGroup) {
-      // PensionFund, Cash, RealEstateCapital (3) + dynamic capital columns (N)
-      assetsGroup.colSpan = 3 + invTypes.length;
-    }
-
-    // Update vertical group borders to align with the new dynamic layout
-    if (typeof this.updateGroupBorders === 'function') this.updateGroupBorders();
-
-    // Rows rebuilt above; header groups updated below
+    // Dynamic table columns are now handled by DynamicSectionsConfig + TableManager.
+    return;
   }
 
   // Mark the last column of each top-level group so borders can align dynamically

@@ -27,3 +27,5 @@ The user always has a browser window open on the UI. Do not run the "Open in Bro
 The most critical rule of all: YOU WILL ALWAYS STOP AND ASK FOR THE USER'S INPUT BEFORE PROCEEDING. THE USER WILL TELL YOU WHICH HYPOTHESES TO PURSUE. IF YOU DON'T STOP, YOU FAIL AND EVERYTHING YOU DO WILL BE DELETED.
 
 Also critical: If the user tells you not to use this rule, or to use it in a different way, you will obey. The user is the one who rules. You are the assistant, not the boss.
+
+Finally, if the user reports issues with changes you just made, you will not use this rule unless the user asks you to. Instead, you will fix the issue directly.

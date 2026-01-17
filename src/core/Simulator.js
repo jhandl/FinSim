@@ -356,9 +356,96 @@ async function initializeSimulator() {
     return false;
   }
 
+  if (!validatePerCountryInputs(startCountry, events, params)) {
+    return false;
+  }
+
   // Pre-run in-memory completion: ensure events have linkedCountry/currency when missing.
   // This happens after the UI relocation-impact gate; it does not persist to disk.
   completeMissingCurrencyAndLinkedCountry(events, startCountry);
+
+  return true;
+}
+
+function validatePerCountryInputs(startCountry, events, params) {
+  if (!config || !params || !config.isRelocationEnabled || !config.isRelocationEnabled()) return true;
+
+  var countries = [];
+  var seen = {};
+  var sc = startCountry ? String(startCountry).toLowerCase() : null;
+  if (sc) {
+    countries.push(sc);
+    seen[sc] = true;
+  }
+
+  var hasRelocation = false;
+  if (Array.isArray(events)) {
+    for (var i = 0; i < events.length; i++) {
+      var evt = events[i];
+      var type = evt && evt.type ? String(evt.type) : '';
+      if (type.indexOf('MV-') === 0) {
+        hasRelocation = true;
+        var code = type.substring(3).toLowerCase();
+        if (code && !seen[code]) {
+          countries.push(code);
+          seen[code] = true;
+        }
+      }
+    }
+  }
+  if (!hasRelocation) return true;
+
+  var allocMissing = [];
+  var contribMissing = [];
+  var stateMissing = [];
+  var p2StateMissing = [];
+  var allocByCountry = params.investmentAllocationsByCountry || {};
+  var contribByCountry = params.pensionContributionsByCountry || {};
+  var stateByCountry = params.statePensionByCountry || {};
+  var p2StateByCountry = params.p2StatePensionByCountry || {};
+  var isCouple = params.simulation_mode === 'couple';
+
+  for (var ci = 0; ci < countries.length; ci++) {
+    var code = countries[ci];
+    var rs = config.getCachedTaxRuleSet(code);
+
+    var allocMap = allocByCountry[code];
+    var allocOk = !!(allocMap && Object.keys(allocMap).length > 0);
+    if (allocOk) {
+      var types = rs.getResolvedInvestmentTypes();
+      for (var ti = 0; ti < types.length; ti++) {
+        var t = types[ti] || {};
+        if (!t.key) continue;
+        if (allocMap[t.key] === undefined || allocMap[t.key] === null) {
+          allocOk = false;
+          break;
+        }
+      }
+    }
+    if (!allocOk) allocMissing.push(code);
+
+    if (rs.getPensionSystemType() !== 'state_only') {
+      var contribMap = contribByCountry[code];
+      var contribOk = !!(contribMap && contribMap.p1Pct !== undefined && contribMap.capped !== undefined);
+      if (isCouple && (!contribMap || contribMap.p2Pct === undefined)) contribOk = false;
+      if (!contribOk) contribMissing.push(code);
+    }
+
+    if (stateByCountry[code] === undefined || stateByCountry[code] === null) stateMissing.push(code);
+    if (isCouple && (p2StateByCountry[code] === undefined || p2StateByCountry[code] === null)) p2StateMissing.push(code);
+  }
+
+  if (allocMissing.length || contribMissing.length || stateMissing.length || p2StateMissing.length) {
+    errors = true;
+    success = false;
+    var parts = [];
+    if (allocMissing.length) parts.push('allocations: ' + allocMissing.join(', '));
+    if (contribMissing.length) parts.push('pension contributions: ' + contribMissing.join(', '));
+    if (stateMissing.length) parts.push('state pension: ' + stateMissing.join(', '));
+    if (p2StateMissing.length) parts.push('P2 state pension: ' + p2StateMissing.join(', '));
+    uiManager.ui.setError(new Error('Missing per-country inputs (' + parts.join('; ') + ')'));
+    return false;
+  }
 
   return true;
 }

@@ -119,6 +119,15 @@ class DynamicSectionManager {
   finalizeSectionWidths(tbody) {
     if (!tbody || !this.initialized) return;
 
+    // Pre-simulation (after loading a scenario but before running), the tbody may contain
+    // only tax-header rows. In that state, TableManager applies an empty-state flex layout
+    // to distribute header labels across the available section width.
+    // Do NOT override that layout by measuring/forcing pixel widths.
+    try {
+      const hasAnyDataRows = !!tbody.querySelector('tr:not(.tax-header)');
+      if (!hasAnyDataRows) return;
+    } catch (_) { }
+
     const sectionName = this.getSectionName();
     const containerSelector = `.dynamic-section-container[data-section="${sectionName}"]`;
     const cellSelector = '.dynamic-section-cell';

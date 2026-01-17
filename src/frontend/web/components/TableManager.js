@@ -149,6 +149,9 @@ class TableManager {
       for (let i = 0; i < pinned.length; i++) {
         initialVisibility[String(pinned[i]).toLowerCase()] = true;
       }
+      initialVisibility.pensionfund = true;
+      initialVisibility.cash = true;
+      initialVisibility.realestatecapital = true;
       this._lastColumnVisibilityMap = initialVisibility;
       this._incomeVisibilityInitialized = true;
     }
@@ -203,6 +206,28 @@ class TableManager {
       // Nominal and (optional) PV values from the core data sheet
       let nominalValue = (data[key] == null ? 0 : data[key]);
       let pvValue = null;
+
+      if (key.indexOf('Income__') === 0) {
+        const mapKey = key.substring(8);
+        const map = data.investmentIncomeByKey;
+        if (map && Object.prototype.hasOwnProperty.call(map, mapKey)) {
+          nominalValue = map[mapKey];
+        }
+        const pvMap = data.investmentIncomeByKeyPV;
+        if (pvMap && Object.prototype.hasOwnProperty.call(pvMap, mapKey)) {
+          pvValue = pvMap[mapKey];
+        }
+      } else if (key.indexOf('Capital__') === 0) {
+        const mapKey = key.substring(9);
+        const map = data.investmentCapitalByKey;
+        if (map && Object.prototype.hasOwnProperty.call(map, mapKey)) {
+          nominalValue = map[mapKey];
+        }
+        const pvMap = data.investmentCapitalByKeyPV;
+        if (pvMap && Object.prototype.hasOwnProperty.call(pvMap, mapKey)) {
+          pvValue = pvMap[mapKey];
+        }
+      }
 
       // Default PV lookup (fixed columns and any other dynamic keys)
       if (pvValue === null) {
@@ -539,6 +564,30 @@ class TableManager {
   }
 
   clearExtraDataRows(maxAge) {
+    // Special case used by scenario loading: clear everything and reset header visibility
+    // to match a fresh page state (no data rows, only the empty tax header).
+    if (maxAge === 0) {
+      const tbody = document.querySelector('#Data tbody');
+      if (tbody) tbody.innerHTML = '';
+      try { this._cleanupTaxHeaders(); } catch (_) { }
+      this._lastCountry = null;
+      this._incomeVisibilityInitialized = false;
+      this._lastColumnVisibilityMap = null;
+      try { if (this.webUI) this.webUI.lastIncomeVisibility = null; } catch (_) { }
+
+      // Restore static column headers (2nd thead row) in case a previous run hid them.
+      try {
+        const headerRow = document.querySelector('#Data thead tr:nth-child(2)');
+        if (headerRow) {
+          const headers = Array.from(headerRow.querySelectorAll('th[data-key]'));
+          for (let i = 0; i < headers.length; i++) {
+            headers[i].style.display = '';
+          }
+        }
+      } catch (_) { }
+      return;
+    }
+
     const headerRow = document.querySelector('#Data thead tr:nth-child(2)');
     const headers = Array.from(headerRow.cells);
     const ageColumnIndex = headers.findIndex(header => header.getAttribute('data-key') === 'Age');

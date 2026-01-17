@@ -4,21 +4,10 @@ This document is a **system map**. It describes how the data table currently wor
 
 ---
 
-### 1) Two “dynamic” systems exist at the same time (but the ownership has shifted)
+### 1) One “dynamic” table system: Dynamic Sections (flexbox inside a single anchor cell)
 
-#### A) Main-header mutation (main header row `<th>` insertion/removal) — **assets only**
-- Owner: `WebUI.applyDynamicColumns(types, incomeVisibility)`
-- Scope (current):
-  - **assets**: removes legacy `FundsCapital` / `SharesCapital` and inserts `<th data-key="Capital__${typeKey}">...` after `RealEstateCapital`.
-  - **group layout**: updates header-group `colspan` values for “Gross Income” and “Assets”.
-  - **borders**: calls `updateGroupBorders()` to mark boundaries.
-- Non-scope (no longer true):
-  - it **does not** create/insert `<th data-key="Income__...">` in the main header row
-  - it **does not** rebuild body rows (data rows are rendered by `TableManager.setDataRow()`)
+Dynamic table columns (income, deductions/tax, and assets) are rendered via **dynamic sections**.
 
-This system is the one that mutates the **Assets** region of the main header row. Income/tax columns are not represented as main-header `<th>` cells anymore.
-
-#### B) Dynamic Sections (flexbox columns inside a single anchor cell) — **income + deductions/tax**
 - Owner chain:
   - `TableManager.dynamicSectionsManager` → `DynamicSectionsManager` → `DynamicSectionManager`
   - Schema source: `DYNAMIC_SECTIONS` in `DynamicSectionsConfig.js`
@@ -29,11 +18,12 @@ This system is the one that mutates the **Assets** region of the main header row
     - In data rows: a single `<td class="dynamic-section-container" data-section="...">` with `colspan=maxCols`, containing a flexbox of value cells (`.dynamic-section-cell[data-key]`), each carrying `data-nominal-value` (and optionally `data-pv-value`).
   - `DynamicSectionManager.finalizeSectionWidths()` later normalizes widths across “periods” (between tax headers).
 
-This system does **not** create/insert `<th data-key="Income__...">` in the main header row. Income/tax “columns” exist as flex items inside the section container cells.
+There is **no** main-header `<th>` injection for dynamic investment columns. Dynamic “columns” exist as flex items inside the section container cells.
 
-**Important:** These systems coexist without overlap in the current design:
-- Income + deductions/taxes are owned by (B) and anchored to fixed main-header keys (`GrossIncome`, `PensionContribution`).
-- Assets (capital by investment type) are owned by (A) via `Capital__*` columns in the main header.
+Configured dynamic sections (as-built):
+- `grossIncome` (anchor: `GrossIncome`)
+- `deductions` (anchor: `PensionContribution`)
+- `assets` (anchor: `RealEstateCapital`)
 
 ---
 
@@ -51,9 +41,10 @@ The concrete key set is country-dependent, but the key *classes* are stable:
     - `DynamicSectionsConfig` builds Gross Income columns from fixed income keys plus `Income__*`.
     - `Income__*` is built from the **union of investment types across cached rulesets** (so relocated periods can still display income for asset keys originating in a different ruleset).
 
-- **Dynamic investment capital keys — rendered as real `<th data-key="Capital__...">` in the main header**
+- **Dynamic investment capital keys — rendered inside the Assets dynamic section**
   - Form: `Capital__${resolvedInvestmentType.key}`
-  - Source of keys: `WebUI.applyDynamicColumns()` inserts these after `RealEstateCapital`.
+  - Source of keys: `DynamicSectionsConfig` builds Assets columns from fixed asset keys plus `Capital__*` from the **union of investment types across cached rulesets**.
+  - Visibility: the assets section pins `PensionFund`, `Cash`, and `RealEstateCapital`; `Capital__*` keys are shown only when non-zero within the residence period.
 
 - **Dynamic tax keys — rendered inside the Deductions dynamic section**
   - Form: `Tax__${taxId}`
@@ -70,7 +61,6 @@ There are two separate country sets used in the table lifecycle:
   - `Config.getInstance().getCachedTaxRuleSet()` (no explicit countryCode)
 - Used by:
   - Initial visibility: pinned-only map is built from `taxRuleSet.getPinnedIncomeTypes()` and stored on `TableManager` as `_lastColumnVisibilityMap`.
-  - Asset header mutation: `WebUI.applyDynamicColumns(investmentTypes, pinnedVisibility)` inserts `Capital__*` columns for the default ruleset’s investment types.
 
 #### B) “Simulation/relocation” country set
 - Derived from the scenario’s event set:
@@ -86,9 +76,11 @@ Separately, per-row rendering chooses the “current country” based on age:
 ### 4) Lifecycle: what runs when
 
 #### Empty state / initial render
-- The main header row is static HTML plus any `Capital__*` mutation performed by `WebUI.applyDynamicColumns()`.
+- The main header row is static HTML and includes **anchor keys** for dynamic sections (`GrossIncome`, `PensionContribution`, `RealEstateCapital`).
+- An empty (pre-run) tax-header row is created via a minimal `TableManager.setDataRow(0,{})` trigger so dynamic section headers exist before a simulation run.
 - The “pinned-only” visibility state is initialized in `TableManager.setDataRow()` by reading `taxRuleSet.getPinnedIncomeTypes()` and storing a lowercase visibility map (`_lastColumnVisibilityMap`).
-- Dynamic section tax-header rows only exist once `TableManager` starts rendering (during a simulation run / rerender).
+- Pre-run header label distribution is handled by `TableManager._applyEmptyStateFlexLayoutToDynamicSectionHeaderRow(...)`.
+- Width finalization is intentionally skipped pre-run (no data rows) so empty-state header flex distribution is not overridden.
 
 #### After running a simulation
 - `TableManager.setDataRow()` inserts tax header rows as country changes:
@@ -96,7 +88,7 @@ Separately, per-row rendering chooses the “current country” based on age:
 - End-of-run visibility is applied via `TableManager.applyIncomeVisibilityAfterSimulation()` (back-compat entrypoint):
   - uses `WebUI.getIncomeColumnVisibility()` (scans `dataSheet` keys and also `investmentIncomeByKey`)
   - stores the result on `TableManager` (`_lastColumnVisibilityMap`) and applies it to the chart
-  - applies per-period visibility inside dynamic sections via `DynamicSectionVisibilityEngine` (for sections with `enableVisibilityEngine=true`, currently `grossIncome`)
+  - applies per-period visibility inside dynamic sections via `DynamicSectionVisibilityEngine` (for sections with `enableVisibilityEngine=true`, currently `grossIncome` and `assets`)
   - applies additional “hide-if-all-zero-in-period” rules for sections without the visibility engine (e.g. `deductions` hides `PensionContribution` when all-zero for a period)
   - finalizes widths via `DynamicSectionManager.finalizeSectionWidths()`
 
@@ -108,30 +100,29 @@ Separately, per-row rendering chooses the “current country” based on age:
 - Default cached ruleset: `ie`
 - Investment types: `taxRuleSet('ie').getResolvedInvestmentTypes()` returns keys like:
   - `indexFunds_ie`, `shares_ie` (and potentially others)
-- Main header row (via `WebUI.applyDynamicColumns`):
-  - Removes `FundsCapital` / `SharesCapital`
-  - Inserts `Capital__indexFunds_ie`, `Capital__shares_ie`, ... after `RealEstateCapital`
 - Gross Income tax-header row (via dynamic sections):
   - Renders fixed income keys plus `Income__*` inside the `grossIncome` section (anchor `GrossIncome`)
+- Assets tax-header row (via dynamic sections):
+  - Renders `PensionFund`, `Cash`, `RealEstateCapital`, plus `Capital__*` inside the `assets` section (anchor `RealEstateCapital`)
 
 #### Example 2 — IE → AR relocation scenario
-- Default cached ruleset still starts as `ie`, so initial `Capital__*` header mutation is IE-shaped.
 - During simulation:
   - `DynamicSectionsManager.initialize()` precomputes section column sets for countries in the scenario (`ie`, `ar`).
   - As `RelocationUtils.getCountryForAge(...)` flips at MV age, tax header rows (and any dynamic sections) switch per-country definitions.
-- Header mutation is limited to capital columns (`Capital__*`).
 - Gross Income dynamic section uses the union of investment types across cached rulesets so that income keys originating in a previous ruleset can still appear (and be hidden/shown by the visibility engine).
+ - Assets dynamic section uses the union of investment types across cached rulesets so that capital keys originating in a previous ruleset can still appear (and be hidden/shown by the visibility engine).
 
 ---
 
 ### 6) Implication for “Phase 3”
 
 Phase 3 must be defined in terms of the **current ownership model**:
-- The visible main header layout is only *partly* driven by `applyDynamicColumns()` (assets capital columns + group colspans/borders).
-- Income and deductions/taxes are driven by dynamic sections anchored at `GrossIncome` and `PensionContribution`.
+- Income, deductions/taxes, and assets are all driven by dynamic sections anchored at `GrossIncome`, `PensionContribution`, and `RealEstateCapital`.
 - Any Phase 3 change that removes or bypasses either system must fully replace its responsibilities (header mutation for assets; section rendering/visibility/width normalization for income+tax).
 
 Therefore, before implementing Phase 3, we must decide:
-- Do we extend the header-mutation system to support the dynamic investment incomes cleanly (lowest risk given current behavior), or
-- Do we migrate investment income to dynamic sections and ensure the rest of the system no longer relies on header mutation for income (higher risk, larger change).
+- How to evolve the dynamic section model while preserving its key invariants:
+  - per-residence-period visibility (pinned keys + “hide if all-zero in period”)
+  - width stability within a residence period
+  - empty-state header distribution without forcing all potential columns visible
 

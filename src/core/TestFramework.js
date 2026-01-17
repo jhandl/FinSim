@@ -884,6 +884,7 @@ class TestFramework {
         setVersion: function(version) { localStorage.setItem('finsim-version', version); },
         fetchUrl: function(url) { var fs = require('fs'); var path = require('path'); if (url.startsWith('/src/core/config/')) { var filename = path.basename(url); var configPath = path.join(__dirname, 'config', filename); return fs.readFileSync(configPath, 'utf8'); } throw new Error('Unsupported URL pattern: ' + url); },
         showAlert: function(msg) { console.warn(msg); return true; },
+        setError: function(err) { console.warn(err && err.message ? err.message : err); return true; },
         showToast: function(message, title, timeout) {},
         clearVersionNote: function() {}, setVersionHighlight: function() {},
         newDataVersion: function(version, message) { if (this.showAlert(message)) { this.setVersion(version); } },

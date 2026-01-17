@@ -97,7 +97,7 @@ graph TD
 #### Core
 
 *   **[`Simulator.js`](src/core/Simulator.js:1):** The main orchestrator of the simulation (year loop + currency consolidation).
-*   **[`Person.js`](src/core/Person.js:1):** Represents an individual in the simulation (including per-country pension pots, with a backward-compatible `person.pension` getter for the start country).
+*   **[`Person.js`](src/core/Person.js:1):** Represents an individual in the simulation (including per-country pension pots via `getPensionForCountry()` and `getPensionPortfolio()`).
 *   **[`Config.js`](src/core/Config.js:1):** Loads and holds all configuration parameters, version chaining, and tax ruleset loading/caching.
 *   **[`Events.js`](src/core/Events.js:1):** Defines the `SimEvent` class.
 *   **[`Taxman.js`](src/core/Taxman.js:1):** Responsible for all tax calculations (formerly `Revenue.js`).

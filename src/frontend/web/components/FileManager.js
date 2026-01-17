@@ -427,6 +427,16 @@ class FileManager {
       console.error('Error preloading tax rulesets:', err);
     }
 
+    // Re-create the empty tax-header row after scenario load so the data table
+    // matches a freshly loaded page (headers present, no stale data rows).
+    try {
+      if (this.webUI.tableManager && typeof this.webUI.tableManager.setDataRow === 'function') {
+        this.webUI.tableManager.setDataRow(0, {});
+        const temp = document.getElementById('data_row_0');
+        if (temp && temp.parentNode) temp.parentNode.removeChild(temp);
+      }
+    } catch (_) { }
+
     this.webUI.setStatus("Ready");
 
     // Check for relocation impacts and update status accordingly

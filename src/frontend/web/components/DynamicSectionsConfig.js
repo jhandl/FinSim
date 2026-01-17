@@ -117,6 +117,62 @@ const DYNAMIC_SECTIONS = [
     }
   },
   {
+    id: 'assets',
+    groupKey: 'assets',
+    anchorKey: 'RealEstateCapital',
+    isGroupBoundary: true,
+    enableVisibilityEngine: true,
+    pinnedKeys: ['PensionFund', 'Cash', 'RealEstateCapital'],
+    getColumns: function (countryCode) {
+      const config = Config.getInstance();
+      const taxRuleSet = config.getCachedTaxRuleSet(countryCode);
+      if (!taxRuleSet) {
+        throw new Error(`TaxRuleSet not cached for country: ${countryCode}`);
+      }
+
+      const columns = [
+        { key: 'PensionFund', label: 'Pension', tooltip: 'Total value of private pension funds' },
+        { key: 'Cash', label: 'Cash', tooltip: 'Total cash savings' },
+        { key: 'RealEstateCapital', label: 'R.Estate', tooltip: 'Total value of your owned real estate' }
+      ];
+
+      // Dynamic Capital__ columns: use the union of investment types across cached rulesets.
+      const typeByKey = {};
+      const orderedKeys = [];
+      const addTypes = (types) => {
+        const list = Array.isArray(types) ? types : [];
+        for (let i = 0; i < list.length; i++) {
+          const t = list[i] || {};
+          const k = t.key;
+          if (!k) continue;
+          if (!typeByKey[k]) {
+            typeByKey[k] = t;
+            orderedKeys.push(k);
+          }
+        }
+      };
+      addTypes(taxRuleSet.getResolvedInvestmentTypes());
+      const cached = config.listCachedRuleSets();
+      for (const cc in cached) {
+        const rs = cached[cc];
+        if (!rs || rs === taxRuleSet) continue;
+        addTypes(rs.getResolvedInvestmentTypes());
+      }
+
+      for (let i = 0; i < orderedKeys.length; i++) {
+        const t = typeByKey[orderedKeys[i]];
+        const label = t.label || t.key;
+        columns.push({
+          key: `Capital__${t.key}`,
+          label: label.substring(0, 12) + (label.length > 12 ? '...' : ''),
+          tooltip: `Total value of your ${label} investments`
+        });
+      }
+
+      return columns;
+    }
+  },
+  {
     id: 'deductions',
     groupKey: 'deductions',
     anchorKey: 'PensionContribution',

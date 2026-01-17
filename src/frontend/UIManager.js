@@ -220,23 +220,39 @@ class UIManager {
     // Add dynamic per-investment-type fields so the table can render N investment types
     try {
       const incMap = dataSheet[row].investmentIncomeByKey || {};
+      const incOut = {};
       for (const key in incMap) {
-        data['Income__' + key] = incMap[key] / scale;
+        const value = incMap[key] / scale;
+        data['Income__' + key] = value;
+        incOut[key] = value;
       }
+      data.investmentIncomeByKey = incOut;
       const capMap = dataSheet[row].investmentCapitalByKey || {};
+      const capOut = {};
       for (const key in capMap) {
-        data['Capital__' + key] = capMap[key] / scale;
+        const value = capMap[key] / scale;
+        data['Capital__' + key] = value;
+        capOut[key] = value;
       }
+      data.investmentCapitalByKey = capOut;
       // Add dynamic PV mirrors for per-investment income/capital so PV mode can
       // be exact-by-construction for dynamic columns as well.
       const incMapPV = dataSheet[row].investmentIncomeByKeyPV || {};
+      const incOutPV = {};
       for (const key in incMapPV) {
-        data['Income__' + key + 'PV'] = incMapPV[key] / scale;
+        const value = incMapPV[key] / scale;
+        data['Income__' + key + 'PV'] = value;
+        incOutPV[key] = value;
       }
+      data.investmentIncomeByKeyPV = incOutPV;
       const capMapPV = dataSheet[row].investmentCapitalByKeyPV || {};
+      const capOutPV = {};
       for (const key in capMapPV) {
-        data['Capital__' + key + 'PV'] = capMapPV[key] / scale;
+        const value = capMapPV[key] / scale;
+        data['Capital__' + key + 'PV'] = value;
+        capOutPV[key] = value;
       }
+      data.investmentCapitalByKeyPV = capOutPV;
 
       // Add dynamic tax totals with display names from tax ruleset
       const taxMap = dataSheet[row].taxByKey || {};

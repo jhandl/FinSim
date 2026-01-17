@@ -90,7 +90,7 @@
   "investmentTypes": [
     {
       "key": "indexFunds_ar",
-      "label": "Local AR Equity Fund (AR)",
+      "label": "MERVAL",
       "baseCurrency": "ARS",
       "assetCountry": "ar",
       "residenceScope": "local",
@@ -103,7 +103,8 @@
     },
     {
       "key": "shares_ar",
-      "label": "Global USD ETF (AR)",
+      "label": "CEDEARs",
+      "baseRef": "globalEquity",
       "baseCurrency": "USD",
       "assetCountry": "us",
       "residenceScope": "global",
