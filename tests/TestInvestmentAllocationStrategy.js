@@ -84,7 +84,7 @@ const TestInvestmentAllocationStrategy = {
       type: "exact_value",
       target: "age",
       age: 30,
-      field: "indexFundsCapital",
+      field: "investmentCapitalByKey:indexFunds",
       expected: 15051.09, // Actual first year investment (50% of surplus under current rules)
       tolerance: 100       // Tight tolerance for precise calculation
     },
@@ -92,7 +92,7 @@ const TestInvestmentAllocationStrategy = {
       type: "exact_value",
       target: "age",
       age: 30,
-      field: "sharesCapital",
+      field: "investmentCapitalByKey:shares",
       expected: 15051.09, // Actual first year investment (50% of surplus under current rules)
       tolerance: 100      // Tight tolerance for precise calculation
     },
@@ -111,7 +111,7 @@ const TestInvestmentAllocationStrategy = {
       type: "exact_value",
       target: "age",
       age: 34,
-      field: "indexFundsCapital",
+      field: "investmentCapitalByKey:indexFunds",
       expected: 35771.8946549744, // Align with simulator under current tax rules
       tolerance: 100
     },
@@ -119,7 +119,7 @@ const TestInvestmentAllocationStrategy = {
       type: "exact_value",
       target: "age",
       age: 34,
-      field: "sharesCapital",
+      field: "investmentCapitalByKey:shares",
       expected: 35771.8946549744, // Align with simulator under current tax rules
       tolerance: 100
     },
@@ -135,14 +135,14 @@ const TestInvestmentAllocationStrategy = {
     {
       type: "exact_value",
       target: "final",
-      field: "indexFundsCapital",
+      field: "investmentCapitalByKey:indexFunds",
       expected: 35771.8946549744, // Final index funds balance under current rules
       tolerance: 100
     },
     {
       type: "exact_value",
       target: "final",
-      field: "sharesCapital",
+      field: "investmentCapitalByKey:shares",
       expected: 35771.8946549744, // Final shares balance under current rules
       tolerance: 100
     }

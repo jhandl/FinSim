@@ -188,7 +188,7 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
 
     // Analyze relocation impacts if relocation is enabled
     if (relocationEnabled && window.RelocationImpactDetector && typeof window.RelocationImpactDetector.analyzeEvents === 'function') {
-      const currentStart = etm.getStartCountry();
+      const currentStart = (window.Config && window.Config.getInstance) ? window.Config.getInstance().getStartCountry() : startCountry;
       if (currentStart) {
         window.RelocationImpactDetector.analyzeEvents(eventsData, currentStart);
         // Force update indicators immediately after analysis
@@ -215,7 +215,7 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
     const cfg = window.Config && window.Config.getInstance ? window.Config.getInstance() : null;
     if (cfg && typeof cfg.syncTaxRuleSetsWithEvents === 'function') {
       try {
-        await cfg.syncTaxRuleSetsWithEvents(eventsData, etm.getStartCountry ? etm.getStartCountry() : startCountry);
+        await cfg.syncTaxRuleSetsWithEvents(eventsData, startCountry);
       } catch (syncError) {
         console.error('syncTaxRuleSetsWithEvents failed', syncError);
       }

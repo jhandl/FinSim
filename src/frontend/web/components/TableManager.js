@@ -4,8 +4,8 @@ class TableManager {
 
   constructor(webUI) {
     this.webUI = webUI;
-    // Flag to track if income visibility has been initialized
-    this._incomeVisibilityInitialized = false;
+    // Flag to track if column visibility has been initialized
+    this._incomeVisibilityInitialized = false; // kept for backward compatibility with existing initialization flow
     this.currencyMode = 'natural'; // 'natural' or 'unified'
     this.reportingCurrency = null;
     this.countryInflationOverrides = {}; // MV event rate overrides: country -> inflation rate (decimal)
@@ -18,6 +18,7 @@ class TableManager {
     this._activeTaxHeader = null;
     this._taxHeaders = [];
     this._lastCountry = null;
+    this._lastColumnVisibilityMap = null;
   }
 
   setPresentValueMode(enabled) {
@@ -125,6 +126,7 @@ class TableManager {
     // Clear existing cells
     row.innerHTML = '';
     try { row.setAttribute('data-age', String(data.Age)); } catch (_) { }
+    try { row.setAttribute('data-year', String(data.Year)); } catch (_) { }
 
     // Reset header init at the start of each simulation (first row)
     if (rowIndex === 0 || rowIndex === 1) {
@@ -139,20 +141,15 @@ class TableManager {
       this._lastCountry = null;
     }
 
-    // On initial page load, show only pinned income columns
+    // Initialize pinned-only visibility map (used until end-of-run visibility is computed)
     if (!this._incomeVisibilityInitialized) {
       const taxRuleSet = Config.getInstance().getCachedTaxRuleSet();
-      const pinnedTypes = taxRuleSet.getPinnedIncomeTypes() || [];
-
-      // Create visibility map with only pinned types visible
+      const pinned = (taxRuleSet && typeof taxRuleSet.getPinnedIncomeTypes === 'function') ? (taxRuleSet.getPinnedIncomeTypes() || []) : [];
       const initialVisibility = {};
-      pinnedTypes.forEach(type => {
-        initialVisibility[String(type).toLowerCase()] = true;
-      });
-
-      const webUI = WebUI.getInstance();
-      const types = Config.getInstance().getCachedTaxRuleSet().getInvestmentTypes();
-      webUI.applyDynamicColumns(types, initialVisibility);
+      for (let i = 0; i < pinned.length; i++) {
+        initialVisibility[String(pinned[i]).toLowerCase()] = true;
+      }
+      this._lastColumnVisibilityMap = initialVisibility;
       this._incomeVisibilityInitialized = true;
     }
 
@@ -194,6 +191,7 @@ class TableManager {
 
       // Register with IntersectionObserver for sticky behavior
       this._registerTaxHeader(taxHeaderRow);
+      try { this._applyVisibilityEngineToEnabledSections(tbody); } catch (_) { }
     }
 
     this._updateDynamicSectionGroupColSpans();
@@ -203,9 +201,14 @@ class TableManager {
 
     const renderValueCell = (key, isDynamicSectionCell) => {
       // Nominal and (optional) PV values from the core data sheet
-      const nominalValue = (data[key] == null ? 0 : data[key]);
-      const pvKey = key + 'PV';
-      const pvValue = Object.prototype.hasOwnProperty.call(data, pvKey) ? data[pvKey] : null;
+      let nominalValue = (data[key] == null ? 0 : data[key]);
+      let pvValue = null;
+
+      // Default PV lookup (fixed columns and any other dynamic keys)
+      if (pvValue === null) {
+        const pvKey = key + 'PV';
+        pvValue = Object.prototype.hasOwnProperty.call(data, pvKey) ? data[pvKey] : null;
+      }
       let v = nominalValue;
       let originalValue, originalCurrency, fxMultiplier;
       let displayCurrencyCode, displayCountryForLocale;
@@ -232,7 +235,8 @@ class TableManager {
       // for event suggestions only).
       if (isMonetary && Config.getInstance().isRelocationEnabled() && this.currencyMode === 'unified' && this.reportingCurrency) {
         const age = data.Age;
-        const year = Config.getInstance().getSimulationStartYear() + age;
+        const startYear = Config.getInstance().getSimulationStartYear();
+        const year = this.presentValueMode ? startYear : (data.Year != null ? data.Year : (startYear + age));
         const fromCountry = RelocationUtils.getCountryForAge(age, this.webUI);
         const toCountry = RelocationUtils.getRepresentativeCountryForCurrency(this.reportingCurrency);
 
@@ -241,12 +245,12 @@ class TableManager {
         if (fromCurrency !== this.reportingCurrency) {
           const economicData = Config.getInstance().getEconomicData();
           if (economicData && economicData.ready) {
-            const cacheKey = `${year}-${fromCountry}-${toCountry}`;
+            const cacheKey = `${year}-${fromCountry}-${toCountry}-${this.presentValueMode ? 'pv' : 'nom'}`;
             let fxMult = this.conversionCache[cacheKey];
             if (fxMult === undefined) {
               // Evolution FX conversion (default mode) - not PPP.
               fxMult = economicData.convert(1, fromCountry, toCountry, year, {
-                baseYear: Config.getInstance().getSimulationStartYear()
+                baseYear: startYear
               });
               if (fxMult !== null) {
                 this.conversionCache[cacheKey] = fxMult;
@@ -324,12 +328,6 @@ class TableManager {
           const cashBreakdown = data.Attributions['incomecash'] || {};
           const taxFreeBreakdown = data.Attributions['incometaxfree'] || {};
           breakdown = { ...cashBreakdown, ...taxFreeBreakdown };
-        } else if (key === 'FundsCapital') {
-          // Use index funds capital attribution
-          breakdown = data.Attributions['indexfundscapital'] || {};
-        } else if (key === 'SharesCapital') {
-          // Use shares capital attribution
-          breakdown = data.Attributions['sharescapital'] || {};
         } else {
           // Check for specific attribution first, then fall back to general 'income' for income columns
           breakdown = data.Attributions[attributionKey];
@@ -397,52 +395,8 @@ class TableManager {
             }
           }
 
-          // Special handling for asset columns (FundsCapital and SharesCapital)
-          if (key === 'FundsCapital' || key === 'SharesCapital') {
-            const orderedKeys = ['Bought', 'Sold', 'Principal', 'P/L'];
-
-            // Pre-format all amounts and calculate max width
-            const formattedAmounts = orderedKeys.map(source => {
-              let amount = breakdown[source] || 0;
-              if (amount === 0) return null;
-
-              // Apply FX conversion if in unified mode and conversion occurred
-              if (this.currencyMode === 'unified' && originalValue !== undefined && fxMultiplier !== undefined) {
-                amount = amount * fxMultiplier;
-              }
-
-              // Apply deflation for present-value display using the same deflationFactor
-              // as the main cell value so tooltip amounts sum to the displayed total
-              if (this.presentValueMode && deflationFactor !== 1) {
-                amount = amount * deflationFactor;
-              }
-
-              // Special handling for P/L
-              let displaySource = source;
-              if (source === 'P/L') {
-                displaySource = amount > 0 ? 'Accum. Gains' : 'Accum. Losses';
-              }
-
-              return {
-                source: displaySource,
-                formatted: FormatUtils.formatCurrency(Math.abs(amount), displayCurrencyCode, displayCountryForLocale)
-              };
-            }).filter(item => item !== null);
-
-            // Only proceed if we have formatted amounts to display
-            if (formattedAmounts.length > 0) {
-              // Find the longest display source name for alignment (after P/L transformation)
-              const maxSourceLength = Math.max(...formattedAmounts.map(item => item.source.length));
-              const maxAmountWidth = Math.max(...formattedAmounts.map(item => item.formatted.length));
-
-              for (const { source, formatted } of formattedAmounts) {
-                const sourcePadding = '&nbsp;'.repeat(Math.max(0, maxSourceLength - source.length + 1));
-                const amountPadding = '&nbsp;'.repeat(Math.max(0, maxAmountWidth - formatted.length));
-                tooltipText += `\n\n<code>${source}${sourcePadding}  ${amountPadding}${formatted}</code>`;
-              }
-            }
-          } else {
-            // Original logic for other columns
+          {
+            // Original logic for all columns (legacy special-cases removed)
             const breakdownEntries = Object.entries(breakdown);
 
             // Find the longest source name for alignment
@@ -539,8 +493,12 @@ class TableManager {
         sectionContainerCell.className = 'dynamic-section-container';
         sectionContainerCell.setAttribute('data-section', sectionId);
         sectionContainerCell.colSpan = maxCols;
-        sectionContainerCell.setAttribute('data-group-end', '1');
-        sectionContainerCell.style.borderRight = '3px solid #666';
+        const cfg = this.dynamicSectionsManager.getSectionConfig(sectionId);
+        const applyBoundaryBorder = boundarySet.has(i) && (!cfg || cfg.isGroupBoundary !== false);
+        if (applyBoundaryBorder) {
+          sectionContainerCell.setAttribute('data-group-end', '1');
+          sectionContainerCell.style.borderRight = '3px solid #666';
+        }
 
         const sectionFlexDiv = document.createElement('div');
         sectionFlexDiv.className = 'dynamic-section-flex';
@@ -574,6 +532,7 @@ class TableManager {
     try {
       const tbody = document.querySelector('#Data tbody');
       if (!tbody) return;
+      try { this._applyVisibilityEngineToEnabledSections(tbody); } catch (_) { }
       this._applyPeriodZeroHideToDynamicSections(tbody);
       this.dynamicSectionsManager.finalizeSectionWidths(tbody);
     } catch (_) { }
@@ -635,6 +594,12 @@ class TableManager {
       throw new Error('Data table not found');
     }
 
+    const isVisible = (el) => {
+      if (!el) return false;
+      const style = window.getComputedStyle(el);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    };
+
     // Get all rows from tbody - these include both tax-header rows and data rows
     const dataRows = Array.from(table.querySelectorAll('tbody tr'));
     if (dataRows.length === 0) {
@@ -650,7 +615,7 @@ class TableManager {
       const containers = row.querySelectorAll('.dynamic-section-container');
       containers.forEach(container => {
         const sectionName = container.getAttribute('data-section') || 'default';
-        const sectionCells = container.querySelectorAll('.dynamic-section-cell');
+        const sectionCells = Array.from(container.querySelectorAll('.dynamic-section-cell')).filter(isVisible);
         const columnCount = sectionCells.length;
 
         const currentMax = maxSectionColumns.get(sectionName) || 0;
@@ -712,13 +677,13 @@ class TableManager {
      */
     const getDataRowValues = (row) => {
       const values = [];
-      const cells = row.querySelectorAll(':scope > td');
+      const cells = Array.from(row.querySelectorAll(':scope > td')).filter(isVisible);
 
       cells.forEach(cell => {
         // Check if this is a dynamic section container with nested flex cells
         if (cell.classList.contains('dynamic-section-container')) {
           const sectionName = cell.getAttribute('data-section') || 'default';
-          const sectionCells = cell.querySelectorAll('.dynamic-section-cell');
+          const sectionCells = Array.from(cell.querySelectorAll('.dynamic-section-cell')).filter(isVisible);
           const maxColumns = maxSectionColumns.get(sectionName) || sectionCells.length;
 
           // Extract actual values
@@ -759,12 +724,12 @@ class TableManager {
       const values = [];
 
       // Process all direct children (th and td) in DOM order
-      const cells = row.querySelectorAll(':scope > th, :scope > td');
+      const cells = Array.from(row.querySelectorAll(':scope > th, :scope > td')).filter(isVisible);
       cells.forEach(cell => {
         // Check if this is a dynamic section container with nested flex cells
         if (cell.classList.contains('dynamic-section-container')) {
           const sectionName = cell.getAttribute('data-section') || 'default';
-          const sectionCells = cell.querySelectorAll('.dynamic-section-cell');
+          const sectionCells = Array.from(cell.querySelectorAll('.dynamic-section-cell')).filter(isVisible);
           const maxColumns = maxSectionColumns.get(sectionName) || sectionCells.length;
 
           // Extract actual values (headers - not stripped)
@@ -982,16 +947,19 @@ class TableManager {
             // Only convert if we have a valid age for year calculation
             if (age != null && isFinite(age)) {
               const toCountry = displayCountryForLocale;
-              const year = Config.getInstance().getSimulationStartYear() + age;
+              const startYear = Config.getInstance().getSimulationStartYear();
+              const rowYearRaw = row.getAttribute('data-year');
+              const rowYear = rowYearRaw != null ? parseInt(rowYearRaw, 10) : NaN;
+              const year = this.presentValueMode ? startYear : (isFinite(rowYear) ? rowYear : (startYear + age));
               const fromCurrency = Config.getInstance().getCachedTaxRuleSet(fromCountry)?.getCurrencyCode();
               if (fromCurrency && fromCurrency !== this.reportingCurrency) {
                 const economicData = Config.getInstance().getEconomicData();
                 if (economicData && economicData.ready) {
-                  const cacheKey = `${year}-${fromCountry}-${toCountry}`;
+                  const cacheKey = `${year}-${fromCountry}-${toCountry}-${this.presentValueMode ? 'pv' : 'nom'}`;
                   let fxMult = this.conversionCache[cacheKey];
                   if (fxMult === undefined) {
                     // Evolution FX conversion (default mode) - not PPP.
-                    fxMult = economicData.convert(1, fromCountry, toCountry, year, { baseYear: Config.getInstance().getSimulationStartYear() });
+                    fxMult = economicData.convert(1, fromCountry, toCountry, year, { baseYear: startYear });
                     if (fxMult !== null && isFinite(fxMult)) this.conversionCache[cacheKey] = fxMult;
                   }
                   if (fxMult !== null && isFinite(fxMult)) {
@@ -1021,21 +989,71 @@ class TableManager {
       try { this.finalizeDataTableLayout(); } catch (_) { }
     }
   }
-  applyIncomeVisibilityAfterSimulation() {
-    const incomeVisibility = this.webUI.getIncomeColumnVisibility();
-    const config = Config.getInstance();
-    const taxRuleSet = config.getCachedTaxRuleSet();
-    const investmentTypes = taxRuleSet.getInvestmentTypes();
 
-    // Apply visibility to table
-    this.webUI.applyDynamicColumns(investmentTypes, incomeVisibility);
+  applyVisibilityAfterSimulation(getVisibilityMapFn) {
+    const getMap = (typeof getVisibilityMapFn === 'function')
+      ? getVisibilityMapFn
+      : (() => this.webUI.getIncomeColumnVisibility());
+
+    const visibilityMap = getMap() || {};
+    this._lastColumnVisibilityMap = Object.assign({}, visibilityMap);
 
     // Apply visibility to chart to match table
-    this.webUI.chartManager.applyIncomeVisibility(incomeVisibility);
+    this.webUI.chartManager.applyIncomeVisibility(visibilityMap);
 
     // Persist last computed visibility for end-of-run application in a single step
-    try { this.webUI.lastIncomeVisibility = incomeVisibility; } catch (_) { }
+    try { this.webUI.lastIncomeVisibility = visibilityMap; } catch (_) { }
 
+    try { this.finalizeDataTableLayout(); } catch (_) { }
+  }
+
+  // Back-compat entrypoint used by UIManager
+  applyIncomeVisibilityAfterSimulation() {
+    return this.applyVisibilityAfterSimulation();
+  }
+
+  _getTaxHeaderPeriods(tbody) {
+    const periods = [];
+    let current = null;
+    const rows = Array.from((tbody || document.querySelector('#Data tbody'))?.querySelectorAll?.('tr') || []);
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.classList && row.classList.contains('tax-header')) {
+        current = { headerRow: row, dataRows: [] };
+        periods.push(current);
+        continue;
+      }
+      if (current) current.dataRows.push(row);
+    }
+    return periods;
+  }
+
+  _applyVisibilityEngineToEnabledSections(tbody) {
+    const periods = this._getTaxHeaderPeriods(tbody);
+    if (!periods.length) return;
+
+    const sections = this.dynamicSectionsManager.getSections();
+    for (let s = 0; s < sections.length; s++) {
+      const cfg = sections[s];
+      if (!cfg || !cfg.enableVisibilityEngine) continue;
+      const sectionId = cfg.id;
+
+      // Per-country pinned key resolution (periods may differ due to relocations)
+      const periodsByCountry = new Map();
+      for (let p = 0; p < periods.length; p++) {
+        const country = (periods[p].headerRow && periods[p].headerRow.getAttribute)
+          ? (periods[p].headerRow.getAttribute('data-country') || '')
+          : '';
+        const key = String(country || '').toLowerCase();
+        if (!periodsByCountry.has(key)) periodsByCountry.set(key, []);
+        periodsByCountry.get(key).push(periods[p]);
+      }
+
+      periodsByCountry.forEach((bucket, country) => {
+        const pinnedKeys = Array.isArray(cfg.pinnedKeys) ? cfg.pinnedKeys : [];
+        DynamicSectionVisibilityEngine.apply(sectionId, pinnedKeys, this._lastColumnVisibilityMap, bucket);
+      });
+    }
   }
 
   _updateDynamicSectionGroupColSpans() {
@@ -1084,24 +1102,38 @@ class TableManager {
   _computeGroupBoundarySet(blueprint) {
     const isIncome = (k) => k && k.indexOf('Income') === 0;
     const isAsset = (k) => k && (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' ||
-      k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
+      k.indexOf('Capital__') === 0);
+    const isDeduction = (k) => k && (k === 'PensionContribution' || k.indexOf('Tax__') === 0);
 
     let yearIdx = -1;
     let incomeLastIdx = -1;
     let expensesIdx = -1;
     let assetsLastIdx = -1;
+    let deductionsLastIdx = -1;
+
+    const considerKey = (key, idx) => {
+      if (key === 'Year') yearIdx = idx;
+      if (key === 'Expenses') expensesIdx = idx;
+      if (isIncome(key)) incomeLastIdx = idx;
+      if (isDeduction(key)) deductionsLastIdx = idx;
+      if (isAsset(key)) assetsLastIdx = idx;
+    };
 
     for (let i = 0; i < blueprint.length; i++) {
       const seg = blueprint[i];
-      if (seg.type !== 'key') continue;
-      if (seg.key === 'Year') yearIdx = i;
-      if (seg.key === 'Expenses') expensesIdx = i;
-      if (isIncome(seg.key)) incomeLastIdx = i;
-      if (isAsset(seg.key)) assetsLastIdx = i;
+      if (seg.type === 'key') {
+        considerKey(seg.key, i);
+      } else if (seg.type === 'section') {
+        const cols = seg.columns || [];
+        if (seg.sectionId === 'deductions') deductionsLastIdx = i;
+        for (let c = 0; c < cols.length; c++) {
+          considerKey(cols[c].key, i);
+        }
+      }
     }
 
     const lastIdx = blueprint.length - 1;
-    return new Set([yearIdx, incomeLastIdx, expensesIdx, assetsLastIdx, lastIdx].filter(i => i >= 0));
+    return new Set([yearIdx, incomeLastIdx, deductionsLastIdx, expensesIdx, assetsLastIdx, lastIdx].filter(i => i >= 0));
   }
 
   _applyPeriodZeroHideToDynamicSections(tbody) {
@@ -1123,8 +1155,16 @@ class TableManager {
 
     for (let s = 0; s < sections.length; s++) {
       const cfg = sections[s];
-      const keys = cfg.periodZeroHideKeys;
-      if (!keys.length) continue;
+      if (cfg && cfg.enableVisibilityEngine) continue; // migrated section owns its own visibility
+      const zeroHideCfg = cfg.zeroHide || {};
+      const explicitKeys = Array.isArray(zeroHideCfg.keys) ? zeroHideCfg.keys.slice() : [];
+      if (Array.isArray(cfg.periodZeroHideKeys)) {
+        explicitKeys.push(...cfg.periodZeroHideKeys);
+      }
+      const prefixList = zeroHideCfg.keyPrefixes || zeroHideCfg.hideZeroKeysPrefix || [];
+      const matcher = (typeof zeroHideCfg.matcher === 'function') ? zeroHideCfg.matcher : null;
+      const hasPrefixRule = Array.isArray(prefixList) && prefixList.length > 0;
+      if (!explicitKeys.length && !hasPrefixRule && !matcher) continue;
 
       const sectionId = cfg.id;
       const containerSelector = `.dynamic-section-container[data-section="${sectionId}"]`;
@@ -1134,10 +1174,22 @@ class TableManager {
         const headerContainer = period.headerRow.querySelector(`th${containerSelector}`);
         if (!headerContainer) continue;
 
-        for (let k = 0; k < keys.length; k++) {
-          const key = keys[k];
+        const headerCells = Array.from(headerContainer.querySelectorAll('.dynamic-section-cell[data-key]'));
+        const keysToCheck = new Set();
+        for (let h = 0; h < headerCells.length; h++) {
+          const key = headerCells[h].getAttribute('data-key');
+          if (!key) continue;
+          if (headerCells[h].style && headerCells[h].style.display === 'none') continue;
+          if (explicitKeys.indexOf(key) !== -1) { keysToCheck.add(key); continue; }
+          if (hasPrefixRule && prefixList.some(pref => key.indexOf(pref) === 0)) { keysToCheck.add(key); continue; }
+          if (matcher) {
+            try { if (matcher(key)) { keysToCheck.add(key); continue; } } catch (_) { }
+          }
+        }
+
+        keysToCheck.forEach((key) => {
           const headerCell = headerContainer.querySelector(`.dynamic-section-cell[data-key="${key}"]`);
-          if (!headerCell) continue;
+          if (!headerCell) return;
 
           let anyNonZero = false;
           for (let r = 0; r < period.dataRows.length; r++) {
@@ -1161,7 +1213,7 @@ class TableManager {
             if (!cell) continue;
             try { cell.style.display = display; } catch (_) { }
           }
-        }
+        });
       }
     }
   }
@@ -1188,13 +1240,17 @@ class TableManager {
         const sectionId = seg.sectionId;
         const columns = seg.columns || [];
         const maxCols = Math.max(1, this.dynamicSectionsManager.getMaxColumnCount(sectionId));
+        const cfg = this.dynamicSectionsManager.getSectionConfig(sectionId);
 
         const sectionContainerCell = document.createElement('th');
         sectionContainerCell.className = 'dynamic-section-container';
         sectionContainerCell.setAttribute('data-section', sectionId);
         sectionContainerCell.colSpan = maxCols;
-        sectionContainerCell.setAttribute('data-group-end', '1');
-        sectionContainerCell.style.borderRight = '3px solid #666';
+        const applyBoundaryBorder = boundarySet.has(i) && (!cfg || cfg.isGroupBoundary !== false);
+        if (applyBoundaryBorder) {
+          sectionContainerCell.setAttribute('data-group-end', '1');
+          sectionContainerCell.style.borderRight = '3px solid #666';
+        }
 
         const sectionFlexDiv = document.createElement('div');
         sectionFlexDiv.className = 'dynamic-section-flex';

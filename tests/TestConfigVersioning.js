@@ -69,6 +69,22 @@ module.exports = {
                         return JSON.stringify(configFiles[requestedVersion]);
                     }
                     
+                    // Handle global tax rules: /src/core/config/tax-rules-global.json
+                    if (url.match(/tax-rules-global\.json$/)) {
+                        return JSON.stringify({
+                            version: "1.0",
+                            investmentBaseTypes: [
+                                {
+                                    baseKey: "globalEquity",
+                                    label: "Global Equity Index",
+                                    baseCurrency: "USD",
+                                    assetCountry: "us",
+                                    residenceScope: "global"
+                                }
+                            ]
+                        });
+                    }
+                    
                     // Handle tax rules files: /src/core/config/tax-rules-ie.json
                     const taxRulesMatch = url.match(/tax-rules-(\w+)\.json$/);
                     if (taxRulesMatch) {
@@ -173,6 +189,20 @@ module.exports = {
                     if (url.match(/finsim-(\d+\.\d+)\.json$/)) {
                         return JSON.stringify(configFiles['1.26']);
                     }
+                    if (url.match(/tax-rules-global\.json$/)) {
+                        return JSON.stringify({
+                            version: "1.0",
+                            investmentBaseTypes: [
+                                {
+                                    baseKey: "globalEquity",
+                                    label: "Global Equity Index",
+                                    baseCurrency: "USD",
+                                    assetCountry: "us",
+                                    residenceScope: "global"
+                                }
+                            ]
+                        });
+                    }
                     if (url.match(/tax-rules-(\w+)\.json$/)) {
                         return JSON.stringify({
                             country: 'IE',
@@ -199,6 +229,20 @@ module.exports = {
                 fetchUrl: async (url) => {
                     if (url.match(/finsim-(\d+\.\d+)\.json$/)) {
                         return JSON.stringify(configFiles['1.27']);
+                    }
+                    if (url.match(/tax-rules-global\.json$/)) {
+                        return JSON.stringify({
+                            version: "1.0",
+                            investmentBaseTypes: [
+                                {
+                                    baseKey: "globalEquity",
+                                    label: "Global Equity Index",
+                                    baseCurrency: "USD",
+                                    assetCountry: "us",
+                                    residenceScope: "global"
+                                }
+                            ]
+                        });
                     }
                     if (url.match(/tax-rules-(\w+)\.json$/)) {
                         return JSON.stringify({
@@ -256,7 +300,7 @@ module.exports = {
                     const originalFetchUrl = mockUi.fetchUrl;
                     mockUi.fetchUrl = async (url) => {
                         // Allow tax rules to load successfully, but throw on config files
-                        if (url.match(/tax-rules-(\w+)\.json$/)) {
+                        if (url.match(/tax-rules-global\.json$/) || url.match(/tax-rules-(\w+)\.json$/)) {
                             return originalFetchUrl(url);
                         }
                         throw new Error("Network timeout");
@@ -272,7 +316,7 @@ module.exports = {
                     const originalFetchUrl = mockUi.fetchUrl;
                     mockUi.fetchUrl = async (url) => {
                         // Allow tax rules to load successfully, but return invalid JSON for config files
-                        if (url.match(/tax-rules-(\w+)\.json$/)) {
+                        if (url.match(/tax-rules-global\.json$/) || url.match(/tax-rules-(\w+)\.json$/)) {
                             return originalFetchUrl(url);
                         }
                         return "invalid json content";

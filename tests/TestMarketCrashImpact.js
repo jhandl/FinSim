@@ -39,7 +39,7 @@ const TestMarketCrashImpact = {
       type: "exact_value",
       target: "age", 
       age: 69,
-      field: "indexFundsCapital",
+      field: "investmentCapitalByKey:indexFunds",
       expected: 100000, // Initial value, 0% base growth
       tolerance: 1
     },
@@ -48,7 +48,7 @@ const TestMarketCrashImpact = {
       type: "exact_value",
       target: "age", 
       age: 70,
-      field: "indexFundsCapital",
+      field: "investmentCapitalByKey:indexFunds",
       expected: 100000 * 0.75, // 75000 after first -25% year
       tolerance: 1
     },
@@ -60,7 +60,7 @@ const TestMarketCrashImpact = {
       type: "exact_value",
       target: "age", 
       age: 72,
-      field: "indexFundsCapital",
+      field: "investmentCapitalByKey:indexFunds",
       expected: 100000 * 0.75 * 0.75 * 0.75, // 42187.5 after three -25% years
       tolerance: 1
     },
@@ -69,7 +69,7 @@ const TestMarketCrashImpact = {
       type: "exact_value",
       target: "age", 
       age: 73,
-      field: "indexFundsCapital",
+      field: "investmentCapitalByKey:indexFunds",
       expected: 100000 * 0.75 * 0.75 * 0.75, // Still 42187.5 (no growth)
       tolerance: 1
     }

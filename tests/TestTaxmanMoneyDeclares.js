@@ -28,6 +28,7 @@ module.exports = {
           youngestChildBorn: null,
           oldestChildBorn: null,
           personalTaxCredit: 0,
+          taxCreditsByCountry: { ie: { personal: 0 } },
           StartCountry: 'ie'
         };
         currentCountry = 'ie';

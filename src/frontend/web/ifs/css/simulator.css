@@ -1066,6 +1066,15 @@ body.modal-open {
   gap: 0.225rem;
 }
 
+/* Dynamic country-specific field containers should inherit input-group layout */
+[data-country-credit-container],
+[data-country-allocation-container],
+[data-country-state-pension-container] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.225rem;
+}
+
 .input-wrapper {
   display: flex;
   justify-content: flex-end;
@@ -1456,6 +1465,10 @@ th {
 
 /* Match original select width for pension capped pseudo-select */
 #PensionContributionCappedToggle.pseudo-select {
+  min-width: 75px;
+  max-width: 75px;
+}
+#Allocations [id^="PensionCappedToggle_"].pseudo-select {
   min-width: 75px;
   max-width: 75px;
 }
@@ -2228,6 +2241,69 @@ footer {
   border-left: var(--card-header-border-width) solid var(--primary-color);
   border-right: var(--card-header-border-width) solid var(--primary-color);
   z-index: 1;
+}
+
+/* ------------------------------------------------------------------
+   Country Tab Selector (Relocation UI)
+-------------------------------------------------------------------*/
+.country-tab-selector {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  border-bottom: var(--card-header-border-width) solid var(--primary-color);
+  margin-top: 0.75rem;
+  margin-bottom: 0.35rem;
+  position: relative;
+}
+
+.country-tab-selector span {
+  cursor: pointer;
+  padding: 0.1rem 0.6rem;
+  margin-left: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  transition: all 0.2s ease;
+  /* Override .mode-toggle-option: square bottom corners like other tab toggles */
+  border-radius: 4px 4px 0 0;
+  border-top: var(--card-header-border-width) solid transparent;
+  border-left: var(--card-header-border-width) solid transparent;
+  border-right: var(--card-header-border-width) solid transparent;
+  border-bottom: none;
+  background-color: transparent;
+}
+
+.country-tab-selector span:first-of-type {
+  margin-left: 0;
+}
+
+.country-tab-selector span.mode-toggle-active {
+  background-color: var(--card-bg-color, white);
+  border-top: var(--card-header-border-width) solid var(--primary-color);
+  border-left: var(--card-header-border-width) solid var(--primary-color);
+  border-right: var(--card-header-border-width) solid var(--primary-color);
+  z-index: 1;
+  position: relative;
+  bottom: calc(-1 * var(--card-header-border-width));
+  /* Overlap the divider line */
+}
+
+.country-tab-selector span:not(.mode-toggle-active) {
+  opacity: 0.6;
+}
+
+.country-tab-selector span:not(.mode-toggle-active):hover {
+  opacity: 0.8;
+}
+
+.country-sync-indicator {
+  position: absolute;
+  left: 0;
+  bottom: calc(-1 * var(--card-header-border-width));
+  font-size: 0.75rem;
+  color: var(--primary-color);
+  background: var(--card-bg-color, white);
+  padding: 0 4px;
+  z-index: 2;
 }
 
 .events-section .card-header-flex {

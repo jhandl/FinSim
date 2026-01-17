@@ -299,6 +299,29 @@ class TaxRuleSet {
   }
 
   /**
+   * Return array of tax credit descriptors that require UI input.
+   * Each descriptor includes: { id, spec, uiInput }
+   * @returns {Array}
+   */
+  getUIConfigurableCredits() {
+    var spec = this.getIncomeTaxSpec();
+    var credits = spec.taxCredits || {};
+    var result = [];
+    for (var creditId in credits) {
+      if (!credits.hasOwnProperty(creditId)) continue;
+      var credit = credits[creditId];
+      if (!credit || typeof credit !== 'object') continue;
+      if (!credit.uiInput || typeof credit.uiInput !== 'object') continue;
+      result.push({
+        id: creditId,
+        spec: credit,
+        uiInput: credit.uiInput
+      });
+    }
+    return result;
+  }
+
+  /**
    * Return array of social contribution descriptors as provided by the JSON
    * (e.g., [{name:'socialContrib', rate:0.04, ageAdjustments:{66:0}}])
    */
@@ -467,12 +490,29 @@ class TaxRuleSet {
     return pr.statePensionIncreaseBands || {};
   }
 
+  // State pension payment period (weekly/monthly/annual).
+  // Backwards-compatible: default to "weekly" when missing.
+  getStatePensionPeriod() {
+    var pr = this.raw.pensionRules || {};
+    var v = pr.statePensionPeriod;
+    if (typeof v === 'string' && v.trim()) return v.trim().toLowerCase();
+    return 'weekly';
+  }
+
   getPensionSystemType() {
     var pr = this.raw.pensionRules || {};
     var ps = pr.pensionSystem || {};
     var type = ps.type;
     if (type === 'state_only' || type === 'mixed') return type;
     return 'mixed';
+  }
+
+  /**
+   * Return true if this country has a private pension system (not state-only).
+   * @returns {boolean}
+   */
+  hasPrivatePensions() {
+    return this.getPensionSystemType() !== 'state_only';
   }
 
   // ----- Generic helpers for tax display names -----
@@ -656,8 +696,46 @@ class TaxRuleSet {
     return Array.isArray(this.raw.investmentTypes) ? this.raw.investmentTypes : [];
   }
 
+  /**
+   * Return investment types with baseRef inheritance resolved.
+   * Performs shallow merge: {...base, ...local} when baseRef is present.
+   * Throws if baseRef references an unknown base type.
+   * @returns {Array} Array of resolved investment type objects
+   */
+  getResolvedInvestmentTypes() {
+    var types = this.getInvestmentTypes();
+    var resolved = [];
+    for (var i = 0; i < types.length; i++) {
+      var type = types[i];
+      if (type && type.baseRef) {
+        var config = null;
+        try {
+          config = Config.getInstance();
+        } catch (_) {
+          throw new Error('Config not initialized. Cannot resolve baseRef: ' + type.baseRef);
+        }
+        var base = config.getInvestmentBaseTypeByKey(type.baseRef);
+        if (!base) {
+          throw new Error('Unknown baseRef: ' + type.baseRef + ' in investment type: ' + (type.key || 'unknown'));
+        }
+        // Shallow merge: local fields override base fields
+        var merged = {};
+        for (var k in base) {
+          if (base.hasOwnProperty(k)) merged[k] = base[k];
+        }
+        for (var k in type) {
+          if (type.hasOwnProperty(k)) merged[k] = type[k];
+        }
+        resolved.push(merged);
+      } else {
+        resolved.push(type);
+      }
+    }
+    return resolved;
+  }
+
   findInvestmentTypeByKey(key) {
-    var list = this.getInvestmentTypes();
+    var list = this.getResolvedInvestmentTypes();
     for (var i = 0; i < list.length; i++) {
       if (list[i] && list[i].key === key) return list[i];
     }

@@ -1,9 +1,9 @@
-// Test for contributionCurrencyMode functionality: AR Mixed Portfolio
-// Validates that both residence and asset modes can operate simultaneously
+// Test for implicit currency conversion: AR Mixed Portfolio
+// Validates that both currency match and currency mismatch scenarios can operate simultaneously
 //
-// Test: AR Single-Country (Mixed Portfolio - Residence + Asset Modes)
-// AR scenario with both local ARS fund (residence mode) and global USD ETF (asset mode).
-// Ensures both modes work correctly in the same portfolio.
+// Test: AR Single-Country (Mixed Portfolio - Matching + Mismatching Currencies)
+// AR scenario with both local ARS fund (ARS base = ARS residence, no conversion) and global USD ETF (USD base ≠ ARS residence, conversion).
+// Ensures both implicit conversion behaviors work correctly in the same portfolio.
 
 const vm = require('vm');
 const { TestFramework } = require('../src/core/TestFramework.js');
@@ -14,7 +14,7 @@ const AR_RULES = require('../src/core/config/tax-rules-ar.json');
 
 const TestContributionCurrencyModeARMixed = {
   name: "Contribution Currency Mode - AR Mixed Portfolio",
-  description: "Validates that both residence mode (ARS fund) and asset mode (USD ETF) can operate simultaneously in an AR portfolio.",
+  description: "Validates that both currency match (ARS fund) and currency mismatch (USD ETF) scenarios can operate simultaneously in an AR portfolio using implicit conversion logic.",
   isCustomTest: true,
 
   async runCustomTest() {
@@ -136,7 +136,7 @@ const TestContributionCurrencyModeARMixed = {
     // Calculate expected amounts
     // Net income after tax: ~5M ARS - 3M ARS - taxes = ~2M ARS (roughly)
     // Surplus to invest: 2M (initial) + ~2M (surplus) - 1M (emergency) = ~3M ARS
-    // Split 50/50: 1.5M ARS to funds (residence mode, stays ARS), 1.5M ARS to shares (asset mode, converts to USD)
+    // Split 50/50: 1.5M ARS to funds (ARS base = ARS residence, stays ARS), 1.5M ARS to shares (USD base ≠ ARS residence, converts to USD)
     const baseYear = rowAge30.year;
     const conversionOptions = { fxMode: 'evolution', baseYear: baseYear };
 
@@ -153,8 +153,16 @@ const TestContributionCurrencyModeARMixed = {
       errors.push(`Cash expected ~1M ARS, got ${rowAge30.cash}`);
     }
 
-    // Validate indexFundsCapital is in ARS (residence mode - no conversion)
-    const indexFundsCapital = rowAge30.indexFundsCapital || 0;
+    // Validate indexFundsCapital is in ARS (base currency matches residence - no conversion)
+    const capsByKey = rowAge30.investmentCapitalByKey || {};
+    const sumByPrefix = (baseKey) => {
+      let total = 0;
+      for (const k in capsByKey) {
+        if (k === baseKey || (baseKey && k.indexOf(baseKey + '_') === 0)) total += capsByKey[k] || 0;
+      }
+      return total;
+    };
+    const indexFundsCapital = sumByPrefix('indexFunds');
     if (indexFundsCapital <= 0) {
       errors.push(`indexFundsCapital should be positive (in ARS), got ${indexFundsCapital}`);
     }
@@ -169,7 +177,7 @@ const TestContributionCurrencyModeARMixed = {
 
     // Validate sharesCapital - after Phase 1 refactor, capital() now consistently returns
     // residence currency. For Argentina residents, this means ARS, not USD.
-    const sharesCapital = rowAge30.sharesCapital || 0;
+    const sharesCapital = sumByPrefix('shares');
     if (sharesCapital <= 0) {
       errors.push(`sharesCapital should be positive (in ARS residence currency), got ${sharesCapital}`);
     }

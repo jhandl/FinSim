@@ -633,33 +633,13 @@ class ChartManager {
               _fieldKey: 'PensionFund'
             },
             {
-              label: 'Shares',
-              borderColor: '#81C784',
-              backgroundColor: '#C8E6C9',
-              fill: true,
-              data: [],
-              pointRadius: 0,
-              order: 2,
-              _fieldKey: 'SharesCapital'
-            },
-            {
-              label: 'Index Funds',
-              borderColor: '#9575CD',
-              backgroundColor: '#E1BEE7',
-              fill: true,
-              data: [],
-              pointRadius: 0,
-              order: 3,
-              _fieldKey: 'FundsCapital'
-            },
-            {
               label: 'Cash',
               borderColor: '#FFB74D',
               backgroundColor: '#FFE0B2',
               fill: true,
               data: [],
               pointRadius: 0,
-              order: 4,
+              order: 2,
               _fieldKey: 'Cash'
             }
           ]
@@ -689,9 +669,9 @@ class ChartManager {
         }
       });
       this.assetsChart.chartManager = this;
-      // Default dynamic mapping for legacy two-types (shares then index funds)
-      this.assetsCapitalStartIndex = 3;
-      this.assetsCapitalKeys = ['shares', 'indexFunds'];
+      // Investment types are injected via applyInvestmentTypes(); start empty to avoid legacy coupling.
+      this.assetsCapitalStartIndex = 2;
+      this.assetsCapitalKeys = [];
 
       // Set flag indicating that charts were initialized correctly
       this.chartsInitialized = true;
@@ -848,7 +828,7 @@ class ChartManager {
           const monetaryFields = [
             'NetIncome', 'Expenses', 'IncomeSalaries', 'IncomeRentals', 'IncomeRSUs', 'IncomePrivatePension',
             'IncomeStatePension', 'IncomeDefinedBenefit', 'IncomeTaxFree', 'IncomeCash', 'RealEstateCapital',
-            'PensionFund', 'Cash', 'FundsCapital', 'SharesCapital'
+            'PensionFund', 'Cash'
           ];
           for (let mf = 0; mf < monetaryFields.length; mf++) {
             const field = monetaryFields[mf];
@@ -874,6 +854,18 @@ class ChartManager {
           });
         } catch (_) { /* keep nominal on any failure */ }
       }
+
+      // Materialize per-type investment income into dynamic Income__* fields so
+      // the chart datasets created by applyInvestmentTypes() get populated.
+      try {
+        const srcMap = (this.presentValueMode && data.investmentIncomeByKeyPV) ? data.investmentIncomeByKeyPV : data.investmentIncomeByKey;
+        if (srcMap) {
+          for (const key in srcMap) {
+            data['Income__' + key] = srcMap[key];
+          }
+        }
+      } catch (_) { /* no-op */ }
+
       // Currency conversion (unified mode): Uses evolved FX (inflation-driven) to convert
       // values to reporting currency, reflecting cumulative inflation differentials.
       // PPP mode is NOT used here (reserved for event suggestions only).
@@ -907,7 +899,7 @@ class ChartManager {
           return;
         }
         const toCountry = this.getRepresentativeCountryForCurrency(targetCurrency);
-        const monetaryFields = ['NetIncome', 'Expenses', 'IncomeSalaries', 'IncomeRentals', 'IncomeRSUs', 'IncomePrivatePension', 'IncomeStatePension', 'IncomeDefinedBenefit', 'IncomeTaxFree', 'IncomeCash', 'RealEstateCapital', 'PensionFund', 'Cash', 'FundsCapital', 'SharesCapital'];
+        const monetaryFields = ['NetIncome', 'Expenses', 'IncomeSalaries', 'IncomeRentals', 'IncomeRSUs', 'IncomePrivatePension', 'IncomeStatePension', 'IncomeDefinedBenefit', 'IncomeTaxFree', 'IncomeCash', 'RealEstateCapital', 'PensionFund', 'Cash'];
         var skippedCount = 0;
         monetaryFields.forEach(field => {
           if (data[field] !== undefined) {
@@ -997,14 +989,12 @@ class ChartManager {
       if (cfL['Tax-Free'] !== undefined) this.cashflowChart.data.datasets[cfL['Tax-Free']].data[i] = data.IncomeTaxFree;
       // Dynamic incomes by investment key
       const incomeIdxByKey = this.cashflowIncomeIndexByKey || {};
-      const keys = this.cashflowIncomeKeys || ['indexFunds', 'shares'];
+      const keys = this.cashflowIncomeKeys || [];
       for (let k = 0; k < keys.length; k++) {
         const key = keys[k];
         const idx = incomeIdxByKey[key];
         if (idx !== undefined) {
-          const val = (data['Income__' + key] !== undefined) ? data['Income__' + key]
-            : (key === 'indexFunds' ? data.IncomeFundsRent : key === 'shares' ? data.IncomeSharesRent : 0);
-          this.cashflowChart.data.datasets[idx].data[i] = val;
+          this.cashflowChart.data.datasets[idx].data[i] = (data['Income__' + key] !== undefined) ? data['Income__' + key] : 0;
         }
       }
       if (cfL['Cash'] !== undefined) this.cashflowChart.data.datasets[cfL['Cash']].data[i] = data.IncomeCash;
@@ -1019,16 +1009,14 @@ class ChartManager {
       if (asL['R.Estate'] !== undefined) this.assetsChart.data.datasets[asL['R.Estate']].data[i] = data.RealEstateCapital;
       if (asL['Cash'] !== undefined) this.assetsChart.data.datasets[asL['Cash']].data[i] = data.Cash;
       if (asL['Pension'] !== undefined) this.assetsChart.data.datasets[asL['Pension']].data[i] = data.PensionFund;
-      // Dynamic capitals per investment type (fallback to legacy fields if dynamic missing)
+      // Dynamic capitals per investment type
       const capIdxByKey = this.assetsCapitalIndexByKey || {};
-      const aKeys = this.assetsCapitalKeys || ['shares', 'indexFunds'];
+      const aKeys = this.assetsCapitalKeys || [];
       for (let k = 0; k < aKeys.length; k++) {
         const key = aKeys[k];
         const idx = capIdxByKey[key];
         if (idx !== undefined) {
-          const val = (data['Capital__' + key] !== undefined) ? data['Capital__' + key]
-            : (key === 'shares' ? data.SharesCapital : key === 'indexFunds' ? data.FundsCapital : 0);
-          this.assetsChart.data.datasets[idx].data[i] = val;
+          this.assetsChart.data.datasets[idx].data[i] = (data['Capital__' + key] !== undefined) ? data['Capital__' + key] : 0;
         }
       }
       if (!opts.skipAssetsUpdate && this.assetsChart) {

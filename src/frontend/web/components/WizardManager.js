@@ -257,8 +257,19 @@ class WizardManager {
             };
             // Prevent immediate dismissal of the next overlay (wizard selection)
             this._ignoreNextOverlayClick = true;
+            setTimeout(() => { this._ignoreNextOverlayClick = false; }, 350);
             if (isTextual(active)) {
-              active.addEventListener('blur', () => { this.previousStep(); }, { once: true });
+              let moved = false;
+              let fallbackId = null;
+              const move = () => {
+                if (moved) return;
+                moved = true;
+                if (fallbackId) clearTimeout(fallbackId);
+                this.previousStep();
+              };
+              active.addEventListener('blur', move, { once: true });
+              try { active.blur(); } catch (_) {}
+              fallbackId = setTimeout(move, 120);
             } else {
               this.previousStep();
             }

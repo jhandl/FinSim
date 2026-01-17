@@ -27,6 +27,15 @@
     "tooltip": "Income Tax paid on taxable income",
     "personalAllowance": 0,
     "taxCredits": {
+      "personal": {
+        "amount": 1875,
+        "uiInput": {
+          "required": false,
+          "section": "personalCircumstances",
+          "label": "Personal Tax Credit",
+          "tooltip": "Override the standard personal tax credit if you have a special case. Leave blank to use the default value from tax rules."
+        }
+      },
       "employee": {
         "min": {
           "amount": 2000,
@@ -146,6 +155,7 @@
       "71": 0.05
     },
     "statePensionAge": 66,
+    "statePensionPeriod": "weekly",
     "statePensionIncreaseBands": {
       "80": 10
     },
@@ -162,11 +172,10 @@
   },
   "investmentTypes": [
     {
-      "key": "indexFunds",
-      "label": "Index Funds",
+      "key": "indexFunds_ie",
+      "label": "Index Funds (IE)",
       "baseCurrency": "EUR",
       "assetCountry": "ie",
-      "contributionCurrencyMode": "residence",
       "residenceScope": "local",
       "taxation": {
         "exitTax": {
@@ -178,11 +187,10 @@
       }
     },
     {
-      "key": "shares",
-      "label": "Shares",
+      "key": "shares_ie",
+      "label": "Shares (IE)",
       "baseCurrency": "EUR",
       "assetCountry": "ie",
-      "contributionCurrencyMode": "residence",
       "residenceScope": "local",
       "taxation": {
         "capitalGains": {

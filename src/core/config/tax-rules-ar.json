@@ -23,7 +23,7 @@
     }
   },
   "incomeTax": {
-    "name": "Impuesto a las Ganancias",
+    "name": "Ganancias",
     "personalAllowance": 0,
     "taxCredits": {},
     "bracketsByStatus": {
@@ -75,6 +75,7 @@
   "pensionRules": {
     "minRetirementAgeState": 65,
     "statePensionAge": 65,
+    "statePensionPeriod": "monthly",
     "pensionSystem": {
       "type": "state_only"
     },
@@ -88,11 +89,10 @@
   },
   "investmentTypes": [
     {
-      "key": "indexFunds",
-      "label": "Local AR Equity Fund",
+      "key": "indexFunds_ar",
+      "label": "Local AR Equity Fund (AR)",
       "baseCurrency": "ARS",
       "assetCountry": "ar",
-      "contributionCurrencyMode": "residence",
       "residenceScope": "local",
       "taxation": {
         "capitalGains": {
@@ -102,11 +102,10 @@
       }
     },
     {
-      "key": "shares",
-      "label": "Global USD ETF",
+      "key": "shares_ar",
+      "label": "Global USD ETF (AR)",
       "baseCurrency": "USD",
       "assetCountry": "us",
-      "contributionCurrencyMode": "asset",
       "residenceScope": "global",
       "taxation": {
         "capitalGains": {

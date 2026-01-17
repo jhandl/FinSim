@@ -23,6 +23,7 @@ class Config {
     this.ui = ui;
     this.thisVersion = this.ui.getVersion();
     this._taxRuleSets = {}; // cache by country code (lowercase)
+    this._globalTaxRules = null; // cache for global tax rules
     this._economicData = null;
     this._simulationStartYear = null;
     this._countryCodeToName = null; // lazy-built map for O(1) name lookup
@@ -107,6 +108,9 @@ class Config {
           Config_instance.clearVersionAlert();
         }
 
+        // Load global tax rules
+        await Config_instance.loadGlobalTaxRules();
+
         Config_instance._simulationStartYear = new Date().getFullYear();
         // Preload default country's tax ruleset so core engine has it synchronously
         await Config_instance.getTaxRuleSet(Config_instance.getDefaultCountry());
@@ -143,6 +147,70 @@ class Config {
       this.ui.showAlert("Can't load configuration file for version " + version);
       throw new Error("Error loading configuration:" + err);
     }
+  }
+
+  async loadGlobalTaxRules() {
+    try {
+      const url = "/src/core/config/tax-rules-global.json";
+      const jsonString = await this.ui.fetchUrl(url);
+      this._globalTaxRules = JSON.parse(jsonString);
+    } catch (err) {
+      console.error('Error loading global tax rules:', err);
+      this.ui.showAlert("Can't load global tax rules configuration file");
+      throw new Error("Error loading global tax rules:" + err);
+    }
+  }
+
+  /**
+   * Return the cached global tax rules object.
+   * Must be called after Config.initialize() has completed.
+   * @returns {Object} The global tax rules object
+   */
+  getGlobalTaxRules() {
+    if (!this._globalTaxRules) {
+      throw new Error("Global tax rules not loaded. Ensure Config.initialize() completed successfully.");
+    }
+    return this._globalTaxRules;
+  }
+
+  /**
+   * Return the array of investment base types from global tax rules.
+   * @returns {Array} Array of investment base type definitions
+   */
+  getInvestmentBaseTypes() {
+    const globalRules = this.getGlobalTaxRules();
+    return Array.isArray(globalRules.investmentBaseTypes) ? globalRules.investmentBaseTypes : [];
+  }
+
+  /**
+   * Look up an investment base type by its baseKey.
+   * @param {string} baseKey - The unique identifier for the base type
+   * @returns {Object|null} The investment base type object, or null if not found
+   */
+  getInvestmentBaseTypeByKey(baseKey) {
+    if (!baseKey) return null;
+    const types = this.getInvestmentBaseTypes();
+    for (var i = 0; i < types.length; i++) {
+      if (types[i] && types[i].baseKey === baseKey) {
+        return types[i];
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get the withholding tax rate for a specific tax type and asset country.
+   * @param {string} taxType - The type of tax (e.g., 'dividend', 'interest', 'capitalGains')
+   * @param {string} assetCountry - The country code where the asset is domiciled (e.g., 'us')
+   * @returns {number} The withholding tax rate (0-1), or 0 if not defined
+   */
+  getAssetTax(taxType, assetCountry) {
+    if (!taxType || !assetCountry) return 0;
+    const globalRules = this.getGlobalTaxRules();
+    const assetTaxes = globalRules.assetTaxes || {};
+    const typeRates = assetTaxes[taxType] || {};
+    const rate = typeRates[assetCountry.toLowerCase()];
+    return (typeof rate === 'number') ? rate : 0;
   }
 
   /**
@@ -330,6 +398,34 @@ class Config {
           if (linked) {
             required.add(linked);
           }
+        }
+      }
+    }
+
+    // Ensure we also load countries referenced by investment types (e.g. AR resident buying USD assets).
+    // This keeps EconomicData complete enough for FX conversions implied by investmentTypes.assetCountry.
+    var preload = [];
+    required.forEach(function (code) {
+      if (!this._taxRuleSets[code]) {
+        preload.push(this.getTaxRuleSet(code).catch(function (err) {
+          return { error: err, countryCode: code };
+        }));
+      }
+    }.bind(this));
+    if (preload.length > 0) {
+      var preloadResults = await Promise.all(preload);
+      // If any preload failed, we still continue; the existing "toLoad" logic below will report failures.
+    }
+    // Now that base rulesets are present, include any assetCountry references from their investment types.
+    var cachedNow = Object.keys(this._taxRuleSets || {});
+    for (var ii = 0; ii < cachedNow.length; ii++) {
+      var rsNow = this._taxRuleSets[cachedNow[ii]];
+      if (!rsNow || typeof rsNow.getResolvedInvestmentTypes !== 'function') continue;
+      var types = rsNow.getResolvedInvestmentTypes() || [];
+      for (var ti = 0; ti < types.length; ti++) {
+        var t = types[ti] || {};
+        if (t.assetCountry && typeof t.assetCountry === 'string') {
+          required.add(t.assetCountry.toLowerCase());
         }
       }
     }

@@ -1,8 +1,8 @@
-// Test for contributionCurrencyMode functionality: AR Asset Mode
-// Validates that contributions in ARS are converted to USD when contributionCurrencyMode is 'asset'
+// Test for implicit currency conversion: AR Asset Currency Mismatch
+// Validates that contributions in ARS are converted to USD when base currency differs from residence currency
 //
-// Test: AR Single-Country (Asset Mode - ARS to USD Conversion)
-// AR global USD ETF uses asset mode with USD base currency.
+// Test: AR Single-Country (Currency Conversion - ARS to USD)
+// AR global USD ETF uses USD base currency which differs from ARS residence currency.
 // Contributions in ARS should be converted to USD using FX rates.
 
 const vm = require('vm');
@@ -14,7 +14,7 @@ const AR_RULES = require('../src/core/config/tax-rules-ar.json');
 
 const TestContributionCurrencyModeARAsset = {
   name: "Contribution Currency Mode - AR Asset",
-  description: "Validates that contributions in ARS are converted to USD for global USD ETF with contributionCurrencyMode 'asset'. Uses convertCurrencyAmount for FX conversion.",
+  description: "Validates that contributions in ARS are converted to USD for global USD ETF when base currency differs from residence currency. Uses convertCurrencyAmount for FX conversion.",
   isCustomTest: true,
 
   async runCustomTest() {
@@ -160,7 +160,11 @@ const TestContributionCurrencyModeARAsset = {
 
     // Validate sharesCapital - after Phase 1 refactor, capital() now consistently returns
     // residence currency. For Argentina residents, this means ARS, not USD.
-    const sharesCapital = rowAge30.sharesCapital || 0;
+    const capsByKey = rowAge30.investmentCapitalByKey || {};
+    let sharesCapital = 0;
+    for (const k in capsByKey) {
+      if (k === 'shares' || k.indexOf('shares_') === 0) sharesCapital += capsByKey[k] || 0;
+    }
     if (sharesCapital <= 0) {
       errors.push(`sharesCapital should be positive (in ARS residence currency), got ${sharesCapital}`);
     }
@@ -182,8 +186,12 @@ const TestContributionCurrencyModeARAsset = {
     }
 
     // Index funds should be 0 since allocation is 0%
-    if (Math.abs((rowAge30.indexFundsCapital || 0)) > 100) {
-      errors.push(`indexFundsCapital should be 0, got ${rowAge30.indexFundsCapital}`);
+    let indexFundsCapital = 0;
+    for (const k in capsByKey) {
+      if (k === 'indexFunds' || k.indexOf('indexFunds_') === 0) indexFundsCapital += capsByKey[k] || 0;
+    }
+    if (Math.abs(indexFundsCapital) > 100) {
+      errors.push(`indexFundsCapital should be 0, got ${indexFundsCapital}`);
     }
 
     return {

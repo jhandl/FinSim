@@ -293,7 +293,7 @@ When asked to produce a plan (vs implement):
 After significant changes:
 
 *   Update the canonical `AGENTS.md` if architecture/assumptions changed.
-*   Keep the docs focused on “current state” rather than historical narrative.
+*   Keep the docs focused on “current state” rather than historical narrative. I can't stress this enough: NEVER include any commentary on the past of any document. Whoever will use these documents does not care that they evolved over time. All these documents exist solely to guide an implementation, not to record history! You're not a historian, you're not a story teller. You're a coding agent.
 
 ## 6. Local Setup
 

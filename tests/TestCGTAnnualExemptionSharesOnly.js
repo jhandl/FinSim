@@ -38,7 +38,7 @@ module.exports = {
     { type: 'exact_value', target: 'age', age: 30, field: 'cgt', expected: 0, tolerance: 1 },
     // Ensure shares were liquidated (principal + 10% gain ≈ 11,000 sold and cashflow recorded)
     // Note: TestFramework assertions read raw dataSheet keys (lowercase), not UI-mapped keys
-    { type: 'comparison', target: 'age', age: 30, field: 'incomeSharesRent', expected: { operator: '>=', value: 10000 } }
+    { type: 'comparison', target: 'age', age: 30, field: 'investmentIncomeByKey:shares', expected: { operator: '>=', value: 10000 } }
   ]
 };
 

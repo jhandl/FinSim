@@ -392,7 +392,7 @@ class FormatUtils {
           if (varToken === 'deemedDisposalYears') {
             let dd;
             try {
-              const types = (typeof ruleset.getInvestmentTypes === 'function') ? ruleset.getInvestmentTypes() : [];
+              const types = (typeof ruleset.getResolvedInvestmentTypes === 'function') ? ruleset.getResolvedInvestmentTypes() : [];
               const indexFunds = Array.isArray(types) ? types.find(t => t && t.key === 'indexFunds') : null;
               if (indexFunds && indexFunds.taxation && indexFunds.taxation.exitTax && typeof indexFunds.taxation.exitTax.deemedDisposalYears === 'number') {
                 dd = indexFunds.taxation.exitTax.deemedDisposalYears;

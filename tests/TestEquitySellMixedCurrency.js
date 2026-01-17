@@ -33,8 +33,8 @@ module.exports = {
       revenue = {
         lastIncome: null,
         lastGains: null,
-        declareInvestmentIncome: function(money) { this.lastIncome = money.amount; },
-        declareInvestmentGains: function(money) { this.lastGains = money.amount; },
+        declareInvestmentIncome: function(money, desc, assetCountry) { this.lastIncome = money.amount; },
+        declareInvestmentGains: function(money, rate, desc, opts, assetCountry) { this.lastGains = money.amount; },
         declarePrivatePensionIncome: function() {},
         declarePrivatePensionLumpSum: function() {}
       };

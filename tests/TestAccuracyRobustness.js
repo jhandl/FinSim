@@ -264,7 +264,7 @@ module.exports = {
       type: 'comparison',
       target: 'age',
       age: 55,
-      field: 'indexFundsCapital',
+      field: 'investmentCapitalByKey:indexFunds',
       expected: {
         operator: '>',
         value: 100000                 // Should have grown from €75K + €50K investment
@@ -394,7 +394,7 @@ module.exports = {
       type: 'comparison',
       target: 'age',
       age: 70,
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         operator: '>',
         value: 40000                  // Should have grown from €25K initial

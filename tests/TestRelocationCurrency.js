@@ -140,7 +140,7 @@ module.exports = {
           initialPension: 0,
           initialFunds: 10000,
           initialShares: 5000,
-          emergencyStash: 20000,
+          emergencyStash: 0,
           FundsAllocation: 0.4,
           SharesAllocation: 0.6,
           inflation: 0.02,
@@ -153,6 +153,10 @@ module.exports = {
           StartCountry: 'ie',
           simulation_mode: 'single',
           economy_mode: 'deterministic',
+          priorityCash: 1,
+          priorityPension: 4,
+          priorityFunds: 2,
+          priorityShares: 3,
           relocationEnabled: true
         },
         events: [
@@ -162,6 +166,9 @@ module.exports = {
           { type: 'M', id: 'IE_Mortgage', amount: 18000, fromAge: 32, toAge: 55, rate: 0.03, currency: 'EUR', linkedCountry: 'ie' },
           { type: 'RI', id: 'IE_Rent', amount: 15000, fromAge: 32, toAge: 60, currency: 'EUR', linkedCountry: 'ie' },
           { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35, currency: 'EUR' },
+          // Buffer against high FX-evolved EUR mortgage costs after relocation while
+          // keeping baseline checks (ages 34–36) intact.
+          { type: 'FI', id: 'EUR_Windfall', amount: 400000, fromAge: 37, toAge: 37, currency: 'EUR', linkedCountry: 'ie' },
           { type: 'SI', id: 'AR_Salary', amount: 62000000, fromAge: 35, toAge: 44, rate: 0.02, match: 0, currency: 'ARS' },
           { type: 'RI', id: 'AR_Rent', amount: 3200000, fromAge: 35, toAge: 60, currency: 'ARS', linkedCountry: 'ar' },
           { type: 'E', id: 'AR_Life', amount: 21000000, fromAge: 35, toAge: 60, currency: 'ARS' }

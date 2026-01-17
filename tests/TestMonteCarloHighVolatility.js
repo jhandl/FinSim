@@ -61,7 +61,7 @@ module.exports = {
     {
       type: 'range',
       target: 'final',
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         min: 450000,              // Allow for Monte Carlo median variation (updated based on 21-year period)
         max: 550000               // Median range around deterministic baseline of ~€503k
@@ -72,7 +72,7 @@ module.exports = {
     {
       type: 'comparison',
       target: 'final',
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         operator: '>',
         value: 200000             // Significantly higher than initial €100k investment
@@ -83,7 +83,7 @@ module.exports = {
     {
       type: 'comparison',
       target: 'final',
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         operator: '<',
         value: 600000             // No extreme high outliers with median across 5000 runs (updated)
@@ -94,7 +94,7 @@ module.exports = {
     {
       type: 'comparison',
       target: 'final',
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         operator: '>',
         value: 400000             // Median prevents extreme low outliers (updated)
@@ -126,7 +126,7 @@ module.exports = {
     {
       type: 'comparison',
       target: 'final',
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         operator: '>',
         value: 400000             // Should be substantially higher than initial €100k (updated)
@@ -148,7 +148,7 @@ module.exports = {
     {
       type: 'exact_value',
       target: 'final',
-      field: 'indexFundsCapital',
+      field: 'investmentCapitalByKey:indexFunds',
       expected: 0,
       tolerance: 10
     },
@@ -166,7 +166,7 @@ module.exports = {
     {
       type: 'comparison',
       target: 'final',
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         operator: '<',
         value: 600000             // Upper bound - median is more conservative than mean (updated)

@@ -7,14 +7,19 @@ const TestDebugRetirement = {
       startingAge: 64,
       targetAge: 67,
       retirementAge: 65,
-      pensionLumpSumRate: 0.25,
-      pensionDrawdownRate: 0.04,
-      statePensionAge: 66,
-      statePensionAmount: 15028,
-      pensionGrowthRate: 0,
       initialSavings: 50000,      // Initial cash
-      initialPension: 500000,    // Initial pension fund
-      StartCountry: 'ie'
+      initialPension: 500000,     // Initial pension fund
+      emergencyStash: 0,
+      inflation: 0,
+      pensionPercentage: 0,
+      pensionCapped: "No",
+      growthRatePension: 0,
+      growthDevPension: 0,
+      StartCountry: 'ie',
+      simulation_mode: 'single',
+      economy_mode: 'deterministic',
+      // State pension is specified as a weekly amount for StartCountry (IE)
+      statePensionWeekly: 0,
     },
     events: [
       {
@@ -26,15 +31,8 @@ const TestDebugRetirement = {
         rate: 0,
         match: 0
       },
-      {
-        type: "R",
-        id: "retirementEvent",
-        amount: 0,
-        fromAge: 65,
-        toAge: 65,
-        rate: 0,
-        match: 0
-      }
+      // No-op marker row for readability; simulator ignores NOP.
+      { type: "NOP", id: "retirementEvent", amount: 0, fromAge: 65, toAge: 65, rate: 0, match: 0 }
     ]
   },
   assertions: [

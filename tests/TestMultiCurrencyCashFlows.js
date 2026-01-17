@@ -106,8 +106,10 @@ module.exports = {
       }
       installTestTaxRules(framework, deepClone(CURRENCY_RULES));
       const results = await framework.runSimulation();
-      if (!results || !results.success) {
-        return { success: false, errors: ['Scenario 1 failed to run'] };
+      // For FX/cashflow validation we only require that the simulator produced a dataSheet.
+      // The run may legitimately be marked unsuccessful (e.g. cashflow shortfall) without invalidating FX math.
+      if (!results || !results.dataSheet) {
+        return { success: false, errors: ['Scenario 1 did not produce results'] };
       }
       const rows = results.dataSheet.filter(r => r && typeof r === 'object');
       const row = findRowByAge(rows, 30);
@@ -163,8 +165,8 @@ module.exports = {
       }
       installTestTaxRules(framework, deepClone(CURRENCY_RULES));
       const results = await framework.runSimulation();
-      if (!results || !results.success) {
-        return { success: false, errors: ['Scenario 2 failed to run'] };
+      if (!results || !results.dataSheet) {
+        return { success: false, errors: ['Scenario 2 did not produce results'] };
       }
       const rows = results.dataSheet.filter(r => r && typeof r === 'object');
       const row = findRowByAge(rows, 30);
@@ -216,8 +218,8 @@ module.exports = {
       }
       installTestTaxRules(framework, deepClone(CURRENCY_RULES));
       const results = await framework.runSimulation();
-      if (!results || !results.success) {
-        return { success: false, errors: ['Scenario 3 failed to run'] };
+      if (!results || !results.dataSheet) {
+        return { success: false, errors: ['Scenario 3 did not produce results'] };
       }
 
       const rows = results.dataSheet.filter(r => r && typeof r === 'object');

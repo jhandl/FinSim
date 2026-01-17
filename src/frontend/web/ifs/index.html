@@ -11,7 +11,7 @@
   <title></title>
   <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico?v=2025-08-23-usc">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20251230-2">
+  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20260115">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=2025-10-28-1">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-23-usc">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-23-usc" />
@@ -115,6 +115,14 @@
           data-toggle-state="off">
           <span>Present Value</span>
           <div class="toggle-switch">
+            <div class="toggle-slider"></div>
+          </div>
+        </button>
+
+        <button id="countryTabsSyncToggleMobile" class="mobile-menu-button secondary-button toggle-button"
+          data-toggle-state="on" style="display: none;">
+          <span>Country Tabs Synced</span>
+          <div class="toggle-switch active">
             <div class="toggle-slider"></div>
           </div>
         </button>
@@ -256,27 +264,6 @@
             <label for="InvestmentAllocation_shares">Shares Allocation</label>
             <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
                 id="InvestmentAllocation_shares" class="percentage" step="1" placeholder=" " autocomplete="off"></div>
-          </div>
-
-          <div class="input-wrapper">
-            <label for="PensionContributionPercentage">Your Pension Contribution</label>
-            <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
-                id="PensionContributionPercentage" class="percentage" step="1" placeholder=" " autocomplete="off"></div>
-          </div>
-          <div class="input-wrapper">
-            <label for="PensionContributionPercentageP2">Their Pension Contribution</label>
-            <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
-                id="PensionContributionPercentageP2" class="percentage" step="1" placeholder=" " autocomplete="off">
-            </div>
-          </div>
-
-          <div class="input-wrapper">
-            <label for="PensionContributionCappedToggle">Pension Contrib. Capped</label>
-            <input type="hidden" id="PensionContributionCapped" class="string" value="Yes" autocomplete="off">
-            <div class="pension-capped-dd visualization-control" id="PensionContributionCappedControl">
-              <span id="PensionContributionCappedToggle" class="dd-toggle pseudo-select">Yes</span>
-              <div id="PensionContributionCappedOptions" class="visualization-dropdown" style="display:none;"></div>
-            </div>
           </div>
         </div>
       </div>
@@ -472,26 +459,16 @@
                   <!-- Options will be populated dynamically -->
                 </div>
               </th>
-              <th colspan="8">Gross Income</th>
+              <th colspan="8" data-group="grossIncome">Gross Income</th>
               <th colspan="1" data-group="deductions">Deductions</th>
               <th colspan="2">Net Cashflow</th>
-              <th colspan="5">Assets</th>
+              <th colspan="3" data-group="assets">Assets</th>
               <th colspan="2"></th>
             </tr>
             <tr>
               <th data-key="Age" title="Your age in this simulation year">Age</th>
               <th data-key="Year" title="Calendar year of the simulation">Year</th>
-              <th data-key="IncomeSalaries" title="Total salary income received this year">Salaries</th>
-              <th data-key="IncomeRentals" title="Rental income from real estate properties">Rentals</th>
-              <th data-key="IncomeRSUs" title="Income from Restricted Stock Units (RSUs) vesting">RSUs</th>
-              <th data-key="IncomePrivatePension" title="Withdrawals from private pension funds">P.Pension</th>
-              <th data-key="IncomeStatePension" title="State pension payments received">S.Pension</th>
-              <th data-key="IncomeDefinedBenefit" title="Defined Benefit pension income">DBI</th>
-              <th data-key="IncomeTaxFree" title="Tax-free income">Tax Free</th>
-              <th data-key="IncomeFundsRent" title="Income generated from index fund investments">Index Funds</th>
-              <th data-key="IncomeSharesRent" title="Income generated from Investment Trusts or individual shares">
-                Shares</th>
-              <th data-key="IncomeCash" title="Withdrawals from cash savings">Cash</th>
+              <th data-key="GrossIncome" title="Gross income columns (dynamic)">Gross Income</th>
               <th data-key="PensionContribution"
                 title="Amount contributed to private pensions (excluding employer match)">P.Contrib</th>
               <th data-key="NetIncome" title="Cash inflows after taxes (excludes pension contributions)">Inflows</th>
@@ -499,9 +476,6 @@
               <th data-key="PensionFund" title="Total value of private pension funds">Pension</th>
               <th data-key="Cash" title="Total cash savings">Cash</th>
               <th data-key="RealEstateCapital" title="Total value of your owned real estate">R.Estate</th>
-              <th data-key="FundsCapital" title="Total value of your index fund investments">Index Funds</th>
-              <th data-key="SharesCapital"
-                title="Total value of your Investment Trusts or individual share investments">Shares</th>
               <th data-key="WithdrawalRate"
                 title="Percentage of your liquid assets (Index Funds + Shares + Pension) that you're withdrawing to cover your expenses.">
                 Withdraw%</th>
@@ -522,7 +496,7 @@
 
   <!-- SYSTEM UTILITIES SECTION -->
   <script src="/src/frontend/AbstractUI.js?v=20251101"></script>
-  <script src="/src/frontend/UIManager.js?v=2026-01-04-3"></script>
+  <script src="/src/frontend/UIManager.js?v=20260117-legacyclean1"></script>
   <script src="/src/frontend/web/utils/DOMUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/DeviceUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/FormatUtils.js?v=20250115-1"></script>
@@ -537,43 +511,46 @@
   <script src="/src/frontend/web/utils/ValidationUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/RelocationUtils.js?v=2026-01-04-1"></script>
   <script src="/src/frontend/web/components/DynamicSectionManager.js?v=2026-01-10-1"></script>
-  <script src="/src/frontend/web/components/DynamicSectionsConfig.js?v=2026-01-10-1"></script>
+  <script src="/src/frontend/web/components/DynamicSectionVisibilityEngine.js?v=2026-01-12-2"></script>
+  <script src="/src/frontend/web/components/DynamicSectionsConfig.js?v=2026-01-12-4"></script>
   <script src="/src/frontend/web/components/DynamicSectionsManager.js?v=2026-01-10-1"></script>
-  <script src="/src/frontend/web/components/TableManager.js?v=2026-01-10-1"></script>
+  <script src="/src/frontend/web/components/TableManager.js?v=20260116d"></script>
   <script src="/src/frontend/web/components/EventsTableManager.js?v=20251210-1"></script>
   <script src="/src/frontend/web/components/RelocationImpactDetector.js?v=2025-12-30-1"></script>
   <script src="/src/frontend/web/components/RelocationImpactAssistant.js?v=20251210-1"></script>
   <script src="/src/frontend/web/components/EventSummaryRenderer.js?v=20250115-1"></script>
   <script src="/src/frontend/web/components/EventAccordionManager.js?v=20251101"></script>
-  <script src="/src/frontend/web/components/WizardManager.js?v=20251101"></script>
+  <script src="/src/frontend/web/components/WizardManager.js?v=20260114-1"></script>
   <script src="/src/frontend/web/components/WizardRenderer.js?v=20251101"></script>
   <script src="/src/frontend/web/components/EventsWizard.js?v=20251109"></script>
-  <script src="/src/frontend/web/components/ChartManager.js?v=20251229-1"></script>
-  <script src="/src/frontend/web/components/FileManager.js?v=2025-12-30-3"></script>
+  <script src="/src/frontend/web/components/ChartManager.js?v=2026-01-12-4"></script>
+  <script src="/src/frontend/web/components/FileManager.js?v=20260114i"></script>
   <script src="/src/frontend/web/components/DragAndDrop.js?v=20251101"></script>
   <script src="/src/frontend/web/components/Wizard.js?v=20251220"></script>
   <script src="/src/frontend/web/components/ContentRenderer.js?v=20251101"></script>
   <script src="/src/frontend/web/components/WelcomeModal.js?v=20251101"></script>
   <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
-  <script src="/src/frontend/web/WebUI.js?v=2026-01-04-6"></script>
-  <script src="/src/core/TaxRuleSet.js?v=2025-11-09-1"></script>
+  <script src="/src/frontend/web/components/CountryTabSyncManager.js?v=20260114-1"></script>
+  <script src="/src/frontend/web/components/CountryChipSelector.js?v=20260114-2"></script>
+  <script src="/src/frontend/web/WebUI.js?v=20260116-allocfix1"></script>
+  <script src="/src/core/TaxRuleSet.js?v=20260115a"></script>
   <script src="/src/core/Config.js?v=2025-12-17-8"></script>
   <script src="/src/core/Events.js?v=2025-09-04"></script>
   <script src="/src/core/EconomicData.js?v=2025-12-18"></script>
   <script src="/src/core/Money.js?v=2025-12-20-14"></script>
-  <script src="/src/core/Person.js?v=2026-01-04-3"></script>
-  <script src="/src/core/Taxman.js?v=2025-12-20-5"></script>
+  <script src="/src/core/Person.js?v=20260117-legacyclean1"></script>
+  <script src="/src/core/Taxman.js?v=20260115c"></script>
   <script src="/src/core/Equities.js?v=2026-01-04-1"></script>
-  <script src="/src/core/InvestmentTypeFactory.js?v=2025-12-20-3"></script>
+  <script src="/src/core/InvestmentTypeFactory.js?v=2026-01-11-1"></script>
   <script src="/src/core/RealEstate.js?v=2025-12-20-3"></script>
   <script src="/src/core/InflationService.js?v=2025-11-26-2"></script>
-  <script src="/src/core/Utils.js?v=2025-12-30-2"></script>
-  <script src="/src/core/PresentValueCalculator.js?v=2026-01-04-2"></script>
+  <script src="/src/core/Utils.js?v=20260116-allocfix2"></script>
+  <script src="/src/core/PresentValueCalculator.js?v=20260115b"></script>
   <script src="/src/core/AttributionPopulator.js?v=2025-12-27-1"></script>
-  <script src="/src/core/DataAggregatesCalculator.js?v=2025-12-23-2"></script>
+  <script src="/src/core/DataAggregatesCalculator.js?v=2026-01-09-2"></script>
   <script src="/src/core/Attribution.js?v=2025-11-05-1"></script>
   <script src="/src/core/AttributionManager.js?v=2025-09-04"></script>
-  <script src="/src/core/Simulator.js?v=2026-01-04-2"></script>
+  <script src="/src/core/Simulator.js?v=20260117-legacyclean2"></script>
 
   <!-- Init app name after Config is initialized -->
   <script>
@@ -737,6 +714,7 @@
         const toggleButton = document.getElementById('experimentalToggleMobile');
         const eventsWizardToggleButton = document.getElementById('eventsWizardToggleMobile');
         const presentValueToggleButton = document.getElementById('presentValueToggleMobile');
+        const countryTabsSyncToggleButton = document.getElementById('countryTabsSyncToggleMobile');
         const firstDivider = document.querySelector('.mobile-menu-divider');
         const secondDivider = document.querySelectorAll('.mobile-menu-divider')[1];
         const thirdDivider = document.querySelectorAll('.mobile-menu-divider')[2];
@@ -747,12 +725,24 @@
         const SHOW_EVENTS_WIZARD_TOGGLE = true;
         // Always show the Present Value toggle
         const SHOW_PRESENT_VALUE_TOGGLE = true;
+        // Show only when relocation is active and there is an effective relocation (MV-* to a different country).
+        let SHOW_COUNTRY_TABS_SYNC_TOGGLE = false;
+        try {
+          if (typeof Config !== 'undefined') {
+            const cfg = Config.getInstance();
+            const relocationEnabled = cfg && cfg.isRelocationEnabled && cfg.isRelocationEnabled();
+            if (relocationEnabled && typeof WebUI !== 'undefined') {
+              const webUI = WebUI.getInstance();
+              SHOW_COUNTRY_TABS_SYNC_TOGGLE = !!(webUI && typeof webUI.hasEffectiveRelocationEvents === 'function' && webUI.hasEffectiveRelocationEvents());
+            }
+          }
+        } catch (_) { /* no-op */ }
 
         // Track which sections have visible content
         let hasRunSection = false;
         let hasSaveLoadSection = false;
         let hasDemoHelpSection = false;
-        let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE;
+        let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE || SHOW_COUNTRY_TABS_SYNC_TOGGLE;
 
         if (currentWidth > breakpoints.tablet) {
           // Desktop mode: Only show Demo/Help/Coffee buttons that are visible in header but burger menu is always available
@@ -813,6 +803,9 @@
         }
         if (presentValueToggleButton) {
           presentValueToggleButton.style.display = SHOW_PRESENT_VALUE_TOGGLE ? 'flex' : 'none';
+        }
+        if (countryTabsSyncToggleButton) {
+          countryTabsSyncToggleButton.style.display = SHOW_COUNTRY_TABS_SYNC_TOGGLE ? 'flex' : 'none';
         }
 
         // Third divider: between Demo/Help/Toggle and Coffee (Coffee is always visible)
@@ -893,6 +886,14 @@
         if (presentValueToggleMobile) {
           presentValueToggleMobile.addEventListener('click', () => {
             this.handlePresentValueToggle(presentValueToggleMobile);
+          });
+        }
+
+        // Country Tabs Sync Toggle
+        const countryTabsSyncToggleMobile = document.getElementById('countryTabsSyncToggleMobile');
+        if (countryTabsSyncToggleMobile) {
+          countryTabsSyncToggleMobile.addEventListener('click', () => {
+            this.handleCountryTabsSyncToggle(countryTabsSyncToggleMobile);
           });
         }
       }
@@ -1017,6 +1018,22 @@
         } catch (_) { /* no-op */ }
       }
 
+      handleCountryTabsSyncToggle(toggleButton) {
+        const currentState = toggleButton.getAttribute('data-toggle-state');
+        const newState = currentState === 'off' ? 'on' : 'off';
+        const toggleSwitch = toggleButton.querySelector('.toggle-switch');
+
+        toggleButton.setAttribute('data-toggle-state', newState);
+        if (toggleSwitch) {
+          if (newState === 'on') toggleSwitch.classList.add('active');
+          else toggleSwitch.classList.remove('active');
+        }
+
+        const enabled = newState === 'on';
+        localStorage.setItem('countryTabsSynced', enabled ? 'true' : 'false');
+        CountryTabSyncManager.getInstance().setSyncState(enabled);
+      }
+
       initializeToggleState() {
         // Initialize experimental toggle
         const toggleButton = document.getElementById('experimentalToggleMobile');
@@ -1104,6 +1121,22 @@
               }
             }
           } catch (_) { /* no-op */ }
+        }
+
+        // Initialize Country Tabs Sync toggle (default to 'on')
+        const countryTabsSyncToggleButton = document.getElementById('countryTabsSyncToggleMobile');
+        if (countryTabsSyncToggleButton) {
+          const savedRaw = localStorage.getItem('countryTabsSynced');
+          const enabled = (savedRaw === null) ? true : (savedRaw === 'true');
+          const savedState = enabled ? 'on' : 'off';
+          const toggleSwitch = countryTabsSyncToggleButton.querySelector('.toggle-switch');
+
+          countryTabsSyncToggleButton.setAttribute('data-toggle-state', savedState);
+          if (toggleSwitch) {
+            if (enabled) toggleSwitch.classList.add('active');
+            else toggleSwitch.classList.remove('active');
+          }
+          CountryTabSyncManager.getInstance().setSyncState(enabled);
         }
       }
     }
@@ -1455,19 +1488,37 @@
       const dataTable = document.getElementById('Data');
       if (!dataTable) return;
 
-      // Read Age column width from first data row (not thead, which may be hidden)
-      // Fall back to thead if no data rows exist yet
-      let ageCell = dataTable.querySelector('tbody tr:not(.tax-header) td:nth-child(1)');
+      // Read Age column width from the visible sticky headers when available.
+      // On fresh load we create a dynamic `.tax-header` row but remove the temporary data row,
+      // so the first reliable visible Age cell is the tax-header's first <th>.
+      let ageCell = dataTable.querySelector('tbody tr.tax-header th:nth-child(1)');
       if (!ageCell) {
+        // Otherwise use the first non-tax data row.
+        ageCell = dataTable.querySelector('tbody tr:not(.tax-header) td:nth-child(1)');
+      }
+      if (!ageCell) {
+        // Last resort: static thead (may be hidden when dynamic tax headers are active).
         ageCell = dataTable.querySelector('thead tr:last-child th:nth-child(1)');
       }
       if (!ageCell) return;
 
-      // Get the computed width of the Age column including borders and padding
-      const ageWidth = ageCell.offsetWidth;
+      // Prefer offsetWidth when available (includes borders/padding and matches historical layout).
+      // If the element is hidden (e.g. header row display:none), offsetWidth can be 0; fall back
+      // to computed CSS width + borders so sticky offsets remain correct.
+      const ow = ageCell.offsetWidth || 0;
+      const cs = window.getComputedStyle(ageCell);
+      const w = parseFloat(cs.width) || 0;
+      const bl = parseFloat(cs.borderLeftWidth) || 0;
+      const br = parseFloat(cs.borderRightWidth) || 0;
+      const fallbackWidth = w + bl + br;
+      const ageWidth = ow || fallbackWidth;
 
       // Set CSS custom property for dynamic positioning
-      dataTable.style.setProperty('--age-column-width', `${ageWidth}px`);
+      if (ageWidth > 0) {
+        dataTable.style.setProperty('--age-column-width', `${ageWidth}px`);
+      } else {
+        dataTable.style.removeProperty('--age-column-width');
+      }
     }
 
     // Update on DOM content loaded
@@ -1569,9 +1620,6 @@
   <script>
     window.addEventListener('error', function (event) {
       console.error('Global error handler:', event.error ? event.error.stack : event.message);
-    });
-    window.addEventListener('unhandledrejection', function (event) {
-      console.error('Global unhandledrejection:', event.reason ? event.reason.stack : event.reason);
     });
   </script>
 

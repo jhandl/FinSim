@@ -22,6 +22,10 @@ module.exports = {
     // MoneyPerfTest uses performance.now(); provide Node perf_hooks inside the VM.
     framework.simulationContext.performance = perfHooks.performance;
 
+    // Ensure VM has mock UI and Config is initialized
+    framework.ensureVMUIManagerMocks();
+    await vm.runInContext('Config.initialize(WebUI.getInstance())', framework.simulationContext);
+
     loadMoneyPerfTestHarness(framework);
 
     // Part 1: Core MoneyPerfTest (covers struct vs object, Taxman-like ops, cash, holdings, capital()).

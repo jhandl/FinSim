@@ -33,8 +33,8 @@ module.exports = {
           growthDevShares: 0.20,
           inflation: 0.02,
           StartCountry: 'ie',
-          simulation_mode: 'montecarlo',
-          economy_mode: 'stochastic',
+          simulation_mode: 'single',
+          economy_mode: 'montecarlo',
           monteCarloRuns: 2500
         },
         events: [

@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "investmentBaseTypes": [
+    {
+      "baseKey": "globalEquity",
+      "label": "Global Equity Index",
+      "baseCurrency": "USD",
+      "assetCountry": "us",
+      "residenceScope": "global"
+    },
+    {
+      "baseKey": "globalBonds",
+      "label": "Global Bond Index",
+      "baseCurrency": "USD",
+      "assetCountry": "us",
+      "residenceScope": "global"
+    }
+  ],
+  "assetTaxes": {
+    "dividend": {
+      "us": 0.3
+    },
+    "interest": {
+      "us": 0.1
+    },
+    "capitalGains": {
+      "us": 0
+    }
+  }
+}
+

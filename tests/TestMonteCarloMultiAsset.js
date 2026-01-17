@@ -89,7 +89,7 @@ module.exports = {
     {
       type: 'exact_value',
       target: 'final',
-      field: 'indexFundsCapital',
+      field: 'investmentCapitalByKey:indexFunds',
       expected: 0,
       tolerance: 10
     },
@@ -98,7 +98,7 @@ module.exports = {
     {
       type: 'comparison',
       target: 'final',
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         operator: '>',
         value: 100000             // Should have substantial accumulation with 100% allocation

@@ -4,14 +4,13 @@
  * Must remain GAS-compatible (no ES6 modules).
  * 
  * PV Semantics (flows):
- * - Residency-deflated: incomeRSUsPV, incomeFundsRentPV, incomeSharesRentPV,
+ * - Residency-deflated: incomeRSUsPV,
  *   incomeCashPV, incomeDefinedBenefitPV, incomeTaxFreePV, netIncomePV, expensesPV,
  *   investmentIncomeByKeyPV[*], Tax__*PV
  * - Source-deflated: incomeSalariesPV, incomeRentalsPV, incomePrivatePensionPV,
  *   pensionContributionPV, incomeStatePensionPV
  * PV Semantics (stocks/assets):
  * - Source-deflated: realEstateCapitalPV, pensionFundPV, investmentCapitalByKeyPV[*],
- *   indexFundsCapitalPV, sharesCapitalPV
  * - Residency-deflated: cashPV; worthPV is mixed (source-deflated assets + residency cash)
  * 
  * This file has to work on both the website and Google Sheets.
@@ -68,17 +67,13 @@ function computePresentValueAggregates(ctx) {
   var investmentAssets = ctx.investmentAssets;
   var realEstateConverted = ctx.realEstateConverted;
   var capsByKey = ctx.capsByKey;
-  // Derive legacy caps from capsByKey (the canonical source)
-  var indexFundsCap = capsByKey['indexFunds'];
-  var sharesCap = capsByKey['shares'];
   var incomeSalaries = ctx.incomeSalaries;
   var incomeShares = ctx.incomeShares;
   var incomeRentals = ctx.incomeRentals;
   var incomePrivatePension = ctx.incomePrivatePension;
   var incomeStatePension = ctx.incomeStatePension;
-  var incomeStatePensionBaseCurrency = ctx.incomeStatePensionBaseCurrency;
-  var incomeFundsRent = ctx.incomeFundsRent;
-  var incomeSharesRent = ctx.incomeSharesRent;
+  var incomeStatePensionByCountry = ctx.incomeStatePensionByCountry;
+  var incomeStatePensionByCountryP2 = ctx.incomeStatePensionByCountryP2;
   var cashWithdraw = ctx.cashWithdraw;
   var incomeDefinedBenefit = ctx.incomeDefinedBenefit;
   var incomeTaxFree = ctx.incomeTaxFree;
@@ -201,30 +196,38 @@ function computePresentValueAggregates(ctx) {
   sumPensionPots(person1);
   sumPensionPots(person2);
 
-  // State Pension PV: Calculate PV in base currency (EUR) using Ireland's inflation, then convert to residence currency
-  // This ensures State Pension purchasing power is measured in the paying country's terms
-  var statePensionPVInBaseCurrency = 0;
+  // State Pension PV: Multi-stream per-country deflation
   var statePensionPVInResidenceCurrency = 0;
-  if (incomeStatePension > 0 && incomeStatePensionBaseCurrency > 0 && person1 && person1.statePensionCountryParam) {
-    var statePensionCountry = String(person1.statePensionCountryParam).toLowerCase();
-    var currentYearPv = year || (startYear + (ageNum - params.startingAge));
-    var statePensionInflationRate = InflationService.resolveInflationRate(statePensionCountry, currentYearPv, {
-      params: params,
-      config: cfg,
-      countryInflationOverrides: countryInflationOverrides
-    });
-    var statePensionPVFactor = getDeflationFactor(ageNum, startYear, statePensionInflationRate);
-    // Calculate PV in base currency (EUR) using Ireland's inflation
-    statePensionPVInBaseCurrency = incomeStatePensionBaseCurrency * statePensionPVFactor;
-    // For State Pension PV: Keep it in EUR (base currency) - do NOT convert to residence currency
-    // The nominal State Pension is converted to ARS for the ledger (correct)
-    // But PV should remain in EUR because it represents Ireland's purchasing power
-    // ChartManager will handle conversion when displaying, recognizing this is EUR
-    var baseCurrency = person1.statePensionCurrencyParam || getCurrencyForCountry(statePensionCountry);
-    statePensionPVInResidenceCurrency = statePensionPVInBaseCurrency;
-  } else if (incomeStatePension > 0) {
-    // Fallback: use standard PV calculation if base currency not available
-    statePensionPVInResidenceCurrency = incomeStatePension * deflationFactor;
+  var usedStatePensionByCountry = false;
+  function sumStatePensionPV(map) {
+    if (!map) return;
+    for (var spCountry in map) {
+      if (!Object.prototype.hasOwnProperty.call(map, spCountry)) continue;
+      var spMoney = map[spCountry];
+      if (!spMoney || spMoney.amount <= 0) continue;
+      usedStatePensionByCountry = true;
+      var spDeflator = getDeflationFactorForCountry(spCountry, ageNum, startYear, {
+        params: params,
+        config: cfg,
+        countryInflationOverrides: countryInflationOverrides,
+        year: year
+      });
+      var spPV_base = spMoney.amount * spDeflator;
+      var spCur = normalizeCurrency(spMoney.currency);
+      var resCur = normalizeCurrency(residenceCurrency);
+      if (spCur !== resCur) {
+        var spPV_res = convertCurrencyAmount(spPV_base, spCur, spCountry, resCur, currentCountry, startYear, true);
+        if (spPV_res === null) throw new Error('State pension PV conversion failed for ' + spCountry);
+        statePensionPVInResidenceCurrency += spPV_res;
+      } else {
+        statePensionPVInResidenceCurrency += spPV_base;
+      }
+    }
+  }
+  sumStatePensionPV(incomeStatePensionByCountry);
+  sumStatePensionPV(incomeStatePensionByCountryP2);
+  if (!usedStatePensionByCountry && incomeStatePension > 0) {
+    throw new Error('State pension PV: missing per-country state pension map');
   }
 
   // Per-investment-type PV deflators (asset-plan.md §4.1):
@@ -387,8 +390,6 @@ function computePresentValueAggregates(ctx) {
       dataRow.incomePrivatePensionPV += incomePrivatePension;
     }
     dataRow.incomeStatePensionPV += (statePensionPVInResidenceCurrency > 0) ? statePensionPVInResidenceCurrency : incomeStatePension;
-    dataRow.incomeFundsRentPV += incomeFundsRent;
-    dataRow.incomeSharesRentPV += incomeSharesRent;
     dataRow.incomeCashPV += Math.max(cashWithdraw, 0);
     dataRow.incomeDefinedBenefitPV += incomeDefinedBenefit;
     dataRow.incomeTaxFreePV += incomeTaxFree;
@@ -415,8 +416,6 @@ function computePresentValueAggregates(ctx) {
       dataRow.pensionContributionPV += personalPensionContribution;
     }
     dataRow.cashPV += cash;
-    dataRow.indexFundsCapitalPV += (dataRow.investmentCapitalByKeyPV['indexFunds'] || 0);
-    dataRow.sharesCapitalPV += (dataRow.investmentCapitalByKeyPV['shares'] || 0);
     var investmentsPV = 0;
     for (var wk in dataRow.investmentCapitalByKeyPV) {
       investmentsPV += dataRow.investmentCapitalByKeyPV[wk];
@@ -518,8 +517,6 @@ function computePresentValueAggregates(ctx) {
     }
     // State Pension PV: Use the pre-calculated statePensionPVInResidenceCurrency (calculated above before the if/else)
     dataRow.incomeStatePensionPV += statePensionPVInResidenceCurrency;
-    dataRow.incomeFundsRentPV += incomeFundsRent * deflationFactor;
-    dataRow.incomeSharesRentPV += incomeSharesRent * deflationFactor;
     dataRow.incomeCashPV += Math.max(cashWithdraw, 0) * deflationFactor;
     dataRow.incomeDefinedBenefitPV += incomeDefinedBenefit * deflationFactor;
     dataRow.incomeTaxFreePV += incomeTaxFree * deflationFactor;
@@ -546,8 +543,6 @@ function computePresentValueAggregates(ctx) {
       dataRow.pensionContributionPV += personalPensionContribution * deflationFactor;
     }
     dataRow.cashPV += cash * deflationFactor;
-    dataRow.indexFundsCapitalPV += (dataRow.investmentCapitalByKeyPV['indexFunds'] || 0);
-    dataRow.sharesCapitalPV += (dataRow.investmentCapitalByKeyPV['shares'] || 0);
     var investmentsPV = 0;
     for (var wk in dataRow.investmentCapitalByKeyPV) {
       investmentsPV += dataRow.investmentCapitalByKeyPV[wk];

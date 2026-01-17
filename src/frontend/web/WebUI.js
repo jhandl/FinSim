@@ -15,11 +15,17 @@ class WebUI extends AbstractUI {
       'StartingAge': { neutral: 'Current Age', your: 'Your Current Age' },
       'InitialPension': { neutral: 'Pension Fund', your: 'Your Pension Fund' },
       'RetirementAge': { neutral: 'Retirement Age', your: 'Your Retirement Age' },
-      'PensionContributionPercentage': { neutral: 'Pension Contribution', your: 'Your Pension Contribution' },
       'StatePensionWeekly': { neutral: 'State Pension (Weekly)', your: 'Your State Pension (Weekly)' },
       'InitialSavings': { neutral: 'Current Savings', your: 'Current Savings (Joint)' }
     };
-    this.p2InputIds = ['P2StartingAge', 'InitialPensionP2', 'P2RetirementAge', 'PensionContributionPercentageP2', 'P2StatePensionWeekly'];
+    this.p2InputIds = ['P2StartingAge', 'InitialPensionP2', 'P2RetirementAge', 'P2StatePensionWeekly'];
+
+    // Country chip selectors (relocation-enabled scenarios only)
+    this.allocationsCountryChipSelector = null;
+    this.personalCircumstancesCountryChipSelector = null;
+    this._allocationValueCache = {};
+    this.pensionCappedDropdowns = {};
+    this.countryTabSyncManager = CountryTabSyncManager.getInstance();
 
     // Initialize in a specific order to ensure dependencies are met
     this.formatUtils = new FormatUtils();
@@ -43,6 +49,9 @@ class WebUI extends AbstractUI {
     }
 
     this.editCallbacks = new Map();
+    this.countryTabSyncManager.addSyncStateListener(() => {
+      this._syncCountryTabsFromManager();
+    });
 
     // Connect error modal to notification utils
     this.notificationUtils.setErrorModalUtils(this.errorModalUtils);
@@ -57,8 +66,6 @@ class WebUI extends AbstractUI {
     this.setupEconomyModeToggle(); // Setup the deterministic/Monte Carlo mode toggle
     this.setupParameterTooltips(); // Setup parameter age field tooltips
     this.setupVisualizationControls(); // Setup visualization controls
-    // Pension Capped dropdown depends on Config/tax rules; initialize after Config.initialize()
-    this.setupPensionContributionTooltips(); // Tooltips for pension contribution inputs
     this.setupCardInfoIcons(); // Setup info icons on cards
     this.setupDataExportButton(); // Setup data table CSV export button
     this.setupIconTooltips(); // Setup tooltips for various mode toggle icons
@@ -431,7 +438,34 @@ class WebUI extends AbstractUI {
           id: element.id
         });
       });
+
+      // Keep country chip visibility in sync with scenario MV-* events.
+      // This is intentionally lightweight (no heavy parsing): just refresh UI affordances.
+      try {
+        if (element && element.closest && element.closest('#Events')) {
+          this.refreshCountryChipsFromScenario();
+        }
+      } catch (_) { }
+
+      // StartCountry changes can flip effective relocation state (single ↔ multi country).
+      try {
+        if (element && element.id === 'StartCountry') {
+          this.refreshCountryChipsFromScenario();
+        }
+      } catch (_) { }
     });
+  }
+
+  setupScenarioCountryAutoRefresh() {
+    // When rows are added/removed in the Events table (e.g. deleting the only MV-* row),
+    // there may be no 'change' event to hook. Observe row mutations and refresh chips.
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return;
+    if (this._eventsCountryObserver) return;
+    this._eventsCountryObserver = new MutationObserver(() => {
+      try { this.refreshCountryChipsFromScenario(); } catch (_) { }
+    });
+    this._eventsCountryObserver.observe(tbody, { childList: true });
   }
 
   // New method to setup the load demo scenario button
@@ -495,7 +529,7 @@ class WebUI extends AbstractUI {
     const ruleset = configInstance.getCachedTaxRuleSet(configInstance.getDefaultCountry());
     if (!ruleset) return;
 
-    const types = ruleset.getInvestmentTypes ? ruleset.getInvestmentTypes() : [];
+    const types = ruleset.getResolvedInvestmentTypes ? ruleset.getResolvedInvestmentTypes() : [];
     const fundsType = ruleset.findInvestmentTypeByKey ? ruleset.findInvestmentTypeByKey('indexFunds') : null;
     const sharesType = ruleset.findInvestmentTypeByKey ? ruleset.findInvestmentTypeByKey('shares') : null;
 
@@ -535,28 +569,6 @@ class WebUI extends AbstractUI {
     setRowHeadingForInput('FundsGrowthRate', fundsLabel);
     setRowHeadingForInput('SharesGrowthRate', sharesLabel);
 
-    // Data table headers
-    const thIncomeFunds = document.querySelector('th[data-key="IncomeFundsRent"]');
-    if (thIncomeFunds) {
-      thIncomeFunds.textContent = fundsLabel;
-      thIncomeFunds.title = `Income generated from ${fundsLabel} investments`;
-    }
-    const thIncomeShares = document.querySelector('th[data-key="IncomeSharesRent"]');
-    if (thIncomeShares) {
-      thIncomeShares.textContent = sharesLabel;
-      thIncomeShares.title = `Income generated from ${sharesLabel} investments`;
-    }
-    const thFundsCapital = document.querySelector('th[data-key="FundsCapital"]');
-    if (thFundsCapital) {
-      thFundsCapital.textContent = fundsLabel;
-      thFundsCapital.title = `Total value of your ${fundsLabel} investments`;
-    }
-    const thSharesCapital = document.querySelector('th[data-key="SharesCapital"]');
-    if (thSharesCapital) {
-      thSharesCapital.textContent = sharesLabel;
-      thSharesCapital.title = `Total value of your ${sharesLabel} investments`;
-    }
-
     // Withdrawal rate tooltip (keep short header text)
     const thWithdraw = document.querySelector('th[data-key="WithdrawalRate"]');
     if (thWithdraw) {
@@ -573,10 +585,1063 @@ class WebUI extends AbstractUI {
     if (this.chartManager && typeof this.chartManager.applyInvestmentTypes === 'function') {
       this.chartManager.applyInvestmentTypes(types);
     }
-    // If there are more than two investment types, dynamically add columns for income and capital per type
-    if (types && types.length > 2) {
+    // Ensure capital columns are always rendered as Capital__*.
+    if (types && types.length > 0) {
       this.applyDynamicColumns(types);
     }
+  }
+
+  /**
+   * Ensure investment-related parameter inputs exist for the active StartCountry ruleset.
+   * The static HTML still includes legacy (un-namespaced) fields for CSV back-compat;
+   * this method creates namespaced fields (e.g. InitialCapital_indexFunds_ie) as needed.
+   */
+  async ensureInvestmentParameterFields() {
+    const config = Config.getInstance();
+    const startCountry = config.getStartCountry();
+    let ruleset = config.getCachedTaxRuleSet(startCountry);
+    if (!ruleset) {
+      ruleset = await config.getTaxRuleSet(startCountry);
+    }
+    const investmentTypes = ruleset.getResolvedInvestmentTypes() || [];
+    this.renderInvestmentParameterFields(investmentTypes);
+  }
+
+  renderInvestmentParameterFields(investmentTypes) {
+    const types = Array.isArray(investmentTypes) ? investmentTypes : [];
+
+    // Capture existing growth rate/volatility values before removing dynamic fields.
+    // This preserves values when StartCountry changes trigger mid-deserialization.
+    const growthRateCache = {};
+    const existingDynamicInputs = document.querySelectorAll('[data-dynamic-investment-param="true"] input.percentage');
+    existingDynamicInputs.forEach(input => {
+      if (input && input.id && input.value) {
+        growthRateCache[input.id] = input.value;
+      }
+    });
+
+    // Remove previously generated dynamic fields
+    document.querySelectorAll('[data-dynamic-investment-param="true"]').forEach(el => {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+
+    // Store the cache on this instance so we can restore values after creation
+    this._growthRateCacheForRestore = growthRateCache;
+
+    const hideInputWrapper = (inputId) => {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+      const wrapper = el.closest('.input-wrapper');
+      if (wrapper) wrapper.style.display = 'none';
+    };
+
+    const hideGrowthRow = (inputId) => {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+      const td = el.closest('td');
+      const tr = td ? td.parentElement : null;
+      if (tr) tr.style.display = 'none';
+    };
+
+    // Keep legacy fields in DOM for CSV back-compat normalization, but hide them from view.
+    hideInputWrapper('InitialCapital_indexFunds');
+    hideInputWrapper('InitialCapital_shares');
+    hideInputWrapper('InvestmentAllocation_indexFunds');
+    hideInputWrapper('InvestmentAllocation_shares');
+    // Legacy pension contribution fields (now per-country) kept hidden for back-compat serialization
+    this.ensureParameterInput('PensionContributionPercentage', 'percentage');
+    this.ensureParameterInput('PensionContributionPercentageP2', 'percentage');
+    this.ensureParameterInput('PensionContributionCapped', 'string');
+    hideGrowthRow('indexFundsGrowthRate');
+    hideGrowthRow('sharesGrowthRate');
+
+    const startGroup = document.querySelector('#startingPosition .input-group');
+    if (startGroup) {
+      // Per Phase 7 design: starting position initial capital remains StartCountry-only.
+      // IDs intentionally remain `InitialCapital_{typeKey}` (no country prefix).
+      for (let i = 0; i < types.length; i++) {
+        const t = types[i] || {};
+        const key = t.key;
+        if (!key) continue;
+        const labelText = t.label || key;
+        const inputId = 'InitialCapital_' + key;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'input-wrapper';
+        wrapper.setAttribute('data-dynamic-investment-param', 'true');
+
+        const label = document.createElement('label');
+        label.setAttribute('for', inputId);
+        label.textContent = labelText;
+        wrapper.appendChild(label);
+
+        const input = this._takeOrCreateInput(inputId, 'currency');
+        input.type = 'text';
+        input.setAttribute('inputmode', 'numeric');
+        input.setAttribute('pattern', '[0-9]*');
+        wrapper.appendChild(input);
+
+        startGroup.appendChild(wrapper);
+      }
+    }
+
+    // Allocations: if relocation is enabled AND MV-* events exist, render per-country allocation inputs
+    // and use the chips as a context switcher (show/hide per-country containers).
+    this.refreshCountryChipsFromScenario(types);
+
+    const tbody = document.querySelector('#growthRates table.growth-rates-table tbody');
+    const inflationInput = document.getElementById('Inflation');
+    const inflationRow = inflationInput ? inflationInput.closest('tr') : null;
+    if (tbody) {
+      for (let i = 0; i < types.length; i++) {
+        const t = types[i] || {};
+        const key = t.key;
+        if (!key) continue;
+        const labelText = t.label || key;
+
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-dynamic-investment-param', 'true');
+
+        const tdLabel = document.createElement('td');
+        tdLabel.textContent = labelText;
+        tr.appendChild(tdLabel);
+
+        const tdGrowth = document.createElement('td');
+        const grWrap = document.createElement('div');
+        grWrap.className = 'percentage-container';
+        const gr = this._takeOrCreateInput(key + 'GrowthRate', 'percentage');
+        gr.type = 'text';
+        gr.setAttribute('inputmode', 'numeric');
+        gr.setAttribute('pattern', '[0-9]*');
+        gr.setAttribute('step', '1');
+        grWrap.appendChild(gr);
+        tdGrowth.appendChild(grWrap);
+        tr.appendChild(tdGrowth);
+
+        const tdVol = document.createElement('td');
+        const sdWrap = document.createElement('div');
+        sdWrap.className = 'percentage-container';
+        const sd = this._takeOrCreateInput(key + 'GrowthStdDev', 'percentage');
+        sd.type = 'text';
+        sd.setAttribute('inputmode', 'numeric');
+        sd.setAttribute('pattern', '[0-9]*');
+        sd.setAttribute('step', '1');
+        sdWrap.appendChild(sd);
+        tdVol.appendChild(sdWrap);
+        tr.appendChild(tdVol);
+
+        if (inflationRow && inflationRow.parentNode === tbody) {
+          tbody.insertBefore(tr, inflationRow);
+        } else {
+          tbody.appendChild(tr);
+        }
+      }
+    }
+
+    // Restore cached growth rate values to newly created inputs
+    if (this._growthRateCacheForRestore) {
+      for (const [id, value] of Object.entries(this._growthRateCacheForRestore)) {
+        const input = document.getElementById(id);
+        if (input && !input.value) {
+          input.value = value;
+        }
+      }
+      this._growthRateCacheForRestore = null;
+    }
+
+    // Re-apply economy mode visibility to newly created volatility cells
+    this.updateUIForEconomyMode();
+  }
+
+  // -------------------------------------------------------------
+  // Country chips + per-country parameter rendering
+  // -------------------------------------------------------------
+
+  _syncCountryTabsFromManager() {
+    const mgr = this.countryTabSyncManager;
+    if (!mgr) return;
+    try {
+      const a = this.allocationsCountryChipSelector;
+      const ac = mgr.getSelectedCountry('allocations');
+      if (a && ac) a.setSelectedCountry(ac);
+    } catch (_) { }
+    try {
+      const p = this.personalCircumstancesCountryChipSelector;
+      const pc = mgr.getSelectedCountry('personalCircumstances');
+      if (p && pc) p.setSelectedCountry(pc);
+    } catch (_) { }
+  }
+
+  /**
+   * Returns an array of unique country codes present in the scenario:
+   * StartCountry + all MV-* event countries.
+   */
+  getScenarioCountries() {
+    const cfg = Config.getInstance();
+    const start = (cfg.getStartCountry && cfg.getStartCountry()) ? cfg.getStartCountry() : cfg.getDefaultCountry();
+    const startCountry = (start || '').toString().trim().toLowerCase();
+    const set = {};
+    if (startCountry) set[startCountry] = true;
+    const events = this.readEvents(false) || [];
+    for (let i = 0; i < events.length; i++) {
+      const t = events[i] && events[i].type ? String(events[i].type) : '';
+      if (t && /^MV-[A-Z]{2,}$/.test(t)) {
+        set[t.substring(3).toLowerCase()] = true;
+      }
+    }
+    return Object.keys(set);
+  }
+
+  hasRelocationEvents() {
+    const events = this.readEvents(false) || [];
+    for (let i = 0; i < events.length; i++) {
+      const t = events[i] && events[i].type ? String(events[i].type) : '';
+      if (t && /^MV-[A-Z]{2,}$/.test(t)) return true;
+    }
+    return false;
+  }
+
+  // "Effective" relocation means there is at least one MV-* event whose country differs from StartCountry.
+  // If all MV-* events are MV-<StartCountry>, the scenario is effectively single-country for UI editing.
+  hasEffectiveRelocationEvents() {
+    const cfg = Config.getInstance();
+    const startCountry = (cfg.getStartCountry && cfg.getStartCountry()) ? String(cfg.getStartCountry()).toLowerCase() : '';
+    const events = this.readEvents(false) || [];
+    for (let i = 0; i < events.length; i++) {
+      const t = events[i] && events[i].type ? String(events[i].type) : '';
+      if (t && /^MV-[A-Z]{2,}$/.test(t)) {
+        const c = t.substring(3).toLowerCase();
+        if (c && c !== startCountry) return true;
+      }
+    }
+    return false;
+  }
+
+  getStatePensionPeriodLabel(countryCode) {
+    const cfg = Config.getInstance();
+    const code = (countryCode || '').toString().trim().toLowerCase();
+    const rs = cfg.getCachedTaxRuleSet(code);
+    let period = (rs && typeof rs.getStatePensionPeriod === 'function') ? rs.getStatePensionPeriod() : null;
+    period = (period || '').toString().trim().toLowerCase();
+    if (!period) return 'Period';
+    return period.charAt(0).toUpperCase() + period.slice(1);
+  }
+
+  /**
+   * Ensure the target parameter input exists, even if it's not currently visible.
+   * Used to support CSV load of per-country fields before chips/containers are rendered.
+   */
+  ensureParameterInput(elementId, className) {
+    const id = (elementId || '').toString().trim();
+    if (!id) return;
+    if (document.getElementById(id)) return;
+    const stash = this._ensureHiddenParamStash();
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = id;
+    input.className = className || '';
+    input.autocomplete = 'off';
+    stash.appendChild(input);
+  }
+
+  _ensureHiddenParamStash() {
+    let stash = document.getElementById('hidden-parameter-stash');
+    if (stash) return stash;
+    stash = document.createElement('div');
+    stash.id = 'hidden-parameter-stash';
+    stash.style.display = 'none';
+    const host = document.querySelector('.parameters-section') || document.body;
+    host.appendChild(stash);
+    return stash;
+  }
+
+  _stashInputElement(inputEl) {
+    if (!inputEl || !inputEl.id) return;
+    const stash = this._ensureHiddenParamStash();
+    // If it's already in the stash, do nothing.
+    if (inputEl.parentNode === stash) return;
+    stash.appendChild(inputEl);
+  }
+
+  _takeOrCreateInput(inputId, className) {
+    const existing = document.getElementById(inputId);
+    if (existing) return existing;
+    const input = document.createElement('input');
+    input.id = inputId;
+    input.className = className || '';
+    input.autocomplete = 'off';
+    return input;
+  }
+
+  /**
+   * Refresh chip visibility + per-country inputs for Allocations and Personal Circumstances.
+   * Optional `fallbackStartTypes` is the StartCountry investment types passed from renderInvestmentParameterFields.
+   */
+  refreshCountryChipsFromScenario(fallbackStartTypes) {
+    const cfg = Config.getInstance();
+    const relocationEnabled = cfg.isRelocationEnabled();
+    const hasMV = relocationEnabled && this.hasEffectiveRelocationEvents();
+
+    // If we were called from a generic events-table change (no types provided),
+    // fall back to StartCountry-resolved investment types so we can correctly
+    // revert to single-country mode when MV-* events are removed.
+    let types = Array.isArray(fallbackStartTypes) ? fallbackStartTypes : [];
+    if (!types.length) {
+      const startCountry = cfg.getStartCountry();
+      const rs = cfg.getCachedTaxRuleSet(startCountry);
+      types = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
+    }
+
+    // Allocations chips + per-country allocation inputs
+    this._setupAllocationsCountryChips(hasMV, types);
+
+    // Personal circumstances chips + per-country state pension inputs
+    this.setupPersonalCircumstancesCountryChips();
+  }
+
+  _setupAllocationsCountryChips(hasMV, fallbackStartTypes) {
+    const cfg = Config.getInstance();
+    const allocCard = document.getElementById('Allocations');
+    const allocGroup = document.querySelector('#Allocations .input-group');
+    if (!allocCard || !allocGroup) return;
+    const simulationMode = this.getValue('simulation_mode') || this.currentSimMode || 'single';
+
+    // Persist any user-entered values before we tear down/rebuild allocation inputs
+    this._captureAllocationValues();
+
+    let chipContainer = allocGroup.querySelector('.country-chip-container') || allocCard.querySelector('.country-chip-container');
+    if (!chipContainer) {
+      chipContainer = document.createElement('div');
+      chipContainer.className = 'country-chip-container';
+    }
+    // Place the tabs at the top of the allocations card
+    if (allocGroup.firstChild) {
+      allocGroup.insertBefore(chipContainer, allocGroup.firstChild);
+    } else {
+      allocGroup.appendChild(chipContainer);
+    }
+
+    // Clear any previously generated allocation inputs (both legacy dynamic and per-country containers)
+    // so we don't end up with duplicates when MV-* events are added/removed.
+    this._clearDynamicAllocationInputs(allocGroup);
+
+    // Remove any previously generated per-country allocation containers (not the chip container)
+    // We'll recreate the correct set each time based on current scenario countries.
+    const existingCountryContainers = allocGroup.querySelectorAll('[data-country-allocation-container="true"]');
+    existingCountryContainers.forEach(el => {
+      try {
+        const inputs = el.querySelectorAll('input');
+        for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+      } catch (_) { }
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+
+    if (!hasMV) {
+      // Chips hidden: keep StartCountry inputs effectively identical to multi-country mode.
+      // If relocation is enabled, render StartCountry using per-country IDs (InvestmentAllocation_{country}_{baseKey})
+      // so values do not "move" when effective relocation is toggled on/off.
+      chipContainer.style.display = 'none';
+      this.allocationsCountryChipSelector = null;
+
+      const relocationEnabled = cfg.isRelocationEnabled && cfg.isRelocationEnabled();
+      const types = Array.isArray(fallbackStartTypes) ? fallbackStartTypes : [];
+      const startCountry = (cfg.getStartCountry() || '').toLowerCase();
+
+      if (relocationEnabled) {
+        const countryContainer = document.createElement('div');
+        countryContainer.setAttribute('data-country-allocation-container', 'true');
+        countryContainer.setAttribute('data-country-code', startCountry);
+        countryContainer.style.display = '';
+        countryContainer.style.flexDirection = 'column';
+        countryContainer.style.gap = '0.225rem';
+        countryContainer.style.display = 'flex';
+
+        // Pension fields first
+        this._renderCountryPensionContributionFields(countryContainer, startCountry, simulationMode);
+
+        for (let i = types.length - 1; i >= 0; i--) {
+          const t = types[i] || {};
+          const key = t.key;
+          if (!key) continue;
+          const baseKey = this._toBaseInvestmentKey(key, startCountry);
+          const labelText = (t.label || key) + ' Allocation';
+          const inputId = 'InvestmentAllocation_' + startCountry + '_' + baseKey;
+          const legacyId = 'InvestmentAllocation_' + key;
+
+          // Keep legacy cache seeded for serialization/back-compat
+          if (!this._allocationValueCache[inputId] && this._allocationValueCache[legacyId]) {
+            this._allocationValueCache[inputId] = this._allocationValueCache[legacyId];
+          }
+          if (!this._allocationValueCache[legacyId] && this._allocationValueCache[inputId]) {
+            this._allocationValueCache[legacyId] = this._allocationValueCache[inputId];
+          }
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'input-wrapper';
+          wrapper.setAttribute('data-dynamic-investment-param', 'true');
+
+          const label = document.createElement('label');
+          label.setAttribute('for', inputId);
+          label.textContent = labelText;
+          wrapper.appendChild(label);
+
+          const pctContainer = document.createElement('div');
+          pctContainer.className = 'percentage-container';
+          const input = this._takeOrCreateInput(inputId, 'percentage');
+          input.type = 'text';
+          input.setAttribute('inputmode', 'numeric');
+          input.setAttribute('pattern', '[0-9]*');
+          input.setAttribute('step', '1');
+          input.setAttribute('placeholder', ' ');
+          this._applyAllocationValueIfCached(inputId, input);
+          pctContainer.appendChild(input);
+          wrapper.appendChild(pctContainer);
+
+          countryContainer.appendChild(wrapper);
+        }
+
+        allocGroup.appendChild(countryContainer);
+      } else {
+        // Relocation disabled: keep original legacy layout/IDs.
+        // Pension fields first
+        this._renderCountryPensionContributionFields(allocGroup, startCountry, simulationMode);
+
+        for (let i = 0; i < types.length; i++) {
+          const t = types[i] || {};
+          const key = t.key;
+          if (!key) continue;
+          const labelText = (t.label || key) + ' Allocation';
+          const inputId = 'InvestmentAllocation_' + key;
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'input-wrapper';
+          wrapper.setAttribute('data-dynamic-investment-param', 'true');
+
+          const label = document.createElement('label');
+          label.setAttribute('for', inputId);
+          label.textContent = labelText;
+          wrapper.appendChild(label);
+
+          const pctContainer = document.createElement('div');
+          pctContainer.className = 'percentage-container';
+          const input = this._takeOrCreateInput(inputId, 'percentage');
+          input.type = 'text';
+          input.setAttribute('inputmode', 'numeric');
+          input.setAttribute('pattern', '[0-9]*');
+          input.setAttribute('step', '1');
+          input.setAttribute('placeholder', ' ');
+          this._applyAllocationValueIfCached(inputId, input);
+          pctContainer.appendChild(input);
+          wrapper.appendChild(pctContainer);
+
+          allocGroup.appendChild(wrapper);
+        }
+      }
+      return;
+    }
+
+    // MV-* present: show chips and render per-country allocation inputs for ALL scenario countries.
+    chipContainer.style.display = '';
+    const scenarioCountries = this.getScenarioCountries();
+    const countries = scenarioCountries.map(code => ({ code: code, name: cfg.getCountryNameByCode(code) }));
+    const startCountry = cfg.getStartCountry();
+    const mgrSelected = this.countryTabSyncManager.getSelectedCountry('allocations');
+    const prevSelected = (this.allocationsCountryChipSelector && this.allocationsCountryChipSelector.getSelectedCountry())
+      ? this.allocationsCountryChipSelector.getSelectedCountry()
+      : null;
+    let selected = mgrSelected || prevSelected || startCountry;
+    if (scenarioCountries.indexOf(String(selected).toLowerCase()) === -1) selected = startCountry;
+
+    this.allocationsCountryChipSelector = new CountryChipSelector(
+      countries,
+      selected,
+      (code) => { this._showAllocationsCountry(code); },
+      'allocations'
+    );
+    this.allocationsCountryChipSelector.render(chipContainer);
+
+    for (let ci = 0; ci < scenarioCountries.length; ci++) {
+      const code = scenarioCountries[ci];
+      const rs = cfg.getCachedTaxRuleSet(code);
+      const invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
+      const countryContainer = document.createElement('div');
+      countryContainer.setAttribute('data-country-allocation-container', 'true');
+      countryContainer.setAttribute('data-country-code', code);
+      countryContainer.style.display = (code === selected) ? '' : 'none';
+      countryContainer.style.display = countryContainer.style.display || 'flex';
+      countryContainer.style.flexDirection = 'column';
+      countryContainer.style.gap = '0.225rem';
+
+      // Pension fields first
+      this._renderCountryPensionContributionFields(countryContainer, code, simulationMode);
+
+      for (let i = invTypes.length - 1; i >= 0; i--) {
+        const t = invTypes[i] || {};
+        const key = t.key;
+        if (!key) continue;
+        const baseKey = this._toBaseInvestmentKey(key, code);
+        const labelText = (t.label || key) + ' Allocation';
+        // Field IDs are country-prefixed so the chip selector can switch contexts without losing values.
+        // Convention: InvestmentAllocation_{countryCode}_{typeKey}
+        const inputId = 'InvestmentAllocation_' + code + '_' + baseKey;
+        const legacyId = 'InvestmentAllocation_' + key;
+
+        // If user previously entered StartCountry allocations in legacy fields and is now enabling MV-*,
+        // seed the StartCountry per-country values (only when per-country is empty).
+        if (String(code).toLowerCase() === String(startCountry).toLowerCase()) {
+          if (!this._allocationValueCache[inputId] && this._allocationValueCache[legacyId]) {
+            this._allocationValueCache[inputId] = this._allocationValueCache[legacyId];
+          }
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'input-wrapper';
+        wrapper.setAttribute('data-dynamic-investment-param', 'true');
+
+        const label = document.createElement('label');
+        label.setAttribute('for', inputId);
+        label.textContent = labelText;
+        wrapper.appendChild(label);
+
+        const pctContainer = document.createElement('div');
+        pctContainer.className = 'percentage-container';
+        const input = this._takeOrCreateInput(inputId, 'percentage');
+        input.type = 'text';
+        input.setAttribute('inputmode', 'numeric');
+        input.setAttribute('pattern', '[0-9]*');
+        input.setAttribute('step', '1');
+        input.setAttribute('placeholder', ' ');
+        this._applyAllocationValueIfCached(inputId, input);
+        pctContainer.appendChild(input);
+        wrapper.appendChild(pctContainer);
+
+        countryContainer.appendChild(wrapper);
+      }
+
+      allocGroup.appendChild(countryContainer);
+    }
+    this.countryTabSyncManager.setSelectedCountry('allocations', selected);
+  }
+
+  _showAllocationsCountry(code) {
+    const selected = (code || '').toString().trim().toLowerCase();
+    const containers = document.querySelectorAll('#Allocations .input-group [data-country-allocation-container="true"]');
+    containers.forEach(el => {
+      const c = (el.getAttribute('data-country-code') || '').toLowerCase();
+      el.style.display = (c === selected) ? '' : 'none';
+    });
+  }
+
+  _clearDynamicAllocationInputs(allocGroup) {
+    if (!allocGroup) return;
+    // Remove dynamic allocation input wrappers created by renderInvestmentParameterFields()
+    // and/or previous MV-* container rebuilds.
+    const wrappers = Array.from(allocGroup.querySelectorAll('.input-wrapper[data-dynamic-investment-param="true"]'));
+    for (let i = 0; i < wrappers.length; i++) {
+      const w = wrappers[i];
+      try {
+        const input = w.querySelector('input');
+        const id = input && input.id ? String(input.id) : '';
+        if (id.indexOf('InvestmentAllocation_') === 0) {
+          // Preserve values across mode switches by stashing the input instead of destroying it
+          if (input) this._stashInputElement(input);
+          if (w.parentNode) w.parentNode.removeChild(w);
+        }
+      } catch (_) { }
+    }
+  }
+
+  _captureAllocationValues() {
+    if (!this._allocationValueCache) this._allocationValueCache = {};
+    const allocCard = document.getElementById('Allocations');
+    const stash = document.getElementById('hidden-parameter-stash');
+    const roots = [];
+    if (allocCard) roots.push(allocCard);
+    if (stash) roots.push(stash);
+    for (let r = 0; r < roots.length; r++) {
+      const inputs = roots[r].querySelectorAll('input[id^="InvestmentAllocation_"]');
+      for (let i = 0; i < inputs.length; i++) {
+        const el = inputs[i];
+        const id = el && el.id ? String(el.id) : '';
+        if (!id) continue;
+        const v = (el.value != null) ? String(el.value) : '';
+        // Only overwrite cache with non-empty values; this preserves previously entered values
+        // even if a rebuilt UI briefly creates empty inputs.
+        if (v.trim().length > 0) this._allocationValueCache[id] = v;
+      }
+    }
+  }
+
+  _applyAllocationValueIfCached(inputId, inputEl) {
+    if (!this._allocationValueCache) return;
+    const id = (inputId || '').toString();
+    if (!id || !inputEl) return;
+    const cached = this._allocationValueCache[id];
+    if (cached === undefined || cached === null) return;
+    const current = (inputEl.value != null) ? String(inputEl.value) : '';
+    if (!current || !current.trim()) inputEl.value = String(cached);
+  }
+
+  _toBaseInvestmentKey(typeKey, countryCode) {
+    const key = (typeKey || '').toString();
+    const c = (countryCode || '').toString().trim().toLowerCase();
+    const suffix = '_' + c;
+    if (c && key.toLowerCase().endsWith(suffix)) {
+      return key.slice(0, key.length - suffix.length);
+    }
+    return key;
+  }
+
+  _renderCountryPensionContributionFields(container, countryCode, simulationMode) {
+    const host = container;
+    if (!host) return;
+    const country = (countryCode || '').toString().trim().toLowerCase();
+    if (!country) return;
+
+    // Remove any previously rendered pension fields for this country within the host and stash inputs.
+    const existing = host.querySelectorAll(`[data-country-pension="true"][data-country-code="${country}"]`);
+    existing.forEach(el => {
+      try {
+        const inputs = el.querySelectorAll('input');
+        for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+      } catch (_) { }
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+
+    const cfg = Config.getInstance();
+    const rs = cfg.getCachedTaxRuleSet(country);
+    if (!rs) return;
+    if (rs && typeof rs.hasPrivatePensions === 'function' && !rs.hasPrivatePensions()) return;
+
+    const shouldShowP2 = (simulationMode || '').toString().toLowerCase() === 'couple';
+
+    // P1 contribution
+    const p1Wrapper = document.createElement('div');
+    p1Wrapper.className = 'input-wrapper';
+    p1Wrapper.setAttribute('data-country-pension', 'true');
+    p1Wrapper.setAttribute('data-country-code', country);
+    const p1Label = document.createElement('label');
+    const p1Id = 'P1PensionContrib_' + country;
+    p1Label.setAttribute('for', p1Id);
+    p1Label.textContent = shouldShowP2 ? 'Your Pension Contribution' : 'Pension Contribution';
+    p1Wrapper.appendChild(p1Label);
+    const p1PctContainer = document.createElement('div');
+    p1PctContainer.className = 'percentage-container';
+    const p1Input = this._takeOrCreateInput(p1Id, 'percentage');
+    p1Input.type = 'text';
+    p1Input.setAttribute('inputmode', 'numeric');
+    p1Input.setAttribute('pattern', '[0-9]*');
+    p1Input.setAttribute('step', '1');
+    p1Input.setAttribute('placeholder', ' ');
+    p1PctContainer.appendChild(p1Input);
+    p1Wrapper.appendChild(p1PctContainer);
+    host.appendChild(p1Wrapper);
+
+    // P2 contribution (couple mode only)
+    const p2Wrapper = document.createElement('div');
+    p2Wrapper.className = 'input-wrapper';
+    p2Wrapper.setAttribute('data-country-pension', 'true');
+    p2Wrapper.setAttribute('data-country-code', country);
+    p2Wrapper.setAttribute('data-couple-only', 'true');
+    p2Wrapper.style.display = shouldShowP2 ? 'flex' : 'none';
+    const p2Label = document.createElement('label');
+    const p2Id = 'P2PensionContrib_' + country;
+    p2Label.setAttribute('for', p2Id);
+    p2Label.textContent = 'Their Pension Contribution';
+    p2Wrapper.appendChild(p2Label);
+    const p2PctContainer = document.createElement('div');
+    p2PctContainer.className = 'percentage-container';
+    const p2Input = this._takeOrCreateInput(p2Id, 'percentage');
+    p2Input.type = 'text';
+    p2Input.setAttribute('inputmode', 'numeric');
+    p2Input.setAttribute('pattern', '[0-9]*');
+    p2Input.setAttribute('step', '1');
+    p2Input.setAttribute('placeholder', ' ');
+    p2PctContainer.appendChild(p2Input);
+    p2Wrapper.appendChild(p2PctContainer);
+    host.appendChild(p2Wrapper);
+
+    // Pension capped dropdown per country
+    const cappedWrapper = document.createElement('div');
+    cappedWrapper.className = 'input-wrapper';
+    cappedWrapper.setAttribute('data-country-pension', 'true');
+    cappedWrapper.setAttribute('data-country-code', country);
+    const cappedLabel = document.createElement('label');
+    const cappedToggleId = 'PensionCappedToggle_' + country;
+    cappedLabel.setAttribute('for', cappedToggleId);
+    cappedLabel.textContent = 'Pension Contrib. Capped';
+    cappedWrapper.appendChild(cappedLabel);
+
+    const hiddenInput = this._takeOrCreateInput('PensionCapped_' + country, 'string');
+    if (!hiddenInput.value) hiddenInput.value = 'Yes';
+    hiddenInput.type = 'hidden';
+    hiddenInput.autocomplete = 'off';
+    cappedWrapper.appendChild(hiddenInput);
+
+    const controlDiv = document.createElement('div');
+    controlDiv.className = 'pension-capped-dd visualization-control';
+    controlDiv.id = 'PensionCappedControl_' + country;
+    const toggleSpan = document.createElement('span');
+    toggleSpan.id = cappedToggleId;
+    toggleSpan.className = 'dd-toggle pseudo-select';
+    toggleSpan.textContent = hiddenInput.value || 'Yes';
+    controlDiv.appendChild(toggleSpan);
+    const optionsDiv = document.createElement('div');
+    optionsDiv.id = 'PensionCappedOptions_' + country;
+    optionsDiv.className = 'visualization-dropdown';
+    optionsDiv.style.display = 'none';
+    controlDiv.appendChild(optionsDiv);
+    cappedWrapper.appendChild(controlDiv);
+    host.appendChild(cappedWrapper);
+
+    // Setup dropdown immediately using the created elements.
+    // IMPORTANT: In some code paths the host container isn't attached to the document yet,
+    // so document.getElementById(...) would fail and the dropdown would never initialize.
+    try {
+      const current = hiddenInput.value || 'Yes';
+      toggleSpan.textContent = current;
+      const dropdown = DropdownUtils.create({
+        toggleEl: toggleSpan,
+        dropdownEl: optionsDiv,
+        options: [
+          { value: 'Yes', label: 'Yes', description: 'Yes' },
+          { value: 'No', label: 'No', description: 'No' },
+          { value: 'Match', label: 'Match', description: 'Match' },
+        ],
+        selectedValue: current,
+        onSelect: (val, label) => {
+          hiddenInput.value = val;
+          toggleSpan.textContent = label;
+          hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        },
+      });
+      this.pensionCappedDropdowns[country] = dropdown;
+      if (dropdown && dropdown.wrapper) {
+        hiddenInput._dropdownWrapper = dropdown.wrapper;
+      }
+    } catch (_) { }
+    const tooltipTargets = [p1Id, 'P2PensionContrib_' + country];
+    this.setupPensionContributionTooltips(tooltipTargets);
+  }
+
+  /**
+   * Render UI-configurable tax credit fields for a country.
+   * @param {HTMLElement} container - Parent container
+   * @param {string} countryCode - Country code
+   */
+  _renderCountryTaxCreditFields(container, countryCode) {
+    const host = container;
+    if (!host) return;
+    const country = (countryCode || '').toString().trim().toLowerCase();
+    if (!country) return;
+
+    // Remove any previously rendered credit fields for this country
+    const existing = host.querySelectorAll(`[data-country-tax-credit="true"][data-country-code="${country}"]`);
+    existing.forEach(el => {
+      const inputs = el.querySelectorAll('input');
+      for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+
+    const cfg = Config.getInstance();
+    const rs = cfg.getCachedTaxRuleSet(country);
+    if (!rs || typeof rs.getUIConfigurableCredits !== 'function') return;
+
+    const credits = rs.getUIConfigurableCredits();
+    if (!credits || credits.length === 0) return;
+
+    for (let i = 0; i < credits.length; i++) {
+      const credit = credits[i];
+      const creditId = credit.id;
+      const uiInput = credit.uiInput;
+
+      if (!uiInput || uiInput.section !== 'personalCircumstances') continue;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'input-wrapper';
+      wrapper.setAttribute('data-country-tax-credit', 'true');
+      wrapper.setAttribute('data-country-code', country);
+      wrapper.setAttribute('data-credit-id', creditId);
+
+      const inputId = `TaxCredit_${creditId}_${country}`;
+
+      const label = document.createElement('label');
+      label.setAttribute('for', inputId);
+      label.textContent = uiInput.label || creditId;
+      wrapper.appendChild(label);
+
+      const input = this._takeOrCreateInput(inputId, 'currency');
+      input.type = 'text';
+      input.setAttribute('inputmode', 'numeric');
+      input.setAttribute('placeholder', ' ');
+      wrapper.appendChild(input);
+
+      if (uiInput.tooltip && typeof TooltipUtils !== 'undefined') {
+        TooltipUtils.attachTooltip(input, uiInput.tooltip, {
+          showOnFocus: true,
+          persistWhileFocused: true
+        });
+      }
+
+      host.appendChild(wrapper);
+    }
+  }
+
+  /**
+   * Setup country chips in Personal Circumstances and render per-country fields.
+   */
+  setupPersonalCircumstancesCountryChips() {
+    const cfg = Config.getInstance();
+    const relocationEnabled = cfg.isRelocationEnabled();
+    const chipsVisible = relocationEnabled && this.hasEffectiveRelocationEvents();
+
+    const card = document.getElementById('personalCircumstances');
+    const group = document.querySelector('#personalCircumstances .input-group');
+    if (!card || !group) return;
+
+    // Place the tabs between global fields (marriage/children) and country-specific fields.
+    let chipContainer = group.querySelector('.country-chip-container') || card.querySelector('.country-chip-container');
+    if (!chipContainer) {
+      chipContainer = document.createElement('div');
+      chipContainer.className = 'country-chip-container';
+    }
+    const youngest = document.getElementById('YoungestChildBorn');
+    const youngestWrap = youngest ? youngest.closest('.input-wrapper') : null;
+    if (youngestWrap && youngestWrap.parentNode === group) {
+      group.insertBefore(chipContainer, youngestWrap.nextSibling);
+    } else {
+      group.insertBefore(chipContainer, group.firstChild);
+    }
+
+    // Remove previously generated per-country state pension wrappers
+    const existing = group.querySelectorAll('[data-country-state-pension="true"], [data-country-state-pension-p2="true"]');
+    existing.forEach(el => {
+      try {
+        const inputs = el.querySelectorAll('input');
+        for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+      } catch (_) { }
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+
+    const existingCredits = group.querySelectorAll('[data-country-credit-container="true"]');
+    existingCredits.forEach(el => {
+      const inputs = el.querySelectorAll('input');
+      for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+
+    // If relocation UI is disabled entirely, still render start-country tax credit inputs
+    // (chips stay hidden; no per-country state pension UI in this mode).
+    if (!relocationEnabled) {
+      chipContainer.style.display = 'none';
+      this.personalCircumstancesCountryChipSelector = null;
+
+      const startCountry = cfg.getStartCountry();
+
+      const legacyCredit = document.getElementById('PersonalTaxCredit');
+      const legacyCreditWrap = legacyCredit ? legacyCredit.closest('.input-wrapper') : null;
+
+      const creditContainer = document.createElement('div');
+      creditContainer.setAttribute('data-country-credit-container', 'true');
+      creditContainer.setAttribute('data-country-code', startCountry);
+      creditContainer.style.display = '';
+      this._renderCountryTaxCreditFields(creditContainer, startCountry);
+
+      // If this country has no configurable credits, keep legacy field visible and stop.
+      if (!creditContainer.firstChild) {
+        if (legacyCreditWrap) legacyCreditWrap.style.display = '';
+        return;
+      }
+
+      // Hide legacy PersonalTaxCredit field whenever the new per-country credit fields are shown.
+      if (legacyCreditWrap) legacyCreditWrap.style.display = 'none';
+
+      // Pre-populate the new personal credit input from legacy value (if present).
+      if (legacyCredit && legacyCredit.value) {
+        const newPersonal = document.getElementById('TaxCredit_personal_' + String(startCountry).toLowerCase());
+        if (newPersonal && (!newPersonal.value || String(newPersonal.value).trim() === '')) {
+          newPersonal.value = legacyCredit.value;
+        }
+      }
+
+      // Insert where the legacy credit used to be; otherwise append.
+      if (legacyCreditWrap && legacyCreditWrap.parentNode) {
+        legacyCreditWrap.parentNode.insertBefore(creditContainer, legacyCreditWrap);
+      } else {
+        group.appendChild(creditContainer);
+      }
+      return;
+    }
+
+    // Relocation UI enabled:
+    // - chips are shown only when there is an effective relocation
+    // - StartCountry fields stay consistent (use per-country IDs even in "single-country" mode)
+    chipContainer.style.display = chipsVisible ? '' : 'none';
+    const startCountry = cfg.getStartCountry();
+    const scenarioCountries = chipsVisible ? this.getScenarioCountries() : [startCountry];
+    const countries = scenarioCountries.map(code => ({ code: code, name: cfg.getCountryNameByCode(code) }));
+    const mgrSelected = this.countryTabSyncManager.getSelectedCountry('personalCircumstances');
+    const prevSelected = (this.personalCircumstancesCountryChipSelector && this.personalCircumstancesCountryChipSelector.getSelectedCountry())
+      ? this.personalCircumstancesCountryChipSelector.getSelectedCountry()
+      : null;
+    let selected = mgrSelected || prevSelected || startCountry;
+    if (scenarioCountries.indexOf(String(selected).toLowerCase()) === -1) selected = startCountry;
+
+    if (chipsVisible) {
+      this.personalCircumstancesCountryChipSelector = new CountryChipSelector(
+        countries,
+        selected,
+        (code) => { this._showStatePensionCountry(code); },
+        'personalCircumstances'
+      );
+      this.personalCircumstancesCountryChipSelector.render(chipContainer);
+    } else {
+      this.personalCircumstancesCountryChipSelector = null;
+    }
+    // Per-country fields are now the visible/editable ones whenever relocation UI is enabled.
+    this._enforceLegacyStatePensionVisibilityWhenChipsActive();
+
+    // Hide legacy PersonalTaxCredit field when relocation UI is enabled
+    const legacyCredit = document.getElementById('PersonalTaxCredit');
+    const legacyCreditWrap = legacyCredit ? legacyCredit.closest('.input-wrapper') : null;
+    if (legacyCreditWrap) legacyCreditWrap.style.display = 'none';
+
+    // Insert per-country state pension wrappers before where legacy state pension wrapper used to be
+    const legacyEl = document.getElementById('StatePensionWeekly');
+    const legacyWrap = legacyEl ? legacyEl.closest('.input-wrapper') : null;
+    const insertBeforeEl = legacyWrap || group.querySelector('.input-wrapper:last-child');
+
+    for (let i = 0; i < scenarioCountries.length; i++) {
+      const code = scenarioCountries[i];
+      const periodLabel = this.getStatePensionPeriodLabel(code);
+      // Convention: StatePension_{country} (period defined in tax rules)
+      const inputId = 'StatePension_' + code;
+      const inputIdP2 = 'P2StatePension_' + code;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'input-wrapper';
+      wrapper.setAttribute('data-country-state-pension', 'true');
+      wrapper.setAttribute('data-country-code', code);
+      wrapper.style.display = (code === selected) ? '' : 'none';
+
+      const label = document.createElement('label');
+      label.setAttribute('for', inputId);
+      label.textContent = (this.currentSimMode === 'single')
+        ? ('State Pension (' + periodLabel + ')')
+        : ('Your State Pension (' + periodLabel + ')');
+      wrapper.appendChild(label);
+
+      const input = this._takeOrCreateInput(inputId, 'currency');
+      input.type = 'text';
+      input.setAttribute('inputmode', 'numeric');
+      input.setAttribute('pattern', '[0-9]*');
+      input.setAttribute('data-1p-ignore', '');
+      wrapper.appendChild(input);
+
+      // Person 2 field (same period label; visibility also depends on single/couple mode)
+      const wrapperP2 = document.createElement('div');
+      wrapperP2.className = 'input-wrapper';
+      wrapperP2.setAttribute('data-country-state-pension-p2', 'true');
+      wrapperP2.setAttribute('data-country-code', code);
+      wrapperP2.style.display = (code === selected) ? '' : 'none';
+
+      const labelP2 = document.createElement('label');
+      labelP2.setAttribute('for', inputIdP2);
+      labelP2.textContent = 'Their State Pension (' + periodLabel + ')';
+      wrapperP2.appendChild(labelP2);
+
+      const inputP2 = this._takeOrCreateInput(inputIdP2, 'currency');
+      inputP2.type = 'text';
+      inputP2.setAttribute('inputmode', 'numeric');
+      inputP2.setAttribute('pattern', '[0-9]*');
+      inputP2.setAttribute('data-1p-ignore', '');
+      wrapperP2.appendChild(inputP2);
+
+      if (insertBeforeEl && insertBeforeEl.parentNode === group) {
+        group.insertBefore(wrapper, insertBeforeEl);
+        group.insertBefore(wrapperP2, insertBeforeEl);
+      } else {
+        group.appendChild(wrapper);
+        group.appendChild(wrapperP2);
+      }
+    }
+
+    // Render tax credit fields for each country
+    for (let i = 0; i < scenarioCountries.length; i++) {
+      const code = scenarioCountries[i];
+
+      // Create a container for this country's credit fields
+      const creditContainer = document.createElement('div');
+      creditContainer.setAttribute('data-country-credit-container', 'true');
+      creditContainer.setAttribute('data-country-code', code);
+      creditContainer.style.display = (code === selected) ? '' : 'none';
+
+      this._renderCountryTaxCreditFields(creditContainer, code);
+
+      if (insertBeforeEl && insertBeforeEl.parentNode) {
+        insertBeforeEl.parentNode.insertBefore(creditContainer, insertBeforeEl);
+      } else {
+        group.appendChild(creditContainer);
+      }
+    }
+
+    // Respect single/couple toggle for the P2 per-country state pension wrappers
+    this._syncP2CountryStatePensionVisibility();
+    this.countryTabSyncManager.setSelectedCountry('personalCircumstances', selected);
+  }
+
+  _showStatePensionCountry(code) {
+    const selected = (code || '').toString().trim().toLowerCase();
+    const wrappers = document.querySelectorAll('#personalCircumstances .input-group [data-country-state-pension="true"]');
+    wrappers.forEach(el => {
+      const c = (el.getAttribute('data-country-code') || '').toLowerCase();
+      el.style.display = (c === selected) ? '' : 'none';
+    });
+    const wrappersP2 = document.querySelectorAll('#personalCircumstances .input-group [data-country-state-pension-p2="true"]');
+    wrappersP2.forEach(el => {
+      const c = (el.getAttribute('data-country-code') || '').toLowerCase();
+      el.style.display = (c === selected) ? '' : 'none';
+    });
+    const creditContainers = document.querySelectorAll('#personalCircumstances .input-group [data-country-credit-container="true"]');
+    creditContainers.forEach(el => {
+      const c = (el.getAttribute('data-country-code') || '').toLowerCase();
+      el.style.display = (c === selected) ? '' : 'none';
+    });
+    this._syncP2CountryStatePensionVisibility();
+  }
+
+  _syncP2CountryStatePensionVisibility() {
+    const isSingleMode = this.currentSimMode === 'single';
+    const selected = (this.personalCircumstancesCountryChipSelector && this.personalCircumstancesCountryChipSelector.getSelectedCountry)
+      ? this.personalCircumstancesCountryChipSelector.getSelectedCountry()
+      : null;
+    const wrappersP2 = document.querySelectorAll('#personalCircumstances .input-group [data-country-state-pension-p2="true"]');
+    wrappersP2.forEach(el => {
+      const c = (el.getAttribute('data-country-code') || '').toLowerCase();
+      if (isSingleMode) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = (!selected || c === String(selected).toLowerCase()) ? '' : 'none';
+      }
+    });
+  }
+
+  _enforceLegacyStatePensionVisibilityWhenChipsActive() {
+    const cfg = Config.getInstance();
+    // When relocation UI is enabled, legacy StatePensionWeekly fields should never be visible,
+    // otherwise they can resurface on single/couple toggle and duplicate the per-country fields.
+    const chipsActive = cfg.isRelocationEnabled && cfg.isRelocationEnabled();
+    if (!chipsActive) return;
+    try {
+      const legacy = document.getElementById('StatePensionWeekly');
+      const legacyWrap = legacy ? legacy.closest('.input-wrapper') : null;
+      if (legacyWrap) legacyWrap.style.display = 'none';
+    } catch (_) { }
+    try {
+      const legacy2 = document.getElementById('P2StatePensionWeekly');
+      const legacyWrap2 = legacy2 ? legacy2.closest('.input-wrapper') : null;
+      if (legacyWrap2) legacyWrap2.style.display = 'none';
+    } catch (_) { }
   }
 
   getIncomeColumnVisibility() {
@@ -592,16 +1657,6 @@ class WebUI extends AbstractUI {
       visibility[String(pinnedTypes[i]).toLowerCase()] = true;
     }
 
-    // TODO: THIS SHOULD NOT EXIST. HAVING TO TRANSLATE KEYS LIKE THIS IS A HUGE CODE SMELL.
-    // Helper to normalize raw dataSheet income keys to header keys
-    const toVisibilityKey = (lowerKey) => {
-      // Map legacy two-type income columns to dynamic header keys
-      if (lowerKey === 'incomefundsrent') return 'income__indexfunds';
-      if (lowerKey === 'incomesharesrent') return 'income__shares';
-      // Keep DBI and TaxFree distinct – do NOT merge
-      return lowerKey; // e.g., incomesalaries, incomedefinedbenefit, incometaxfree, incomecash, income__custom
-    };
-
     // Scan dataSheet for income columns with non-zero values
     try {
       const ds = (typeof dataSheet !== 'undefined') ? dataSheet : null;
@@ -609,6 +1664,7 @@ class WebUI extends AbstractUI {
       if (length > 0) {
         // Build union of ALL income keys across ALL rows (rows are 1-based)
         const visKeyToSourceKeys = {};
+        const visKeyToMapKey = {};
         for (let r = 1; r < length; r++) {
           const rowObj = ds[r];
           if (!rowObj) continue;
@@ -617,9 +1673,20 @@ class WebUI extends AbstractUI {
             const k = keys[i];
             const lk = String(k).toLowerCase();
             if (!lk.startsWith('income')) continue;
-            const vKey = toVisibilityKey(lk);
+            const vKey = lk;
             if (!visKeyToSourceKeys[vKey]) visKeyToSourceKeys[vKey] = [];
             if (visKeyToSourceKeys[vKey].indexOf(k) === -1) visKeyToSourceKeys[vKey].push(k);
+          }
+
+          // Core emits dynamic investment liquidation income via investmentIncomeByKey (not flattened Income__ fields).
+          // Add visibility keys matching the dynamic table columns: th[data-key="Income__${key}"] lowercased.
+          const incMap = rowObj.investmentIncomeByKey;
+          if (incMap && typeof incMap === 'object') {
+            for (const invKey in incMap) {
+              const vKey = ('income__' + String(invKey)).toLowerCase();
+              if (!visKeyToSourceKeys[vKey]) visKeyToSourceKeys[vKey] = [];
+              visKeyToMapKey[vKey] = invKey;
+            }
           }
         }
 
@@ -633,8 +1700,17 @@ class WebUI extends AbstractUI {
           for (let r = 1; r < length && !hasNonZeroValue; r++) {
             const rowObj = ds[r];
             if (!rowObj) continue;
+            const mapKey = visKeyToMapKey[vKey];
+            if (mapKey) {
+              const incMap = rowObj.investmentIncomeByKey;
+              if (incMap && typeof incMap === 'object') {
+                const value = incMap[mapKey];
+                if (typeof value === 'number' && Math.abs(value) > threshold) { hasNonZeroValue = true; break; }
+              }
+            }
             for (let s = 0; s < sourceKeys.length; s++) {
-              const value = rowObj[sourceKeys[s]];
+              const sourceKey = sourceKeys[s];
+              const value = rowObj[sourceKey];
               if (typeof value === 'number' && Math.abs(value) > threshold) { hasNonZeroValue = true; break; }
             }
           }
@@ -654,59 +1730,16 @@ class WebUI extends AbstractUI {
     const headerGroupsRow = thead ? thead.querySelector('tr.header-groups') : null;
     const headerRow = thead ? thead.querySelector('tr:nth-child(2)') : null;
     if (!thead || !headerGroupsRow || !headerRow) return;
+    const invTypes = Array.isArray(types) ? types : [];
 
-    // Remove legacy income columns (Funds/Shares) if present
-    const legacyIncomeKeys = ['IncomeFundsRent', 'IncomeSharesRent'];
-    legacyIncomeKeys.forEach(k => {
-      const th = headerRow.querySelector(`th[data-key="${k}"]`);
-      if (th) th.remove();
-    });
-    // Remove any previously added dynamic income columns to avoid duplicates
-    Array.from(headerRow.querySelectorAll('th[data-key^="Income__"]')).forEach(th => th.remove());
-
-    // Insert dynamic income columns so that IncomeCash remains LAST in Gross Income
-    const cashTh = headerRow.querySelector('th[data-key="IncomeCash"]');
-    if (cashTh) {
-      for (let i = 0; i < types.length; i++) {
-        const type = types[i];
-        const key = type && type.key ? type.key : `asset${i}`;
-        const label = type && type.label ? type.label : key;
-        const th = document.createElement('th');
-        th.setAttribute('data-key', `Income__${key}`);
-        th.title = `Income generated from ${label} investments`;
-        th.textContent = label;
-        cashTh.insertAdjacentElement('beforebegin', th);
-      }
-    } else {
-      // Fallback: append after the last existing income column
-      const incomeHeaders = Array.from(headerRow.querySelectorAll('th[data-key^="Income"]'));
-      let incomeAnchor = incomeHeaders.length > 0 ? incomeHeaders[incomeHeaders.length - 1] : null;
-      if (!incomeAnchor) return;
-      for (let i = 0; i < types.length; i++) {
-        const type = types[i];
-        const key = type && type.key ? type.key : `asset${i}`;
-        const label = type && type.label ? type.label : key;
-        const th = document.createElement('th');
-        th.setAttribute('data-key', `Income__${key}`);
-        th.title = `Income generated from ${label} investments`;
-        th.textContent = label;
-        incomeAnchor.insertAdjacentElement('afterend', th);
-        incomeAnchor = th;
-      }
-    }
-
-    // Remove legacy capital columns (Funds/Shares) and insert dynamic capitals after RealEstateCapital
-    const legacyCapitalKeys = ['FundsCapital', 'SharesCapital'];
-    legacyCapitalKeys.forEach(k => {
-      const th = headerRow.querySelector(`th[data-key="${k}"]`);
-      if (th) th.remove();
-    });
+    // === CAPITAL COLUMNS ===
+    // Insert dynamic capitals after RealEstateCapital
     // Remove any previously added dynamic capital columns to avoid duplicates
     Array.from(headerRow.querySelectorAll('th[data-key^="Capital__"]')).forEach(th => th.remove());
     let capitalAnchor = headerRow.querySelector('th[data-key="RealEstateCapital"]');
     if (capitalAnchor) {
-      for (let i = 0; i < types.length; i++) {
-        const type = types[i];
+      for (let i = 0; i < invTypes.length; i++) {
+        const type = invTypes[i];
         const key = type && type.key ? type.key : `asset${i}`;
         const label = type && type.label ? type.label : key;
         const th = document.createElement('th');
@@ -718,46 +1751,18 @@ class WebUI extends AbstractUI {
       }
     }
 
-    // Handle income column visibility if provided
-    if (incomeVisibility) {
-      // After line 526 (in the income visibility handling section)
-      const incomeHeaders = headerRow.querySelectorAll('th[data-key^="Income"]');
-
-      // 1) Build target visible list deterministically from header order
-      const visibilityList = Array.from(incomeHeaders).map(th => {
-        const key = th.getAttribute('data-key').toLowerCase();
-        return !!incomeVisibility[key];
-      });
-
-      // 2) Apply header visibility from the list
-      Array.from(incomeHeaders).forEach((th, i) => {
-        th.style.display = visibilityList[i] ? '' : 'none';
-      });
-
-      // 3) Rebuild body rows to match new header set
-      const uiMgr = (typeof window !== 'undefined' && window.uiManager) ? window.uiManager : (typeof uiManager !== 'undefined' ? uiManager : null);
-      if (uiMgr && typeof uiMgr.updateDataRow === 'function') {
-        const ds = (typeof dataSheet !== 'undefined' && Array.isArray(dataSheet)) ? dataSheet : null;
-        const total = ds ? Math.max(0, ds.length - 1) : 0;
-        for (let i = 1; i <= total; i++) {
-          uiMgr.updateDataRow(i, i / Math.max(1, total));
-        }
-      }
-    }
-
     // Adjust header group colspans for Gross Income and Assets
     const groupCells = Array.from(headerGroupsRow.querySelectorAll('th'));
-    const grossIncomeGroup = groupCells.find(th => (th.textContent || '').trim() === 'Gross Income');
-    const assetsGroup = groupCells.find(th => (th.textContent || '').trim() === 'Assets');
+    const grossIncomeGroup = groupCells.find(th => (th.dataset && th.dataset.group === 'grossIncome') || ((th.textContent || '').trim() === 'Gross Income'));
+    const assetsGroup = groupCells.find(th => (th.dataset && th.dataset.group === 'assets') || ((th.textContent || '').trim() === 'Assets'));
     if (grossIncomeGroup) {
-      // Compute from number of visible income <th> elements
-      const incomeHeaders = Array.from(headerRow.querySelectorAll('th[data-key^="Income"]'));
-      const visibleCount = incomeHeaders.filter(th => th.style.display !== 'none').length;
-      grossIncomeGroup.colSpan = visibleCount;
+      if (this.tableManager && this.tableManager.dynamicSectionsManager) {
+        grossIncomeGroup.colSpan = Math.max(1, this.tableManager.dynamicSectionsManager.getMaxColumnCount('grossIncome'));
+      }
     }
     if (assetsGroup) {
       // PensionFund, Cash, RealEstateCapital (3) + dynamic capital columns (N)
-      assetsGroup.colSpan = 3 + types.length;
+      assetsGroup.colSpan = 3 + invTypes.length;
     }
 
     // Update vertical group borders to align with the new dynamic layout
@@ -775,15 +1780,8 @@ class WebUI extends AbstractUI {
     const headerRow = thead.querySelector('tr:nth-child(2)');
     if (!headerRow) return;
 
-    const allHeaders = Array.from(headerRow.querySelectorAll('th[data-key]'));
-    if (allHeaders.length === 0) return;
-    const headers = allHeaders.filter(h => h.style.display !== 'none');
-
-    // Helper predicates
-    const isIncome = (k) => k.indexOf('Income') === 0;
-    const isTax = (k) => k.indexOf('Tax__') === 0;
-    // Asset group includes pension, cash, real estate and investment capitals ONLY
-    const isAsset = (k) => (k === 'PensionFund' || k === 'Cash' || k === 'RealEstateCapital' || k.indexOf('Capital__') === 0 || k === 'FundsCapital' || k === 'SharesCapital');
+    const allHeaders = Array.from(headerRow.querySelectorAll('th[data-key]')).filter(h => h.style.display !== 'none');
+    if (!allHeaders.length || !this.tableManager) return;
 
     // Clear existing markers and borders
     for (let i = 0; i < allHeaders.length; i++) {
@@ -791,48 +1789,31 @@ class WebUI extends AbstractUI {
       allHeaders[i].style.borderRight = '';
     }
 
-    // Compute group-end indices
-    const findLastIndex = (predicate) => {
-      for (let i = headers.length - 1; i >= 0; i--) {
-        if (predicate(headers[i].dataset.key)) return i;
+    let blueprint = null;
+    let boundarySet = null;
+    try {
+      blueprint = this.tableManager._buildRowBlueprint(Config.getInstance().getDefaultCountry());
+      boundarySet = this.tableManager._computeGroupBoundarySet(blueprint);
+    } catch (_) { }
+    if (!blueprint || !boundarySet) return;
+
+    for (let i = 0; i < blueprint.length && i < allHeaders.length; i++) {
+      const th = allHeaders[i];
+      const seg = blueprint[i];
+      let applyBorder = boundarySet.has(i);
+      if (seg && seg.type === 'section') {
+        const cfg = this.tableManager.dynamicSectionsManager.getSectionConfig(seg.sectionId);
+        if (cfg && cfg.isGroupBoundary === false) applyBorder = false;
       }
-      return -1;
-    };
-
-    // After Year column
-    const yearIdx = headers.findIndex(th => th.dataset.key === 'Year');
-
-    // Gross Income: last header with key starting with 'Income'
-    const incomeLastIdx = findLastIndex(k => isIncome(k));
-
-    // Deductions: last Tax__ column, fallback to PensionContribution
-    let deductionsLastIdx = findLastIndex(k => isTax(k));
-    if (deductionsLastIdx === -1) deductionsLastIdx = headers.findIndex(th => th.dataset.key === 'PensionContribution');
-
-    // Net Cashflow: after Expenses
-    const netCashflowLastIdx = headers.findIndex(th => th.dataset.key === 'Expenses');
-
-    // Assets: last asset column (dynamic capitals if present)
-    let assetsLastIdx = findLastIndex(k => isAsset(k));
-    // If no dynamic capitals present, fall back to SharesCapital (static) if visible
-    if (assetsLastIdx === -1) {
-      assetsLastIdx = headers.findIndex(th => th.dataset.key === 'SharesCapital');
-      if (assetsLastIdx === -1) assetsLastIdx = headers.findIndex(th => th.dataset.key === 'RealEstateCapital');
-    }
-
-    // Build list of boundary indices (skip -1)
-    const boundaryIdxs = [yearIdx, incomeLastIdx, deductionsLastIdx, netCashflowLastIdx, assetsLastIdx].filter(i => i >= 0);
-
-    // Apply markers and visual border to headers
-    for (let i = 0; i < boundaryIdxs.length; i++) {
-      const th = headers[boundaryIdxs[i]];
-      th.setAttribute('data-group-end', '1');
-      th.style.borderRight = '3px solid #666';
+      if (applyBorder) {
+        th.setAttribute('data-group-end', '1');
+        th.style.borderRight = '3px solid #666';
+      }
     }
 
     // Always close the table with a right-side border on the last column
-    if (headers.length > 0) {
-      const lastTh = headers[headers.length - 1];
+    if (allHeaders.length > 0) {
+      const lastTh = allHeaders[allHeaders.length - 1];
       lastTh.setAttribute('data-group-end', '1');
       lastTh.style.borderRight = '3px solid #666';
     }
@@ -1185,7 +2166,7 @@ class WebUI extends AbstractUI {
       // End-of-run: rebuild datasets transactionally and re-apply visibility to ensure single-step update
       const cfg = Config.getInstance();
       const rs = (cfg && typeof cfg.getCachedTaxRuleSet === 'function') ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry && cfg.getDefaultCountry()) : null;
-      const types = (rs && typeof rs.getInvestmentTypes === 'function') ? (rs.getInvestmentTypes() || []) : [];
+      const types = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
       if (this.chartManager && typeof this.chartManager.applyInvestmentTypes === 'function') {
         this.chartManager.applyInvestmentTypes(types, { preserveData: true, transactional: true });
       }
@@ -1336,6 +2317,7 @@ class WebUI extends AbstractUI {
         }
       }
     });
+    this._toggleCoupleOnlyFields(isSingleMode);
 
     // Update P1 Labels
     for (const inputId in this.p1Labels) {
@@ -1350,6 +2332,29 @@ class WebUI extends AbstractUI {
     if (initialSavingsLabel) {
       initialSavingsLabel.textContent = isSingleMode ? 'Current Savings' : 'Current Savings (Joint)';
     }
+
+    // Sync chip-driven state pension fields with sim mode (single/couple).
+    try {
+      this.setupPersonalCircumstancesCountryChips();
+      this._enforceLegacyStatePensionVisibilityWhenChipsActive();
+    } catch (_) { }
+
+    // Keep per-country pension contribution labels consistent with legacy behaviour
+    this._updatePensionContributionLabelsForMode(isSingleMode);
+  }
+
+  _toggleCoupleOnlyFields(isSingleMode) {
+    const wrappers = document.querySelectorAll('[data-couple-only="true"]');
+    wrappers.forEach(w => {
+      w.style.display = isSingleMode ? 'none' : 'flex';
+    });
+  }
+
+  _updatePensionContributionLabelsForMode(isSingleMode) {
+    const labels = document.querySelectorAll('label[for^="P1PensionContrib_"]');
+    labels.forEach(l => {
+      l.textContent = isSingleMode ? 'Pension Contribution' : 'Your Pension Contribution';
+    });
   }
 
   setupEconomyModeToggle() {
@@ -1413,23 +2418,19 @@ class WebUI extends AbstractUI {
   }
 
   preserveVolatilityValues() {
-    const volatilityFields = ['PensionGrowthStdDev', 'FundsGrowthStdDev', 'SharesGrowthStdDev'];
-
-    volatilityFields.forEach(fieldId => {
-      const element = document.getElementById(fieldId);
-      if (element && element.value) {
-        this.preservedVolatilityValues[fieldId] = element.value;
+    const elements = document.querySelectorAll('#growthRates input[id$="GrowthStdDev"]');
+    elements.forEach(el => {
+      if (el && el.id && el.value) {
+        this.preservedVolatilityValues[el.id] = el.value;
       }
     });
   }
 
   restoreVolatilityValues() {
-    const volatilityFields = ['PensionGrowthStdDev', 'FundsGrowthStdDev', 'SharesGrowthStdDev'];
-
-    volatilityFields.forEach(fieldId => {
-      const element = document.getElementById(fieldId);
-      if (element && this.preservedVolatilityValues[fieldId]) {
-        element.value = this.preservedVolatilityValues[fieldId];
+    const elements = document.querySelectorAll('#growthRates input[id$="GrowthStdDev"]');
+    elements.forEach(el => {
+      if (el && el.id && this.preservedVolatilityValues[el.id]) {
+        el.value = this.preservedVolatilityValues[el.id];
       }
     });
   }
@@ -1459,10 +2460,16 @@ class WebUI extends AbstractUI {
   /* -------------------------------------------------------------
    * Pension Contribution tooltip (maps entered % of max to actual % by age band)
    * ------------------------------------------------------------- */
-  setupPensionContributionTooltips() {
+  setupPensionContributionTooltips(targetInputIds) {
+    const cfg = Config.getInstance();
+    const ids = Array.isArray(targetInputIds) && targetInputIds.length
+      ? targetInputIds
+      : Array.from(document.querySelectorAll('input[id^="P1PensionContrib_"], input[id^="P2PensionContrib_"]')).map(el => el.id);
+
     const attach = (inputId) => {
       const el = document.getElementById(inputId);
       if (!el || typeof TooltipUtils === 'undefined') return;
+      const country = this._extractCountryFromPensionId(inputId) || cfg.getDefaultCountry();
       TooltipUtils.attachTooltip(el, () => {
         // Determine entered value as a fraction (e.g., 100 -> 1.0)
         let entered = 1; // default to 100% for clarity when empty
@@ -1472,8 +2479,7 @@ class WebUI extends AbstractUI {
 
         // Get age bands from TaxRuleSet (fallback to legacy config if needed)
         let bands = {};
-        const cfg = Config.getInstance();
-        const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry()) : null;
+        const rs = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(country) : null;
         bands = (rs && typeof rs.getPensionContributionAgeBands === 'function')
           ? rs.getPensionContributionAgeBands()
           : (cfg && cfg.pensionContributionRateBands) ? cfg.pensionContributionRateBands : {};
@@ -1513,8 +2519,16 @@ class WebUI extends AbstractUI {
       });
     };
 
-    attach('PensionContributionPercentage');
-    attach('PensionContributionPercentageP2');
+    for (let i = 0; i < ids.length; i++) {
+      attach(ids[i]);
+    }
+  }
+
+  _extractCountryFromPensionId(inputId) {
+    if (!inputId) return '';
+    const idx = inputId.lastIndexOf('_');
+    if (idx === -1) return '';
+    return inputId.substring(idx + 1).toLowerCase();
   }
 
   showParameterTooltip(inputElement, fieldId) {
@@ -1629,14 +2643,16 @@ class WebUI extends AbstractUI {
   /* -------------------------------------------------------------
    * Pension Capped dropdown (Yes / No / Match) with tooltips
    * ------------------------------------------------------------- */
-  setupPensionCappedDropdown() {
+  setupPensionCappedDropdownForCountry(countryCode) {
+    const country = (countryCode || '').toString().trim().toLowerCase();
+    if (!country) return;
     try {
-      const hiddenInput = document.getElementById('PensionContributionCapped');
-      const toggleEl = document.getElementById('PensionContributionCappedToggle');
-      const dropdownEl = document.getElementById('PensionContributionCappedOptions');
+      const hiddenInput = document.getElementById('PensionCapped_' + country);
+      const toggleEl = document.getElementById('PensionCappedToggle_' + country);
+      const dropdownEl = document.getElementById('PensionCappedOptions_' + country);
       if (!hiddenInput || !toggleEl || !dropdownEl) return;
 
-      // Build descriptions for each option from help.yml text used for this field
+      // Build descriptions for each option from help.yml text used for the legacy field
       let yesDesc = 'Yes';
       let noDesc = 'No';
       let matchDesc = 'Match';
@@ -1653,7 +2669,6 @@ class WebUI extends AbstractUI {
               html = FormatUtils.replaceAgeYearPlaceholders(html);
             }
           } catch (_) { }
-          // Extract text inside the <li><b>Label</b>: description</li> items
           const extract = (label) => {
             const re = new RegExp(`<li>\\s*<b>${label}<\\/b>\\s*:\\s*([^<]+)<\\/li>`, 'i');
             const m = html.match(re);
@@ -1674,7 +2689,7 @@ class WebUI extends AbstractUI {
         { value: 'Match', label: 'Match', description: matchDesc },
       ];
 
-      this.pensionCappedDropdown = DropdownUtils.create({
+      const dropdown = DropdownUtils.create({
         toggleEl,
         dropdownEl,
         options,
@@ -1682,18 +2697,18 @@ class WebUI extends AbstractUI {
         onSelect: (val, label) => {
           hiddenInput.value = val;
           toggleEl.textContent = label;
-          // Fire change so listeners update
           hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
         },
       });
 
-      // Bridge validation styling: allow NotificationUtils to add .warning on wrapper via hidden input
-      if (this.pensionCappedDropdown && this.pensionCappedDropdown.wrapper) {
-        hiddenInput._dropdownWrapper = this.pensionCappedDropdown.wrapper;
+      this.pensionCappedDropdowns[country] = dropdown;
+
+      if (dropdown && dropdown.wrapper) {
+        hiddenInput._dropdownWrapper = dropdown.wrapper;
       }
     } catch (err) {
       // Non-fatal: keep native fallback if anything goes wrong
-      console.warn('setupPensionCappedDropdown failed', err);
+      console.warn('setupPensionCappedDropdownForCountry failed', err);
     }
   }
 
@@ -1721,7 +2736,16 @@ class WebUI extends AbstractUI {
       hiddenInput.id = 'StartCountry';
       hiddenInput.className = 'string';
       hiddenInput.autocomplete = 'off';
+      // Initialize deterministically, but mark as "auto" so geolocation may override it
+      // without being treated as a user edit.
+      // IMPORTANT: do NOT call config.getStartCountry() here because StartCountry doesn't exist yet
+      // and getStartCountry() reads it when relocation is enabled.
+      hiddenInput.value = config.getDefaultCountry();
+      hiddenInput.dataset.auto = '1';
       wrapper.appendChild(hiddenInput);
+      hiddenInput.addEventListener('change', async () => {
+        await this.ensureInvestmentParameterFields();
+      });
 
       // Create dropdown control div
       const controlDiv = document.createElement('div');
@@ -1759,22 +2783,32 @@ class WebUI extends AbstractUI {
         toggleEl: toggleSpan,
         dropdownEl: optionsDiv,
         options,
-        selectedValue: '',
+        selectedValue: hiddenInput.value,
         onSelect: (val, label) => {
           hiddenInput.value = val;
+          hiddenInput.dataset.auto = '0'; // user-chosen
           toggleSpan.textContent = label;
           // Fire change so listeners update
           hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
         },
       });
 
+      // Ensure visible label is populated for the initial selected value.
+      try {
+        const initial = (hiddenInput.value || '').toString().trim();
+        if (initial) {
+          const match = options.find(o => String(o.value).trim().toLowerCase() === initial.toLowerCase());
+          if (match) toggleSpan.textContent = match.label;
+        }
+      } catch (_) { }
+
       // Bridge validation styling
       if (this.startCountryDropdown && this.startCountryDropdown.wrapper) {
         hiddenInput._dropdownWrapper = this.startCountryDropdown.wrapper;
       }
 
-      // Fetch user country
-      return this.fetchUserCountry();
+      // Fetch user country (non-blocking; never gate app startup on network)
+      this.fetchUserCountry();
     } catch (err) {
       // Non-fatal
       console.warn('setupStartCountryDropdown failed', err);
@@ -1783,6 +2817,8 @@ class WebUI extends AbstractUI {
 
   async fetchUserCountry() {
     try {
+      // Ensure StartCountry input exists before setting value
+      this.ensureParameterInput('StartCountry', 'string');
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
       const response = await fetch('https://ipapi.co/country/', { signal: controller.signal });
@@ -1797,7 +2833,17 @@ class WebUI extends AbstractUI {
         return code.trim().toLowerCase() === country;
       });
       if (match) {
+        const from = this.getValue('StartCountry');
+        const baselineSet = (this.fileManager && this.fileManager.lastSavedState !== null);
+        const wasDirty = (this.fileManager && this.fileManager.hasUnsavedChanges && this.fileManager.hasUnsavedChanges());
+        // Only auto-set if StartCountry is still "auto"/default (not user-selected) and hasn't started editing.
+        const el = (typeof document !== 'undefined') ? document.getElementById('StartCountry') : null;
+        const isAuto = !!(el && el.dataset && el.dataset.auto === '1');
+        if (!isAuto) return;
+        if (wasDirty) return;
+
         this.setValue('StartCountry', match.code);
+        try { if (el && el.dataset) el.dataset.auto = '1'; } catch (_) { }
         // Also update the visible dropdown label/selected state (avoid re-dispatching change)
         const optionsEl = document.getElementById('StartCountryOptions');
         const toggleEl = document.getElementById('StartCountryToggle');
@@ -1808,6 +2854,11 @@ class WebUI extends AbstractUI {
             optEl.classList.add('selected');
             toggleEl.textContent = optEl.textContent;
           }
+        }
+        // Auto-detected StartCountry is part of initial app state, not a user edit:
+        // refresh baseline if one was already established.
+        if (this.fileManager && baselineSet) {
+          this.fileManager.updateLastSavedState();
         }
       }
     } catch (e) {
@@ -2107,8 +3158,16 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
 
     // Initialize controls that depend on Config/tax rules being available
     // IMPORTANT: Create StartCountry controls before any code may read it
-    webUi.setupPensionCappedDropdown();
     await webUi.setupStartCountryDropdown();
+    // StartCountry may be changed by fetchUserCountry(); ensure its ruleset is cached
+    // before any sync-only consumers (e.g. dynamic sections) run.
+    const cfgStart = Config.getInstance();
+    const startCountry = cfgStart.getStartCountry();
+    if (!cfgStart.getCachedTaxRuleSet(startCountry)) {
+      await cfgStart.getTaxRuleSet(startCountry);
+    }
+    await webUi.ensureInvestmentParameterFields();
+    webUi.setupScenarioCountryAutoRefresh();
 
     // Create the initial empty event row as early as possible post-Config init
     // so tests and UI logic can safely target row_1 without racing later steps
@@ -2127,7 +3186,7 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
       const txt = th.getAttribute('title');
       if (!txt) return;
       // Persist tooltip text for TableManager-generated sticky tax headers
-      try { th.setAttribute('data-tooltip', txt); } catch (_) {}
+      try { th.setAttribute('data-tooltip', txt); } catch (_) { }
       th.removeAttribute('title');
       TooltipUtils.attachTooltip(th, txt, { hoverDelay: 150, touchDelay: 250 });
     });
@@ -2136,7 +3195,30 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     const cfg = Config.getInstance();
     const rs = (cfg.getCachedTaxRuleSet ? (cfg.getCachedTaxRuleSet(cfg.getDefaultCountry())) : null) || (cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet() : null);
     if (rs && typeof rs.getInvestmentTypes === 'function') {
-      const investmentTypes = rs.getInvestmentTypes() || [];
+      let investmentTypes = rs.getResolvedInvestmentTypes() || [];
+      try {
+        const cached = cfg.listCachedRuleSets ? cfg.listCachedRuleSets() : {};
+        const typeByKey = {};
+        const ordered = [];
+        const addTypes = (list) => {
+          const arr = Array.isArray(list) ? list : [];
+          for (let i = 0; i < arr.length; i++) {
+            const t = arr[i];
+            if (!t || !t.key) continue;
+            if (!typeByKey[t.key]) {
+              typeByKey[t.key] = t;
+              ordered.push(t);
+            }
+          }
+        };
+        addTypes(investmentTypes);
+        for (const cc in cached) {
+          const crs = cached[cc];
+          if (!crs || crs === rs || typeof crs.getResolvedInvestmentTypes !== 'function') continue;
+          addTypes(crs.getResolvedInvestmentTypes());
+        }
+        investmentTypes = ordered;
+      } catch (_) { }
       const pinned = (typeof rs.getPinnedIncomeTypes === 'function') ? (rs.getPinnedIncomeTypes() || []) : [];
       const pinnedVisibility = {};
       for (let i = 0; i < pinned.length; i++) {

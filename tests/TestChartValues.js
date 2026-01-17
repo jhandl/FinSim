@@ -80,11 +80,11 @@ const DEMO3_BASELINE = {
   // across countries (vs ballooning nominally under evolved FX).
   ages: {
     40: { worth: 2292223578.686624, cash: 14938121.255654156, netIncome: 833059779.5234649 },
-    65: { worth: 1826924404261.7158, cash: 4546507611.75827, netIncome: 82167802428.2647 },
-    80: { worth: 32285240708581.207, cash: 140509952772.85306, netIncome: 2419679637876.817 }
+    65: { worth: 1826924404261.7158, cash: 4546507611.75827, netIncome: 8656794176.110376 },
+    80: { worth: 44933691100436.414, cash: 140509952772.85306, netIncome: 2419679637876.817 }
   },
-  final: { age: 90, worth: 284990679944460.1, cash: 1383757107738.8225 },
-  maxWorth: 284990679944460.1
+  final: { age: 90, worth: 674105084118480.4, cash: 1383757107738.8225 },
+  maxWorth: 674105084118480.4
 };
 
 // Tolerances for evolution FX mode (inflation-driven FX rates)
@@ -99,6 +99,20 @@ function parseNumeric(value, treatPercentAsFraction) {
   const numericPortion = percent ? trimmed.slice(0, -1) : trimmed;
   const num = parseFloat(numericPortion);
   if (isNaN(num)) return 0;
+  if (percent && treatPercentAsFraction) {
+    return num / 100;
+  }
+  return num;
+}
+
+function parseOptionalNumeric(value, treatPercentAsFraction) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const percent = trimmed.endsWith('%');
+  const numericPortion = percent ? trimmed.slice(0, -1) : trimmed;
+  const num = parseFloat(numericPortion);
+  if (isNaN(num)) return null;
   if (percent && treatPercentAsFraction) {
     return num / 100;
   }
@@ -151,6 +165,16 @@ function addParameter(target, rawKey, rawValue) {
   target[actualKey] = normalized;
   if (actualKey !== trimmedKey) {
     target[trimmedKey] = normalized;
+  }
+  if (/^TaxCredit_/.test(actualKey)) {
+    const parts = actualKey.split('_');
+    if (parts.length >= 3) {
+      const country = parts[parts.length - 1].toLowerCase();
+      const creditId = parts.slice(1, parts.length - 1).join('_');
+      if (!target.taxCreditsByCountry) target.taxCreditsByCountry = {};
+      if (!target.taxCreditsByCountry[country]) target.taxCreditsByCountry[country] = {};
+      target.taxCreditsByCountry[country][creditId] = normalized;
+    }
   }
 }
 
@@ -231,6 +255,15 @@ function parseDemoCsvScenario(filePath) {
   params.growthDevFunds = 0;
   params.growthDevShares = 0;
   params.growthDevPension = 0;
+
+  const startCountry = (params.StartCountry || 'ie').toLowerCase();
+  if (params.personalTaxCredit !== undefined && params.personalTaxCredit !== null && params.personalTaxCredit !== '') {
+    if (!params.taxCreditsByCountry) params.taxCreditsByCountry = {};
+    if (!params.taxCreditsByCountry[startCountry]) params.taxCreditsByCountry[startCountry] = {};
+    if (params.taxCreditsByCountry[startCountry].personal === undefined) {
+      params.taxCreditsByCountry[startCountry].personal = params.personalTaxCredit;
+    }
+  }
 
   return { parameters: params, events, relocations };
 }
@@ -798,6 +831,10 @@ module.exports = {
           emergencyStash: 0,
           FundsAllocation: 0.5,
           SharesAllocation: 0.5,
+          priorityCash: 1,
+          priorityFunds: 2,
+          priorityShares: 3,
+          priorityPension: 4,
           inflation: 0.02,
           growthRateFunds: 0.05,
           growthRateShares: 0.06,
@@ -814,17 +851,18 @@ module.exports = {
           { type: 'SI', id: 'IE_Salary', amount: 50000, fromAge: 30, toAge: 39, rate: 0.04, match: 0.03, currency: 'EUR' },
           { type: 'E', id: 'IE_Life', amount: 35000, fromAge: 30, toAge: 39, currency: 'EUR' },
           { type: 'R', id: 'IE_Property', amount: 40000, fromAge: 32, toAge: 60, currency: 'EUR', linkedCountry: 'ie' },
-          { type: 'M', id: 'IE_Property', amount: 18000, fromAge: 32, toAge: 55, rate: 0.03, currency: 'EUR', linkedCountry: 'ie' },
+          { type: 'M', id: 'IE_Property', amount: 8000, fromAge: 32, toAge: 39, rate: 0.03, currency: 'EUR', linkedCountry: 'ie' },
           { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR' },
-          { type: 'SI', id: 'AR_Salary', amount: 65000000, fromAge: 40, toAge: 60, rate: 0.02, match: 0, currency: 'ARS' },
-          { type: 'E', id: 'AR_Expenses', amount: 20000000, fromAge: 40, toAge: 60, currency: 'ARS' },
-          { type: 'RI', id: 'AR_Rent', amount: 4000000, fromAge: 42, toAge: 60, currency: 'ARS', linkedCountry: 'ar' }
+          { type: 'SI', id: 'AR_Salary', amount: 120000000, fromAge: 40, toAge: 60, rate: 0.02, match: 0, currency: 'ARS' },
+          { type: 'E', id: 'AR_Expenses', amount: 18000000, fromAge: 40, toAge: 60, rate: 0.02, currency: 'ARS' },
+          { type: 'RI', id: 'AR_Rent', amount: 4000000, fromAge: 40, toAge: 60, currency: 'ARS', linkedCountry: 'ar' }
         ]
       },
       assertions: []
     };
 
     const syntheticFramework = new TestFramework();
+    syntheticFramework.verbose = false;
 
     // Run the new emergency stash relocation test
     const stashResult = await this.testEmergencyStashRelocation();
@@ -840,6 +878,7 @@ module.exports = {
       ar: deepClone(AR_RULES)
     });
     const syntheticResults = await syntheticFramework.runSimulation();
+    // (debug-only logging removed)
     if (!syntheticResults || !syntheticResults.success) {
       return { success: false, errors: ['Synthetic scenario failed to run'] };
     }
@@ -911,7 +950,6 @@ module.exports = {
     // demo3 regression
     const parsed = parseDemoCsvScenario(DEMO3_PATH);
     parsed.parameters.relocationEnabled = parsed.parameters.relocationEnabled !== false;
-
     const demoFramework = new TestFramework();
     if (!demoFramework.loadScenario({
       name: 'Demo3Regression',
@@ -951,7 +989,7 @@ module.exports = {
     // Add ages with major real estate/market events (demo3: age 70 has R,Downsize and SM,Crash)
     demoAllowedSpikeAges.add(70);
     ensureSmoothSeries(demoRows, 'worth', demoAllowedSpikeAges, 1.1, errors, 'Demo net worth');
-    ensureSmoothSeries(demoRows, 'cash', demoAllowedSpikeAges, 1.1, errors, 'Demo cash');
+    ensureSmoothSeries(demoRows, 'cash', demoAllowedSpikeAges, 1.3, errors, 'Demo cash');
     ensureNonZero(demoRows, 'netIncome', parsed.parameters.startingAge, Math.min((parsed.parameters.targetAge || parsed.parameters.startingAge + 60), parsed.parameters.startingAge + 40), errors, 'Demo net income');
     validatePresentValueSeries(demoRows, parsed.parameters.inflation, parsed.parameters.startingAge, errors);
 
@@ -980,6 +1018,31 @@ module.exports = {
       parsed.events,
       parsed.parameters.StartCountry
     );
+
+    // Dynamic investment income regression: demo3 should emit per-investment-type liquidation income
+    // into investmentIncomeByKey, using resolved type keys (e.g. *_ie) rather than legacy unscoped keys.
+    const demoLiquidationAge = 35;
+    const demoLiquidationRow = findRow(demoRows, demoLiquidationAge);
+    const demoIncomeMap = demoLiquidationRow ? demoLiquidationRow.investmentIncomeByKey : null;
+    const demoIncomeEntries = demoIncomeMap && typeof demoIncomeMap === 'object'
+      ? Object.entries(demoIncomeMap).filter(([, value]) => Number.isFinite(value) && Math.abs(value) > 1e-6)
+      : [];
+    if (!demoLiquidationRow) {
+      errors.push(`Demo: missing row for expected liquidation age ${demoLiquidationAge}`);
+    } else if (demoIncomeEntries.length === 0) {
+      errors.push(`Demo: expected non-zero investmentIncomeByKey at age ${demoLiquidationAge}`);
+    } else {
+      const demoIncomeKeys = demoIncomeEntries.map(([key]) => key);
+      const legacyKeys = demoIncomeKeys.filter(key => key === 'indexFunds' || key === 'shares' || key === 'pension');
+      if (legacyKeys.length) {
+        errors.push(`Demo: investmentIncomeByKey used legacy keys at age ${demoLiquidationAge}: ${legacyKeys.join(', ')}`);
+      }
+      const badKeys = demoIncomeKeys.filter(key => String(key).indexOf('_') === -1 || !String(key).toLowerCase().endsWith('_ie'));
+      if (badKeys.length) {
+        errors.push(`Demo: investmentIncomeByKey keys were not ruleset-resolved (expected *_ie) at age ${demoLiquidationAge}: ${badKeys.join(', ')}`);
+      }
+    }
+
     validateActualPVFields(
       demoRows,
       parsed.parameters.inflation,

@@ -64,6 +64,9 @@ module.exports = {
           StartCountry: 'uu',
           simulation_mode: 'single',
           economy_mode: 'deterministic',
+          relocationEnabled: true,
+          growthRatePension: 0,
+          growthDevPension: 0,
           pensionPercentage: 0.05,
           pensionPercentageP2: 0
         },

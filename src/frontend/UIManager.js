@@ -138,9 +138,45 @@ class UIManager {
 
     // Data sheet semantics:
     // - core `netIncome` includes personal pension contributions (pension savings)
-    // - UI "Inflows" should reflect cash inflows, excluding pension contributions
-    const cashInflows = dataSheet[row].netIncome - dataSheet[row].pensionContribution;
-    const cashInflowsPV = dataSheet[row].netIncomePV - dataSheet[row].pensionContributionPV;
+    // - UI "Inflows" should reflect cash inflows after taxes, excluding pension contributions.
+    //   It must be computed from the post-withdrawal income/tax buckets (not from core `netIncome`,
+    //   which is computed pre-withdrawal and intentionally excludes withdrawals).
+    const invMap = dataSheet[row].investmentIncomeByKey || {};
+    let invIncome = 0;
+    for (const key in invMap) invIncome += invMap[key];
+    const invMapPV = dataSheet[row].investmentIncomeByKeyPV || {};
+    let invIncomePV = 0;
+    for (const key in invMapPV) invIncomePV += invMapPV[key];
+    const taxByKey = dataSheet[row].taxByKey || {};
+    let totalTax = 0;
+    for (const tId in taxByKey) totalTax += taxByKey[tId];
+    let totalTaxPV = 0;
+    for (const tId in taxByKey) {
+      const pvKey = 'Tax__' + tId + 'PV';
+      totalTaxPV += (dataSheet[row][pvKey] || 0);
+    }
+    const grossInflows =
+      (dataSheet[row].incomeSalaries || 0) +
+      (dataSheet[row].incomeRSUs || 0) +
+      (dataSheet[row].incomeRentals || 0) +
+      (dataSheet[row].incomePrivatePension || 0) +
+      (dataSheet[row].incomeStatePension || 0) +
+      (dataSheet[row].incomeDefinedBenefit || 0) +
+      (dataSheet[row].incomeTaxFree || 0) +
+      (dataSheet[row].incomeCash || 0) +
+      invIncome;
+    const grossInflowsPV =
+      (dataSheet[row].incomeSalariesPV || 0) +
+      (dataSheet[row].incomeRSUsPV || 0) +
+      (dataSheet[row].incomeRentalsPV || 0) +
+      (dataSheet[row].incomePrivatePensionPV || 0) +
+      (dataSheet[row].incomeStatePensionPV || 0) +
+      (dataSheet[row].incomeDefinedBenefitPV || 0) +
+      (dataSheet[row].incomeTaxFreePV || 0) +
+      (dataSheet[row].incomeCashPV || 0) +
+      invIncomePV;
+    const cashInflows = grossInflows - totalTax - (dataSheet[row].pensionContribution || 0);
+    const cashInflowsPV = grossInflowsPV - totalTaxPV - (dataSheet[row].pensionContributionPV || 0);
 
     const data = {
       // Age and year are state values, not accumulated - don't divide by scale
@@ -151,8 +187,6 @@ class UIManager {
       IncomeRentals: dataSheet[row].incomeRentals / scale,
       IncomePrivatePension: dataSheet[row].incomePrivatePension / scale,
       IncomeStatePension: dataSheet[row].incomeStatePension / scale,
-      IncomeFundsRent: dataSheet[row].incomeFundsRent / scale,
-      IncomeSharesRent: dataSheet[row].incomeSharesRent / scale,
       IncomeCash: dataSheet[row].incomeCash / scale,
       IncomeDefinedBenefit: dataSheet[row].incomeDefinedBenefit / scale,
       IncomeTaxFree: dataSheet[row].incomeTaxFree / scale,
@@ -161,8 +195,6 @@ class UIManager {
       Expenses: dataSheet[row].expenses / scale,
       PensionFund: dataSheet[row].pensionFund / scale,
       Cash: dataSheet[row].cash / scale,
-      FundsCapital: dataSheet[row].indexFundsCapital / scale,
-      SharesCapital: dataSheet[row].sharesCapital / scale,
       PensionContribution: dataSheet[row].pensionContribution / scale,
       WithdrawalRate: dataSheet[row].withdrawalRate / scale,
       Worth: dataSheet[row].worth / scale,
@@ -172,8 +204,6 @@ class UIManager {
       IncomeRentalsPV: dataSheet[row].incomeRentalsPV / scale,
       IncomePrivatePensionPV: dataSheet[row].incomePrivatePensionPV / scale,
       IncomeStatePensionPV: dataSheet[row].incomeStatePensionPV / scale,
-      IncomeFundsRentPV: dataSheet[row].incomeFundsRentPV / scale,
-      IncomeSharesRentPV: dataSheet[row].incomeSharesRentPV / scale,
       IncomeCashPV: dataSheet[row].incomeCashPV / scale,
       IncomeDefinedBenefitPV: dataSheet[row].incomeDefinedBenefitPV / scale,
       IncomeTaxFreePV: dataSheet[row].incomeTaxFreePV / scale,
@@ -182,8 +212,6 @@ class UIManager {
       ExpensesPV: dataSheet[row].expensesPV / scale,
       PensionFundPV: dataSheet[row].pensionFundPV / scale,
       CashPV: dataSheet[row].cashPV / scale,
-      FundsCapitalPV: dataSheet[row].indexFundsCapitalPV / scale,
-      SharesCapitalPV: dataSheet[row].sharesCapitalPV / scale,
       PensionContributionPV: dataSheet[row].pensionContributionPV / scale,
       WorthPV: dataSheet[row].worthPV / scale,
       Attributions: dataSheet[row].attributions
@@ -290,23 +318,210 @@ class UIManager {
 
     // Dynamic investment parameters from ruleset
     const ruleset = cfg.getCachedTaxRuleSet(params.StartCountry);
-    const investmentTypes = ruleset.getInvestmentTypes() || [];
+    const investmentTypes = ruleset.getResolvedInvestmentTypes() || [];
     const initialCapitalByKey = {};
-    const investmentAllocationsByKey = {};
+    const investmentAllocationsByCountry = {};
     const investmentGrowthRatesByKey = {};
     const investmentVolatilitiesByKey = {};
+    const startCountry = params.StartCountry.toLowerCase();
+    investmentAllocationsByCountry[startCountry] = {};
     for (let i = 0; i < investmentTypes.length; i++) {
       const type = investmentTypes[i];
       const key = type.key;
       initialCapitalByKey[key] = this.ui.getValue(`InitialCapital_${key}`);
-      investmentAllocationsByKey[key] = this.ui.getValue(`InvestmentAllocation_${key}`);
+      // Allocation inputs can be rendered either as legacy `InvestmentAllocation_{typeKey}`
+      // or as per-country `InvestmentAllocation_{countryCode}_{baseKey}` when relocation UI is enabled.
+      let alloc = 0;
+      try {
+        alloc = this.ui.getValue(`InvestmentAllocation_${key}`);
+      } catch (_) {
+        alloc = 0;
+      }
+      investmentAllocationsByCountry[startCountry][key] = alloc;
       investmentGrowthRatesByKey[key] = this.ui.getValue(`${key}GrowthRate`);
       investmentVolatilitiesByKey[key] = this.ui.getValue(`${key}GrowthStdDev`);
     }
     params.initialCapitalByKey = initialCapitalByKey;
-    params.investmentAllocationsByKey = investmentAllocationsByKey;
+    params.investmentAllocationsByCountry = investmentAllocationsByCountry;
     params.investmentGrowthRatesByKey = investmentGrowthRatesByKey;
     params.investmentVolatilitiesByKey = investmentVolatilitiesByKey;
+
+    // Relocation-enabled: read per-country allocations from country-prefixed fields
+    // Convention: InvestmentAllocation_{countryCode}_{typeKey} (typeKey without country suffix)
+    try {
+      if (cfg.isRelocationEnabled && cfg.isRelocationEnabled()) {
+        // Derive scenario countries from MV-* events + StartCountry
+        let scenarioCountries = null;
+        if (this.ui && typeof this.ui.getScenarioCountries === 'function') {
+          scenarioCountries = this.ui.getScenarioCountries();
+        } else {
+          // Fallback: parse events directly (UIManager already knows how)
+          const evs = this.readEvents(false) || [];
+          const set = {};
+          set[startCountry] = true;
+          for (let i = 0; i < evs.length; i++) {
+            const t = evs[i] && evs[i].type ? String(evs[i].type) : '';
+            if (t && /^MV-[A-Z]{2,}$/.test(t)) set[t.substring(3).toLowerCase()] = true;
+          }
+          scenarioCountries = Object.keys(set);
+        }
+
+        for (let ci = 0; ci < scenarioCountries.length; ci++) {
+          const c = String(scenarioCountries[ci] || '').trim().toLowerCase();
+          if (!c) continue;
+          if (!investmentAllocationsByCountry[c]) investmentAllocationsByCountry[c] = {};
+          const rs = cfg.getCachedTaxRuleSet(c);
+          const types = rs.getResolvedInvestmentTypes() || [];
+          for (let ti = 0; ti < types.length; ti++) {
+            const type = types[ti] || {};
+            const key = type.key;
+            if (!key) continue;
+            const suffix = '_' + c;
+            const baseKey = (String(key).toLowerCase().endsWith(suffix)) ? String(key).slice(0, String(key).length - suffix.length) : String(key);
+            const fieldId = `InvestmentAllocation_${c}_${baseKey}`;
+            investmentAllocationsByCountry[c][key] = this.ui.getValue(fieldId);
+          }
+        }
+
+        // Backward compatibility: if old format `InvestmentAllocation_{key}` exists, map to StartCountry
+        // (DOMUtils.getValue throws if missing; detect via DOM when possible).
+        try {
+          if (typeof document !== 'undefined') {
+            for (let i = 0; i < investmentTypes.length; i++) {
+              const key = investmentTypes[i] && investmentTypes[i].key;
+              if (!key) continue;
+              const oldId = `InvestmentAllocation_${key}`;
+              if (document.getElementById(oldId)) {
+                investmentAllocationsByCountry[startCountry][key] = this.ui.getValue(oldId);
+              }
+            }
+          }
+        } catch (_) { }
+      }
+    } catch (_) { }
+
+    // Per-country pension contributions (relocation-aware)
+    params.pensionContributionsByCountry = {};
+    if (cfg.isRelocationEnabled && cfg.isRelocationEnabled()) {
+      const scenarioCountries = (this.ui && typeof this.ui.getScenarioCountries === 'function')
+        ? this.ui.getScenarioCountries()
+        : [startCountry];
+      for (let ci = 0; ci < scenarioCountries.length; ci++) {
+        const c = String(scenarioCountries[ci] || '').trim().toLowerCase();
+        if (!c) continue;
+        const rs = cfg.getCachedTaxRuleSet(c);
+        if (!rs) continue;
+        if (rs.hasPrivatePensions && typeof rs.hasPrivatePensions === 'function' && !rs.hasPrivatePensions()) continue;
+        const p1Pct = this.ui.getValue(`P1PensionContrib_${c}`);
+        const p2Pct = this.ui.getValue(`P2PensionContrib_${c}`);
+        const capped = this.ui.getValue(`PensionCapped_${c}`);
+        params.pensionContributionsByCountry[c] = {
+          p1Pct: (p1Pct !== null && p1Pct !== '') ? parseFloat(p1Pct) : 0,
+          p2Pct: (p2Pct !== null && p2Pct !== '') ? parseFloat(p2Pct) : 0,
+          capped: capped || 'No'
+        };
+      }
+    }
+
+    // Ensure StartCountry pension contribution settings exist (single-country UI uses global fields).
+    const startCountryLower = startCountry.toLowerCase();
+    if (!params.pensionContributionsByCountry[startCountryLower]) {
+      params.pensionContributionsByCountry[startCountryLower] = {
+        p1Pct: params.pensionPercentage || 0,
+        p2Pct: params.pensionPercentageP2 || 0,
+        capped: params.pensionCapped || 'No'
+      };
+    }
+
+    // State pension (per-country): Convention StatePension_{countryCode}
+    // Note: actual period semantics are derived from ruleset config, not the field ID.
+    const statePensionByCountry = {};
+    const p2StatePensionByCountry = {};
+    if (cfg.isRelocationEnabled && cfg.isRelocationEnabled()) {
+      let scenarioCountries = null;
+      if (this.ui && typeof this.ui.getScenarioCountries === 'function') {
+        scenarioCountries = this.ui.getScenarioCountries();
+      } else {
+        scenarioCountries = [startCountry];
+      }
+      for (let i = 0; i < scenarioCountries.length; i++) {
+        const c = String(scenarioCountries[i] || '').trim().toLowerCase();
+        if (!c) continue;
+        const id = `StatePension_${c}`;
+        const idP2 = `P2StatePension_${c}`;
+        // Only read if the element exists (avoid throwing in non-web environments).
+        if (typeof document !== 'undefined' && !document.getElementById(id)) continue;
+        statePensionByCountry[c] = this.ui.getValue(id);
+        if (typeof document !== 'undefined' && document.getElementById(idP2)) {
+          p2StatePensionByCountry[c] = this.ui.getValue(idP2);
+        }
+      }
+    }
+    // Single-country UI: StatePensionWeekly / P2StatePensionWeekly apply to StartCountry.
+    if (statePensionByCountry[startCountry] === undefined || statePensionByCountry[startCountry] === null) {
+      statePensionByCountry[startCountry] = params.statePensionWeekly;
+    }
+    if (p2StatePensionByCountry[startCountry] === undefined || p2StatePensionByCountry[startCountry] === null) {
+      p2StatePensionByCountry[startCountry] = params.p2StatePensionWeekly;
+    }
+    params.statePensionByCountry = statePensionByCountry;
+    params.p2StatePensionByCountry = p2StatePensionByCountry;
+
+    // Read per-country tax credits
+    params.taxCreditsByCountry = params.taxCreditsByCountry || {};
+    const taxCreditCountries = (this.ui && typeof this.ui.getScenarioCountries === 'function')
+      ? this.ui.getScenarioCountries()
+      : [startCountry];
+    taxCreditCountries.forEach(country => {
+      const c = String(country || '').trim().toLowerCase();
+      if (!c) return;
+      const rs = cfg.getCachedTaxRuleSet(c);
+      if (!rs || typeof rs.getUIConfigurableCredits !== 'function') return;
+      const credits = rs.getUIConfigurableCredits();
+      if (!credits || credits.length === 0) return;
+      params.taxCreditsByCountry[c] = params.taxCreditsByCountry[c] || {};
+      credits.forEach(credit => {
+        const creditId = credit.id;
+        const fieldId = `TaxCredit_${creditId}_${c}`;
+        const el = (typeof document !== 'undefined') ? document.getElementById(fieldId) : null;
+        if (typeof document !== 'undefined' && !el) return;
+        if (el && el.value === '') return;
+        const val = this.ui.getValue(fieldId);
+        if (val !== null && val !== '' && val !== undefined) {
+          params.taxCreditsByCountry[c][creditId] = parseFloat(val);
+        }
+      });
+    });
+
+    // Map PersonalTaxCredit override to StartCountry personal credit input (UI convenience).
+    const legacyCredit = this.ui.getValue('PersonalTaxCredit');
+    if (legacyCredit !== null && legacyCredit !== '' && legacyCredit !== undefined) {
+      const startCountryLegacy = params.StartCountry.toLowerCase();
+      if (!params.taxCreditsByCountry[startCountryLegacy]) {
+        params.taxCreditsByCountry[startCountryLegacy] = {};
+      }
+      if (!params.taxCreditsByCountry[startCountryLegacy].personal) {
+        params.taxCreditsByCountry[startCountryLegacy].personal = parseFloat(legacyCredit);
+      }
+    }
+
+    // Build drawdown priority map keyed by investment type key.
+    // Core consumes this directly; priorities are still expressed via the existing UI fields.
+    params.drawdownPrioritiesByKey = {};
+    const defaultPriority = 4;
+    const allocCountries = Object.keys(params.investmentAllocationsByCountry || {});
+    for (let ci = 0; ci < allocCountries.length; ci++) {
+      const cc = allocCountries[ci];
+      const allocMap = params.investmentAllocationsByCountry[cc] || {};
+      const keys = Object.keys(allocMap);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        if (!key) continue;
+        if (key.indexOf('indexFunds_') === 0) params.drawdownPrioritiesByKey[key] = params.priorityFunds;
+        else if (key.indexOf('shares_') === 0) params.drawdownPrioritiesByKey[key] = params.priorityShares;
+        else params.drawdownPrioritiesByKey[key] = defaultPriority;
+      }
+    }
 
     // In deterministic mode, override volatility parameters to 0 to ensure fixed growth rates
     if (params.economyMode === 'deterministic') {
@@ -398,19 +613,32 @@ class UIManager {
         }
       }
 
-      // Dynamic investment allocations sum ≤100%
-      let allocSum = 0;
-      const allocKeys = Object.keys(params.investmentAllocationsByKey);
-      for (let i = 0; i < allocKeys.length; i++) {
-        allocSum += parseFloat(params.investmentAllocationsByKey[allocKeys[i]]) || 0;
-      }
-      if (allocSum > 1.0001) {
-        const labels = investmentTypes.map(function (t) { return t.label || t.key; }).join(' + ');
-        for (let i = 0; i < investmentTypes.length; i++) {
-          const inputId = `InvestmentAllocation_${investmentTypes[i].key}`;
-          this.ui.setWarning(inputId, `${labels} allocations can't exceed 100%`);
+      // Dynamic investment allocations sum ≤100% (per country)
+      const allocCountries = Object.keys(params.investmentAllocationsByCountry || {});
+      for (let ci = 0; ci < allocCountries.length; ci++) {
+        const cc = allocCountries[ci];
+        const map = params.investmentAllocationsByCountry[cc] || {};
+        const keys = Object.keys(map);
+        let sum = 0;
+        for (let i = 0; i < keys.length; i++) sum += parseFloat(map[keys[i]]) || 0;
+        if (sum > 1.0001) {
+          const rs = cfg.getCachedTaxRuleSet(cc);
+          const types = rs.getResolvedInvestmentTypes ? (rs.getResolvedInvestmentTypes() || []) : [];
+          const labels = types.map(function (t) { return t.label || t.key; }).join(' + ');
+          for (let i = 0; i < types.length; i++) {
+            const t = types[i] || {};
+            const key = t.key;
+            if (!key) continue;
+            // Prefer country-prefixed ID; fall back to unprefixed if present.
+            const suffix = '_' + cc;
+            const baseKey = (String(key).toLowerCase().endsWith(suffix)) ? String(key).slice(0, String(key).length - suffix.length) : String(key);
+            const prefId = `InvestmentAllocation_${cc}_${baseKey}`;
+            const legacyId = `InvestmentAllocation_${key}`;
+            const warnId = (typeof document !== 'undefined' && document.getElementById(prefId)) ? prefId : legacyId;
+            this.ui.setWarning(warnId, `${labels} allocations can't exceed 100%`);
+          }
+          errors = true;
         }
-        errors = true;
       }
 
       // Validate percentage fields

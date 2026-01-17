@@ -77,6 +77,19 @@ class PensionPortfolio {
 }
 
 /**
+ * Convert state pension period to annual multiplier.
+ * @param {string} period - Period string from ruleset ('weekly', 'monthly', 'yearly')
+ * @returns {number} Annual multiplier (52 for weekly, 12 for monthly, 1 for yearly)
+ */
+function getStatePensionMultiplier(period) {
+  var p = (period || '').toString().trim().toLowerCase();
+  if (p === 'weekly') return 52;
+  if (p === 'monthly') return 12;
+  if (p === 'yearly' || p === 'annual') return 1;
+  throw new Error('Unknown state pension period: ' + period);
+}
+
+/**
  * Person class to encapsulate person-specific data and logic for the financial simulator.
  * This class handles individual pension management, age tracking, and income calculations.
  */
@@ -106,10 +119,7 @@ class Person {
 
     // Store essential person-specific parameters
     this.retirementAgeParam = personSpecificUIParams.retirementAge;
-    this.statePensionWeeklyParam = personSpecificUIParams.statePensionWeekly;
-    this.pensionContributionPercentageParam = personSpecificUIParams.pensionContributionPercentage;
-    this.statePensionCurrencyParam = personSpecificUIParams.statePensionCurrency || null;
-    this.statePensionCountryParam = personSpecificUIParams.statePensionCountry || null;
+    this.statePensionByCountry = personSpecificUIParams.statePensionByCountry;
     this.params = commonSimParams;
 
     // Reset yearly variables
@@ -159,7 +169,7 @@ class Person {
   resetYearlyVariables() {
     this.yearlyIncomePrivatePension = 0;
     this.yearlyIncomeStatePension = null; // Money
-    this.yearlyIncomeStatePensionBaseCurrency = null; // Money
+    this.yearlyIncomeStatePensionByCountry = {};
   }
 
   /**
@@ -186,7 +196,7 @@ class Person {
     // Reset yearly income accumulators
     this.yearlyIncomePrivatePension = 0;
     this.yearlyIncomeStatePension = null;
-    this.yearlyIncomeStatePensionBaseCurrency = null;
+    this.yearlyIncomeStatePensionByCountry = {};
 
     // Retirement: when the retirement age is reached, switch to retired phase.
     // Lump sum is applied per-pot when (and only when) each pot is eligible.
@@ -215,107 +225,68 @@ class Person {
       }
     }
 
-    // State Pension: Check if age qualifies for state pension
-    var _cfg = null, _rs = null;
-    var activeCountry = null;
-    try {
-      _cfg = Config.getInstance();
-      activeCountry = (currentCountry || (_cfg && typeof _cfg.getDefaultCountry === 'function' && _cfg.getDefaultCountry())) || null;
-      if (_cfg && typeof _cfg.getCachedTaxRuleSet === 'function') {
-        _rs = _cfg.getCachedTaxRuleSet((activeCountry || '').toLowerCase());
-      }
-    } catch (_) { _rs = null; }
-    var statePensionAge = (_rs && typeof _rs.getPensionMinRetirementAgeState === 'function') ? _rs.getPensionMinRetirementAgeState() : 0;
-    var spIncreases = (_rs && typeof _rs.getStatePensionIncreaseBands === 'function') ? _rs.getStatePensionIncreaseBands() : null;
-    var yearlyStatePensionBase = 0;
-    var spCountry = this.statePensionCountryParam || activeCountry;
-    if (this.statePensionWeeklyParam && this.statePensionWeeklyParam > 0 &&
-      this.age >= statePensionAge) {
+    // State Pension: iterate per-country sources (rules-driven periods)
+    var statePensionByCountry = this.statePensionByCountry;
 
-      // Resolve inflation rate for the State Pension country (not necessarily residence country)
-      var spInflationRate = null;
-      if (typeof InflationService !== 'undefined' && InflationService && typeof InflationService.resolveInflationRate === 'function') {
-        try {
-          spInflationRate = InflationService.resolveInflationRate(spCountry, currentYear, {
-            params: this.params || config.params || config,
-            config: config,
-            countryInflationOverrides: null // Do not apply residence overrides to source country pension
-          });
-        } catch (_) { }
-      }
-      // Fallback to params.inflation if resolution failed
-      if (spInflationRate === null || spInflationRate === undefined) {
-        spInflationRate = (this.params && typeof this.params.inflation === 'number') ? this.params.inflation :
-          ((config.params && typeof config.params.inflation === 'number') ? config.params.inflation :
-            (config.inflation !== undefined ? config.inflation : 0.02));
-      }
+    var totalStatePensionResidenceCurrency = 0;
+    var targetCurrency = targetCurrencyParam || null;
+    if (typeof normalizeCurrency === 'function') {
+      targetCurrency = targetCurrency ? normalizeCurrency(targetCurrency) : targetCurrency;
+    }
+    for (var spCountry in statePensionByCountry) {
+      if (!Object.prototype.hasOwnProperty.call(statePensionByCountry, spCountry)) continue;
+      var amount = statePensionByCountry[spCountry];
+      if (!amount || amount <= 0) continue;
 
-      // Calculate yearly state pension (52 weeks) using the specific inflation rate
-      yearlyStatePensionBase = 52 * adjust(this.statePensionWeeklyParam, spInflationRate);
+      var spCountryNormalized = String(spCountry).toLowerCase();
+      var rs = Config.getInstance().getCachedTaxRuleSet(spCountryNormalized);
+      var statePensionAge = rs.getPensionMinRetirementAgeState();
+      if (this.age < statePensionAge) continue;
 
-      // Add increase(s) if age qualifies for state pension increase
+      var spInflationRate = InflationService.resolveInflationRate(spCountryNormalized, currentYear, {
+        params: this.params,
+        config: config,
+        countryInflationOverrides: null // Do not apply residence overrides to source country pension
+      });
+
+      var period = rs.getStatePensionPeriod();
+      var multiplier = getStatePensionMultiplier(period);
+      var yearlyStatePensionBase = multiplier * adjust(amount, spInflationRate);
+
+      var spIncreases = rs.getStatePensionIncreaseBands();
       if (spIncreases && typeof spIncreases === 'object') {
         var thresholds = Object.keys(spIncreases).map(function (k) { return parseInt(k); }).sort(function (a, b) { return a - b; });
         for (var i = 0; i < thresholds.length; i++) {
           var t = thresholds[i];
           if (this.age >= t) {
-            yearlyStatePensionBase += 52 * adjust(spIncreases[String(t)], spInflationRate);
+            yearlyStatePensionBase += multiplier * adjust(spIncreases[String(t)], spInflationRate);
           }
         }
       }
-    }
 
-    // Create base-currency Money object (pre-conversion) for PV calculations
-    var spCurrency = this.statePensionCurrencyParam || null;
-    if (!spCurrency && typeof getCurrencyForCountry === 'function') {
-      spCurrency = getCurrencyForCountry(spCountry);
-    }
-    if (typeof normalizeCurrency === 'function') {
-      spCurrency = spCurrency ? normalizeCurrency(spCurrency) : spCurrency;
-    }
-    var spCountryNormalized = spCountry ? String(spCountry).toLowerCase() : null;
-
-    if (yearlyStatePensionBase > 0 && spCurrency && spCountryNormalized) {
-      this.yearlyIncomeStatePensionBaseCurrency = Money.create(
+      var spCurrency = getCurrencyForCountry(spCountryNormalized);
+      if (typeof normalizeCurrency === 'function') {
+        spCurrency = spCurrency ? normalizeCurrency(spCurrency) : spCurrency;
+      }
+      this.yearlyIncomeStatePensionByCountry[spCountryNormalized] = Money.create(
         yearlyStatePensionBase,
         spCurrency,
         spCountryNormalized
       );
-    } else {
-      this.yearlyIncomeStatePensionBaseCurrency = null;
+
+      if (spCurrency && targetCurrency && spCurrency !== targetCurrency) {
+        var convertedStatePension = convertCurrencyAmount(yearlyStatePensionBase, spCurrency, spCountryNormalized, targetCurrency, currentCountry, currentYear, true);
+        if (convertedStatePension === null) {
+          return { lumpSumAmount: null, privatePensionByCountry: {} };
+        }
+        totalStatePensionResidenceCurrency += convertedStatePension;
+      } else {
+        totalStatePensionResidenceCurrency += yearlyStatePensionBase;
+      }
     }
 
-    // Default to base-currency value unless we successfully convert to the target currency.
-    this.yearlyIncomeStatePension = this.yearlyIncomeStatePensionBaseCurrency;
-
-    if (yearlyStatePensionBase > 0 && typeof convertCurrencyAmount === 'function') {
-      var baseCurrency = this.statePensionCurrencyParam || null;
-      if (typeof normalizeCurrency === 'function') {
-        baseCurrency = baseCurrency ? normalizeCurrency(baseCurrency) : baseCurrency;
-      }
-      if (!baseCurrency && typeof getCurrencyForCountry === 'function') {
-        baseCurrency = getCurrencyForCountry(this.statePensionCountryParam || currentCountry);
-        if (typeof normalizeCurrency === 'function') {
-          baseCurrency = baseCurrency ? normalizeCurrency(baseCurrency) : baseCurrency;
-        }
-      }
-      var targetCurrency = targetCurrencyParam || null;
-      if (typeof normalizeCurrency === 'function') {
-        targetCurrency = targetCurrency ? normalizeCurrency(targetCurrency) : targetCurrency;
-      }
-      if (baseCurrency && targetCurrency && baseCurrency !== targetCurrency) {
-        var baseCountry = this.statePensionCountryParam ? String(this.statePensionCountryParam).toLowerCase() : null;
-        if (!baseCountry && typeof findCountryForCurrency === 'function') {
-          baseCountry = findCountryForCurrency(baseCurrency, currentCountry);
-        }
-        var convertedStatePension = convertCurrencyAmount(yearlyStatePensionBase, baseCurrency, baseCountry, targetCurrency, currentCountry, currentYear, true);
-        if (convertedStatePension === null) {
-          // Strict mode failure: set to 0 and let errors flag abort simulation
-          this.yearlyIncomeStatePension = Money.create(0, targetCurrency, String(currentCountry).toLowerCase());
-        } else if (typeof convertedStatePension === 'number' && !isNaN(convertedStatePension)) {
-          this.yearlyIncomeStatePension = Money.create(convertedStatePension, targetCurrency, String(currentCountry).toLowerCase());
-        }
-      }
+    if (totalStatePensionResidenceCurrency > 0) {
+      this.yearlyIncomeStatePension = Money.create(totalStatePensionResidenceCurrency, targetCurrency, String(currentCountry).toLowerCase());
     }
 
     return { lumpSumAmount: lumpSumAmount, privatePensionByCountry: privatePensionByCountry };

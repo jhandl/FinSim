@@ -1,13 +1,13 @@
-// Test for contributionCurrencyMode functionality in handleInvestments()
+// Test for implicit currency conversion in handleInvestments()
 // Validates currency conversion when investing in assets with different base currencies
 //
-// Test: IE Single-Country (Asset Mode, No-Op Conversion - EUR to EUR)
-// IE investments use asset mode with EUR, which should be a no-op conversion.
+// Test: IE Single-Country (No Conversion - EUR to EUR)
+// IE investments use EUR base currency matching EUR residence currency, so no conversion occurs.
 // Also demonstrates backward compatibility with existing IE scenarios.
 
 const TestContributionCurrencyMode = {
   name: "Contribution Currency Mode",
-  description: "Validates currency conversion logic for investments based on contributionCurrencyMode field. Tests IE no-op conversion (EUR→EUR).",
+  description: "Validates implicit currency conversion logic for investments based on base currency vs residence currency comparison. Tests IE no-op conversion (EUR→EUR).",
 
   scenario: {
     parameters: {
@@ -73,7 +73,7 @@ const TestContributionCurrencyMode = {
       type: "exact_value",
       target: "age",
       age: 30,
-      field: "indexFundsCapital",
+      field: "investmentCapitalByKey:indexFunds",
       expected: 9771.09,
       tolerance: 500
     },
@@ -81,7 +81,7 @@ const TestContributionCurrencyMode = {
       type: "exact_value",
       target: "age",
       age: 30,
-      field: "sharesCapital",
+      field: "investmentCapitalByKey:shares",
       expected: 9771.09,
       tolerance: 500
     },
@@ -90,7 +90,7 @@ const TestContributionCurrencyMode = {
       type: "comparison",
       target: "age",
       age: 30,
-      field: "indexFundsCapital",
+      field: "investmentCapitalByKey:indexFunds",
       expected: {
         operator: ">",
         value: 0
@@ -100,7 +100,7 @@ const TestContributionCurrencyMode = {
       type: "comparison",
       target: "age",
       age: 30,
-      field: "sharesCapital",
+      field: "investmentCapitalByKey:shares",
       expected: {
         operator: ">",
         value: 0

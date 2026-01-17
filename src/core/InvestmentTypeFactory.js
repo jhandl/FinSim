@@ -18,7 +18,6 @@ class GenericInvestmentAsset extends Equity {
     this.label = this._typeDef.label || this.key;
     this.baseCurrency = this._typeDef.baseCurrency;
     this.assetCountry = this._typeDef.assetCountry;
-    this.contributionCurrencyMode = this._typeDef.contributionCurrencyMode;
     this.residenceScope = this._typeDef.residenceScope;
     this._taxCategory = GenericInvestmentAsset._resolveTaxCategory(investmentTypeDef);
     this._deemedDisposalYears = GenericInvestmentAsset._resolveDeemedDisposalYears(investmentTypeDef);
@@ -105,7 +104,7 @@ class GenericInvestmentAsset extends Equity {
   // Override to attribute sales using the configured label instead of class name
   declareRevenue(income, gains) {
     var incomeMoney = Money.from(income, residenceCurrency, currentCountry);
-    revenue.declareInvestmentIncome(incomeMoney, this.label + ' Income');
+    revenue.declareInvestmentIncome(incomeMoney, this.label + ' Income', this.assetCountry);
     if (gains > 0 || this.canOffsetLosses) {
       // Determine flags from type definition
       var isExit = (this._taxCategory === 'exitTax');
@@ -116,14 +115,14 @@ class GenericInvestmentAsset extends Equity {
         category: isExit ? 'exitTax' : 'cgt',
         eligibleForAnnualExemption: eligible,
         allowLossOffset: allowOffset
-      });
+      }, this.assetCountry);
     }
   }
 
   // Mirror classification in simulation path for withdraw planning
   simulateDeclareRevenue(income, gains, testRevenue) {
     var incomeMoney = Money.from(income, residenceCurrency, currentCountry);
-    testRevenue.declareInvestmentIncome(incomeMoney, this.label + ' Income');
+    testRevenue.declareInvestmentIncome(incomeMoney, this.label + ' Income', this.assetCountry);
     if (gains > 0 || this.canOffsetLosses) {
       var isExit = (this._taxCategory === 'exitTax');
       var gainsMoney = Money.from(gains, residenceCurrency, currentCountry);
@@ -131,7 +130,7 @@ class GenericInvestmentAsset extends Equity {
         category: isExit ? 'exitTax' : 'cgt',
         eligibleForAnnualExemption: !!this.eligibleForAnnualExemption,
         allowLossOffset: !!this.canOffsetLosses
-      });
+      }, this.assetCountry);
     }
   }
 
@@ -190,7 +189,7 @@ class GenericInvestmentAsset extends Equity {
                 category: 'exitTax',
                 eligibleForAnnualExemption: !!this.eligibleForAnnualExemption,
                 allowLossOffset: !!this.canOffsetLosses
-              });
+              }, this.assetCountry);
             }
           }
         }
@@ -210,15 +209,26 @@ class InvestmentTypeFactory {
   static createAssets(ruleset, growthRatesByKey, stdDevsByKey) {
     var assets = [];
     if (!ruleset || typeof ruleset.getInvestmentTypes !== 'function') return assets;
-    var types = ruleset.getInvestmentTypes();
+    var types = ruleset.getResolvedInvestmentTypes();
     for (var i = 0; i < types.length; i++) {
       var t = types[i];
       var key = t && t.key ? t.key : 'asset' + i;
-      var gr = growthRatesByKey && growthRatesByKey[key] !== undefined ? growthRatesByKey[key] : 0;
-      var sd = stdDevsByKey && stdDevsByKey[key] !== undefined ? stdDevsByKey[key] : 0;
+      var gr = (growthRatesByKey && growthRatesByKey[key] !== undefined) ? growthRatesByKey[key] : undefined;
+      var sd = (stdDevsByKey && stdDevsByKey[key] !== undefined) ? stdDevsByKey[key] : undefined;
+      // Backward compat: if caller provided base keys (e.g. indexFunds/shares),
+      // project them onto namespaced keys (e.g. indexFunds_ie/shares_ie).
+      if (gr === undefined && growthRatesByKey && key && String(key).indexOf('_') > 0) {
+        var baseKey = String(key).split('_')[0];
+        if (growthRatesByKey[baseKey] !== undefined) gr = growthRatesByKey[baseKey];
+      }
+      if (sd === undefined && stdDevsByKey && key && String(key).indexOf('_') > 0) {
+        var baseKey2 = String(key).split('_')[0];
+        if (stdDevsByKey[baseKey2] !== undefined) sd = stdDevsByKey[baseKey2];
+      }
+      if (gr === undefined) gr = 0;
+      if (sd === undefined) sd = 0;
       var baseCurrency = t.baseCurrency;
       var assetCountry = t.assetCountry;
-      var contributionCurrencyMode = t.contributionCurrencyMode;
       var residenceScope = t.residenceScope;
       assets.push({
         key: key,
@@ -226,7 +236,6 @@ class InvestmentTypeFactory {
         asset: new GenericInvestmentAsset(t, gr, sd, ruleset),
         baseCurrency: baseCurrency,
         assetCountry: assetCountry,
-        contributionCurrencyMode: contributionCurrencyMode,
         residenceScope: residenceScope
       });
     }

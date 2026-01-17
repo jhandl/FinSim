@@ -2,7 +2,8 @@ var uiManager, params, events, config, dataSheet, row, errors;
 var year, periods, failedAt, success, montecarlo;
 var revenue, realEstate, stockGrowthOverride, attributionManager;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
-var incomeStatePension, incomePrivatePension, incomeFundsRent, incomeSharesRent, withdrawalRate;
+var purchaseShortfallThisYear;
+var incomeStatePension, incomePrivatePension, withdrawalRate;
 var incomeSalaries, incomeShares, incomeRentals, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
 var personalPensionContribution, personalPensionContributionByCountry;
 var incomePrivatePensionByCountry;
@@ -48,16 +49,14 @@ async function run() {
     uiManager.ui.flush();
     return;
   }
-  // Check if we have volatility values
-  const hasVolatility = (params.growthDevPension > 0 || params.growthDevFunds > 0 || params.growthDevShares > 0);
-
-  // Monte Carlo mode is enabled when user selects it AND there are volatility values
-  // For backward compatibility, if economyMode is undefined, infer from volatility values
-  if (params.economyMode === undefined || params.economyMode === null) {
-    montecarlo = hasVolatility; // Backward compatibility: auto-detect from volatility
-  } else {
-    montecarlo = (params.economyMode === 'montecarlo' && hasVolatility);
+  // Monte Carlo mode is enabled when user selects it AND there are volatility values.
+  var hasVolatility = (params.growthDevPension > 0);
+  var volByKey = params.investmentVolatilitiesByKey || {};
+  for (var k in volByKey) {
+    if (!Object.prototype.hasOwnProperty.call(volByKey, k)) continue;
+    if (parseFloat(volByKey[k]) > 0) { hasVolatility = true; break; }
   }
+  montecarlo = (params.economyMode === 'montecarlo' && hasVolatility);
 
   // In web UI we retain per-run yearly data for pinch-point visualization.
   // In tests / GAS environments this data is unused and very expensive at Monte Carlo scale.
@@ -130,7 +129,7 @@ function findCountryForCurrency(currencyCode, preferredCountry) {
 
   if (preferred) {
     var prefCurrency = getCurrencyForCountry(preferred);
-    if (normalizeCurrency(prefCurrency) === currency) {
+    if (prefCurrency && normalizeCurrency(prefCurrency) === currency) {
       cache[currency] = preferred;
       return preferred;
     }
@@ -317,33 +316,6 @@ function readScenario(validate) {
   errors = false;
   uiManager.clearWarnings();
   params = uiManager.readParameters(validate);
-  // Normalize parameter aliases to prevent NaN propagation from undefined keys (root-cause fix)
-  // Tests may provide 'fundsAllocation'/'sharesAllocation' (lower camelCase); engine expects 'FundsAllocation'/'SharesAllocation'
-  if (params) {
-    // Ensure growth rates/devs are numeric defaults (0) when omitted by tests
-    var toNumOrZero = function (v) {
-      var n = (typeof v === 'string') ? parseFloat(v) : v;
-      return (typeof n === 'number' && isFinite(n)) ? n : 0;
-    };
-    params.growthRateFunds = toNumOrZero(params.growthRateFunds);
-    params.growthDevFunds = toNumOrZero(params.growthDevFunds);
-    params.growthRateShares = toNumOrZero(params.growthRateShares);
-    params.growthDevShares = toNumOrZero(params.growthDevShares);
-    params.growthRatePension = toNumOrZero(params.growthRatePension);
-    params.growthDevPension = toNumOrZero(params.growthDevPension);
-
-    if (params.FundsAllocation === undefined && params.fundsAllocation !== undefined) {
-      var fa = (typeof params.fundsAllocation === 'string') ? parseFloat(params.fundsAllocation) : params.fundsAllocation;
-      params.FundsAllocation = (typeof fa === 'number' && isFinite(fa)) ? fa : 0;
-    }
-    if (params.SharesAllocation === undefined && params.sharesAllocation !== undefined) {
-      var sa = (typeof params.sharesAllocation === 'string') ? parseFloat(params.sharesAllocation) : params.sharesAllocation;
-      params.SharesAllocation = (typeof sa === 'number' && isFinite(sa)) ? sa : 0;
-    }
-    // Ensure numeric defaults if still missing
-    if (typeof params.FundsAllocation !== 'number' || !isFinite(params.FundsAllocation)) params.FundsAllocation = 0;
-    if (typeof params.SharesAllocation !== 'number' || !isFinite(params.SharesAllocation)) params.SharesAllocation = 0;
-  }
   events = uiManager.readEvents(validate);
   if (errors) {
     uiManager.setStatus("Check errors", STATUS_COLORS.WARNING);
@@ -365,8 +337,7 @@ async function initializeSimulator() {
   }
 
   // StartCountry is mandatory
-  // Accept both canonical 'StartCountry' and legacy 'startingCountry' param names
-  var sc = (params && (params.StartCountry || params.startingCountry)) ? String(params.StartCountry || params.startingCountry).trim() : '';
+  var sc = (params && params.StartCountry) ? String(params.StartCountry).trim() : '';
   if (!sc) {
     errors = true;
     success = false;
@@ -422,21 +393,52 @@ function loadFromFile(file) {
 function initializeSimulationVariables() {
   // Get growth rates and volatilities from dynamic maps
   var growthByKey = params.investmentGrowthRatesByKey || {};
-  var volByKey = params.investmentVolatilitiesByKey || {};
-  // Initialize investment instruments using dynamic growth/vol maps
-  indexFunds = new IndexFunds(growthByKey.indexFunds || 0, volByKey.indexFunds || 0);
-  shares = new Shares(growthByKey.shares || 0, volByKey.shares || 0);
+  // In deterministic mode, volatility must be zero (even if scenario provides stddev fields).
+  // Monte Carlo mode is the only time stdev is applied.
+  var volByKey = montecarlo ? (params.investmentVolatilitiesByKey || {}) : {};
+  // Initialize legacy single-country instruments for the StartCountry (used by some legacy columns/paths).
+  var sc = String(params.StartCountry || config.getDefaultCountry()).toLowerCase();
+  indexFunds = new IndexFunds(growthByKey['indexFunds_' + sc] || 0, volByKey['indexFunds_' + sc] || 0);
+  shares = new Shares(growthByKey['shares_' + sc] || 0, volByKey['shares_' + sc] || 0);
   // Also create generic assets array (compat path: map first two to existing ones for IE)
   // Per strictness §9: investmentAssets must always be a valid, non-empty array
   try {
-    var rs = (function () { try { return Config.getInstance().getCachedTaxRuleSet(params.StartCountry || config.getDefaultCountry()); } catch (_) { return null; } })();
-    if (rs && typeof InvestmentTypeFactory !== 'undefined') {
-      investmentAssets = InvestmentTypeFactory.createAssets(rs, growthByKey, volByKey);
-      // NOTE: Do NOT replace GenericInvestmentAsset objects with legacy IndexFunds/Shares.
-      // The factory creates assets with proper baseCurrency metadata for currency conversion.
-      // Legacy indexFunds/shares objects are still maintained separately for backward compat
-      // in data display, but investmentAssets should use the factory-created objects.
+    var cfg = Config.getInstance();
+    var startCode = String(params.StartCountry || config.getDefaultCountry()).toLowerCase();
+    var countryOrder = [];
+    var seenCountries = {};
+    if (startCode) { countryOrder.push(startCode); seenCountries[startCode] = true; }
+    for (var ei = 0; ei < events.length; ei++) {
+      var evt = events[ei];
+      if (evt && evt.type && evt.type.indexOf('MV-') === 0) {
+        var mvCode = evt.type.substring(3).toLowerCase();
+        if (mvCode && !seenCountries[mvCode]) { countryOrder.push(mvCode); seenCountries[mvCode] = true; }
+      }
+      if (evt && evt.linkedCountry) {
+        var lc = String(evt.linkedCountry).toLowerCase();
+        if (lc && !seenCountries[lc]) { countryOrder.push(lc); seenCountries[lc] = true; }
+      }
     }
+    investmentAssets = [];
+    var seenKeys = {};
+    for (var ci = 0; ci < countryOrder.length; ci++) {
+      var code = countryOrder[ci];
+      var rs = cfg.getCachedTaxRuleSet(code);
+      if (rs && typeof InvestmentTypeFactory !== 'undefined') {
+        var assets = InvestmentTypeFactory.createAssets(rs, growthByKey, volByKey);
+        for (var ai = 0; ai < assets.length; ai++) {
+          var a = assets[ai];
+          if (a && a.key && !seenKeys[a.key]) {
+            investmentAssets.push(a);
+            seenKeys[a.key] = true;
+          }
+        }
+      }
+    }
+    // NOTE: Do NOT replace GenericInvestmentAsset objects with legacy IndexFunds/Shares.
+    // The factory creates assets with proper baseCurrency metadata for currency conversion.
+    // Legacy indexFunds/shares objects are still maintained separately for backward compat
+    // in data display, but investmentAssets should use the factory-created objects.
   } catch (e) {
     // Catch silently - fallback below will populate investmentAssets
   }
@@ -450,12 +452,44 @@ function initializeSimulationVariables() {
   }
   // Initialize investment assets with initial capital from dynamic map
   var initialCapitalByKey = params.initialCapitalByKey || {};
+  // Backward compat: project base keys (indexFunds/shares) onto namespaced keys (indexFunds_ie/shares_ie)
+  // so tests/scenarios that seed initialFunds/initialShares still work with investmentTypes.
+  if (investmentAssets && investmentAssets.length > 0) {
+    for (var ik = 0; ik < investmentAssets.length; ik++) {
+      var entryKey = investmentAssets[ik] && investmentAssets[ik].key;
+      if (!entryKey) continue;
+      if (initialCapitalByKey[entryKey] !== undefined) continue;
+      if (String(entryKey).indexOf('_') > 0) {
+        var baseKey = String(entryKey).split('_')[0];
+        if (initialCapitalByKey[baseKey] !== undefined) {
+          initialCapitalByKey[entryKey] = initialCapitalByKey[baseKey];
+        }
+      }
+    }
+  }
   var startCountry = normalizeCountry(params.StartCountry || config.getDefaultCountry());
+  // Build set of StartCountry investment type keys for initial capital filtering
+  var startCountryKeys = {};
+  try {
+    var startRuleset = cfg.getCachedTaxRuleSet(startCountry);
+    if (startRuleset && typeof startRuleset.getResolvedInvestmentTypes === 'function') {
+      var startTypes = startRuleset.getResolvedInvestmentTypes() || [];
+      for (var si = 0; si < startTypes.length; si++) {
+        if (startTypes[si] && startTypes[si].key) {
+          startCountryKeys[startTypes[si].key] = true;
+        }
+      }
+    }
+  } catch (_) {
+    // Fallback: if ruleset unavailable, allow all keys (backward compat)
+    startCountryKeys = null;
+  }
   var startCurrency = getCurrencyForCountry(startCountry);
   for (var i = 0; i < investmentAssets.length; i++) {
     var entry = investmentAssets[i];
     var initialCapital = initialCapitalByKey[entry.key];
-    if (initialCapital > 0) {
+    // Only seed holdings for StartCountry investment types
+    if (initialCapital > 0 && (startCountryKeys === null || startCountryKeys[entry.key])) {
       var currency = entry.baseCurrency || startCurrency;
       var country = entry.assetCountry || startCountry;
       entry.asset.buy(initialCapital, currency, country);
@@ -477,10 +511,7 @@ function initializeSimulationVariables() {
   const p1SpecificParams = {
     startingAge: params.startingAge,
     retirementAge: params.retirementAge,
-    statePensionWeekly: params.statePensionWeekly,
-    pensionContributionPercentage: params.pensionPercentage,
-    statePensionCurrency: baseStateCurrency,
-    statePensionCountry: baseStateCountry
+    statePensionByCountry: params.statePensionByCountry
   };
   person1 = new Person('P1', p1SpecificParams, params, {
     growthRatePension: params.growthRatePension,
@@ -503,10 +534,7 @@ function initializeSimulationVariables() {
     const p2SpecificParams = {
       startingAge: params.p2StartingAge, // Will be 0 or undefined if not set
       retirementAge: params.p2RetirementAge,
-      statePensionWeekly: params.p2StatePensionWeekly,
-      pensionContributionPercentage: params.pensionPercentageP2,
-      statePensionCurrency: baseStateCurrency,
-      statePensionCountry: baseStateCountry
+      statePensionByCountry: params.p2StatePensionByCountry
     };
     person2 = new Person('P2', p2SpecificParams, params, {
       growthRatePension: params.growthRatePension,
@@ -562,10 +590,7 @@ function resetYearlyVariables() {
   incomeRentals = 0;
   incomePrivatePension = 0;
   incomeStatePension = 0;
-  incomeStatePensionBaseCurrency = 0; // Track State Pension in base currency (EUR) for PV calculation
   incomeDefinedBenefit = 0;
-  incomeFundsRent = 0;
-  incomeSharesRent = 0;
   incomeTaxFree = 0;
   pensionContribution = 0;
   // Reset per-type income map for the year
@@ -579,6 +604,7 @@ function resetYearlyVariables() {
   cashDeficit = 0;
   cashWithdraw = 0;
   savings = 0;
+  purchaseShortfallThisYear = 0;
 
   // Add year to Person objects (this increments their ages and calls pension.addYear())
   person1.addYear();
@@ -737,11 +763,6 @@ function calculatePensionIncome() {
   if (person1StatePension > 0) {
     attributionManager.record('incomestatepension', 'Your State Pension', person1StatePension);
     incomeStatePension += person1StatePension;
-    // Track base currency amount for PV calculation (before currency conversion)
-    var person1StatePensionBaseCurrency = person1.yearlyIncomeStatePensionBaseCurrency ? person1.yearlyIncomeStatePensionBaseCurrency.amount : 0;
-    if (person1StatePensionBaseCurrency > 0) {
-      incomeStatePensionBaseCurrency += person1StatePensionBaseCurrency;
-    }
   }
 
   // Calculate pension income for Person 2 (if exists)
@@ -795,11 +816,6 @@ function calculatePensionIncome() {
     if (person2StatePension > 0) {
       attributionManager.record('incomestatepension', 'Their State Pension', person2StatePension);
       incomeStatePension += person2StatePension;
-      // Track base currency amount for PV calculation (before currency conversion)
-      var person2StatePensionBaseCurrency = person2.yearlyIncomeStatePensionBaseCurrency ? person2.yearlyIncomeStatePensionBaseCurrency.amount : 0;
-      if (person2StatePensionBaseCurrency > 0) {
-        incomeStatePensionBaseCurrency += person2StatePensionBaseCurrency;
-      }
     }
   }
 
@@ -1099,7 +1115,17 @@ function processEvents() {
             } else {
               // Country has private pension - use current country's pension pot
               var bands = (rsSalary && typeof rsSalary.getPensionContributionAgeBands === 'function') ? rsSalary.getPensionContributionAgeBands() : {};
-              var baseRate = (salaryPerson.pensionContributionPercentageParam || 0) * getRateForKey(salaryPerson.age, bands);
+              var countryContribs = getPensionContributionsByCountry(year);
+              var contribPct = null;
+              if (countryContribs) {
+                if (typeof person2 !== 'undefined' && salaryPerson === person2 && countryContribs.p2Pct !== undefined) {
+                  contribPct = countryContribs.p2Pct;
+                } else if (countryContribs.p1Pct !== undefined) {
+                  contribPct = countryContribs.p1Pct;
+                }
+              }
+              var effectivePct = (contribPct !== null && contribPct !== undefined) ? contribPct : 0;
+              var baseRate = effectivePct * getRateForKey(salaryPerson.age, bands);
 
               // Use salary's origin country for pension pot (not current residence)
               var pensionCountry = bucketCountry;
@@ -1113,7 +1139,10 @@ function processEvents() {
                   pensionBaseAmount = convertedToPensionCurrency;
                 }
               }
-              if (params.pensionCapped === "Yes") {
+              var effectiveCapped = (countryContribs && countryContribs.capped !== undefined)
+                ? countryContribs.capped
+                : (params.pensionCapped || 'No');
+              if (effectiveCapped === "Yes") {
                 var cap = (rsSalary && typeof rsSalary.getPensionContributionAnnualCap === 'function') ? rsSalary.getPensionContributionAnnualCap() : 0;
                 var capValue = adjust(cap);
                 // Convert cap to pension country currency for comparison
@@ -1126,7 +1155,7 @@ function processEvents() {
                 if (capValue > 0 && pensionBaseAmount > capValue) {
                   baseRate = baseRate * capValue / pensionBaseAmount;
                 }
-              } else if (params.pensionCapped === "Match") {
+              } else if (effectiveCapped === "Match") {
                 baseRate = Math.min(entry.match || 0, baseRate);
               }
               var employerRate = Math.min(entry.match || 0, baseRate);
@@ -1282,13 +1311,17 @@ function processEvents() {
           break;
 
         case 'purchase': {
-          var purchaseTotal = categoryTotalsByType['purchase'] || entryConvertedAmount;
+          // Purchases are cash-funded (not "expenses" unless shortfall).
+          // Do NOT use consolidated totals here: multiple purchase entries in the same year would
+          // otherwise be double-charged against cash (see TestRealEstatePVRelocation).
+          var purchaseTotal = entryConvertedAmount;
           var cashUsed = Math.min(cash, purchaseTotal);
           cash -= cashUsed;
           cashMoney.amount -= cashUsed;
           var shortfall = purchaseTotal - cashUsed;
           if (shortfall > 0) {
             expenses += shortfall;
+            purchaseShortfallThisYear += shortfall;
             attributionManager.record('expenses', 'Purchase shortfall (' + entry.eventId + ')', shortfall);
           }
           attributionManager.record('realestatecapital', 'Purchase (' + entry.eventId + ')', purchaseTotal);
@@ -1615,27 +1648,31 @@ function handleInvestments() {
    */
   if (netIncome > expenses) {
     savings = netIncome - expenses;
-    cash += savings;
-    cashMoney.amount += savings;
+    // When a property purchase cannot be funded from available cash, we track the
+    // "shortfall" as an expense. In these cases, keep cash at 0 for the year
+    // instead of accumulating surplus (see TestPropertyPurchaseAttribution).
+    if (!(purchaseShortfallThisYear > 0)) {
+      cash += savings;
+      cashMoney.amount += savings;
+    }
   }
 
 
   if (cash < targetCash) {
     cashDeficit = targetCash - cash;
   }
-  // Compute capsByKey inline for capital calculations
+  // Compute capsByKey inline for capital calculations (canonical: investmentAssets keys)
   var capsByKey = {};
-  capsByKey['indexFunds'] = indexFunds.capital();
-  capsByKey['shares'] = shares.capital();
   if (investmentAssets && investmentAssets.length > 0) {
     for (var ci = 0; ci < investmentAssets.length; ci++) {
       var centry = investmentAssets[ci];
       if (!centry || !centry.asset || typeof centry.asset.capital !== 'function') continue;
-      var assetObj = centry.asset;
-      if (assetObj === indexFunds || assetObj === shares) continue;
-      var c = assetObj.capital();
+      var c = centry.asset.capital();
       capsByKey[centry.key] = (capsByKey[centry.key] || 0) + c;
     }
+  } else {
+    capsByKey['indexFunds'] = indexFunds.capital();
+    capsByKey['shares'] = shares.capital();
   }
   let totalInvestmentCaps = 0;
   for (var k in capsByKey) {
@@ -1653,7 +1690,9 @@ function handleInvestments() {
     }
   }
   if (capitalPreWithdrawal > 0) {
-    withdrawalRate = (incomeFundsRent + incomeSharesRent + incomePrivatePension) / capitalPreWithdrawal;
+    let invIncome = 0;
+    for (var k in investmentIncomeByKey) invIncome += investmentIncomeByKey[k];
+    withdrawalRate = (invIncome + incomePrivatePension) / capitalPreWithdrawal;
   } else {
     withdrawalRate = 0;
   }
@@ -1674,18 +1713,19 @@ function handleInvestments() {
       }
     }
     if (investmentAssets && supportsContributionModes) {
-      var allocations = getAllocationsByKey();
+      var allocations = getAllocationsByYear(year);
       var sumInvested = 0;
+      var sumAlloc = 0;
       for (var i = 0; i < investmentAssets.length; i++) {
         var entry = investmentAssets[i];
         var alloc = allocations[entry.key] || 0;
+        sumAlloc += alloc;
         if (alloc > 0 && entry.asset && entry.asset.buy) {
           var amount = surplus * alloc;
           if (amount > 0) {
-            // Apply currency conversion based on contributionCurrencyMode:
-            // - 'asset': convert contribution from residence currency to asset's base currency
-            // - 'residence': invest directly in residence currency (no conversion)
-            if (entry.contributionCurrencyMode === 'asset') {
+            // Apply implicit currency conversion: convert if base currency differs from residence.
+            // If baseCurrency is missing, follow the legacy default (no conversion).
+            if (entry.baseCurrency && entry.baseCurrency !== residenceCurrency) {
               var amountInAssetCurrency = convertCurrencyAmount(
                 amount,
                 residenceCurrency,
@@ -1695,19 +1735,14 @@ function handleInvestments() {
                 year
               );
               if (amountInAssetCurrency === null) {
-                // Conversion failed - log error and skip this investment type
                 if (uiManager && typeof uiManager.setStatus === 'function') {
                   uiManager.setStatus('Currency conversion failed for investment type: ' + entry.key, STATUS_COLORS.ERROR);
                 }
                 continue;
               }
-              // Equity.buy() receives numeric amount + currency/country.
-              // Asset classes track Money internally; capital() returns sum of numeric amounts.
               entry.asset.buy(amountInAssetCurrency, entry.baseCurrency, entry.assetCountry);
             } else {
-              // contributionCurrencyMode === 'residence': invest directly in residence currency
-              // Equity.buy() receives numeric amount + currency/country.
-              // Asset classes track Money internally; capital() returns sum of numeric amounts.
+              // Base currency matches residence currency - no conversion needed
               entry.asset.buy(amount, residenceCurrency, currentCountry);
             }
             // Track invested amount in residence currency for cash deduction
@@ -1724,7 +1759,7 @@ function handleInvestments() {
     }
     // Legacy two-asset investing path - use dynamic allocations
     if (!usedDynamic) {
-      var allocByKey = getAllocationsByKey();
+      var allocByKey = getAllocationsByYear(year);
       // buy() receives numeric amount + currency/country metadata.
       // Asset classes track Money internally; Simulator works with numbers only.
       indexFunds.buy(surplus * (allocByKey.indexFunds || 0), residenceCurrency, currentCountry);
@@ -1754,16 +1789,16 @@ function handleInvestments() {
     }
   }
 
+  // If yearly income cannot cover expenses after all withdrawals, mark run as failed.
+  if (netIncome < expenses - 100 && success) {
+    success = false;
+    failedAt = person1.age;
+  }
+
   // Inflate target cash (emergency stash) at residence country inflation to maintain purchasing power
   // This is done at the end of the year so it applies to the target for the NEXT year
   var residenceInflation = resolveCountryInflation(currentCountry);
   targetCash *= (1 + residenceInflation);
-  if ((netIncome < expenses - 100) && success) {
-    success = false;
-    failedAt = person1.age;
-  }
-  // Final recomputation of taxes after all withdrawals/sales to ensure totals include any newly realised gains or income.
-  revenue.computeTaxes();
 }
 
 
@@ -1788,7 +1823,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
   if (person2 && person2.phase === Phases.retired) {
     totalPensionCapital += person2.getTotalPensionCapital();
   }
-  var totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome());
+  var totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome()+incomeTaxFree);
   if (needed > totalAvailable + 0.01) {
     liquidateAll();
     return;
@@ -1868,12 +1903,6 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
             flagSimulationFailure(person1.age);
             return;
           }
-          // Populate legacy income buckets for backward compatibility
-          if (entry.key === 'indexFunds') {
-            incomeFundsRent += sold;
-          } else if (entry.key === 'shares') {
-            incomeSharesRent += sold;
-          }
           // Record dynamic income for this investment type
           if (!investmentIncomeByKey) investmentIncomeByKey = {};
           if (!investmentIncomeByKey[entry.key]) investmentIncomeByKey[entry.key] = 0;
@@ -1882,7 +1911,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
         }
       }
 
-      netIncome = cashWithdraw + revenue.netIncome();
+      netIncome = cashWithdraw + revenue.netIncome() + incomeTaxFree;;
       if (keepTrying == false) { break; }
     }
   }
@@ -1924,12 +1953,6 @@ function liquidateAll() {
         flagSimulationFailure(person1.age);
         return;
       }
-      // Populate legacy income buckets for backward compatibility
-      if (entry.key === 'indexFunds') {
-        incomeFundsRent += sold;
-      } else if (entry.key === 'shares') {
-        incomeSharesRent += sold;
-      }
       // Populate dynamic income map
       if (!investmentIncomeByKey) investmentIncomeByKey = {};
       if (!investmentIncomeByKey[entry.key]) investmentIncomeByKey[entry.key] = 0;
@@ -1937,21 +1960,49 @@ function liquidateAll() {
     }
   }
 
-  netIncome = cashWithdraw + revenue.netIncome();
+  netIncome = cashWithdraw + revenue.netIncome() + incomeTaxFree;
 }
 
-// Returns an allocation map keyed by investment type key.
-// Uses dynamic investmentAllocationsByKey from UI; legacy fallback for backward compat.
-function getAllocationsByKey() {
-  // Prefer dynamic map from params
-  if (params.investmentAllocationsByKey) {
-    return params.investmentAllocationsByKey;
+/**
+ * Returns allocation map for the current simulation year based on residence country.
+ * Allocations are scoped per country and switch when residence changes via MV-* events.
+ * Falls back to StartCountry allocations if current country not configured.
+ *
+ * @param {number} year - Current simulation year (for future time-varying allocations)
+ * @returns {Object} Map of investment type keys to allocation percentages
+ */
+function getAllocationsByYear(year) {
+  // Derive residence country from person1.age (matches year loop context)
+  var residenceCountry = getCountryForAge(person1.age, events, params.StartCountry);
+
+  var countryAllocations = params.investmentAllocationsByCountry[residenceCountry];
+  if (!countryAllocations || Object.keys(countryAllocations).length === 0) {
+    var startCountry = String(params.StartCountry).toLowerCase();
+    countryAllocations = params.investmentAllocationsByCountry[startCountry];
   }
-  // Legacy fallback
-  var map = {};
-  map['indexFunds'] = (typeof params.FundsAllocation === 'number') ? params.FundsAllocation : 0;
-  map['shares'] = (typeof params.SharesAllocation === 'number') ? params.SharesAllocation : 0;
-  return map;
+  return countryAllocations || {};
+}
+
+/**
+ * Get pension contribution configuration for the given year's residence country.
+ * @param {number} year - Simulation year
+ * @returns {Object|null} - {p1Pct, p2Pct, capped} or null if not configured
+ */
+function getPensionContributionsByCountry(year) {
+  if (!params.pensionContributionsByCountry) return null;
+  var residenceCountry = getResidenceCountryForYear(year);
+  return params.pensionContributionsByCountry[residenceCountry] || null;
+}
+
+/**
+ * Derive residence country for a given year from MV-* events.
+ * @param {number} year - Simulation year
+ * @returns {string} - Country code (lowercase)
+ */
+function getResidenceCountryForYear(year) {
+  var age = year - params.startingAge + person1.age;
+  var country = getCountryForAge(events, age, params.StartCountry);
+  return country ? String(country).toLowerCase() : (params.StartCountry || '').toLowerCase();
 }
 
 // Returns a growth rate map keyed by investment type key.
@@ -1969,25 +2020,7 @@ function getVolatilitiesByKey() {
 // Returns a priority map keyed by investment type key.
 // Backward-compat: derive ranks for 'indexFunds' and 'shares' from legacy params; others default to lowest priority (4).
 function getDrawdownPrioritiesByKey() {
-  var map = {};
-  try {
-    map['indexFunds'] = (typeof params.priorityFunds === 'number') ? params.priorityFunds : 0;
-    map['shares'] = (typeof params.priorityShares === 'number') ? params.priorityShares : 0;
-  } catch (e) {
-    map['indexFunds'] = 0;
-    map['shares'] = 0;
-  }
-  // Assign a default lowest priority to any additional assets
-  var defaultPriority = 4;
-  if (investmentAssets && investmentAssets.length > 0) {
-    for (var i = 0; i < investmentAssets.length; i++) {
-      var key = investmentAssets[i].key;
-      if (map[key] === undefined) {
-        map[key] = defaultPriority;
-      }
-    }
-  }
-  return map;
+  return params.drawdownPrioritiesByKey;
 }
 
 function initializeRealEstate() {
@@ -2056,19 +2089,18 @@ function buildAggregateContext() {
     throw new Error('Real estate value conversion failed: cannot convert total value to ' + residenceCurrency + ' for country ' + currentCountry + ' at year ' + year);
   }
 
-  // Compute capitals by key while avoiding double-counting legacy assets
+  // Compute capitals by key (canonical: investmentAssets keys)
   var capsByKey = {};
-  capsByKey['indexFunds'] = indexFunds.capital();
-  capsByKey['shares'] = shares.capital();
   if (investmentAssets && investmentAssets.length > 0) {
     for (var ci = 0; ci < investmentAssets.length; ci++) {
       var centry = investmentAssets[ci];
       if (!centry || !centry.asset || typeof centry.asset.capital !== 'function') continue;
-      var assetObj = centry.asset;
-      if (assetObj === indexFunds || assetObj === shares) continue; // skip legacy duplicates
-      var c = assetObj.capital();
+      var c = centry.asset.capital();
       capsByKey[centry.key] = (capsByKey[centry.key] || 0) + c;
     }
+  } else {
+    capsByKey['indexFunds'] = indexFunds.capital();
+    capsByKey['shares'] = shares.capital();
   }
 
   var pensionCap = person1.getTotalPensionCapital() + (person2 ? person2.getTotalPensionCapital() : 0);
@@ -2108,9 +2140,8 @@ function buildAggregateContext() {
     incomeRentals: incomeRentals,
     incomePrivatePension: incomePrivatePension,
     incomeStatePension: incomeStatePension,
-    incomeStatePensionBaseCurrency: (typeof incomeStatePensionBaseCurrency !== 'undefined') ? incomeStatePensionBaseCurrency : 0,
-    incomeFundsRent: incomeFundsRent,
-    incomeSharesRent: incomeSharesRent,
+    incomeStatePensionByCountry: (person1 && person1.yearlyIncomeStatePensionByCountry) ? person1.yearlyIncomeStatePensionByCountry : {},
+    incomeStatePensionByCountryP2: (person2 && person2.yearlyIncomeStatePensionByCountry) ? person2.yearlyIncomeStatePensionByCountry : {},
     cashWithdraw: cashWithdraw,
     incomeDefinedBenefit: incomeDefinedBenefit,
     incomeTaxFree: incomeTaxFree,

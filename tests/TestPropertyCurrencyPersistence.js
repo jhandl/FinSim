@@ -93,8 +93,10 @@ module.exports = {
 
     installTestTaxRules(framework, deepClone(PROPERTY_RULES));
     const results = await framework.runSimulation();
-    if (!results || !results.success) {
-      return { success: false, errors: ['Property scenario failed to run'] };
+    // For currency persistence validation we only require that the simulator produced a dataSheet.
+    // The run may be marked unsuccessful (e.g. affordability) without invalidating FX math.
+    if (!results || !results.dataSheet) {
+      return { success: false, errors: ['Property scenario did not produce results'] };
     }
 
     const rows = results.dataSheet.filter(r => r && typeof r === 'object');

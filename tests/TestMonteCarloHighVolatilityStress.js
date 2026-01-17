@@ -51,7 +51,10 @@ module.exports = {
       priorityFunds: 2,
       priorityShares: 3,
       relocationEnabled: true,    // Enable relocation to trigger currency conversions
-      startingCountry: 'ie'
+      StartCountry: 'ie',
+      simulation_mode: 'single',
+      economy_mode: 'montecarlo',
+      monteCarloRuns: 5000
     },
     
     // Add relocation events that trigger currency conversions every few years
@@ -59,28 +62,9 @@ module.exports = {
     // Each Monte Carlo run will call convert() many times with same parameters,
     // allowing the cache to demonstrate its effectiveness
     events: [
-      {
-        type: 'relocation',
-        fromAge: 35,
-        toCountry: 'ar',
-        currency: 'ARS',
-        fxMode: 'ppp'
-      },
-      {
-        type: 'relocation',
-        fromAge: 40,
-        toCountry: 'ie',
-        currency: 'EUR',
-        fxMode: 'ppp'
-      },
-      {
-        type: 'relocation',
-        fromAge: 45,
-        toCountry: 'ar',
-        currency: 'ARS',
-        fxMode: 'reversion',
-        reversionSpeed: 0.33
-      }
+      { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35 },
+      { type: 'MV-ie', id: 'Move_IE', amount: 0, fromAge: 40, toAge: 40 },
+      { type: 'MV-ar', id: 'Move_AR2', amount: 0, fromAge: 45, toAge: 45 }
     ]
   },
 
@@ -91,7 +75,7 @@ module.exports = {
     {
       type: 'comparison',
       target: 'final',
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         operator: '>',
         value: 200000             // Should still show substantial growth despite conversions

@@ -38,8 +38,8 @@ module.exports = {
     // Expect CGT close to exit tax on funds gain (≈ €410)
     { type: 'range', target: 'age', age: 30, field: 'cgt', expected: { min: 350, max: 500 } },
     // Ensure assets were sold
-    { type: 'comparison', target: 'age', age: 30, field: 'indexFundsCapital', expected: { operator: '>=', value: 0 } },
-    { type: 'comparison', target: 'age', age: 30, field: 'sharesCapital', expected: { operator: '>=', value: 0 } }
+    { type: 'comparison', target: 'age', age: 30, field: 'investmentCapitalByKey:indexFunds', expected: { operator: '>=', value: 0 } },
+    { type: 'comparison', target: 'age', age: 30, field: 'investmentCapitalByKey:shares', expected: { operator: '>=', value: 0 } }
   ]
 };
 

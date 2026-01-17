@@ -291,8 +291,18 @@ module.exports = {
     const worthComponentsPV =
       (row40.realEstateCapitalPV || 0) +
       (row40.pensionFundPV || 0) +
-      (row40.indexFundsCapitalPV || 0) +
-      (row40.sharesCapitalPV || 0) +
+      (function () {
+        const m = row40.investmentCapitalByKeyPV || {};
+        let t = 0;
+        for (const k in m) { if (k === 'indexFunds' || k.indexOf('indexFunds_') === 0) t += m[k] || 0; }
+        return t;
+      })() +
+      (function () {
+        const m = row40.investmentCapitalByKeyPV || {};
+        let t = 0;
+        for (const k in m) { if (k === 'shares' || k.indexOf('shares_') === 0) t += m[k] || 0; }
+        return t;
+      })() +
       (row40.cashPV || 0);
     if (!withinTolerance(row40.worthPV || 0, worthComponentsPV, Math.max(1, Math.abs(worthComponentsPV) * 1e-6))) {
       errors.push('worthPV should equal the sum of asset PV components at age 40');

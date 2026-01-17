@@ -133,7 +133,7 @@ module.exports = {
       type: 'comparison',
       target: 'age',
       age: 37,
-      field: 'indexFundsCapital',
+      field: 'investmentCapitalByKey:indexFunds',
       expected: {
         operator: '>',
         value: 39000                // Baseline produces ≈€39.4k (reduced due to inflated stash); keep healthy growth buffer
@@ -410,7 +410,7 @@ module.exports = {
       type: 'comparison',
       target: 'age',
       age: 65,
-      field: 'indexFundsCapital',
+      field: 'investmentCapitalByKey:indexFunds',
       expected: {
         operator: '>=',
         value: 0                    // Index funds should never go negative
@@ -421,7 +421,7 @@ module.exports = {
       type: 'comparison',
       target: 'age',
       age: 65,
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         operator: '>=',
         value: 0                    // Shares should never go negative

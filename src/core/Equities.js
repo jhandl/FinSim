@@ -30,10 +30,10 @@ class Equity {
 
   declareRevenue(income, gains) {
     var incomeMoney = Money.from(income, residenceCurrency, currentCountry);
-    revenue.declareInvestmentIncome(incomeMoney);
+    revenue.declareInvestmentIncome(incomeMoney, undefined, undefined);
     if (gains > 0 || this.canOffsetLosses) {
       var gainsMoney = Money.from(gains, residenceCurrency, currentCountry);
-      revenue.declareInvestmentGains(gainsMoney, this.taxRate, this.constructor.name + " Sale");
+      revenue.declareInvestmentGains(gainsMoney, this.taxRate, this.constructor.name + " Sale", undefined, undefined);
     }
   }
 
@@ -303,10 +303,10 @@ class Equity {
 
   simulateDeclareRevenue(income, gains, testRevenue) {
     var incomeMoney = Money.from(income, residenceCurrency, currentCountry);
-    testRevenue.declareInvestmentIncome(incomeMoney);
+    testRevenue.declareInvestmentIncome(incomeMoney, undefined, undefined);
     if (gains > 0 || this.canOffsetLosses) {
       var gainsMoney = Money.from(gains, residenceCurrency, currentCountry);
-      testRevenue.declareInvestmentGains(gainsMoney, this.taxRate, this.constructor.name + " Sim");
+      testRevenue.declareInvestmentGains(gainsMoney, this.taxRate, this.constructor.name + " Sim", undefined, undefined);
     }
   }
 
@@ -399,14 +399,14 @@ class IndexFunds extends Equity {
 
   simulateDeclareRevenue(income, gains, testRevenue) {
     var incomeMoney = Money.from(income, residenceCurrency, currentCountry);
-    testRevenue.declareInvestmentIncome(incomeMoney);
+    testRevenue.declareInvestmentIncome(incomeMoney, undefined, undefined);
     if (gains > 0 || this.canOffsetLosses) {
       var gainsMoney = Money.from(gains, residenceCurrency, currentCountry);
       testRevenue.declareInvestmentGains(gainsMoney, this.taxRate, this.constructor.name + " Sim", {
         category: 'exitTax',
         eligibleForAnnualExemption: !!this._exitTaxEligibleForAnnualExemption,
         allowLossOffset: !!this.canOffsetLosses
-      });
+      }, undefined);
     }
   }
 
@@ -480,27 +480,27 @@ class Shares extends Equity {
   // Explicitly mark CGT classification for shares
   declareRevenue(income, gains) {
     var incomeMoney = Money.from(income, residenceCurrency, currentCountry);
-    revenue.declareInvestmentIncome(incomeMoney);
+    revenue.declareInvestmentIncome(incomeMoney, undefined, undefined);
     if (gains > 0 || this.canOffsetLosses) {
       var gainsMoney = Money.from(gains, residenceCurrency, currentCountry);
       revenue.declareInvestmentGains(gainsMoney, this.taxRate, this.constructor.name + " Sale", {
         category: 'cgt',
         eligibleForAnnualExemption: true,
         allowLossOffset: true
-      });
+      }, undefined);
     }
   }
 
   simulateDeclareRevenue(income, gains, testRevenue) {
     var incomeMoney = Money.from(income, residenceCurrency, currentCountry);
-    testRevenue.declareInvestmentIncome(incomeMoney);
+    testRevenue.declareInvestmentIncome(incomeMoney, undefined, undefined);
     if (gains > 0 || this.canOffsetLosses) {
       var gainsMoney = Money.from(gains, residenceCurrency, currentCountry);
       testRevenue.declareInvestmentGains(gainsMoney, this.taxRate, this.constructor.name + " Sim", {
         category: 'cgt',
         eligibleForAnnualExemption: true,
         allowLossOffset: true
-      });
+      }, undefined);
     }
   }
 

@@ -184,7 +184,7 @@ module.exports = {
       type: 'range',
       target: 'age',
       age: 45,
-      field: 'indexFundsCapital',
+      field: 'investmentCapitalByKey:indexFunds',
       expected: {
         min: 90000,                 // Updated to actual index fund accumulation
         max: 110000
@@ -342,7 +342,7 @@ module.exports = {
       type: 'comparison',
       target: 'age',
       age: 50,
-      field: 'indexFundsCapital',
+      field: 'investmentCapitalByKey:indexFunds',
       expected: {
         operator: '>',
         value: 0                    // Should have index fund investments
@@ -353,7 +353,7 @@ module.exports = {
       type: 'comparison',
       target: 'age',
       age: 50,
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: {
         operator: '>',
         value: 0                    // Should have shares investments

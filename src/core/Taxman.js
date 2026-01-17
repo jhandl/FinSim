@@ -47,13 +47,19 @@ class Taxman {
     if (person && this.person1Ref && person.id === this.person1Ref.id) {
       this.pensionContribAmountP1 += contribution;
       this.pensionContribReliefP1 += relief;
+      this.totalSalaryP1 += amount;
       this.salariesP1.push({ amount: amount, contribRate: contribRate, description: description });
-      this.salariesP1.sort((a, b) => a.amount - b.amount);
+      if (this.salariesP1.length > 1) {
+        this.salariesP1.sort((a, b) => a.amount - b.amount);
+      }
     } else if (person && this.person2Ref && person.id === this.person2Ref.id) {
       this.pensionContribAmountP2 += contribution;
       this.pensionContribReliefP2 += relief;
+      this.totalSalaryP2 += amount;
       this.salariesP2.push({ amount: amount, contribRate: contribRate, description: description });
-      this.salariesP2.sort((a, b) => a.amount - b.amount);
+      if (this.salariesP2.length > 1) {
+        this.salariesP2.sort((a, b) => a.amount - b.amount);
+      }
     }
   };
 
@@ -138,7 +144,7 @@ class Taxman {
     // Attribution for state pension is handled in Simulator.js
   };
 
-  declareInvestmentIncome(money, description) {
+  declareInvestmentIncome(money, description, assetCountry) {
     if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
       throw new Error('declareInvestmentIncome requires a Money object');
     }
@@ -147,9 +153,24 @@ class Taxman {
       throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
     }
 
-    const amount = money.amount;
-    this.investmentIncome += amount;
-    this.attributionManager.record('investmentincome', description, amount);
+    const grossAmount = money.amount;
+    
+    // Apply withholding tax if asset country is provided
+    var withholdingAmount = 0;
+    if (assetCountry) {
+      withholdingAmount = this.getWithholdingTax('dividend', assetCountry, grossAmount);
+      if (withholdingAmount > 0) {
+        if (!this.withholdingEntries) this.withholdingEntries = [];
+        this.withholdingEntries.push({
+          source: assetCountry.toUpperCase() + ' Dividend Withholding',
+          amount: withholdingAmount
+        });
+      }
+    }
+    
+    // Record gross income; withholding is materialized as a tax during computeTaxes()
+    this.investmentIncome += grossAmount;
+    this.attributionManager.record('investmentincome', description, grossAmount);
 
     Money.add(this.investmentIncomeMoney, money);
   };
@@ -170,7 +191,21 @@ class Taxman {
     Money.add(this.incomeMoney, money);
   };
 
-  declareInvestmentGains(money, taxRate, description, options) {
+  /**
+   * Calculate withholding tax for investment income based on asset country.
+   * @param {string} incomeType - Type of income ('dividend', 'interest', 'capitalGains')
+   * @param {string} assetCountry - Country code where asset is domiciled
+   * @param {number} grossAmount - Gross income amount before withholding
+   * @returns {number} Withholding tax amount to deduct
+   */
+  getWithholdingTax(incomeType, assetCountry, grossAmount) {
+    if (!assetCountry || grossAmount <= 0) return 0;
+    const config = Config.getInstance();
+    const rate = config.getAssetTax(incomeType, assetCountry);
+    return grossAmount * rate;
+  }
+
+  declareInvestmentGains(money, taxRate, description, options, assetCountry) {
     // options: { category: 'cgt'|'exitTax', eligibleForAnnualExemption: boolean, allowLossOffset: boolean }
     if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
       throw new Error('declareInvestmentGains requires a Money object');
@@ -180,7 +215,23 @@ class Taxman {
       throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
     }
 
-    const amount = money.amount;
+    const grossAmount = money.amount;
+    
+    // Apply withholding tax if asset country is provided
+    var withholdingAmount = 0;
+    if (assetCountry) {
+      withholdingAmount = this.getWithholdingTax('capitalGains', assetCountry, grossAmount);
+      if (withholdingAmount > 0) {
+        if (!this.withholdingEntries) this.withholdingEntries = [];
+        this.withholdingEntries.push({
+          source: assetCountry.toUpperCase() + ' Capital Gains Withholding',
+          amount: withholdingAmount
+        });
+      }
+    }
+    
+    // Record gross gains; withholding is materialized as a tax during computeTaxes()
+    const amount = grossAmount;
     var currentCountry = money.country;
     if (!this.gains.hasOwnProperty(taxRate)) {
       this.gains[taxRate] = {
@@ -207,7 +258,7 @@ class Taxman {
     // Store detailed entry for precise CGT/Exit Tax handling
     const entry = {
       amount: amount,
-      amountMoney: Money.create(money.amount, money.currency, money.country),
+      amountMoney: Money.create(amount, money.currency, money.country),
       description: description,
       category: (options && (options.category === 'exitTax' || options.category === 'cgt')) ? options.category : 'cgt',
       eligibleForAnnualExemption: options && typeof options.eligibleForAnnualExemption === 'boolean' ? options.eligibleForAnnualExemption : true,
@@ -221,6 +272,16 @@ class Taxman {
     this.resetTaxAttributions();
     // Reset dynamic totals at start of each computation
     this.taxTotals = {};
+
+    // Re-apply declared withholding (declared during the year; materialized at compute time)
+    if (this.withholdingEntries && this.withholdingEntries.length > 0) {
+      for (var i = 0; i < this.withholdingEntries.length; i++) {
+        var w = this.withholdingEntries[i];
+        if (w && typeof w.amount === 'number' && w.amount !== 0) {
+          this._recordTax('withholding', w.source || 'Withholding', w.amount);
+        }
+      }
+    }
 
     this.computeIT();
     this.computeSocialContributionsGeneric();
@@ -260,9 +321,13 @@ class Taxman {
     this.people = 1;
     this.salariesP1 = [];
     this.salariesP2 = [];
+    this.totalSalaryP1 = 0;
+    this.totalSalaryP2 = 0;
 
     // Dynamic tax totals map for country-neutral engine
     this.taxTotals = {};
+    // Withholding declarations are accumulated during the year and materialized during computeTaxes()
+    this.withholdingEntries = [];
 
     this.person1Ref = person1 || null;
     this.person2Ref = person2_optional || null;
@@ -483,8 +548,8 @@ class Taxman {
     var status = this.married ? 'married' : 'single';
     itBands = this.ruleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
     if (this.married) {
-      const p1TotalSalary = this.salariesP1.reduce(function (sum, s) { return sum + s.amount; }, 0);
-      const p2TotalSalary = this.person2Ref ? this.salariesP2.reduce(function (sum, s) { return sum + s.amount; }, 0) : 0;
+      const p1TotalSalary = this.totalSalaryP1 || 0;
+      const p2TotalSalary = this.person2Ref ? (this.totalSalaryP2 || 0) : 0;
       var maxIncrease = adjust(this.ruleset.getIncomeTaxJointBandIncreaseMax());
       if (p1TotalSalary > 0 && p2TotalSalary > 0) {
         marriedBandIncrease = Math.min(maxIncrease, Math.min(p1TotalSalary, p2TotalSalary));
@@ -511,56 +576,16 @@ class Taxman {
       tax += this.computeProgressiveTax(lumpBands2, lumpSumAttribution, 'incomeTax');
     }
 
-    let numSalaryEarners = (this.salariesP1.length > 0 ? 1 : 0) + (this.salariesP2.length > 0 ? 1 : 0);
-    var employeeCredit = this.ruleset.getIncomeTaxEmployeeCredit();
-    var ageCredit = this.ruleset.getIncomeTaxAgeCredit();
     var ageExemptionAge = this.ruleset.getIncomeTaxAgeExemptionAge();
     var ageExemptionLimit = this.ruleset.getIncomeTaxAgeExemptionLimit();
-
-    // Compute per-person employee credit honoring declarative `min` / `max`
-    var empSpec = (this.ruleset && typeof this.ruleset.getIncomeTaxEmployeeCreditSpec === 'function')
-      ? this.ruleset.getIncomeTaxEmployeeCreditSpec()
-      : { amount: employeeCredit, min: null, max: null };
-
-    // Sum PAYE salaries per person
-    const p1TotalSalary = this.salariesP1.reduce(function (sum, s) { return sum + s.amount; }, 0);
-    const p2TotalSalary = this.salariesP2.reduce(function (sum, s) { return sum + s.amount; }, 0);
-
-    const computePerPersonEmployeeCredit = (salaryTotal) => {
-      if (!salaryTotal || salaryTotal <= 0) return 0;
-      var base = empSpec.amount || 0;
-      var candidate = base;
-      // Apply `min` rule if present: credit = min(base, salaryTotal * rate) or min(base, amount)
-      if (empSpec.min) {
-        var minByRate = (empSpec.min.rate && typeof empSpec.min.rate === 'number') ? salaryTotal * empSpec.min.rate : null;
-        var minByAmount = (empSpec.min.amount && typeof empSpec.min.amount === 'number') ? empSpec.min.amount : null;
-        var minCandidates = [];
-        if (minByRate !== null) minCandidates.push(minByRate);
-        if (minByAmount !== null) minCandidates.push(minByAmount);
-        if (minCandidates.length > 0) candidate = Math.min(base, Math.min.apply(null, minCandidates));
-      }
-      // Apply `max` rule if present: candidate = Math.min(candidate, salaryTotal * rate or amount)
-      if (empSpec.max) {
-        var maxByRate = (empSpec.max.rate && typeof empSpec.max.rate === 'number') ? salaryTotal * empSpec.max.rate : null;
-        var maxByAmount = (empSpec.max.amount && typeof empSpec.max.amount === 'number') ? empSpec.max.amount : null;
-        var maxCandidates = [];
-        if (maxByRate !== null) maxCandidates.push(maxByRate);
-        if (maxByAmount !== null) maxCandidates.push(maxByAmount);
-        if (maxCandidates.length > 0) candidate = Math.min(candidate, Math.max.apply(null, maxCandidates));
-      }
-      return candidate;
-    };
-
-    var empCreditP1 = computePerPersonEmployeeCredit(p1TotalSalary);
-    var empCreditP2 = computePerPersonEmployeeCredit(p2TotalSalary);
-
-    let credit = adjust(params.personalTaxCredit + empCreditP1 + empCreditP2);
-    if (this.person1Ref && this.person1Ref.age >= ageExemptionAge) {
-      credit += adjust(ageCredit);
-    }
-    if (this.married && this.person2Ref && this.person2Ref.age >= ageExemptionAge) {
-      credit += adjust(ageCredit);
-    }
+    const totalIncome = taxableIncomeAttribution.getTotal();
+    const totalCredits = this._applyTaxCredits(
+      this.ruleset,
+      params,
+      totalIncome,
+      this.person1Ref ? this.person1Ref.age : null
+    );
+    let credit = adjust(totalCredits);
 
     let exemption = ageExemptionLimit * (this.married ? 2 : 1);
 
@@ -568,7 +593,7 @@ class Taxman {
     let p2AgeEligible = (this.married && this.person2Ref && this.person2Ref.age >= ageExemptionAge);
     let isEligibleForAgeExemption = p1AgeEligible || p2AgeEligible;
 
-    const taxableAmount = taxableIncomeAttribution.getTotal();
+    const taxableAmount = totalIncome;
     const ageExempt = (isEligibleForAgeExemption && taxableAmount <= adjust(exemption) && (this.privatePensionLumpSumCountP1 === 0 && this.privatePensionLumpSumCountP2 === 0));
     if (ageExempt) {
       // Clear any previously recorded income tax for age exemption case
@@ -691,6 +716,129 @@ class Taxman {
       applyForPerson(this.person1Ref, this.salariesP1, nonPayeIncomeAttribution, contribObj);
       if (this.person2Ref) applyForPerson(this.person2Ref, this.salariesP2, nonPayeIncomeAttribution, contribObj);
     }
+  }
+
+  /**
+   * Apply all tax credits from the ruleset, with optional user overrides.
+   * @param {TaxRuleSet} ruleset - Active tax ruleset
+   * @param {Object} params - Simulation parameters
+   * @param {number} grossIncome - Gross income for credit calculations
+   * @param {number} age - Person's age for age-based credits
+   * @returns {number} - Total credits amount
+   */
+  _applyTaxCredits(ruleset, params, grossIncome, age) {
+    var spec = ruleset.getIncomeTaxSpec();
+    var credits = spec.taxCredits || {};
+    var totalCredits = 0;
+    var country = null;
+    if (this.countryHistory && this.countryHistory.length) {
+      country = this.countryHistory[this.countryHistory.length - 1].country;
+    } else if (ruleset && typeof ruleset.getCountryCode === 'function') {
+      country = ruleset.getCountryCode();
+    }
+    if (country) country = String(country).toLowerCase();
+
+    for (var creditId in credits) {
+      if (!credits.hasOwnProperty(creditId)) continue;
+      var creditDef = credits[creditId];
+      var creditAmount = 0;
+
+      // Check for user override first
+      if (country && params.taxCreditsByCountry && params.taxCreditsByCountry[country]) {
+        var override = params.taxCreditsByCountry[country][creditId];
+        if (override !== undefined && override !== null && override !== '') {
+          creditAmount = Number(override);
+          totalCredits += creditAmount;
+          continue;
+        }
+      }
+
+      // Calculate based on credit type
+      if (creditId === 'employee') {
+        // Employee credit is applied per salary earner (P1/P2).
+        // Preserve historical semantics: declarative `min` acts as a cap:
+        // credit = min(baseAmount, salaryTotal * rate, min.amount).
+        var empSpec = (ruleset && typeof ruleset.getIncomeTaxEmployeeCreditSpec === 'function')
+          ? ruleset.getIncomeTaxEmployeeCreditSpec()
+          : { amount: 0, min: null, max: null };
+        var p1TotalSalary = this.totalSalaryP1 || 0;
+        var p2TotalSalary = this.totalSalaryP2 || 0;
+        var earners = (p1TotalSalary > 0 ? 1 : 0) + (p2TotalSalary > 0 ? 1 : 0);
+
+        // If user override exists, treat it as a per-earner override.
+        if (country && params.taxCreditsByCountry && params.taxCreditsByCountry[country]
+          && params.taxCreditsByCountry[country][creditId] !== undefined
+          && params.taxCreditsByCountry[country][creditId] !== null
+          && params.taxCreditsByCountry[country][creditId] !== '') {
+          creditAmount = Number(params.taxCreditsByCountry[country][creditId]) * earners;
+          totalCredits += creditAmount;
+          continue;
+        }
+
+        var computePerPersonEmployeeCredit = function (salaryTotal) {
+          if (!salaryTotal || salaryTotal <= 0) return 0;
+          var base = empSpec.amount || 0;
+          var candidate = base;
+          if (empSpec.min) {
+            var minByRate = (typeof empSpec.min.rate === 'number') ? salaryTotal * empSpec.min.rate : null;
+            var minByAmount = (typeof empSpec.min.amount === 'number') ? empSpec.min.amount : null;
+            var minCandidates = [];
+            if (minByRate !== null) minCandidates.push(minByRate);
+            if (minByAmount !== null) minCandidates.push(minByAmount);
+            if (minCandidates.length > 0) candidate = Math.min(base, Math.min.apply(null, minCandidates));
+          }
+          if (empSpec.max) {
+            var maxByRate = (typeof empSpec.max.rate === 'number') ? salaryTotal * empSpec.max.rate : null;
+            var maxByAmount = (typeof empSpec.max.amount === 'number') ? empSpec.max.amount : null;
+            var maxCandidates = [];
+            if (maxByRate !== null) maxCandidates.push(maxByRate);
+            if (maxByAmount !== null) maxCandidates.push(maxByAmount);
+            if (maxCandidates.length > 0) candidate = Math.min(candidate, Math.max.apply(null, maxCandidates));
+          }
+          return candidate;
+        };
+
+        var empCreditP1 = computePerPersonEmployeeCredit(p1TotalSalary);
+        var empCreditP2 = computePerPersonEmployeeCredit(p2TotalSalary);
+        creditAmount = empCreditP1 + empCreditP2;
+      } else if (creditId === 'age') {
+        // Age credit is applied per eligible person (P1/P2) using threshold map when present.
+        var ageSpec = creditDef;
+        var creditForAge = function (ageNum) {
+          if (typeof ageSpec === 'number') return ageSpec;
+          if (!ageSpec || typeof ageSpec !== 'object' || Array.isArray(ageSpec)) return 0;
+          var thresholds = Object.keys(ageSpec)
+            .map(function (k) { return parseInt(k); })
+            .filter(function (n) { return !isNaN(n); })
+            .sort(function (a, b) { return a - b; });
+          var amt = 0;
+          for (var i = 0; i < thresholds.length; i++) {
+            if (ageNum >= thresholds[i]) {
+              var val = ageSpec[String(thresholds[i])];
+              if (typeof val === 'number') amt = val;
+            }
+          }
+          return amt;
+        };
+        var p1Age = this.person1Ref ? this.person1Ref.age : age;
+        var p2Age = (this.person2Ref && this.married) ? this.person2Ref.age : null;
+        creditAmount = creditForAge(p1Age || 0) + (p2Age !== null ? creditForAge(p2Age) : 0);
+      } else if (creditId === 'personal') {
+        // Legacy compatibility: scenarios/tests can provide a single PersonalTaxCredit override.
+        // This corresponds to the total personal credit amount to apply for the household.
+        if (params && params.personalTaxCredit !== undefined && params.personalTaxCredit !== null && params.personalTaxCredit !== '') {
+          creditAmount = Number(params.personalTaxCredit);
+        } else if (typeof creditDef === 'number') creditAmount = creditDef;
+        else if (creditDef && typeof creditDef === 'object' && typeof creditDef.amount === 'number') creditAmount = creditDef.amount;
+      } else {
+        if (typeof creditDef === 'number') creditAmount = creditDef;
+        else if (creditDef && typeof creditDef === 'object' && typeof creditDef.amount === 'number') creditAmount = creditDef.amount;
+      }
+
+      totalCredits += creditAmount;
+    }
+
+    return totalCredits;
   }
 
   /**

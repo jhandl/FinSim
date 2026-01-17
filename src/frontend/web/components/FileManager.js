@@ -18,7 +18,9 @@ class FileManager {
 
     // If we haven't saved yet, treat as unsaved only if real data differs
     if (this.lastSavedState === null) {
-      return true;
+      // Establish baseline lazily to avoid false positives on first load.
+      this.lastSavedState = currentState;
+      return false;
     }
 
     const normalize = (csv) => {

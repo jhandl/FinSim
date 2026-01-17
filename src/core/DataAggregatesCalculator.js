@@ -25,8 +25,6 @@
  *   @param {number} ctx.incomeRentals - Pre-extracted .amount from rental Money objects
  *   @param {number} ctx.incomePrivatePension - Pre-extracted .amount from pension Money objects
  *   @param {number} ctx.incomeStatePension - Pre-extracted .amount from state pension Money objects
- *   @param {number} ctx.incomeFundsRent - Pre-extracted .amount from fund income Money objects
- *   @param {number} ctx.incomeSharesRent - Pre-extracted .amount from share income Money objects
  *   @param {number} ctx.cashWithdraw - Pre-extracted .amount from cash withdrawal Money objects
  *   @param {number} ctx.incomeDefinedBenefit - Pre-extracted .amount from DB pension Money objects
  *   @param {number} ctx.incomeTaxFree - Pre-extracted .amount from tax-free income Money objects
@@ -53,8 +51,6 @@ function computeNominalAggregates(ctx) {
   var incomeRentals = ctx.incomeRentals;
   var incomePrivatePension = ctx.incomePrivatePension;
   var incomeStatePension = ctx.incomeStatePension;
-  var incomeFundsRent = ctx.incomeFundsRent;
-  var incomeSharesRent = ctx.incomeSharesRent;
   var cashWithdraw = ctx.cashWithdraw;
   var incomeDefinedBenefit = ctx.incomeDefinedBenefit;
   var incomeTaxFree = ctx.incomeTaxFree;
@@ -72,10 +68,6 @@ function computeNominalAggregates(ctx) {
   var cash = ctx.cash;
   var year = ctx.year;
 
-  // This is used below to hide the deemed disposal tax payments, otherwise they're shown as income.
-  let FundsTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeFundsRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
-  let SharesTax = (incomeFundsRent + incomeSharesRent + cashWithdraw > 0) ? revenue.getTaxTotal('capitalGains') * incomeSharesRent / (incomeFundsRent + incomeSharesRent + cashWithdraw) : 0;
-
   if (!(row in dataSheet)) {
     dataSheet[row] = {
       "age": 0,
@@ -86,8 +78,6 @@ function computeNominalAggregates(ctx) {
       "incomeRentals": 0,
       "incomePrivatePension": 0,
       "incomeStatePension": 0,
-      "incomeFundsRent": 0,
-      "incomeSharesRent": 0,
       "incomeCash": 0,
       "incomeDefinedBenefit": 0,
       "incomeTaxFree": 0,
@@ -96,8 +86,6 @@ function computeNominalAggregates(ctx) {
       "expenses": 0,
       "pensionFund": 0,
       "cash": 0,
-      "indexFundsCapital": 0,
-      "sharesCapital": 0,
       "pensionContribution": 0,
       "withdrawalRate": 0,
       "worth": 0,
@@ -107,8 +95,6 @@ function computeNominalAggregates(ctx) {
       "incomeRentalsPV": 0,
       "incomePrivatePensionPV": 0,
       "incomeStatePensionPV": 0,
-      "incomeFundsRentPV": 0,
-      "incomeSharesRentPV": 0,
       "incomeCashPV": 0,
       "incomeDefinedBenefitPV": 0,
       "incomeTaxFreePV": 0,
@@ -117,8 +103,6 @@ function computeNominalAggregates(ctx) {
       "expensesPV": 0,
       "pensionFundPV": 0,
       "cashPV": 0,
-      "indexFundsCapitalPV": 0,
-      "sharesCapitalPV": 0,
       "pensionContributionPV": 0,
       "worthPV": 0,
       // Attribution and dynamic per-key maps (nominal and PV)
@@ -156,8 +140,6 @@ function computeNominalAggregates(ctx) {
   dataSheet[row].incomeRentals += incomeRentals;
   dataSheet[row].incomePrivatePension += incomePrivatePension;
   dataSheet[row].incomeStatePension += incomeStatePension;
-  dataSheet[row].incomeFundsRent += incomeFundsRent;
-  dataSheet[row].incomeSharesRent += incomeSharesRent;
   dataSheet[row].incomeCash += Math.max(cashWithdraw, 0);
   dataSheet[row].incomeDefinedBenefit += incomeDefinedBenefit;
   dataSheet[row].incomeTaxFree += incomeTaxFree;
@@ -166,8 +148,6 @@ function computeNominalAggregates(ctx) {
   dataSheet[row].expenses += expenses;
   dataSheet[row].pensionFund += pensionCap;
   dataSheet[row].cash += cash;
-  dataSheet[row].indexFundsCapital += capsByKey['indexFunds'];
-  dataSheet[row].sharesCapital += capsByKey['shares'];
   // Accumulate per-type income and capital for dynamic UI columns
   // Ensure investmentIncomeByKey exists even if row was pre-initialized
   if (!dataSheet[row].investmentIncomeByKey) dataSheet[row].investmentIncomeByKey = {};

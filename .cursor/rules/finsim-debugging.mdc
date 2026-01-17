@@ -4,7 +4,8 @@ alwaysApply: false
 ---
 ## DEBUGGING ##
 
-When fixing an issue DO NOT jump to conclusions or start making sweeping changes based on absolutely no information. Don't do that. ALWAYS debug first. That means that you need to read the relevant code, understand how it works, and then formulate 5 to 7 hypothesis, select the one or two most likely ones, ask the user if they agree (and wait for their confirmation), then add logging to confirm (only add minimal logging, it's not easy to find the needle in a haystack of a ton of logs), and only when the root cause has been unequivocally proven through the logs, only then apply a fix, without removing the logs. Then test the fix by checking the logs. If the fix didn't work, remove the logs and start over. Once you have confirmed that you fixed the issue (as proven by the logs), clean up the logs. Once that is done, you can declare that you fixed the issue. No sooner than that.
+When fixing an issue DO NOT jump to conclusions or start making sweeping changes based on absolutely no information. Don't do that. ALWAYS debug first. That means that you need to read the relevant code, understand how it works, and then formulate 5 to 7 hypothesis, select the one or two most likely ones, ask the user if they agree (and wait for their confirmation), then add logging to confirm (only add minimal logging, it's not easy to find the needle in a haystack of a ton of logs). You may need to do several cycles of logging to pin-point the root cause. Each time, remove any no-longer-needed logs before adding new ones.Only when the root cause has been unequivocally proven through the logs, explain the root cause and propose a fix. Wait for the user's approval, and then implement the fix without removing the logs that led to the proof. Then test the fix by checking the logs. If the fix didn't work, remove the logs, revert the "fix" and start over. Once you have confirmed that you fixed the issue (as proven by the logs), clean up the remaining logs. Once that is done, you can declare that you fixed the issue. No sooner than that.
+
 All this also applies to UI issues that require you to look at the UI, but instead (or in addition to) logs, you can use css to add visual cues like colored borders or show data in a temporary overlay. For mobile issues, use the phonitor.js library to add a debug overlay. If necessary, the user will share screenshots for you to see what's happening in the UI.
 
 All log lines must start with "[DBG]" and be in one line. No try catch block or variables. Simple console.log statements.
@@ -15,10 +16,14 @@ NEVER EVER USE DELAYS TO TRY TO FIX TIMING ISSUES. The correct way to fix those 
 
 DO NOT MAKE ASSUMPTIONS ABOUT THE CAUSE OF AN ISSUE. ALWAYS DEBUG!
 
-A local webserver is always running, so there's never need to start a new one to. DO NOT ASK THE USER TO RUN A SERVER. IT'S ALWAYS ALREADY RUNNING!
-
-The user always has a browser window open on the UI. Do not run the "Open in Browser" command. It's always already open.
+DO NOT MAKE ASSUMPTIONS ABOUT HOW THE CODE WORKS. ALWAYS READ THE CODE TO UNDERSTAND HOW IT WORKS.
 
 If logging to the console, use console.log().
 
-The most critical rule of all: YOU WILL ALWAYS STOP AND ASK FOR THE USER'S INPUT BEFORE PROCEEDING. THE USER WILL TELL YOU WHICH HYPOTHESES TO PURSUE. IF YOU DON'T STOP, YOU FAIL AND EVERYTHING YOU DO WILL BE DELETED. 
+A local webserver is always running, so there's never need to start a new one to. DO NOT ASK THE USER TO RUN A SERVER. IT'S ALWAYS ALREADY RUNNING!
+
+The user always has a browser window open on the UI. Do not run the "Open in Browser" command. It's always already open. Also, because of a technical limitation, you cannot control the browser or interact with the UI. Don't try to open the browser. The user will test the UI in their browser.
+
+The most critical rule of all: YOU WILL ALWAYS STOP AND ASK FOR THE USER'S INPUT BEFORE PROCEEDING. THE USER WILL TELL YOU WHICH HYPOTHESES TO PURSUE. IF YOU DON'T STOP, YOU FAIL AND EVERYTHING YOU DO WILL BE DELETED.
+
+Also critical: If the user tells you not to use this rule, or to use it in a different way, you will obey. The user is the one who rules. You are the assistant, not the boss.

@@ -300,8 +300,18 @@ module.exports = {
     const worthComponentsPV =
       (row49.realEstateCapitalPV || 0) +
       (row49.pensionFundPV || 0) +
-      (row49.indexFundsCapitalPV || 0) +
-      (row49.sharesCapitalPV || 0) +
+      (function () {
+        const m = row49.investmentCapitalByKeyPV || {};
+        let t = 0;
+        for (const k in m) { if (k === 'indexFunds' || k.indexOf('indexFunds_') === 0) t += m[k] || 0; }
+        return t;
+      })() +
+      (function () {
+        const m = row49.investmentCapitalByKeyPV || {};
+        let t = 0;
+        for (const k in m) { if (k === 'shares' || k.indexOf('shares_') === 0) t += m[k] || 0; }
+        return t;
+      })() +
       (row49.cashPV || 0);
     if (!withinTolerance(row49.worthPV || 0, worthComponentsPV, Math.max(1, Math.abs(worthComponentsPV) * 1e-6))) {
       errors.push(
@@ -381,8 +391,18 @@ module.exports = {
     const coupleWorthComponentsPV =
       (coupleRow49.realEstateCapitalPV || 0) +
       (coupleRow49.pensionFundPV || 0) +
-      (coupleRow49.indexFundsCapitalPV || 0) +
-      (coupleRow49.sharesCapitalPV || 0) +
+      (function () {
+        const m = coupleRow49.investmentCapitalByKeyPV || {};
+        let t = 0;
+        for (const k in m) { if (k === 'indexFunds' || k.indexOf('indexFunds_') === 0) t += m[k] || 0; }
+        return t;
+      })() +
+      (function () {
+        const m = coupleRow49.investmentCapitalByKeyPV || {};
+        let t = 0;
+        for (const k in m) { if (k === 'shares' || k.indexOf('shares_') === 0) t += m[k] || 0; }
+        return t;
+      })() +
       (coupleRow49.cashPV || 0);
     if (!withinTolerance(coupleRow49.worthPV || 0, coupleWorthComponentsPV, Math.max(1, Math.abs(coupleWorthComponentsPV) * 1e-6))) {
       errors.push(

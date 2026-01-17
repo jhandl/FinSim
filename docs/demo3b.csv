@@ -1,0 +1,66 @@
+# FinSim v2.0 Save File
+# Parameters
+StartingAge,30
+TargetAge,90
+InitialSavings,20000
+InitialPension,0
+RetirementAge,65
+EmergencyStash,20000
+PensionContributionPercentage,30%
+PensionContributionCapped,Yes
+PensionGrowthRate,5%
+PensionGrowthStdDev,10%
+Inflation,3%
+MarriageYear,2025
+YoungestChildBorn,0
+OldestChildBorn,2027
+PersonalTaxCredit,4000
+StatePensionWeekly,300
+PriorityCash,4
+PriorityPension,3
+PriorityFunds,1
+PriorityShares,2
+P2StartingAge,28
+P2RetirementAge,65
+P2StatePensionWeekly,400
+InitialPensionP2,0
+PensionContributionPercentageP2,25%
+simulation_mode,couple
+economy_mode,deterministic
+InitialCapital_indexFunds_ie,0
+indexFunds_ieGrowthRate,7%
+indexFunds_ieGrowthStdDev,15%
+InitialCapital_shares_ie,0
+shares_ieGrowthRate,6%
+shares_ieGrowthStdDev,15%
+InvestmentAllocation_indexFunds_ie,50%
+InvestmentAllocation_shares_ie,50%
+InvestmentAllocation_shares_ar,100%
+InvestmentAllocation_indexFunds_ar,0%
+InvestmentAllocation_indexfunds_ie,0
+InvestmentAllocation_indexfunds_ar,0
+StatePension_ie,300
+StatePension_ar,1000
+P2StatePension_ie,400
+P2StatePension_ar,2000
+P1PensionContrib_ie,30%
+P2PensionContrib_ie,25%
+PensionCapped_ie,Yes
+TaxCredit_personal_ie,4000
+StartCountry,ie
+
+# Events
+Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta
+SI,You,40000,30,40,0.035,0.03,linkedEventId=split_1762624764068_cmuo82pdo
+SI2np,Your Partner,30000,30,40,0.02,0,linkedEventId=split_1762624772055_tlitwyl80
+E,Life,40000,30,40,,,linkedEventId=split_1762624789954_fgc7fmqve
+E,Kid,6000,32,40,,,linkedEventId=split_1762624796604_1zr4xkn8q
+R,Family House,40000,35,70,,,currency=EUR;linkedCountry=ie
+M,Family House,18000,35,60,0.035,,currency=EUR;linkedCountry=ie
+MV-AR,hola,0,40,,,,
+E,Kid,3334610,40,52,,,currency=ARS;linkedEventId=split_1762624796604_1zr4xkn8q;resolved=1
+E,Life,22230730,40,100,,,currency=ARS;linkedEventId=split_1762624789954_fgc7fmqve;resolved=1
+SI2np,Your Partner,20673048,40,64,,0,currency=ARS;linkedEventId=split_1762624772055_tlitwyl80
+SI,You,30230730,40,64,,0.03,currency=ARS;linkedEventId=split_1762624764068_cmuo82pdo;resolved=1
+R,Downsize,255615112,70,100,,,currency=ARS;linkedCountry=ar
+SM,Crash,,70,72,-0.25,,

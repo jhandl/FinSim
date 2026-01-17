@@ -98,7 +98,23 @@ class MonteCarloTestRunner {
     return results.map(result => {
       const dataSheet = result.dataSheet;
       const finalRow = dataSheet[dataSheet.length - 1];
-      return finalRow ? (finalRow[field] || 0) : 0;
+      if (!finalRow) return 0;
+
+      // Support dynamic map extraction for post-Phase-4 runtime (no legacy buckets).
+      // Format: "investmentCapitalByKey:shares" sums keys "shares" and "shares_*".
+      if (typeof field === 'string' && field.indexOf('investmentCapitalByKey:') === 0) {
+        const baseKey = field.split(':')[1] || '';
+        const map = finalRow.investmentCapitalByKey || {};
+        let total = 0;
+        for (const k in map) {
+          if (k === baseKey || (baseKey && k.indexOf(baseKey + '_') === 0)) {
+            total += map[k] || 0;
+          }
+        }
+        return total;
+      }
+
+      return finalRow[field] || 0;
     });
   }
 
@@ -175,8 +191,8 @@ module.exports = {
           priorityFunds: 2,
           priorityShares: 3,
           StartCountry: 'ie'
-          , simulation_mode: 'montecarlo'
-          , economy_mode: 'stochastic'
+          , simulation_mode: 'single'
+          , economy_mode: 'montecarlo'
           , monteCarloRuns: 2500
         },
         events: []  // No events for clean volatility testing
@@ -216,11 +232,11 @@ module.exports = {
         }
 
         // Extract final share values for statistical analysis
-        const shareValues = runner.extractFinalValues(results, 'sharesCapital');
+        const shareValues = runner.extractFinalValues(results, 'investmentCapitalByKey:shares');
         const worthValues = runner.extractFinalValues(results, 'worth');
 
         // Analyze statistics
-        const shareStats = runner.analyzeStatistics(shareValues, 'sharesCapital', scenario.name);
+        const shareStats = runner.analyzeStatistics(shareValues, 'shares', scenario.name);
         const worthStats = runner.analyzeStatistics(worthValues, 'worth', scenario.name);
 
         // Store results

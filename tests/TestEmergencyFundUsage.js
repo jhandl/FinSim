@@ -108,7 +108,7 @@ const TestEmergencyFundUsage = {
       type: 'exact_value',
       target: 'age',
       age: 39,
-      field: 'indexFundsCapital',
+      field: 'investmentCapitalByKey:indexFunds',
       expected: 20000,
       tolerance: 100
     },
@@ -118,7 +118,7 @@ const TestEmergencyFundUsage = {
       type: 'exact_value',
       target: 'age',
       age: 39,
-      field: 'sharesCapital',
+      field: 'investmentCapitalByKey:shares',
       expected: 15000,
       tolerance: 100
     },
@@ -142,7 +142,7 @@ const TestEmergencyFundUsage = {
       type: 'comparison',
       target: 'age',
       age: 40,
-      field: 'indexFundsCapital',
+      field: 'investmentCapitalByKey:indexFunds',
       expected: {
         operator: '<=',
         value: 20000                   // Should be equal or less than initial

@@ -120,7 +120,7 @@ class TestFramework {
         'age', 'year', 'phase', 'periods', 'failedAt', 'success', 'montecarlo',
         'revenue', 'realEstate', 'stockGrowthOverride', 'netIncome', 'expenses',
         'savings', 'targetCash', 'cashWithdraw', 'cashDeficit', 'incomeStatePension',
-        'incomePrivatePension', 'incomeFundsRent', 'incomeSharesRent', 'withdrawalRate',
+        'incomePrivatePension', 'withdrawalRate',
         'cash', 'indexFunds', 'shares', 'incomeSalaries', 'incomeShares', 'incomeRentals',
         'incomeDefinedBenefit', 'incomeTaxFree', 'pensionContribution', 'person1', 'person2'
       ];
@@ -178,8 +178,35 @@ class TestFramework {
         Date: Date,
         Math: Math,
         JSON: JSON,
+        Promise: Promise,
         require: require,
         __dirname: __dirname,
+        // Minimal fetch polyfill for VM context
+        fetch: function (url, opts) {
+          return new Promise(function (resolve) {
+            try {
+              var http = require('http');
+              var method = (opts && opts.method) ? opts.method : 'GET';
+              var headers = (opts && opts.headers) ? opts.headers : {};
+              var body = (opts && opts.body) ? String(opts.body) : '';
+              var req = http.request(url, { method: method, headers: headers }, function (res) {
+                try { res.on('data', function () { }); } catch (_) { }
+                try {
+                  res.on('end', function () {
+                    resolve({ ok: true, status: res.statusCode || 200, json: function () { return Promise.resolve({}); } });
+                  });
+                } catch (_) {
+                  resolve({ ok: true, status: res.statusCode || 200, json: function () { return Promise.resolve({}); } });
+                }
+              });
+              req.on('error', function () { resolve({ ok: false, status: 0, json: function () { return Promise.resolve({}); } }); });
+              if (body) req.write(body);
+              req.end();
+            } catch (_) {
+              resolve({ ok: false, status: 0, json: function () { return Promise.resolve({}); } });
+            }
+          });
+        },
 
         // Simple localStorage polyfill for Config.getTaxRuleSet() persistence
         localStorage: {
@@ -225,8 +252,6 @@ class TestFramework {
         cashDeficit: 0,
         incomeStatePension: 0,
         incomePrivatePension: 0,
-        incomeFundsRent: 0,
-        incomeSharesRent: 0,
         withdrawalRate: 0,
         cash: 0,
         indexFunds: null,
@@ -446,13 +471,15 @@ class TestFramework {
       await p;
 
       // After Config is initialized, enforce relocation enablement from test params (opt-in).
-      // Default to disabled unless the test explicitly sets relocationEnabled === true.
+      // Only override when the test explicitly provides relocationEnabled (true/false).
       vm.runInContext(`
         (function(){
           try {
             var cfg = Config.getInstance();
-            var enabled = !!(typeof testParams !== 'undefined' && testParams && testParams.relocationEnabled === true);
-            cfg.relocationFeatureEnabled = enabled;
+            var hasParam = (typeof testParams !== 'undefined' && testParams && Object.prototype.hasOwnProperty.call(testParams, 'relocationEnabled'));
+            if (hasParam) {
+              cfg.relocationFeatureEnabled = (testParams.relocationEnabled === true);
+            }
           } catch (_) {}
         })();
       `, this.simulationContext);
@@ -524,6 +551,7 @@ class TestFramework {
       if (runPromise && typeof runPromise.then === 'function') {
         await runPromise;
       }
+
       // Collect results after run() has completed
       vm.runInContext('simulationResults = { dataSheet: dataSheet, success: success, failedAt: failedAt, executionTime: (Date.now()-start) }', this.simulationContext);
       const results = vm.runInContext('simulationResults', this.simulationContext);
@@ -629,13 +657,15 @@ class TestFramework {
     // Show a sample of key fields from the final row
     if (validRows.length > 0) {
       const finalRow = validRows[validRows.length - 1];
+        const caps = finalRow.investmentCapitalByKey || {};
+        let invCapTotal = 0;
+        for (const k in caps) invCapTotal += (caps[k] || 0);
       console.log(`🔧 ${prefix}: Final row detailed breakdown:`);
       console.log(`🔧 ${prefix}:   Age: ${finalRow.age}, Year: ${finalRow.year}`);
       console.log(`🔧 ${prefix}:   Net Worth: €${finalRow.worth ? finalRow.worth.toLocaleString() : 'N/A'}`);
       console.log(`🔧 ${prefix}:   Cash: €${finalRow.cash ? finalRow.cash.toLocaleString() : 'N/A'}`);
       console.log(`🔧 ${prefix}:   Pension Fund: €${finalRow.pensionFund ? finalRow.pensionFund.toLocaleString() : 'N/A'}`);
-      console.log(`🔧 ${prefix}:   Index Funds: €${finalRow.indexFundsCapital ? finalRow.indexFundsCapital.toLocaleString() : 'N/A'}`);
-      console.log(`🔧 ${prefix}:   Shares: €${finalRow.sharesCapital ? finalRow.sharesCapital.toLocaleString() : 'N/A'}`);
+        console.log(`🔧 ${prefix}:   Investments: €${invCapTotal ? invCapTotal.toLocaleString() : 'N/A'}`);
       console.log(`🔧 ${prefix}:   Net Income: €${finalRow.netIncome ? finalRow.netIncome.toLocaleString() : 'N/A'}`);
       console.log(`🔧 ${prefix}:   Expenses: €${finalRow.expenses ? finalRow.expenses.toLocaleString() : 'N/A'}`);
     }
@@ -663,12 +693,6 @@ class TestFramework {
       // Note: median computation intentionally omitted in VM mock
       if (__seededParams) {
         testParams = __seededParams;
-        // Normalize StartCountry alias if tests provide 'startingCountry'
-        try {
-          if (testParams && !testParams.StartCountry && testParams.startingCountry) {
-            testParams.StartCountry = testParams.startingCountry;
-          }
-        } catch (_) {}
       }
       if (__seededEvents) {
         testEvents = __seededEvents.map(function(e) { return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match, e.currency, e.linkedEventId, e.linkedCountry); });
@@ -687,8 +711,8 @@ class TestFramework {
             // Age and year are state values, not accumulated - don't divide by runs
             var numericFields = [
               'incomeSalaries','incomeRSUs','incomeRentals','incomePrivatePension','incomeStatePension',
-              'incomeFundsRent','incomeSharesRent','incomeCash','realEstateCapital','netIncome','expenses','pensionFund',
-              'cash','indexFundsCapital','sharesCapital','pensionContribution','withdrawalRate','worth'
+              'incomeCash','realEstateCapital','netIncome','expenses','pensionFund',
+              'cash','pensionContribution','withdrawalRate','worth'
             ];
             for (var fi = 0; fi < numericFields.length; fi++) {
               var key = numericFields[fi];
@@ -731,67 +755,125 @@ class TestFramework {
       };
       MockUIManager.prototype.updateDataRow = function(row, progress) {};
       MockUIManager.prototype.readParameters = function(validate) {
-        // Transform legacy parameter names to new dynamic structure
-        if (testParams && !testParams.investmentGrowthRatesByKey) {
-          testParams.investmentGrowthRatesByKey = {};
-          testParams.investmentVolatilitiesByKey = {};
-          testParams.investmentAllocationsByKey = {};
-          testParams.initialCapitalByKey = {};
-          var parsePercent = function(v) {
-            if (v === null || v === undefined || v === '') return null;
-            if (typeof v === 'number' && isFinite(v)) return v;
-            var s = String(v).trim();
-            if (!s) return null;
-            var isPct = s.indexOf('%') >= 0;
-            var n = parseFloat(s.replace('%', ''));
-            if (!isFinite(n)) return null;
-            return isPct ? (n / 100) : n;
-          };
-          // Map legacy names to dynamic maps
-          if (testParams.growthRateFunds !== undefined) testParams.investmentGrowthRatesByKey.indexFunds = testParams.growthRateFunds;
-          if (testParams.growthRateShares !== undefined) testParams.investmentGrowthRatesByKey.shares = testParams.growthRateShares;
-          if (testParams.growthDevFunds !== undefined) testParams.investmentVolatilitiesByKey.indexFunds = testParams.growthDevFunds;
-          if (testParams.growthDevShares !== undefined) testParams.investmentVolatilitiesByKey.shares = testParams.growthDevShares;
-          if (testParams.FundsAllocation !== undefined) testParams.investmentAllocationsByKey.indexFunds = testParams.FundsAllocation;
-          if (testParams.SharesAllocation !== undefined) testParams.investmentAllocationsByKey.shares = testParams.SharesAllocation;
-          if (testParams.initialFunds !== undefined) testParams.initialCapitalByKey.indexFunds = testParams.initialFunds;
-          if (testParams.initialShares !== undefined) testParams.initialCapitalByKey.shares = testParams.initialShares;
+        if (!testParams) return testParams;
 
-          // Also support v2.0 save-file dynamic parameter naming (demo3.csv).
-          // Examples: InitialCapital_indexFunds, InvestmentAllocation_indexFunds, indexFundsGrowthRate.
-          if (testParams.InitialCapital_indexFunds !== undefined) {
-            var ic = Number(testParams.InitialCapital_indexFunds);
-            if (isFinite(ic)) testParams.initialCapitalByKey.indexFunds = ic;
-          }
-          if (testParams.InitialCapital_shares !== undefined) {
-            var ic2 = Number(testParams.InitialCapital_shares);
-            if (isFinite(ic2)) testParams.initialCapitalByKey.shares = ic2;
-          }
-          if (testParams.InvestmentAllocation_indexFunds !== undefined) {
-            var a = parsePercent(testParams.InvestmentAllocation_indexFunds);
-            if (a !== null) testParams.investmentAllocationsByKey.indexFunds = a;
-          }
-          if (testParams.InvestmentAllocation_shares !== undefined) {
-            var a2 = parsePercent(testParams.InvestmentAllocation_shares);
-            if (a2 !== null) testParams.investmentAllocationsByKey.shares = a2;
-          }
-          if (testParams.indexFundsGrowthRate !== undefined) {
-            var gr = parsePercent(testParams.indexFundsGrowthRate);
-            if (gr !== null) testParams.investmentGrowthRatesByKey.indexFunds = gr;
-          }
-          if (testParams.sharesGrowthRate !== undefined) {
-            var gr2 = parsePercent(testParams.sharesGrowthRate);
-            if (gr2 !== null) testParams.investmentGrowthRatesByKey.shares = gr2;
-          }
-          if (testParams.indexFundsGrowthStdDev !== undefined) {
-            var sd = parsePercent(testParams.indexFundsGrowthStdDev);
-            if (sd !== null) testParams.investmentVolatilitiesByKey.indexFunds = sd;
-          }
-          if (testParams.sharesGrowthStdDev !== undefined) {
-            var sd2 = parsePercent(testParams.sharesGrowthStdDev);
-            if (sd2 !== null) testParams.investmentVolatilitiesByKey.shares = sd2;
+        var sc = String(testParams.StartCountry || 'ie').trim().toLowerCase();
+
+        var parsePercent = function(v) {
+          if (v === null || v === undefined || v === '') return null;
+          if (typeof v === 'number' && isFinite(v)) return v;
+          var s = String(v).trim();
+          if (!s) return null;
+          var isPct = s.indexOf('%') >= 0;
+          var n = parseFloat(s.replace('%', ''));
+          if (!isFinite(n)) return null;
+          return isPct ? (n / 100) : n;
+        };
+
+        // Normalize modes (tests provide canonical values; older tests may omit).
+        if (!testParams.simulation_mode) {
+          testParams.simulation_mode = (testParams.p2StartingAge || testParams.P2StartingAge) ? 'couple' : 'single';
+        }
+        if (!testParams.economyMode) {
+          if (testParams.economy_mode) {
+            testParams.economyMode = testParams.economy_mode;
+          } else {
+            var hasVol = false;
+            if (parseFloat(testParams.growthDevPension || 0) > 0) hasVol = true;
+            if (parseFloat(testParams.growthDevFunds || 0) > 0) hasVol = true;
+            if (parseFloat(testParams.growthDevShares || 0) > 0) hasVol = true;
+            testParams.economyMode = hasVol ? 'montecarlo' : 'deterministic';
           }
         }
+
+        // Canonical investment maps (namespaced keys, e.g. indexFunds_ie)
+        if (!testParams.investmentGrowthRatesByKey) testParams.investmentGrowthRatesByKey = {};
+        if (!testParams.investmentVolatilitiesByKey) testParams.investmentVolatilitiesByKey = {};
+        if (!testParams.initialCapitalByKey) testParams.initialCapitalByKey = {};
+        if (!testParams.investmentAllocationsByCountry) testParams.investmentAllocationsByCountry = {};
+        if (!testParams.investmentAllocationsByCountry[sc]) testParams.investmentAllocationsByCountry[sc] = {};
+
+        // Legacy shorthand -> canonical namespaced keys for StartCountry
+        if (testParams.growthRateFunds !== undefined) testParams.investmentGrowthRatesByKey['indexFunds_' + sc] = testParams.growthRateFunds;
+        if (testParams.growthRateShares !== undefined) testParams.investmentGrowthRatesByKey['shares_' + sc] = testParams.growthRateShares;
+        if (testParams.growthDevFunds !== undefined) testParams.investmentVolatilitiesByKey['indexFunds_' + sc] = testParams.growthDevFunds;
+        if (testParams.growthDevShares !== undefined) testParams.investmentVolatilitiesByKey['shares_' + sc] = testParams.growthDevShares;
+        if (testParams.initialFunds !== undefined) testParams.initialCapitalByKey['indexFunds_' + sc] = testParams.initialFunds;
+        if (testParams.initialShares !== undefined) testParams.initialCapitalByKey['shares_' + sc] = testParams.initialShares;
+        if (testParams.FundsAllocation !== undefined) testParams.investmentAllocationsByCountry[sc]['indexFunds_' + sc] = testParams.FundsAllocation;
+        if (testParams.SharesAllocation !== undefined) testParams.investmentAllocationsByCountry[sc]['shares_' + sc] = testParams.SharesAllocation;
+
+        // Also support v2.0 save-file dynamic parameter naming (demo3.csv-like).
+        if (testParams.InitialCapital_indexFunds !== undefined) {
+          var ic = Number(testParams.InitialCapital_indexFunds);
+          if (isFinite(ic)) testParams.initialCapitalByKey['indexFunds_' + sc] = ic;
+        }
+        if (testParams.InitialCapital_shares !== undefined) {
+          var ic2 = Number(testParams.InitialCapital_shares);
+          if (isFinite(ic2)) testParams.initialCapitalByKey['shares_' + sc] = ic2;
+        }
+        if (testParams.InvestmentAllocation_indexFunds !== undefined) {
+          var a = parsePercent(testParams.InvestmentAllocation_indexFunds);
+          if (a !== null) testParams.investmentAllocationsByCountry[sc]['indexFunds_' + sc] = a;
+        }
+        if (testParams.InvestmentAllocation_shares !== undefined) {
+          var a2 = parsePercent(testParams.InvestmentAllocation_shares);
+          if (a2 !== null) testParams.investmentAllocationsByCountry[sc]['shares_' + sc] = a2;
+        }
+        if (testParams.indexFundsGrowthRate !== undefined) {
+          var gr = parsePercent(testParams.indexFundsGrowthRate);
+          if (gr !== null) testParams.investmentGrowthRatesByKey['indexFunds_' + sc] = gr;
+        }
+        if (testParams.sharesGrowthRate !== undefined) {
+          var gr2 = parsePercent(testParams.sharesGrowthRate);
+          if (gr2 !== null) testParams.investmentGrowthRatesByKey['shares_' + sc] = gr2;
+        }
+        if (testParams.indexFundsGrowthStdDev !== undefined) {
+          var sd = parsePercent(testParams.indexFundsGrowthStdDev);
+          if (sd !== null) testParams.investmentVolatilitiesByKey['indexFunds_' + sc] = sd;
+        }
+        if (testParams.sharesGrowthStdDev !== undefined) {
+          var sd2 = parsePercent(testParams.sharesGrowthStdDev);
+          if (sd2 !== null) testParams.investmentVolatilitiesByKey['shares_' + sc] = sd2;
+        }
+
+        // Canonical per-country pension contributions
+        if (!testParams.pensionContributionsByCountry) testParams.pensionContributionsByCountry = {};
+        if (!testParams.pensionContributionsByCountry[sc]) {
+          testParams.pensionContributionsByCountry[sc] = {
+            p1Pct: testParams.pensionPercentage || 0,
+            p2Pct: testParams.pensionPercentageP2 || 0,
+            capped: testParams.pensionCapped || 'No'
+          };
+        }
+
+        // Canonical per-country state pensions
+        if (!testParams.statePensionByCountry) testParams.statePensionByCountry = {};
+        if (testParams.statePensionByCountry[sc] === undefined) testParams.statePensionByCountry[sc] = testParams.statePensionWeekly || 0;
+        if (!testParams.p2StatePensionByCountry) testParams.p2StatePensionByCountry = {};
+        if (testParams.p2StatePensionByCountry[sc] === undefined) testParams.p2StatePensionByCountry[sc] = testParams.p2StatePensionWeekly || 0;
+
+        // Canonical drawdown priorities by investment key
+        if (!testParams.drawdownPrioritiesByKey) testParams.drawdownPrioritiesByKey = {};
+        // Apply base priorities across all scenario countries (StartCountry + any MV-*).
+        var scenarioCountries = {};
+        scenarioCountries[sc] = true;
+        try {
+          var evs = Array.isArray(testEvents) ? testEvents : [];
+          for (var ei = 0; ei < evs.length; ei++) {
+            var evt = evs[ei];
+            var t = evt && evt.type ? String(evt.type) : '';
+            if (t && t.indexOf('MV-') === 0) {
+              scenarioCountries[t.substring(3).toLowerCase()] = true;
+            }
+          }
+        } catch (_) { }
+        for (var cc in scenarioCountries) {
+          if (!Object.prototype.hasOwnProperty.call(scenarioCountries, cc)) continue;
+          if (testParams.priorityFunds !== undefined) testParams.drawdownPrioritiesByKey['indexFunds_' + cc] = testParams.priorityFunds;
+          if (testParams.priorityShares !== undefined) testParams.drawdownPrioritiesByKey['shares_' + cc] = testParams.priorityShares;
+        }
+
         return testParams;
       };
       MockUIManager.prototype.readEvents = function(validate) { return testEvents; };
@@ -972,6 +1054,66 @@ class TestFramework {
   }
 
   /**
+   * Resolve a field to a value (supports dynamic per-key maps).
+   *
+   * Canonical dynamic syntax:
+   * - investmentCapitalByKey:<baseKey>   (sums <baseKey> + <baseKey>_* keys)
+   * - investmentIncomeByKey:<baseKey>    (sums <baseKey> + <baseKey>_* keys)
+   * - investmentCapitalByKeyPV:<baseKey>
+   * - investmentIncomeByKeyPV:<baseKey>
+   *
+   * Legacy aliases (kept for test compatibility):
+   * - indexFundsCapital / sharesCapital
+   * - incomeFundsRent / incomeSharesRent
+   * - PV variants: *PV
+   */
+  _getFieldValue(rowObj, field) {
+    if (!rowObj) return undefined;
+    const f = String(field || '');
+
+    const sumByPrefix = (map, baseKey) => {
+      const m = map || {};
+      let total = 0;
+      for (const k in m) {
+        if (k === baseKey || (baseKey && k.indexOf(baseKey + '_') === 0)) {
+          total += m[k] || 0;
+        }
+      }
+      return total;
+    };
+
+    if (f.indexOf('investmentCapitalByKeyPV:') === 0) {
+      const baseKey = f.split(':')[1] || '';
+      return sumByPrefix(rowObj.investmentCapitalByKeyPV, baseKey);
+    }
+    if (f.indexOf('investmentIncomeByKeyPV:') === 0) {
+      const baseKey = f.split(':')[1] || '';
+      return sumByPrefix(rowObj.investmentIncomeByKeyPV, baseKey);
+    }
+    if (f.indexOf('investmentCapitalByKey:') === 0) {
+      const baseKey = f.split(':')[1] || '';
+      return sumByPrefix(rowObj.investmentCapitalByKey, baseKey);
+    }
+    if (f.indexOf('investmentIncomeByKey:') === 0) {
+      const baseKey = f.split(':')[1] || '';
+      return sumByPrefix(rowObj.investmentIncomeByKey, baseKey);
+    }
+
+    // Legacy test aliases
+    if (f === 'indexFundsCapital') return sumByPrefix(rowObj.investmentCapitalByKey, 'indexFunds');
+    if (f === 'sharesCapital') return sumByPrefix(rowObj.investmentCapitalByKey, 'shares');
+    if (f === 'incomeFundsRent') return sumByPrefix(rowObj.investmentIncomeByKey, 'indexFunds');
+    if (f === 'incomeSharesRent') return sumByPrefix(rowObj.investmentIncomeByKey, 'shares');
+    if (f === 'indexFundsCapitalPV') return sumByPrefix(rowObj.investmentCapitalByKeyPV, 'indexFunds');
+    if (f === 'sharesCapitalPV') return sumByPrefix(rowObj.investmentCapitalByKeyPV, 'shares');
+    if (f === 'incomeFundsRentPV') return sumByPrefix(rowObj.investmentIncomeByKeyPV, 'indexFunds');
+    if (f === 'incomeSharesRentPV') return sumByPrefix(rowObj.investmentIncomeByKeyPV, 'shares');
+
+    const key = this._resolveFieldAlias(rowObj, field);
+    return rowObj[key];
+  }
+
+  /**
    * Get the final value of a field from the data sheet
    */
   getFinalValue(dataSheet, field) {
@@ -984,8 +1126,7 @@ class TestFramework {
       throw new Error('No valid data rows found');
     }
     const lastRow = validRows[validRows.length - 1];
-    const key = this._resolveFieldAlias(lastRow, field);
-    return lastRow[key];
+    return this._getFieldValue(lastRow, field);
   }
 
   /**
@@ -997,8 +1138,7 @@ class TestFramework {
     if (!row) {
       throw new Error(`No data found for age ${age}`);
     }
-    const key = this._resolveFieldAlias(row, field);
-    return row[key];
+    return this._getFieldValue(row, field);
   }
 
   /**
@@ -1011,8 +1151,7 @@ class TestFramework {
       throw new Error(`Row index ${rowIndex} out of bounds (valid rows: ${validRows.length})`);
     }
     const row = validRows[rowIndex];
-    const key = this._resolveFieldAlias(row, field);
-    return row[key];
+    return this._getFieldValue(row, field);
   }
 
   /**

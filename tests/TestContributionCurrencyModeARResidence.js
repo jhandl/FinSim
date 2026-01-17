@@ -1,8 +1,8 @@
-// Test for contributionCurrencyMode functionality: AR Residence Mode
-// Validates that contributions in ARS stay in ARS when contributionCurrencyMode is 'residence'
+// Test for implicit currency conversion: AR Residence Currency Match
+// Validates that contributions in ARS stay in ARS when base currency matches residence currency
 //
-// Test: AR Single-Country (Residence Mode - ARS to ARS, No Conversion)
-// AR local equity fund uses residence mode with ARS base currency.
+// Test: AR Single-Country (No Conversion - ARS to ARS)
+// AR local equity fund uses ARS base currency matching ARS residence currency.
 // Contributions in ARS should be reflected directly in the fund's capital without conversion.
 
 const { TestFramework } = require('../src/core/TestFramework.js');
@@ -11,7 +11,7 @@ const AR_RULES = require('../src/core/config/tax-rules-ar.json');
 
 const TestContributionCurrencyModeARResidence = {
   name: "Contribution Currency Mode - AR Residence",
-  description: "Validates that contributions in ARS stay in ARS for local AR equity fund with contributionCurrencyMode 'residence'. No cross-currency conversion should occur.",
+  description: "Validates that contributions in ARS stay in ARS for local AR equity fund when base currency matches residence currency. No cross-currency conversion should occur.",
   isCustomTest: true,
 
   async runCustomTest() {
@@ -109,8 +109,12 @@ const TestContributionCurrencyModeARResidence = {
     // Initial savings 2M + net income surplus invested (less emergency stash 1M)
     // Net income after tax: ~5M - 3M - taxes = ~2M (roughly)
     // Surplus to invest: 2M (initial) + ~2M (surplus) - 1M (emergency) = ~3M ARS
-    // Since contributionCurrencyMode is 'residence', this should stay as ARS without conversion
-    const indexFundsCapital = rowAge30.indexFundsCapital || 0;
+    // Since base currency (ARS) matches residence currency (ARS), this should stay as ARS without conversion
+    const capsByKey = rowAge30.investmentCapitalByKey || {};
+    let indexFundsCapital = 0;
+    for (const k in capsByKey) {
+      if (k === 'indexFunds' || k.indexOf('indexFunds_') === 0) indexFundsCapital += capsByKey[k] || 0;
+    }
     if (indexFundsCapital <= 0) {
       errors.push(`indexFundsCapital should be positive (in ARS), got ${indexFundsCapital}`);
     }
@@ -123,8 +127,12 @@ const TestContributionCurrencyModeARResidence = {
     }
 
     // Shares should remain at 0 since allocation is 0%
-    if (Math.abs((rowAge30.sharesCapital || 0)) > 100) {
-      errors.push(`sharesCapital should be 0, got ${rowAge30.sharesCapital}`);
+    let sharesCapital = 0;
+    for (const k in capsByKey) {
+      if (k === 'shares' || k.indexOf('shares_') === 0) sharesCapital += capsByKey[k] || 0;
+    }
+    if (Math.abs(sharesCapital) > 100) {
+      errors.push(`sharesCapital should be 0, got ${sharesCapital}`);
     }
 
     // Key assertion: indexFundsCapital should be in ARS (same order of magnitude as ARS amounts)
@@ -144,6 +152,7 @@ const TestContributionCurrencyModeARResidence = {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = TestContributionCurrencyModeARResidence;
 }
+
 
 
 

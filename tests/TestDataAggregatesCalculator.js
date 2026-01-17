@@ -160,8 +160,6 @@ function buildTestContext(opts) {
     incomeRentals: opts.incomeRentals,
     incomePrivatePension: opts.incomePrivatePension,
     incomeStatePension: opts.incomeStatePension,
-    incomeFundsRent: opts.incomeFundsRent,
-    incomeSharesRent: opts.incomeSharesRent,
     cashWithdraw: opts.cashWithdraw,
     incomeDefinedBenefit: opts.incomeDefinedBenefit,
     incomeTaxFree: opts.incomeTaxFree,
@@ -204,8 +202,6 @@ module.exports = {
         incomeRentals: 10000,
         incomePrivatePension: 0,
         incomeStatePension: 0,
-        incomeFundsRent: 0,
-        incomeSharesRent: 0,
         cashWithdraw: 0,
         incomeDefinedBenefit: 0,
         incomeTaxFree: 0,
@@ -231,8 +227,8 @@ module.exports = {
       if (Math.abs(dataRow.netIncome - 60000) > 1e-6) errors.push('Scenario 1: netIncome mismatch');
       if (Math.abs(dataRow.expenses - 30000) > 1e-6) errors.push('Scenario 1: expenses mismatch');
       if (Math.abs(dataRow.pensionFund - 100000) > 1e-6) errors.push('Scenario 1: pensionFund mismatch');
-      if (Math.abs(dataRow.indexFundsCapital - 150000) > 1e-6) errors.push('Scenario 1: indexFundsCapital mismatch');
-      if (Math.abs(dataRow.sharesCapital - 50000) > 1e-6) errors.push('Scenario 1: sharesCapital mismatch');
+      if (Math.abs((dataRow.investmentCapitalByKey.indexFunds || 0) - 150000) > 1e-6) errors.push('Scenario 1: investmentCapitalByKey.indexFunds mismatch');
+      if (Math.abs((dataRow.investmentCapitalByKey.shares || 0) - 50000) > 1e-6) errors.push('Scenario 1: investmentCapitalByKey.shares mismatch');
       if (Math.abs(dataRow.cash - 20000) > 1e-6) errors.push('Scenario 1: cash mismatch');
       if (Math.abs(dataRow.worth - 320000) > 1e-6) errors.push('Scenario 1: worth mismatch');
     }
@@ -253,8 +249,6 @@ module.exports = {
         incomeRentals: 0,
         incomePrivatePension: 0,
         incomeStatePension: 0,
-        incomeFundsRent: 0,
-        incomeSharesRent: 0,
         cashWithdraw: 0,
         incomeDefinedBenefit: 0,
         incomeTaxFree: 0,
@@ -295,8 +289,6 @@ module.exports = {
         incomeRentals: 0,
         incomePrivatePension: 0,
         incomeStatePension: 0,
-        incomeFundsRent: 0,
-        incomeSharesRent: 0,
         cashWithdraw: 0,
         incomeDefinedBenefit: 0,
         incomeTaxFree: 0,
@@ -339,8 +331,6 @@ module.exports = {
         incomeRentals: 0,
         incomePrivatePension: 0,
         incomeStatePension: 0,
-        incomeFundsRent: 0,
-        incomeSharesRent: 0,
         cashWithdraw: 0,
         incomeDefinedBenefit: 0,
         incomeTaxFree: 0,
@@ -381,8 +371,6 @@ module.exports = {
         incomeRentals: 0,
         incomePrivatePension: 0,
         incomeStatePension: 0,
-        incomeFundsRent: 0,
-        incomeSharesRent: 0,
         cashWithdraw: 0,
         incomeDefinedBenefit: 0,
         incomeTaxFree: 0,

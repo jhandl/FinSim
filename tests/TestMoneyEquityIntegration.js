@@ -31,8 +31,8 @@ module.exports = {
 
     vm.runInContext(`
       revenue = {
-        declareInvestmentIncome: function() {},
-        declareInvestmentGains: function() {},
+        declareInvestmentIncome: function(money, desc, assetCountry) {},
+        declareInvestmentGains: function(money, rate, desc, opts, assetCountry) {},
         declarePrivatePensionIncome: function() {},
         declarePrivatePensionLumpSum: function() {}
       };
