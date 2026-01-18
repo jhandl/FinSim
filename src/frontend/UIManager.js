@@ -896,11 +896,11 @@ class UIManager {
           if (events[p].type === 'R' && events[p].id === events[m].id) {
             found = true;
             if (events[p].fromAge !== events[m].fromAge) {
-              this.ui.setWarning(`Events[${m + 1},3]`, "The mortgage (M) and purchase (R) events for a property should have the same starting age.");
+              this.ui.setWarning(`Events[${m + 1},3]`, "The mortgage (M) and purchase (R) events for a property must have the same starting age.");
               errors = true;
             }
             if (events[m].toAge > events[p].toAge) {
-              this.ui.setWarning(`Events[${m + 1},4]`, "The mortgage should not continue after the property is sold.");
+              this.ui.setWarning(`Events[${m + 1},4]`, "The mortgage must end when the property is sold.");
               errors = true;
             }
           }
