@@ -115,6 +115,8 @@ var RelocationImpactDetector = {
         }
       }
 
+      this.validateRealEstateLinkedCountries(events, mvEvents, startCountry);
+
       // Final pass: remove impacts for events that are already resolved
       for (var k = 0; k < events.length; k++) {
         this.clearResolvedImpacts(events[k]);
@@ -155,6 +157,71 @@ var RelocationImpactDetector = {
     }
     mvEvents.sort(function (a, b) { return Number(a.fromAge) - Number(b.fromAge); });
     return mvEvents;
+  },
+
+  getCountryAtAge: function (mvEvents, startCountry, age) {
+    var current = startCountry;
+    for (var i = 0; i < mvEvents.length; i++) {
+      var mvAge = Number(mvEvents[i].fromAge);
+      if (age >= mvAge) current = mvEvents[i].type.substring(3).toLowerCase();
+      else break;
+    }
+    return current;
+  },
+
+  getMvEventForAge: function (mvEvents, age) {
+    var chosen = mvEvents[0];
+    for (var i = 0; i < mvEvents.length; i++) {
+      if (age >= Number(mvEvents[i].fromAge)) chosen = mvEvents[i];
+      else break;
+    }
+    return chosen;
+  },
+
+  ensureSimpleImpact: function (event, mvEvents, startCountry) {
+    if (event.relocationImpact && event.relocationImpact.category === 'simple') return;
+    if (event.relocationImpact) delete event.relocationImpact;
+    var mvEvent = this.getMvEventForAge(mvEvents, Number(event.fromAge));
+    var destinationCountry = mvEvent ? mvEvent.type.substring(3).toLowerCase() : startCountry;
+    var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry);
+    this.addImpact(event, 'simple', message, mvEvent ? mvEvent.id : '', true);
+  },
+
+  validateRealEstateLinkedCountries: function (events, mvEvents, startCountry) {
+    var pairs = {};
+    for (var i = 0; i < events.length; i++) {
+      var event = events[i];
+      if (event && (event.type === 'R' || event.type === 'M')) {
+        var id = String(event.id);
+        if (!pairs[id]) pairs[id] = { r: null, m: null };
+        if (event.type === 'R') pairs[id].r = event;
+        else pairs[id].m = event;
+      }
+    }
+
+    var ids = Object.keys(pairs);
+    for (var j = 0; j < ids.length; j++) {
+      var pair = pairs[ids[j]];
+      var r = pair.r;
+      var m = pair.m;
+      var rCountry = r ? this.getCountryAtAge(mvEvents, startCountry, Number(r.fromAge)) : null;
+      var mCountry = m ? this.getCountryAtAge(mvEvents, startCountry, Number(m.fromAge)) : null;
+      var rLinked = r && r.linkedCountry ? String(r.linkedCountry).toLowerCase() : '';
+      var mLinked = m && m.linkedCountry ? String(m.linkedCountry).toLowerCase() : '';
+      var mismatch = false;
+
+      if (r && rLinked && rCountry && rLinked !== rCountry) mismatch = true;
+      if (m && mLinked && mCountry && mLinked !== mCountry) mismatch = true;
+      if (r && m && rCountry && mCountry && rCountry !== mCountry) mismatch = true;
+
+      if (!mismatch) continue;
+
+      if (r) { r.linkedCountry = null; r.currency = null; }
+      if (m) { m.linkedCountry = null; m.currency = null; }
+
+      if (r) this.ensureSimpleImpact(r, mvEvents, startCountry);
+      if (m) this.ensureSimpleImpact(m, mvEvents, startCountry);
+    }
   },
 
   /**
