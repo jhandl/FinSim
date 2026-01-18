@@ -249,7 +249,7 @@ class Config {
    */
   isRelocationEnabled() {
     // Only enable when explicitly enabled AND a non-empty availableCountries list is provided in config
-    return (this.relocationFeatureEnabled === true)
+    return (this.relocationEnabled === true)
       && Array.isArray(this.availableCountries)
       && this.availableCountries.length > 0;
   }

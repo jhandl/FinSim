@@ -478,7 +478,7 @@ class TestFramework {
             var cfg = Config.getInstance();
             var hasParam = (typeof testParams !== 'undefined' && testParams && Object.prototype.hasOwnProperty.call(testParams, 'relocationEnabled'));
             if (hasParam) {
-              cfg.relocationFeatureEnabled = (testParams.relocationEnabled === true);
+              cfg.relocationEnabled = (testParams.relocationEnabled === true);
             }
           } catch (_) {}
         })();
