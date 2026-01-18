@@ -1150,6 +1150,25 @@ class ChartManager {
         return;
       }
 
+      if (maxAge === 0) {
+        if (this.cashflowChart) {
+          this.cashflowChart.data.labels = [];
+          this.cashflowChart.data.datasets.forEach(dataset => {
+            dataset.data = [];
+          });
+          this.cashflowChart.update();
+        }
+        if (this.assetsChart) {
+          this.assetsChart.data.labels = [];
+          this.assetsChart.data.datasets.forEach(dataset => {
+            dataset.data = [];
+          });
+          this.assetsChart.update();
+        }
+        this.cachedRowData = {};
+        return;
+      }
+
       if (this.cashflowChart) {
         const maxAgeIndex = this.cashflowChart.data.labels.findIndex(label => label === maxAge);
         if (maxAgeIndex !== -1) {
