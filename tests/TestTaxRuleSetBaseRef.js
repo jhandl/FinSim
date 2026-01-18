@@ -43,7 +43,7 @@ module.exports = {
         errors.push('Missing shares_ar after baseRef resolution');
       } else {
         if (arType.baseKey !== 'globalEquity') errors.push('shares_ar should inherit baseKey globalEquity');
-        if (arType.label !== 'Global USD ETF (AR)') errors.push('shares_ar should preserve local label');
+        if (arType.label !== 'CEDEARs') errors.push('shares_ar should preserve local label');
       }
     } catch (err) {
       errors.push('Unexpected error: ' + (err && err.message ? err.message : String(err)));

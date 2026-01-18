@@ -397,12 +397,8 @@ function validatePerCountryInputs(startCountry, events, params) {
 
   var allocMissing = [];
   var contribMissing = [];
-  var stateMissing = [];
-  var p2StateMissing = [];
   var allocByCountry = params.investmentAllocationsByCountry || {};
   var contribByCountry = params.pensionContributionsByCountry || {};
-  var stateByCountry = params.statePensionByCountry || {};
-  var p2StateByCountry = params.p2StatePensionByCountry || {};
   var isCouple = params.simulation_mode === 'couple';
 
   for (var ci = 0; ci < countries.length; ci++) {
@@ -410,39 +406,36 @@ function validatePerCountryInputs(startCountry, events, params) {
     var rs = config.getCachedTaxRuleSet(code);
 
     var allocMap = allocByCountry[code];
-    var allocOk = !!(allocMap && Object.keys(allocMap).length > 0);
-    if (allocOk) {
+    // Only validate completeness when a per-country allocation map is explicitly provided.
+    // Missing allocations for a visited country means "no investing in that residence period".
+    if (allocMap && typeof allocMap === 'object' && Object.keys(allocMap).length > 0) {
       var types = rs.getResolvedInvestmentTypes();
       for (var ti = 0; ti < types.length; ti++) {
         var t = types[ti] || {};
         if (!t.key) continue;
         if (allocMap[t.key] === undefined || allocMap[t.key] === null) {
-          allocOk = false;
+          allocMissing.push(code);
           break;
         }
       }
     }
-    if (!allocOk) allocMissing.push(code);
 
     if (rs.getPensionSystemType() !== 'state_only') {
       var contribMap = contribByCountry[code];
       var contribOk = !!(contribMap && contribMap.p1Pct !== undefined && contribMap.capped !== undefined);
       if (isCouple && (!contribMap || contribMap.p2Pct === undefined)) contribOk = false;
-      if (!contribOk) contribMissing.push(code);
+      // Only require per-country pension contribution config when explicitly provided for that country.
+      // If omitted, the simulation treats it as 0% contributions for that residence period.
+      if (contribMap && Object.keys(contribMap).length > 0 && !contribOk) contribMissing.push(code);
     }
-
-    if (stateByCountry[code] === undefined || stateByCountry[code] === null) stateMissing.push(code);
-    if (isCouple && (p2StateByCountry[code] === undefined || p2StateByCountry[code] === null)) p2StateMissing.push(code);
   }
 
-  if (allocMissing.length || contribMissing.length || stateMissing.length || p2StateMissing.length) {
+  if (allocMissing.length || contribMissing.length) {
     errors = true;
     success = false;
     var parts = [];
     if (allocMissing.length) parts.push('allocations: ' + allocMissing.join(', '));
     if (contribMissing.length) parts.push('pension contributions: ' + contribMissing.join(', '));
-    if (stateMissing.length) parts.push('state pension: ' + stateMissing.join(', '));
-    if (p2StateMissing.length) parts.push('P2 state pension: ' + p2StateMissing.join(', '));
     uiManager.ui.setError(new Error('Missing per-country inputs (' + parts.join('; ') + ')'));
     return false;
   }
@@ -2063,10 +2056,7 @@ function getAllocationsByYear(year) {
   var residenceCountry = getCountryForAge(person1.age, events, params.StartCountry);
 
   var countryAllocations = params.investmentAllocationsByCountry[residenceCountry];
-  if (!countryAllocations || Object.keys(countryAllocations).length === 0) {
-    var startCountry = String(params.StartCountry).toLowerCase();
-    countryAllocations = params.investmentAllocationsByCountry[startCountry];
-  }
+  // Missing per-country allocations means "no investing" for this residence period.
   return countryAllocations || {};
 }
 

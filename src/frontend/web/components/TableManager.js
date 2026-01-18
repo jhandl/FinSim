@@ -1310,7 +1310,10 @@ class TableManager {
           const flexItem = document.createElement('div');
           flexItem.className = 'dynamic-section-cell';
           flexItem.setAttribute('data-key', def.key);
-          flexItem.textContent = def.label;
+          const labelEl = document.createElement('span');
+          labelEl.className = 'cell-content';
+          labelEl.textContent = def.label;
+          flexItem.appendChild(labelEl);
           if (def.tooltip) {
             TooltipUtils.attachTooltip(flexItem, def.tooltip, { hoverDelay: 300, touchDelay: 400 });
           }
@@ -1397,7 +1400,9 @@ class TableManager {
         const minWidthPolicy = minWidthByKey[key];
         if (minWidthPolicy === 'label') {
           const labelWidth = labelWidths[i] || 0;
-          try { cell.style.minWidth = labelWidth ? `${labelWidth}px` : '0px'; } catch (_) { }
+          const MIN_COL_PX = 100;
+          const w = Math.max(MIN_COL_PX, labelWidth || 0);
+          try { cell.style.minWidth = w ? `${w}px` : '0px'; } catch (_) { }
         } else {
           try { cell.style.minWidth = '0px'; } catch (_) { }
         }

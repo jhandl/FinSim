@@ -172,26 +172,42 @@ class DynamicSectionManager {
     const periodMeasurements = [];
     for (let p = 0; p < periods.length; p++) {
       const period = periods[p];
-      const m = { maxPerColumn: [], cellsByColumn: [] };
+      const m = { maxPerColumn: [], headerPerColumn: [], desiredPerColumn: [], cellsByColumn: [] };
 
       for (let r = 0; r < period.rows.length; r++) {
         const row = period.rows[r];
+        const isHeaderRow = row.classList && row.classList.contains('tax-header');
         const container = row.querySelector(containerSelector);
         if (!container) continue;
 
         const cells = getVisibleCells(container);
         for (let i = 0; i < cells.length; i++) {
           const cell = cells[i];
-          const naturalWidth = cell.scrollWidth;
-          if (!m.maxPerColumn[i] || naturalWidth > m.maxPerColumn[i]) {
-            m.maxPerColumn[i] = naturalWidth;
+          if (isHeaderRow) {
+            const w = cell.scrollWidth;
+            if (!m.headerPerColumn[i] || w > m.headerPerColumn[i]) m.headerPerColumn[i] = w;
+          } else {
+            const naturalWidth = cell.scrollWidth;
+            if (!m.maxPerColumn[i] || naturalWidth > m.maxPerColumn[i]) {
+              m.maxPerColumn[i] = naturalWidth;
+            }
           }
           if (!m.cellsByColumn[i]) m.cellsByColumn[i] = [];
           m.cellsByColumn[i].push(cell);
         }
       }
 
-      m.totalNaturalWidth = m.maxPerColumn.reduce((sum, w) => sum + (w || 0), 0);
+      const MIN_COL_PX = 100;
+      const MAX_HEADER_EXTRA_PX = 90;
+      for (let i = 0; i < m.cellsByColumn.length; i++) {
+        const dataW = m.maxPerColumn[i] || 0;
+        const headerW = m.headerPerColumn[i] || 0;
+        let w = dataW;
+        if (headerW > w) w = Math.max(w, MIN_COL_PX);
+        if (headerW) w = Math.max(w, Math.min(headerW, w + MAX_HEADER_EXTRA_PX));
+        m.desiredPerColumn[i] = w;
+      }
+      m.totalNaturalWidth = m.desiredPerColumn.reduce((sum, w) => sum + (w || 0), 0);
       periodMeasurements.push(m);
     }
 
@@ -205,10 +221,8 @@ class DynamicSectionManager {
     for (let i = 0; i < periodMeasurements.length; i++) {
       const m = periodMeasurements[i];
       if (m.totalNaturalWidth === 0) continue;
-
       const scaleFactor = maxTotalWidth / m.totalNaturalWidth;
-      const scaledWidths = m.maxPerColumn.map(w => Math.round((w || 0) * scaleFactor));
-
+      const scaledWidths = m.desiredPerColumn.map(w => Math.round((w || 0) * scaleFactor));
       for (let colIdx = 0; colIdx < m.cellsByColumn.length; colIdx++) {
         const width = scaledWidths[colIdx] || 0;
         const cells = m.cellsByColumn[colIdx] || [];

@@ -758,6 +758,18 @@ class TestFramework {
         if (!testParams) return testParams;
 
         var sc = String(testParams.StartCountry || 'ie').trim().toLowerCase();
+        var scenarioCountries = {};
+        scenarioCountries[sc] = true;
+        try {
+          var evs = Array.isArray(testEvents) ? testEvents : [];
+          for (var ei = 0; ei < evs.length; ei++) {
+            var evt = evs[ei];
+            var t = evt && evt.type ? String(evt.type) : '';
+            if (t && t.indexOf('MV-') === 0) {
+              scenarioCountries[t.substring(3).toLowerCase()] = true;
+            }
+          }
+        } catch (_) { }
 
         var parsePercent = function(v) {
           if (v === null || v === undefined || v === '') return null;
@@ -803,6 +815,19 @@ class TestFramework {
         if (testParams.FundsAllocation !== undefined) testParams.investmentAllocationsByCountry[sc]['indexFunds_' + sc] = testParams.FundsAllocation;
         if (testParams.SharesAllocation !== undefined) testParams.investmentAllocationsByCountry[sc]['shares_' + sc] = testParams.SharesAllocation;
 
+        // When relocations exist, project legacy scalar allocations/growth onto each scenario country
+        for (var cc in scenarioCountries) {
+          if (!Object.prototype.hasOwnProperty.call(scenarioCountries, cc)) continue;
+          if (!testParams.investmentAllocationsByCountry[cc]) testParams.investmentAllocationsByCountry[cc] = {};
+          if (testParams.FundsAllocation !== undefined) testParams.investmentAllocationsByCountry[cc]['indexFunds_' + cc] = testParams.FundsAllocation;
+          if (testParams.SharesAllocation !== undefined) testParams.investmentAllocationsByCountry[cc]['shares_' + cc] = testParams.SharesAllocation;
+
+          if (testParams.growthRateFunds !== undefined) testParams.investmentGrowthRatesByKey['indexFunds_' + cc] = testParams.growthRateFunds;
+          if (testParams.growthRateShares !== undefined) testParams.investmentGrowthRatesByKey['shares_' + cc] = testParams.growthRateShares;
+          if (testParams.growthDevFunds !== undefined) testParams.investmentVolatilitiesByKey['indexFunds_' + cc] = testParams.growthDevFunds;
+          if (testParams.growthDevShares !== undefined) testParams.investmentVolatilitiesByKey['shares_' + cc] = testParams.growthDevShares;
+        }
+
         // Also support v2.0 save-file dynamic parameter naming (demo3.csv-like).
         if (testParams.InitialCapital_indexFunds !== undefined) {
           var ic = Number(testParams.InitialCapital_indexFunds);
@@ -837,6 +862,36 @@ class TestFramework {
           if (sd2 !== null) testParams.investmentVolatilitiesByKey['shares_' + sc] = sd2;
         }
 
+        // Propagate demo3.csv-like allocation/growth fields to each scenario country
+        for (var cc2 in scenarioCountries) {
+          if (!Object.prototype.hasOwnProperty.call(scenarioCountries, cc2)) continue;
+          if (!testParams.investmentAllocationsByCountry[cc2]) testParams.investmentAllocationsByCountry[cc2] = {};
+          if (testParams.InvestmentAllocation_indexFunds !== undefined) {
+            var aa = parsePercent(testParams.InvestmentAllocation_indexFunds);
+            if (aa !== null) testParams.investmentAllocationsByCountry[cc2]['indexFunds_' + cc2] = aa;
+          }
+          if (testParams.InvestmentAllocation_shares !== undefined) {
+            var bb = parsePercent(testParams.InvestmentAllocation_shares);
+            if (bb !== null) testParams.investmentAllocationsByCountry[cc2]['shares_' + cc2] = bb;
+          }
+          if (testParams.indexFundsGrowthRate !== undefined) {
+            var gg = parsePercent(testParams.indexFundsGrowthRate);
+            if (gg !== null) testParams.investmentGrowthRatesByKey['indexFunds_' + cc2] = gg;
+          }
+          if (testParams.sharesGrowthRate !== undefined) {
+            var gg2 = parsePercent(testParams.sharesGrowthRate);
+            if (gg2 !== null) testParams.investmentGrowthRatesByKey['shares_' + cc2] = gg2;
+          }
+          if (testParams.indexFundsGrowthStdDev !== undefined) {
+            var ss = parsePercent(testParams.indexFundsGrowthStdDev);
+            if (ss !== null) testParams.investmentVolatilitiesByKey['indexFunds_' + cc2] = ss;
+          }
+          if (testParams.sharesGrowthStdDev !== undefined) {
+            var ss2 = parsePercent(testParams.sharesGrowthStdDev);
+            if (ss2 !== null) testParams.investmentVolatilitiesByKey['shares_' + cc2] = ss2;
+          }
+        }
+
         // Canonical per-country pension contributions
         if (!testParams.pensionContributionsByCountry) testParams.pensionContributionsByCountry = {};
         if (!testParams.pensionContributionsByCountry[sc]) {
@@ -856,8 +911,6 @@ class TestFramework {
         // Canonical drawdown priorities by investment key
         if (!testParams.drawdownPrioritiesByKey) testParams.drawdownPrioritiesByKey = {};
         // Apply base priorities across all scenario countries (StartCountry + any MV-*).
-        var scenarioCountries = {};
-        scenarioCountries[sc] = true;
         try {
           var evs = Array.isArray(testEvents) ? testEvents : [];
           for (var ei = 0; ei < evs.length; ei++) {

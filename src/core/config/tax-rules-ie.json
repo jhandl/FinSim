@@ -173,7 +173,7 @@
   "investmentTypes": [
     {
       "key": "indexFunds_ie",
-      "label": "Index Funds (IE)",
+      "label": "Index Funds",
       "baseRef": "globalEquity",
       "baseCurrency": "EUR",
       "assetCountry": "ie",
@@ -189,7 +189,7 @@
     },
     {
       "key": "shares_ie",
-      "label": "Shares (IE)",
+      "label": "Shares",
       "baseCurrency": "EUR",
       "assetCountry": "ie",
       "residenceScope": "local",

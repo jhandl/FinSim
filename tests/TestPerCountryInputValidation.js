@@ -71,8 +71,8 @@ module.exports = {
       ar: deepClone(AR_RULES)
     });
     const missingResults = await frameworkMissing.runSimulation();
-    if (!missingResults || missingResults.success !== false) {
-      errors.push('Expected relocation scenario with missing per-country inputs to fail');
+    if (!missingResults || missingResults.success !== true) {
+      errors.push('Expected relocation scenario with missing per-country inputs to succeed (missing inputs => no investing/contribs)');
     }
 
     const stateOnlyScenario = {

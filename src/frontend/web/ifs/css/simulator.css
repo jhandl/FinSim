@@ -1091,6 +1091,13 @@ label {
   white-space: nowrap;
 }
 
+/* Only truncate dynamic investment parameter labels (avoid affecting all static labels). */
+.input-wrapper[data-dynamic-investment-param="true"] > label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
 input,
 select {
   border: var(--input-field-border) solid var(--border-color);
@@ -1238,6 +1245,13 @@ th {
   padding-right: 0.25rem;
 }
 
+/* Only truncate dynamic investment rows (avoid affecting Inflation/Pension/etc). */
+.growth-rates-table tr[data-dynamic-investment-param="true"] td:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .growth-rates-table input,
 .growth-rates-table .currency-container {
   width: 72px !important;
@@ -1248,13 +1262,9 @@ th {
   text-align: center;
 }
 
-.growth-rates-table th:first-child {
-  width: 40%;
-}
-
 .growth-rates-table th:not(:first-child),
 .growth-rates-table td:not(:first-child) {
-  width: 25%;
+  width: 80px;
 }
 
 .delete-event {
@@ -1420,8 +1430,12 @@ th {
 
 .priority-label {
   flex-grow: 1;
+  min-width: 0;
   font-weight: 500;
   font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @keyframes priorityInsert {
@@ -1572,6 +1586,17 @@ th {
 #Data th.dynamic-section-container .dynamic-section-cell {
   font-weight: bold;
   background-color: #f5f5f5;
+  overflow: hidden;
+}
+
+/* Header label truncation should depend on available space (not string length) */
+#Data th.dynamic-section-container .dynamic-section-cell > .cell-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 
 /* Tax header row dynamic section cells need same background as tax headers */

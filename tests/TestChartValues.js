@@ -83,8 +83,8 @@ const DEMO3_BASELINE = {
     65: { worth: 1826924404261.7158, cash: 4546507611.75827, netIncome: 8656794176.110376 },
     80: { worth: 44933691100436.414, cash: 140509952772.85306, netIncome: 2419679637876.817 }
   },
-  final: { age: 90, worth: 674105084118480.4, cash: 1383757107738.8225 },
-  maxWorth: 674105084118480.4
+  final: { age: 90, worth: 485797566412545.4, cash: 1383757107738.8225 },
+  maxWorth: 485797566412545.4
 };
 
 // Tolerances for evolution FX mode (inflation-driven FX rates)

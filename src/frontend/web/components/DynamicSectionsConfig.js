@@ -102,7 +102,7 @@ const DYNAMIC_SECTIONS = [
         const label = t.label || t.key;
         columns.push({
           key: `Income__${t.key}`,
-          label: label.substring(0, 12) + (label.length > 12 ? '...' : ''),
+          label: label,
           tooltip: `Income from ${label}`
         });
       }
@@ -164,7 +164,7 @@ const DYNAMIC_SECTIONS = [
         const label = t.label || t.key;
         columns.push({
           key: `Capital__${t.key}`,
-          label: label.substring(0, 12) + (label.length > 12 ? '...' : ''),
+          label: label,
           tooltip: `Total value of your ${label} investments`
         });
       }
