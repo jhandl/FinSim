@@ -2042,6 +2042,14 @@ class EventAccordionManager {
 
     // Update the accordion dropdown toggle text to show the new event type
     this.updateAccordionDropdownToggle(container, event);
+    const typeContainer = container.querySelector(`#AccordionEventType_${event.rowId}`);
+    if (typeContainer) {
+      if (event.type && event.type.indexOf('MV-') === 0) {
+        typeContainer.title = 'Inflation is set in Economy -> (country tab).';
+      } else {
+        typeContainer.removeAttribute('title');
+      }
+    }
 
     // Update field visibility based on event type
     const fields = [

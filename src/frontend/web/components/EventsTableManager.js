@@ -771,6 +771,15 @@ class EventsTableManager {
     if (rateInput) {
       rateInput.placeholder = (!required || !required.rate || required.rate === 'optional') ? 'inflation' : '';
     }
+
+    const typeContainer = row.querySelector('.event-type-container');
+    if (typeContainer) {
+      if (eventType && eventType.indexOf('MV-') === 0) {
+        typeContainer.title = 'Inflation is set in Economy -> (country tab).';
+      } else {
+        typeContainer.removeAttribute('title');
+      }
+    }
   }
 
   updateEventRowsVisibilityAndTypes() {

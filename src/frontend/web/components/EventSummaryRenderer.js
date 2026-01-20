@@ -322,6 +322,9 @@ class EventSummaryRenderer {
    * Based on what the rate field means for each event type
    */
   showsGrowthRateField(eventType, event = null) {
+    if (typeof eventType === 'string' && eventType.indexOf('MV-') === 0) {
+      return false;
+    }
     // One-off expenses: Never show Growth Rate field since it occurs only once
     if (event && this.isOneOffExpense(event)) {
       return false;

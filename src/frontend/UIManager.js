@@ -1092,7 +1092,7 @@ class UIManager {
 
   static getRequiredFields(eventType) {
     if (eventType && eventType.indexOf('MV-') === 0 && eventType.length > 3) {
-      const pattern = 'rrr-o-'.split('');
+      const pattern = 'rrr---'.split('');
       return Object.fromEntries(UIManager.getFields().map((field, i) => [
         field,
         pattern[i] === 'r' ? 'required' : pattern[i] === 'o' ? 'optional' : 'hidden'
