@@ -892,6 +892,100 @@ class TestFramework {
           }
         }
 
+        // Support generic v2.0 "typeKey-suffixed" fields (e.g. demo3.csv):
+        // - InvestmentAllocation_indexFunds_ie, InvestmentAllocation_ie_indexfunds (variants)
+        // - InitialCapital_indexFunds_ie
+        // - indexFunds_ieGrowthRate / shares_ieGrowthStdDev
+        try {
+          var normalizeBaseKey = function (base) {
+            var s = String(base || '').trim();
+            var l = s.toLowerCase();
+            if (l === 'indexfunds' || l === 'funds' || l === 'etf' || l === 'etfs') return 'indexFunds';
+            if (l === 'shares' || l === 'trust' || l === 'trusts') return 'shares';
+            return s;
+          };
+          var ensureCountryAlloc = function (cc) {
+            if (!testParams.investmentAllocationsByCountry[cc]) testParams.investmentAllocationsByCountry[cc] = {};
+          };
+          var setAlloc = function (cc, invKey, pct) {
+            if (pct === null) return;
+            ensureCountryAlloc(cc);
+            // Match CSV/UI semantics: the last value wins when multiple keys exist.
+            testParams.investmentAllocationsByCountry[cc][invKey] = pct;
+          };
+
+          for (var pkey in testParams) {
+            if (!Object.prototype.hasOwnProperty.call(testParams, pkey)) continue;
+            var sval = testParams[pkey];
+
+            // Investment allocations: InvestmentAllocation_{base}_{cc} OR InvestmentAllocation_{cc}_{base}
+            if (pkey && String(pkey).indexOf('InvestmentAllocation_') === 0) {
+              var suf = String(pkey).substring('InvestmentAllocation_'.length);
+              // Prefer cc_base when the first segment looks like a real country code (e.g. ie_indexfunds).
+              // Fallback to base_cc (e.g. indexFunds_ie).
+              var m2 = suf.match(/^([a-z]{2,})_(.+)$/i);     // cc_base
+              var m1 = suf.match(/^(.+)_([a-z]{2,})$/i);     // base_cc
+              var base = null;
+              var ccAlloc = null;
+              if (m2) {
+                var cc2 = String(m2[1]).toLowerCase();
+                // Only treat as cc_base when cc is already known (StartCountry/MV-*) or is 2-letter.
+                if (scenarioCountries[cc2] || cc2.length === 2) {
+                  base = m2[2]; ccAlloc = cc2;
+                }
+              }
+              if (!ccAlloc && m1) { base = m1[1]; ccAlloc = String(m1[2]).toLowerCase(); }
+              if (base && ccAlloc) {
+                scenarioCountries[ccAlloc] = true;
+                var baseNorm = normalizeBaseKey(base);
+                var invKey = baseNorm + '_' + ccAlloc;
+                setAlloc(ccAlloc, invKey, parsePercent(sval));
+              }
+              continue;
+            }
+
+            // Initial capital: InitialCapital_{base}_{cc}
+            if (pkey && String(pkey).indexOf('InitialCapital_') === 0) {
+              var sufC = String(pkey).substring('InitialCapital_'.length);
+              var mC = sufC.match(/^(.+)_([a-z]{2,})$/i);
+              if (mC) {
+                var baseC = normalizeBaseKey(mC[1]);
+                var ccC = String(mC[2]).toLowerCase();
+                scenarioCountries[ccC] = true;
+                var invKeyC = baseC + '_' + ccC;
+                var cap = Number(sval);
+                if (isFinite(cap) && testParams.initialCapitalByKey[invKeyC] === undefined) {
+                  testParams.initialCapitalByKey[invKeyC] = cap;
+                }
+              }
+              continue;
+            }
+
+            // Growth/vol: {base}_{cc}GrowthRate / GrowthStdDev
+            if (pkey && (String(pkey).endsWith('GrowthRate') || String(pkey).endsWith('GrowthStdDev'))) {
+              var isStd = String(pkey).endsWith('GrowthStdDev');
+              var suffixLen = isStd ? 'GrowthStdDev'.length : 'GrowthRate'.length;
+              var typePart = String(pkey).slice(0, -suffixLen);
+              var mG = typePart.match(/^(.+)_([a-z]{2,})$/i);
+              if (mG) {
+                var baseG = normalizeBaseKey(mG[1]);
+                var ccG = String(mG[2]).toLowerCase();
+                scenarioCountries[ccG] = true;
+                var invKeyG = baseG + '_' + ccG;
+                var rateVal = parsePercent(sval);
+                if (rateVal !== null) {
+                  if (isStd) {
+                    if (testParams.investmentVolatilitiesByKey[invKeyG] === undefined) testParams.investmentVolatilitiesByKey[invKeyG] = rateVal;
+                  } else {
+                    if (testParams.investmentGrowthRatesByKey[invKeyG] === undefined) testParams.investmentGrowthRatesByKey[invKeyG] = rateVal;
+                  }
+                }
+              }
+              continue;
+            }
+          }
+        } catch (_) { }
+
         // Canonical per-country pension contributions
         if (!testParams.pensionContributionsByCountry) testParams.pensionContributionsByCountry = {};
         if (!testParams.pensionContributionsByCountry[sc]) {

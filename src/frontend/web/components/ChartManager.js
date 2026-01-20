@@ -399,12 +399,16 @@ class ChartManager {
                   const original = originalValues[rowIndex] && originalValues[rowIndex][fieldKey];
                   if (original) {
                     // Format converted amount with reporting currency
-                    const reportingCurrency = chartManager.reportingCurrency || 'EUR';
-                    const toCountry = chartManager.getRepresentativeCountryForCurrency ? chartManager.getRepresentativeCountryForCurrency(reportingCurrency) : 'ie';
+                    const reportingCurrency = chartManager.reportingCurrency;
+                    if (!reportingCurrency) throw new Error('ChartManager tooltip: missing reportingCurrency');
+                    const toCountry = chartManager.getRepresentativeCountryForCurrency(reportingCurrency);
                     const cfg = Config.getInstance();
                     const rs = cfg.getCachedTaxRuleSet(toCountry);
-                    const numberLocale = rs ? rs.getNumberLocale() : 'en-IE';
-                    const currencyCode = rs ? rs.getCurrencyCode() : 'EUR';
+                    if (!rs) throw new Error('ChartManager tooltip: missing ruleset for reporting currency country ' + String(toCountry));
+                    const numberLocale = rs.getNumberLocale();
+                    const currencyCode = rs.getCurrencyCode();
+                    if (!numberLocale) throw new Error('ChartManager tooltip: missing numberLocale for ' + String(toCountry));
+                    if (!currencyCode) throw new Error('ChartManager tooltip: missing currencyCode for ' + String(toCountry));
                     const converted = context.parsed.y.toLocaleString(numberLocale, {
                       style: 'currency',
                       currency: currencyCode,
@@ -412,10 +416,13 @@ class ChartManager {
                       maximumFractionDigits: 0
                     });
                     // Format original amount with original currency
-                    const origCountry = chartManager.getCountryForAge ? chartManager.getCountryForAge(context.chart.data.labels[rowIndex]) : 'ie';
+                    const origCountry = chartManager.getCountryForAge(context.chart.data.labels[rowIndex]);
                     const origRs = cfg.getCachedTaxRuleSet(origCountry);
-                    const origNumberLocale = origRs ? origRs.getNumberLocale() : 'en-IE';
-                    const origCurrencyCode = original.currency || 'EUR';
+                    if (!origRs) throw new Error('ChartManager tooltip: missing ruleset for origin country ' + String(origCountry));
+                    const origNumberLocale = origRs.getNumberLocale();
+                    if (!origNumberLocale) throw new Error('ChartManager tooltip: missing numberLocale for ' + String(origCountry));
+                    const origCurrencyCode = original.currency || origRs.getCurrencyCode();
+                    if (!origCurrencyCode) throw new Error('ChartManager tooltip: missing origin currency for ' + String(origCountry));
                     const origFormatted = original.value.toLocaleString(origNumberLocale, {
                       style: 'currency',
                       currency: origCurrencyCode,
@@ -759,12 +766,7 @@ class ChartManager {
   }
 
   getRepresentativeCountryForCurrency(code) {
-    try {
-      return RelocationUtils.getRepresentativeCountryForCurrency(code);
-    } catch (err) {
-      console.log('ChartManager.getRepresentativeCountryForCurrency error: ' + (err && err.message ? err.message : err));
-      return code ? String(code).toLowerCase() : 'ie';
-    }
+    return RelocationUtils.getRepresentativeCountryForCurrency(code);
   }
 
   // Build fast lookup maps for current dataset indices
@@ -883,7 +885,11 @@ class ChartManager {
         }
         const age = data.Age;
         const sourceCountry = this.getCountryForAge(age);
-        const sourceCurrency = cfg.getCachedTaxRuleSet(sourceCountry) ? cfg.getCachedTaxRuleSet(sourceCountry).getCurrencyCode() : 'EUR';
+        const sourceRs = cfg.getCachedTaxRuleSet(sourceCountry);
+        if (!sourceRs || typeof sourceRs.getCurrencyCode !== 'function') {
+          throw new Error('ChartManager.updateChartsRow: missing ruleset for source country ' + String(sourceCountry));
+        }
+        const sourceCurrency = sourceRs.getCurrencyCode();
         const targetCurrency = this.reportingCurrency;
         // Derive calendar year for FX evolution:
         // - Use the explicit Year field from the data row when available.
@@ -904,16 +910,9 @@ class ChartManager {
         monetaryFields.forEach(field => {
           if (data[field] !== undefined) {
             var originalVal = data[field];
-            // State Pension PV is always in EUR (Ireland's currency), regardless of residence country
-            // We need to use Ireland as the source country for conversion, not the residence country
             var actualSourceCountry = sourceCountry;
             var actualSourceCurrency = sourceCurrency;
             var isStatePension = (field === 'IncomeStatePension');
-            if (isStatePension && this.presentValueMode) {
-              // In PV mode, State Pension is in EUR (Ireland)
-              actualSourceCountry = 'ie';
-              actualSourceCurrency = 'EUR';
-            }
             if (actualSourceCurrency !== targetCurrency) {
               // FX conversion using evolution mode (inflation-driven, default mode) - not PPP.
               // We always call EconomicData.convert with baseYear = simulation start; the

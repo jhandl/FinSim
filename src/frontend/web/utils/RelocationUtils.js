@@ -42,29 +42,29 @@ class RelocationUtils {
     const currencySet = new Set();
     const startCountry = cfg.getStartCountry();
 
-    const startRs = cfg.getCachedTaxRuleSet(String(startCountry).toLowerCase());
-    const startCur = startRs && startRs.getCurrencyCode ? startRs.getCurrencyCode() : null;
-    if (startCur) currencySet.add(startCur);
-
-    const uiManager = new UIManager(webUI);
-    const events = uiManager.readEvents(false) || [];
-    for (let i = 0; i < events.length; i++) {
-      const e = events[i]; if (!e) continue;
-      if (e.type && e.type.indexOf('MV-') === 0) {
-        const dest = e.type.substring(3).toLowerCase();
-        const rs = cfg.getCachedTaxRuleSet(dest);
-        const cur = rs && rs.getCurrencyCode ? rs.getCurrencyCode() : null;
-        if (cur) currencySet.add(cur);
-      }
-      if (e.currency) {
-        currencySet.add(String(e.currency).toUpperCase());
-      }
-      if (e.linkedCountry) {
-        const rs = cfg.getCachedTaxRuleSet(String(e.linkedCountry).toLowerCase());
-        const cur = rs && rs.getCurrencyCode ? rs.getCurrencyCode() : null;
-        if (cur) currencySet.add(cur);
-      }
+    // Only include currencies that are backed by a loaded/cached ruleset.
+    // Unified currency conversion is country-based; offering unsupported currencies
+    // is invalid and must fail fast rather than silently falling back.
+    const countries = cfg.getAvailableCountries() || [];
+    for (let i = 0; i < countries.length; i++) {
+      const country = countries[i];
+      if (!country || !country.code) continue;
+      const rs = cfg.getCachedTaxRuleSet(String(country.code).toLowerCase());
+      if (!rs || typeof rs.getCurrencyCode !== 'function') continue;
+      const cur = rs.getCurrencyCode();
+      if (cur) currencySet.add(String(cur).toUpperCase());
     }
+
+    // Ensure start-country currency is included (must exist).
+    const startRs = cfg.getCachedTaxRuleSet(String(startCountry).toLowerCase());
+    if (!startRs || typeof startRs.getCurrencyCode !== 'function') {
+      throw new Error('RelocationUtils.getCurrencyOptions: missing ruleset for StartCountry ' + String(startCountry));
+    }
+    const startCur = startRs.getCurrencyCode();
+    if (!startCur) {
+      throw new Error('RelocationUtils.getCurrencyOptions: StartCountry ruleset missing currency code for ' + String(startCountry));
+    }
+    currencySet.add(String(startCur).toUpperCase());
 
     const options = [];
     currencySet.forEach((code) => {
@@ -81,12 +81,18 @@ class RelocationUtils {
     const cfg = Config.getInstance();
     const startCountry = cfg.getStartCountry();
     const rs = cfg.getCachedTaxRuleSet(String(startCountry).toLowerCase());
-    return rs && rs.getCurrencyCode ? (rs.getCurrencyCode() || 'EUR') : 'EUR';
+    if (!rs || typeof rs.getCurrencyCode !== 'function') {
+      throw new Error('RelocationUtils.getDefaultReportingCurrency: missing ruleset for StartCountry ' + String(startCountry));
+    }
+    const cur = rs.getCurrencyCode();
+    if (!cur) {
+      throw new Error('RelocationUtils.getDefaultReportingCurrency: StartCountry ruleset missing currency code for ' + String(startCountry));
+    }
+    return String(cur).toUpperCase();
   }
 
   static getRepresentativeCountryForCurrency(code) {
     const cfg = Config.getInstance();
-    const startCountry = cfg.getStartCountry();
     const countries = cfg.getAvailableCountries();
     for (let i = 0; i < countries.length; i++) {
       const country = countries[i];
@@ -95,7 +101,7 @@ class RelocationUtils {
         return country.code.toLowerCase();
       }
     }
-    return startCountry.toLowerCase();
+    throw new Error('RelocationUtils.getRepresentativeCountryForCurrency: no country found for currency ' + String(code));
   }
 
   static createCurrencyControls(container, manager, webUI) {

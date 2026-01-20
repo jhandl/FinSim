@@ -113,7 +113,7 @@ module.exports = {
       const ui = createUiSimulatingDomUtils(doc);
       seedParameterIds(ui);
 
-      const csv = fs.readFileSync(path.join(__dirname, '..', 'docs', 'demo3b.csv'), 'utf8');
+      const csv = fs.readFileSync(path.join(__dirname, '..', 'docs', 'demo3.csv'), 'utf8');
       deserializeSimulation(csv, ui);
 
       const gFunds = doc.getElementById('InvestmentAllocation_indexFunds_ie');
