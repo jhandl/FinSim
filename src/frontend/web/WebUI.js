@@ -958,6 +958,7 @@ class WebUI extends AbstractUI {
 
         // Pension fields first
         this._renderCountryPensionContributionFields(countryContainer, startCountry, simulationMode);
+        this._renderCountryAssetMixBlock(countryContainer, startCountry);
 
         for (let i = types.length - 1; i >= 0; i--) {
           const t = types[i] || {};
@@ -1074,6 +1075,7 @@ class WebUI extends AbstractUI {
 
       // Pension fields first
       this._renderCountryPensionContributionFields(countryContainer, code, simulationMode);
+      this._renderCountryAssetMixBlock(countryContainer, code);
 
       for (let i = invTypes.length - 1; i >= 0; i--) {
         const t = invTypes[i] || {};
@@ -1130,6 +1132,213 @@ class WebUI extends AbstractUI {
       const c = (el.getAttribute('data-country-code') || '').toLowerCase();
       el.style.display = (c === selected) ? '' : 'none';
     });
+  }
+
+  _renderCountryAssetMixBlock(container, countryCode) {
+    const host = container;
+    if (!host) return;
+    const code = (countryCode || '').toString().trim().toLowerCase();
+    if (!code) return;
+
+    const existing = host.querySelectorAll(`[data-asset-mix="true"][data-country-code="${code}"]`);
+    existing.forEach(el => {
+      try {
+        const inputs = el.querySelectorAll('input');
+        for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+      } catch (_) { }
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+
+    const wrapper = document.createElement('div');
+    wrapper.setAttribute('data-asset-mix', 'true');
+    wrapper.setAttribute('data-country-code', code);
+    wrapper.title = 'Applies to new investing while resident in this country.';
+    wrapper.style.display = 'flex';
+    wrapper.style.flexDirection = 'column';
+    wrapper.style.gap = '0.225rem';
+
+    const headerRow = document.createElement('div');
+    headerRow.className = 'input-wrapper';
+    const headerLabel = document.createElement('label');
+    headerLabel.textContent = 'Asset Mix';
+    headerRow.appendChild(headerLabel);
+    const toggle = document.createElement('div');
+    toggle.className = 'simulation-mode-toggle';
+    const toggleStatic = document.createElement('span');
+    toggleStatic.className = 'mode-toggle-option';
+    toggleStatic.textContent = 'Static';
+    const toggleGlidepath = document.createElement('span');
+    toggleGlidepath.className = 'mode-toggle-option';
+    toggleGlidepath.textContent = 'Glidepath';
+    toggle.appendChild(toggleStatic);
+    toggle.appendChild(toggleGlidepath);
+    headerRow.appendChild(toggle);
+    wrapper.appendChild(headerRow);
+
+    const modeInputId = 'AssetMixMode_' + code;
+    const modeInput = this._takeOrCreateInput(modeInputId, 'string');
+    modeInput.type = 'hidden';
+    modeInput.autocomplete = 'off';
+    if (!modeInput.value) modeInput.value = 'static';
+    wrapper.appendChild(modeInput);
+
+    const staticRow = document.createElement('div');
+    staticRow.className = 'input-wrapper';
+    const staticLabel = document.createElement('label');
+    const staticInputId = 'AssetMixEquitiesPct_' + code;
+    staticLabel.setAttribute('for', staticInputId);
+    staticLabel.textContent = 'Equities %';
+    staticRow.appendChild(staticLabel);
+    const staticPctContainer = document.createElement('div');
+    staticPctContainer.className = 'percentage-container';
+    const staticInput = this._takeOrCreateInput(staticInputId, 'percentage');
+    staticInput.type = 'text';
+    staticInput.setAttribute('inputmode', 'numeric');
+    staticInput.setAttribute('pattern', '[0-9]*');
+    staticInput.setAttribute('step', '1');
+    staticInput.setAttribute('placeholder', ' ');
+    staticPctContainer.appendChild(staticInput);
+    staticRow.appendChild(staticPctContainer);
+    wrapper.appendChild(staticRow);
+
+    const glideStartAgeRow = document.createElement('div');
+    glideStartAgeRow.className = 'input-wrapper';
+    const glideStartAgeLabel = document.createElement('label');
+    const glideStartAgeId = 'AssetMixGlideStartAge_' + code;
+    glideStartAgeLabel.setAttribute('for', glideStartAgeId);
+    glideStartAgeLabel.textContent = 'Start age';
+    glideStartAgeRow.appendChild(glideStartAgeLabel);
+    const glideStartAgeInput = this._takeOrCreateInput(glideStartAgeId, '');
+    glideStartAgeInput.type = 'text';
+    glideStartAgeInput.setAttribute('inputmode', 'numeric');
+    glideStartAgeInput.setAttribute('pattern', '[0-9]*');
+    glideStartAgeRow.appendChild(glideStartAgeInput);
+    wrapper.appendChild(glideStartAgeRow);
+
+    const glideEndAgeRow = document.createElement('div');
+    glideEndAgeRow.className = 'input-wrapper';
+    const glideEndAgeLabel = document.createElement('label');
+    const glideEndAgeId = 'AssetMixGlideEndAge_' + code;
+    glideEndAgeLabel.setAttribute('for', glideEndAgeId);
+    glideEndAgeLabel.textContent = 'End age';
+    glideEndAgeRow.appendChild(glideEndAgeLabel);
+    const glideEndAgeInput = this._takeOrCreateInput(glideEndAgeId, '');
+    glideEndAgeInput.type = 'text';
+    glideEndAgeInput.setAttribute('inputmode', 'numeric');
+    glideEndAgeInput.setAttribute('pattern', '[0-9]*');
+    glideEndAgeRow.appendChild(glideEndAgeInput);
+    wrapper.appendChild(glideEndAgeRow);
+
+    const glideStartPctRow = document.createElement('div');
+    glideStartPctRow.className = 'input-wrapper';
+    const glideStartPctLabel = document.createElement('label');
+    const glideStartPctId = 'AssetMixGlideStartEquitiesPct_' + code;
+    glideStartPctLabel.setAttribute('for', glideStartPctId);
+    glideStartPctLabel.textContent = 'Equities % before';
+    glideStartPctRow.appendChild(glideStartPctLabel);
+    const glideStartPctContainer = document.createElement('div');
+    glideStartPctContainer.className = 'percentage-container';
+    const glideStartPctInput = this._takeOrCreateInput(glideStartPctId, 'percentage');
+    glideStartPctInput.type = 'text';
+    glideStartPctInput.setAttribute('inputmode', 'numeric');
+    glideStartPctInput.setAttribute('pattern', '[0-9]*');
+    glideStartPctInput.setAttribute('step', '1');
+    glideStartPctInput.setAttribute('placeholder', ' ');
+    glideStartPctContainer.appendChild(glideStartPctInput);
+    glideStartPctRow.appendChild(glideStartPctContainer);
+    wrapper.appendChild(glideStartPctRow);
+
+    const glideEndPctRow = document.createElement('div');
+    glideEndPctRow.className = 'input-wrapper';
+    const glideEndPctLabel = document.createElement('label');
+    const glideEndPctId = 'AssetMixGlideEndEquitiesPct_' + code;
+    glideEndPctLabel.setAttribute('for', glideEndPctId);
+    glideEndPctLabel.textContent = 'Equities % at end';
+    glideEndPctRow.appendChild(glideEndPctLabel);
+    const glideEndPctContainer = document.createElement('div');
+    glideEndPctContainer.className = 'percentage-container';
+    const glideEndPctInput = this._takeOrCreateInput(glideEndPctId, 'percentage');
+    glideEndPctInput.type = 'text';
+    glideEndPctInput.setAttribute('inputmode', 'numeric');
+    glideEndPctInput.setAttribute('pattern', '[0-9]*');
+    glideEndPctInput.setAttribute('step', '1');
+    glideEndPctInput.setAttribute('placeholder', ' ');
+    glideEndPctContainer.appendChild(glideEndPctInput);
+    glideEndPctRow.appendChild(glideEndPctContainer);
+    wrapper.appendChild(glideEndPctRow);
+
+    const preview = document.createElement('div');
+    preview.id = 'AssetMixPreview_' + code;
+    preview.className = 'micro-note';
+    preview.title = 'Preview of equities allocation policy.';
+    wrapper.appendChild(preview);
+
+    const applyMode = (modeValue) => {
+      const mode = (modeValue || 'static').toString().trim().toLowerCase();
+      const isStatic = mode !== 'glidepath';
+      toggleStatic.classList.toggle('mode-toggle-active', isStatic);
+      toggleGlidepath.classList.toggle('mode-toggle-active', !isStatic);
+      staticRow.style.display = isStatic ? 'flex' : 'none';
+      glideStartAgeRow.style.display = isStatic ? 'none' : 'flex';
+      glideEndAgeRow.style.display = isStatic ? 'none' : 'flex';
+      glideStartPctRow.style.display = isStatic ? 'none' : 'flex';
+      glideEndPctRow.style.display = isStatic ? 'none' : 'flex';
+    };
+
+    toggleStatic.onclick = () => {
+      modeInput.value = 'static';
+      applyMode(modeInput.value);
+      this.updateAssetMixPreview(code);
+    };
+
+    toggleGlidepath.onclick = () => {
+      modeInput.value = 'glidepath';
+      applyMode(modeInput.value);
+      this.updateAssetMixPreview(code);
+    };
+
+    const previewUpdater = () => this.updateAssetMixPreview(code);
+    staticInput.oninput = previewUpdater;
+    glideStartAgeInput.oninput = previewUpdater;
+    glideEndAgeInput.oninput = previewUpdater;
+    glideStartPctInput.oninput = previewUpdater;
+    glideEndPctInput.oninput = previewUpdater;
+
+    applyMode(modeInput.value || 'static');
+    host.appendChild(wrapper);
+    this.formatUtils.setupPercentageInputs();
+    this.updateAssetMixPreview(code);
+  }
+
+  updateAssetMixPreview(countryCode) {
+    const code = (countryCode || '').toString().trim().toLowerCase();
+    if (!code) return;
+    const preview = document.getElementById('AssetMixPreview_' + code);
+    const modeInput = document.getElementById('AssetMixMode_' + code);
+    if (!preview || !modeInput) return;
+
+    const mode = (modeInput.value || 'static').toString().trim().toLowerCase();
+    if (mode === 'glidepath') {
+      const startAgeEl = document.getElementById('AssetMixGlideStartAge_' + code);
+      const endAgeEl = document.getElementById('AssetMixGlideEndAge_' + code);
+      const startPctEl = document.getElementById('AssetMixGlideStartEquitiesPct_' + code);
+      const endPctEl = document.getElementById('AssetMixGlideEndEquitiesPct_' + code);
+      const startAge = startAgeEl && startAgeEl.value ? String(startAgeEl.value).trim() : '?';
+      const endAge = endAgeEl && endAgeEl.value ? String(endAgeEl.value).trim() : '?';
+      const startPct = startPctEl && startPctEl.value ? String(startPctEl.value).trim() : '?';
+      const endPct = endPctEl && endPctEl.value ? String(endPctEl.value).trim() : '?';
+      preview.textContent = startPct + ' -> ' + endPct + ' from ' + startAge + '-' + endAge;
+      return;
+    }
+
+    const equitiesEl = document.getElementById('AssetMixEquitiesPct_' + code);
+    const equitiesVal = equitiesEl && equitiesEl.value ? String(equitiesEl.value).trim() : '?';
+    let bondsVal = '?';
+    const equitiesNum = parseInt(equitiesVal, 10);
+    if (!isNaN(equitiesNum)) {
+      bondsVal = String(100 - equitiesNum);
+    }
+    preview.textContent = 'Equities: ' + equitiesVal + (bondsVal ? ' (Bonds: ' + bondsVal + ')' : '');
   }
 
   _clearDynamicAllocationInputs(allocGroup) {
