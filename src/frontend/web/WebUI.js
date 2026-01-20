@@ -23,6 +23,7 @@ class WebUI extends AbstractUI {
     // Country chip selectors (relocation-enabled scenarios only)
     this.allocationsCountryChipSelector = null;
     this.personalCircumstancesCountryChipSelector = null;
+    this.economyCountryChipSelector = null;
     this._allocationValueCache = {};
     this.pensionCappedDropdowns = {};
     this.countryTabSyncManager = CountryTabSyncManager.getInstance();
@@ -770,6 +771,11 @@ class WebUI extends AbstractUI {
       const pc = mgr.getSelectedCountry('personalCircumstances');
       if (p && pc) p.setSelectedCountry(pc);
     } catch (_) { }
+    try {
+      const e = this.economyCountryChipSelector;
+      const ec = mgr.getSelectedCountry('economyWrappers');
+      if (e && ec) e.setSelectedCountry(ec);
+    } catch (_) { }
   }
 
   /**
@@ -897,6 +903,242 @@ class WebUI extends AbstractUI {
 
     // Personal circumstances chips + per-country state pension inputs
     this.setupPersonalCircumstancesCountryChips();
+
+    // Economy variant container + per-country wrappers table
+    this.refreshEconomyVariantUI();
+  }
+
+  // -------------------------------------------------------------
+  // Economy variant (global return profiles + country wrappers)
+  // -------------------------------------------------------------
+
+  refreshEconomyVariantUI() {
+    const cfg = Config.getInstance();
+    const relocationEnabled = cfg.isRelocationEnabled();
+    const hasMV = relocationEnabled && this.hasEffectiveRelocationEvents();
+
+    const growthCard = document.getElementById('growthRates');
+    if (!growthCard) return;
+
+    const legacyTable = growthCard.querySelector('table.growth-rates-table');
+    const variantContainer = this._ensureEconomyVariantContainer(growthCard);
+
+    if (!hasMV) {
+      variantContainer.style.display = 'none';
+      if (legacyTable) legacyTable.style.display = '';
+      this.economyCountryChipSelector = null;
+      return;
+    }
+
+    variantContainer.style.display = '';
+    if (legacyTable) legacyTable.style.display = 'none';
+
+    this._renderEconomyReturnProfiles(cfg);
+    this._renderEconomyWrappers(cfg);
+    this.updateUIForEconomyMode();
+  }
+
+  _ensureEconomyVariantContainer(growthCard) {
+    const card = growthCard || document.getElementById('growthRates');
+    if (!card) return null;
+    let container = document.getElementById('economyVariantContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'economyVariantContainer';
+      container.className = 'economy-variant-container';
+      const legacyTable = card.querySelector('table.growth-rates-table');
+      if (legacyTable) {
+        card.insertBefore(container, legacyTable);
+      } else {
+        card.appendChild(container);
+      }
+    }
+    let profiles = document.getElementById('economyReturnProfilesContainer');
+    if (!profiles) {
+      profiles = document.createElement('div');
+      profiles.id = 'economyReturnProfilesContainer';
+      container.appendChild(profiles);
+    }
+    let wrappers = document.getElementById('economyCountryWrappersContainer');
+    if (!wrappers) {
+      wrappers = document.createElement('div');
+      wrappers.id = 'economyCountryWrappersContainer';
+      container.appendChild(wrappers);
+    }
+    return container;
+  }
+
+  _renderEconomyReturnProfiles(cfg) {
+    const container = document.getElementById('economyReturnProfilesContainer');
+    if (!container) return;
+
+    const existingInputs = container.querySelectorAll('input');
+    for (let i = 0; i < existingInputs.length; i++) {
+      this._stashInputElement(existingInputs[i]);
+    }
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
+
+    const title = document.createElement('div');
+    title.className = 'economy-section-title';
+    title.textContent = 'Return Profiles';
+    container.appendChild(title);
+
+    const table = document.createElement('table');
+    table.className = 'growth-rates-table economy-profiles-table';
+
+    const thead = document.createElement('thead');
+    const headRow = document.createElement('tr');
+    ['Profile', 'Growth Rate', 'Volatility'].forEach(text => {
+      const th = document.createElement('th');
+      th.textContent = text;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    const profiles = cfg.getInvestmentBaseTypes();
+    for (let i = 0; i < profiles.length; i++) {
+      const p = profiles[i] || {};
+      const baseKey = p.baseKey;
+      if (!baseKey) continue;
+      const labelText = p.label || baseKey;
+
+      const tr = document.createElement('tr');
+
+      const tdLabel = document.createElement('td');
+      tdLabel.textContent = labelText;
+      tr.appendChild(tdLabel);
+
+      const tdGrowth = document.createElement('td');
+      const grWrap = document.createElement('div');
+      grWrap.className = 'percentage-container';
+      const gr = this._takeOrCreateInput('ReturnProfileGrowthRate_' + baseKey, 'percentage');
+      gr.type = 'text';
+      gr.setAttribute('inputmode', 'numeric');
+      gr.setAttribute('pattern', '[0-9]*');
+      gr.setAttribute('step', '1');
+      grWrap.appendChild(gr);
+      tdGrowth.appendChild(grWrap);
+      tr.appendChild(tdGrowth);
+
+      const tdVol = document.createElement('td');
+      const volWrap = document.createElement('div');
+      volWrap.className = 'percentage-container';
+      const vol = this._takeOrCreateInput('ReturnProfileVolatility_' + baseKey, 'percentage');
+      vol.type = 'text';
+      vol.setAttribute('inputmode', 'numeric');
+      vol.setAttribute('pattern', '[0-9]*');
+      vol.setAttribute('step', '1');
+      volWrap.appendChild(vol);
+      tdVol.appendChild(volWrap);
+      tr.appendChild(tdVol);
+
+      tbody.appendChild(tr);
+    }
+
+    table.appendChild(tbody);
+    container.appendChild(table);
+  }
+
+  _renderEconomyWrappers(cfg) {
+    const container = document.getElementById('economyCountryWrappersContainer');
+    if (!container) return;
+
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
+
+    const title = document.createElement('div');
+    title.className = 'economy-section-title';
+    title.textContent = 'Tax Wrappers';
+    container.appendChild(title);
+
+    const chipContainer = document.createElement('div');
+    chipContainer.className = 'country-chip-container';
+    container.appendChild(chipContainer);
+
+    const scenarioCountries = this.getScenarioCountries();
+    const countries = scenarioCountries.map(code => ({ code: code, name: cfg.getCountryNameByCode(code) }));
+    const startCountry = cfg.getStartCountry();
+    const mgrSelected = this.countryTabSyncManager.getSelectedCountry('economyWrappers');
+    const prevSelected = (this.economyCountryChipSelector && this.economyCountryChipSelector.getSelectedCountry())
+      ? this.economyCountryChipSelector.getSelectedCountry()
+      : null;
+    let selected = mgrSelected || prevSelected || startCountry;
+    if (scenarioCountries.indexOf(String(selected).toLowerCase()) === -1) selected = startCountry;
+
+    this.economyCountryChipSelector = new CountryChipSelector(
+      countries,
+      selected,
+      (code) => { this._showEconomyWrappersCountry(code); },
+      'economyWrappers'
+    );
+    this.economyCountryChipSelector.render(chipContainer);
+
+    for (let ci = 0; ci < scenarioCountries.length; ci++) {
+      const code = scenarioCountries[ci];
+      const ruleset = cfg.getCachedTaxRuleSet(code);
+      const types = ruleset.getResolvedInvestmentTypes();
+      const table = document.createElement('table');
+      table.className = 'growth-rates-table economy-wrappers-table';
+      table.setAttribute('data-economy-wrapper-table', 'true');
+      table.setAttribute('data-country-code', code);
+      table.style.display = (code === selected) ? '' : 'none';
+
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      ['Wrapper', 'Tax', 'Profile'].forEach(text => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      for (let i = 0; i < types.length; i++) {
+        const t = types[i] || {};
+        const baseType = cfg.getInvestmentBaseTypeByKey(t.baseRef);
+        const profileLabel = baseType.label || baseType.baseKey;
+        const taxLabel = t.taxation.exitTax ? 'Exit Tax' : 'CGT';
+
+        const tr = document.createElement('tr');
+        tr.title = 'Uses profile: ' + profileLabel;
+
+        const tdLabel = document.createElement('td');
+        tdLabel.textContent = t.label || t.key;
+        tr.appendChild(tdLabel);
+
+        const tdTax = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = 'economy-tax-badge';
+        badge.textContent = taxLabel;
+        tdTax.appendChild(badge);
+        tr.appendChild(tdTax);
+
+        const tdProfile = document.createElement('td');
+        tdProfile.textContent = profileLabel;
+        tr.appendChild(tdProfile);
+
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      container.appendChild(table);
+    }
+
+    this.countryTabSyncManager.setSelectedCountry('economyWrappers', selected);
+  }
+
+  _showEconomyWrappersCountry(code) {
+    const selected = (code || '').toString().trim().toLowerCase();
+    const tables = document.querySelectorAll('#economyCountryWrappersContainer [data-economy-wrapper-table="true"]');
+    tables.forEach(el => {
+      const c = (el.getAttribute('data-country-code') || '').toLowerCase();
+      el.style.display = (c === selected) ? '' : 'none';
+    });
   }
 
   _setupAllocationsCountryChips(hasMV, fallbackStartTypes) {
@@ -2371,8 +2613,13 @@ class WebUI extends AbstractUI {
     }
 
     // Show/hide volatility column - use visibility to maintain table layout
-    const volatilityHeader = document.querySelector('#growthRates th:nth-child(3)');
-    const volatilityCells = document.querySelectorAll('#growthRates td:nth-child(3)');
+    const variantContainer = document.getElementById('economyVariantContainer');
+    const useProfilesTable = variantContainer && variantContainer.style.display !== 'none';
+    const tableSelector = useProfilesTable
+      ? '#growthRates table.economy-profiles-table'
+      : '#growthRates table.growth-rates-table';
+    const volatilityHeader = document.querySelector(tableSelector + ' th:nth-child(3)');
+    const volatilityCells = document.querySelectorAll(tableSelector + ' td:nth-child(3)');
 
     if (volatilityHeader) {
       volatilityHeader.style.visibility = isDeterministic ? 'hidden' : '';
@@ -2391,7 +2638,7 @@ class WebUI extends AbstractUI {
   }
 
   preserveVolatilityValues() {
-    const elements = document.querySelectorAll('#growthRates input[id$="GrowthStdDev"]');
+    const elements = document.querySelectorAll('#growthRates input[id$="GrowthStdDev"], #growthRates input[id^="ReturnProfileVolatility_"]');
     elements.forEach(el => {
       if (el && el.id && el.value) {
         this.preservedVolatilityValues[el.id] = el.value;
@@ -2400,7 +2647,7 @@ class WebUI extends AbstractUI {
   }
 
   restoreVolatilityValues() {
-    const elements = document.querySelectorAll('#growthRates input[id$="GrowthStdDev"]');
+    const elements = document.querySelectorAll('#growthRates input[id$="GrowthStdDev"], #growthRates input[id^="ReturnProfileVolatility_"]');
     elements.forEach(el => {
       if (el && el.id && this.preservedVolatilityValues[el.id]) {
         el.value = this.preservedVolatilityValues[el.id];

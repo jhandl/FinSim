@@ -190,6 +190,7 @@
     {
       "key": "shares_ie",
       "label": "Shares",
+      "baseRef": "globalEquity",
       "baseCurrency": "EUR",
       "assetCountry": "ie",
       "residenceScope": "local",

@@ -1267,6 +1267,39 @@ th {
   width: 80px;
 }
 
+.economy-variant-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.economy-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-color);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.economy-wrappers-table td:first-child {
+  text-align: left;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+.economy-tax-badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #eef2f6;
+  color: #3b4b5a;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .delete-event {
   background: none;
   border: none;

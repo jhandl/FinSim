@@ -91,6 +91,7 @@
     {
       "key": "indexFunds_ar",
       "label": "MERVAL",
+      "baseRef": "globalEquity",
       "baseCurrency": "ARS",
       "assetCountry": "ar",
       "residenceScope": "local",
