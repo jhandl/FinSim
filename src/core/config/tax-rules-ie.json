@@ -188,6 +188,22 @@
       }
     },
     {
+      "key": "equityEtf_ie",
+      "label": "Equity ETF",
+      "baseRef": "globalEquity",
+      "baseCurrency": "EUR",
+      "assetCountry": "ie",
+      "residenceScope": "local",
+      "taxation": {
+        "exitTax": {
+          "rate": 0.38,
+          "deemedDisposalYears": 8,
+          "allowLossOffset": false,
+          "eligibleForAnnualExemption": false
+        }
+      }
+    },
+    {
       "key": "shares_ie",
       "label": "Shares",
       "baseCurrency": "EUR",

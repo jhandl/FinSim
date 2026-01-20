@@ -2331,6 +2331,18 @@ footer {
   z-index: 2;
 }
 
+.economy-linked-indicator {
+  margin-left: 0.35rem;
+  padding: 0 0.35rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  color: #666666;
+  background: #f5f7f9;
+}
+
 .events-section .card-header-flex {
   display: flex;
   justify-content: space-between;

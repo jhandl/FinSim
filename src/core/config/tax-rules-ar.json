@@ -114,6 +114,20 @@
           "allowLossOffset": true
         }
       }
+    },
+    {
+      "key": "cedears2_ar",
+      "label": "CEDEARs (Alt)",
+      "baseRef": "globalEquity",
+      "baseCurrency": "USD",
+      "assetCountry": "us",
+      "residenceScope": "global",
+      "taxation": {
+        "capitalGains": {
+          "rateRef": "capitalGainsTax.rate",
+          "allowLossOffset": true
+        }
+      }
     }
   ],
   "pinnedIncomeTypes": [
