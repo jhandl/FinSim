@@ -2331,6 +2331,21 @@ footer {
   z-index: 2;
 }
 
+.economy-copy-controls,
+.allocations-copy-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0.25rem;
+}
+
+.copy-controls-label {
+  font-size: 0.85rem;
+  color: var(--text-color);
+  opacity: 0.8;
+}
+
 .events-section .card-header-flex {
   display: flex;
   justify-content: space-between;
