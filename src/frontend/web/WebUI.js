@@ -23,9 +23,13 @@ class WebUI extends AbstractUI {
     // Country chip selectors (relocation-enabled scenarios only)
     this.allocationsCountryChipSelector = null;
     this.personalCircumstancesCountryChipSelector = null;
+    this.economyCountryChipSelector = null;
     this._allocationValueCache = {};
     this.pensionCappedDropdowns = {};
     this.countryTabSyncManager = CountryTabSyncManager.getInstance();
+    this.linkIdenticalWrappersEnabled = true;
+    this._economyLinkGroups = null;
+    this._isEconomyPropagating = false;
 
     // Initialize in a specific order to ensure dependencies are met
     this.formatUtils = new FormatUtils();
@@ -64,6 +68,7 @@ class WebUI extends AbstractUI {
     this.setupLoadDemoScenarioButton();
     this.setupSimModeToggle(); // Setup the single/couple mode toggle
     this.setupEconomyModeToggle(); // Setup the deterministic/Monte Carlo mode toggle
+    this.setupEconomyLinkingToggle(); // Setup linked wrapper propagation toggle
     this.setupParameterTooltips(); // Setup parameter age field tooltips
     this.setupVisualizationControls(); // Setup visualization controls
     this.setupCardInfoIcons(); // Setup info icons on cards
@@ -607,26 +612,39 @@ class WebUI extends AbstractUI {
     this.renderInvestmentParameterFields(investmentTypes);
   }
 
+  _captureGrowthRateValues() {
+    const growthRateCache = {};
+    const inputs = document.querySelectorAll('#growthRates tr[data-economy-wrapper-row="true"] input.percentage');
+    inputs.forEach(input => {
+      if (input && input.id && input.value) {
+        growthRateCache[input.id] = input.value;
+      }
+    });
+    this._growthRateCacheForRestore = growthRateCache;
+  }
+
+  _restoreGrowthRateValues() {
+    if (!this._growthRateCacheForRestore) return;
+    for (const [id, value] of Object.entries(this._growthRateCacheForRestore)) {
+      const input = document.getElementById(id);
+      if (input && !input.value) {
+        input.value = value;
+      }
+    }
+    this._growthRateCacheForRestore = null;
+  }
+
   renderInvestmentParameterFields(investmentTypes) {
     const types = Array.isArray(investmentTypes) ? investmentTypes : [];
 
     // Capture existing growth rate/volatility values before removing dynamic fields.
     // This preserves values when StartCountry changes trigger mid-deserialization.
-    const growthRateCache = {};
-    const existingDynamicInputs = document.querySelectorAll('[data-dynamic-investment-param="true"] input.percentage');
-    existingDynamicInputs.forEach(input => {
-      if (input && input.id && input.value) {
-        growthRateCache[input.id] = input.value;
-      }
-    });
+    this._captureGrowthRateValues();
 
     // Remove previously generated dynamic fields
     document.querySelectorAll('[data-dynamic-investment-param="true"]').forEach(el => {
       if (el && el.parentNode) el.parentNode.removeChild(el);
     });
-
-    // Store the cache on this instance so we can restore values after creation
-    this._growthRateCacheForRestore = growthRateCache;
 
     const hideInputWrapper = (inputId) => {
       const el = document.getElementById(inputId);
@@ -688,69 +706,6 @@ class WebUI extends AbstractUI {
     // Allocations: if relocation is enabled AND MV-* events exist, render per-country allocation inputs
     // and use the chips as a context switcher (show/hide per-country containers).
     this.refreshCountryChipsFromScenario(types);
-
-    const tbody = document.querySelector('#growthRates table.growth-rates-table tbody');
-    const inflationInput = document.getElementById('Inflation');
-    const inflationRow = inflationInput ? inflationInput.closest('tr') : null;
-    if (tbody) {
-      for (let i = 0; i < types.length; i++) {
-        const t = types[i] || {};
-        const key = t.key;
-        if (!key) continue;
-        const labelText = t.label || key;
-
-        const tr = document.createElement('tr');
-        tr.setAttribute('data-dynamic-investment-param', 'true');
-
-        const tdLabel = document.createElement('td');
-        tdLabel.textContent = labelText;
-        tr.appendChild(tdLabel);
-
-        const tdGrowth = document.createElement('td');
-        const grWrap = document.createElement('div');
-        grWrap.className = 'percentage-container';
-        const gr = this._takeOrCreateInput(key + 'GrowthRate', 'percentage');
-        gr.type = 'text';
-        gr.setAttribute('inputmode', 'numeric');
-        gr.setAttribute('pattern', '[0-9]*');
-        gr.setAttribute('step', '1');
-        grWrap.appendChild(gr);
-        tdGrowth.appendChild(grWrap);
-        tr.appendChild(tdGrowth);
-
-        const tdVol = document.createElement('td');
-        const sdWrap = document.createElement('div');
-        sdWrap.className = 'percentage-container';
-        const sd = this._takeOrCreateInput(key + 'GrowthStdDev', 'percentage');
-        sd.type = 'text';
-        sd.setAttribute('inputmode', 'numeric');
-        sd.setAttribute('pattern', '[0-9]*');
-        sd.setAttribute('step', '1');
-        sdWrap.appendChild(sd);
-        tdVol.appendChild(sdWrap);
-        tr.appendChild(tdVol);
-
-        if (inflationRow && inflationRow.parentNode === tbody) {
-          tbody.insertBefore(tr, inflationRow);
-        } else {
-          tbody.appendChild(tr);
-        }
-      }
-    }
-
-    // Restore cached growth rate values to newly created inputs
-    if (this._growthRateCacheForRestore) {
-      for (const [id, value] of Object.entries(this._growthRateCacheForRestore)) {
-        const input = document.getElementById(id);
-        if (input && !input.value) {
-          input.value = value;
-        }
-      }
-      this._growthRateCacheForRestore = null;
-    }
-
-    // Re-apply economy mode visibility to newly created volatility cells
-    this.updateUIForEconomyMode();
   }
 
   // -------------------------------------------------------------
@@ -769,6 +724,11 @@ class WebUI extends AbstractUI {
       const p = this.personalCircumstancesCountryChipSelector;
       const pc = mgr.getSelectedCountry('personalCircumstances');
       if (p && pc) p.setSelectedCountry(pc);
+    } catch (_) { }
+    try {
+      const e = this.economyCountryChipSelector;
+      const ec = mgr.getSelectedCountry('economy');
+      if (e && ec) e.setSelectedCountry(ec);
     } catch (_) { }
   }
 
@@ -892,11 +852,19 @@ class WebUI extends AbstractUI {
       types = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
     }
 
+    this._captureGrowthRateValues();
+
     // Allocations chips + per-country allocation inputs
     this._setupAllocationsCountryChips(hasMV, types);
 
     // Personal circumstances chips + per-country state pension inputs
     this.setupPersonalCircumstancesCountryChips();
+
+    // Economy chips + per-country wrapper rows
+    this._setupEconomyCountryChips(hasMV, types);
+
+    this._restoreGrowthRateValues();
+    this.updateUIForEconomyMode();
   }
 
   _setupAllocationsCountryChips(hasMV, fallbackStartTypes) {
@@ -1129,6 +1097,207 @@ class WebUI extends AbstractUI {
     containers.forEach(el => {
       const c = (el.getAttribute('data-country-code') || '').toLowerCase();
       el.style.display = (c === selected) ? '' : 'none';
+    });
+  }
+
+  _setupEconomyCountryChips(hasMV, fallbackStartTypes) {
+    const cfg = Config.getInstance();
+    const card = document.getElementById('growthRates');
+    if (!card) return;
+    const table = card.querySelector('table.growth-rates-table');
+    if (!table) return;
+
+    let chipContainer = card.querySelector('.economy-country-chip-container');
+    if (!chipContainer) {
+      chipContainer = document.createElement('div');
+      chipContainer.className = 'country-chip-container economy-country-chip-container';
+      card.insertBefore(chipContainer, table);
+    }
+
+    if (!hasMV) {
+      chipContainer.style.display = 'none';
+      this.economyCountryChipSelector = null;
+      this._renderEconomyWrapperRows(false, fallbackStartTypes);
+      return;
+    }
+
+    chipContainer.style.display = '';
+    const scenarioCountries = this.getScenarioCountries();
+    const countries = scenarioCountries.map(code => ({ code: code, name: cfg.getCountryNameByCode(code) }));
+    const startCountry = cfg.getStartCountry();
+    const mgrSelected = this.countryTabSyncManager.getSelectedCountry('economy');
+    const prevSelected = (this.economyCountryChipSelector && this.economyCountryChipSelector.getSelectedCountry())
+      ? this.economyCountryChipSelector.getSelectedCountry()
+      : null;
+    let selected = mgrSelected || prevSelected || startCountry;
+    if (scenarioCountries.indexOf(String(selected).toLowerCase()) === -1) selected = startCountry;
+
+    this.economyCountryChipSelector = new CountryChipSelector(
+      countries,
+      selected,
+      (code) => { this._showEconomyCountry(code); },
+      'economy'
+    );
+    this.economyCountryChipSelector.render(chipContainer);
+    this._renderEconomyWrapperRows(true, fallbackStartTypes);
+    this._showEconomyCountry(selected);
+    this.countryTabSyncManager.setSelectedCountry('economy', selected);
+  }
+
+  _renderEconomyWrapperRows(hasMV, fallbackStartTypes) {
+    const cfg = Config.getInstance();
+    const tbody = document.querySelector('#growthRates table.growth-rates-table tbody');
+    if (!tbody) return;
+
+    const existing = tbody.querySelectorAll('tr[data-economy-wrapper-row="true"]');
+    existing.forEach(row => {
+      if (row && row.parentNode) row.parentNode.removeChild(row);
+    });
+
+    const pensionInput = document.getElementById('PensionGrowthRate');
+    const pensionRow = pensionInput ? pensionInput.closest('tr') : null;
+    const inflationInput = document.getElementById('Inflation');
+    const inflationRow = inflationInput ? inflationInput.closest('tr') : null;
+    if (pensionRow) pensionRow.style.display = hasMV ? 'none' : '';
+    if (inflationRow) inflationRow.style.display = hasMV ? 'none' : '';
+
+    let countries = [];
+    if (hasMV) {
+      countries = this.getScenarioCountries();
+    } else {
+      const startCountry = cfg.getStartCountry();
+      countries = [startCountry];
+    }
+
+    this._economyLinkGroups = this._buildEconomyLinkGroups(countries);
+
+    for (let ci = 0; ci < countries.length; ci++) {
+      const code = countries[ci];
+      let invTypes = [];
+      if (!hasMV && Array.isArray(fallbackStartTypes) && fallbackStartTypes.length) {
+        invTypes = fallbackStartTypes;
+      } else {
+        const rs = cfg.getCachedTaxRuleSet(code);
+        invTypes = rs.getResolvedInvestmentTypes() || [];
+      }
+
+      for (let i = 0; i < invTypes.length; i++) {
+        const t = invTypes[i] || {};
+        const key = t.key;
+        if (!key) continue;
+        const labelText = t.label || key;
+
+        const tr = document.createElement('tr');
+        tr.setAttribute('data-dynamic-investment-param', 'true');
+        tr.setAttribute('data-economy-wrapper-row', 'true');
+        if (hasMV) tr.setAttribute('data-economy-country', code);
+
+        const tdLabel = document.createElement('td');
+        tdLabel.textContent = labelText;
+        if (t.baseRef) {
+          const group = this._economyLinkGroups[t.baseRef] || [];
+          const others = group.filter(entry => entry.key !== key);
+          const otherList = others.map(entry => {
+            return entry.countryCode.toUpperCase() + ' ' + entry.label;
+          }).join(', ');
+          tdLabel.title = 'Linked key: ' + t.baseRef + '. Also updates: ' + (otherList || 'none');
+        }
+        tr.appendChild(tdLabel);
+
+        const tdGrowth = document.createElement('td');
+        const grWrap = document.createElement('div');
+        grWrap.className = 'percentage-container';
+        const gr = this._takeOrCreateInput(key + 'GrowthRate', 'percentage');
+        gr.type = 'text';
+        gr.setAttribute('inputmode', 'numeric');
+        gr.setAttribute('pattern', '[0-9]*');
+        gr.setAttribute('step', '1');
+        grWrap.appendChild(gr);
+        tdGrowth.appendChild(grWrap);
+        tr.appendChild(tdGrowth);
+
+        const tdVol = document.createElement('td');
+        const sdWrap = document.createElement('div');
+        sdWrap.className = 'percentage-container';
+        const sd = this._takeOrCreateInput(key + 'GrowthStdDev', 'percentage');
+        sd.type = 'text';
+        sd.setAttribute('inputmode', 'numeric');
+        sd.setAttribute('pattern', '[0-9]*');
+        sd.setAttribute('step', '1');
+        sdWrap.appendChild(sd);
+        tdVol.appendChild(sdWrap);
+        tr.appendChild(tdVol);
+
+        if (t.baseRef) {
+          this._attachEconomyLinkedListener(gr, t, 'GrowthRate');
+          this._attachEconomyLinkedListener(sd, t, 'GrowthStdDev');
+        }
+
+        if (inflationRow && inflationRow.parentNode === tbody) {
+          tbody.insertBefore(tr, inflationRow);
+        } else {
+          tbody.appendChild(tr);
+        }
+      }
+    }
+  }
+
+  _buildEconomyLinkGroups(countries) {
+    const cfg = Config.getInstance();
+    const groups = {};
+    for (let i = 0; i < countries.length; i++) {
+      const code = countries[i];
+      const rs = cfg.getCachedTaxRuleSet(code);
+      const types = rs.getResolvedInvestmentTypes() || [];
+      for (let j = 0; j < types.length; j++) {
+        const t = types[j] || {};
+        if (!t.baseRef) continue;
+        if (!groups[t.baseRef]) groups[t.baseRef] = [];
+        groups[t.baseRef].push({
+          countryCode: code,
+          label: t.label || t.key,
+          key: t.key
+        });
+      }
+    }
+    return groups;
+  }
+
+  _showEconomyCountry(code) {
+    const selected = (code || '').toString().trim().toLowerCase();
+    const rows = document.querySelectorAll('#growthRates tr[data-economy-country]');
+    rows.forEach(row => {
+      const c = (row.getAttribute('data-economy-country') || '').toLowerCase();
+      row.style.display = (c === selected) ? '' : 'none';
+    });
+  }
+
+  _attachEconomyLinkedListener(inputEl, wrapperType, fieldSuffix) {
+    if (!inputEl) return;
+    const flag = 'data-economy-link-listener-' + fieldSuffix;
+    if (inputEl.getAttribute(flag) === 'true') return;
+    inputEl.setAttribute(flag, 'true');
+    inputEl.addEventListener('input', () => {
+      if (!this.linkIdenticalWrappersEnabled) return;
+      if (!wrapperType || !wrapperType.baseRef) return;
+      if (this._isEconomyPropagating) return;
+      const groups = this._economyLinkGroups || {};
+      const group = groups[wrapperType.baseRef];
+      if (!group || group.length < 2) return;
+      this._isEconomyPropagating = true;
+      let updated = 0;
+      for (let i = 0; i < group.length; i++) {
+        const entry = group[i];
+        if (entry.key === wrapperType.key) continue;
+        const target = document.getElementById(entry.key + fieldSuffix);
+        if (!target) continue;
+        target.value = inputEl.value;
+        updated++;
+      }
+      this._isEconomyPropagating = false;
+      if (updated > 0) {
+        this.showToast('Updated ' + updated + ' linked rows', 'Linked update', 4);
+      }
     });
   }
 
@@ -2341,6 +2510,45 @@ class WebUI extends AbstractUI {
 
       monteCarlo.addEventListener('click', () => {
         this.switchEconomyMode('montecarlo');
+      });
+    }
+  }
+
+  setupEconomyLinkingToggle() {
+    const header = document.querySelector('#growthRates .card-header-flex');
+    if (!header) return;
+
+    let container = header.querySelector('.economy-link-toggle');
+    if (!container) {
+      container = document.createElement('label');
+      container.className = 'economy-link-toggle';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.id = 'linkIdenticalWrappersToggle';
+      const text = document.createElement('span');
+      text.textContent = 'Link identical wrappers across countries';
+      container.appendChild(input);
+      container.appendChild(text);
+      header.appendChild(container);
+    }
+
+    const inputEl = container.querySelector('input');
+    let stored = null;
+    if (typeof localStorage !== 'undefined') {
+      stored = localStorage.getItem('linkIdenticalWrappersAcrossCountries');
+    }
+    if (stored === 'true' || stored === 'false') {
+      this.linkIdenticalWrappersEnabled = stored === 'true';
+    } else {
+      this.linkIdenticalWrappersEnabled = true;
+    }
+    if (inputEl) {
+      inputEl.checked = !!this.linkIdenticalWrappersEnabled;
+      inputEl.addEventListener('change', () => {
+        this.linkIdenticalWrappersEnabled = !!inputEl.checked;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('linkIdenticalWrappersAcrossCountries', this.linkIdenticalWrappersEnabled ? 'true' : 'false');
+        }
       });
     }
   }
