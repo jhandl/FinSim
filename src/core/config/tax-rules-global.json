@@ -3,14 +3,14 @@
   "investmentBaseTypes": [
     {
       "baseKey": "globalEquity",
-      "label": "Global Equity Index",
+      "label": "Global Equity",
       "baseCurrency": "USD",
       "assetCountry": "us",
       "residenceScope": "global"
     },
     {
       "baseKey": "globalBonds",
-      "label": "Global Bond Index",
+      "label": "Global Bonds",
       "baseCurrency": "USD",
       "assetCountry": "us",
       "residenceScope": "global"

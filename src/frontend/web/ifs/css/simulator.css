@@ -1487,6 +1487,91 @@ th {
   max-width: 75px;
 }
 
+/* ------------------------------------------------------------------
+   Allocations (compact, label + holds + % aligned on one row)
+   Scoped to data-allocations-row="true" to avoid impacting other cards.
+-------------------------------------------------------------------*/
+#Allocations .input-wrapper[data-allocations-row="true"] {
+  gap: 0.45rem;
+  flex-wrap: nowrap;
+}
+
+#Allocations .input-wrapper[data-allocations-row="true"] > label {
+  /* Allow long labels to wrap; keep controls on the same line */
+  white-space: normal;
+  line-height: 1.1rem;
+  /* Keep default label font size unless wrapping is triggered */
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Override dynamic-label ellipsis for allocations: we prefer wrap (when needed) */
+  overflow: visible;
+  text-overflow: clip;
+}
+
+#Allocations .input-wrapper[data-allocations-row="true"] > label .alloc-label-text {
+  min-width: 0;
+  /* Prefer staying on one line; JS flips to wrap only when needed */
+  white-space: nowrap;
+  display: block;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+#Allocations .input-wrapper[data-allocations-row="true"] > label .alloc-label-text.alloc-wrap {
+  white-space: normal;
+  /* Slight reduction only (must still wrap when triggered) */
+  font-size: 0.82rem;
+  line-height: 1.0rem;
+  /* Show up to 2 lines; JS inserts a hard break to guarantee wrapping */
+  display: block;
+  max-height: 2.0rem;
+  overflow: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Smaller % box in allocations */
+#Allocations .input-wrapper[data-allocations-row="true"] .percentage-container {
+  width: 60px;
+  flex: 0 0 60px;
+}
+
+#Allocations .input-wrapper[data-allocations-row="true"] input.percentage {
+  font-size: 0.8rem;
+  padding-top: 0.15rem !important;
+  padding-bottom: 0.15rem !important;
+}
+
+#Allocations .input-wrapper[data-allocations-row="true"] .alloc-holds-control {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+}
+
+#Allocations .percentage-container::after {
+  right: 0.2rem;
+  font-size: 0.72rem;
+}
+
+/* Narrower pseudo-selects inside allocations (pension capped + holds) */
+#Allocations [id^="PensionCappedToggle_"].pseudo-select {
+  min-width: 60px;
+  max-width: 60px;
+  font-size: 0.75rem !important;
+  padding: 0.15rem 1.0rem 0.15rem 6px;
+  line-height: 1.05rem;
+  flex-shrink: 0;
+}
+
+#Allocations .alloc-holds-toggle.pseudo-select {
+  width: auto !important;
+  min-width: 72px;
+  max-width: 132px;
+  font-size: 0.75rem !important;
+  padding: 0.15rem 1.0rem 0.15rem 6px;
+  line-height: 1.05rem;
+  flex-shrink: 0;
+}
+
 /* Specific width for Match column */
 #Events td:nth-child(7) .percentage-container {
   width: 52px;

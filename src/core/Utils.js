@@ -342,6 +342,28 @@ function serializeSimulation(ui) {
   var startCountry = config.getStartCountry();
   var startRuleset = config.getCachedTaxRuleSet(startCountry);
   var investmentTypes = startRuleset.getResolvedInvestmentTypes() || [];
+  // Collect events early so we can infer scenario countries for economy fields.
+  var events = ui.getTableData('Events', 6, true);
+  var scenarioCountries = [];
+  var scenarioCountrySet = {};
+  var scLower = (startCountry || config.getDefaultCountry() || '').toString().trim().toLowerCase();
+  if (scLower) {
+    scenarioCountrySet[scLower] = true;
+    scenarioCountries.push(scLower);
+  }
+  for (var ei = 0; ei < events.length; ei++) {
+    var evt = events[ei];
+    var rawType = evt && evt[0] ? String(evt[0]) : '';
+    var type = rawType;
+    if (rawType.indexOf(':') >= 0) type = rawType.split(':')[0];
+    if (type && /^MV-[A-Z]{2,}$/.test(type)) {
+      var cc = type.substring(3).toLowerCase();
+      if (!scenarioCountrySet[cc]) {
+        scenarioCountrySet[cc] = true;
+        scenarioCountries.push(cc);
+      }
+    }
+  }
 
   // Collect all parameters
   const parameters = {
@@ -374,7 +396,10 @@ function serializeSimulation(ui) {
     // Simulation Mode
     simulation_mode: ui.getValue('simulation_mode'),
     // Economy Mode
-    economy_mode: ui.getValue('economy_mode')
+    economy_mode: ui.getValue('economy_mode'),
+    // Feature toggles
+    investmentStrategiesEnabled: ui.getValue('investmentStrategiesEnabled'),
+    perCountryInvestmentsEnabled: ui.getValue('perCountryInvestmentsEnabled')
   };
 
   // Dynamic investment parameters from StartCountry ruleset (generic fields only)
@@ -384,6 +409,141 @@ function serializeSimulation(ui) {
     parameters['InitialCapital_' + key] = ui.getValue('InitialCapital_' + key);
     parameters[key + 'GrowthRate'] = ui.getValue(key + 'GrowthRate');
     parameters[key + 'GrowthStdDev'] = ui.getValue(key + 'GrowthStdDev');
+  }
+
+  // Global + local economy inputs (dynamic rows rendered in the growth rates panel).
+  var getRawInputValue = function(id) {
+    try {
+      if (typeof document !== 'undefined') {
+        var el = document.getElementById(id);
+        if (el && el.value !== undefined) return String(el.value);
+      }
+    } catch (_) { }
+    return null;
+  };
+  var isMissingRaw = function(raw) {
+    return (raw === null || raw === undefined || String(raw).trim() === '');
+  };
+
+  var economyFeatureActive = false;
+  if (scenarioCountries.length > 1) economyFeatureActive = true;
+  if (ui.getValue('perCountryInvestmentsEnabled') === 'on' || ui.getValue('perCountryInvestmentsEnabled') === true) {
+    economyFeatureActive = true;
+  }
+
+  var globalBaseTypes = config.getInvestmentBaseTypes();
+  var globalEntries = [];
+  var anyGlobalValuePresent = false;
+  for (var gb = 0; gb < globalBaseTypes.length; gb++) {
+    var gt = globalBaseTypes[gb] || {};
+    var baseKey = gt.baseKey;
+    if (!baseKey) continue;
+    var gGrowthId = 'GlobalAssetGrowth_' + baseKey;
+    var gVolId = 'GlobalAssetVolatility_' + baseKey;
+    var gGrowthRaw = getRawInputValue(gGrowthId);
+    var gVolRaw = getRawInputValue(gVolId);
+    if (!isMissingRaw(gGrowthRaw) || !isMissingRaw(gVolRaw)) anyGlobalValuePresent = true;
+    globalEntries.push({ baseKey: baseKey, gGrowthId: gGrowthId, gVolId: gVolId, gGrowthRaw: gGrowthRaw, gVolRaw: gVolRaw });
+  }
+
+  var globalEconomyInUse = economyFeatureActive || anyGlobalValuePresent;
+  for (var gi = 0; gi < globalEntries.length; gi++) {
+    var entry = globalEntries[gi];
+    var shouldWriteGlobal = globalEconomyInUse || !isMissingRaw(entry.gGrowthRaw) || !isMissingRaw(entry.gVolRaw);
+    if (!shouldWriteGlobal) continue;
+
+    try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(entry.gGrowthId, 'percentage'); } catch (_) { }
+    try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(entry.gVolId, 'percentage'); } catch (_) { }
+
+    var gGrowthVal = ui.getValue(entry.gGrowthId);
+    parameters[entry.gGrowthId] = gGrowthVal;
+
+    var gVolVal = ui.getValue(entry.gVolId);
+    parameters[entry.gVolId] = gVolVal;
+  }
+
+  for (var sci = 0; sci < scenarioCountries.length; sci++) {
+    var cc2 = scenarioCountries[sci];
+    var pensionGrowthId = 'PensionGrowth_' + cc2;
+    var pensionVolId = 'PensionVolatility_' + cc2;
+    var inflationId = 'Inflation_' + cc2;
+    var hadPgInput = false;
+    var hadPvInput = false;
+    var hadInfInput = false;
+    try {
+      if (typeof document !== 'undefined') {
+        hadPgInput = !!document.getElementById(pensionGrowthId);
+        hadPvInput = !!document.getElementById(pensionVolId);
+        hadInfInput = !!document.getElementById(inflationId);
+      }
+    } catch (_) { }
+    try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(pensionGrowthId, 'percentage'); } catch (_) { }
+    try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(pensionVolId, 'percentage'); } catch (_) { }
+    try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(inflationId, 'percentage'); } catch (_) { }
+
+    var pgRaw = getRawInputValue(pensionGrowthId);
+    var pgVal = ui.getValue(pensionGrowthId);
+    var shouldWritePensionGrowth = economyFeatureActive || hadPgInput || !isMissingRaw(pgRaw);
+    if (shouldWritePensionGrowth) {
+      if (isMissingRaw(pgRaw)) pgVal = '';
+      parameters[pensionGrowthId] = pgVal;
+    }
+
+    var pvRaw = getRawInputValue(pensionVolId);
+    var pvVal = ui.getValue(pensionVolId);
+    var shouldWritePensionVol = economyFeatureActive || hadPvInput || !isMissingRaw(pvRaw);
+    if (shouldWritePensionVol) {
+      if (isMissingRaw(pvRaw)) pvVal = '';
+      parameters[pensionVolId] = pvVal;
+    }
+
+    var infRaw = getRawInputValue(inflationId);
+    var infVal = ui.getValue(inflationId);
+    var shouldWriteInflation = economyFeatureActive || hadInfInput || !isMissingRaw(infRaw);
+    if (shouldWriteInflation) {
+      if (isMissingRaw(infRaw)) infVal = '';
+      parameters[inflationId] = infVal;
+    }
+
+    var rs = config.getCachedTaxRuleSet(cc2);
+    var invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
+    for (var li = 0; li < invTypes.length; li++) {
+      var t = invTypes[li] || {};
+      var key = t.key;
+      if (!key) continue;
+      var scope = (t.residenceScope || '').toString().trim().toLowerCase();
+      if (scope !== 'local') continue;
+      var suffix = '_' + cc2;
+      var baseKey2 = (String(key).toLowerCase().endsWith(suffix)) ? String(key).slice(0, String(key).length - suffix.length) : String(key);
+      var localGrowthId = 'LocalAssetGrowth_' + cc2 + '_' + baseKey2;
+      var localVolId = 'LocalAssetVolatility_' + cc2 + '_' + baseKey2;
+      try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(localGrowthId, 'percentage'); } catch (_) { }
+      try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(localVolId, 'percentage'); } catch (_) { }
+
+      var lgRaw = getRawInputValue(localGrowthId);
+      var lgVal = ui.getValue(localGrowthId);
+      var shouldWriteLocalGrowth = economyFeatureActive || !isMissingRaw(lgRaw);
+      if (shouldWriteLocalGrowth) {
+        if (isMissingRaw(lgRaw) && economyFeatureActive) {
+          var legacyGrowthId = key + 'GrowthRate';
+          var legacyGrowthRaw = getRawInputValue(legacyGrowthId);
+          if (!isMissingRaw(legacyGrowthRaw)) lgVal = ui.getValue(legacyGrowthId);
+        }
+        parameters[localGrowthId] = lgVal;
+      }
+
+      var lvRaw = getRawInputValue(localVolId);
+      var lvVal = ui.getValue(localVolId);
+      var shouldWriteLocalVol = economyFeatureActive || !isMissingRaw(lvRaw);
+      if (shouldWriteLocalVol) {
+        if (isMissingRaw(lvRaw) && economyFeatureActive) {
+          var legacyVolId = key + 'GrowthStdDev';
+          var legacyVolRaw = getRawInputValue(legacyVolId);
+          if (!isMissingRaw(legacyVolRaw)) lvVal = ui.getValue(legacyVolId);
+        }
+        parameters[localVolId] = lvVal;
+      }
+    }
   }
 
   // Allocations + per-country state pension: serialize ONLY via generic keys.
@@ -403,9 +563,19 @@ function serializeSimulation(ui) {
     var genericId = 'InvestmentAllocation_' + key;
     try {
       if (typeof document !== 'undefined' && document.getElementById(perId)) {
-        parameters[genericId] = ui.getValue(perId);
+        var perRaw = getRawInputValue(perId);
+        if (perRaw !== null && String(perRaw).trim() === '') {
+          parameters[genericId] = '';
+        } else {
+          parameters[genericId] = ui.getValue(perId);
+        }
       } else if (typeof document !== 'undefined' && document.getElementById(genericId)) {
-        parameters[genericId] = ui.getValue(genericId);
+        var genRaw = getRawInputValue(genericId);
+        if (genRaw !== null && String(genRaw).trim() === '') {
+          parameters[genericId] = '';
+        } else {
+          parameters[genericId] = ui.getValue(genericId);
+        }
       }
     } catch (_) { }
   }
@@ -425,7 +595,12 @@ function serializeSimulation(ui) {
         var cc = String(m[1]).toLowerCase();
         var baseKey = String(m[2]);
         var typeKey = baseKey + '_' + cc;
-        parameters['InvestmentAllocation_' + typeKey] = ui.getValue(id);
+        var rawAlloc = (el.value !== undefined) ? String(el.value) : '';
+        if (rawAlloc.trim() === '') {
+          parameters['InvestmentAllocation_' + typeKey] = '';
+        } else {
+          parameters['InvestmentAllocation_' + typeKey] = ui.getValue(id);
+        }
       }
     } catch (_) { }
 
@@ -518,15 +693,56 @@ function serializeSimulation(ui) {
     } catch (_) { }
   }
 
+  if (typeof document !== 'undefined') {
+    var globalAllocInputs = Array.prototype.slice.call(document.querySelectorAll('[id^="GlobalAllocation_"]'));
+    for (var gai = 0; gai < globalAllocInputs.length; gai++) {
+      var el = globalAllocInputs[gai];
+      if (!el || !el.id) continue;
+      var m = String(el.id).match(/^GlobalAllocation_(.+)$/);
+      if (!m) continue;
+      parameters[el.id] = ui.getValue(el.id);
+    }
+
+    var mixInputs = Array.prototype.slice.call(document.querySelectorAll('[id^="MixConfig_"]'));
+    for (var mi = 0; mi < mixInputs.length; mi++) {
+      var el = mixInputs[mi];
+      if (!el || !el.id) continue;
+      if (!/^MixConfig_([a-z]{2,})_(.+)_(type|asset1|asset2|startAge|targetAge|targetAgeOverridden|startAsset1Pct|startAsset2Pct|endAsset1Pct|endAsset2Pct)$/i.test(el.id)) continue;
+      parameters[el.id] = ui.getValue(el.id);
+    }
+
+    var globalMixInputs = Array.prototype.slice.call(document.querySelectorAll('[id^="GlobalMixConfig_"]'));
+    for (var gmi = 0; gmi < globalMixInputs.length; gmi++) {
+      var el = globalMixInputs[gmi];
+      if (!el || !el.id) continue;
+      if (!/^GlobalMixConfig_(.+)_(type|asset1|asset2|startAge|targetAge|targetAgeOverridden|startAsset1Pct|startAsset2Pct|endAsset1Pct|endAsset2Pct)$/i.test(el.id)) continue;
+      parameters[el.id] = ui.getValue(el.id);
+    }
+  }
+
   // Conditionally add StartCountry if relocation is enabled
   if (config.isRelocationEnabled()) {
     parameters.StartCountry = ui.getValue('StartCountry');
   }
 
+  // Preserve empty input values as empty strings in CSV output.
+  if (typeof document !== 'undefined') {
+    for (const key in parameters) {
+      if (!Object.prototype.hasOwnProperty.call(parameters, key)) continue;
+      if (key.indexOf('InvestmentAllocation_') === 0) continue;
+      if (key.indexOf('LocalAssetGrowth_') === 0) continue;
+      if (key.indexOf('LocalAssetVolatility_') === 0) continue;
+      const raw = getRawInputValue(key);
+      if (raw !== null && String(raw).trim() === '') {
+        parameters[key] = '';
+      }
+    }
+  }
+
   // Format special values (percentages and booleans)
   for (const [key, value] of Object.entries(parameters)) {
     // Skip formatting if value is undefined or null
-    if (value === undefined || value === null) {
+    if (value === undefined || value === null || value === '') {
       continue;
     }
     if (ui.isPercentage(key)) {
@@ -537,7 +753,7 @@ function serializeSimulation(ui) {
   }
 
   // Get events data, including hidden event types (like SI2 in single mode)
-  const events = ui.getTableData('Events', 6, true);
+  // (already collected above for economy parameter defaults)
 
   // Collect Meta per-row from DOM when running in web UI (GAS-safe guard)
   var metaByRow = [];
@@ -682,6 +898,9 @@ function deserializeSimulation(content, ui) {
   var sawLegacyPensionContributionPercentage = false;
   var sawLegacyPensionContributionPercentageP2 = false;
   var sawLegacyPensionContributionCapped = false;
+  var sawPerCountryPensionGrowth = {};
+  var sawPerCountryPensionVolatility = {};
+  var sawPerCountryInflation = {};
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -695,7 +914,7 @@ function deserializeSimulation(content, ui) {
       // Split only on the first comma so values like "1,234" don't get truncated.
       const commaIndex = line.indexOf(',');
       const key = (commaIndex >= 0) ? line.substring(0, commaIndex) : line;
-      const value = (commaIndex >= 0) ? line.substring(commaIndex + 1) : '';
+      let value = (commaIndex >= 0) ? line.substring(commaIndex + 1) : '';
 
       // Map legacy CSV field names to current dynamic element IDs
       const legacyFieldMap = {
@@ -720,6 +939,15 @@ function deserializeSimulation(content, ui) {
       };
 
       const actualKey = legacyFieldMap[key] || key;
+      if (/^PensionGrowth_[a-z]{2,}$/i.test(actualKey)) {
+        sawPerCountryPensionGrowth[String(actualKey.substring('PensionGrowth_'.length)).toLowerCase()] = true;
+      }
+      if (/^PensionVolatility_[a-z]{2,}$/i.test(actualKey)) {
+        sawPerCountryPensionVolatility[String(actualKey.substring('PensionVolatility_'.length)).toLowerCase()] = true;
+      }
+      if (/^Inflation_[a-z]{2,}$/i.test(actualKey)) {
+        sawPerCountryInflation[String(actualKey.substring('Inflation_'.length)).toLowerCase()] = true;
+      }
 
       // Track legacy scalar values for later per-country migration.
       if (actualKey === 'StatePensionWeekly') { legacyStatePensionWeekly = value; sawLegacyStatePensionWeekly = true; }
@@ -736,6 +964,38 @@ function deserializeSimulation(content, ui) {
           // Also allow chip-driven per-country ids to exist in files (future-proof).
           if (/^InvestmentAllocation_/.test(actualKey)) {
             ui.ensureParameterInput(actualKey, 'percentage');
+          } else if (/^GlobalAllocation_.+/.test(actualKey)) {
+            ui.ensureParameterInput(actualKey, 'percentage');
+          } else if (/^GlobalAssetGrowth_.+/.test(actualKey)) {
+            ui.ensureParameterInput(actualKey, 'percentage');
+          } else if (/^GlobalAssetVolatility_.+/.test(actualKey)) {
+            ui.ensureParameterInput(actualKey, 'percentage');
+          } else if (/^LocalAssetGrowth_[a-z]{2,}_.+/i.test(actualKey)) {
+            ui.ensureParameterInput(actualKey, 'percentage');
+          } else if (/^LocalAssetVolatility_[a-z]{2,}_.+/i.test(actualKey)) {
+            ui.ensureParameterInput(actualKey, 'percentage');
+          } else if (/^PensionGrowth_[a-z]{2,}$/i.test(actualKey)) {
+            ui.ensureParameterInput(actualKey, 'percentage');
+          } else if (/^PensionVolatility_[a-z]{2,}$/i.test(actualKey)) {
+            ui.ensureParameterInput(actualKey, 'percentage');
+          } else if (/^Inflation_[a-z]{2,}$/i.test(actualKey)) {
+            ui.ensureParameterInput(actualKey, 'percentage');
+          } else if (/^MixConfig_([a-z]{2,})_(.+)_(type|asset1|asset2|startAge|targetAge|targetAgeOverridden|startAsset1Pct|startAsset2Pct|endAsset1Pct|endAsset2Pct)$/i.test(actualKey)) {
+            var mixMatch = actualKey.match(/^MixConfig_([a-z]{2,})_(.+)_(type|asset1|asset2|startAge|targetAge|targetAgeOverridden|startAsset1Pct|startAsset2Pct|endAsset1Pct|endAsset2Pct)$/i);
+            var mixField = mixMatch ? String(mixMatch[3]) : '';
+            var mixType = 'string';
+            if (mixField === 'startAge' || mixField === 'targetAge') mixType = 'number';
+            if (mixField === 'targetAgeOverridden') mixType = 'boolean';
+            if (mixField.indexOf('Pct') >= 0) mixType = 'percentage';
+            ui.ensureParameterInput(actualKey, mixType);
+          } else if (/^GlobalMixConfig_(.+)_(type|asset1|asset2|startAge|targetAge|targetAgeOverridden|startAsset1Pct|startAsset2Pct|endAsset1Pct|endAsset2Pct)$/i.test(actualKey)) {
+            var gMixMatch = actualKey.match(/^GlobalMixConfig_(.+)_(type|asset1|asset2|startAge|targetAge|targetAgeOverridden|startAsset1Pct|startAsset2Pct|endAsset1Pct|endAsset2Pct)$/i);
+            var gMixField = gMixMatch ? String(gMixMatch[2]) : '';
+            var gMixType = 'string';
+            if (gMixField === 'startAge' || gMixField === 'targetAge') gMixType = 'number';
+            if (gMixField === 'targetAgeOverridden') gMixType = 'boolean';
+            if (gMixField.indexOf('Pct') >= 0) gMixType = 'percentage';
+            ui.ensureParameterInput(actualKey, gMixType);
           } else if (/^StatePension_[a-z]{2,}$/.test(actualKey)) {
             ui.ensureParameterInput(actualKey, 'currency');
           } else if (/^P2StatePension_[a-z]{2,}$/.test(actualKey)) {
@@ -759,6 +1019,16 @@ function deserializeSimulation(content, ui) {
 
       try {
         ui.setValue(actualKey, value);
+        try {
+          if (typeof document !== 'undefined') {
+            if (/^PensionGrowth_[a-z]{2,}$/i.test(actualKey) ||
+                /^PensionVolatility_[a-z]{2,}$/i.test(actualKey) ||
+                /^Inflation_[a-z]{2,}$/i.test(actualKey)) {
+              var loadedEl = document.getElementById(actualKey);
+              if (loadedEl) loadedEl.setAttribute('data-csv-loaded', '1');
+            }
+          }
+        } catch (_) { }
         if (actualKey === 'P2StartingAge' && value && value.trim() !== '') {
           p2StartingAgeExists = true;
         }
@@ -777,6 +1047,16 @@ function deserializeSimulation(content, ui) {
         // Skip if parameter doesn't exist
       }
     }
+  }
+
+  var investmentStrategiesValue = ui.getValue('investmentStrategiesEnabled');
+  if (investmentStrategiesValue === undefined || investmentStrategiesValue === null || investmentStrategiesValue === '') {
+    ui.setValue('investmentStrategiesEnabled', 'off');
+  }
+
+  var perCountryInvestmentsValue = ui.getValue('perCountryInvestmentsEnabled');
+  if (perCountryInvestmentsValue === undefined || perCountryInvestmentsValue === null || perCountryInvestmentsValue === '') {
+    ui.setValue('perCountryInvestmentsEnabled', 'off');
   }
 
   // Map generic per-country keys into chip-driven UI fields (web UI only).
@@ -838,12 +1118,37 @@ function deserializeSimulation(content, ui) {
           if (!countrySet[cc]) continue;
           const perId = 'InvestmentAllocation_' + cc + '_' + baseKey;
           ui.ensureParameterInput(perId, 'percentage');
-          try { ui.setValue(perId, ui.getValue(id)); } catch (_) { }
+          try {
+            var rawAlloc = null;
+            try {
+              if (typeof document !== 'undefined') {
+                var elAlloc = document.getElementById(id);
+                if (elAlloc && elAlloc.value !== undefined) rawAlloc = String(elAlloc.value);
+              }
+            } catch (_) { rawAlloc = null; }
+            if (rawAlloc !== null && rawAlloc.trim() === '') {
+              ui.setValue(perId, '');
+            } else {
+              ui.setValue(perId, ui.getValue(id));
+            }
+          } catch (_) { }
         }
       } catch (_) { }
 
       // 3) Legacy personal tax credit -> per-country tax credit input
-      const legacyCredit = (ui && typeof ui.getValue === 'function') ? ui.getValue('PersonalTaxCredit') : null;
+      let legacyCredit = null;
+      let legacyCreditRaw = null;
+      try {
+        if (typeof document !== 'undefined') {
+          const el = document.getElementById('PersonalTaxCredit');
+          if (el && el.value !== undefined) legacyCreditRaw = String(el.value);
+        }
+      } catch (_) { }
+      if (legacyCreditRaw !== null) {
+        if (String(legacyCreditRaw).trim() !== '') legacyCredit = legacyCreditRaw;
+      } else if (ui && typeof ui.getValue === 'function') {
+        legacyCredit = ui.getValue('PersonalTaxCredit');
+      }
       if (legacyCredit !== undefined && legacyCredit !== null && legacyCredit !== '') {
         const startRaw = (ui && typeof ui.getValue === 'function') ? ui.getValue('StartCountry') : null;
         const startCountry = String(startRaw || cfg.getStartCountry() || '').trim().toLowerCase();
@@ -1010,7 +1315,20 @@ function deserializeSimulation(content, ui) {
         if (!countrySet[cc]) continue;
         const perId = 'InvestmentAllocation_' + cc + '_' + baseKey;
         ui.ensureParameterInput(perId, 'percentage');
-        try { ui.setValue(perId, ui.getValue(id)); } catch (_) { }
+        try {
+          var rawAlloc = null;
+          try {
+            if (typeof document !== 'undefined') {
+              var elAlloc = document.getElementById(id);
+              if (elAlloc && elAlloc.value !== undefined) rawAlloc = String(elAlloc.value);
+            }
+          } catch (_) { rawAlloc = null; }
+          if (rawAlloc !== null && rawAlloc.trim() === '') {
+            ui.setValue(perId, '');
+          } else {
+            ui.setValue(perId, ui.getValue(id));
+          }
+        } catch (_) { }
       }
     }
   } catch (_) { }
@@ -1160,6 +1478,97 @@ function deserializeSimulation(content, ui) {
       eventData.push(parts);
     }
   }
+
+  // Default new economy fields from legacy values when missing (globals/locals/pension/inflation).
+  try {
+    var cfg2 = Config.getInstance();
+    var rawStart = startCountryForNormalization;
+    if (!rawStart && ui && typeof ui.getValue === 'function') {
+      rawStart = ui.getValue('StartCountry');
+    }
+    if (!rawStart) rawStart = cfg2.getStartCountry();
+    var sc2 = (rawStart || '').toString().trim().toLowerCase();
+    var scenarioCountries = [];
+    var scenarioSet = {};
+    if (sc2) {
+      scenarioSet[sc2] = true;
+      scenarioCountries.push(sc2);
+    }
+    for (var ei2 = 0; ei2 < eventData.length; ei2++) {
+      var row = eventData[ei2];
+      var t = row && row[0] ? String(row[0]) : '';
+      if (t && /^MV-[A-Z]{2,}$/.test(t)) {
+        var cc2 = t.substring(3).toLowerCase();
+        if (!scenarioSet[cc2]) {
+          scenarioSet[cc2] = true;
+          scenarioCountries.push(cc2);
+        }
+      }
+    }
+
+    var getRawInputValue = function(id) {
+      try {
+        if (typeof document !== 'undefined') {
+          var el = document.getElementById(id);
+          if (el && el.value !== undefined) return String(el.value);
+        }
+      } catch (_) { }
+      return null;
+    };
+    var isMissingRaw = function(raw) {
+      return (raw === null || raw === undefined || String(raw).trim() === '');
+    };
+
+    var legacyPensionGrowth = ui.getValue('PensionGrowthRate');
+    var legacyPensionVol = ui.getValue('PensionGrowthStdDev');
+    var legacyInflation = ui.getValue('Inflation');
+
+    for (var sci = 0; sci < scenarioCountries.length; sci++) {
+      var cc = scenarioCountries[sci];
+      var isStartCountry = (cc === sc2);
+      var pensionGrowthId = 'PensionGrowth_' + cc;
+      var pensionVolId = 'PensionVolatility_' + cc;
+      var inflationId = 'Inflation_' + cc;
+      try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(pensionGrowthId, 'percentage'); } catch (_) { }
+      try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(pensionVolId, 'percentage'); } catch (_) { }
+      try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(inflationId, 'percentage'); } catch (_) { }
+
+      if (isStartCountry && !sawPerCountryPensionGrowth[cc] && isMissingRaw(getRawInputValue(pensionGrowthId))) {
+        ui.setValue(pensionGrowthId, legacyPensionGrowth);
+      }
+      if (isStartCountry && !sawPerCountryPensionVolatility[cc] && isMissingRaw(getRawInputValue(pensionVolId))) {
+        ui.setValue(pensionVolId, legacyPensionVol);
+      }
+      if (isStartCountry && !sawPerCountryInflation[cc] && isMissingRaw(getRawInputValue(inflationId))) {
+        ui.setValue(inflationId, legacyInflation);
+      }
+
+      var rs = cfg2.getCachedTaxRuleSet(cc);
+      var invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
+      for (var li = 0; li < invTypes.length; li++) {
+        var it = invTypes[li] || {};
+        var key = it.key;
+        if (!key) continue;
+        var scope = (it.residenceScope || '').toString().trim().toLowerCase();
+        if (scope !== 'local') continue;
+        var suffix = '_' + cc;
+        var baseKey2 = (String(key).toLowerCase().endsWith(suffix)) ? String(key).slice(0, String(key).length - suffix.length) : String(key);
+        var localGrowthId = 'LocalAssetGrowth_' + cc + '_' + baseKey2;
+        var localVolId = 'LocalAssetVolatility_' + cc + '_' + baseKey2;
+        try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(localGrowthId, 'percentage'); } catch (_) { }
+        try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(localVolId, 'percentage'); } catch (_) { }
+
+        if (isMissingRaw(getRawInputValue(localGrowthId))) {
+          var legacyGrowthId = key + 'GrowthRate';
+          if (!isMissingRaw(getRawInputValue(legacyGrowthId))) ui.setValue(localGrowthId, ui.getValue(legacyGrowthId));
+        }
+        if (isMissingRaw(getRawInputValue(localVolId))) {
+          var legacyVolId = key + 'GrowthStdDev';
+          if (!isMissingRaw(getRawInputValue(legacyVolId))) ui.setValue(localVolId, ui.getValue(legacyVolId));
+        }
+      }
+    }
+  } catch (_) { }
 
   return eventData;
 }

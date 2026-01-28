@@ -264,7 +264,7 @@ If there is no UI test for the feature you are changing, ask the user to test ma
 
 ### 5.1. Debugging Protocol (when fixing a bug)
 
-Use this strict sequence to avoid “fixing the wrong thing”:
+Use this strict sequence to avoid “fixing the wrong thing” unless the user explicitly tells you to fix the issue directly (remember he's the boss, not you):
 
 1.  Read and understand the relevant code path(s).
 2.  Formulate 5–7 root-cause hypotheses.

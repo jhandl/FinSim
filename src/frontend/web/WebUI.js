@@ -10,6 +10,8 @@ class WebUI extends AbstractUI {
     this.currentSimMode = 'single'; // Default to single person mode
     this.currentEconomyMode = 'deterministic'; // Default to deterministic mode
     this.preservedVolatilityValues = {}; // Store volatility values when switching modes
+    this.investmentStrategiesEnabled = false;
+    this.perCountryInvestmentsEnabled = false;
 
     this.p1Labels = {
       'StartingAge': { neutral: 'Current Age', your: 'Your Current Age' },
@@ -344,6 +346,12 @@ class WebUI extends AbstractUI {
     if (elementId === 'economy_mode') {
       return this.currentEconomyMode;
     }
+    if (elementId === 'investmentStrategiesEnabled') {
+      return this.investmentStrategiesEnabled;
+    }
+    if (elementId === 'perCountryInvestmentsEnabled') {
+      return this.perCountryInvestmentsEnabled;
+    }
     return DOMUtils.getValue(elementId);
   }
 
@@ -360,6 +368,14 @@ class WebUI extends AbstractUI {
     if (elementId === 'economy_mode') {
       if (this.currentEconomyMode === value) return; // No change, do nothing
       this.switchEconomyMode(value);
+      return;
+    }
+    if (elementId === 'investmentStrategiesEnabled') {
+      this.investmentStrategiesEnabled = (value === 'on' || value === true || value === 'true');
+      return;
+    }
+    if (elementId === 'perCountryInvestmentsEnabled') {
+      this.perCountryInvestmentsEnabled = (value === 'on' || value === true || value === 'true');
       return;
     }
     DOMUtils.setValue(elementId, value);
@@ -394,6 +410,7 @@ class WebUI extends AbstractUI {
       RelocationUtils.extractRelocationTransitions(this, this.tableManager);
       this.tableManager.setupTableCurrencyControls();
     }
+    this.syncToggleStates();
   }
 
   async loadFromUrl(url, name) {
@@ -417,6 +434,39 @@ class WebUI extends AbstractUI {
       RelocationUtils.extractRelocationTransitions(this, this.tableManager);
       this.tableManager.setupTableCurrencyControls();
     }
+    this.syncToggleStates();
+  }
+
+  syncToggleStates() {
+    const strategiesState = this.investmentStrategiesEnabled ? 'on' : 'off';
+    localStorage.setItem('investmentStrategiesEnabled', strategiesState);
+    const strategiesButton = document.getElementById('investmentStrategiesToggleMobile');
+    if (strategiesButton) {
+      strategiesButton.setAttribute('data-toggle-state', strategiesState);
+      const toggleSwitch = strategiesButton.querySelector('.toggle-switch');
+      if (toggleSwitch) {
+        if (strategiesState === 'on') toggleSwitch.classList.add('active');
+        else toggleSwitch.classList.remove('active');
+      }
+    }
+    window.dispatchEvent(new CustomEvent('investmentStrategiesToggle', {
+      detail: { state: strategiesState, enabled: strategiesState === 'on' }
+    }));
+
+    const perCountryState = this.perCountryInvestmentsEnabled ? 'on' : 'off';
+    localStorage.setItem('perCountryInvestmentsEnabled', perCountryState);
+    const perCountryButton = document.getElementById('perCountryInvestmentsToggleMobile');
+    if (perCountryButton) {
+      perCountryButton.setAttribute('data-toggle-state', perCountryState);
+      const toggleSwitch = perCountryButton.querySelector('.toggle-switch');
+      if (toggleSwitch) {
+        if (perCountryState === 'on') toggleSwitch.classList.add('active');
+        else toggleSwitch.classList.remove('active');
+      }
+    }
+    window.dispatchEvent(new CustomEvent('perCountryInvestmentsToggle', {
+      detail: { state: perCountryState, enabled: perCountryState === 'on' }
+    }));
   }
 
   // Lightweight proxy to read events without creating a new UIManager instance
@@ -609,6 +659,7 @@ class WebUI extends AbstractUI {
 
   renderInvestmentParameterFields(investmentTypes) {
     const types = Array.isArray(investmentTypes) ? investmentTypes : [];
+    this._lastInvestmentTypesForGrowthRates = types;
 
     // Capture existing growth rate/volatility values before removing dynamic fields.
     // This preserves values when StartCountry changes trigger mid-deserialization.
@@ -618,6 +669,14 @@ class WebUI extends AbstractUI {
       if (input && input.id && input.value) {
         growthRateCache[input.id] = input.value;
       }
+    });
+    // Preserve starting position initial capital values across dynamic re-renders.
+    const startingCapitalCache = {};
+    const existingCapitalInputs = document.querySelectorAll('[data-dynamic-investment-param="true"] input.currency');
+    existingCapitalInputs.forEach(input => {
+      if (!input || !input.id || input.id.indexOf('InitialCapital_') !== 0) return;
+      const raw = (input.value !== undefined && input.value !== null) ? String(input.value) : '';
+      if (raw.trim() !== '') startingCapitalCache[input.id] = raw;
     });
 
     // Remove previously generated dynamic fields
@@ -655,6 +714,29 @@ class WebUI extends AbstractUI {
     hideGrowthRow('indexFundsGrowthRate');
     hideGrowthRow('sharesGrowthRate');
 
+    // Ensure per-type growth inputs exist for serialization/back-compat, but keep them hidden.
+    for (let i = 0; i < types.length; i++) {
+      const t = types[i] || {};
+      const key = t.key;
+      if (!key) continue;
+      const grId = key + 'GrowthRate';
+      const sdId = key + 'GrowthStdDev';
+
+      const gr = this._takeOrCreateInput(grId, 'percentage');
+      gr.type = 'text';
+      gr.setAttribute('inputmode', 'numeric');
+      gr.setAttribute('pattern', '[0-9]*');
+      gr.setAttribute('step', '1');
+      this._stashInputElement(gr);
+
+      const sd = this._takeOrCreateInput(sdId, 'percentage');
+      sd.type = 'text';
+      sd.setAttribute('inputmode', 'numeric');
+      sd.setAttribute('pattern', '[0-9]*');
+      sd.setAttribute('step', '1');
+      this._stashInputElement(sd);
+    }
+
     const startGroup = document.querySelector('#startingPosition .input-group');
     if (startGroup) {
       // Per Phase 7 design: starting position initial capital remains StartCountry-only.
@@ -679,6 +761,10 @@ class WebUI extends AbstractUI {
         input.type = 'text';
         input.setAttribute('inputmode', 'numeric');
         input.setAttribute('pattern', '[0-9]*');
+        const cached = startingCapitalCache[inputId];
+        if (cached !== undefined && cached !== null && String(cached).trim() !== '') {
+          input.value = cached;
+        }
         wrapper.appendChild(input);
 
         startGroup.appendChild(wrapper);
@@ -692,13 +778,22 @@ class WebUI extends AbstractUI {
     const tbody = document.querySelector('#growthRates table.growth-rates-table tbody');
     const inflationInput = document.getElementById('Inflation');
     const inflationRow = inflationInput ? inflationInput.closest('tr') : null;
+    const pensionInput = document.getElementById('PensionGrowthRate');
+    const pensionRow = pensionInput ? pensionInput.closest('tr') : null;
+    const setRowHeadingForInput = (inputId, label) => {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const td = input.closest('td');
+      if (!td) return;
+      const tr = td.parentElement;
+      if (!tr) return;
+      const firstCell = tr.children && tr.children[0];
+      if (firstCell) firstCell.textContent = label;
+    };
     if (tbody) {
-      for (let i = 0; i < types.length; i++) {
-        const t = types[i] || {};
-        const key = t.key;
-        if (!key) continue;
-        const labelText = t.label || key;
-
+      const cfg = Config.getInstance();
+      const baseTypes = cfg.getInvestmentBaseTypes();
+      const makeGrowthRow = (labelText, growthId, volId) => {
         const tr = document.createElement('tr');
         tr.setAttribute('data-dynamic-investment-param', 'true');
 
@@ -709,7 +804,7 @@ class WebUI extends AbstractUI {
         const tdGrowth = document.createElement('td');
         const grWrap = document.createElement('div');
         grWrap.className = 'percentage-container';
-        const gr = this._takeOrCreateInput(key + 'GrowthRate', 'percentage');
+        const gr = this._takeOrCreateInput(growthId, 'percentage');
         gr.type = 'text';
         gr.setAttribute('inputmode', 'numeric');
         gr.setAttribute('pattern', '[0-9]*');
@@ -721,7 +816,7 @@ class WebUI extends AbstractUI {
         const tdVol = document.createElement('td');
         const sdWrap = document.createElement('div');
         sdWrap.className = 'percentage-container';
-        const sd = this._takeOrCreateInput(key + 'GrowthStdDev', 'percentage');
+        const sd = this._takeOrCreateInput(volId, 'percentage');
         sd.type = 'text';
         sd.setAttribute('inputmode', 'numeric');
         sd.setAttribute('pattern', '[0-9]*');
@@ -730,11 +825,200 @@ class WebUI extends AbstractUI {
         tdVol.appendChild(sdWrap);
         tr.appendChild(tdVol);
 
-        if (inflationRow && inflationRow.parentNode === tbody) {
-          tbody.insertBefore(tr, inflationRow);
-        } else {
-          tbody.appendChild(tr);
+        return tr;
+      };
+
+      if (baseTypes && baseTypes.length > 0) {
+        const globalsFrag = document.createDocumentFragment();
+        for (let i = 0; i < baseTypes.length; i++) {
+          const t = baseTypes[i] || {};
+          const baseKey = t.baseKey;
+          if (!baseKey) continue;
+          const labelText = t.label || baseKey;
+          const growthId = 'GlobalAssetGrowth_' + baseKey;
+          const volId = 'GlobalAssetVolatility_' + baseKey;
+          const tr = makeGrowthRow(labelText, growthId, volId);
+          globalsFrag.appendChild(tr);
         }
+        if (globalsFrag.firstChild) {
+          tbody.insertBefore(globalsFrag, tbody.firstChild);
+        }
+      }
+
+      const relocationEnabled = cfg.isRelocationEnabled();
+      const hasMV = relocationEnabled && this.hasRelocationEvents();
+      const showCountryChips = this.perCountryInvestmentsEnabled && hasMV;
+      if (!showCountryChips) {
+        this.growthRatesCountryChipSelector = null;
+        setRowHeadingForInput('PensionGrowthRate', 'Pension');
+        setRowHeadingForInput('Inflation', 'Inflation');
+        if (pensionRow) pensionRow.style.display = '';
+        if (inflationRow) inflationRow.style.display = '';
+        const rows = tbody.querySelectorAll('[data-dynamic-pension-volatility="true"]');
+        rows.forEach(el => {
+          const inputs = el.querySelectorAll('input');
+          for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        });
+      }
+
+      if (showCountryChips) {
+        if (pensionRow) pensionRow.style.display = 'none';
+        if (inflationRow) inflationRow.style.display = 'none';
+        const insertBeforeRow = pensionRow || inflationRow || null;
+
+        const chipsRow = document.createElement('tr');
+        chipsRow.setAttribute('data-dynamic-investment-param', 'true');
+        const chipsCell = document.createElement('td');
+        chipsCell.colSpan = 3;
+        const chipContainer = document.createElement('div');
+        chipContainer.className = 'country-chip-container';
+        chipsCell.appendChild(chipContainer);
+        chipsRow.appendChild(chipsCell);
+
+        if (insertBeforeRow) {
+          tbody.insertBefore(chipsRow, insertBeforeRow);
+        } else {
+          tbody.appendChild(chipsRow);
+        }
+
+        const scenarioCountries = this.getScenarioCountries();
+        const countries = scenarioCountries.map(code => ({ code: code, name: cfg.getCountryNameByCode(code) }));
+        const startCountry = cfg.getStartCountry();
+        const mgrSelected = this.countryTabSyncManager.getSelectedCountry('growthRates');
+        const prevSelected = (this.growthRatesCountryChipSelector && this.growthRatesCountryChipSelector.getSelectedCountry())
+          ? this.growthRatesCountryChipSelector.getSelectedCountry()
+          : null;
+        let selected = mgrSelected || prevSelected || startCountry;
+        if (scenarioCountries.indexOf(String(selected).toLowerCase()) === -1) selected = startCountry;
+
+        const updateCountryLabels = (code) => {
+          const cc = (code || '').toString().trim().toUpperCase();
+          if (cc) {
+            setRowHeadingForInput('PensionGrowthRate', 'Pension (' + cc + ')');
+            setRowHeadingForInput('Inflation', 'Inflation (' + cc + ')');
+          }
+        };
+
+        const showGrowthCountry = (code) => {
+          const selectedCode = (code || '').toString().trim().toLowerCase();
+          const rows = tbody.querySelectorAll('[data-country-growth-row="true"]');
+          rows.forEach(el => {
+            const c = (el.getAttribute('data-country-code') || '').toLowerCase();
+            el.style.display = (c === selectedCode) ? '' : 'none';
+          });
+          updateCountryLabels(selectedCode);
+        };
+
+        const clearPensionInflationRows = () => {
+          const rows = tbody.querySelectorAll('[data-dynamic-pension-volatility="true"]');
+          rows.forEach(el => {
+            const inputs = el.querySelectorAll('input');
+            for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+          });
+        };
+
+        const renderPensionInflationRows = (code) => {
+          const selectedCode = (code || '').toString().trim().toLowerCase();
+          clearPensionInflationRows();
+          if (!selectedCode) return;
+          const cc = selectedCode.toUpperCase();
+          const pgId = 'PensionGrowth_' + selectedCode;
+          const pvId = 'PensionVolatility_' + selectedCode;
+          const infId = 'Inflation_' + selectedCode;
+          const trPension = makeGrowthRow('Pension (' + cc + ')', pgId, pvId);
+          trPension.setAttribute('data-dynamic-pension-volatility', 'true');
+          const trInflation = document.createElement('tr');
+          trInflation.setAttribute('data-dynamic-pension-volatility', 'true');
+          const infLabel = document.createElement('td');
+          infLabel.textContent = 'Inflation (' + cc + ')';
+          trInflation.appendChild(infLabel);
+          const infGrowth = document.createElement('td');
+          const infWrap = document.createElement('div');
+          infWrap.className = 'percentage-container';
+          const infInput = this._takeOrCreateInput(infId, 'percentage');
+          infInput.type = 'text';
+          infInput.setAttribute('inputmode', 'numeric');
+          infInput.setAttribute('pattern', '[0-9]*');
+          infInput.setAttribute('step', '0.1');
+          infWrap.appendChild(infInput);
+          infGrowth.appendChild(infWrap);
+          trInflation.appendChild(infGrowth);
+          trInflation.appendChild(document.createElement('td'));
+          if (insertBeforeRow) {
+            tbody.insertBefore(trPension, insertBeforeRow);
+            tbody.insertBefore(trInflation, insertBeforeRow);
+          } else {
+            tbody.appendChild(trPension);
+            tbody.appendChild(trInflation);
+          }
+          this.formatUtils.setupPercentageInputs();
+          this.updateUIForEconomyMode();
+        };
+
+        this.growthRatesCountryChipSelector = new CountryChipSelector(
+          countries,
+          selected,
+          (code) => { showGrowthCountry(code); renderPensionInflationRows(code); },
+          'growthRates'
+        );
+        this.growthRatesCountryChipSelector.render(chipContainer);
+
+        const legacyPensionGrowth = this.getValue('PensionGrowthRate');
+        const legacyPensionVol = this.getValue('PensionGrowthStdDev');
+        const legacyInflation = this.getValue('Inflation');
+        const legacyPgInput = document.getElementById('PensionGrowthRate');
+        const legacyPvInput = document.getElementById('PensionGrowthStdDev');
+        const legacyInfInput = document.getElementById('Inflation');
+        const legacyPgRaw = legacyPgInput ? String(legacyPgInput.value || '').trim() : '';
+        const legacyPvRaw = legacyPvInput ? String(legacyPvInput.value || '').trim() : '';
+        const legacyInfRaw = legacyInfInput ? String(legacyInfInput.value || '').trim() : '';
+        const startCode = String(startCountry || '').toLowerCase();
+        if (startCode) {
+          this.ensureParameterInput('PensionGrowth_' + startCode, 'percentage');
+          this.ensureParameterInput('PensionVolatility_' + startCode, 'percentage');
+          this.ensureParameterInput('Inflation_' + startCode, 'percentage');
+          const startPg = document.getElementById('PensionGrowth_' + startCode);
+          const startPv = document.getElementById('PensionVolatility_' + startCode);
+          const startInf = document.getElementById('Inflation_' + startCode);
+          const startPgLoaded = startPg && startPg.getAttribute('data-csv-loaded') === '1';
+          const startPvLoaded = startPv && startPv.getAttribute('data-csv-loaded') === '1';
+          const startInfLoaded = startInf && startInf.getAttribute('data-csv-loaded') === '1';
+          if (startPg && !startPg.value && legacyPgRaw !== '' && !startPgLoaded) this.setValue(startPg.id, legacyPensionGrowth);
+          if (startPv && !startPv.value && legacyPvRaw !== '' && !startPvLoaded) this.setValue(startPv.id, legacyPensionVol);
+          if (startInf && !startInf.value && legacyInfRaw !== '' && !startInfLoaded) this.setValue(startInf.id, legacyInflation);
+        }
+
+        for (let ci = 0; ci < scenarioCountries.length; ci++) {
+          const code = scenarioCountries[ci];
+          const rs = cfg.getCachedTaxRuleSet(code);
+          const invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
+          const localTypes = invTypes.filter(t => (t && t.residenceScope || '').toLowerCase() === 'local');
+          for (let i = 0; i < localTypes.length; i++) {
+            const t = localTypes[i] || {};
+            const key = t.key;
+            if (!key) continue;
+            const baseKey = this._toBaseInvestmentKey(key, code);
+            if (!baseKey) continue;
+            const labelText = t.label || baseKey;
+            const growthId = 'LocalAssetGrowth_' + code + '_' + baseKey;
+            const volId = 'LocalAssetVolatility_' + code + '_' + baseKey;
+            const tr = makeGrowthRow(labelText, growthId, volId);
+            tr.setAttribute('data-country-growth-row', 'true');
+            tr.setAttribute('data-country-code', code);
+            tr.style.display = (String(code).toLowerCase() === String(selected).toLowerCase()) ? '' : 'none';
+            if (insertBeforeRow) {
+              tbody.insertBefore(tr, insertBeforeRow);
+            } else {
+              tbody.appendChild(tr);
+            }
+          }
+        }
+
+        showGrowthCountry(selected);
+        renderPensionInflationRows(selected);
+        this.countryTabSyncManager.setSelectedCountry('growthRates', selected);
       }
     }
 
@@ -751,6 +1035,33 @@ class WebUI extends AbstractUI {
 
     // Re-apply economy mode visibility to newly created volatility cells
     this.updateUIForEconomyMode();
+    this.formatUtils.setupPercentageInputs();
+
+    const refreshGrowthRatesForRelocation = () => {
+      const cfg = Config.getInstance();
+      const shouldShow = this.perCountryInvestmentsEnabled && cfg.isRelocationEnabled() && this.hasRelocationEvents();
+      const hasChips = !!this.growthRatesCountryChipSelector;
+      if (shouldShow !== hasChips) {
+        this.renderInvestmentParameterFields(this._lastInvestmentTypesForGrowthRates || types);
+      }
+    };
+
+    if (!this._growthRatesRelocationObserver) {
+      const eventsBody = document.querySelector('#Events tbody');
+      if (eventsBody) {
+        this._growthRatesRelocationObserver = new MutationObserver(() => {
+          refreshGrowthRatesForRelocation();
+        });
+        this._growthRatesRelocationObserver.observe(eventsBody, { childList: true, subtree: true });
+      }
+    }
+
+    if (!this._growthRatesToggleListener) {
+      this._growthRatesToggleListener = () => {
+        refreshGrowthRatesForRelocation();
+      };
+      window.addEventListener('perCountryInvestmentsToggle', this._growthRatesToggleListener);
+    }
   }
 
   // -------------------------------------------------------------
@@ -881,6 +1192,7 @@ class WebUI extends AbstractUI {
     const cfg = Config.getInstance();
     const relocationEnabled = cfg.isRelocationEnabled();
     const hasMV = relocationEnabled && this.hasEffectiveRelocationEvents();
+    const perCountryEnabled = !!this.perCountryInvestmentsEnabled;
 
     // If we were called from a generic events-table change (no types provided),
     // fall back to StartCountry-resolved investment types so we can correctly
@@ -893,10 +1205,13 @@ class WebUI extends AbstractUI {
     }
 
     // Allocations chips + per-country allocation inputs
-    this._setupAllocationsCountryChips(hasMV, types);
+    // Per-country OFF: hide chips and render global-only fields (independent keys).
+    // Per-country ON: existing relocation/MV-driven chip behavior.
+    this._setupAllocationsCountryChips(perCountryEnabled && hasMV, types);
 
     // Personal circumstances chips + per-country state pension inputs
     this.setupPersonalCircumstancesCountryChips();
+
   }
 
   _setupAllocationsCountryChips(hasMV, fallbackStartTypes) {
@@ -930,11 +1245,81 @@ class WebUI extends AbstractUI {
     const existingCountryContainers = allocGroup.querySelectorAll('[data-country-allocation-container="true"]');
     existingCountryContainers.forEach(el => {
       try {
+        const inputs = el.querySelectorAll('input, select');
+        for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+      } catch (_) { }
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+
+    // Also remove any previously rendered pension contribution fields that may have been
+    // attached directly under the allocations group (e.g. global mode), so we don't
+    // duplicate them when rendering per-country containers.
+    const existingPensionWrappers = allocGroup.querySelectorAll('[data-country-pension="true"]');
+    existingPensionWrappers.forEach(el => {
+      try {
         const inputs = el.querySelectorAll('input');
         for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
       } catch (_) { }
       if (el && el.parentNode) el.parentNode.removeChild(el);
     });
+
+    // Per-country toggle OFF: global allocations only (no chips, no per-country containers).
+    if (!this.perCountryInvestmentsEnabled) {
+      chipContainer.style.display = 'none';
+      this.allocationsCountryChipSelector = null;
+
+      const types = Array.isArray(fallbackStartTypes) ? fallbackStartTypes : [];
+      const startCountry = (cfg.getStartCountry() || '').toLowerCase();
+
+      // Pension contribution controls remain StartCountry-scoped (same ids as per-country mode)
+      this._renderCountryPensionContributionFields(allocGroup, startCountry, simulationMode);
+
+      // Render global allocation fields using GlobalAllocation_* keys (independent of per-country fields).
+      for (let i = 0; i < types.length; i++) {
+        const t = types[i] || {};
+        const key = t.key;
+        if (!key) continue;
+        const baseKey = this._toBaseInvestmentKey(key, startCountry);
+        const labelText = (t.label || baseKey);
+        const inputId = 'GlobalAllocation_' + baseKey;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'input-wrapper';
+        wrapper.setAttribute('data-dynamic-investment-param', 'true');
+        wrapper.setAttribute('data-allocations-row', 'true');
+
+        const label = document.createElement('label');
+        label.setAttribute('for', inputId);
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'alloc-label-text';
+        labelSpan.textContent = labelText;
+        label.appendChild(labelSpan);
+        wrapper.appendChild(label);
+
+        // "Holds" dropdown for baseRef-backed types (e.g., IE Index Funds) lives in the label area.
+        const defaultHold = t.baseRef || t.baseKey || '';
+        if (defaultHold) {
+          const holdId = 'GlobalMixConfig_' + baseKey + '_asset1';
+          this._appendHoldsDropdown(wrapper, holdId, String(defaultHold));
+        }
+
+        const pctContainer = document.createElement('div');
+        pctContainer.className = 'percentage-container';
+        const input = this._takeOrCreateInput(inputId, 'percentage');
+        input.type = 'text';
+        input.setAttribute('inputmode', 'numeric');
+        input.setAttribute('pattern', '[0-9]*');
+        input.setAttribute('step', '1');
+        input.setAttribute('placeholder', ' ');
+        this._applyAllocationValueIfCached(inputId, input);
+        pctContainer.appendChild(input);
+        wrapper.appendChild(pctContainer);
+
+        allocGroup.appendChild(wrapper);
+      }
+      this._refreshAllocationsLabelLayout();
+      return;
+    }
 
     if (!hasMV) {
       // Chips hidden: keep StartCountry inputs effectively identical to multi-country mode.
@@ -959,12 +1344,12 @@ class WebUI extends AbstractUI {
         // Pension fields first
         this._renderCountryPensionContributionFields(countryContainer, startCountry, simulationMode);
 
-        for (let i = types.length - 1; i >= 0; i--) {
+        for (let i = 0; i < types.length; i++) {
           const t = types[i] || {};
           const key = t.key;
           if (!key) continue;
           const baseKey = this._toBaseInvestmentKey(key, startCountry);
-          const labelText = (t.label || key) + ' Allocation';
+          const labelText = (t.label || key);
           const inputId = 'InvestmentAllocation_' + startCountry + '_' + baseKey;
           const legacyId = 'InvestmentAllocation_' + key;
 
@@ -979,11 +1364,22 @@ class WebUI extends AbstractUI {
           const wrapper = document.createElement('div');
           wrapper.className = 'input-wrapper';
           wrapper.setAttribute('data-dynamic-investment-param', 'true');
+          wrapper.setAttribute('data-allocations-row', 'true');
 
           const label = document.createElement('label');
           label.setAttribute('for', inputId);
-          label.textContent = labelText;
+          const labelSpan = document.createElement('span');
+          labelSpan.className = 'alloc-label-text';
+          labelSpan.textContent = labelText;
+          label.appendChild(labelSpan);
           wrapper.appendChild(label);
+
+          // "Holds" dropdown for baseRef-backed types (e.g., IE Index Funds). No dropdown for standalone locals (e.g., MERVAL).
+          const defaultHold = t.baseRef || t.baseKey || '';
+          if (defaultHold) {
+            const holdId = 'MixConfig_' + startCountry + '_' + baseKey + '_asset1';
+            this._appendHoldsDropdown(wrapper, holdId, String(defaultHold));
+          }
 
           const pctContainer = document.createElement('div');
           pctContainer.className = 'percentage-container';
@@ -1001,6 +1397,7 @@ class WebUI extends AbstractUI {
         }
 
         allocGroup.appendChild(countryContainer);
+        this._refreshAllocationsLabelLayout();
       } else {
         // Relocation disabled: keep original legacy layout/IDs.
         // Pension fields first
@@ -1010,17 +1407,29 @@ class WebUI extends AbstractUI {
           const t = types[i] || {};
           const key = t.key;
           if (!key) continue;
-          const labelText = (t.label || key) + ' Allocation';
+          const labelText = (t.label || key);
           const inputId = 'InvestmentAllocation_' + key;
 
           const wrapper = document.createElement('div');
           wrapper.className = 'input-wrapper';
           wrapper.setAttribute('data-dynamic-investment-param', 'true');
+          wrapper.setAttribute('data-allocations-row', 'true');
 
           const label = document.createElement('label');
           label.setAttribute('for', inputId);
-          label.textContent = labelText;
+          const labelSpan = document.createElement('span');
+          labelSpan.className = 'alloc-label-text';
+          labelSpan.textContent = labelText;
+          label.appendChild(labelSpan);
           wrapper.appendChild(label);
+
+          // "Holds" dropdown for baseRef-backed types in legacy single-country mode.
+          const defaultHold = t.baseRef || t.baseKey || '';
+          if (defaultHold) {
+            const baseKey = this._toBaseInvestmentKey(key, startCountry);
+            const holdId = 'GlobalMixConfig_' + baseKey + '_asset1';
+            this._appendHoldsDropdown(wrapper, holdId, String(defaultHold));
+          }
 
           const pctContainer = document.createElement('div');
           pctContainer.className = 'percentage-container';
@@ -1036,6 +1445,7 @@ class WebUI extends AbstractUI {
 
           allocGroup.appendChild(wrapper);
         }
+        this._refreshAllocationsLabelLayout();
       }
       return;
     }
@@ -1075,12 +1485,12 @@ class WebUI extends AbstractUI {
       // Pension fields first
       this._renderCountryPensionContributionFields(countryContainer, code, simulationMode);
 
-      for (let i = invTypes.length - 1; i >= 0; i--) {
+      for (let i = 0; i < invTypes.length; i++) {
         const t = invTypes[i] || {};
         const key = t.key;
         if (!key) continue;
         const baseKey = this._toBaseInvestmentKey(key, code);
-        const labelText = (t.label || key) + ' Allocation';
+        const labelText = (t.label || key);
         // Field IDs are country-prefixed so the chip selector can switch contexts without losing values.
         // Convention: InvestmentAllocation_{countryCode}_{typeKey}
         const inputId = 'InvestmentAllocation_' + code + '_' + baseKey;
@@ -1097,11 +1507,22 @@ class WebUI extends AbstractUI {
         const wrapper = document.createElement('div');
         wrapper.className = 'input-wrapper';
         wrapper.setAttribute('data-dynamic-investment-param', 'true');
+        wrapper.setAttribute('data-allocations-row', 'true');
 
         const label = document.createElement('label');
         label.setAttribute('for', inputId);
-        label.textContent = labelText;
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'alloc-label-text';
+        labelSpan.textContent = labelText;
+        label.appendChild(labelSpan);
         wrapper.appendChild(label);
+
+        // "Holds" dropdown for baseRef-backed types (e.g., IE Index Funds / AR CEDEARs). No dropdown for MERVAL.
+        const defaultHold = t.baseRef || t.baseKey || '';
+        if (defaultHold) {
+          const holdId = 'MixConfig_' + code + '_' + baseKey + '_asset1';
+          this._appendHoldsDropdown(wrapper, holdId, String(defaultHold));
+        }
 
         const pctContainer = document.createElement('div');
         pctContainer.className = 'percentage-container';
@@ -1121,7 +1542,9 @@ class WebUI extends AbstractUI {
       allocGroup.appendChild(countryContainer);
     }
     this.countryTabSyncManager.setSelectedCountry('allocations', selected);
+    this._refreshAllocationsLabelLayout();
   }
+
 
   _showAllocationsCountry(code) {
     const selected = (code || '').toString().trim().toLowerCase();
@@ -1130,6 +1553,7 @@ class WebUI extends AbstractUI {
       const c = (el.getAttribute('data-country-code') || '').toLowerCase();
       el.style.display = (c === selected) ? '' : 'none';
     });
+    this._refreshAllocationsLabelLayout();
   }
 
   _clearDynamicAllocationInputs(allocGroup) {
@@ -1140,11 +1564,23 @@ class WebUI extends AbstractUI {
     for (let i = 0; i < wrappers.length; i++) {
       const w = wrappers[i];
       try {
-        const input = w.querySelector('input');
-        const id = input && input.id ? String(input.id) : '';
-        if (id.indexOf('InvestmentAllocation_') === 0) {
-          // Preserve values across mode switches by stashing the input instead of destroying it
-          if (input) this._stashInputElement(input);
+        const els = w.querySelectorAll('input, select');
+        let shouldRemove = false;
+        for (let j = 0; j < els.length; j++) {
+          const el = els[j];
+          const id = el && el.id ? String(el.id) : '';
+          if (!id) continue;
+          if (id.indexOf('InvestmentAllocation_') === 0 ||
+              id.indexOf('GlobalAllocation_') === 0 ||
+              id.indexOf('MixConfig_') === 0 ||
+              id.indexOf('GlobalMixConfig_') === 0) {
+            shouldRemove = true;
+            break;
+          }
+        }
+        if (shouldRemove) {
+          // Preserve values across mode switches by stashing inputs instead of destroying them
+          for (let j = 0; j < els.length; j++) this._stashInputElement(els[j]);
           if (w.parentNode) w.parentNode.removeChild(w);
         }
       } catch (_) { }
@@ -1159,9 +1595,9 @@ class WebUI extends AbstractUI {
     if (allocCard) roots.push(allocCard);
     if (stash) roots.push(stash);
     for (let r = 0; r < roots.length; r++) {
-      const inputs = roots[r].querySelectorAll('input[id^="InvestmentAllocation_"]');
-      for (let i = 0; i < inputs.length; i++) {
-        const el = inputs[i];
+      const els = roots[r].querySelectorAll('[id^="InvestmentAllocation_"], [id^="GlobalAllocation_"], [id^="MixConfig_"], [id^="GlobalMixConfig_"]');
+      for (let i = 0; i < els.length; i++) {
+        const el = els[i];
         const id = el && el.id ? String(el.id) : '';
         if (!id) continue;
         const v = (el.value != null) ? String(el.value) : '';
@@ -1192,6 +1628,198 @@ class WebUI extends AbstractUI {
     return key;
   }
 
+  _getGlobalBaseTypeDropdownOptions() {
+    const cfg = Config.getInstance();
+    const types = cfg.getInvestmentBaseTypes() || [];
+    const out = [];
+    for (let i = 0; i < types.length; i++) {
+      const t = types[i] || {};
+      const v = t.baseKey;
+      if (!v) continue;
+      const label = t.label || v;
+      out.push({ value: v, label: label, description: label });
+    }
+    return out;
+  }
+
+  _appendHoldsDropdown(wrapperEl, hiddenInputId, defaultBaseKey) {
+    const options = this._getGlobalBaseTypeDropdownOptions();
+    if (!options.length) return;
+    if (!wrapperEl) return;
+
+    const hidden = this._takeOrCreateInput(hiddenInputId, 'string');
+    hidden.type = 'hidden';
+    hidden.autocomplete = 'off';
+    if (!hidden.value && defaultBaseKey) hidden.value = defaultBaseKey;
+    wrapperEl.appendChild(hidden);
+
+    const controlDiv = document.createElement('div');
+    controlDiv.className = 'alloc-holds-control visualization-control';
+    const toggleSpan = document.createElement('span');
+    toggleSpan.id = 'HoldsToggle_' + hiddenInputId;
+    toggleSpan.className = 'dd-toggle pseudo-select alloc-holds-toggle';
+    controlDiv.appendChild(toggleSpan);
+    const optionsDiv = document.createElement('div');
+    optionsDiv.className = 'visualization-dropdown';
+    optionsDiv.style.display = 'none';
+    controlDiv.appendChild(optionsDiv);
+    wrapperEl.appendChild(controlDiv);
+
+    const currentValue = hidden.value || options[0].value;
+    hidden.value = currentValue;
+    let currentLabel = null;
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].value === currentValue) { currentLabel = options[i].label; break; }
+    }
+    toggleSpan.textContent = currentLabel || currentValue;
+    this._fitAllocHoldsToggleWidth(toggleSpan);
+
+    DropdownUtils.create({
+      toggleEl: toggleSpan,
+      dropdownEl: optionsDiv,
+      options: options,
+      selectedValue: currentValue,
+      onSelect: (val, labelText) => {
+        hidden.value = val;
+        toggleSpan.textContent = labelText;
+        this._fitAllocHoldsToggleWidth(toggleSpan);
+        // Holds width change can reduce label space; recompute wrap/layout.
+        this._refreshAllocationsLabelLayout();
+        hidden.dispatchEvent(new Event('change', { bubbles: true }));
+      },
+    });
+  }
+
+  _fitAllocHoldsToggleWidth(toggleSpan) {
+    if (!toggleSpan) return;
+    const text = (toggleSpan.textContent || '').toString();
+    if (!text) return;
+    const cs = window.getComputedStyle(toggleSpan);
+    const font = cs.font || (cs.fontSize + ' ' + cs.fontFamily);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.font = font;
+    const w = Math.ceil(ctx.measureText(text).width);
+    // Padding + caret room (matches pseudo-select padding/right arrow)
+    const padded = w + 28;
+    const clamped = Math.max(72, Math.min(132, padded));
+    toggleSpan.style.minWidth = clamped + 'px';
+    toggleSpan.style.maxWidth = clamped + 'px';
+  }
+
+  _refreshAllocationsLabelLayout() {
+    const rows = document.querySelectorAll('#Allocations .input-wrapper[data-allocations-row="true"]');
+    requestAnimationFrame(() => {
+      // Hidden measurer to avoid early wrap triggers from scrollWidth rounding.
+      if (!this._allocLabelMeasurer) {
+        const m = document.createElement('span');
+        m.style.position = 'absolute';
+        m.style.left = '-10000px';
+        m.style.top = '-10000px';
+        m.style.visibility = 'hidden';
+        m.style.whiteSpace = 'nowrap';
+        m.style.pointerEvents = 'none';
+        m.style.padding = '0';
+        m.style.border = '0';
+        document.body.appendChild(m);
+        this._allocLabelMeasurer = m;
+      }
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const holds = row.querySelector('.alloc-holds-toggle');
+        if (holds) this._fitAllocHoldsToggleWidth(holds);
+
+        const labelText = row.querySelector('.alloc-label-text');
+        if (!labelText) continue;
+
+        // Always measure in "unwrapped" state to avoid early triggering.
+        const original = labelText.getAttribute('data-original-text') || labelText.textContent || '';
+        if (!labelText.getAttribute('data-original-text')) {
+          labelText.setAttribute('data-original-text', String(original));
+        }
+        labelText.classList.remove('alloc-wrap');
+        while (labelText.firstChild) labelText.removeChild(labelText.firstChild);
+        labelText.appendChild(document.createTextNode(String(original)));
+
+        // Trigger wrap ONLY when the one-line label truly exceeds available width at normal font.
+        let needsWrap = false;
+        try {
+          const boxW = labelText.getBoundingClientRect().width;
+          const cs = window.getComputedStyle(labelText);
+          const measurer = this._allocLabelMeasurer;
+          measurer.style.font = cs.font;
+          measurer.style.letterSpacing = cs.letterSpacing;
+          measurer.style.textTransform = cs.textTransform;
+          measurer.style.fontKerning = cs.fontKerning || 'auto';
+          measurer.textContent = String(original);
+          const textW = measurer.getBoundingClientRect().width;
+          // Use a small tolerance to avoid "early" triggers from subpixel differences.
+          needsWrap = textW > (boxW + 0.25);
+        } catch (_) {
+          needsWrap = (labelText.scrollWidth > labelText.clientWidth);
+        }
+        if (!needsWrap) continue;
+
+        // Enter wrap mode: small font + guaranteed wrap (insert <br>).
+        labelText.classList.add('alloc-wrap');
+
+        const text = String(original);
+        const boxW = labelText.getBoundingClientRect().width;
+        if (!boxW || boxW <= 0) continue;
+
+        // Compute break point using the hidden measurer (nowrap), using the WRAPPED font.
+        let breakAt = -1;
+        try {
+          const csWrap = window.getComputedStyle(labelText);
+          const measurer = this._allocLabelMeasurer;
+          measurer.style.font = csWrap.font;
+          measurer.style.letterSpacing = csWrap.letterSpacing;
+          measurer.style.textTransform = csWrap.textTransform;
+          measurer.style.fontKerning = csWrap.fontKerning || 'auto';
+
+          const limitW = boxW - 0.25;
+          const spacePositions = [];
+          for (let p = 0; p < text.length; p++) {
+            if (text.charAt(p) === ' ') spacePositions.push(p);
+          }
+          // Prefer breaking on a space that keeps line1 within limit.
+          for (let si = 0; si < spacePositions.length; si++) {
+            const pos = spacePositions[si];
+            const candidate = text.slice(0, pos).trimRight();
+            measurer.textContent = candidate;
+            const w = measurer.getBoundingClientRect().width;
+            if (w <= limitW) breakAt = pos;
+            else break;
+          }
+          // If no space break works, fall back to per-character split.
+          if (breakAt < 0) {
+            for (let c = 1; c < text.length; c++) {
+              const candidate = text.slice(0, c);
+              measurer.textContent = candidate;
+              const w = measurer.getBoundingClientRect().width;
+              if (w <= limitW) breakAt = c;
+              else break;
+            }
+          }
+        } catch (_) { }
+
+        // Restore full original then apply hard break if we found a split point.
+        while (labelText.firstChild) labelText.removeChild(labelText.firstChild);
+        if (breakAt > 0 && breakAt < text.length - 1) {
+          labelText.appendChild(document.createTextNode(text.slice(0, breakAt).trimRight()));
+          labelText.appendChild(document.createElement('br'));
+          labelText.appendChild(document.createTextNode(text.slice(breakAt).trimLeft()));
+        } else {
+          // Worst case: force a mid split so wrap is always visible once triggered.
+          const mid = Math.max(1, Math.min(text.length - 1, Math.floor(text.length / 2)));
+          labelText.appendChild(document.createTextNode(text.slice(0, mid)));
+          labelText.appendChild(document.createElement('br'));
+          labelText.appendChild(document.createTextNode(text.slice(mid)));
+        }
+      }
+    });
+  }
+
   _renderCountryPensionContributionFields(container, countryCode, simulationMode) {
     const host = container;
     if (!host) return;
@@ -1220,6 +1848,7 @@ class WebUI extends AbstractUI {
     p1Wrapper.className = 'input-wrapper';
     p1Wrapper.setAttribute('data-country-pension', 'true');
     p1Wrapper.setAttribute('data-country-code', country);
+    p1Wrapper.setAttribute('data-allocations-row', 'true');
     const p1Label = document.createElement('label');
     const p1Id = 'P1PensionContrib_' + country;
     p1Label.setAttribute('for', p1Id);
@@ -1242,6 +1871,7 @@ class WebUI extends AbstractUI {
     p2Wrapper.className = 'input-wrapper';
     p2Wrapper.setAttribute('data-country-pension', 'true');
     p2Wrapper.setAttribute('data-country-code', country);
+    p2Wrapper.setAttribute('data-allocations-row', 'true');
     p2Wrapper.setAttribute('data-couple-only', 'true');
     p2Wrapper.style.display = shouldShowP2 ? 'flex' : 'none';
     const p2Label = document.createElement('label');
@@ -1266,6 +1896,7 @@ class WebUI extends AbstractUI {
     cappedWrapper.className = 'input-wrapper';
     cappedWrapper.setAttribute('data-country-pension', 'true');
     cappedWrapper.setAttribute('data-country-code', country);
+    cappedWrapper.setAttribute('data-allocations-row', 'true');
     const cappedLabel = document.createElement('label');
     const cappedToggleId = 'PensionCappedToggle_' + country;
     cappedLabel.setAttribute('for', cappedToggleId);
@@ -3128,6 +3759,25 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     // Tax ruleset is preloaded by Config.initialize(); no need to preload again here
     // Apply dynamic investment labels from ruleset (first two investment types)
     webUi.applyInvestmentLabels();
+
+    const investmentStrategiesState = localStorage.getItem('investmentStrategiesEnabled') || 'off';
+    webUi.investmentStrategiesEnabled = (investmentStrategiesState === 'on');
+
+    const perCountryInvestmentsState = localStorage.getItem('perCountryInvestmentsEnabled') || 'off';
+    webUi.perCountryInvestmentsEnabled = (perCountryInvestmentsState === 'on');
+
+    // Listen for Investment Strategies toggle
+    window.addEventListener('investmentStrategiesToggle', (e) => {
+      webUi.investmentStrategiesEnabled = e.detail.enabled;
+      // Future phases will add UI refresh logic here
+    });
+
+    // Listen for Per-Country Investments toggle
+    window.addEventListener('perCountryInvestmentsToggle', (e) => {
+      webUi.perCountryInvestmentsEnabled = e.detail.enabled;
+      // Refresh allocations UI immediately (global ↔ per-country mode)
+      try { webUi.refreshCountryChipsFromScenario(webUi._lastInvestmentTypesForGrowthRates); } catch (_) { }
+    });
 
     // Initialize controls that depend on Config/tax rules being available
     // IMPORTANT: Create StartCountry controls before any code may read it

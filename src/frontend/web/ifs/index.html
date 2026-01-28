@@ -11,7 +11,7 @@
   <title></title>
   <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico?v=2025-08-23-usc">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20260117-13">
+  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20260127-9">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=2025-10-28-1">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-23-usc">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-23-usc" />
@@ -123,6 +123,22 @@
           data-toggle-state="on" style="display: none;">
           <span>Country Tabs Synced</span>
           <div class="toggle-switch active">
+            <div class="toggle-slider"></div>
+          </div>
+        </button>
+
+        <button id="investmentStrategiesToggleMobile" class="mobile-menu-button secondary-button toggle-button"
+          data-toggle-state="off">
+          <span>Investment Strategies</span>
+          <div class="toggle-switch">
+            <div class="toggle-slider"></div>
+          </div>
+        </button>
+
+        <button id="perCountryInvestmentsToggleMobile" class="mobile-menu-button secondary-button toggle-button"
+          data-toggle-state="off">
+          <span>Per-Country Investments</span>
+          <div class="toggle-switch">
             <div class="toggle-slider"></div>
           </div>
         </button>
@@ -530,7 +546,7 @@
   <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
   <script src="/src/frontend/web/components/CountryTabSyncManager.js?v=20260114-1"></script>
   <script src="/src/frontend/web/components/CountryChipSelector.js?v=20260114-2"></script>
-  <script src="/src/frontend/web/WebUI.js?v=20260117-1"></script>
+  <script src="/src/frontend/web/WebUI.js?v=20260127-25"></script>
   <script src="/src/core/TaxRuleSet.js?v=20260115a"></script>
   <script src="/src/core/Config.js?v=2025-12-17-8"></script>
   <script src="/src/core/Events.js?v=2025-09-04"></script>
@@ -542,7 +558,7 @@
   <script src="/src/core/InvestmentTypeFactory.js?v=2026-01-11-1"></script>
   <script src="/src/core/RealEstate.js?v=2025-12-20-3"></script>
   <script src="/src/core/InflationService.js?v=2025-11-26-2"></script>
-  <script src="/src/core/Utils.js?v=20260116-allocfix2"></script>
+  <script src="/src/core/Utils.js?v=20260127-10"></script>
   <script src="/src/core/PresentValueCalculator.js?v=20260115b"></script>
   <script src="/src/core/AttributionPopulator.js?v=2025-12-27-1"></script>
   <script src="/src/core/DataAggregatesCalculator.js?v=2026-01-09-2"></script>
@@ -713,6 +729,8 @@
         const eventsWizardToggleButton = document.getElementById('eventsWizardToggleMobile');
         const presentValueToggleButton = document.getElementById('presentValueToggleMobile');
         const countryTabsSyncToggleButton = document.getElementById('countryTabsSyncToggleMobile');
+        const investmentStrategiesToggleButton = document.getElementById('investmentStrategiesToggleMobile');
+        const perCountryInvestmentsToggleButton = document.getElementById('perCountryInvestmentsToggleMobile');
         const firstDivider = document.querySelector('.mobile-menu-divider');
         const secondDivider = document.querySelectorAll('.mobile-menu-divider')[1];
         const thirdDivider = document.querySelectorAll('.mobile-menu-divider')[2];
@@ -725,6 +743,8 @@
         const SHOW_PRESENT_VALUE_TOGGLE = true;
         // Show only when relocation is active and there is an effective relocation (MV-* to a different country).
         let SHOW_COUNTRY_TABS_SYNC_TOGGLE = false;
+        const SHOW_INVESTMENT_STRATEGIES_TOGGLE = true;
+        const SHOW_PER_COUNTRY_INVESTMENTS_TOGGLE = true;
         try {
           if (typeof Config !== 'undefined') {
             const cfg = Config.getInstance();
@@ -740,7 +760,7 @@
         let hasRunSection = false;
         let hasSaveLoadSection = false;
         let hasDemoHelpSection = false;
-        let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE || SHOW_COUNTRY_TABS_SYNC_TOGGLE;
+        let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE || SHOW_COUNTRY_TABS_SYNC_TOGGLE || SHOW_INVESTMENT_STRATEGIES_TOGGLE || SHOW_PER_COUNTRY_INVESTMENTS_TOGGLE;
 
         if (currentWidth > breakpoints.tablet) {
           // Desktop mode: Only show Demo/Help/Coffee buttons that are visible in header but burger menu is always available
@@ -804,6 +824,12 @@
         }
         if (countryTabsSyncToggleButton) {
           countryTabsSyncToggleButton.style.display = SHOW_COUNTRY_TABS_SYNC_TOGGLE ? 'flex' : 'none';
+        }
+        if (investmentStrategiesToggleButton) {
+          investmentStrategiesToggleButton.style.display = SHOW_INVESTMENT_STRATEGIES_TOGGLE ? 'flex' : 'none';
+        }
+        if (perCountryInvestmentsToggleButton) {
+          perCountryInvestmentsToggleButton.style.display = SHOW_PER_COUNTRY_INVESTMENTS_TOGGLE ? 'flex' : 'none';
         }
 
         // Third divider: between Demo/Help/Toggle and Coffee (Coffee is always visible)
@@ -892,6 +918,22 @@
         if (countryTabsSyncToggleMobile) {
           countryTabsSyncToggleMobile.addEventListener('click', () => {
             this.handleCountryTabsSyncToggle(countryTabsSyncToggleMobile);
+          });
+        }
+
+        // Investment Strategies Toggle
+        const investmentStrategiesToggleMobile = document.getElementById('investmentStrategiesToggleMobile');
+        if (investmentStrategiesToggleMobile) {
+          investmentStrategiesToggleMobile.addEventListener('click', () => {
+            this.handleInvestmentStrategiesToggle(investmentStrategiesToggleMobile);
+          });
+        }
+
+        // Per-Country Investments Toggle
+        const perCountryInvestmentsToggleMobile = document.getElementById('perCountryInvestmentsToggleMobile');
+        if (perCountryInvestmentsToggleMobile) {
+          perCountryInvestmentsToggleMobile.addEventListener('click', () => {
+            this.handlePerCountryInvestmentsToggle(perCountryInvestmentsToggleMobile);
           });
         }
       }
@@ -1032,6 +1074,42 @@
         CountryTabSyncManager.getInstance().setSyncState(enabled);
       }
 
+      handleInvestmentStrategiesToggle(toggleButton) {
+        const currentState = toggleButton.getAttribute('data-toggle-state');
+        const newState = currentState === 'off' ? 'on' : 'off';
+        const toggleSwitch = toggleButton.querySelector('.toggle-switch');
+
+        toggleButton.setAttribute('data-toggle-state', newState);
+        if (toggleSwitch) {
+          if (newState === 'on') toggleSwitch.classList.add('active');
+          else toggleSwitch.classList.remove('active');
+        }
+
+        localStorage.setItem('investmentStrategiesEnabled', newState);
+
+        window.dispatchEvent(new CustomEvent('investmentStrategiesToggle', {
+          detail: { state: newState, enabled: newState === 'on' }
+        }));
+      }
+
+      handlePerCountryInvestmentsToggle(toggleButton) {
+        const currentState = toggleButton.getAttribute('data-toggle-state');
+        const newState = currentState === 'off' ? 'on' : 'off';
+        const toggleSwitch = toggleButton.querySelector('.toggle-switch');
+
+        toggleButton.setAttribute('data-toggle-state', newState);
+        if (toggleSwitch) {
+          if (newState === 'on') toggleSwitch.classList.add('active');
+          else toggleSwitch.classList.remove('active');
+        }
+
+        localStorage.setItem('perCountryInvestmentsEnabled', newState);
+
+        window.dispatchEvent(new CustomEvent('perCountryInvestmentsToggle', {
+          detail: { state: newState, enabled: newState === 'on' }
+        }));
+      }
+
       initializeToggleState() {
         // Initialize experimental toggle
         const toggleButton = document.getElementById('experimentalToggleMobile');
@@ -1135,6 +1213,40 @@
             else toggleSwitch.classList.remove('active');
           }
           CountryTabSyncManager.getInstance().setSyncState(enabled);
+        }
+
+        // Initialize Investment Strategies toggle
+        const investmentStrategiesToggleButton = document.getElementById('investmentStrategiesToggleMobile');
+        if (investmentStrategiesToggleButton) {
+          const savedState = localStorage.getItem('investmentStrategiesEnabled') || 'off';
+          const toggleSwitch = investmentStrategiesToggleButton.querySelector('.toggle-switch');
+
+          investmentStrategiesToggleButton.setAttribute('data-toggle-state', savedState);
+          if (toggleSwitch) {
+            if (savedState === 'on') toggleSwitch.classList.add('active');
+            else toggleSwitch.classList.remove('active');
+          }
+
+          window.dispatchEvent(new CustomEvent('investmentStrategiesToggle', {
+            detail: { state: savedState, enabled: savedState === 'on' }
+          }));
+        }
+
+        // Initialize Per-Country Investments toggle
+        const perCountryInvestmentsToggleButton = document.getElementById('perCountryInvestmentsToggleMobile');
+        if (perCountryInvestmentsToggleButton) {
+          const savedState = localStorage.getItem('perCountryInvestmentsEnabled') || 'off';
+          const toggleSwitch = perCountryInvestmentsToggleButton.querySelector('.toggle-switch');
+
+          perCountryInvestmentsToggleButton.setAttribute('data-toggle-state', savedState);
+          if (toggleSwitch) {
+            if (savedState === 'on') toggleSwitch.classList.add('active');
+            else toggleSwitch.classList.remove('active');
+          }
+
+          window.dispatchEvent(new CustomEvent('perCountryInvestmentsToggle', {
+            detail: { state: savedState, enabled: savedState === 'on' }
+          }));
         }
       }
     }
