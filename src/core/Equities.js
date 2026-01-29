@@ -16,15 +16,18 @@ class Equity {
 
 
 
-  buy(amountToBuy, currency, country) {
+  buy(amountToBuy, currency, country, growthOverride, stdevOverride) {
     if (!currency || !country) {
       throw new Error('Equity.buy() requires currency and country parameters');
     }
-    this.portfolio.push({
+    var holding = {
       principal: Money.create(amountToBuy, currency, country),
       interest: Money.create(0, currency, country),
       age: 0
-    });
+    };
+    if (typeof growthOverride === 'number') holding.growth = growthOverride;
+    if (typeof stdevOverride === 'number') holding.stdev = stdevOverride;
+    this.portfolio.push(holding);
     this.yearlyBought += amountToBuy;
   }
 
@@ -257,7 +260,10 @@ class Equity {
     for (let i = 0; i < this.portfolio.length; i++) {
       const holding = this.portfolio[i];
       // Maintain legacy behavior: always use gaussian(mean, stdev) for growth sampling
-      const growthRate = gaussian(this.growth, this.stdev);
+      const growthRate = gaussian(
+        (holding.growth !== undefined ? holding.growth : this.growth),
+        (holding.stdev !== undefined ? holding.stdev : this.stdev)
+      );
       const holdingTotal = holding.principal.amount + holding.interest.amount;
       const growthAmount = holdingTotal * growthRate;
       holding.interest.amount += growthAmount;
@@ -531,12 +537,17 @@ class Pension extends Equity {
     this.lumpSumTaken = false;
     this.person = person;
     this.countryCode = countryCode ? String(countryCode).toLowerCase() : null;
+    this._isPension = true;
+    this._internalRebalance = false;
     try {
       var cfg = Config.getInstance();
       // Load ruleset for THIS pension's country, not the default country
       var rulesetCountry = this.countryCode || cfg.getDefaultCountry();
       this._ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(rulesetCountry) : null;
     } catch (e) { this._ruleset = null; }
+    this.taxAdvantaged = (this._ruleset && typeof this._ruleset.isPrivatePensionTaxAdvantaged === 'function')
+      ? this._ruleset.isPrivatePensionTaxAdvantaged()
+      : true;
   }
 
   // Override currency methods: pension tracks its own country's currency
@@ -550,6 +561,7 @@ class Pension extends Equity {
   }
 
   declareRevenue(income, gains) {
+    if (this._internalRebalance && this.taxAdvantaged) return;
     var pensionIncomeMoney = Money.from(income, residenceCurrency, currentCountry);
     if (this.lumpSum) {
       revenue.declarePrivatePensionLumpSum(pensionIncomeMoney, this.person);

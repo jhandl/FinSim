@@ -37,7 +37,7 @@ class GenericInvestmentAsset extends Equity {
   }
 
   // Override buy() to capture currency/country from first call if still undefined
-  buy(amountToBuy, currency, country) {
+  buy(amountToBuy, currency, country, growthOverride, stdevOverride) {
     if (!currency || !country) {
       throw new Error('Equity.buy() requires currency and country parameters');
     }
@@ -48,7 +48,7 @@ class GenericInvestmentAsset extends Equity {
     if (this.assetCountry === undefined) {
       this.assetCountry = country;
     }
-    super.buy(amountToBuy, currency, country);
+    super.buy(amountToBuy, currency, country, growthOverride, stdevOverride);
   }
 
   // Override currency methods for multi-country assets
@@ -206,20 +206,87 @@ class GenericInvestmentAsset extends Equity {
  * growthRatesByKey/stdDevsByKey are optional maps to supply UI parameterized growth settings.
  */
 class InvestmentTypeFactory {
-  static createAssets(ruleset, growthRatesByKey, stdDevsByKey) {
+  static resolveMixConfig(params, countryCode, baseKey) {
+    if (!params) return null;
+    var toNumber = function (value) {
+      if (value === null || value === undefined || value === '') return null;
+      var n = Number(value);
+      return (typeof n === 'number' && !isNaN(n)) ? n : null;
+    };
+    var normalizePct = function (value) {
+      var n = toNumber(value);
+      if (n === null) return null;
+      return (Math.abs(n) <= 1) ? (n * 100) : n;
+    };
+    var normalizeRate = function (value) {
+      var n = toNumber(value);
+      if (n === null) return null;
+      return (Math.abs(n) > 1) ? (n / 100) : n;
+    };
+    var mixPrefix = countryCode ? ('MixConfig_' + countryCode + '_' + baseKey) : null;
+    var globalPrefix = 'GlobalMixConfig_' + baseKey;
+    var typeValue = null;
+    var prefix = null;
+    if (mixPrefix && params[mixPrefix + '_type'] !== undefined && params[mixPrefix + '_type'] !== null && params[mixPrefix + '_type'] !== '') {
+      typeValue = params[mixPrefix + '_type'];
+      prefix = mixPrefix;
+    } else if (params[globalPrefix + '_type'] !== undefined && params[globalPrefix + '_type'] !== null && params[globalPrefix + '_type'] !== '') {
+      typeValue = params[globalPrefix + '_type'];
+      prefix = globalPrefix;
+    } else {
+      return null;
+    }
+    var typeNorm = String(typeValue).trim().toLowerCase();
+    if (typeNorm === 'glide' || typeNorm === 'glidepath') typeNorm = 'glidePath';
+    if (typeNorm !== 'fixed' && typeNorm !== 'glidePath') return null;
+    var mix = {
+      type: typeNorm,
+      asset1: params[prefix + '_asset1'],
+      asset2: params[prefix + '_asset2'],
+      startAge: toNumber(params[prefix + '_startAge']),
+      targetAge: toNumber(params[prefix + '_targetAge']),
+      targetAgeOverridden: params[prefix + '_targetAgeOverridden'],
+      startAsset1Pct: normalizePct(params[prefix + '_startAsset1Pct']),
+      startAsset2Pct: normalizePct(params[prefix + '_startAsset2Pct']),
+      endAsset1Pct: normalizePct(params[prefix + '_endAsset1Pct']),
+      endAsset2Pct: normalizePct(params[prefix + '_endAsset2Pct'])
+    };
+    if (mix.startAsset1Pct === null && mix.startAsset2Pct !== null) mix.startAsset1Pct = 100 - mix.startAsset2Pct;
+    if (mix.endAsset1Pct === null && mix.endAsset2Pct !== null) mix.endAsset1Pct = 100 - mix.endAsset2Pct;
+    mix.asset1Growth = normalizeRate(params['GlobalAssetGrowth_' + mix.asset1]);
+    mix.asset2Growth = normalizeRate(params['GlobalAssetGrowth_' + mix.asset2]);
+    mix.asset1Vol = normalizeRate(params['GlobalAssetVolatility_' + mix.asset1]);
+    mix.asset2Vol = normalizeRate(params['GlobalAssetVolatility_' + mix.asset2]);
+    mix.country = countryCode;
+    mix.baseKey = baseKey;
+    return mix;
+  }
+
+  static createAssets(ruleset, growthRatesByKey, stdDevsByKey, params) {
     var assets = [];
     if (!ruleset || typeof ruleset.getInvestmentTypes !== 'function') return assets;
     var types = ruleset.getResolvedInvestmentTypes();
+    var countryCode = null;
+    if (ruleset && typeof ruleset.getCountryCode === 'function') {
+      var cc = ruleset.getCountryCode();
+      if (cc) countryCode = String(cc).toLowerCase();
+    }
     for (var i = 0; i < types.length; i++) {
       var t = types[i];
       var key = t && t.key ? t.key : 'asset' + i;
+      var baseKey = key;
+      var suffix = (countryCode ? ('_' + countryCode) : '');
+      if (suffix && String(key).toLowerCase().lastIndexOf(suffix) === String(key).toLowerCase().length - suffix.length) {
+        baseKey = String(key).slice(0, String(key).length - suffix.length);
+      }
+      var mixConfig = InvestmentTypeFactory.resolveMixConfig(params, countryCode, baseKey);
       var gr = (growthRatesByKey && growthRatesByKey[key] !== undefined) ? growthRatesByKey[key] : undefined;
       var sd = (stdDevsByKey && stdDevsByKey[key] !== undefined) ? stdDevsByKey[key] : undefined;
       // Backward compat: if caller provided base keys (e.g. indexFunds/shares),
       // project them onto namespaced keys (e.g. indexFunds_ie/shares_ie).
       if (gr === undefined && growthRatesByKey && key && String(key).indexOf('_') > 0) {
-        var baseKey = String(key).split('_')[0];
-        if (growthRatesByKey[baseKey] !== undefined) gr = growthRatesByKey[baseKey];
+        var baseKeyCompat = String(key).split('_')[0];
+        if (growthRatesByKey[baseKeyCompat] !== undefined) gr = growthRatesByKey[baseKeyCompat];
       }
       if (sd === undefined && stdDevsByKey && key && String(key).indexOf('_') > 0) {
         var baseKey2 = String(key).split('_')[0];
@@ -230,10 +297,12 @@ class InvestmentTypeFactory {
       var baseCurrency = t.baseCurrency;
       var assetCountry = t.assetCountry;
       var residenceScope = t.residenceScope;
+      var assetInstance = new GenericInvestmentAsset(t, gr, sd, ruleset);
+      if (mixConfig) assetInstance.mixConfig = mixConfig;
       assets.push({
         key: key,
         label: (t.label || key),
-        asset: new GenericInvestmentAsset(t, gr, sd, ruleset),
+        asset: assetInstance,
         baseCurrency: baseCurrency,
         assetCountry: assetCountry,
         residenceScope: residenceScope

@@ -2109,6 +2109,75 @@ footer {
   text-align: right;
 }
 
+/* Mix config modal */
+.mix-config-modal .mix-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.mix-config-modal .mix-label {
+  font-weight: 600;
+  color: var(--text-color);
+  min-width: 140px;
+}
+
+.mix-config-modal .mix-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.mix-config-modal .mix-type-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.mix-config-modal label {
+  flex: 0 0 auto;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.mix-config-modal .mix-type-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 500;
+}
+
+.mix-config-modal .mix-inline input[type="text"] {
+  width: 56px;
+  text-align: right;
+}
+
+.mix-config-modal .mix-inline select {
+  min-width: 140px;
+}
+
+.mix-config-modal .mix-slider-row {
+  flex: 1 1 220px;
+}
+
+.mix-config-modal .mix-slider-row input[type="range"] {
+  flex: 1 1 180px;
+}
+
+.mix-config-modal .mix-slider-label {
+  font-size: 0.8rem;
+  color: #555;
+  min-width: 150px;
+  text-align: right;
+}
+
+.mix-config-modal .mix-row.mix-target {
+  margin-bottom: 0;
+}
+
 /* Status indicator clickable when error */
 .status-indicator.error {
   cursor: pointer;

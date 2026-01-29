@@ -57,6 +57,7 @@
     "statePensionAge": 67,
     "statePensionIncreaseBands": {  },
     "pensionSystem": { "type": "mixed" },
+    "taxAdvantaged": true,
     "definedBenefit": { "treatment": "privatePension" }
   },
 

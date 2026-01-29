@@ -505,7 +505,7 @@ function initializeSimulationVariables() {
       var code = countryOrder[ci];
       var rs = cfg.getCachedTaxRuleSet(code);
       if (rs && typeof InvestmentTypeFactory !== 'undefined') {
-        var assets = InvestmentTypeFactory.createAssets(rs, growthByKey, volByKey);
+        var assets = InvestmentTypeFactory.createAssets(rs, growthByKey, volByKey, params);
         for (var ai = 0; ai < assets.length; ai++) {
           var a = assets[ai];
           if (a && a.key && !seenKeys[a.key]) {
@@ -597,7 +597,12 @@ function initializeSimulationVariables() {
     growthRatePension: params.growthRatePension,
     growthDevPension: params.growthDevPension
   });
-  if (params.initialPension > 0) person1.getPensionForCountry(baseStateCountry).buy(params.initialPension, baseStateCurrency, baseStateCountry);
+  var p1Pension = person1.getPensionForCountry(baseStateCountry);
+  var p1MixConfig = resolvePensionMixConfig(person1, baseStateCountry);
+  p1Pension.mixConfig = p1MixConfig || null;
+  if (params.initialPension > 0) {
+    buyPensionWithMix(p1Pension, params.initialPension, baseStateCurrency, baseStateCountry, p1MixConfig, person1.age + 1);
+  }
 
   // Initialize Person 2 (P2) if the mode is 'couple'
   if (params.simulation_mode === 'couple') {
@@ -620,7 +625,12 @@ function initializeSimulationVariables() {
       growthRatePension: params.growthRatePension,
       growthDevPension: params.growthDevPension
     });
-    if (params.initialPensionP2 > 0) person2.getPensionForCountry(baseStateCountry).buy(params.initialPensionP2, baseStateCurrency, baseStateCountry);
+    var p2Pension = person2.getPensionForCountry(baseStateCountry);
+    var p2MixConfig = resolvePensionMixConfig(person2, baseStateCountry);
+    p2Pension.mixConfig = p2MixConfig || null;
+    if (params.initialPensionP2 > 0) {
+      buyPensionWithMix(p2Pension, params.initialPensionP2, baseStateCurrency, baseStateCountry, p2MixConfig, person2.age + 1);
+    }
   } else {
     person2 = null;
   }
@@ -1267,7 +1277,10 @@ function processEvents() {
                 }
                 // buy() receives numeric amount + currency/country metadata.
                 // Use getPensionForCountry to get/create the correct country's pension pot.
-                salaryPerson.getPensionForCountry(pensionCountry).buy(totalContrib, pensionCurrency, pensionCountry);
+                var pensionPot = salaryPerson.getPensionForCountry(pensionCountry);
+                var pensionMixConfig = resolvePensionMixConfig(salaryPerson, pensionCountry);
+                pensionPot.mixConfig = pensionMixConfig || null;
+                buyPensionWithMix(pensionPot, totalContrib, pensionCurrency, pensionCountry, pensionMixConfig, salaryPerson.age);
               }
               declaredRate = baseRate;
             }
@@ -1713,6 +1726,54 @@ function processEvents() {
   }
 }
 
+function getPensionMixBaseKey(person) {
+  if (person && person.id === 'P2') return 'pensionP2';
+  return 'pensionP1';
+}
+
+function resolvePensionMixConfig(person, countryCode) {
+  var baseKey = getPensionMixBaseKey(person);
+  var cc = normalizeCountry(countryCode);
+  return InvestmentTypeFactory.resolveMixConfig(params, cc, baseKey);
+}
+
+function buyPensionWithMix(pensionPot, amount, currency, country, mixConfig, currentAge) {
+  if (mixConfig && (mixConfig.type === 'fixed' || mixConfig.type === 'glidePath')) {
+    var asset1Pct = mixConfig.startAsset1Pct;
+    if (mixConfig.type === 'glidePath' && typeof GlidePathCalculator !== 'undefined') {
+      var currentMix = GlidePathCalculator.getCurrentMix(currentAge, mixConfig);
+      if (currentMix) asset1Pct = currentMix.asset1Pct;
+    }
+    if (asset1Pct === null || asset1Pct === undefined) asset1Pct = mixConfig.endAsset1Pct;
+    var asset2Pct = 100 - asset1Pct;
+    var amount1 = amount * (asset1Pct / 100);
+    var amount2 = amount - amount1;
+    if (amount1 > 0) pensionPot.buy(amount1, currency, country, mixConfig.asset1Growth, mixConfig.asset1Vol);
+    if (amount2 > 0) pensionPot.buy(amount2, currency, country, mixConfig.asset2Growth, mixConfig.asset2Vol);
+  } else {
+    pensionPot.buy(amount, currency, country);
+  }
+}
+
+function rebalancePersonPensions(person) {
+  var pensions = person.pensions;
+  var keys = Object.keys(pensions).sort();
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var pot = pensions[key];
+    if (!pot) continue;
+    var mixConfig = resolvePensionMixConfig(person, key);
+    pot.mixConfig = mixConfig || null;
+    if (!mixConfig) continue;
+    var entry = {
+      asset: pot,
+      baseCurrency: pot._getBaseCurrency(),
+      assetCountry: pot._getAssetCountry()
+    };
+    rebalanceMixAsset(entry, 0, person.age);
+  }
+}
+
 
 function handleInvestments() {
   netIncome = revenue.netIncome() + incomeTaxFree;
@@ -1796,6 +1857,7 @@ function handleInvestments() {
       var allocations = getAllocationsByYear(year);
       var sumInvested = 0;
       var sumAlloc = 0;
+      var currentAge = person1 ? person1.age : null;
       for (var i = 0; i < investmentAssets.length; i++) {
         var entry = investmentAssets[i];
         var alloc = allocations[entry.key] || 0;
@@ -1805,8 +1867,11 @@ function handleInvestments() {
           if (amount > 0) {
             // Apply implicit currency conversion: convert if base currency differs from residence.
             // If baseCurrency is missing, follow the legacy default (no conversion).
+            var amountInAssetCurrency = amount;
+            var buyCurrency = residenceCurrency;
+            var buyCountry = currentCountry;
             if (entry.baseCurrency && entry.baseCurrency !== residenceCurrency) {
-              var amountInAssetCurrency = convertCurrencyAmount(
+              amountInAssetCurrency = convertCurrencyAmount(
                 amount,
                 residenceCurrency,
                 currentCountry,
@@ -1820,10 +1885,25 @@ function handleInvestments() {
                 }
                 continue;
               }
-              entry.asset.buy(amountInAssetCurrency, entry.baseCurrency, entry.assetCountry);
+              buyCurrency = entry.baseCurrency;
+              buyCountry = entry.assetCountry;
+            }
+            var mixConfig = entry.asset.mixConfig;
+            if (mixConfig && (mixConfig.type === 'fixed' || mixConfig.type === 'glidePath')) {
+              var asset1Pct = mixConfig.startAsset1Pct;
+              if (mixConfig.type === 'glidePath' && typeof GlidePathCalculator !== 'undefined') {
+                var currentMix = GlidePathCalculator.getCurrentMix(currentAge, mixConfig);
+                if (currentMix) asset1Pct = currentMix.asset1Pct;
+              }
+              if (asset1Pct === null || asset1Pct === undefined) asset1Pct = mixConfig.endAsset1Pct;
+              var asset2Pct = 100 - asset1Pct;
+              var amount1 = amountInAssetCurrency * (asset1Pct / 100);
+              var amount2 = amountInAssetCurrency - amount1;
+              if (amount1 > 0) entry.asset.buy(amount1, buyCurrency, buyCountry, mixConfig.asset1Growth, mixConfig.asset1Vol);
+              if (amount2 > 0) entry.asset.buy(amount2, buyCurrency, buyCountry, mixConfig.asset2Growth, mixConfig.asset2Vol);
             } else {
               // Base currency matches residence currency - no conversion needed
-              entry.asset.buy(amount, residenceCurrency, currentCountry);
+              entry.asset.buy(amountInAssetCurrency, buyCurrency, buyCountry);
             }
             // Track invested amount in residence currency for cash deduction
             sumInvested += amount;
@@ -1853,6 +1933,25 @@ function handleInvestments() {
       cashMoney.amount -= invested;
     }
   }
+  // Hybrid rebalance for mix-enabled assets (after surplus allocation, before next year's growth)
+  if (investmentAssets && investmentAssets.length > 0) {
+    var currentAge = person1 ? person1.age : null;
+    var remainingSurplus = cash > targetCash ? (cash - targetCash) : 0;
+    for (var ri = 0; ri < investmentAssets.length; ri++) {
+      var entry = investmentAssets[ri];
+      if (entry.asset && entry.asset.mixConfig) {
+        var consumed = rebalanceMixAsset(entry, remainingSurplus, currentAge);
+        if (consumed > 0) {
+          remainingSurplus -= consumed;
+          cash -= consumed;
+          cashMoney.amount -= consumed;
+        }
+      }
+    }
+  }
+  // Pension mix rebalancing (per person, per country)
+  if (person1) rebalancePersonPensions(person1);
+  if (person2) rebalancePersonPensions(person2);
   /**
    * @assumes residenceCurrency - Emergency cash top-up uses residence currency amounts.
    * @performance Hot path - direct .amount access for cash top-up.
@@ -1879,6 +1978,169 @@ function handleInvestments() {
   // This is done at the end of the year so it applies to the target for the NEXT year
   var residenceInflation = resolveCountryInflation(currentCountry);
   targetCash *= (1 + residenceInflation);
+}
+
+
+function rebalanceMixAsset(assetEntry, surplusCash, currentAge) {
+  var asset = assetEntry.asset;
+  var mixConfig = asset.mixConfig;
+  if (!mixConfig || (mixConfig.type !== 'fixed' && mixConfig.type !== 'glidePath')) return 0;
+  if (!asset.portfolio || asset.portfolio.length === 0) return 0;
+  var skipTax = asset && asset._isPension && asset.taxAdvantaged;
+  if (skipTax) asset._internalRebalance = true;
+  try {
+
+    var t1 = 0;
+    var t2 = 0;
+    if (mixConfig.type === 'glidePath') {
+      var currentMix = GlidePathCalculator.getCurrentMix(currentAge, mixConfig);
+      t1 = currentMix.asset1Pct / 100;
+      t2 = currentMix.asset2Pct / 100;
+    } else {
+      var asset1Pct = mixConfig.startAsset1Pct;
+      if (asset1Pct === null || asset1Pct === undefined) asset1Pct = mixConfig.endAsset1Pct;
+      var asset2Pct = mixConfig.startAsset2Pct;
+      if (asset2Pct === null || asset2Pct === undefined) asset2Pct = 100 - asset1Pct;
+      t1 = asset1Pct / 100;
+      t2 = asset2Pct / 100;
+    }
+
+    var matchTolerance = 0.0001;
+    var v1 = 0;
+    var v2 = 0;
+    for (var i = 0; i < asset.portfolio.length; i++) {
+      var holding = asset.portfolio[i];
+      if (typeof holding.growth !== 'number' || typeof holding.stdev !== 'number') continue;
+      var isAsset1 = Math.abs(holding.growth - mixConfig.asset1Growth) < matchTolerance &&
+        Math.abs(holding.stdev - mixConfig.asset1Vol) < matchTolerance;
+      var isAsset2 = Math.abs(holding.growth - mixConfig.asset2Growth) < matchTolerance &&
+        Math.abs(holding.stdev - mixConfig.asset2Vol) < matchTolerance;
+      if (!isAsset1 && !isAsset2) continue;
+
+      var holdingCapital = holding.principal.amount + holding.interest.amount;
+      var holdingConverted = holdingCapital;
+      if (holding.principal.currency !== residenceCurrency || holding.principal.country !== currentCountry) {
+        holdingConverted = convertCurrencyAmount(
+          holdingCapital,
+          holding.principal.currency,
+          holding.principal.country,
+          residenceCurrency,
+          currentCountry,
+          year,
+          true
+        );
+        if (holdingConverted === null) {
+          throw new Error('rebalanceMixAsset: holding conversion failed');
+        }
+      }
+      if (isAsset1) v1 += holdingConverted;
+      if (isAsset2) v2 += holdingConverted;
+    }
+
+    if (v1 + v2 === 0) return 0;
+
+    var V = v1 + v2 + surplusCash;
+    var targetV1 = V * t1;
+    var targetV2 = V * t2;
+    var d1 = targetV1 - v1;
+    var d2 = targetV2 - v2;
+    var tolerance = 0.001;
+
+    var buyCurrency = residenceCurrency;
+    var buyCountry = currentCountry;
+    if (assetEntry.baseCurrency && assetEntry.baseCurrency !== residenceCurrency) {
+      buyCurrency = assetEntry.baseCurrency;
+      buyCountry = assetEntry.assetCountry;
+    }
+
+    var startingSurplus = surplusCash;
+
+    function buyIntoMix(amountResidence, growthOverride, stdevOverride) {
+      var amountInAssetCurrency = amountResidence;
+      if (buyCurrency !== residenceCurrency) {
+        amountInAssetCurrency = convertCurrencyAmount(
+          amountResidence,
+          residenceCurrency,
+          currentCountry,
+          buyCurrency,
+          buyCountry,
+          year,
+          true
+        );
+        if (amountInAssetCurrency === null) {
+          throw new Error('rebalanceMixAsset: buy conversion failed');
+        }
+      }
+      asset.buy(amountInAssetCurrency, buyCurrency, buyCountry, growthOverride, stdevOverride);
+    }
+
+    function sellFromAssetType(targetGrowth, targetStdev, amountToSell) {
+      if (amountToSell <= 0) return 0;
+      var originalPortfolio = asset.portfolio;
+      var matchingHoldings = [];
+      for (var hi = 0; hi < originalPortfolio.length; hi++) {
+        var h = originalPortfolio[hi];
+        if (typeof h.growth !== 'number' || typeof h.stdev !== 'number') continue;
+        if (Math.abs(h.growth - targetGrowth) < matchTolerance &&
+          Math.abs(h.stdev - targetStdev) < matchTolerance) {
+          matchingHoldings.push(h);
+        }
+      }
+      if (matchingHoldings.length === 0) return 0;
+      var matchSet = new Set(matchingHoldings);
+      asset.portfolio = matchingHoldings;
+      var sold = asset.sell(amountToSell);
+      if (sold === null) {
+        asset.portfolio = originalPortfolio;
+        throw new Error('rebalanceMixAsset: sell conversion failed');
+      }
+      var remainingSet = new Set(asset.portfolio);
+      var rebuilt = [];
+      for (var pi = 0; pi < originalPortfolio.length; pi++) {
+        var ph = originalPortfolio[pi];
+        if (matchSet.has(ph)) {
+          if (remainingSet.has(ph)) rebuilt.push(ph);
+        } else {
+          rebuilt.push(ph);
+        }
+      }
+      asset.portfolio = rebuilt;
+      return sold;
+    }
+
+    if (d1 > tolerance * V && surplusCash > 0) {
+      var buy1 = Math.min(d1, surplusCash);
+      if (buy1 > 0) {
+        buyIntoMix(buy1, mixConfig.asset1Growth, mixConfig.asset1Vol);
+        surplusCash -= buy1;
+        d1 -= buy1;
+      }
+    }
+    if (d2 > tolerance * V && surplusCash > 0) {
+      var buy2 = Math.min(d2, surplusCash);
+      if (buy2 > 0) {
+        buyIntoMix(buy2, mixConfig.asset2Growth, mixConfig.asset2Vol);
+        surplusCash -= buy2;
+        d2 -= buy2;
+      }
+    }
+
+    if (d1 > tolerance * V && d2 < -tolerance * V) {
+      var sold2 = sellFromAssetType(mixConfig.asset2Growth, mixConfig.asset2Vol, d1);
+      if (sold2 > 0) {
+        buyIntoMix(sold2, mixConfig.asset1Growth, mixConfig.asset1Vol);
+      }
+    } else if (d2 > tolerance * V && d1 < -tolerance * V) {
+      var sold1 = sellFromAssetType(mixConfig.asset1Growth, mixConfig.asset1Vol, d2);
+      if (sold1 > 0) {
+        buyIntoMix(sold1, mixConfig.asset2Growth, mixConfig.asset2Vol);
+      }
+    }
+
+    return startingSurplus - surplusCash;
+  } finally {
+    if (skipTax) asset._internalRebalance = false;
+  }
 }
 
 

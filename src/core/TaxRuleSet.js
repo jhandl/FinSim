@@ -507,6 +507,12 @@ class TaxRuleSet {
     return 'mixed';
   }
 
+  isPrivatePensionTaxAdvantaged() {
+    var pr = this.raw.pensionRules || {};
+    if (typeof pr.taxAdvantaged === 'boolean') return pr.taxAdvantaged;
+    return true;
+  }
+
   /**
    * Return true if this country has a private pension system (not state-only).
    * @returns {boolean}

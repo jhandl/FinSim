@@ -1271,9 +1271,6 @@ class WebUI extends AbstractUI {
       const types = Array.isArray(fallbackStartTypes) ? fallbackStartTypes : [];
       const startCountry = (cfg.getStartCountry() || '').toLowerCase();
 
-      // Pension contribution controls remain StartCountry-scoped (same ids as per-country mode)
-      this._renderCountryPensionContributionFields(allocGroup, startCountry, simulationMode);
-
       // Render global allocation fields using GlobalAllocation_* keys (independent of per-country fields).
       for (let i = 0; i < types.length; i++) {
         const t = types[i] || {};
@@ -1317,6 +1314,8 @@ class WebUI extends AbstractUI {
 
         allocGroup.appendChild(wrapper);
       }
+      // Pension contribution controls remain StartCountry-scoped (same ids as per-country mode)
+      this._renderCountryPensionContributionFields(allocGroup, startCountry, simulationMode);
       this._refreshAllocationsLabelLayout();
       return;
     }
@@ -1340,9 +1339,6 @@ class WebUI extends AbstractUI {
         countryContainer.style.flexDirection = 'column';
         countryContainer.style.gap = '0.225rem';
         countryContainer.style.display = 'flex';
-
-        // Pension fields first
-        this._renderCountryPensionContributionFields(countryContainer, startCountry, simulationMode);
 
         for (let i = 0; i < types.length; i++) {
           const t = types[i] || {};
@@ -1395,14 +1391,13 @@ class WebUI extends AbstractUI {
 
           countryContainer.appendChild(wrapper);
         }
+        // Pension fields below allocations
+        this._renderCountryPensionContributionFields(countryContainer, startCountry, simulationMode);
 
         allocGroup.appendChild(countryContainer);
         this._refreshAllocationsLabelLayout();
       } else {
         // Relocation disabled: keep original legacy layout/IDs.
-        // Pension fields first
-        this._renderCountryPensionContributionFields(allocGroup, startCountry, simulationMode);
-
         for (let i = 0; i < types.length; i++) {
           const t = types[i] || {};
           const key = t.key;
@@ -1445,6 +1440,8 @@ class WebUI extends AbstractUI {
 
           allocGroup.appendChild(wrapper);
         }
+        // Pension fields below allocations
+        this._renderCountryPensionContributionFields(allocGroup, startCountry, simulationMode);
         this._refreshAllocationsLabelLayout();
       }
       return;
@@ -1481,9 +1478,6 @@ class WebUI extends AbstractUI {
       countryContainer.style.display = countryContainer.style.display || 'flex';
       countryContainer.style.flexDirection = 'column';
       countryContainer.style.gap = '0.225rem';
-
-      // Pension fields first
-      this._renderCountryPensionContributionFields(countryContainer, code, simulationMode);
 
       for (let i = 0; i < invTypes.length; i++) {
         const t = invTypes[i] || {};
@@ -1538,6 +1532,8 @@ class WebUI extends AbstractUI {
 
         countryContainer.appendChild(wrapper);
       }
+      // Pension fields below allocations
+      this._renderCountryPensionContributionFields(countryContainer, code, simulationMode);
 
       allocGroup.appendChild(countryContainer);
     }
@@ -1637,21 +1633,39 @@ class WebUI extends AbstractUI {
       const v = t.baseKey;
       if (!v) continue;
       const label = t.label || v;
-      out.push({ value: v, label: label, description: label });
+      out.push({ value: v, label: label, shortLabel: t.shortLabel || '', description: label });
     }
     return out;
   }
 
   _appendHoldsDropdown(wrapperEl, hiddenInputId, defaultBaseKey) {
-    const options = this._getGlobalBaseTypeDropdownOptions();
-    if (!options.length) return;
+    const baseOptions = this._getGlobalBaseTypeDropdownOptions();
+    if (!baseOptions.length) return;
     if (!wrapperEl) return;
 
-    const hidden = this._takeOrCreateInput(hiddenInputId, 'string');
-    hidden.type = 'hidden';
-    hidden.autocomplete = 'off';
-    if (!hidden.value && defaultBaseKey) hidden.value = defaultBaseKey;
-    wrapperEl.appendChild(hidden);
+    const mixPrefix = String(hiddenInputId || '').replace(/_asset1$/i, '');
+    const mixInputs = this._ensureMixConfigInputs(mixPrefix, defaultBaseKey);
+    const hidden = mixInputs.asset1;
+
+    const strategiesEnabled = !!this.investmentStrategiesEnabled;
+    const mixValue = '__mix__';
+    const buildOptions = (selectedValue) => {
+      const out = [];
+      for (let i = 0; i < baseOptions.length; i++) {
+        const opt = baseOptions[i];
+        if (!opt) continue;
+        out.push({
+          value: opt.value,
+          label: opt.label,
+          description: opt.description,
+          selected: opt.value === selectedValue,
+        });
+      }
+      if (strategiesEnabled) {
+        out.push({ value: mixValue, label: 'Mix...', description: 'Configure a fixed or glidepath mix.' });
+      }
+      return out;
+    };
 
     const controlDiv = document.createElement('div');
     controlDiv.className = 'alloc-holds-control visualization-control';
@@ -1663,24 +1677,38 @@ class WebUI extends AbstractUI {
     optionsDiv.className = 'visualization-dropdown';
     optionsDiv.style.display = 'none';
     controlDiv.appendChild(optionsDiv);
+
     wrapperEl.appendChild(controlDiv);
 
-    const currentValue = hidden.value || options[0].value;
+    let currentValue = hidden.value || baseOptions[0].value;
     hidden.value = currentValue;
     let currentLabel = null;
-    for (let i = 0; i < options.length; i++) {
-      if (options[i].value === currentValue) { currentLabel = options[i].label; break; }
+    for (let i = 0; i < baseOptions.length; i++) {
+      if (baseOptions[i].value === currentValue) { currentLabel = baseOptions[i].label; break; }
     }
     toggleSpan.textContent = currentLabel || currentValue;
     this._fitAllocHoldsToggleWidth(toggleSpan);
 
-    DropdownUtils.create({
+    const dropdown = DropdownUtils.create({
       toggleEl: toggleSpan,
       dropdownEl: optionsDiv,
-      options: options,
+      options: buildOptions(currentValue),
       selectedValue: currentValue,
       onSelect: (val, labelText) => {
+        if (val === mixValue) {
+          dropdown.setOptions(buildOptions(currentValue));
+          this._openMixConfigModal({
+            mixPrefix: mixPrefix,
+            baseOptions: baseOptions,
+            updateSummary: () => updateMixSummary(),
+            defaultAsset1: currentValue
+          });
+          return;
+        }
         hidden.value = val;
+        currentValue = val;
+        currentLabel = labelText;
+        mixInputs.type.value = '';
         toggleSpan.textContent = labelText;
         this._fitAllocHoldsToggleWidth(toggleSpan);
         // Holds width change can reduce label space; recompute wrap/layout.
@@ -1688,6 +1716,379 @@ class WebUI extends AbstractUI {
         hidden.dispatchEvent(new Event('change', { bubbles: true }));
       },
     });
+
+    const updateMixSummary = () => {
+      const showSummary = strategiesEnabled && this._hasMixConfig(mixPrefix);
+      const selectedValue = showSummary ? mixValue : currentValue;
+      dropdown.setOptions(buildOptions(selectedValue));
+      const opts = optionsDiv.querySelectorAll('[data-value]');
+      for (let i = 0; i < opts.length; i++) {
+        const opt = opts[i];
+        const val = opt.getAttribute('data-value');
+        opt.classList.toggle('selected', val === selectedValue);
+      }
+      toggleSpan.classList.toggle('alloc-holds-summary', showSummary);
+      if (showSummary) {
+        currentValue = hidden.value || currentValue;
+        toggleSpan.textContent = this._formatMixSummary(mixPrefix, baseOptions);
+      } else {
+        const display = currentLabel || currentValue;
+        toggleSpan.textContent = display;
+      }
+      this._fitAllocHoldsToggleWidth(toggleSpan);
+      this._refreshAllocationsLabelLayout();
+    };
+
+    updateMixSummary();
+  }
+
+  _ensureMixConfigInputs(mixPrefix, defaultAsset1) {
+    const ensure = (suffix, className, defaultValue) => {
+      const id = mixPrefix + '_' + suffix;
+      const el = this._takeOrCreateInput(id, className || '');
+      el.type = 'hidden';
+      el.autocomplete = 'off';
+      this._applyAllocationValueIfCached(id, el);
+      if (!el.value && defaultValue !== undefined) el.value = defaultValue;
+      this._stashInputElement(el);
+      return el;
+    };
+    const asset1 = ensure('asset1', 'string', defaultAsset1);
+    const asset2 = ensure('asset2', 'string');
+    const type = ensure('type', 'string');
+    const startAge = ensure('startAge', 'number');
+    const targetAge = ensure('targetAge', 'number');
+    const targetAgeOverridden = ensure('targetAgeOverridden', 'boolean');
+    const startAsset1Pct = ensure('startAsset1Pct', 'percentage');
+    const startAsset2Pct = ensure('startAsset2Pct', 'percentage');
+    const endAsset1Pct = ensure('endAsset1Pct', 'percentage');
+    const endAsset2Pct = ensure('endAsset2Pct', 'percentage');
+    return {
+      asset1: asset1,
+      asset2: asset2,
+      type: type,
+      startAge: startAge,
+      targetAge: targetAge,
+      targetAgeOverridden: targetAgeOverridden,
+      startAsset1Pct: startAsset1Pct,
+      startAsset2Pct: startAsset2Pct,
+      endAsset1Pct: endAsset1Pct,
+      endAsset2Pct: endAsset2Pct
+    };
+  }
+
+  _hasMixConfig(mixPrefix) {
+    const typeEl = document.getElementById(mixPrefix + '_type');
+    const typeVal = typeEl && typeEl.value ? String(typeEl.value).trim().toLowerCase() : '';
+    return typeVal === 'fixed' || typeVal === 'glide' || typeVal === 'glidepath';
+  }
+
+  _stripGlobalPrefix(label) {
+    return (label || '').toString().replace(/^global\s+/i, '');
+  }
+
+  _shortAssetLabel(label) {
+    const stripped = this._stripGlobalPrefix(label);
+    const lower = stripped.toLowerCase();
+    if (lower.indexOf('equity') === 0) return 'Eq';
+    if (lower.indexOf('bond') === 0) return 'Bonds';
+    return stripped;
+  }
+
+  _formatMixSummary(mixPrefix, baseOptions) {
+    const typeEl = document.getElementById(mixPrefix + '_type');
+    const typeVal = typeEl && typeEl.value ? String(typeEl.value).trim().toLowerCase() : '';
+    const isGlide = typeVal === 'glide' || typeVal === 'glidepath';
+    const asset1 = document.getElementById(mixPrefix + '_asset1');
+    const asset2 = document.getElementById(mixPrefix + '_asset2');
+    const labelMap = {};
+    const shortLabelMap = {};
+    const opts = Array.isArray(baseOptions) ? baseOptions : this._getGlobalBaseTypeDropdownOptions();
+    for (let i = 0; i < opts.length; i++) {
+      const opt = opts[i];
+      if (!opt || !opt.value) continue;
+      labelMap[opt.value] = opt.label || opt.value;
+      shortLabelMap[opt.value] = opt.shortLabel || '';
+    }
+    const asset1Label = this._stripGlobalPrefix(labelMap[asset1 && asset1.value] || (asset1 && asset1.value) || 'Asset1');
+    const asset2Label = this._stripGlobalPrefix(labelMap[asset2 && asset2.value] || (asset2 && asset2.value) || 'Asset2');
+    const asset1Short = shortLabelMap[asset1 && asset1.value] || this._shortAssetLabel(asset1Label);
+    const asset2Short = shortLabelMap[asset2 && asset2.value] || this._shortAssetLabel(asset2Label);
+
+    const pctVal = (field) => {
+      const el = document.getElementById(mixPrefix + '_' + field);
+      const raw = el && el.value ? String(el.value).trim() : '';
+      const num = parseInt(raw, 10);
+      return isNaN(num) ? null : num;
+    };
+    let startPct1 = pctVal('startAsset1Pct');
+    let startPct2 = pctVal('startAsset2Pct');
+    if (startPct2 === null && startPct1 !== null) startPct2 = 100 - startPct1;
+    let endPct1 = pctVal('endAsset1Pct');
+    let endPct2 = pctVal('endAsset2Pct');
+    if (endPct2 === null && endPct1 !== null) endPct2 = 100 - endPct1;
+    if (startPct1 === null && endPct1 !== null) startPct1 = endPct1;
+    if (startPct2 === null && endPct2 !== null) startPct2 = endPct2;
+
+    const startPctText = startPct1 === null ? '?' : String(startPct1);
+    const startPct2Text = startPct2 === null ? '?' : String(startPct2);
+    const endPctText = endPct1 === null ? '?' : String(endPct1);
+    const endPct2Text = endPct2 === null ? '?' : String(endPct2);
+
+    if (!isGlide) {
+      return `${startPctText}/${startPct2Text} ${asset1Short}/${asset2Short}`;
+    }
+
+    const targetAgeEl = document.getElementById(mixPrefix + '_targetAge');
+    const targetAge = targetAgeEl && targetAgeEl.value ? String(targetAgeEl.value).trim() : '?';
+    return `→${endPctText}/${endPct2Text} ${asset1Short}/${asset2Short}`;
+  }
+
+  _ensureMixModal() {
+    if (this._mixModal) return this._mixModal;
+    const modal = document.createElement('div');
+    modal.id = 'mixConfigModal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-content mix-config-modal">
+        <div class="modal-header">
+          <h3>Mix Strategy</h3>
+          <span class="modal-close" aria-label="Close">&times;</span>
+        </div>
+        <div class="modal-body">
+          <div class="mix-row">
+            <div class="mix-label">Mix Type:</div>
+            <div class="mix-type-toggle">
+              <label><input type="radio" name="mixConfigType" value="fixed"> Fixed</label>
+              <label><input type="radio" name="mixConfigType" value="glide"> Glide Path</label>
+            </div>
+          </div>
+          <div class="mix-row mix-timeline">
+            <div class="mix-label">Timeline (Glide only):</div>
+            <div class="mix-inline">
+              <span>Start Age</span>
+              <input id="mixConfigStartAge" type="text" inputmode="numeric" pattern="[0-9]*">
+              <span>Target</span>
+              <input id="mixConfigTargetAge" type="text" inputmode="numeric" pattern="[0-9]*">
+            </div>
+          </div>
+          <div class="mix-row">
+            <div class="mix-label">Assets:</div>
+            <div class="mix-inline">
+              <span>Asset1</span>
+              <select id="mixConfigAsset1"></select>
+              <span>Asset2</span>
+              <select id="mixConfigAsset2"></select>
+            </div>
+          </div>
+          <div class="mix-row">
+            <div class="mix-label">Start Mix:</div>
+            <div class="mix-inline mix-slider-row">
+              <input id="mixConfigStartSlider" type="range" min="0" max="100" step="1">
+              <div class="mix-slider-label" id="mixConfigStartLabel"></div>
+            </div>
+          </div>
+          <div class="mix-row mix-target">
+            <div class="mix-label">Target Mix:</div>
+            <div class="mix-inline mix-slider-row">
+              <input id="mixConfigEndSlider" type="range" min="0" max="100" step="1">
+              <div class="mix-slider-label" id="mixConfigEndLabel"></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="mixConfigCancel" class="secondary-button">Cancel</button>
+          <button id="mixConfigApply" class="primary-button">Apply</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const closeX = modal.querySelector('.modal-close');
+    const cancelBtn = modal.querySelector('#mixConfigCancel');
+    const applyBtn = modal.querySelector('#mixConfigApply');
+    const typeFixed = modal.querySelector('input[name="mixConfigType"][value="fixed"]');
+    const typeGlide = modal.querySelector('input[name="mixConfigType"][value="glide"]');
+    const startAgeInput = modal.querySelector('#mixConfigStartAge');
+    const targetAgeInput = modal.querySelector('#mixConfigTargetAge');
+    const asset1Select = modal.querySelector('#mixConfigAsset1');
+    const asset2Select = modal.querySelector('#mixConfigAsset2');
+    const startSlider = modal.querySelector('#mixConfigStartSlider');
+    const endSlider = modal.querySelector('#mixConfigEndSlider');
+    const startLabel = modal.querySelector('#mixConfigStartLabel');
+    const endLabel = modal.querySelector('#mixConfigEndLabel');
+    const timelineRow = modal.querySelector('.mix-timeline');
+    const targetRow = modal.querySelector('.mix-target');
+
+    const closeModal = () => this._closeMixConfigModal();
+    closeX.addEventListener('click', closeModal);
+    cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    this._mixModal = {
+      modal: modal,
+      applyBtn: applyBtn,
+      typeFixed: typeFixed,
+      typeGlide: typeGlide,
+      startAgeInput: startAgeInput,
+      targetAgeInput: targetAgeInput,
+      asset1Select: asset1Select,
+      asset2Select: asset2Select,
+      startSlider: startSlider,
+      endSlider: endSlider,
+      startLabel: startLabel,
+      endLabel: endLabel,
+      timelineRow: timelineRow,
+      targetRow: targetRow
+    };
+
+    return this._mixModal;
+  }
+
+  _closeMixConfigModal() {
+    this._mixModal.modal.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    if (this._mixModalEscHandler) {
+      document.removeEventListener('keydown', this._mixModalEscHandler);
+      this._mixModalEscHandler = null;
+    }
+  }
+
+  _openMixConfigModal(context) {
+    const modal = this._ensureMixModal();
+    const ctx = context;
+
+    const mixPrefix = ctx.mixPrefix;
+    const baseOptions = ctx.baseOptions;
+    const mixInputs = this._ensureMixConfigInputs(mixPrefix, ctx.defaultAsset1);
+
+    const labelMap = {};
+    for (let i = 0; i < baseOptions.length; i++) {
+      const opt = baseOptions[i];
+      if (!opt || !opt.value) continue;
+      labelMap[opt.value] = opt.label || opt.value;
+    }
+
+    const defaultAsset1 = mixInputs.asset1.value || (baseOptions[0] ? baseOptions[0].value : '');
+    let defaultAsset2 = mixInputs.asset2.value;
+    if (!defaultAsset2) {
+      for (let i = 0; i < baseOptions.length; i++) {
+        if (baseOptions[i].value !== defaultAsset1) { defaultAsset2 = baseOptions[i].value; break; }
+      }
+    }
+    if (!defaultAsset2) defaultAsset2 = defaultAsset1;
+
+    const typeVal = mixInputs.type.value ? String(mixInputs.type.value).trim().toLowerCase() : 'fixed';
+    const isGlide = typeVal === 'glide' || typeVal === 'glidepath';
+
+    const defaultStartAge = mixInputs.startAge.value ? String(mixInputs.startAge.value) : (this.getValue('StartingAge') || '');
+    const defaultTargetAge = mixInputs.targetAge.value ? String(mixInputs.targetAge.value) : (this.getValue('RetirementAge') || this.getValue('TargetAge') || '');
+    const targetAgeOverride = mixInputs.targetAgeOverridden.value ? String(mixInputs.targetAgeOverridden.value).toLowerCase() : '';
+
+    const pctVal = (el) => {
+      const raw = el && el.value ? String(el.value).trim() : '';
+      const num = parseInt(raw, 10);
+      return isNaN(num) ? null : Math.max(0, Math.min(100, num));
+    };
+    const startPct = pctVal(mixInputs.startAsset1Pct);
+    const endPct = pctVal(mixInputs.endAsset1Pct);
+    const startSliderVal = (startPct === null) ? 100 : startPct;
+    const endSliderVal = (endPct === null) ? startSliderVal : endPct;
+
+    modal.typeFixed.checked = !isGlide;
+    modal.typeGlide.checked = isGlide;
+    modal.startAgeInput.value = defaultStartAge;
+    modal.targetAgeInput.value = defaultTargetAge;
+
+    const fillSelect = (selectEl, selectedValue) => {
+      while (selectEl.firstChild) selectEl.removeChild(selectEl.firstChild);
+      for (let i = 0; i < baseOptions.length; i++) {
+        const opt = baseOptions[i];
+        if (!opt) continue;
+        const o = document.createElement('option');
+        o.value = opt.value;
+        o.textContent = opt.label || opt.value;
+        if (opt.value === selectedValue) o.selected = true;
+        selectEl.appendChild(o);
+      }
+    };
+    fillSelect(modal.asset1Select, defaultAsset1);
+    fillSelect(modal.asset2Select, defaultAsset2);
+    modal.startSlider.value = String(startSliderVal);
+    modal.endSlider.value = String(endSliderVal);
+
+    const state = {
+      mixPrefix: mixPrefix,
+      baseOptions: baseOptions,
+      labelMap: labelMap,
+      defaultTargetAge: defaultTargetAge,
+      targetAgeOverridden: (targetAgeOverride === 'yes' || targetAgeOverride === 'true')
+    };
+    const updateMode = () => {
+      const glideOn = modal.typeGlide.checked;
+      modal.timelineRow.style.display = glideOn ? '' : 'none';
+      modal.targetRow.style.display = glideOn ? '' : 'none';
+    };
+    const updateSliderLabels = () => {
+      const asset1Key = modal.asset1Select.value;
+      const asset2Key = modal.asset2Select.value;
+      const asset1Label = labelMap[asset1Key] || asset1Key || 'Asset1';
+      const asset2Label = labelMap[asset2Key] || asset2Key || 'Asset2';
+      const startVal = parseInt(modal.startSlider.value, 10);
+      const endVal = parseInt(modal.endSlider.value, 10);
+      const startPct1 = isNaN(startVal) ? 0 : startVal;
+      const endPct1 = isNaN(endVal) ? 0 : endVal;
+      modal.startLabel.textContent = `${this._stripGlobalPrefix(asset1Label)}:${startPct1}% ${this._stripGlobalPrefix(asset2Label)}:${100 - startPct1}%`;
+      modal.endLabel.textContent = `${this._stripGlobalPrefix(asset1Label)}:${endPct1}% ${this._stripGlobalPrefix(asset2Label)}:${100 - endPct1}%`;
+    };
+
+    modal.typeFixed.onchange = updateMode;
+    modal.typeGlide.onchange = updateMode;
+    modal.asset1Select.onchange = updateSliderLabels;
+    modal.asset2Select.onchange = updateSliderLabels;
+    modal.startSlider.oninput = updateSliderLabels;
+    modal.endSlider.oninput = updateSliderLabels;
+    modal.targetAgeInput.oninput = () => { state.targetAgeOverridden = true; };
+
+    modal.applyBtn.onclick = () => {
+      const isGlideMode = modal.typeGlide.checked;
+      const asset1Val = modal.asset1Select.value;
+      const asset2Val = modal.asset2Select.value;
+      const startPct1 = parseInt(modal.startSlider.value, 10) || 0;
+      const endPct1 = isGlideMode ? (parseInt(modal.endSlider.value, 10) || 0) : startPct1;
+      const startAgeVal = modal.startAgeInput.value ? String(modal.startAgeInput.value).trim() : '';
+      const targetAgeVal = modal.targetAgeInput.value ? String(modal.targetAgeInput.value).trim() : '';
+      const overrideFlag = (isGlideMode && (state.targetAgeOverridden || (state.defaultTargetAge && targetAgeVal && targetAgeVal !== String(state.defaultTargetAge)))) ? 'Yes' : 'No';
+
+      mixInputs.type.value = isGlideMode ? 'glide' : 'fixed';
+      mixInputs.asset1.value = asset1Val;
+      mixInputs.asset2.value = asset2Val;
+      mixInputs.startAge.value = startAgeVal;
+      mixInputs.targetAge.value = targetAgeVal;
+      mixInputs.targetAgeOverridden.value = overrideFlag;
+      mixInputs.startAsset1Pct.value = String(startPct1);
+      mixInputs.startAsset2Pct.value = String(100 - startPct1);
+      mixInputs.endAsset1Pct.value = String(endPct1);
+      mixInputs.endAsset2Pct.value = String(100 - endPct1);
+
+      ctx.updateSummary();
+      this._closeMixConfigModal();
+    };
+
+    updateMode();
+    updateSliderLabels();
+
+    if (this._mixModalEscHandler) document.removeEventListener('keydown', this._mixModalEscHandler);
+    this._mixModalEscHandler = (e) => {
+      if (e.key === 'Escape' && this._mixModal && this._mixModal.modal.style.display === 'block') {
+        this._closeMixConfigModal();
+      }
+    };
+    document.addEventListener('keydown', this._mixModalEscHandler);
+    modal.modal.style.display = 'block';
+    document.body.classList.add('modal-open');
   }
 
   _fitAllocHoldsToggleWidth(toggleSpan) {
@@ -1702,7 +2103,10 @@ class WebUI extends AbstractUI {
     const w = Math.ceil(ctx.measureText(text).width);
     // Padding + caret room (matches pseudo-select padding/right arrow)
     const padded = w + 28;
-    const clamped = Math.max(72, Math.min(132, padded));
+    const isSummary = toggleSpan.classList.contains('alloc-holds-summary');
+    const minW = isSummary ? 90 : 72;
+    const maxW = isSummary ? 220 : 132;
+    const clamped = Math.max(minW, Math.min(maxW, padded));
     toggleSpan.style.minWidth = clamped + 'px';
     toggleSpan.style.maxWidth = clamped + 'px';
   }
@@ -1726,8 +2130,12 @@ class WebUI extends AbstractUI {
       }
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const holds = row.querySelector('.alloc-holds-toggle');
-        if (holds) this._fitAllocHoldsToggleWidth(holds);
+        const holds = row.querySelectorAll('.alloc-holds-toggle');
+        for (let h = 0; h < holds.length; h++) {
+          const hold = holds[h];
+          if (!hold || hold.offsetParent === null) continue;
+          this._fitAllocHoldsToggleWidth(hold);
+        }
 
         const labelText = row.querySelector('.alloc-label-text');
         if (!labelText) continue;
@@ -1852,8 +2260,13 @@ class WebUI extends AbstractUI {
     const p1Label = document.createElement('label');
     const p1Id = 'P1PensionContrib_' + country;
     p1Label.setAttribute('for', p1Id);
-    p1Label.textContent = shouldShowP2 ? 'Your Pension Contribution' : 'Pension Contribution';
+    const p1LabelSpan = document.createElement('span');
+    p1LabelSpan.className = 'alloc-label-text';
+    p1LabelSpan.textContent = shouldShowP2 ? 'Your Pension Contribution' : 'Pension Contribution';
+    p1Label.appendChild(p1LabelSpan);
     p1Wrapper.appendChild(p1Label);
+    const p1MixId = 'MixConfig_' + country + '_pensionP1_asset1';
+    this._appendHoldsDropdown(p1Wrapper, p1MixId, 'globalEquity');
     const p1PctContainer = document.createElement('div');
     p1PctContainer.className = 'percentage-container';
     const p1Input = this._takeOrCreateInput(p1Id, 'percentage');
@@ -1877,8 +2290,13 @@ class WebUI extends AbstractUI {
     const p2Label = document.createElement('label');
     const p2Id = 'P2PensionContrib_' + country;
     p2Label.setAttribute('for', p2Id);
-    p2Label.textContent = 'Their Pension Contribution';
+    const p2LabelSpan = document.createElement('span');
+    p2LabelSpan.className = 'alloc-label-text';
+    p2LabelSpan.textContent = 'Their Pension Contribution';
+    p2Label.appendChild(p2LabelSpan);
     p2Wrapper.appendChild(p2Label);
+    const p2MixId = 'MixConfig_' + country + '_pensionP2_asset1';
+    this._appendHoldsDropdown(p2Wrapper, p2MixId, 'globalEquity');
     const p2PctContainer = document.createElement('div');
     p2PctContainer.className = 'percentage-container';
     const p2Input = this._takeOrCreateInput(p2Id, 'percentage');
@@ -3769,7 +4187,7 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     // Listen for Investment Strategies toggle
     window.addEventListener('investmentStrategiesToggle', (e) => {
       webUi.investmentStrategiesEnabled = e.detail.enabled;
-      // Future phases will add UI refresh logic here
+      webUi.refreshCountryChipsFromScenario(webUi._lastInvestmentTypesForGrowthRates);
     });
 
     // Listen for Per-Country Investments toggle

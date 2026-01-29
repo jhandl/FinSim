@@ -288,6 +288,7 @@ class TestFramework {
         'AttributionManager.js',
         'Taxman.js',
         'Equities.js',
+        'GlidePathCalculator.js',
         'InvestmentTypeFactory.js',
         'RealEstate.js',
         'Person.js',

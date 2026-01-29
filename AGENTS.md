@@ -1,6 +1,6 @@
 # FinSim Agent Onboarding Guide
 
-This is a consolidated agent guide for FinSim. It preserves the structure and narrative style of `AGENTS_original.md`, while incorporating key “as-built” workflow rules and architectural notes from the current `AGENTS.md`.
+This is a consolidated agent guide for FinSim.
 
 ## 1. Project Overview
 
@@ -112,6 +112,10 @@ graph TD
 *   **[`Attribution.js`](src/core/Attribution.js:1):** Primitive used to capture and aggregate per‑source contributions (income, taxes, gains).
 *   **[`AttributionManager.js`](src/core/AttributionManager.js:1):** Orchestrates yearly attribution tracking used across `Taxman` and the simulator.
 *   **[`InvestmentTypeFactory.js`](src/core/InvestmentTypeFactory.js:1):** Builds generic investment assets from tax‑rule `investmentTypes`, enabling dynamic per‑type assets beyond the legacy two (Funds/Shares).
+
+#### Investment Management
+
+*   **Hybrid rebalancing:** Mix-enabled assets (fixed or glide path) rebalance annually after surplus allocation. Surplus cash is used first (tax-free), then minimal selling corrects remaining drift (taxable via `Taxman.declareInvestmentGains()`), with a 0.1% tolerance.
 
 #### Frontend
 

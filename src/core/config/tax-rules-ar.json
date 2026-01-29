@@ -79,6 +79,7 @@
     "pensionSystem": {
       "type": "state_only"
     },
+    "taxAdvantaged": true,
     "contributionLimits": {},
     "lumpSumTaxBands": {},
     "minDrawdownRates": {}

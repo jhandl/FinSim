@@ -4,6 +4,7 @@
     {
       "baseKey": "globalEquity",
       "label": "Global Equity",
+      "shortLabel": "Eq",
       "baseCurrency": "USD",
       "assetCountry": "us",
       "residenceScope": "global"
@@ -11,6 +12,7 @@
     {
       "baseKey": "globalBonds",
       "label": "Global Bonds",
+      "shortLabel": "Bd",
       "baseCurrency": "USD",
       "assetCountry": "us",
       "residenceScope": "global"
