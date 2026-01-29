@@ -211,12 +211,37 @@ Configures cross-border tax behaviour:
 
 ## 8. Investment Types
 
+> **Note**: For details on how investment types interact with the relocation system (currency, residence scope), see [`docs/relocation-system.md`](../relocation-system.md).
+
 ### 8.1 `investmentTypes`
 
-Defines generic investment categories (index funds, shares, etc.) and their tax treatment. Each item typically includes:
+Defines generic investment categories (index funds, shares, etc.) and their tax treatment. Each item in this array represents a distinct asset class available to the user.
 
-- **`key`**: Stable identifier used in the core engine, e.g. `"indexFunds"`, `"shares"`.
+These definitions control how `Equities` instances (index funds, shares) are taxed when sold or deemed disposed of. The Irish rules, for example, treat:
+
+- `indexFunds` under an exit-tax regime with deemed disposals,
+- `shares` under standard CGT referencing `capitalGainsTax`.
+
+### 8.2 Investment Type Fields
+
+Each entry in the `investmentTypes` array supports the following fields:
+
+- **`key`**: Stable identifier used in the core engine (e.g., `"indexFunds_ie"`, `"shares_ar"`).
 - **`label`**: Human-readable name displayed in the UI.
+- **`baseRef`** (optional): Reference to a global base type key (e.g., `"globalEquity"`).
+  - Triggers a shallow merge: `{...baseType, ...localType}`.
+  - Resolved by `TaxRuleSet.getResolvedInvestmentTypes()`.
+  - Enables wrappers to inherit economic defaults while overriding taxation.
+- **`baseCurrency`**: ISO currency code for the asset (e.g., `"EUR"`, `"USD"`, `"ARS"`).
+  - Inherited from `baseRef` if omitted.
+  - Used for FX conversion in multi-currency scenarios.
+- **`assetCountry`**: Two-letter country code for the asset's economic home (e.g., `"ie"`, `"us"`, `"ar"`).
+  - Inherited from `baseRef` if omitted.
+  - Determines which country's CPI is used for PV deflation (when scope is global).
+- **`residenceScope`**: `"local"` or `"global"`.
+  - **`"local"`**: Asset tied to residency; PV uses residency CPI; flagged by relocation detector.
+  - **`"global"`**: Portable asset; PV uses `assetCountry` CPI; ignored by relocation detector.
+  - See section 8.4 for detailed semantics.
 - **`taxation`**: Object describing how this type is taxed:
   - **Exit tax-style regimes**:
     - `exitTax.rate`: Exit tax rate as a decimal.
@@ -231,12 +256,258 @@ Defines generic investment categories (index funds, shares, etc.) and their tax 
     - `capitalGains.allowLossOffset`:
       - Whether losses can offset gains.
 
-These definitions control how `Equities` instances (index funds, shares) are taxed when sold or deemed disposed of. The Irish rules, for example, treat:
+#### Examples
 
-- `indexFunds` under an exit-tax regime with deemed disposals,
-- `shares` under standard CGT referencing `capitalGainsTax`.
+**Example 1: IE Index Funds (Local wrapper of global asset)**
+```json
+{
+  "key": "indexFunds_ie",
+  "label": "Index Funds",
+  "baseRef": "globalEquity",
+  "baseCurrency": "EUR",
+  "assetCountry": "ie",
+  "residenceScope": "local",
+  "taxation": {
+    "exitTax": {
+      "rate": 0.38,
+      "deemedDisposalYears": 8,
+      "allowLossOffset": false,
+      "eligibleForAnnualExemption": false
+    }
+  }
+}
+```
+- Inherits `baseKey: "globalEquity"` from global rules
+- Overrides `baseCurrency` to EUR (IE domiciled)
+- Overrides `assetCountry` to `ie` (local)
+- Sets `residenceScope: "local"` (tied to IE residency)
+- Defines IE-specific exit tax treatment
 
-Additional economic semantics for investment types (such as currency and domicile) are specified in `docs/asset-plan.md` and will be added to the JSON files as part of the multi-country investment work.
+**Example 2: AR CEDEARs (Global wrapper)**
+```json
+{
+  "key": "shares_ar",
+  "label": "CEDEARs",
+  "baseRef": "globalEquity",
+  "baseCurrency": "USD",
+  "assetCountry": "us",
+  "residenceScope": "global",
+  "taxation": {
+    "capitalGains": {
+      "rateRef": "capitalGainsTax.rate",
+      "allowLossOffset": true
+    }
+  }
+}
+```
+- Inherits from `globalEquity` but keeps USD/US domicile
+- Sets `residenceScope: "global"` (portable)
+- Uses AR's CGT rate via `rateRef`
+
+**Example 3: AR MERVAL (Pure local asset)**
+```json
+{
+  "key": "indexFunds_ar",
+  "label": "MERVAL",
+  "baseCurrency": "ARS",
+  "assetCountry": "ar",
+  "residenceScope": "local",
+  "taxation": {
+    "capitalGains": {
+      "rateRef": "capitalGainsTax.rate",
+      "allowLossOffset": true
+    }
+  }
+}
+```
+- No `baseRef` (standalone)
+- ARS currency, AR domicile
+- Local scope (tied to AR residency)
+
+### 8.3 Economic Data Flows
+
+Document how growth/volatility parameters flow through the system:
+
+**Global Asset Parameters** (visible in economy panel):
+- **Format**: `GlobalAssetGrowth_{baseKey}`, `GlobalAssetVolatility_{baseKey}`
+- **Example**: `GlobalAssetGrowth_globalEquity`, `GlobalAssetVolatility_globalBonds`
+- **Source**: `src/core/config/tax-rules-global.json` defines base types
+- **UI**: Rendered as visible rows in growth rates table (`src/frontend/web/WebUI.js`)
+- **Usage**: Read by `InvestmentTypeFactory.resolveMixConfig()` for mix assets
+
+**Local Asset Parameters** (per-country):
+- **Format**: `LocalAssetGrowth_{cc}_{baseKey}`, `LocalAssetVolatility_{cc}_{baseKey}`
+- **Example**: `LocalAssetGrowth_ie_indexFunds`, `LocalAssetVolatility_ar_merval`
+- **UI**: Rendered in per-country tabs when relocation is enabled
+- **Usage**: For local investments without `baseRef`
+
+**Wrapper-Level Parameters** (legacy, hidden):
+- **Format**: `{key}GrowthRate`, `{key}GrowthStdDev`
+- **Example**: `indexFunds_ieGrowthRate`, `shares_arGrowthStdDev`
+- **UI**: Created but hidden (`src/frontend/web/WebUI.js`)
+- **Usage**: Backward compatibility fallback in `InvestmentTypeFactory.createAssets()`
+- **Serialization**: Preserved in CSV for legacy scenario compatibility
+- **Status**: Deprecated; use asset-level params for new scenarios
+
+**Parameter Resolution Order** (in `InvestmentTypeFactory.createAssets()`):
+1. Try `growthRatesByKey[key]` (e.g., `indexFunds_ie`)
+2. If undefined and key has country suffix, try base key (e.g., `indexFunds`) — **backward compat**
+3. Default to 0 if still undefined
+
+### 8.4 `residenceScope` Semantics
+
+> **Note**: For implementation details of PV deflation, see `src/core/PresentValueCalculator.js`.
+
+Describes the behavioral differences between local and global scope:
+
+| Aspect | `residenceScope: "local"` | `residenceScope: "global"` |
+|--------|---------------------------|----------------------------|
+| **PV Deflation** | Uses **residency CPI** (where you live) | Uses **assetCountry CPI** (asset's home) |
+| **Relocation Impact** | Flagged if `assetCountry === originCountry` and capital > 0 | Not flagged (portable) |
+| **UI Parameters** | Per-country rows: `LocalAssetGrowth_{cc}_{baseKey}` | Global rows: `GlobalAssetGrowth_{baseKey}` |
+| **Serialization** | Saves wrapper-level growth/vol for locals | No per-country params saved |
+| **Use Case** | Country-specific investments (e.g., IE domiciled funds, AR MERVAL) | Portable global assets (e.g., US ETFs, CEDEARs) |
+
+**PV Deflation Logic**:
+```mermaid
+graph TD
+    A[Investment Capital PV] --> B{residenceScope?}
+    B -->|global| C[Use assetCountry CPI]
+    B -->|local| D[Use residency CPI]
+    C --> E[Back-convert to asset currency]
+    C --> F[Apply asset deflator]
+    D --> G[No conversion needed]
+    D --> H[Apply residency deflator]
+    E --> F
+    G --> H
+    F --> I[PV in residence currency]
+    H --> I
+```
+
+**Relocation Impact Detection** (`src/frontend/web/components/RelocationImpactDetector.js`):
+- Local holdings with `assetCountry === originCountry` trigger "local_holdings" impact
+- User prompted to keep/sell/reinvest when relocating
+- Global holdings ignored (assumed portable)
+
+**`residenceScope` Decision Tree**:
+```mermaid
+graph TD
+    A[Investment Type] --> B{Has baseRef?}
+    B -->|Yes| C[Inherit from global base]
+    B -->|No| D[Standalone definition]
+    C --> E{residenceScope?}
+    D --> E
+    E -->|local| F[Local Investment]
+    E -->|global| G[Global Investment]
+    F --> H[PV: residency CPI]
+    F --> I[Relocation: flagged if assetCountry matches origin]
+    F --> J[UI: per-country params]
+    G --> K[PV: assetCountry CPI]
+    G --> L[Relocation: ignored]
+    G --> M[UI: global params]
+```
+
+### 8.5 Runtime: GenericInvestmentAsset and InvestmentTypeFactory
+
+> **Note**: See `src/core/InvestmentTypeFactory.js` for implementation details.
+
+**`GenericInvestmentAsset`**:
+- Extends `Equity` base class.
+- Configured by `investmentTypeDef` from tax rules.
+- Resolves tax category (exit tax vs CGT), deemed disposal, loss offset, annual exemption.
+- Captures `baseCurrency`, `assetCountry`, `residenceScope` for multi-currency support.
+- Overrides `buy()` to capture currency/country from first call if undefined.
+
+**`InvestmentTypeFactory.createAssets()`**:
+- Loads `investmentTypes` from `TaxRuleSet.getResolvedInvestmentTypes()` (with `baseRef` inheritance).
+- Resolves growth/volatility from `growthRatesByKey`/`stdDevsByKey` maps.
+- Applies backward compat fallback for base keys.
+- Resolves mix configuration from params (if enabled).
+- Returns array of `{ key, label, asset, baseCurrency, assetCountry, residenceScope }`.
+
+**Simulator Integration** (`src/core/Simulator.js`):
+- Calls `InvestmentTypeFactory.createAssets()` for each scenario country.
+- Deduplicates by key across countries.
+- Initializes assets with `initialCapitalByKey` (filtered to StartCountry types).
+- Maintains legacy `indexFunds`/`shares` objects for backward compat.
+
+**Investment Type Resolution Flow**:
+```mermaid
+sequenceDiagram
+    participant UI as WebUI
+    participant Sim as Simulator
+    participant Factory as InvestmentTypeFactory
+    participant TRS as TaxRuleSet
+    participant Config as Config
+
+    UI->>Sim: run(params)
+    Sim->>Config: getCachedTaxRuleSet(country)
+    Config->>TRS: new TaxRuleSet(rules)
+    Sim->>Factory: createAssets(ruleset, growthByKey, volByKey, params)
+    Factory->>TRS: getResolvedInvestmentTypes()
+    TRS->>Config: getInvestmentBaseTypeByKey(baseRef)
+    Config-->>TRS: baseType
+    TRS-->>Factory: resolved types (with inheritance)
+    Factory->>Factory: resolve growth/vol (wrapper fallback)
+    Factory->>Factory: new GenericInvestmentAsset(type, gr, sd, ruleset)
+    Factory-->>Sim: assets array
+    Sim->>Sim: initialize with initialCapitalByKey
+```
+
+### 8.6 Audit Findings: Wrapper-Level Economic Data
+
+**Current Usage**:
+1. **Backward Compat Fallback**: `InvestmentTypeFactory.createAssets()` reads wrapper-level params if namespaced key not found.
+2. **CSV Serialization**: `Utils.serializeSimulation()` writes wrapper-level params; `deserializeSimulation()` reads them.
+3. **UI Hidden Inputs**: `WebUI.renderInvestmentParameterFields()` creates hidden inputs for serialization.
+4. **Test Framework**: `TestFramework.js` maps legacy test params to wrapper-level keys.
+
+**Migration Path**:
+- **Option 1 (Conservative)**: Keep wrapper-level params for backward compat; document as deprecated.
+- **Option 2 (Clean)**: Remove wrapper-level params; migrate legacy CSV files during deserialization.
+  - Add migration logic in `Utils.deserializeSimulation()` to detect wrapper-level params and convert to asset-level.
+  - Update tests to use asset-level params.
+  - Remove hidden inputs from `WebUI.renderInvestmentParameterFields()`.
+  - Remove fallback from `InvestmentTypeFactory.createAssets()`.
+
+**Current Status**: Wrapper-level params are preserved for backward compatibility. Removal is deferred to a future cleanup phase.
+
+### 8.7 Global Base Types
+
+**Purpose**: Define reusable asset templates for multi-country scenarios.
+
+**Location**: `src/core/config/tax-rules-global.json`.
+
+**Schema**:
+```json
+{
+  "investmentBaseTypes": [
+    {
+      "baseKey": "globalEquity",
+      "label": "Global Equity",
+      "shortLabel": "Eq",
+      "baseCurrency": "USD",
+      "assetCountry": "us",
+      "residenceScope": "global"
+    }
+  ]
+}
+```
+
+**Fields**:
+- **`baseKey`**: Unique identifier referenced by `baseRef` in country rules.
+- **`label`**: Full name for UI display.
+- **`shortLabel`**: Abbreviated label for compact UI (e.g., mix dropdowns).
+- **`baseCurrency`**, **`assetCountry`**, **`residenceScope`**: Default values inherited by wrappers.
+
+**Usage**:
+- Accessed via `Config.getInvestmentBaseTypes()`.
+- Merged into country-specific types by `TaxRuleSet.getResolvedInvestmentTypes()`.
+- Used in mix configuration dropdowns (`src/frontend/web/WebUI.js`).
+
+**Current Base Types**:
+1. **`globalEquity`**: USD-denominated, US-domiciled, global scope.
+2. **`globalBonds`**: USD-denominated, US-domiciled, global scope.
 
 ---
 
