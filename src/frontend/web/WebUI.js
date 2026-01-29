@@ -714,11 +714,17 @@ class WebUI extends AbstractUI {
     hideGrowthRow('indexFundsGrowthRate');
     hideGrowthRow('sharesGrowthRate');
 
-    // Ensure per-type growth inputs exist for serialization/back-compat, but keep them hidden.
+    // Ensure per-type growth inputs exist for local investments (no baseRef) for serialization/back-compat.
+    // Non-local wrappers (with baseRef) use asset-level params and don't need wrapper-level inputs.
     for (let i = 0; i < types.length; i++) {
       const t = types[i] || {};
       const key = t.key;
       if (!key) continue;
+      
+      // Skip wrapper-level inputs for non-local wrappers (those with baseRef)
+      // Non-local wrappers use asset-level params: GlobalAssetGrowth_{baseRef}, GlobalAssetVolatility_{baseRef}
+      if (t.baseRef) continue;
+
       const grId = key + 'GrowthRate';
       const sdId = key + 'GrowthStdDev';
 
@@ -994,7 +1000,7 @@ class WebUI extends AbstractUI {
           const code = scenarioCountries[ci];
           const rs = cfg.getCachedTaxRuleSet(code);
           const invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
-          const localTypes = invTypes.filter(t => (t && t.residenceScope || '').toLowerCase() === 'local');
+          const localTypes = invTypes.filter(t => (t && t.residenceScope || '').toLowerCase() === 'local' && !t.baseRef);
           for (let i = 0; i < localTypes.length; i++) {
             const t = localTypes[i] || {};
             const key = t.key;

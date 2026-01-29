@@ -343,11 +343,11 @@ Document how growth/volatility parameters flow through the system:
 
 **Wrapper-Level Parameters** (legacy, hidden):
 - **Format**: `{key}GrowthRate`, `{key}GrowthStdDev`
-- **Example**: `indexFunds_ieGrowthRate`, `shares_arGrowthStdDev`
-- **UI**: Created but hidden (`src/frontend/web/WebUI.js`)
-- **Usage**: Backward compatibility fallback in `InvestmentTypeFactory.createAssets()`
-- **Serialization**: Preserved in CSV for legacy scenario compatibility
-- **Status**: Deprecated; use asset-level params for new scenarios
+- **Example**: `indexFunds_ieGrowthRate` (if local), `shares_arGrowthStdDev` (if local)
+- **UI**: Created but hidden (`src/frontend/web/WebUI.js`) ONLY for local investments (no `baseRef`). Non-local wrappers (with `baseRef`) do NOT have these inputs.
+- **Usage**: Backward compatibility fallback in `InvestmentTypeFactory.createAssets()` for local investments.
+- **Serialization**: Preserved in CSV for legacy scenario compatibility (local investments only).
+- **Status**: Deprecated; non-local wrappers use asset-level params.
 
 **Parameter Resolution Order** (in `InvestmentTypeFactory.createAssets()`):
 1. Try `growthRatesByKey[key]` (e.g., `indexFunds_ie`)
@@ -470,7 +470,7 @@ sequenceDiagram
   - Remove hidden inputs from `WebUI.renderInvestmentParameterFields()`.
   - Remove fallback from `InvestmentTypeFactory.createAssets()`.
 
-**Current Status**: Wrapper-level params are preserved for backward compatibility. Removal is deferred to a future cleanup phase.
+**Current Status**: Wrapper-Level Parameters are preserved ONLY for local investments (without `baseRef`) for backward compatibility. Non-local wrappers rely on asset-level parameters.
 
 ### 8.7 Global Base Types
 

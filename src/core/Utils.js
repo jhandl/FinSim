@@ -407,8 +407,11 @@ function serializeSimulation(ui) {
     var type = investmentTypes[i];
     var key = type.key;
     parameters['InitialCapital_' + key] = ui.getValue('InitialCapital_' + key);
-    parameters[key + 'GrowthRate'] = ui.getValue(key + 'GrowthRate');
-    parameters[key + 'GrowthStdDev'] = ui.getValue(key + 'GrowthStdDev');
+    // Wrapper-level growth/volatility inputs are only present for local investments (no baseRef)
+    if (!type.baseRef) {
+      parameters[key + 'GrowthRate'] = ui.getValue(key + 'GrowthRate');
+      parameters[key + 'GrowthStdDev'] = ui.getValue(key + 'GrowthStdDev');
+    }
   }
 
   // Global + local economy inputs (dynamic rows rendered in the growth rates panel).

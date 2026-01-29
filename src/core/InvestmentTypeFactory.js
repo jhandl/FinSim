@@ -262,7 +262,31 @@ class InvestmentTypeFactory {
     return mix;
   }
 
+  /**
+   * Creates GenericInvestmentAsset instances from ruleset investment types.
+   * 
+   * Parameter resolution:
+   * - Wrappers WITH baseRef (e.g., indexFunds_ie with baseRef: "globalEquity"):
+   *   Use asset-level params: GlobalAssetGrowth_globalEquity, GlobalAssetVolatility_globalEquity.
+   *   Asset-level params are treated as PERCENTAGES (e.g., 10 => 10%).
+   *   If asset-level params are undefined, falls back to wrapper-level params (decimals) for compatibility.
+   *   Fallback order: wrapperKey -> baseKeyCompat (e.g., indexFunds_ie -> indexFunds).
+   * - Wrappers WITHOUT baseRef (pure local investments):
+   *   Use wrapper-level params: investmentGrowthRatesByKey[key], investmentVolatilitiesByKey[key].
+   *   Wrapper-level params are treated as DECIMALS (e.g., 0.1 => 10%).
+   * 
+   * @param {TaxRuleSet} ruleset - Country tax ruleset with investment type definitions
+   * @param {Object} growthRatesByKey - Map of wrapper-level growth rates (for local wrappers or fallback)
+   * @param {Object} stdDevsByKey - Map of wrapper-level volatilities (for local wrappers or fallback)
+   * @param {Object} params - Full simulation params (contains asset-level params)
+   * @returns {Array} Array of {key, label, asset, baseCurrency, assetCountry, residenceScope}
+   */
   static createAssets(ruleset, growthRatesByKey, stdDevsByKey, params) {
+    var toNumber = function (value) {
+      if (value === null || value === undefined || value === '') return null;
+      var n = Number(value);
+      return (typeof n === 'number' && !isNaN(n)) ? n : null;
+    };
     var assets = [];
     if (!ruleset || typeof ruleset.getInvestmentTypes !== 'function') return assets;
     var types = ruleset.getResolvedInvestmentTypes();
@@ -280,17 +304,54 @@ class InvestmentTypeFactory {
         baseKey = String(key).slice(0, String(key).length - suffix.length);
       }
       var mixConfig = InvestmentTypeFactory.resolveMixConfig(params, countryCode, baseKey);
-      var gr = (growthRatesByKey && growthRatesByKey[key] !== undefined) ? growthRatesByKey[key] : undefined;
-      var sd = (stdDevsByKey && stdDevsByKey[key] !== undefined) ? stdDevsByKey[key] : undefined;
-      // Backward compat: if caller provided base keys (e.g. indexFunds/shares),
-      // project them onto namespaced keys (e.g. indexFunds_ie/shares_ie).
-      if (gr === undefined && growthRatesByKey && key && String(key).indexOf('_') > 0) {
-        var baseKeyCompat = String(key).split('_')[0];
-        if (growthRatesByKey[baseKeyCompat] !== undefined) gr = growthRatesByKey[baseKeyCompat];
-      }
-      if (sd === undefined && stdDevsByKey && key && String(key).indexOf('_') > 0) {
-        var baseKey2 = String(key).split('_')[0];
-        if (stdDevsByKey[baseKey2] !== undefined) sd = stdDevsByKey[baseKey2];
+      var gr, sd;
+      if (t.baseRef) {
+        // Non-local wrapper: use asset-level parameters (treated as percentages)
+        var rawGr = params['GlobalAssetGrowth_' + t.baseRef];
+        var valGr = toNumber(rawGr);
+        if (valGr !== null) {
+          gr = valGr / 100;
+        } else {
+          // Fallback 1: Wrapper-level params (treated as decimals/legacy)
+          if (growthRatesByKey && growthRatesByKey[key] !== undefined) {
+            gr = growthRatesByKey[key];
+          }
+          // Fallback 2: Base-key wrapper-level params (treated as decimals/legacy)
+          if (gr === undefined && growthRatesByKey && key && String(key).indexOf('_') > 0) {
+            var baseKeyCompat = String(key).split('_')[0];
+            if (growthRatesByKey[baseKeyCompat] !== undefined) gr = growthRatesByKey[baseKeyCompat];
+          }
+        }
+
+        var rawSd = params['GlobalAssetVolatility_' + t.baseRef];
+        var valSd = toNumber(rawSd);
+        if (valSd !== null) {
+          sd = valSd / 100;
+        } else {
+           // Fallback 1: Wrapper-level params
+           if (stdDevsByKey && stdDevsByKey[key] !== undefined) {
+             sd = stdDevsByKey[key];
+           }
+           // Fallback 2: Base-key wrapper-level params
+           if (sd === undefined && stdDevsByKey && key && String(key).indexOf('_') > 0) {
+             var baseKeyCompat2 = String(key).split('_')[0];
+             if (stdDevsByKey[baseKeyCompat2] !== undefined) sd = stdDevsByKey[baseKeyCompat2];
+           }
+        }
+      } else {
+        // Local wrapper: use wrapper-level parameters (existing logic)
+        gr = (growthRatesByKey && growthRatesByKey[key] !== undefined) ? growthRatesByKey[key] : undefined;
+        sd = (stdDevsByKey && stdDevsByKey[key] !== undefined) ? stdDevsByKey[key] : undefined;
+        // Backward compat: if caller provided base keys (e.g. indexFunds/shares),
+        // project them onto namespaced keys (e.g. indexFunds_ie/shares_ie).
+        if (gr === undefined && growthRatesByKey && key && String(key).indexOf('_') > 0) {
+          var baseKeyCompat = String(key).split('_')[0];
+          if (growthRatesByKey[baseKeyCompat] !== undefined) gr = growthRatesByKey[baseKeyCompat];
+        }
+        if (sd === undefined && stdDevsByKey && key && String(key).indexOf('_') > 0) {
+          var baseKey2 = String(key).split('_')[0];
+          if (stdDevsByKey[baseKey2] !== undefined) sd = stdDevsByKey[baseKey2];
+        }
       }
       if (gr === undefined) gr = 0;
       if (sd === undefined) sd = 0;
