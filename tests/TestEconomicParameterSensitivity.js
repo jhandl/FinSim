@@ -45,7 +45,8 @@ async function computeRange(parameters, runs) {
   if (!values.length) return null;
   const min = Math.min.apply(null, values);
   const max = Math.max.apply(null, values);
-  return { min: min, max: max, range: max - min };
+  const range = max - min;
+  return { min: min, max: max, range: range };
 }
 
 module.exports = {

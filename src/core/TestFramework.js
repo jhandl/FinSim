@@ -176,7 +176,7 @@ class TestFramework {
         SpreadsheetApp: undefined,
         console: console,
         Date: Date,
-        Math: Math,
+        Math: Object.create(Math),
         JSON: JSON,
         Promise: Promise,
         require: require,
@@ -547,6 +547,9 @@ class TestFramework {
       }
 
       // Record start time inside VM and run the simulation, awaiting completion if async
+      if (TestFramework._seedCounter === undefined) TestFramework._seedCounter = 0;
+      var seedValue = 123456789 + (TestFramework._seedCounter++);
+      vm.runInContext('Math.__seed = ' + seedValue + '; Math.random = function(){ Math.__seed = (Math.__seed * 1664525 + 1013904223) % 4294967296; return Math.__seed / 4294967296; };', this.simulationContext);
       vm.runInContext('var start = Date.now();', this.simulationContext);
       const runPromise = vm.runInContext('run()', this.simulationContext);
       if (runPromise && typeof runPromise.then === 'function') {
@@ -911,8 +914,9 @@ class TestFramework {
           var setAlloc = function (cc, invKey, pct) {
             if (pct === null) return;
             ensureCountryAlloc(cc);
-            // Match CSV/UI semantics: the last value wins when multiple keys exist.
-            testParams.investmentAllocationsByCountry[cc][invKey] = pct;
+            if (testParams.investmentAllocationsByCountry[cc][invKey] === undefined) {
+              testParams.investmentAllocationsByCountry[cc][invKey] = pct;
+            }
           };
 
           for (var pkey in testParams) {

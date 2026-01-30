@@ -58,6 +58,7 @@ async function run() {
   }
   montecarlo = (params.economyMode === 'montecarlo' && hasVolatility);
 
+
   // In web UI we retain per-run yearly data for pinch-point visualization.
   // In tests / GAS environments this data is unused and very expensive at Monte Carlo scale.
   capturePerRunResults = !!(uiManager && uiManager.ui && typeof uiManager.ui.storeSimulationResults === 'function');

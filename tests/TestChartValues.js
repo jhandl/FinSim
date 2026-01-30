@@ -79,12 +79,12 @@ const DEMO3_BASELINE = {
   // at relocation time. This keeps the emergency stash purchasing-power consistent
   // across countries (vs ballooning nominally under evolved FX).
   ages: {
-    40: { worth: 2275190337.739375, cash: 79379609.1242759, netIncome: 833020387.0938061 },
-    65: { worth: 1739718993357.7207, cash: 48826750509.70023, netIncome: 8656794176.110376 },
-    80: { worth: 50316425410673.17, cash: 506368781729.67224, netIncome: 2556084888994.7246 }
+    40: { worth: 2365180583.0256557, cash: 14938121.255654156, netIncome: 833020387.0938061 },
+    65: { worth: 1741621933890.7112, cash: 4546507611.75827, netIncome: 8656794176.110376 },
+    80: { worth: 45498433381788.15, cash: 140509952772.85306, netIncome: 2562598167465.065 }
   },
-  final: { age: 90, worth: 897312543083125.1, cash: 4964200246566.705 },
-  maxWorth: 897312543083125.1
+  final: { age: 90, worth: 481812197657587.7, cash: 1383757107738.8225 },
+  maxWorth: 481812197657587.7
 };
 
 // Tolerances for evolution FX mode (inflation-driven FX rates)
