@@ -10,7 +10,8 @@ class FileManager {
 
   updateLastSavedState() {
     // Ensure this is called when the UI is in a known "clean" or "new scenario" state.
-    this.lastSavedState = serializeSimulation(this.webUI);
+    const snapshot = serializeSimulation(this.webUI);
+    this.lastSavedState = snapshot;
   }
 
   hasUnsavedChanges() {
@@ -24,16 +25,35 @@ class FileManager {
     }
 
     const normalize = (csv) => {
-      return csv
-        .split('\n')
-        .filter(line => {
-          if (line.startsWith('EventsSortPreset,')) return false;
-          return true;
-        })
-        .join('\n');
+      const lines = csv.split('\n');
+      const filtered = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith('EventsSortPreset,')) continue;
+        filtered.push(line);
+      }
+      const paramsIndex = filtered.indexOf('# Parameters');
+      if (paramsIndex === -1) return filtered.join('\n');
+      let eventsIndex = -1;
+      for (let i = paramsIndex + 1; i < filtered.length; i++) {
+        if (filtered[i] === '# Events') {
+          eventsIndex = i;
+          break;
+        }
+      }
+      if (eventsIndex === -1) return filtered.join('\n');
+      const before = filtered.slice(0, paramsIndex + 1);
+      const paramsBlock = filtered.slice(paramsIndex + 1, eventsIndex);
+      const after = filtered.slice(eventsIndex);
+      const paramsLines = paramsBlock.filter(line => line !== '');
+      paramsLines.sort();
+      return before.concat(paramsLines).concat(after).join('\n');
     };
 
-    return normalize(currentState) !== normalize(this.lastSavedState);
+    const normCurrent = normalize(currentState);
+    const normBase = normalize(this.lastSavedState);
+    const dirty = normCurrent !== normBase;
+    return dirty;
   }
 
   setupSaveButton() {

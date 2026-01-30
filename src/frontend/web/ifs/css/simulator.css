@@ -363,6 +363,26 @@ header.header-hidden {
   position: relative;
 }
 
+.allocations-country-header {
+  display: flex;
+  align-items: flex-end;
+}
+
+#Allocations .card-header-flex {
+  align-items: flex-end;
+  padding-bottom: 0.45rem;
+}
+
+#Allocations .card-header-flex h2 {
+  top: 0;
+}
+
+#Allocations .card-header-flex .country-tab-selector {
+  margin-top: 0;
+  margin-bottom: -0.45rem;
+  border-bottom: none;
+}
+
 .card-header-flex h2 {
   margin-bottom: 0;
   padding-bottom: 0;
@@ -2548,17 +2568,6 @@ footer {
 
 .country-tab-selector span:not(.mode-toggle-active):hover {
   opacity: 0.8;
-}
-
-.country-sync-indicator {
-  position: absolute;
-  left: 0;
-  bottom: calc(-1 * var(--card-header-border-width));
-  font-size: 0.75rem;
-  color: var(--primary-color);
-  background: var(--card-bg-color, white);
-  padding: 0 4px;
-  z-index: 2;
 }
 
 .events-section .card-header-flex {

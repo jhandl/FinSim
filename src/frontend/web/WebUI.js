@@ -1268,8 +1268,10 @@ class WebUI extends AbstractUI {
       chipContainer = document.createElement('div');
       chipContainer.className = 'country-chip-container';
     }
-    // Place the tabs at the top of the allocations card
-    if (allocGroup.firstChild) {
+    const headerTarget = allocCard.querySelector('.allocations-country-header');
+    if (headerTarget) {
+      headerTarget.appendChild(chipContainer);
+    } else if (allocGroup.firstChild) {
       allocGroup.insertBefore(chipContainer, allocGroup.firstChild);
     } else {
       allocGroup.appendChild(chipContainer);

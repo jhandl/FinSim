@@ -23,9 +23,7 @@ class CountryChipSelector {
     this.onCountryChange = (typeof onCountryChange === 'function') ? onCountryChange : null;
     this.panelId = (panelId || '').toString();
     this.containerElement = null;
-    this._syncIndicatorEl = null;
     this._countryListener = null;
-    this._syncListener = null;
   }
 
   getSelectedCountry() {
@@ -60,12 +58,6 @@ class CountryChipSelector {
     const row = document.createElement('div');
     row.className = 'country-tab-selector';
 
-    // Sync indicator (left end of divider line)
-    const indicator = document.createElement('div');
-    indicator.className = 'country-sync-indicator';
-    this._syncIndicatorEl = indicator;
-    row.appendChild(indicator);
-
     for (let i = 0; i < this.countries.length; i++) {
       const c = this.countries[i] || {};
       const code = (c.code || '').toString().trim().toLowerCase();
@@ -88,7 +80,6 @@ class CountryChipSelector {
 
     this.containerElement.appendChild(row);
     this._bindToSyncManager();
-    this._updateSyncIndicator();
     this._updateActiveState();
   }
 
@@ -108,8 +99,6 @@ class CountryChipSelector {
     const mgr = CountryTabSyncManager.getInstance();
 
     if (this._countryListener) mgr.removeCountryChangeListener(this._countryListener);
-    if (this._syncListener) mgr.removeSyncStateListener(this._syncListener);
-
     this._countryListener = (ev) => {
       if (!ev) return;
       const targetPanel = ev.panelId;
@@ -120,22 +109,7 @@ class CountryChipSelector {
       if (this.onCountryChange) this.onCountryChange(this.selectedCountry);
     };
 
-    this._syncListener = () => {
-      this._updateSyncIndicator();
-    };
-
     mgr.addCountryChangeListener(this._countryListener);
-    mgr.addSyncStateListener(this._syncListener);
-  }
-
-  _updateSyncIndicator() {
-    if (!this._syncIndicatorEl) return;
-    const mgr = CountryTabSyncManager.getInstance();
-    const synced = mgr.getSyncState();
-    this._syncIndicatorEl.textContent = synced ? '🔗' : '⛓️‍💥';
-    this._syncIndicatorEl.title = synced
-      ? 'Country tabs are synced (switching in one panel switches all panels).'
-      : 'Country tabs are independent (each panel can select its own country).';
   }
 
   _flagEmojiFromCountryCode(code) {
