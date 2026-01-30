@@ -1220,6 +1220,17 @@ class WebUI extends AbstractUI {
 
   }
 
+  _sortInvestmentTypes(types) {
+    if (!Array.isArray(types)) return [];
+    // Sort: types without (baseRef || baseKey) come first.
+    return types.slice().sort((a, b) => {
+      const aHas = !!(a.baseRef || a.baseKey);
+      const bHas = !!(b.baseRef || b.baseKey);
+      if (aHas === bHas) return 0;
+      return aHas ? 1 : -1;
+    });
+  }
+
   _setupAllocationsCountryChips(hasMV, fallbackStartTypes) {
     const cfg = Config.getInstance();
     const allocCard = document.getElementById('Allocations');
@@ -1274,7 +1285,7 @@ class WebUI extends AbstractUI {
       chipContainer.style.display = 'none';
       this.allocationsCountryChipSelector = null;
 
-      const types = Array.isArray(fallbackStartTypes) ? fallbackStartTypes : [];
+      const types = this._sortInvestmentTypes(Array.isArray(fallbackStartTypes) ? fallbackStartTypes : []);
       const startCountry = (cfg.getStartCountry() || '').toLowerCase();
 
       // Render global allocation fields using GlobalAllocation_* keys (independent of per-country fields).
@@ -1334,7 +1345,7 @@ class WebUI extends AbstractUI {
       this.allocationsCountryChipSelector = null;
 
       const relocationEnabled = cfg.isRelocationEnabled && cfg.isRelocationEnabled();
-      const types = Array.isArray(fallbackStartTypes) ? fallbackStartTypes : [];
+      const types = this._sortInvestmentTypes(Array.isArray(fallbackStartTypes) ? fallbackStartTypes : []);
       const startCountry = (cfg.getStartCountry() || '').toLowerCase();
 
       if (relocationEnabled) {
@@ -1476,7 +1487,8 @@ class WebUI extends AbstractUI {
     for (let ci = 0; ci < scenarioCountries.length; ci++) {
       const code = scenarioCountries[ci];
       const rs = cfg.getCachedTaxRuleSet(code);
-      const invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
+      let invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
+      invTypes = this._sortInvestmentTypes(invTypes);
       const countryContainer = document.createElement('div');
       countryContainer.setAttribute('data-country-allocation-container', 'true');
       countryContainer.setAttribute('data-country-code', code);
@@ -2254,6 +2266,18 @@ class WebUI extends AbstractUI {
     const rs = cfg.getCachedTaxRuleSet(country);
     if (!rs) return;
     if (rs && typeof rs.hasPrivatePensions === 'function' && !rs.hasPrivatePensions()) return;
+
+    if (host.children.length > 0) {
+      const hr = document.createElement('hr');
+      hr.setAttribute('data-country-pension', 'true');
+      hr.setAttribute('data-country-code', country);
+      hr.style.border = 'none';
+      hr.style.borderTop = '1px solid #eee';
+      hr.style.margin = '0.2rem 0';
+      hr.style.height = '0';
+      hr.style.width = '100%';
+      host.appendChild(hr);
+    }
 
     const shouldShowP2 = (simulationMode || '').toString().toLowerCase() === 'couple';
 
