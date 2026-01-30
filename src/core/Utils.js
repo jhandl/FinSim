@@ -516,6 +516,8 @@ function serializeSimulation(ui) {
       if (!key) continue;
       var scope = (t.residenceScope || '').toString().trim().toLowerCase();
       if (scope !== 'local') continue;
+      // Skip inheriting wrappers (baseRef) - they use asset-level params
+      if (t.baseRef) continue;
       var suffix = '_' + cc2;
       var baseKey2 = (String(key).toLowerCase().endsWith(suffix)) ? String(key).slice(0, String(key).length - suffix.length) : String(key);
       var localGrowthId = 'LocalAssetGrowth_' + cc2 + '_' + baseKey2;
@@ -1554,6 +1556,8 @@ function deserializeSimulation(content, ui) {
         if (!key) continue;
         var scope = (it.residenceScope || '').toString().trim().toLowerCase();
         if (scope !== 'local') continue;
+        // Skip inheriting wrappers (baseRef) - they use asset-level params
+        if (it.baseRef) continue;
         var suffix = '_' + cc;
         var baseKey2 = (String(key).toLowerCase().endsWith(suffix)) ? String(key).slice(0, String(key).length - suffix.length) : String(key);
         var localGrowthId = 'LocalAssetGrowth_' + cc + '_' + baseKey2;

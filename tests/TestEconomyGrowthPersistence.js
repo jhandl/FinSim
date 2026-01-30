@@ -99,8 +99,8 @@ module.exports = {
       global.document = doc;
       const ieRuleset = {
         getResolvedInvestmentTypes: () => ([
-          { key: 'indexFunds_ie', label: 'Index Funds', residenceScope: 'local' },
-          { key: 'shares_ie', label: 'Shares', residenceScope: 'global' }
+          { key: 'indexFunds_ie', label: 'Index Funds', baseRef: 'globalEquity', residenceScope: 'local' },
+          { key: 'shares_ie', label: 'Shares', residenceScope: 'local' }
         ])
       };
       global.Config = {
@@ -127,8 +127,8 @@ module.exports = {
       // Phase A: per-country values should win and round-trip
       doc.ensureEl('GlobalAssetGrowth_globalEquity', 'percentage').value = '7';
       doc.ensureEl('GlobalAssetVolatility_globalEquity', 'percentage').value = '15';
-      doc.ensureEl('LocalAssetGrowth_ie_indexFunds', 'percentage').value = '5';
-      doc.ensureEl('LocalAssetVolatility_ie_indexFunds', 'percentage').value = '12';
+      doc.ensureEl('LocalAssetGrowth_ie_shares', 'percentage').value = '5';
+      doc.ensureEl('LocalAssetVolatility_ie_shares', 'percentage').value = '12';
       doc.ensureEl('PensionGrowth_ie', 'percentage').value = '6';
       doc.ensureEl('PensionVolatility_ie', 'percentage').value = '10';
       doc.ensureEl('Inflation_ie', 'percentage').value = '2';
@@ -144,12 +144,15 @@ module.exports = {
       if (csv.indexOf('GlobalAssetVolatility_globalEquity,15') === -1) {
         errors.push('Missing GlobalAssetVolatility_globalEquity in CSV.');
       }
-      // No global defaults expected for bonds when unset.
-      if (csv.indexOf('LocalAssetGrowth_ie_indexFunds,5') === -1) {
-        errors.push('Missing LocalAssetGrowth_ie_indexFunds in CSV.');
+      // Inheriting wrappers should NOT serialize LocalAssetGrowth
+      if (csv.indexOf('LocalAssetGrowth_ie_indexFunds') !== -1) {
+        errors.push('LocalAssetGrowth_ie_indexFunds should NOT be in CSV for inheriting wrapper.');
       }
-      if (csv.indexOf('LocalAssetVolatility_ie_indexFunds,12') === -1) {
-        errors.push('Missing LocalAssetVolatility_ie_indexFunds in CSV.');
+      if (csv.indexOf('LocalAssetGrowth_ie_shares,5') === -1) {
+        errors.push('Missing LocalAssetGrowth_ie_shares in CSV.');
+      }
+      if (csv.indexOf('LocalAssetVolatility_ie_shares,12') === -1) {
+        errors.push('Missing LocalAssetVolatility_ie_shares in CSV.');
       }
       if (csv.indexOf('PensionGrowth_ie,6') === -1) {
         errors.push('Missing PensionGrowth_ie in CSV.');
@@ -172,8 +175,8 @@ module.exports = {
       ui2.ensureParameterInput('PensionGrowthRate', 'percentage');
       ui2.ensureParameterInput('PensionGrowthStdDev', 'percentage');
       ui2.ensureParameterInput('Inflation', 'percentage');
-      ui2.ensureParameterInput('indexFunds_ieGrowthRate', 'percentage');
-      ui2.ensureParameterInput('indexFunds_ieGrowthStdDev', 'percentage');
+      ui2.ensureParameterInput('shares_ieGrowthRate', 'percentage');
+      ui2.ensureParameterInput('shares_ieGrowthStdDev', 'percentage');
 
       deserializeSimulation(csv, ui2);
 
@@ -185,13 +188,13 @@ module.exports = {
       if (!gVol || gVol.value !== '15') {
         errors.push('GlobalAssetVolatility_globalEquity did not deserialize.');
       }
-      const lGrow = doc2.getElementById('LocalAssetGrowth_ie_indexFunds');
+      const lGrow = doc2.getElementById('LocalAssetGrowth_ie_shares');
       if (!lGrow || lGrow.value !== '5') {
-        errors.push('LocalAssetGrowth_ie_indexFunds did not deserialize.');
+        errors.push('LocalAssetGrowth_ie_shares did not deserialize.');
       }
-      const lVol = doc2.getElementById('LocalAssetVolatility_ie_indexFunds');
+      const lVol = doc2.getElementById('LocalAssetVolatility_ie_shares');
       if (!lVol || lVol.value !== '12') {
-        errors.push('LocalAssetVolatility_ie_indexFunds did not deserialize.');
+        errors.push('LocalAssetVolatility_ie_shares did not deserialize.');
       }
       const pGrow = doc2.getElementById('PensionGrowth_ie');
       if (!pGrow || pGrow.value !== '6') {
@@ -214,8 +217,8 @@ module.exports = {
       doc3.ensureEl('PensionGrowthRate', 'percentage').value = '6';
       doc3.ensureEl('PensionGrowthStdDev', 'percentage').value = '12';
       doc3.ensureEl('Inflation', 'percentage').value = '2';
-      doc3.ensureEl('indexFunds_ieGrowthRate', 'percentage').value = '4';
-      doc3.ensureEl('indexFunds_ieGrowthStdDev', 'percentage').value = '9';
+      doc3.ensureEl('shares_ieGrowthRate', 'percentage').value = '4';
+      doc3.ensureEl('shares_ieGrowthStdDev', 'percentage').value = '9';
       doc3.ensureEl('perCountryInvestmentsEnabled', 'string').value = 'on';
 
       csv = serializeSimulation(ui3);
@@ -238,11 +241,14 @@ module.exports = {
       if (csv.indexOf('Inflation_ie,') === -1) {
         errors.push('Expected Inflation_ie to serialize as empty.');
       }
-      if (csv.indexOf('LocalAssetGrowth_ie_indexFunds,4') === -1) {
-        errors.push('Legacy growth did not map to LocalAssetGrowth_ie_indexFunds.');
+      if (csv.indexOf('LocalAssetGrowth_ie_shares,4') === -1) {
+        errors.push('Legacy growth did not map to LocalAssetGrowth_ie_shares.');
       }
-      if (csv.indexOf('LocalAssetVolatility_ie_indexFunds,9') === -1) {
-        errors.push('Legacy volatility did not map to LocalAssetVolatility_ie_indexFunds.');
+      if (csv.indexOf('LocalAssetVolatility_ie_shares,9') === -1) {
+        errors.push('Legacy volatility did not map to LocalAssetVolatility_ie_shares.');
+      }
+      if (csv.indexOf('LocalAssetGrowth_ie_indexFunds') !== -1) {
+        errors.push('Inheriting wrapper LocalAssetGrowth_ie_indexFunds should NOT be serialized even from legacy.');
       }
 
       const doc4 = createParameterDocument();
@@ -255,8 +261,8 @@ module.exports = {
       ui4.ensureParameterInput('PensionGrowthRate', 'percentage');
       ui4.ensureParameterInput('PensionGrowthStdDev', 'percentage');
       ui4.ensureParameterInput('Inflation', 'percentage');
-      ui4.ensureParameterInput('indexFunds_ieGrowthRate', 'percentage');
-      ui4.ensureParameterInput('indexFunds_ieGrowthStdDev', 'percentage');
+      ui4.ensureParameterInput('shares_ieGrowthRate', 'percentage');
+      ui4.ensureParameterInput('shares_ieGrowthStdDev', 'percentage');
 
       deserializeSimulation(csv, ui4);
 
@@ -272,13 +278,13 @@ module.exports = {
       if (!dInf || dInf.value !== '') {
         errors.push('Inflation_ie should remain blank when serialized blank.');
       }
-      const dlGrow = doc4.getElementById('LocalAssetGrowth_ie_indexFunds');
+      const dlGrow = doc4.getElementById('LocalAssetGrowth_ie_shares');
       if (!dlGrow || dlGrow.value !== '4') {
-        errors.push('Default LocalAssetGrowth_ie_indexFunds did not deserialize.');
+        errors.push('Default LocalAssetGrowth_ie_shares did not deserialize.');
       }
-      const dlVol = doc4.getElementById('LocalAssetVolatility_ie_indexFunds');
+      const dlVol = doc4.getElementById('LocalAssetVolatility_ie_shares');
       if (!dlVol || dlVol.value !== '9') {
-        errors.push('Default LocalAssetVolatility_ie_indexFunds did not deserialize.');
+        errors.push('Default LocalAssetVolatility_ie_shares did not deserialize.');
       }
 
       // Phase C: relocation scenario with MV event should serialize per-country locals
