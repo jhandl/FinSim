@@ -40,6 +40,10 @@ function createFakeDocument(metaRows) {
         }
       };
     }
+    ,
+    querySelectorAll() {
+      return [];
+    }
   };
 }
 
@@ -60,7 +64,9 @@ module.exports = {
         InitialSavings: '10000',
         P2StartingAge: '',
         simulation_mode: 'single',
-        economy_mode: 'deterministic'
+        economy_mode: 'deterministic',
+        investmentStrategiesEnabled: 'off',
+        perCountryInvestmentsEnabled: 'off'
       };
 
       const fakeUI = {
@@ -85,6 +91,7 @@ module.exports = {
       const fakeConfigInstance = {
         isRelocationEnabled: () => true,
         getCountryNameByCode: code => (code || '').toUpperCase(),
+        getInvestmentBaseTypes: () => ([]),
         listCachedRuleSets: () => ({ aa: fakeRuleSet, bb: fakeRuleSet }),
         getCachedTaxRuleSet: () => fakeRuleSet,
         getDefaultCountry: () => 'aa',
@@ -110,7 +117,8 @@ module.exports = {
 
       const sinkValues = {};
       const uiSink = {
-        setValue(key, value) { sinkValues[key] = value; }
+        setValue(key, value) { sinkValues[key] = value; },
+        getValue(key) { return sinkValues[key] || ''; }
       };
 
       const eventRows = deserializeSimulation(csv, uiSink);

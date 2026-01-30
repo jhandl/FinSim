@@ -110,6 +110,8 @@ function seedLegacyDemoBaseParameterIds(ui) {
     'PensionContributionPercentageP2',
     'simulation_mode',
     'economy_mode',
+    'investmentStrategiesEnabled',
+    'perCountryInvestmentsEnabled',
 
     // Legacy allocation + capital keys that are later normalized/migrated
     'InvestmentAllocation_indexFunds',
@@ -202,4 +204,3 @@ module.exports = {
     return { success: errors.length === 0, errors };
   }
 };
-

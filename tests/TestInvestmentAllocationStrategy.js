@@ -25,10 +25,10 @@ const TestInvestmentAllocationStrategy = {
       statePensionWeekly: 289,
       growthRatePension: 0.05,
       growthDevPension: 0.0,
-      growthRateFunds: 0,                  // Zero growth to simplify
-      growthDevFunds: 0.0,
-      growthRateShares: 0,                 // Zero growth to simplify
-      growthDevShares: 0.0,
+      GlobalAssetGrowth_globalEquity: 0,   // Zero growth to simplify
+      GlobalAssetVolatility_globalEquity: 0.0,
+      investmentGrowthRatesByKey: { shares_ie: 0 },
+      investmentVolatilitiesByKey: { shares_ie: 0.0 },
       inflation: 0.02,
       priorityCash: 1,
       priorityPension: 4,

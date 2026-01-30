@@ -133,10 +133,18 @@ The Allocations panel renders different parameter IDs depending on the Per-Count
 
 The layout rules described in this document apply to the investment allocation rows in both modes.
 
+## Economic Data Source
+
+Investment wrappers displayed in the Allocations panel may inherit economic behavior from global base assets:
+
+- **Inheriting wrappers** (`baseRef` present): Growth/volatility defined by asset-level parameters in Economy panel
+- **Local wrappers** (no `baseRef`): Growth/volatility defined per-wrapper in Economy panel (per-country rows)
+
+The "Holds" selector (when present) shows which global asset a wrapper inherits from.
+
 ## Notes for future extension
 
 - This layout is currently scoped to the Allocations panel using `data-allocations-row="true"`.
 - If the same compact layout is rolled out to other panels, prefer:
   - adding an explicit “compact row” marker attribute, and
   - keeping fixed-width input columns via `flex: 0 0 <width>` so alignment remains stable.
-

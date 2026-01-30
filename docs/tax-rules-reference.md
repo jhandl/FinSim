@@ -328,6 +328,21 @@ Each entry in the `investmentTypes` array supports the following fields:
 
 Document how growth/volatility parameters flow through the system:
 
+**Percentage Format Convention**:
+- **UI and Parameters**: Percentages are expressed as whole numbers (10 = 10%, not 0.1)
+- **Internal Calculations**: Converted to decimals (10 -> 0.1) by dividing by 100
+- **Global Asset Parameters**: `GlobalAssetGrowth_globalEquity: 7` means 7% growth
+- **Local Wrapper Parameters**: `investmentGrowthRatesByKey[key]: 0.1` means 10% growth (legacy decimal format)
+- **Pension Parameters**: `PensionGrowth_ie: 5` means 5% growth
+
+**Parameter Resolution** (in `InvestmentTypeFactory.createAssets()`):
+- **Global asset params**: Treated as percentages (whole numbers), divided by 100 via `normalizeRate()`
+- **Local wrapper params**: Treated as decimals (legacy format), used as-is
+- **Flexible normalization**: `normalizeRate()` function handles both:
+  - `|value| > 1` → treated as percentage, divided by 100 (e.g., `10` → `0.1`)
+  - `|value| ≤ 1` → treated as decimal, used as-is (e.g., `0.1` → `0.1`)
+  - This allows seamless handling of both UI percentages and legacy decimal formats
+
 **Global Asset Parameters** (visible in economy panel):
 - **Format**: `GlobalAssetGrowth_{baseKey}`, `GlobalAssetVolatility_{baseKey}`
 - **Example**: `GlobalAssetGrowth_globalEquity`, `GlobalAssetVolatility_globalBonds`
@@ -343,16 +358,107 @@ Document how growth/volatility parameters flow through the system:
 
 **Wrapper-Level Parameters** (legacy, hidden):
 - **Format**: `{key}GrowthRate`, `{key}GrowthStdDev`
-- **Example**: `indexFunds_ieGrowthRate` (if local), `shares_arGrowthStdDev` (if local)
-- **UI**: Created but hidden (`src/frontend/web/WebUI.js`) ONLY for local investments (no `baseRef`). Non-local wrappers (with `baseRef`) do NOT have these inputs.
+- **Example**: `indexFunds_ieGrowthRate`, `shares_ieGrowthStdDev` (for local investments only)
+- **UI**: Created but hidden (`src/frontend/web/WebUI.js` lines 718-745) ONLY for local investments (no `baseRef`). Non-local wrappers (with `baseRef`) do NOT have these inputs created.
 - **Usage**: Backward compatibility fallback in `InvestmentTypeFactory.createAssets()` for local investments.
-- **Serialization**: Preserved in CSV for legacy scenario compatibility (local investments only).
-- **Status**: Deprecated; non-local wrappers use asset-level params.
+- **Serialization**: Preserved in CSV (`src/core/Utils.js` lines 411-416) for legacy scenario compatibility (local investments only). Non-local wrappers skip wrapper-level params entirely.
+- **Status**: Deprecated for non-local wrappers; local wrappers continue to use wrapper-level params as primary source.
+
+### 8.9 UI Parameter Key Reference
+
+**Global Asset Parameters** (visible in growth rates table):
+- **Growth**: `GlobalAssetGrowth_globalEquity`, `GlobalAssetGrowth_globalBonds`
+- **Volatility**: `GlobalAssetVolatility_globalEquity`, `GlobalAssetVolatility_globalBonds`
+- **Location**: `src/frontend/web/WebUI.js` lines 845-846
+- **Format**: Whole number percentages (e.g., `7` = 7%)
+
+**Per-Country Pension Parameters** (when relocation enabled):
+- **Growth**: `PensionGrowth_ie`, `PensionGrowth_ar`
+- **Volatility**: `PensionVolatility_ie`, `PensionVolatility_ar`
+- **Inflation**: `Inflation_ie`, `Inflation_ar`
+- **Location**: `src/frontend/web/WebUI.js` lines 934-936
+- **Format**: Whole number percentages (e.g., `5` = 5%), normalized to decimals (`0.05`) internally
+
+**Per-Country Local Asset Parameters** (when relocation enabled):
+- **Growth**: `LocalAssetGrowth_ie_shares`, `LocalAssetGrowth_ar_merval`
+- **Volatility**: `LocalAssetVolatility_ie_shares`, `LocalAssetVolatility_ar_merval`
+- **Location**: `src/frontend/web/WebUI.js` lines 1012-1013
+- **Condition**: Only for local investments (no `baseRef`)
+- **Format**: Whole number percentages
+
+**Allocation Parameters**:
+- **Generic**: `InvestmentAllocation_indexFunds_ie`, `InvestmentAllocation_shares_ar`
+- **Per-country (chip-driven)**: `InvestmentAllocation_ie_indexFunds`, `InvestmentAllocation_ar_shares`
+- **Location**: `src/frontend/web/WebUI.js` lines 568-569, `src/core/Utils.js` lines 599-600
+- **Format**: Whole number percentages
+
+**State Pension Parameters**:
+- **Per-country**: `StatePension_ie`, `P2StatePension_ar`
+- **Legacy**: `StatePensionWeekly`, `P2StatePensionWeekly` (mapped to StartCountry)
+- **Location**: `src/core/Utils.js` lines 619-634
+- **Format**: Currency amounts
+
+**Pension Contribution Parameters**:
+- **Per-country**: `P1PensionContrib_ie`, `P2PensionContrib_ar`, `PensionCapped_ie`
+- **Legacy**: `PensionContributionPercentage`, `PensionContributionPercentageP2`, `PensionContributionCapped`
+- **Location**: `src/core/Utils.js` lines 639-670
+- **Format**: Percentages (contrib) or string (capped)
 
 **Parameter Resolution Order** (in `InvestmentTypeFactory.createAssets()`):
-1. Try `growthRatesByKey[key]` (e.g., `indexFunds_ie`)
-2. If undefined and key has country suffix, try base key (e.g., `indexFunds`) — **backward compat**
-3. Default to 0 if still undefined
+
+Resolution differs based on whether the wrapper inherits from a global asset:
+
+**Non-Local Wrappers** (with `baseRef`, e.g., `indexFunds_ie` with `baseRef: "globalEquity"`):
+1. **Primary**: Asset-level params `GlobalAssetGrowth_{baseRef}`, `GlobalAssetVolatility_{baseRef}` (treated as percentages, divided by 100)
+2. **Fallback 1**: Wrapper-level `growthRatesByKey[key]` / `stdDevsByKey[key]` (treated as decimals)
+3. **Fallback 2**: Base key `growthRatesByKey[baseKey]` / `stdDevsByKey[baseKey]` (e.g., `indexFunds` for `indexFunds_ie`)
+4. **Default**: 0 if all undefined
+
+**Local Wrappers** (no `baseRef`, e.g., pure local `shares_ie`):
+1. **Primary**: Wrapper-level `growthRatesByKey[key]` / `stdDevsByKey[key]` (treated as decimals)
+2. **Fallback**: Base key `growthRatesByKey[baseKey]` / `stdDevsByKey[baseKey]` (backward compat)
+3. **Default**: 0 if all undefined
+
+**Flexible Normalization**: The `normalizeRate()` function handles both formats:
+- Values with `|n| > 1` are treated as percentages and divided by 100 (e.g., `10` → `0.1`)
+- Values with `|n| ≤ 1` are treated as decimals and used as-is (e.g., `0.1` → `0.1`)
+
+### 8.8 Mix Configuration Parameter Resolution
+
+**Purpose**: Resolve growth/volatility for mixed-asset strategies (fixed mix or glide path).
+
+**Function**: `InvestmentTypeFactory.resolveMixConfig(params, countryCode, baseKey)`
+
+**Parameter Hierarchy**:
+1. **Per-country mix config**: `MixConfig_{cc}_{baseKey}_*` (e.g., `MixConfig_ie_indexFunds_type`)
+2. **Global mix config**: `GlobalMixConfig_{baseKey}_*` (e.g., `GlobalMixConfig_indexFunds_type`)
+3. **Fallback**: `null` if neither exists
+
+**Mix Config Fields**:
+- `type`: `"fixed"` or `"glidePath"`
+- `asset1`, `asset2`: Base keys (e.g., `"globalEquity"`, `"globalBonds"`)
+- `startAge`, `targetAge`: Age range for glide path
+- `targetAgeOverridden`: Boolean flag
+- `startAsset1Pct`, `startAsset2Pct`, `endAsset1Pct`, `endAsset2Pct`: Allocation percentages
+
+**Economic Data Resolution** (lines 256-259 in `InvestmentTypeFactory.js`):
+- `asset1Growth`: `normalizeRate(params['GlobalAssetGrowth_' + mix.asset1])`
+- `asset2Growth`: `normalizeRate(params['GlobalAssetGrowth_' + mix.asset2])`
+- `asset1Vol`: `normalizeRate(params['GlobalAssetVolatility_' + mix.asset1])`
+- `asset2Vol`: `normalizeRate(params['GlobalAssetVolatility_' + mix.asset2])`
+
+**Example**:
+```javascript
+// Per-country IE index funds with fixed 60/40 equity/bonds mix
+MixConfig_ie_indexFunds_type: "fixed"
+MixConfig_ie_indexFunds_asset1: "globalEquity"
+MixConfig_ie_indexFunds_asset2: "globalBonds"
+MixConfig_ie_indexFunds_startAsset1Pct: 60
+MixConfig_ie_indexFunds_startAsset2Pct: 40
+// Economic data from global asset params
+GlobalAssetGrowth_globalEquity: 7
+GlobalAssetGrowth_globalBonds: 3
+```
 
 ### 8.4 `residenceScope` Semantics
 
@@ -409,21 +515,32 @@ graph TD
 
 ### 8.5 Runtime: GenericInvestmentAsset and InvestmentTypeFactory
 
-> **Note**: See `src/core/InvestmentTypeFactory.js` for implementation details.
+> **Implementation**: See `src/core/InvestmentTypeFactory.js` for full details.
 
-**`GenericInvestmentAsset`**:
-- Extends `Equity` base class.
-- Configured by `investmentTypeDef` from tax rules.
-- Resolves tax category (exit tax vs CGT), deemed disposal, loss offset, annual exemption.
-- Captures `baseCurrency`, `assetCountry`, `residenceScope` for multi-currency support.
-- Overrides `buy()` to capture currency/country from first call if undefined.
+**`GenericInvestmentAsset`** (lines 11-199):
+- Extends `Equity` base class
+- Configured by `investmentTypeDef` from tax rules
+- Resolves tax category (exit tax vs CGT) via `_resolveTaxCategory()` (lines 63-66)
+- Resolves deemed disposal via `_resolveDeemedDisposalYears()` (lines 75-78)
+- Resolves loss offset via `_resolveAllowLossOffset()` (lines 68-73)
+- Resolves annual exemption eligibility via `_resolveAnnualExemptionEligibility()` (lines 80-88)
+- Captures `baseCurrency`, `assetCountry`, `residenceScope` for multi-currency support (lines 19-21)
+- Overrides `buy()` to capture currency/country from first call if undefined (lines 40-52)
 
-**`InvestmentTypeFactory.createAssets()`**:
-- Loads `investmentTypes` from `TaxRuleSet.getResolvedInvestmentTypes()` (with `baseRef` inheritance).
-- Resolves growth/volatility from `growthRatesByKey`/`stdDevsByKey` maps.
-- Applies backward compat fallback for base keys.
-- Resolves mix configuration from params (if enabled).
-- Returns array of `{ key, label, asset, baseCurrency, assetCountry, residenceScope }`.
+**`InvestmentTypeFactory.createAssets()`** (lines 284-378):
+- Loads `investmentTypes` from `TaxRuleSet.getResolvedInvestmentTypes()` (line 297)
+- Resolves growth/volatility from params with dual-path logic (lines 313-360):
+  - Non-local (baseRef): asset-level → wrapper-level fallback
+  - Local (no baseRef): wrapper-level → base key fallback
+- Applies `normalizeRate()` for flexible percentage/decimal handling (lines 290-294)
+- Resolves mix configuration via `resolveMixConfig()` if enabled (line 311)
+- Returns array of `{ key, label, asset, baseCurrency, assetCountry, residenceScope }` (lines 368-375)
+
+**`InvestmentTypeFactory.resolveMixConfig()`** (lines 209-263):
+- Resolves per-country or global mix config params (lines 226-238)
+- Normalizes percentages and rates (lines 216-225)
+- Fetches asset-level growth/vol for mix components (lines 256-259)
+- Returns mix config object or null (line 262)
 
 **Simulator Integration** (`src/core/Simulator.js`):
 - Calls `InvestmentTypeFactory.createAssets()` for each scenario country.
@@ -452,25 +569,39 @@ sequenceDiagram
     Factory->>Factory: new GenericInvestmentAsset(type, gr, sd, ruleset)
     Factory-->>Sim: assets array
     Sim->>Sim: initialize with initialCapitalByKey
+
+**Parameter Resolution Details**:
+- Line 459: `Factory->>TRS: getResolvedInvestmentTypes()` returns types with `baseRef` inheritance
+- Line 463: `Factory->>Factory: resolve growth/vol (wrapper fallback)` implements dual-path logic:
+  - Non-local (baseRef): asset-level → wrapper-level fallback
+  - Local (no baseRef): wrapper-level → base key fallback
+- Line 464: `Factory->>Factory: new GenericInvestmentAsset(type, gr, sd, ruleset)` receives resolved params
 ```
 
 ### 8.6 Audit Findings: Wrapper-Level Economic Data
 
-**Current Usage**:
-1. **Backward Compat Fallback**: `InvestmentTypeFactory.createAssets()` reads wrapper-level params if namespaced key not found.
-2. **CSV Serialization**: `Utils.serializeSimulation()` writes wrapper-level params; `deserializeSimulation()` reads them.
-3. **UI Hidden Inputs**: `WebUI.renderInvestmentParameterFields()` creates hidden inputs for serialization.
-4. **Test Framework**: `TestFramework.js` maps legacy test params to wrapper-level keys.
+**Current Implementation** (as of Phase 5 completion):
 
-**Migration Path**:
-- **Option 1 (Conservative)**: Keep wrapper-level params for backward compat; document as deprecated.
-- **Option 2 (Clean)**: Remove wrapper-level params; migrate legacy CSV files during deserialization.
-  - Add migration logic in `Utils.deserializeSimulation()` to detect wrapper-level params and convert to asset-level.
-  - Update tests to use asset-level params.
-  - Remove hidden inputs from `WebUI.renderInvestmentParameterFields()`.
-  - Remove fallback from `InvestmentTypeFactory.createAssets()`.
+**Usage**:
+1. **Local Investments** (no `baseRef`):
+   - Wrapper-level params (`{key}GrowthRate`, `{key}GrowthStdDev`) are PRIMARY source
+   - UI creates hidden inputs for serialization (`WebUI.js` lines 718-745)
+   - CSV serialization preserves wrapper-level params (`Utils.js` lines 411-416)
+   - Factory uses wrapper-level params with base key fallback (`InvestmentTypeFactory.js` lines 347-360)
 
-**Current Status**: Wrapper-Level Parameters are preserved ONLY for local investments (without `baseRef`) for backward compatibility. Non-local wrappers rely on asset-level parameters.
+2. **Non-Local Investments** (with `baseRef`):
+   - Asset-level params (`GlobalAssetGrowth_{baseRef}`) are PRIMARY source
+   - Wrapper-level params serve as FALLBACK only (backward compat)
+   - UI does NOT create wrapper-level inputs (`WebUI.js` line 727: `if (t.baseRef) continue;`)
+   - CSV serialization SKIPS wrapper-level params (`Utils.js` line 412: `if (!type.baseRef)`)
+   - Factory prioritizes asset-level, falls back to wrapper-level (`InvestmentTypeFactory.js` lines 313-345)
+
+**Backward Compatibility**:
+- Legacy CSV files with wrapper-level params for non-local wrappers still load (fallback path)
+- New CSV files omit wrapper-level params for non-local wrappers (cleaner)
+- Local wrappers continue to use wrapper-level params (no change)
+
+**Status**: Wrapper-level parameters are DEPRECATED for non-local wrappers; ACTIVE for local wrappers.
 
 ### 8.7 Global Base Types
 
@@ -538,4 +669,3 @@ The tax rules schema is intentionally extensible:
   - Avoid mixing logic into the JSON.
 
 The current files (`tax-rules-ie.json`, `tax-rules-ar.json`) should be considered the authoritative examples for field usage until further countries are added.
-

@@ -79,12 +79,12 @@ const DEMO3_BASELINE = {
   // at relocation time. This keeps the emergency stash purchasing-power consistent
   // across countries (vs ballooning nominally under evolved FX).
   ages: {
-    40: { worth: 2292223578.686624, cash: 14938121.255654156, netIncome: 833059779.5234649 },
-    65: { worth: 1826924404261.7158, cash: 4546507611.75827, netIncome: 8656794176.110376 },
-    80: { worth: 44933691100436.414, cash: 140509952772.85306, netIncome: 2419679637876.817 }
+    40: { worth: 2275190337.739375, cash: 79379609.1242759, netIncome: 833020387.0938061 },
+    65: { worth: 1739718993357.7207, cash: 48826750509.70023, netIncome: 8656794176.110376 },
+    80: { worth: 50316425410673.17, cash: 506368781729.67224, netIncome: 2556084888994.7246 }
   },
-  final: { age: 90, worth: 485797566412545.4, cash: 1383757107738.8225 },
-  maxWorth: 485797566412545.4
+  final: { age: 90, worth: 897312543083125.1, cash: 4964200246566.705 },
+  maxWorth: 897312543083125.1
 };
 
 // Tolerances for evolution FX mode (inflation-driven FX rates)
@@ -115,6 +115,34 @@ function parseOptionalNumeric(value, treatPercentAsFraction) {
   if (isNaN(num)) return null;
   if (percent && treatPercentAsFraction) {
     return num / 100;
+  }
+  return num;
+}
+
+function parsePercentNumber(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const percent = trimmed.endsWith('%');
+  const numericPortion = percent ? trimmed.slice(0, -1) : trimmed;
+  let num = parseFloat(numericPortion);
+  if (isNaN(num)) return null;
+  if (!percent && Math.abs(num) <= 1) {
+    num = num * 100;
+  }
+  return num;
+}
+
+function parsePercentDecimal(value) {
+  if (value === undefined || value === null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const percent = trimmed.endsWith('%');
+  const numericPortion = percent ? trimmed.slice(0, -1) : trimmed;
+  let num = parseFloat(numericPortion);
+  if (isNaN(num)) return null;
+  if (percent || Math.abs(num) > 1) {
+    num = num / 100;
   }
   return num;
 }
@@ -252,11 +280,39 @@ function parseDemoCsvScenario(filePath) {
   if (!params.economyMode) {
     params.economyMode = 'deterministic';
   }
+
+  const startCountry = (params.StartCountry || 'ie').toLowerCase();
+  const globalGrowth = parsePercentNumber(
+    params.GlobalAssetGrowth_globalEquity || params.indexFunds_ieGrowthRate || params.FundsGrowthRate || params.growthRateFunds
+  );
+  const globalVol = parsePercentNumber(
+    params.GlobalAssetVolatility_globalEquity || params.indexFunds_ieGrowthStdDev || params.FundsGrowthStdDev || params.growthDevFunds
+  );
+  if (globalGrowth !== null && (params.GlobalAssetGrowth_globalEquity === undefined || params.GlobalAssetGrowth_globalEquity === '')) {
+    params.GlobalAssetGrowth_globalEquity = globalGrowth;
+  }
+  if (globalVol !== null && (params.GlobalAssetVolatility_globalEquity === undefined || params.GlobalAssetVolatility_globalEquity === '')) {
+    params.GlobalAssetVolatility_globalEquity = globalVol;
+  }
+
+  if (!params.investmentGrowthRatesByKey) params.investmentGrowthRatesByKey = {};
+  if (!params.investmentVolatilitiesByKey) params.investmentVolatilitiesByKey = {};
+  const sharesRate = parsePercentDecimal(
+    params.shares_ieGrowthRate || params.SharesGrowthRate || params.growthRateShares
+  );
+  const sharesVol = parsePercentDecimal(
+    params.shares_ieGrowthStdDev || params.SharesGrowthStdDev || params.growthDevShares
+  );
+  const sharesKey = 'shares_' + startCountry;
+  if (sharesRate !== null && params.investmentGrowthRatesByKey[sharesKey] === undefined) {
+    params.investmentGrowthRatesByKey[sharesKey] = sharesRate;
+  }
+  if (sharesVol !== null && params.investmentVolatilitiesByKey[sharesKey] === undefined) {
+    params.investmentVolatilitiesByKey[sharesKey] = sharesVol;
+  }
   params.growthDevFunds = 0;
   params.growthDevShares = 0;
   params.growthDevPension = 0;
-
-  const startCountry = (params.StartCountry || 'ie').toLowerCase();
   if (params.personalTaxCredit !== undefined && params.personalTaxCredit !== null && params.personalTaxCredit !== '') {
     if (!params.taxCreditsByCountry) params.taxCreditsByCountry = {};
     if (!params.taxCreditsByCountry[startCountry]) params.taxCreditsByCountry[startCountry] = {};
@@ -836,12 +892,12 @@ module.exports = {
           priorityShares: 3,
           priorityPension: 4,
           inflation: 0.02,
-          growthRateFunds: 0.05,
-          growthRateShares: 0.06,
+          GlobalAssetGrowth_globalEquity: 5,
+          GlobalAssetVolatility_globalEquity: 0,
           growthRatePension: 0.04,
-          growthDevFunds: 0,
-          growthDevShares: 0,
           growthDevPension: 0,
+          investmentGrowthRatesByKey: { shares_ie: 0.06 },
+          investmentVolatilitiesByKey: { shares_ie: 0 },
           StartCountry: 'ie',
           simulation_mode: 'single',
           economy_mode: 'deterministic',

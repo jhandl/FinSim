@@ -117,6 +117,30 @@ graph TD
 
 *   **Hybrid rebalancing:** Mix-enabled assets (fixed or glide path) rebalance annually after surplus allocation. Surplus cash is used first (tax-free), then minimal selling corrects remaining drift (taxable via `Taxman.declareInvestmentGains()`), with a 0.1% tolerance.
 
+#### Investment Economic Data Separation
+
+Investment wrappers are defined in country tax rules (`investmentTypes` in `tax-rules-*.json`) and can either:
+
+1. **Inherit from global assets** (`baseRef` property):
+   - Economic behavior (growth/volatility) comes from asset-level parameters
+   - Parameters: `GlobalAssetGrowth_{baseKey}`, `GlobalAssetVolatility_{baseKey}`
+   - Example: `indexFunds_ie` with `baseRef: 'globalEquity'` uses `GlobalAssetGrowth_globalEquity`
+   - Tax treatment defined by wrapper (e.g., Exit Tax vs CGT)
+
+2. **Define local investments** (no `baseRef`):
+   - Economic behavior defined at wrapper level
+   - Parameters: `investmentGrowthRatesByKey['{key}']`, `investmentVolatilitiesByKey['{key}']`
+   - Or per-country: `LocalAssetGrowth_{cc}_{baseKey}`, `LocalAssetVolatility_{cc}_{baseKey}`
+   - Example: Pure local asset with no global equivalent
+
+**Key rule:** Wrappers with `baseRef` use asset-level economic data; wrappers without `baseRef` use wrapper-level economic data.
+
+**Implementation:** `InvestmentTypeFactory.createAssets()` checks for `baseRef` and resolves parameters accordingly.
+
+**UI impact:** Economy panel hides growth/volatility inputs for non-local wrappers (those with `baseRef`).
+
+**Serialization:** `Utils.js` skips wrapper-level economic parameters for non-local wrappers in CSV output.
+
 #### Frontend
 
 *   **[`UIManager.js`](src/frontend/UIManager.js:1):** An abstraction layer that sits between the core simulator and the UI, allowing the core to remain UI-agnostic.

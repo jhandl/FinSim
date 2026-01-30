@@ -87,6 +87,8 @@ function seedParameterIds(ui) {
   // deserializeSimulation may set these outside try/catch blocks for older files.
   ui.ensureParameterInput('simulation_mode', 'string');
   ui.ensureParameterInput('economy_mode', 'string');
+  ui.ensureParameterInput('investmentStrategiesEnabled', 'string');
+  ui.ensureParameterInput('perCountryInvestmentsEnabled', 'string');
 }
 
 module.exports = {
@@ -135,4 +137,3 @@ module.exports = {
     return { success: errors.length === 0, errors };
   }
 };
-

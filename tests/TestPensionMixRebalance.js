@@ -28,7 +28,7 @@ function buildParams(overrides) {
     investmentAllocationsByCountry: { ie: { indexFunds_ie: 0, shares_ie: 0 } },
     investmentGrowthRatesByKey: { shares_ie: 0 },
     investmentVolatilitiesByKey: { shares_ie: 0 },
-    GlobalAssetGrowth_globalEquity: 0.1,
+    GlobalAssetGrowth_globalEquity: 10,
     GlobalAssetGrowth_globalBonds: 0,
     GlobalAssetVolatility_globalEquity: 0,
     GlobalAssetVolatility_globalBonds: 0,

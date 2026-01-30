@@ -213,15 +213,15 @@ class InvestmentTypeFactory {
       var n = Number(value);
       return (typeof n === 'number' && !isNaN(n)) ? n : null;
     };
-    var normalizePct = function (value) {
-      var n = toNumber(value);
-      if (n === null) return null;
-      return (Math.abs(n) <= 1) ? (n * 100) : n;
-    };
     var normalizeRate = function (value) {
       var n = toNumber(value);
       if (n === null) return null;
       return (Math.abs(n) > 1) ? (n / 100) : n;
+    };
+    var normalizePct = function (value) {
+      var n = toNumber(value);
+      if (n === null) return null;
+      return (Math.abs(n) <= 1) ? (n * 100) : n;
     };
     var mixPrefix = countryCode ? ('MixConfig_' + countryCode + '_' + baseKey) : null;
     var globalPrefix = 'GlobalMixConfig_' + baseKey;
@@ -287,6 +287,11 @@ class InvestmentTypeFactory {
       var n = Number(value);
       return (typeof n === 'number' && !isNaN(n)) ? n : null;
     };
+    var normalizeRate = function (value) {
+      var n = toNumber(value);
+      if (n === null) return null;
+      return (Math.abs(n) > 1) ? (n / 100) : n;
+    };
     var assets = [];
     if (!ruleset || typeof ruleset.getInvestmentTypes !== 'function') return assets;
     var types = ruleset.getResolvedInvestmentTypes();
@@ -308,9 +313,9 @@ class InvestmentTypeFactory {
       if (t.baseRef) {
         // Non-local wrapper: use asset-level parameters (treated as percentages)
         var rawGr = params['GlobalAssetGrowth_' + t.baseRef];
-        var valGr = toNumber(rawGr);
+        var valGr = normalizeRate(rawGr);
         if (valGr !== null) {
-          gr = valGr / 100;
+          gr = valGr;
         } else {
           // Fallback 1: Wrapper-level params (treated as decimals/legacy)
           if (growthRatesByKey && growthRatesByKey[key] !== undefined) {
@@ -324,9 +329,9 @@ class InvestmentTypeFactory {
         }
 
         var rawSd = params['GlobalAssetVolatility_' + t.baseRef];
-        var valSd = toNumber(rawSd);
+        var valSd = normalizeRate(rawSd);
         if (valSd !== null) {
-          sd = valSd / 100;
+          sd = valSd;
         } else {
            // Fallback 1: Wrapper-level params
            if (stdDevsByKey && stdDevsByKey[key] !== undefined) {
