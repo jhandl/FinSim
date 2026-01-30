@@ -1745,6 +1745,7 @@ class WebUI extends AbstractUI {
           });
           return;
         }
+        if (mixInputs.type.value) mixInputs.typeSaved.value = mixInputs.type.value;
         hidden.value = val;
         currentValue = val;
         currentLabel = labelText;
@@ -1796,6 +1797,7 @@ class WebUI extends AbstractUI {
     const asset1 = ensure('asset1', 'string', defaultAsset1);
     const asset2 = ensure('asset2', 'string');
     const type = ensure('type', 'string');
+    const typeSaved = ensure('typeSaved', 'string');
     const startAge = ensure('startAge', 'number');
     const targetAge = ensure('targetAge', 'number');
     const targetAgeOverridden = ensure('targetAgeOverridden', 'boolean');
@@ -1807,6 +1809,7 @@ class WebUI extends AbstractUI {
       asset1: asset1,
       asset2: asset2,
       type: type,
+      typeSaved: typeSaved,
       startAge: startAge,
       targetAge: targetAge,
       targetAgeOverridden: targetAgeOverridden,
@@ -1893,46 +1896,44 @@ class WebUI extends AbstractUI {
       <div class="modal-content mix-config-modal">
         <div class="modal-header">
           <h3>Mix Strategy</h3>
-          <span class="modal-close" aria-label="Close">&times;</span>
+          <div class="tab-toggle">
+            <span class="tab-toggle-option mode-toggle-active" data-value="fixed">Fixed</span>
+            <span class="tab-toggle-option" data-value="glide">Glide Path</span>
+          </div>
         </div>
         <div class="modal-body">
-          <div class="mix-row">
-            <div class="mix-label">Mix Type:</div>
-            <div class="mix-type-toggle">
-              <label><input type="radio" name="mixConfigType" value="fixed"> Fixed</label>
-              <label><input type="radio" name="mixConfigType" value="glide"> Glide Path</label>
+          <div class="mix-assets-row">
+            <div class="mix-row">
+              <div class="mix-label">Asset 1:</div>
+              <div class="mix-inline visualization-control">
+                <span id="mixConfigAsset1Toggle" class="dd-toggle pseudo-select"></span>
+                <div id="mixConfigAsset1Options" class="visualization-dropdown" style="display:none;"></div>
+              </div>
+            </div>
+            <div class="mix-row">
+              <div class="mix-label">Asset 2:</div>
+              <div class="mix-inline visualization-control">
+                <span id="mixConfigAsset2Toggle" class="dd-toggle pseudo-select"></span>
+                <div id="mixConfigAsset2Options" class="visualization-dropdown" style="display:none;"></div>
+              </div>
             </div>
           </div>
-          <div class="mix-row mix-timeline">
-            <div class="mix-label">Timeline (Glide only):</div>
+          <div class="mix-section">
             <div class="mix-inline">
-              <span>Start Age</span>
-              <input id="mixConfigStartAge" type="text" inputmode="numeric" pattern="[0-9]*">
-              <span>Target</span>
-              <input id="mixConfigTargetAge" type="text" inputmode="numeric" pattern="[0-9]*">
+              <input id="mixConfigStartAge" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Age">
+              <div class="mix-slider-wrapper">
+                <input id="mixConfigStartSlider" type="range" min="0" max="100" step="5">
+                <span class="mix-slider-label" id="mixConfigStartLabel"></span>
+              </div>
             </div>
           </div>
-          <div class="mix-row">
-            <div class="mix-label">Assets:</div>
+          <div class="mix-section mix-target">
             <div class="mix-inline">
-              <span>Asset1</span>
-              <select id="mixConfigAsset1"></select>
-              <span>Asset2</span>
-              <select id="mixConfigAsset2"></select>
-            </div>
-          </div>
-          <div class="mix-row">
-            <div class="mix-label">Start Mix:</div>
-            <div class="mix-inline mix-slider-row">
-              <input id="mixConfigStartSlider" type="range" min="0" max="100" step="1">
-              <div class="mix-slider-label" id="mixConfigStartLabel"></div>
-            </div>
-          </div>
-          <div class="mix-row mix-target">
-            <div class="mix-label">Target Mix:</div>
-            <div class="mix-inline mix-slider-row">
-              <input id="mixConfigEndSlider" type="range" min="0" max="100" step="1">
-              <div class="mix-slider-label" id="mixConfigEndLabel"></div>
+              <input id="mixConfigTargetAge" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Age">
+              <div class="mix-slider-wrapper">
+                <input id="mixConfigEndSlider" type="range" min="0" max="100" step="5">
+                <span class="mix-slider-label" id="mixConfigEndLabel"></span>
+              </div>
             </div>
           </div>
         </div>
@@ -1944,24 +1945,23 @@ class WebUI extends AbstractUI {
     `;
     document.body.appendChild(modal);
 
-    const closeX = modal.querySelector('.modal-close');
     const cancelBtn = modal.querySelector('#mixConfigCancel');
     const applyBtn = modal.querySelector('#mixConfigApply');
-    const typeFixed = modal.querySelector('input[name="mixConfigType"][value="fixed"]');
-    const typeGlide = modal.querySelector('input[name="mixConfigType"][value="glide"]');
+    const tabFixed = modal.querySelector('.tab-toggle-option[data-value="fixed"]');
+    const tabGlide = modal.querySelector('.tab-toggle-option[data-value="glide"]');
     const startAgeInput = modal.querySelector('#mixConfigStartAge');
     const targetAgeInput = modal.querySelector('#mixConfigTargetAge');
-    const asset1Select = modal.querySelector('#mixConfigAsset1');
-    const asset2Select = modal.querySelector('#mixConfigAsset2');
+    const asset1Toggle = modal.querySelector('#mixConfigAsset1Toggle');
+    const asset1Options = modal.querySelector('#mixConfigAsset1Options');
+    const asset2Toggle = modal.querySelector('#mixConfigAsset2Toggle');
+    const asset2Options = modal.querySelector('#mixConfigAsset2Options');
     const startSlider = modal.querySelector('#mixConfigStartSlider');
     const endSlider = modal.querySelector('#mixConfigEndSlider');
     const startLabel = modal.querySelector('#mixConfigStartLabel');
     const endLabel = modal.querySelector('#mixConfigEndLabel');
-    const timelineRow = modal.querySelector('.mix-timeline');
-    const targetRow = modal.querySelector('.mix-target');
+    const targetSection = modal.querySelector('.mix-target');
 
     const closeModal = () => this._closeMixConfigModal();
-    closeX.addEventListener('click', closeModal);
     cancelBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
@@ -1970,18 +1970,23 @@ class WebUI extends AbstractUI {
     this._mixModal = {
       modal: modal,
       applyBtn: applyBtn,
-      typeFixed: typeFixed,
-      typeGlide: typeGlide,
+      tabFixed: tabFixed,
+      tabGlide: tabGlide,
       startAgeInput: startAgeInput,
       targetAgeInput: targetAgeInput,
-      asset1Select: asset1Select,
-      asset2Select: asset2Select,
+      asset1Toggle: asset1Toggle,
+      asset1Options: asset1Options,
+      asset2Toggle: asset2Toggle,
+      asset2Options: asset2Options,
       startSlider: startSlider,
       endSlider: endSlider,
       startLabel: startLabel,
       endLabel: endLabel,
-      timelineRow: timelineRow,
-      targetRow: targetRow
+      targetSection: targetSection,
+      asset1Dropdown: null,
+      asset2Dropdown: null,
+      asset1Value: '',
+      asset2Value: ''
     };
 
     return this._mixModal;
@@ -2020,11 +2025,16 @@ class WebUI extends AbstractUI {
     }
     if (!defaultAsset2) defaultAsset2 = defaultAsset1;
 
-    const typeVal = mixInputs.type.value ? String(mixInputs.type.value).trim().toLowerCase() : 'fixed';
+    const typeVal = mixInputs.type.value
+      ? String(mixInputs.type.value).trim().toLowerCase()
+      : (mixInputs.typeSaved.value ? String(mixInputs.typeSaved.value).trim().toLowerCase() : 'fixed');
     const isGlide = typeVal === 'glide' || typeVal === 'glidepath';
 
-    const defaultStartAge = mixInputs.startAge.value ? String(mixInputs.startAge.value) : (this.getValue('StartingAge') || '');
-    const defaultTargetAge = mixInputs.targetAge.value ? String(mixInputs.targetAge.value) : (this.getValue('RetirementAge') || this.getValue('TargetAge') || '');
+    const isP2Mix = mixPrefix.indexOf('_pensionP2') !== -1;
+    const startAgeField = isP2Mix ? 'P2StartingAge' : 'StartingAge';
+    const retireAgeField = isP2Mix ? 'P2RetirementAge' : 'RetirementAge';
+    const defaultStartAge = mixInputs.startAge.value ? String(mixInputs.startAge.value) : (this.getValue(startAgeField) || '');
+    const defaultTargetAge = mixInputs.targetAge.value ? String(mixInputs.targetAge.value) : (this.getValue(retireAgeField) || '');
     const targetAgeOverride = mixInputs.targetAgeOverridden.value ? String(mixInputs.targetAgeOverridden.value).toLowerCase() : '';
 
     const pctVal = (el) => {
@@ -2032,30 +2042,73 @@ class WebUI extends AbstractUI {
       const num = parseInt(raw, 10);
       return isNaN(num) ? null : Math.max(0, Math.min(100, num));
     };
+    const snapStep = (val) => Math.max(0, Math.min(100, Math.round(val / 5) * 5));
     const startPct = pctVal(mixInputs.startAsset1Pct);
     const endPct = pctVal(mixInputs.endAsset1Pct);
-    const startSliderVal = (startPct === null) ? 100 : startPct;
-    const endSliderVal = (endPct === null) ? startSliderVal : endPct;
+    const startSliderVal = (startPct === null) ? 100 : snapStep(startPct);
+    const endSliderVal = (endPct === null) ? startSliderVal : snapStep(endPct);
 
-    modal.typeFixed.checked = !isGlide;
-    modal.typeGlide.checked = isGlide;
+    if (isGlide) {
+      modal.tabGlide.classList.add('mode-toggle-active');
+      modal.tabFixed.classList.remove('mode-toggle-active');
+    } else {
+      modal.tabFixed.classList.add('mode-toggle-active');
+      modal.tabGlide.classList.remove('mode-toggle-active');
+    }
     modal.startAgeInput.value = defaultStartAge;
     modal.targetAgeInput.value = defaultTargetAge;
 
-    const fillSelect = (selectEl, selectedValue) => {
-      while (selectEl.firstChild) selectEl.removeChild(selectEl.firstChild);
+    const buildAssetOptions = (selectedValue) => {
+      const opts = [];
       for (let i = 0; i < baseOptions.length; i++) {
         const opt = baseOptions[i];
         if (!opt) continue;
-        const o = document.createElement('option');
-        o.value = opt.value;
-        o.textContent = opt.label || opt.value;
-        if (opt.value === selectedValue) o.selected = true;
-        selectEl.appendChild(o);
+        opts.push({
+          value: opt.value,
+          label: opt.label || opt.value,
+          description: opt.description || opt.label || opt.value,
+          selected: opt.value === selectedValue
+        });
       }
+      return opts;
     };
-    fillSelect(modal.asset1Select, defaultAsset1);
-    fillSelect(modal.asset2Select, defaultAsset2);
+    const setAssetToggle = (toggleEl, value) => {
+      toggleEl.textContent = labelMap[value] || value || '';
+    };
+    modal.asset1Value = defaultAsset1;
+    modal.asset2Value = defaultAsset2;
+    setAssetToggle(modal.asset1Toggle, defaultAsset1);
+    setAssetToggle(modal.asset2Toggle, defaultAsset2);
+    if (!modal.asset1Dropdown) {
+      modal.asset1Dropdown = DropdownUtils.create({
+        toggleEl: modal.asset1Toggle,
+        dropdownEl: modal.asset1Options,
+        options: buildAssetOptions(defaultAsset1),
+        selectedValue: defaultAsset1,
+        onSelect: (val, labelText) => {
+          modal.asset1Value = val;
+          modal.asset1Toggle.textContent = labelText;
+          updateSliderLabels();
+        }
+      });
+    } else {
+      modal.asset1Dropdown.setOptions(buildAssetOptions(defaultAsset1));
+    }
+    if (!modal.asset2Dropdown) {
+      modal.asset2Dropdown = DropdownUtils.create({
+        toggleEl: modal.asset2Toggle,
+        dropdownEl: modal.asset2Options,
+        options: buildAssetOptions(defaultAsset2),
+        selectedValue: defaultAsset2,
+        onSelect: (val, labelText) => {
+          modal.asset2Value = val;
+          modal.asset2Toggle.textContent = labelText;
+          updateSliderLabels();
+        }
+      });
+    } else {
+      modal.asset2Dropdown.setOptions(buildAssetOptions(defaultAsset2));
+    }
     modal.startSlider.value = String(startSliderVal);
     modal.endSlider.value = String(endSliderVal);
 
@@ -2066,14 +2119,16 @@ class WebUI extends AbstractUI {
       defaultTargetAge: defaultTargetAge,
       targetAgeOverridden: (targetAgeOverride === 'yes' || targetAgeOverride === 'true')
     };
+
     const updateMode = () => {
-      const glideOn = modal.typeGlide.checked;
-      modal.timelineRow.style.display = glideOn ? '' : 'none';
-      modal.targetRow.style.display = glideOn ? '' : 'none';
+      const glideOn = modal.tabGlide.classList.contains('mode-toggle-active');
+      modal.targetSection.style.display = glideOn ? '' : 'none';
+      modal.startAgeInput.style.display = glideOn ? '' : 'none';
     };
+
     const updateSliderLabels = () => {
-      const asset1Key = modal.asset1Select.value;
-      const asset2Key = modal.asset2Select.value;
+      const asset1Key = modal.asset1Value;
+      const asset2Key = modal.asset2Value;
       const asset1Label = labelMap[asset1Key] || asset1Key || 'Asset1';
       const asset2Label = labelMap[asset2Key] || asset2Key || 'Asset2';
       const startVal = parseInt(modal.startSlider.value, 10);
@@ -2084,18 +2139,26 @@ class WebUI extends AbstractUI {
       modal.endLabel.textContent = `${this._stripGlobalPrefix(asset1Label)}:${endPct1}% ${this._stripGlobalPrefix(asset2Label)}:${100 - endPct1}%`;
     };
 
-    modal.typeFixed.onchange = updateMode;
-    modal.typeGlide.onchange = updateMode;
-    modal.asset1Select.onchange = updateSliderLabels;
-    modal.asset2Select.onchange = updateSliderLabels;
+    modal.tabFixed.onclick = () => {
+      modal.tabFixed.classList.add('mode-toggle-active');
+      modal.tabGlide.classList.remove('mode-toggle-active');
+      updateMode();
+    };
+
+    modal.tabGlide.onclick = () => {
+      modal.tabGlide.classList.add('mode-toggle-active');
+      modal.tabFixed.classList.remove('mode-toggle-active');
+      updateMode();
+    };
+
     modal.startSlider.oninput = updateSliderLabels;
     modal.endSlider.oninput = updateSliderLabels;
     modal.targetAgeInput.oninput = () => { state.targetAgeOverridden = true; };
 
     modal.applyBtn.onclick = () => {
-      const isGlideMode = modal.typeGlide.checked;
-      const asset1Val = modal.asset1Select.value;
-      const asset2Val = modal.asset2Select.value;
+      const isGlideMode = modal.tabGlide.classList.contains('mode-toggle-active');
+      const asset1Val = modal.asset1Value;
+      const asset2Val = modal.asset2Value;
       const startPct1 = parseInt(modal.startSlider.value, 10) || 0;
       const endPct1 = isGlideMode ? (parseInt(modal.endSlider.value, 10) || 0) : startPct1;
       const startAgeVal = modal.startAgeInput.value ? String(modal.startAgeInput.value).trim() : '';
@@ -2103,6 +2166,7 @@ class WebUI extends AbstractUI {
       const overrideFlag = (isGlideMode && (state.targetAgeOverridden || (state.defaultTargetAge && targetAgeVal && targetAgeVal !== String(state.defaultTargetAge)))) ? 'Yes' : 'No';
 
       mixInputs.type.value = isGlideMode ? 'glide' : 'fixed';
+      mixInputs.typeSaved.value = mixInputs.type.value;
       mixInputs.asset1.value = asset1Val;
       mixInputs.asset2.value = asset2Val;
       mixInputs.startAge.value = startAgeVal;

@@ -2110,72 +2110,127 @@ footer {
 }
 
 /* Mix config modal */
+.mix-config-modal .modal-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  padding-bottom: 0;
+  border-bottom: var(--card-header-border-width) solid var(--primary-color);
+}
+
+.mix-config-modal .pseudo-select {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mix-config-modal .visualization-dropdown {
+  min-width: 0;
+}
+
+.mix-config-modal .modal-header h3 {
+  margin: 0;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+  font-size: 1.25rem;
+}
+
+.mix-config-modal .modal-header .tab-toggle {
+  margin-left: auto;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.mix-config-modal .mix-assets-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
 .mix-config-modal .mix-row {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 0.75rem;
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: nowrap; /* Never wrap label and its dropdown/slider */
+}
+
+/* Ensure asset rows don't grow unnecessarily when side-by-side */
+.mix-config-modal .mix-assets-row .mix-row {
+  margin-bottom: 0;
+  flex: 0 1 auto;
+}
+
+/* Ensure the inline container doesn't force expansion in asset rows */
+.mix-config-modal .mix-assets-row .mix-inline {
+  flex: 0 1 auto;
 }
 
 .mix-config-modal .mix-label {
-  font-weight: 600;
+  display: block;
+  font-weight: bold;
   color: var(--text-color);
-  min-width: 140px;
+  margin-bottom: 0;
+  text-align: left;
+  min-width: 70px;
+  flex-shrink: 0;
 }
 
 .mix-config-modal .mix-inline {
   display: flex;
-  align-items: center;
+  align-items: center; /* Consistently center vertically */
   gap: 0.5rem;
-  flex-wrap: wrap;
+  flex: 1; /* Default to grow (needed for sliders) */
+  flex-wrap: nowrap; /* Never wrap inline controls */
+  min-width: 0;
 }
 
-.mix-config-modal .mix-type-toggle {
+.mix-config-modal .mix-slider-wrapper {
+  flex: 1;
   display: flex;
-  align-items: center;
-  gap: 0.8rem;
-}
-
-.mix-config-modal label {
-  flex: 0 0 auto;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.mix-config-modal .mix-type-toggle label {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-weight: 500;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0; /* Enable shrinking */
 }
 
 .mix-config-modal .mix-inline input[type="text"] {
-  width: 56px;
+  width: 80px; /* Wider as requested */
+  height: 34px;
   text-align: right;
+  flex-shrink: 0;
+  margin-top: -15px; /* Center with slider track: (8px top margin + 10px slider half-height) - 17px input half-height */
 }
 
-.mix-config-modal .mix-inline select {
-  min-width: 140px;
-}
-
-.mix-config-modal .mix-slider-row {
-  flex: 1 1 220px;
-}
-
-.mix-config-modal .mix-slider-row input[type="range"] {
-  flex: 1 1 180px;
+.mix-config-modal .mix-inline input[type="range"] {
+  width: 100%;
+  margin: 8px 0; /* Standard slider margin */
+  cursor: pointer;
+  padding: 0;
 }
 
 .mix-config-modal .mix-slider-label {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: #555;
-  min-width: 150px;
-  text-align: right;
+  white-space: nowrap;
+  text-align: center;
+  width: 100%;
 }
 
-.mix-config-modal .mix-row.mix-target {
-  margin-bottom: 0;
+.mix-config-modal .mix-inline select {
+  flex: 0 0 auto; /* Don't grow or shrink */
+  width: auto;    /* Use intrinsic width based on content */
+  max-width: 100%;
+  height: 34px;   /* Consistent height */
+  min-width: 35px; /* Lower minimum usable width */
+}
+
+.mix-config-modal .mix-section {
+  margin-bottom: 1.25rem;
 }
 
 /* Status indicator clickable when error */
@@ -2227,25 +2282,6 @@ footer {
   margin-right: 0.4rem;
   font-size: 0.9rem;
   vertical-align: baseline;
-}
-
-/* Mobile responsive modal */
-@media (max-width: 768px) {
-  .modal-content {
-    margin: 5% auto;
-    width: 95%;
-    max-height: 90vh;
-  }
-
-  .modal-header,
-  .modal-body,
-  .modal-footer {
-    padding: 1rem;
-  }
-
-  .modal-header h3 {
-    font-size: 1.1rem;
-  }
 }
 
 /* Column Header Tooltips */
@@ -2338,6 +2374,46 @@ footer {
   font-size: 0.9em;
   vertical-align: top;
   padding-top: 0.1rem;
+}
+
+/* Generic Tab Toggle - reusable tab pattern */
+.tab-toggle {
+  display: flex;
+  align-items: flex-end;
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.tab-toggle-option {
+  cursor: pointer;
+  padding: 0.1rem 0.8rem;
+  margin-left: 0;
+  border-radius: 4px 4px 0 0;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  border-top: var(--card-header-border-width) solid transparent;
+  border-left: var(--card-header-border-width) solid transparent;
+  border-right: var(--card-header-border-width) solid transparent;
+  border-bottom: none;
+  background-color: transparent;
+  position: relative;
+  top: var(--card-header-border-width);
+  font-size: 1rem;
+}
+
+.tab-toggle-option:first-child {
+  margin-left: 0;
+}
+
+.tab-toggle-option.mode-toggle-active {
+  background-color: var(--card-bg-color, white);
+  border-top: var(--card-header-border-width) solid var(--primary-color);
+  border-left: var(--card-header-border-width) solid var(--primary-color);
+  border-right: var(--card-header-border-width) solid var(--primary-color);
+  z-index: 1;
+}
+
+.tab-toggle-option:hover:not(.mode-toggle-active) {
+  opacity: 0.7;
 }
 
 /* Events Header Controls - container for view toggle and age/year toggle */

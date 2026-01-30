@@ -129,6 +129,16 @@ class DropdownUtils {
     // ---------------------------------------------------------------------
     const rebuildOptions = (opts) => {
       if (!Array.isArray(opts)) return;
+      const hasExplicitSelected = opts.some(opt => opt && opt.selected);
+      if (hasExplicitSelected) {
+        for (let i = 0; i < opts.length; i++) {
+          const opt = opts[i];
+          if (opt && opt.selected) {
+            selected = opt.value;
+            break;
+          }
+        }
+      }
       const hdrNode = dropdownEl.querySelector('.dropdown-header');
       dropdownEl.innerHTML = '';
       if (hdrNode) dropdownEl.appendChild(hdrNode);
@@ -153,7 +163,8 @@ class DropdownUtils {
           div.style.cssText += opt.style;
         }
 
-        if (opt.selected || opt.value === selected) div.classList.add('selected');
+        const isSelected = hasExplicitSelected ? !!opt.selected : opt.value === selected;
+        if (isSelected) div.classList.add('selected');
         dropdownEl.appendChild(div);
       });
     };
@@ -357,6 +368,7 @@ class DropdownUtils {
       selected = val;
       dropdownEl.querySelectorAll('[data-value]').forEach((el) => el.classList.remove('selected'));
       tgt.classList.add('selected');
+      removeTooltip();
       close();
       if (typeof onSelect === 'function') onSelect(val, label);
       e.stopPropagation();
