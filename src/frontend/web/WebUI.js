@@ -866,6 +866,28 @@ class WebUI extends AbstractUI {
           for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
           if (el && el.parentNode) el.parentNode.removeChild(el);
         });
+
+        // Render local investment types for start country (when no chips shown)
+        for (let i = 0; i < types.length; i++) {
+          const t = types[i] || {};
+          const key = t.key;
+          if (!key) continue;
+          
+          // Only show local investments (no baseRef)
+          // Non-local (with baseRef) are handled by global rows at the top
+          if (t.baseRef) continue;
+
+          const labelText = t.label || key;
+          const growthId = key + 'GrowthRate';
+          const volId = key + 'GrowthStdDev';
+          
+          const tr = makeGrowthRow(labelText, growthId, volId);
+          if (pensionRow) {
+            tbody.insertBefore(tr, pensionRow);
+          } else {
+            tbody.appendChild(tr);
+          }
+        }
       }
 
       if (showCountryChips) {

@@ -76,9 +76,12 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     webUI = new WebUI();
     
     // Spy on internal methods
+    const inputs = {};
     webUI._takeOrCreateInput = jest.fn((id, type) => {
+      if (inputs[id]) return inputs[id];
       const el = document.createElement('input');
       el.id = id;
+      inputs[id] = el;
       return el;
     });
     webUI._stashInputElement = jest.fn((el) => {
@@ -169,5 +172,29 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     
     // Should NOT include inheriting wrapper
     expect(rowIds).not.toContain('LocalAssetGrowth_ie_wrapper');
+  });
+
+  test('renders local investment types in economy table when relocation disabled', () => {
+    // Setup
+    webUI.perCountryInvestmentsEnabled = false;
+    mockConfig.isRelocationEnabled.mockReturnValue(false);
+    webUI.hasRelocationEvents.mockReturnValue(false);
+
+    const types = [
+      { key: 'localInv', label: 'Local', residenceScope: 'local' }
+    ];
+
+    webUI.renderInvestmentParameterFields(types);
+
+    const tbody = document.querySelector('.growth-rates-table tbody');
+    // Check for row containing localInvGrowthRate
+    const input = document.getElementById('localInvGrowthRate');
+    expect(input).not.toBeNull();
+    // Verify it is inside the table
+    const tr = input.closest('tr');
+    expect(tr).not.toBeNull();
+    expect(tbody.contains(tr)).toBe(true);
+    // Verify it is visible (not display: none)
+    expect(tr.style.display).not.toBe('none');
   });
 });
