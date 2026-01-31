@@ -1357,6 +1357,7 @@ class WebUI extends AbstractUI {
       }
       // Pension contribution controls remain StartCountry-scoped (same ids as per-country mode)
       this._renderCountryPensionContributionFields(allocGroup, startCountry, simulationMode);
+      this.formatUtils.setupPercentageInputs();
       this._refreshAllocationsLabelLayout();
       return;
     }
@@ -1436,6 +1437,7 @@ class WebUI extends AbstractUI {
         this._renderCountryPensionContributionFields(countryContainer, startCountry, simulationMode);
 
         allocGroup.appendChild(countryContainer);
+        this.formatUtils.setupPercentageInputs();
         this._refreshAllocationsLabelLayout();
       } else {
         // Relocation disabled: keep original legacy layout/IDs.
@@ -1483,6 +1485,7 @@ class WebUI extends AbstractUI {
         }
         // Pension fields below allocations
         this._renderCountryPensionContributionFields(allocGroup, startCountry, simulationMode);
+        this.formatUtils.setupPercentageInputs();
         this._refreshAllocationsLabelLayout();
       }
       return;
@@ -1580,6 +1583,7 @@ class WebUI extends AbstractUI {
       allocGroup.appendChild(countryContainer);
     }
     this.countryTabSyncManager.setSelectedCountry('allocations', selected);
+    this.formatUtils.setupPercentageInputs();
     this._refreshAllocationsLabelLayout();
   }
 
