@@ -215,9 +215,10 @@ module.exports = {
           errors.push('Pension portfolio missing or empty');
         }
         
-        // Validate indexFunds/shares have proper Money structure (Money-only)
-        [indexFunds, shares].forEach(function(asset, assetIdx) {
-          var name = assetIdx === 0 ? 'indexFunds' : 'shares';
+        // Validate investmentAssets have proper Money structure (Money-only)
+        investmentAssets.forEach(function(entry) {
+          var name = entry.key;
+          var asset = entry.asset;
           if (!asset.portfolio || !Array.isArray(asset.portfolio)) {
             errors.push(name + '.portfolio must be an array');
             return;

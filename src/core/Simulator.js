@@ -16,7 +16,7 @@ var incomeRentalsByCountry;
  *
  * Cash operations update both to maintain invariant: cash === cashMoney.amount
  */
-var cash, cashMoney, indexFunds, shares;
+var cash, cashMoney;
 // Generic investment array (future replacement for specific variables)
 var investmentAssets; // [{ key, label, asset }]
 // Track per-investment-type flows to support dynamic UI columns
@@ -479,9 +479,8 @@ function initializeSimulationVariables() {
   var volByKey = montecarlo ? (params.investmentVolatilitiesByKey || {}) : {};
   // Initialize legacy single-country instruments for the StartCountry (used by some legacy columns/paths).
   var sc = String(params.StartCountry || config.getDefaultCountry()).toLowerCase();
-  indexFunds = new IndexFunds(growthByKey['indexFunds_' + sc] || 0, volByKey['indexFunds_' + sc] || 0);
-  shares = new Shares(growthByKey['shares_' + sc] || 0, volByKey['shares_' + sc] || 0);
-  // Also create generic assets array (compat path: map first two to existing ones for IE)
+  
+  // Create generic assets array using the factory
   // Per strictness §9: investmentAssets must always be a valid, non-empty array
   try {
     var cfg = Config.getInstance();
@@ -516,20 +515,13 @@ function initializeSimulationVariables() {
         }
       }
     }
-    // NOTE: Do NOT replace GenericInvestmentAsset objects with legacy IndexFunds/Shares.
-    // The factory creates assets with proper baseCurrency metadata for currency conversion.
-    // Legacy indexFunds/shares objects are still maintained separately for backward compat
-    // in data display, but investmentAssets should use the factory-created objects.
   } catch (e) {
-    // Catch silently - fallback below will populate investmentAssets
+    // Catch silently - fallback validation below will handle it
   }
-  // Fallback: if investmentAssets is empty or undefined, create minimal array with legacy assets
-  // This ensures withdraw() and liquidateAll() can always iterate over investmentAssets
+
+  // Ensure investmentAssets is always populated
   if (!investmentAssets || investmentAssets.length === 0) {
-    investmentAssets = [
-      { key: 'indexFunds', asset: indexFunds },
-      { key: 'shares', asset: shares }
-    ];
+    throw new Error('No investment assets created. Check tax rules configuration.');
   }
   // Initialize investment assets with initial capital from dynamic map
   var initialCapitalByKey = params.initialCapitalByKey || {};
@@ -704,28 +696,21 @@ function resetYearlyVariables() {
   // Pass Person objects to revenue reset (now using updated ages and year)
   revenue.reset(person1, person2, attributionManager, currentCountry, year);
 
-  // Add year to global investment objects
-  indexFunds.addYear();
-  shares.addYear();
-  // Also update generic assets if any (avoid double-calling for legacy assets)
+  // Add year to investment assets
   if (investmentAssets && investmentAssets.length > 0) {
     for (var i = 0; i < investmentAssets.length; i++) {
       var ga = investmentAssets[i].asset;
       if (!ga || !ga.addYear) continue;
-      if (ga === indexFunds || ga === shares) continue; // skip duplicates
       ga.addYear();
     }
   }
   realEstate.addYear();
 
   // Reset yearly statistics for attribution tracking
-  indexFunds.resetYearlyStats();
-  shares.resetYearlyStats();
   if (investmentAssets && investmentAssets.length > 0) {
     for (var j = 0; j < investmentAssets.length; j++) {
       var assetObj = investmentAssets[j].asset;
       if (!assetObj || !assetObj.resetYearlyStats) continue;
-      if (assetObj === indexFunds || assetObj === shares) continue; // skip duplicates
       assetObj.resetYearlyStats();
     }
   }
@@ -1812,9 +1797,6 @@ function handleInvestments() {
       var c = centry.asset.capital();
       capsByKey[centry.key] = (capsByKey[centry.key] || 0) + c;
     }
-  } else {
-    capsByKey['indexFunds'] = indexFunds.capital();
-    capsByKey['shares'] = shares.capital();
   }
   let totalInvestmentCaps = 0;
   for (var k in capsByKey) {
@@ -1917,21 +1899,6 @@ function handleInvestments() {
         cash -= invested;
         cashMoney.amount -= invested;
       }
-    }
-    // Legacy two-asset investing path - use dynamic allocations
-    if (!usedDynamic) {
-      var allocByKey = getAllocationsByYear(year);
-      // buy() receives numeric amount + currency/country metadata.
-      // Asset classes track Money internally; Simulator works with numbers only.
-      indexFunds.buy(surplus * (allocByKey.indexFunds || 0), residenceCurrency, currentCountry);
-      shares.buy(surplus * (allocByKey.shares || 0), residenceCurrency, currentCountry);
-      invested = surplus * ((allocByKey.indexFunds || 0) + (allocByKey.shares || 0));
-      /**
-       * @assumes residenceCurrency - Investment amounts are in residence currency.
-       * @performance Hot path - direct .amount access for investment deduction.
-       */
-      cash -= invested;
-      cashMoney.amount -= invested;
     }
   }
   // Hybrid rebalance for mix-enabled assets (after surplus allocation, before next year's growth)
@@ -2438,9 +2405,6 @@ function buildAggregateContext() {
       var c = centry.asset.capital();
       capsByKey[centry.key] = (capsByKey[centry.key] || 0) + c;
     }
-  } else {
-    capsByKey['indexFunds'] = indexFunds.capital();
-    capsByKey['shares'] = shares.capital();
   }
 
   var pensionCap = person1.getTotalPensionCapital() + (person2 ? person2.getTotalPensionCapital() : 0);
@@ -2470,8 +2434,6 @@ function buildAggregateContext() {
 
     // Asset managers
     realEstate: realEstate,
-    indexFunds: indexFunds,
-    shares: shares,
     investmentAssets: investmentAssets,
 
     // Income/expense flows
@@ -2545,8 +2507,7 @@ function updateYearlyData() {
   // Populate attribution fields (extracted to AttributionPopulator.js for testability)
   AttributionPopulator.populateAttributionFields(
     dataSheet[row],
-    indexFunds,
-    shares,
+    investmentAssets,
     attributionManager,
     revenue
   );

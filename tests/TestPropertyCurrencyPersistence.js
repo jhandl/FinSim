@@ -18,7 +18,11 @@ const PROPERTY_RULES = {
     incomeTax: { brackets: { '0': 0.2 }, taxCredits: { employee: 0, personal: 0 } },
     residencyRules: { postEmigrationTaxYears: 0, taxesForeignIncome: false },
     capitalGainsTax: { rate: 0.2, annualExemption: 0 },
-    pensionRules: { systemType: 'mixed', lumpSumTaxBands: { '0': 0 } }
+    pensionRules: { systemType: 'mixed', lumpSumTaxBands: { '0': 0 } },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'SSS', assetCountry: 'ss', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'SSS', assetCountry: 'ss', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   },
   tt: {
     version: 'prop-test',
@@ -33,7 +37,11 @@ const PROPERTY_RULES = {
     incomeTax: { brackets: { '0': 0.15 }, taxCredits: { employee: 0, personal: 0 } },
     residencyRules: { postEmigrationTaxYears: 0, taxesForeignIncome: false },
     capitalGainsTax: { rate: 0.15, annualExemption: 0 },
-    pensionRules: { systemType: 'mixed', lumpSumTaxBands: { '0': 0 } }
+    pensionRules: { systemType: 'mixed', lumpSumTaxBands: { '0': 0 } },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'TTT', assetCountry: 'tt', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'TTT', assetCountry: 'tt', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   }
 };
 

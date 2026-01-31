@@ -44,7 +44,15 @@ module.exports = {
         (function() {
           currentCountry = 'ie';
           residenceCurrency = 'EUR';
-          var asset = new IndexFunds(0.05, 0);
+          var rs = new TaxRuleSet({
+            version: 'test-1',
+            country: 'IE',
+            locale: { currencyCode: 'EUR', numberFormat: { decimal: '.', thousand: ',' } },
+            investmentTypes: [{ key: 'indexFunds', label: 'Index Funds', baseCurrency: 'EUR', assetCountry: 'ie', taxation: { exitTax: { rate: 0.41 } } }],
+            incomeTax: { brackets: { '0': 0.2 } }
+          });
+          var assets = InvestmentTypeFactory.createAssets(rs, { indexFunds: 0.05 }, { indexFunds: 0 });
+          var asset = assets[0].asset;
           asset.buy(10000, 'EUR', 'ie');
           asset.addYear();
           return { capital: asset.capital(), principal: asset.getPortfolioStats().principal };
@@ -127,7 +135,15 @@ module.exports = {
           currentCountry = 'ie';
           residenceCurrency = 'EUR';
           year = Config.getInstance().getSimulationStartYear();
-          var asset = new Shares(0, 0);
+          var rs = new TaxRuleSet({
+            version: 'test-4',
+            country: 'IE',
+            locale: { currencyCode: 'EUR', numberFormat: { decimal: '.', thousand: ',' } },
+            investmentTypes: [{ key: 'shares', label: 'Shares', baseCurrency: 'EUR', assetCountry: 'ie', taxation: { capitalGains: { rate: 0.33 } } }],
+            incomeTax: { brackets: { '0': 0.2 } }
+          });
+          var assets = InvestmentTypeFactory.createAssets(rs, { shares: 0 }, { shares: 0 });
+          var asset = assets[0].asset;
           asset.buy(10000, 'EUR', 'ie');
           var sold = asset.sell(5000);
           var remaining = asset.capital();
@@ -159,7 +175,15 @@ module.exports = {
         (function() {
           currentCountry = 'ie';
           residenceCurrency = 'EUR';
-          var asset = new IndexFunds(0.05, 0);
+          var rs = new TaxRuleSet({
+            version: 'test-5',
+            country: 'IE',
+            locale: { currencyCode: 'EUR', numberFormat: { decimal: '.', thousand: ',' } },
+            investmentTypes: [{ key: 'indexFunds', label: 'Index Funds', baseCurrency: 'EUR', assetCountry: 'ie', taxation: { exitTax: { rate: 0.41 } } }],
+            incomeTax: { brackets: { '0': 0.2 } }
+          });
+          var assets = InvestmentTypeFactory.createAssets(rs, { indexFunds: 0.05 }, { indexFunds: 0 });
+          var asset = assets[0].asset;
           asset.buy(10000, 'EUR', 'ie');
           asset.addYear();
           
@@ -186,7 +210,15 @@ module.exports = {
         (function() {
           currentCountry = 'ie';
           residenceCurrency = 'EUR';
-          var asset = new Shares(0, 0);
+          var rs = new TaxRuleSet({
+            version: 'test-6',
+            country: 'IE',
+            locale: { currencyCode: 'EUR', numberFormat: { decimal: '.', thousand: ',' } },
+            investmentTypes: [{ key: 'shares', label: 'Shares', baseCurrency: 'EUR', assetCountry: 'ie', taxation: { capitalGains: { rate: 0.33 } } }],
+            incomeTax: { brackets: { '0': 0.2 } }
+          });
+          var assets = InvestmentTypeFactory.createAssets(rs, { shares: 0 }, { shares: 0 });
+          var asset = assets[0].asset;
           asset.buy(5000, 'EUR', 'ie');
           asset.addYear();
           asset.addYear();
@@ -216,7 +248,15 @@ module.exports = {
           residenceCurrency = 'EUR';
           year = 2024;
           
-          var asset = new IndexFunds(0.05, 0);
+          var rs = new TaxRuleSet({
+            version: 'test-7',
+            country: 'IE',
+            locale: { currencyCode: 'EUR', numberFormat: { decimal: '.', thousand: ',' } },
+            investmentTypes: [{ key: 'indexFunds', label: 'Index Funds', baseCurrency: 'EUR', assetCountry: 'ie', taxation: { exitTax: { rate: 0.41 } } }],
+            incomeTax: { brackets: { '0': 0.2 } }
+          });
+          var assets = InvestmentTypeFactory.createAssets(rs, { indexFunds: 0.05 }, { indexFunds: 0 });
+          var asset = assets[0].asset;
           asset.buy(10000, 'EUR', 'ie');
           asset.addYear(); // Grows to ~10500
           asset.buy(5000, 'EUR', 'ie');
@@ -255,7 +295,15 @@ module.exports = {
           currentCountry = 'ie';
           residenceCurrency = 'EUR';
           
-          var asset = new Shares(0, 0);
+          var rs = new TaxRuleSet({
+            version: 'test-8',
+            country: 'IE',
+            locale: { currencyCode: 'EUR', numberFormat: { decimal: '.', thousand: ',' } },
+            investmentTypes: [{ key: 'shares', label: 'Shares', baseCurrency: 'EUR', assetCountry: 'ie', taxation: { capitalGains: { rate: 0.33 } } }],
+            incomeTax: { brackets: { '0': 0.2 } }
+          });
+          var assets = InvestmentTypeFactory.createAssets(rs, { shares: 0 }, { shares: 0 });
+          var asset = assets[0].asset;
           asset.buy(10000, 'EUR', 'ie');
           asset.buy(5000, 'EUR', 'ie');
           
@@ -288,7 +336,15 @@ module.exports = {
           residenceCurrency = 'EUR';
           year = 2024;
           
-          var asset = new IndexFunds(0.05, 0);
+          var rs = new TaxRuleSet({
+            version: 'test-9',
+            country: 'IE',
+            locale: { currencyCode: 'EUR', numberFormat: { decimal: '.', thousand: ',' } },
+            investmentTypes: [{ key: 'indexFunds', label: 'Index Funds', baseCurrency: 'EUR', assetCountry: 'ie', taxation: { exitTax: { rate: 0.41 } } }],
+            incomeTax: { brackets: { '0': 0.2 } }
+          });
+          var assets = InvestmentTypeFactory.createAssets(rs, { indexFunds: 0.05 }, { indexFunds: 0 });
+          var asset = assets[0].asset;
           asset.buy(10000, 'EUR', 'ie');  // EUR holding
           asset.addYear(); // Grows to ~10500 (with ~500 gain)
           

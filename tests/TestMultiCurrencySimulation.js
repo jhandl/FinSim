@@ -40,8 +40,8 @@ module.exports = {
           initialFunds: 0,
           initialShares: 0,
           emergencyStash: 0,
-          FundsAllocation: 0,
-          SharesAllocation: 0,
+          FundsAllocation: 0.1,
+          SharesAllocation: 0.1,
           priorityCash: 1,
           priorityPension: 2,
           priorityFunds: 3,
@@ -151,36 +151,30 @@ module.exports = {
       (function() {
         var errors = [];
         
-        // Validate IndexFunds portfolio structure (Money-only)
-        if (!indexFunds.portfolio || !Array.isArray(indexFunds.portfolio)) {
-          errors.push('indexFunds.portfolio must be an array');
+        // Validate investmentAssets portfolio structure (Money-only)
+        if (!investmentAssets || !Array.isArray(investmentAssets)) {
+          errors.push('investmentAssets must be an array');
         } else {
-          indexFunds.portfolio.forEach(function(holding, idx) {
-            if (!holding.principal || typeof holding.principal.amount !== 'number') {
-              errors.push('Holding ' + idx + ' principal.amount must be a number');
-            }
-            if (!holding.principal.currency || typeof holding.principal.currency !== 'string') {
-              errors.push('Holding ' + idx + ' principal.currency must be a string');
-            }
-            if (!holding.principal.country || typeof holding.principal.country !== 'string') {
-              errors.push('Holding ' + idx + ' principal.country must be a string');
-            }
-            if (!holding.interest || typeof holding.interest.amount !== 'number') {
-              errors.push('Holding ' + idx + ' interest.amount must be a number');
-            }
-          });
-        }
-        
-        // Validate Shares portfolio structure (Money-only)
-        if (!shares.portfolio || !Array.isArray(shares.portfolio)) {
-          errors.push('shares.portfolio must be an array');
-        } else {
-          shares.portfolio.forEach(function(holding, idx) {
-            if (!holding.principal || typeof holding.principal.amount !== 'number') {
-              errors.push('Shares holding ' + idx + ' principal.amount must be a number');
-            }
-            if (!holding.principal.currency || typeof holding.principal.currency !== 'string') {
-              errors.push('Shares holding ' + idx + ' principal.currency must be a string');
+          investmentAssets.forEach(function(entry) {
+            var asset = entry.asset;
+            var name = entry.key;
+            if (!asset.portfolio || !Array.isArray(asset.portfolio)) {
+              errors.push(name + '.portfolio must be an array');
+            } else {
+              asset.portfolio.forEach(function(holding, idx) {
+                if (!holding.principal || typeof holding.principal.amount !== 'number') {
+                  errors.push(name + ' holding ' + idx + ' principal.amount must be a number');
+                }
+                if (!holding.principal.currency || typeof holding.principal.currency !== 'string') {
+                  errors.push(name + ' holding ' + idx + ' principal.currency must be a string');
+                }
+                if (!holding.principal.country || typeof holding.principal.country !== 'string') {
+                  errors.push(name + ' holding ' + idx + ' principal.country must be a string');
+                }
+                if (!holding.interest || typeof holding.interest.amount !== 'number') {
+                  errors.push(name + ' holding ' + idx + ' interest.amount must be a number');
+                }
+              });
             }
           });
         }
@@ -260,24 +254,42 @@ module.exports = {
       (function() {
         var errors = [];
 
-        if (!indexFunds || !indexFunds.portfolio || indexFunds.portfolio.length === 0) {
+        if (!investmentAssets || investmentAssets.length === 0) {
           return null;
         }
         
-        // Check EUR holdings maintain EUR currency
-        var eurHoldings = indexFunds.portfolio.filter(function(h) {
-          return h.principal.currency === 'EUR';
-        });
-        if (eurHoldings.length === 0) {
-          errors.push('Expected at least one EUR holding in indexFunds');
+        // Find specific country assets
+        var ieAsset = null;
+        var arAsset = null;
+        
+        for (var i = 0; i < investmentAssets.length; i++) {
+          var k = investmentAssets[i].key;
+          if (k === 'indexFunds_ie' || k === 'indexFunds') ieAsset = investmentAssets[i].asset;
+          if (k === 'indexFunds_ar') arAsset = investmentAssets[i].asset;
         }
         
-        // Check ARS holdings maintain ARS currency
-        var arsHoldings = indexFunds.portfolio.filter(function(h) {
-          return h.principal.currency === 'ARS';
-        });
-        if (arsHoldings.length === 0) {
-          errors.push('Expected at least one ARS holding in indexFunds after relocation');
+        // Check EUR holdings in IE asset
+        if (!ieAsset || !ieAsset.portfolio) {
+           errors.push('IE index funds asset not found');
+        } else {
+          var eurHoldings = ieAsset.portfolio.filter(function(h) {
+            return h.principal.currency === 'EUR';
+          });
+          if (eurHoldings.length === 0) {
+            errors.push('Expected at least one EUR holding in IE indexFunds');
+          }
+        }
+        
+        // Check ARS holdings in AR asset
+        if (!arAsset || !arAsset.portfolio) {
+           errors.push('AR index funds asset not found (should have been created for relocation)');
+        } else {
+          var arsHoldings = arAsset.portfolio.filter(function(h) {
+            return h.principal.currency === 'ARS';
+          });
+          if (arsHoldings.length === 0) {
+            errors.push('Expected at least one ARS holding in AR indexFunds after relocation');
+          }
         }
         
         return errors.length > 0 ? errors.join('; ') : null;

@@ -30,7 +30,11 @@ const BASE_RULES = {
     capitalGainsTax: {
       rate: 0.2,
       annualExemption: 1200
-    }
+    },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'AAA', assetCountry: 'aa', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'AAA', assetCountry: 'aa', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   },
   bb: {
     version: 'test-1',
@@ -57,7 +61,11 @@ const BASE_RULES = {
     capitalGainsTax: {
       rate: 0.1,
       annualExemption: 500
-    }
+    },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'BBB', assetCountry: 'bb', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'BBB', assetCountry: 'bb', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   },
   cc: {
     version: 'test-1',
@@ -84,7 +92,11 @@ const BASE_RULES = {
     capitalGainsTax: {
       rate: 0.15,
       annualExemption: 700
-    }
+    },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'CCC', assetCountry: 'cc', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'CCC', assetCountry: 'cc', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   }
 };
 

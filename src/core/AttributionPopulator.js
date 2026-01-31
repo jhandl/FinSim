@@ -1,24 +1,34 @@
-function populateAttributionFields(dataRow, indexFunds, shares, attributionManager, revenue) {
+function populateAttributionFields(dataRow, investmentAssets, attributionManager, revenue) {
   // Record portfolio statistics for tooltip attribution
-  const indexFundsStats = indexFunds.getPortfolioStats();
-  const indexFundsNet = indexFundsStats.yearlyBought - indexFundsStats.yearlySold;
-  if (indexFundsNet > 0) {
-    attributionManager.record('indexfundscapital', 'Bought', indexFundsNet);
-  } else if (indexFundsNet < 0) {
-    attributionManager.record('indexfundscapital', 'Sold', -indexFundsNet);
-  }
-  attributionManager.record('indexfundscapital', 'Principal', indexFundsStats.principal);
-  attributionManager.record('indexfundscapital', 'P/L', indexFundsStats.totalGain);
+  if (investmentAssets && Array.isArray(investmentAssets)) {
+    for (var i = 0; i < investmentAssets.length; i++) {
+      var entry = investmentAssets[i];
+      if (!entry || !entry.asset) continue;
+      
+      var metricKey = null;
+      var baseKey = entry.key;
+      // Map to legacy metric keys for backward compatibility
+      if (baseKey === 'indexFunds' || String(baseKey).indexOf('indexFunds_') === 0) {
+        metricKey = 'indexfundscapital';
+      } else if (baseKey === 'shares' || String(baseKey).indexOf('shares_') === 0) {
+        metricKey = 'sharescapital';
+      } else {
+        // Fallback for new types: lowercase key + 'capital'
+        metricKey = String(baseKey).toLowerCase() + 'capital';
+      }
 
-  const sharesStats = shares.getPortfolioStats();
-  const sharesNet = sharesStats.yearlyBought - sharesStats.yearlySold;
-  if (sharesNet > 0) {
-    attributionManager.record('sharescapital', 'Bought', sharesNet);
-  } else if (sharesNet < 0) {
-    attributionManager.record('sharescapital', 'Sold', -sharesNet);
+      const stats = entry.asset.getPortfolioStats();
+      const net = stats.yearlyBought - stats.yearlySold;
+      
+      if (net > 0) {
+        attributionManager.record(metricKey, 'Bought', net);
+      } else if (net < 0) {
+        attributionManager.record(metricKey, 'Sold', -net);
+      }
+      attributionManager.record(metricKey, 'Principal', stats.principal);
+      attributionManager.record(metricKey, 'P/L', stats.totalGain);
+    }
   }
-  attributionManager.record('sharescapital', 'Principal', sharesStats.principal);
-  attributionManager.record('sharescapital', 'P/L', sharesStats.totalGain);
 
   const currentAttributions = attributionManager.getAllAttributions();
   for (const metric in currentAttributions) {

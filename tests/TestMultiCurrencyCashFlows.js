@@ -18,7 +18,11 @@ const CURRENCY_RULES = {
     incomeTax: { brackets: { '0': 0.1 }, taxCredits: { employee: 0, personal: 0 } },
     residencyRules: { postEmigrationTaxYears: 0, taxesForeignIncome: false },
     capitalGainsTax: { rate: 0.1, annualExemption: 0 },
-    pensionRules: { systemType: 'mixed', lumpSumTaxBands: { '0': 0 } }
+    pensionRules: { systemType: 'mixed', lumpSumTaxBands: { '0': 0 } },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'QQQ', assetCountry: 'qq', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'QQQ', assetCountry: 'qq', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   },
   pp: {
     version: 'fx-test',
@@ -33,7 +37,11 @@ const CURRENCY_RULES = {
     incomeTax: { brackets: { '0': 0.2 }, taxCredits: { employee: 0, personal: 0 } },
     residencyRules: { postEmigrationTaxYears: 0, taxesForeignIncome: false },
     capitalGainsTax: { rate: 0.2, annualExemption: 0 },
-    pensionRules: { systemType: 'mixed', lumpSumTaxBands: { '0': 0 } }
+    pensionRules: { systemType: 'mixed', lumpSumTaxBands: { '0': 0 } },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'PPP', assetCountry: 'pp', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'PPP', assetCountry: 'pp', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   },
   rr: {
     version: 'fx-test',
@@ -48,7 +56,11 @@ const CURRENCY_RULES = {
     incomeTax: { brackets: { '0': 0.15 }, taxCredits: { employee: 0, personal: 0 } },
     residencyRules: { postEmigrationTaxYears: 0, taxesForeignIncome: false },
     capitalGainsTax: { rate: 0.15, annualExemption: 0 },
-    pensionRules: { systemType: 'mixed', lumpSumTaxBands: { '0': 0 } }
+    pensionRules: { systemType: 'mixed', lumpSumTaxBands: { '0': 0 } },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'RRR', assetCountry: 'rr', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'RRR', assetCountry: 'rr', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   }
 };
 

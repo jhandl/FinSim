@@ -188,7 +188,15 @@ module.exports = {
           year = 2024;
           
           // Build test portfolio with 100 holdings (per plan spec)
-          var homogeneousAsset = new IndexFunds(0, 0);
+          var rs = new TaxRuleSet({
+            version: 'perf-test',
+            country: 'IE',
+            locale: { currencyCode: 'EUR', numberFormat: { decimal: '.', thousand: ',' } },
+            investmentTypes: [{ key: 'indexFunds', label: 'Index Funds', baseCurrency: 'EUR', assetCountry: 'ie', taxation: { exitTax: { rate: 0.41 } } }],
+            incomeTax: { brackets: { '0': 0.2 } }
+          });
+          var assets = InvestmentTypeFactory.createAssets(rs, { indexFunds: 0 }, { indexFunds: 0 });
+          var homogeneousAsset = assets[0].asset;
           for (var i = 0; i < 100; i++) {
             homogeneousAsset.buy(1000, 'EUR', 'ie');
           }

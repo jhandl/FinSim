@@ -121,7 +121,7 @@ class TestFramework {
         'revenue', 'realEstate', 'stockGrowthOverride', 'netIncome', 'expenses',
         'savings', 'targetCash', 'cashWithdraw', 'cashDeficit', 'incomeStatePension',
         'incomePrivatePension', 'withdrawalRate',
-        'cash', 'indexFunds', 'shares', 'incomeSalaries', 'incomeShares', 'incomeRentals',
+        'cash', 'incomeSalaries', 'incomeShares', 'incomeRentals',
         'incomeDefinedBenefit', 'incomeTaxFree', 'pensionContribution', 'person1', 'person2'
       ];
 

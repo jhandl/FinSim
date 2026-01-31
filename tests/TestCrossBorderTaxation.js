@@ -28,7 +28,11 @@ const TRAILING_RULES = {
     pensionRules: {
       systemType: 'mixed',
       lumpSumTaxBands: { '0': 0 }
-    }
+    },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'XXX', assetCountry: 'xx', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'XXX', assetCountry: 'xx', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   },
   yy: {
     version: 'test-1',
@@ -55,7 +59,11 @@ const TRAILING_RULES = {
     pensionRules: {
       systemType: 'mixed',
       lumpSumTaxBands: { '0': 0 }
-    }
+    },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'YYY', assetCountry: 'yy', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'YYY', assetCountry: 'yy', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   },
   zz: {
     version: 'test-1',
@@ -82,7 +90,11 @@ const TRAILING_RULES = {
     pensionRules: {
       systemType: 'mixed',
       lumpSumTaxBands: { '0': 0 }
-    }
+    },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'ZZZ', assetCountry: 'zz', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'ZZZ', assetCountry: 'zz', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   }
 };
 

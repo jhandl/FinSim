@@ -22,7 +22,11 @@ const PENSION_RULES = {
         ageBandsPercent: { '0': 1 }
       }
     },
-    capitalGainsTax: { rate: 0.2, annualExemption: 0 }
+    capitalGainsTax: { rate: 0.2, annualExemption: 0 },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'UUU', assetCountry: 'uu', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'UUU', assetCountry: 'uu', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   },
   vv: {
     version: 'pension-test',
@@ -37,7 +41,11 @@ const PENSION_RULES = {
     incomeTax: { brackets: { '0': 0.15 }, taxCredits: { employee: 0, personal: 0 } },
     residencyRules: { postEmigrationTaxYears: 0, taxesForeignIncome: false },
     pensionRules: { systemType: 'state_only' },
-    capitalGainsTax: { rate: 0.15, annualExemption: 0 }
+    capitalGainsTax: { rate: 0.15, annualExemption: 0 },
+    investmentTypes: [
+      { key: 'funds', label: 'Funds', baseCurrency: 'VVV', assetCountry: 'vv', taxation: { exitTax: { rate: 0.41 } } },
+      { key: 'shares', label: 'Shares', baseCurrency: 'VVV', assetCountry: 'vv', taxation: { capitalGains: { rate: 0.33 } } }
+    ]
   }
 };
 

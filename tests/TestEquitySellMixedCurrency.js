@@ -47,7 +47,15 @@ module.exports = {
           residenceCurrency = 'EUR';
           year = Config.getInstance().getSimulationStartYear();
 
-          var asset = new Shares(0, 0);
+          var rs = new TaxRuleSet({
+            version: 'test-mixed-curr',
+            country: 'IE',
+            locale: { currencyCode: 'EUR', numberFormat: { decimal: '.', thousand: ',' } },
+            investmentTypes: [{ key: 'shares', label: 'Shares', baseCurrency: 'EUR', assetCountry: 'ie', taxation: { capitalGains: { rate: 0.33 } } }],
+            incomeTax: { brackets: { '0': 0.2 } }
+          });
+          var assets = InvestmentTypeFactory.createAssets(rs, { shares: 0 }, { shares: 0 });
+          var asset = assets[0].asset;
           asset.buy(100, 'USD', 'us');
           asset.buy(200, 'EUR', 'ie');
           asset.portfolio[0].interest.amount = 20; // USD gains

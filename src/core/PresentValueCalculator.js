@@ -64,7 +64,7 @@ function computePresentValueAggregates(ctx) {
   var realEstate = ctx.realEstate;
   var indexFunds = ctx.indexFunds;
   var shares = ctx.shares;
-  var investmentAssets = ctx.investmentAssets;
+  var investmentAssets = ctx.investmentAssets || [];
   var realEstateConverted = ctx.realEstateConverted;
   var capsByKey = ctx.capsByKey;
   var incomeSalaries = ctx.incomeSalaries;

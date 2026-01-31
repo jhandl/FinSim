@@ -177,7 +177,15 @@ module.exports = {
           await vm.runInContext('Config.initialize(WebUI.getInstance())', framework.simulationContext);
           const moneyError = vm.runInContext(`
             (function() {
-              var asset = new IndexFunds(0.04, 0);
+              var rs = new TaxRuleSet({
+                version: 'test-fx',
+                country: 'IE',
+                locale: { currencyCode: 'EUR', numberFormat: { decimal: '.', thousand: ',' } },
+                investmentTypes: [{ key: 'indexFunds', label: 'Index Funds', baseCurrency: 'EUR', assetCountry: 'ie', taxation: { exitTax: { rate: 0.41 } } }],
+                incomeTax: { brackets: { '0': 0.2 } }
+              });
+              var assets = InvestmentTypeFactory.createAssets(rs, { indexFunds: 0.04 }, { indexFunds: 0 });
+              var asset = assets[0].asset;
               asset.buy(1000, 'EUR', 'ie');
               if (!asset.portfolio || asset.portfolio.length !== 1) return 'portfolio missing after buy';
               var holding = asset.portfolio[0];
