@@ -3,7 +3,6 @@ const path = require('path');
 
 const { TestFramework } = require('../src/core/TestFramework.js');
 const DataAggregatesCalculator = require('../src/core/DataAggregatesCalculator.js');
-const { Equities } = require('../src/core/Equities.js');
 const { RealEstate } = require('../src/core/RealEstate.js');
 const { Person } = require('../src/core/Person.js');
 const { Taxman } = require('../src/core/Taxman.js');

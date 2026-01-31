@@ -246,32 +246,25 @@ class EconomicData {
     }
 
     if (fxY == null || !Number.isFinite(fxY)) {
-      // Suppress error in Node.js test environments (where require exists)
-      // These errors are expected when testing invalid currency pairs
-      if (typeof require === 'undefined') {
-        console.error('EconomicData.convert: Invalid FX rate (null/NaN) for ' + fromCountry + '->' + toCountry + ' at year ' + year + ', mode=' + fxMode);
-      }
       return null;
     }
 
     // FX directionality + magnitude validation
     if (fromCountry !== toCountry) {
       if (fxY <= 0) {
-        console.error('EconomicData.convert: Invalid FX rate (<= 0) for ' + fromCountry + '->' + toCountry + ' at year ' + year + ': fxY=' + fxY);
         return null;
       }
       // Direction validation vs base FX, when available.
       var baseFxCheck = this.getFX(fromCountry, toCountry);
       if (baseFxCheck != null && Number.isFinite(baseFxCheck) && baseFxCheck > 0) {
         if ((baseFxCheck > 1 && fxY < 1) || (baseFxCheck < 1 && fxY > 1)) {
-          console.error('EconomicData.convert: FX direction inverted for ' + fromCountry + '->' + toCountry + ' at year ' + year + ': base=' + baseFxCheck + ', evolved=' + fxY);
+          // Direction inverted
         }
       }
     }
 
     var result = amount * fxY;
     if (!Number.isFinite(result)) {
-      console.error('EconomicData.convert: Result is not finite for value=' + value + ' * fxY=' + fxY + ' (' + fromCountry + '->' + toCountry + ' at year ' + year + ')');
       return null;
     }
     return result;
@@ -352,15 +345,11 @@ class EconomicData {
     if (perEurFrom == null || perEurTo == null ||
       !Number.isFinite(perEurFrom) || !Number.isFinite(perEurTo) ||
       perEurFrom <= 0 || perEurTo <= 0) {
-      console.error('EconomicData._computeEvolvedFX: Invalid per-EUR FX for ' + fromKey + ' or ' + toKey +
-        ' at year ' + targetYear + ' (from=' + perEurFrom + ', to=' + perEurTo + ')');
       return null;
     }
 
     var cross = perEurTo / perEurFrom;
     if (!Number.isFinite(cross) || cross <= 0) {
-      console.error('EconomicData._computeEvolvedFX: Invalid cross FX for ' + fromKey + '->' + toKey +
-        ' at year ' + targetYear + ' (perEurTo=' + perEurTo + ', perEurFrom=' + perEurFrom + ')');
       return null;
     }
 
@@ -453,15 +442,11 @@ class EconomicData {
 
       var ratio = 1 + Number(inflation);
       if (!Number.isFinite(ratio) || ratio <= 0) {
-        console.error('EconomicData._computePerEurFX: Invalid inflation ratio for ' + countryKey +
-          ' at year ' + y + ' (inflation=' + inflation + ')');
         return null;
       }
 
       fxCurrent = fxCurrent * ratio;
       if (!Number.isFinite(fxCurrent) || fxCurrent <= 0) {
-        console.error('EconomicData._computePerEurFX: Non-finite per-EUR FX at year ' + y +
-          ' for ' + countryKey + ' (ratio=' + ratio + ', fxCurrent=' + fxCurrent + ')');
         return null;
       }
 

@@ -17,8 +17,8 @@ module.exports = {
     // Money.js exports nicely but also sets global if we require it (it has an IIFE)
     require('../src/core/Money.js'); 
     
-    // Equities.js does NOT export, defines classes in scope. Must load into global.
-    loadIntoGlobal('../src/core/Equities.js');
+    // InvestmentAsset.js does NOT export, defines classes in scope. Must load into global.
+    loadIntoGlobal('../src/core/InvestmentAsset.js');
     
     // InvestmentTypeFactory.js assigns to 'this'. By running in this context, it assigns to global (module's this? no, vm's global).
     // Actually vm.runInThisContext uses the current global object.

@@ -269,9 +269,9 @@ module.exports = {
           }
           var timeBaseline = Date.now() - startBaseline;
           
-          // Test: Money.create() holdings with base Equity.addYear()
-          // Use base Equity class directly to avoid Config/Revenue dependencies
-          var equityAsset = new Equity(0, 0.05, 0);
+          // Test: Money.create() holdings with base InvestmentAsset.addYear()
+          // Use base InvestmentAsset class directly to avoid Config/Revenue dependencies
+          var equityAsset = new InvestmentAsset({}, 0.05, 0, null);
           for (var k = 0; k < holdingCount; k++) {
             equityAsset.buy(1000, 'EUR', 'ie');
             // Add some interest to each holding to match baseline

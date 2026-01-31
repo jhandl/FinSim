@@ -15,7 +15,7 @@ module.exports = {
 
     // Load dependencies
     require('../src/core/Money.js');
-    loadIntoGlobal('../src/core/Equities.js');
+    loadIntoGlobal('../src/core/InvestmentAsset.js');
     loadIntoGlobal('../src/core/InvestmentTypeFactory.js');
     const { TaxRuleSet } = require('../src/core/TaxRuleSet.js');
 

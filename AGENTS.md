@@ -70,7 +70,7 @@ graph TD
         D[Simulator.js] --> E{Core Components};
         E --> F[Taxman.js];
         E --> G[Person.js];
-        E --> H[Equities.js];
+        E --> H[InvestmentAsset.js + Pension.js];
         E --> I[RealEstate.js];
         E --> J[Config.js];
         D -- Populates --> K[Data Sheet];
@@ -102,7 +102,8 @@ graph TD
 *   **[`Events.js`](src/core/Events.js:1):** Defines the `SimEvent` class.
 *   **[`Taxman.js`](src/core/Taxman.js:1):** Responsible for all tax calculations (formerly `Revenue.js`).
 *   **[`TaxRuleSet.js`](src/core/TaxRuleSet.js:1):** Wraps country tax JSON and exposes getters consumed by `Taxman`.
-*   **[`Equities.js`](src/core/Equities.js:1):** The base class for core investment assets (`IndexFunds`, `Shares`, `Pension`).
+*   **[`InvestmentAsset.js`](src/core/InvestmentAsset.js:1):** The base class for core investment assets (`IndexFunds`, `Shares`) and generic types.
+*   **[`Pension.js`](src/core/Pension.js:1):** Manages private pension pots, extending `InvestmentAsset`.
 *   **[`RealEstate.js`](src/core/RealEstate.js:1):** Manages real estate properties and mortgages.
 *   **[`Money.js`](src/core/Money.js:1):** Currency-aware value wrapper enforcing explicit currency tracking throughout calculations; both `Money.create()` (struct) and `new Money()` (instance) exist, and hot paths should stay lightweight.
 *   **[`EconomicData.js`](src/core/EconomicData.js:1):** Exposes CPI, FX rates, and PPP profiles from tax rules for inflation and currency conversions (including `fxMode: 'constant' | 'evolution' | 'ppp' | 'reversion'`; default is evolution for coherent ledger math, PPP is typically used for analytics/suggestions).

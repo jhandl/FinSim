@@ -1,0 +1,164 @@
+✅ PASSED: TestAccuracyRobustness
+✅ PASSED: TestAllocationEmptyPersistence
+✅ PASSED: TestAllocationScenarioLoadNoOverwrite
+✅ PASSED: TestAllocationScopingAcrossRelocation
+✅ PASSED: TestAllocationSerializePreservesZero
+✅ PASSED: TestAttributionPopulator
+✅ PASSED: TestBasicTaxCalculation
+✅ PASSED: TestBoundaryConditions
+✅ PASSED: TestCGTAnnualExemptionSharesOnly
+✅ PASSED: TestChartValues
+✅ PASSED: TestConfigVersioning
+✅ PASSED: TestContributionCurrencyMode
+✅ PASSED: TestContributionCurrencyModeARAsset
+✅ PASSED: TestContributionCurrencyModeARMixed
+✅ PASSED: TestContributionCurrencyModeARResidence
+✅ PASSED: TestCoreMixGlide
+✅ PASSED: TestCorePresentValueLayer
+✅ PASSED: TestCrossBorderTaxation
+✅ PASSED: TestCSVMultiCurrencyRoundTrip
+✅ PASSED: TestCurrencyConversionModes
+Error: Cannot find module '../src/core/Equities.js'
+Require stack:
+- /Users/jhandl/FinSim/tests/TestDataAggregatesCalculator.js
+- /Users/jhandl/FinSim/src/core/[eval]
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1405:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1061:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1066:22)
+    at Module._load (node:internal/modules/cjs/loader:1215:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.require (node:internal/modules/cjs/loader:1491:12)
+    at require (node:internal/modules/helpers:135:16)
+    at Object.<anonymous> (/Users/jhandl/FinSim/tests/TestDataAggregatesCalculator.js:6:22)
+    at Module._compile (node:internal/modules/cjs/loader:1734:14)
+❌ FAILED: TestDataAggregatesCalculator
+✅ PASSED: TestDebugRetirement
+✅ PASSED: TestDeflationFactorHelper
+✅ PASSED: TestDeflationUtils
+✅ PASSED: TestDualStatePensions
+✅ PASSED: TestDynamicInvestmentIncomeSections
+✅ PASSED: TestEconomicData
+✅ PASSED: TestEconomicParameterSensitivity
+✅ PASSED: TestEconomyGrowthPersistence
+✅ PASSED: TestEmergencyFundUsage
+✅ PASSED: TestEquitySellMixedCurrency
+✅ PASSED: TestEventWizardVariableReplacement
+✅ PASSED: TestExitTaxIgnoresAnnualExemptionFundsOnly
+✅ PASSED: TestFXConversions
+✅ PASSED: TestGenericTaxCredits
+✅ PASSED: TestGlobalAssetWithholding
+✅ PASSED: TestHelpLinks
+✅ PASSED: TestHybridRebalanceTax
+✅ PASSED: TestInvestmentAllocationStrategy
+✅ PASSED: TestInvestmentInheritance
+EconomicData.convert: FX direction inverted for IE->US at year 2036: base=1.18, evolved=0.9813506624196539
+✅ PASSED: TestInvestmentRefactorBaseline
+✅ PASSED: TestInvestmentSerialization
+✅ PASSED: TestInvestmentTogglePersistence
+Error: ENOENT: no such file or directory, open '/Users/jhandl/FinSim/src/core/Equities.js'
+    at Object.readFileSync (node:fs:433:20)
+    at loadIntoGlobal (/Users/jhandl/FinSim/tests/TestInvestmentTypeFactory.js:12:26)
+    at Object.runCustomTest (/Users/jhandl/FinSim/tests/TestInvestmentTypeFactory.js:18:5)
+    at [eval]:19:28
+    at runScriptInThisContext (node:internal/vm:218:10)
+    at node:internal/process/execution:456:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:454:60)
+    at evalFunction (node:internal/process/execution:286:30)
+    at evalTypeScript (node:internal/process/execution:298:3)
+❌ FAILED: TestInvestmentTypeFactory
+✅ PASSED: TestIrishTaxSystem
+✅ PASSED: TestLedgerFxModeEnforcement
+✅ PASSED: TestLegacyAllocationFallback
+✅ PASSED: TestLegacyScenarioDeserialization
+✅ PASSED: TestLifeScenarios
+✅ PASSED: TestLocalInvestmentHoldingsDetection
+Error: ENOENT: no such file or directory, open '/Users/jhandl/FinSim/src/core/Equities.js'
+    at Object.readFileSync (node:fs:433:20)
+    at loadIntoGlobal (/Users/jhandl/FinSim/tests/TestLocalVsNonLocalWrappers.js:12:26)
+    at Object.runCustomTest (/Users/jhandl/FinSim/tests/TestLocalVsNonLocalWrappers.js:21:5)
+    at [eval]:19:28
+    at runScriptInThisContext (node:internal/vm:218:10)
+    at node:internal/process/execution:456:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:454:60)
+    at evalFunction (node:internal/process/execution:286:30)
+    at evalTypeScript (node:internal/process/execution:298:3)
+❌ FAILED: TestLocalVsNonLocalWrappers
+✅ PASSED: TestLossOffsetSharesOnly
+✅ PASSED: TestMarketCrashImpact
+✅ PASSED: TestMixConfigPersistence
+✅ PASSED: TestMixedPortfolioExitVsCGT
+✅ PASSED: TestMoneyCurrencyMixing
+✅ PASSED: TestMoneyEquityIntegration
+✅ PASSED: TestMoneyMCPerformance
+  Error: addYear() perf test threw: Equity is not defined
+❌ FAILED: TestMoneyPerformance
+✅ PASSED: TestMoneyPersonIntegration
+✅ PASSED: TestMoneyUnitOps
+✅ PASSED: TestMonteCarloHighVolatility
+✅ PASSED: TestMonteCarloHighVolatilityStress
+✅ PASSED: TestMonteCarloMultiAsset
+✅ PASSED: TestMonteCarloValidation
+✅ PASSED: TestMortgageAmortization
+✅ PASSED: TestMortgageEventValidation
+✅ PASSED: TestMultiCountryInvestmentCapitalKeys
+✅ PASSED: TestMultiCountryStatePensions
+✅ PASSED: TestMultiCurrencyCashFlows
+✅ PASSED: TestMultiCurrencySimulation
+✅ PASSED: TestMultipleIncomeStreams
+✅ PASSED: TestMultiPotPensionAggregation
+✅ PASSED: TestMultiPotPensionLumpSumEligibility
+✅ PASSED: TestOneOffExpenseClassification
+✅ PASSED: TestPensionContributionValidation
+✅ PASSED: TestPensionInvestmentAsset
+✅ PASSED: TestPensionMatchContribution
+✅ PASSED: TestPensionMixRebalance
+✅ PASSED: TestPensionPVRelocation
+✅ PASSED: TestPensionSystemConflicts
+✅ PASSED: TestPensionVolatilityPerCountry
+✅ PASSED: TestPerCountryInputValidation
+✅ PASSED: TestPerCountryPensionContribs
+✅ PASSED: TestPinchPointVisualization
+✅ PASSED: TestPropertyCurrencyPersistence
+✅ PASSED: TestPropertyPurchaseAttribution
+✅ PASSED: TestPropertyPurchaseFix
+✅ PASSED: TestPropertySalePurchaseAttribution
+✅ PASSED: TestPVFXIncomeOverlap
+✅ PASSED: TestPVMultiCountryDeflation
+✅ PASSED: TestRealEstateAssetCountryGrowth
+✅ PASSED: TestRealEstatePVRelocation
+✅ PASSED: TestRealEstateTransaction
+✅ PASSED: TestRegression
+✅ PASSED: TestRegressionSinglePerson
+✅ PASSED: TestRegressionStressTest
+✅ PASSED: TestRegressionTwoPerson
+✅ PASSED: TestRegressionTwoPersonDifferentIncome
+✅ PASSED: TestRegressionTwoPersonMarried
+✅ PASSED: TestRelocationCurrency
+✅ PASSED: TestRelocationImpactDetection
+✅ PASSED: TestRelocationOverlapSalaryIncome
+✅ PASSED: TestRelocationResidencyDerivation
+✅ PASSED: TestRetirementPhaseTransition
+✅ PASSED: TestScenarioVersioning
+✅ PASSED: TestSeparatePensionPots
+✅ PASSED: TestStatePensionIntegration
+✅ PASSED: TestStrictErrorHandling
+✅ PASSED: TestTaxmanMoneyDeclares
+✅ PASSED: TestTaxRuleSet
+✅ PASSED: TestTaxRuleSetBaseRef
+✅ PASSED: TestTwoPersonTaxCalculation
+✅ PASSED: TestUnionCatalogInitialCapital
+✅ PASSED: TestValidation
+✅ PASSED: TestValidationUtilsCurrency
+✅ PASSED: TestWizardContentRenderer
+
+ Results: [0;32m113 passed[0m, [0;31m4 failed[0m
+
+[0;31mFailed tests:[0m
+  [0;31m❌ TestDataAggregatesCalculator[0m
+  [0;31m❌ TestInvestmentTypeFactory[0m
+  [0;31m❌ TestLocalVsNonLocalWrappers[0m
+  [0;31m❌ TestMoneyPerformance[0m
+
