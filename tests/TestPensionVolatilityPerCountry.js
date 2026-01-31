@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
+const adapterSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'core', 'LegacyScenarioAdapter.js'), 'utf8');
+vm.runInThisContext(adapterSource);
 const utilsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'core', 'Utils.js'), 'utf8');
 
 function createParameterDocument() {
@@ -120,6 +122,7 @@ module.exports = {
           console,
           document: doc,
           Config: stubConfig,
+          LegacyScenarioAdapter: LegacyScenarioAdapter,
           FormatUtils: {
             formatPercentage(value) {
               const numValue = parseFloat(value);

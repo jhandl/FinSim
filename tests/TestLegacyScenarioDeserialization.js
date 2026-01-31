@@ -1,8 +1,11 @@
+require('../src/core/LegacyScenarioAdapter.js');
 require('../src/core/Utils.js');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
+const adapterSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'core', 'LegacyScenarioAdapter.js'), 'utf8');
+vm.runInThisContext(adapterSource);
 const utilsSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'core', 'Utils.js'), 'utf8');
 vm.runInThisContext(utilsSource);
 
@@ -180,6 +183,12 @@ module.exports = {
       const cap = doc.getElementById('PensionCapped_ie');
       if (!cap || !cap.value || cap.value.trim() === '') {
         errors.push('PensionCapped_ie was not populated from legacy PensionContributionCapped');
+      }
+
+      // Namespaced growth rates should be populated from legacy keys.
+      const fundsGrowth = doc.getElementById('indexFunds_ieGrowthRate');
+      if (!fundsGrowth || fundsGrowth.value !== '7') {
+        errors.push('indexFunds_ieGrowthRate expected 7, got ' + (fundsGrowth ? fundsGrowth.value : 'null'));
       }
 
       // Also validate lower/odd casing normalization.

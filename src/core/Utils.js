@@ -885,13 +885,40 @@ function deserializeSimulation(content, ui) {
     throw new Error('Could not determine scenario file version.');
   }
 
+  const legacyAdapter = new LegacyScenarioAdapter();
+  // Pre-scan for StartCountry to allow single-pass mapping with normalization
+  var startCountryForNormalization = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.includes('# Parameters')) {
+      for (let j = i + 1; j < lines.length; j++) {
+        const l = lines[j];
+        if (l.startsWith('#')) break;
+        if (l === '') continue;
+        const commaIndex = l.indexOf(',');
+        const key = (commaIndex >= 0) ? l.substring(0, commaIndex) : l;
+        if (key === 'StartCountry') {
+          startCountryForNormalization = (commaIndex >= 0) ? l.substring(commaIndex + 1).trim() : null;
+          break;
+        }
+      }
+      break;
+    }
+  }
+
+  const isLegacyIeScenario = (irelandMatch || (fileVersion !== null && fileVersion < 2.0));
+
+  if (!startCountryForNormalization) {
+    try {
+      startCountryForNormalization = Config.getInstance().getStartCountry();
+    } catch (_) { }
+  }
+
   let section = '';
   let p2StartingAgeExists = false;
   let simulationModeExists = false;
   let economyModeExists = false;
   let hasVolatilityInFile = false;
-  // Normalize legacy investment keys to namespaced format
-  var startCountryForNormalization = null;
   // Legacy scalars that must be copied into per-country fields when relocation UI is enabled
   var legacyStatePensionWeekly = null;
   var legacyP2StatePensionWeekly = null;
@@ -921,29 +948,7 @@ function deserializeSimulation(content, ui) {
       const key = (commaIndex >= 0) ? line.substring(0, commaIndex) : line;
       let value = (commaIndex >= 0) ? line.substring(commaIndex + 1) : '';
 
-      // Map legacy CSV field names to current dynamic element IDs
-      const legacyFieldMap = {
-        'InitialETFs': 'InitialCapital_indexFunds',
-        'InitialTrusts': 'InitialCapital_shares',
-        'InitialFunds': 'InitialCapital_indexFunds',
-        'InitialShares': 'InitialCapital_shares',
-        'EtfAllocation': 'InvestmentAllocation_indexFunds',
-        'TrustAllocation': 'InvestmentAllocation_shares',
-        'FundsAllocation': 'InvestmentAllocation_indexFunds',
-        'SharesAllocation': 'InvestmentAllocation_shares',
-        'EtfGrowthRate': 'indexFundsGrowthRate',
-        'EtfGrowthStdDev': 'indexFundsGrowthStdDev',
-        'TrustGrowthRate': 'sharesGrowthRate',
-        'TrustGrowthStdDev': 'sharesGrowthStdDev',
-        'FundsGrowthRate': 'indexFundsGrowthRate',
-        'FundsGrowthStdDev': 'indexFundsGrowthStdDev',
-        'SharesGrowthRate': 'sharesGrowthRate',
-        'SharesGrowthStdDev': 'sharesGrowthStdDev',
-        'PriorityETF': 'PriorityFunds',
-        'PriorityTrust': 'PriorityShares'
-      };
-
-      const actualKey = legacyFieldMap[key] || key;
+      const actualKey = legacyAdapter.mapFieldName(key, startCountryForNormalization, isLegacyIeScenario);
       if (/^PensionGrowth_[a-z]{2,}$/i.test(actualKey)) {
         sawPerCountryPensionGrowth[String(actualKey.substring('PensionGrowth_'.length)).toLowerCase()] = true;
       }
@@ -968,6 +973,12 @@ function deserializeSimulation(content, ui) {
           // Generic allocations are saved as InvestmentAllocation_{typeKey} (e.g. InvestmentAllocation_indexFunds_ie).
           // Also allow chip-driven per-country ids to exist in files (future-proof).
           if (/^InvestmentAllocation_/.test(actualKey)) {
+            ui.ensureParameterInput(actualKey, 'percentage');
+          } else if (/^InitialCapital_.+_[a-z]{2,}$/i.test(actualKey)) {
+            // Namespaced capital keys (e.g. InitialCapital_indexFunds_ie)
+            ui.ensureParameterInput(actualKey, 'currency');
+          } else if (/.+_[a-z]{2,}(GrowthRate|GrowthStdDev)$/i.test(actualKey)) {
+            // Namespaced growth/vol keys (e.g. indexFunds_ieGrowthRate)
             ui.ensureParameterInput(actualKey, 'percentage');
           } else if (/^GlobalAllocation_.+/.test(actualKey)) {
             ui.ensureParameterInput(actualKey, 'percentage');
@@ -1184,159 +1195,19 @@ function deserializeSimulation(content, ui) {
     }
   }
 
-  // Normalize legacy investment keys: if StartCountry wasn't in the file, use current config start country
-  if (!startCountryForNormalization) {
-    startCountryForNormalization = Config.getInstance().getStartCountry();
-  }
-  if (startCountryForNormalization) {
-    var countryCode = startCountryForNormalization.toLowerCase();
-    // Normalize InitialCapital_* keys
-    var legacyCapitalKeys = ['InitialCapital_indexFunds', 'InitialCapital_shares'];
-    for (var i = 0; i < legacyCapitalKeys.length; i++) {
-      var legacyKey = legacyCapitalKeys[i];
-      try {
-        // IMPORTANT: In the web UI, DOMUtils.getValue() returns 0 for empty numeric inputs
-        // inside .parameters-section. Use raw DOM value to distinguish "empty" vs explicit 0.
-        var rawLegacy = null;
-        try {
-          if (typeof document !== 'undefined') {
-            var elLegacy = document.getElementById(legacyKey);
-            if (elLegacy && elLegacy.value !== undefined) rawLegacy = String(elLegacy.value);
-          }
-        } catch (_) { rawLegacy = null; }
-        if (rawLegacy !== null && rawLegacy.trim() === '') continue;
-
-        var value = ui.getValue(legacyKey);
-        if (value !== undefined && value !== null && value !== '') {
-          var baseKey = legacyKey.replace('InitialCapital_', '');
-          var normalizedKey = 'InitialCapital_' + normalizeInvestmentKey(baseKey, startCountryForNormalization);
-          if (normalizedKey !== legacyKey) {
-            // Don't overwrite if the normalized key already has a value (e.g., set directly from CSV)
-            var rawExisting = null;
-            try {
-              if (typeof document !== 'undefined') {
-                var elExisting = document.getElementById(normalizedKey);
-                if (elExisting && elExisting.value !== undefined) rawExisting = String(elExisting.value);
-              }
-            } catch (_) { rawExisting = null; }
-            if (rawExisting !== null && rawExisting.trim() !== '') {
-              ui.setValue(legacyKey, ''); // Clear legacy key
-              continue;
-            }
-            try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(normalizedKey, 'currency'); } catch (_) { }
-            ui.setValue(normalizedKey, value);
-            ui.setValue(legacyKey, ''); // Clear legacy key
-          }
-        }
-      } catch (_) { }
-    }
-    // Normalize InvestmentAllocation_* keys
-    var legacyAllocKeys = ['InvestmentAllocation_indexFunds', 'InvestmentAllocation_shares'];
-    for (var j = 0; j < legacyAllocKeys.length; j++) {
-      var legacyKey = legacyAllocKeys[j];
-      try {
-        // IMPORTANT: In the web UI, DOMUtils.getValue() returns 0 for empty percentage inputs
-        // inside .parameters-section. Use raw DOM value to distinguish "empty" vs explicit 0.
-        var rawLegacy = null;
-        try {
-          if (typeof document !== 'undefined') {
-            var elLegacy = document.getElementById(legacyKey);
-            if (elLegacy && elLegacy.value !== undefined) rawLegacy = String(elLegacy.value);
-          }
-        } catch (_) { rawLegacy = null; }
-        if (rawLegacy !== null && rawLegacy.trim() === '') continue;
-
-        var value = ui.getValue(legacyKey);
-        if (value !== undefined && value !== null && value !== '') {
-          var baseKey = legacyKey.replace('InvestmentAllocation_', '');
-          var normalizedKey = 'InvestmentAllocation_' + normalizeInvestmentKey(baseKey, startCountryForNormalization);
-          if (normalizedKey !== legacyKey) {
-            // Don't overwrite if the normalized key already has a value (e.g., set directly from CSV)
-            var rawExisting = null;
-            try {
-              if (typeof document !== 'undefined') {
-                var elExisting = document.getElementById(normalizedKey);
-                if (elExisting && elExisting.value !== undefined) rawExisting = String(elExisting.value);
-              }
-            } catch (_) { rawExisting = null; }
-            if (rawExisting !== null && rawExisting.trim() !== '') {
-              ui.setValue(legacyKey, ''); // Clear legacy key
-              continue;
-            }
-            try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(normalizedKey, 'percentage'); } catch (_) { }
-            ui.setValue(normalizedKey, value);
-            ui.setValue(legacyKey, ''); // Clear legacy key
-          }
-        }
-      } catch (_) { }
-    }
-    // Normalize growth rate keys
-    var legacyGrowthKeys = ['indexFundsGrowthRate', 'sharesGrowthRate', 'indexFundsGrowthStdDev', 'sharesGrowthStdDev'];
-    for (var k = 0; k < legacyGrowthKeys.length; k++) {
-      var legacyKey = legacyGrowthKeys[k];
-      try {
-        var value = ui.getValue(legacyKey);
-        // Only copy if legacy value is non-zero (DOMUtils.getValue returns 0 for empty inputs in parameters section)
-        if (value !== undefined && value !== null && value !== '' && value !== 0) {
-          var baseKey = legacyKey.replace('GrowthRate', '').replace('GrowthStdDev', '');
-          var suffix = legacyKey.indexOf('GrowthStdDev') >= 0 ? 'GrowthStdDev' : 'GrowthRate';
-          var normalizedKey = normalizeInvestmentKey(baseKey, startCountryForNormalization) + suffix;
-          if (normalizedKey !== legacyKey) {
-            // Don't overwrite if the normalized key already has a value (e.g., set directly from CSV)
-            var existingValue = null;
-            try { existingValue = ui.getValue(normalizedKey); } catch (_) { }
-            if (existingValue === undefined || existingValue === null || existingValue === '' || existingValue === 0) {
-              try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(normalizedKey, 'percentage'); } catch (_) { }
-              ui.setValue(normalizedKey, value);
-            }
-            ui.setValue(legacyKey, ''); // Clear legacy key
-          }
-        }
-      } catch (_) { }
+  // Clear Person 2 fields if they weren't present in the loaded scenario
+  // This prevents old single-person scenarios from retaining Person 2 data from previously loaded joint scenarios
+  if (!p2StartingAgeExists) {
+    try {
+      ui.setValue('P2StartingAge', '');
+      ui.setValue('P2RetirementAge', '');
+      ui.setValue('P2StatePensionWeekly', '');
+      ui.setValue('InitialPensionP2', '');
+      ui.setValue('PensionContributionPercentageP2', '');
+    } catch (e) {
+      // Skip if parameters don't exist in the UI
     }
   }
-
-  // After normalization, map generic allocation keys into chip-driven per-country allocation inputs.
-  // This second pass is required because legacy files first map FundsAllocation->InvestmentAllocation_indexFunds
-  // and ONLY later normalize to InvestmentAllocation_indexFunds_ie.
-  try {
-    if (ui && typeof ui.ensureParameterInput === 'function') {
-      const cfg = Config.getInstance();
-      const list = (cfg.getAvailableCountries && cfg.getAvailableCountries()) ? cfg.getAvailableCountries() : [];
-      const countrySet = {};
-      for (let i = 0; i < list.length; i++) {
-        const code = list[i] && list[i].code ? String(list[i].code).trim().toLowerCase() : '';
-        if (code) countrySet[code] = true;
-      }
-      const allocKeys = (typeof document !== 'undefined')
-        ? Array.prototype.slice.call(document.querySelectorAll('input[id^="InvestmentAllocation_"]'))
-        : [];
-      for (let i = 0; i < allocKeys.length; i++) {
-        const id = allocKeys[i] && allocKeys[i].id ? String(allocKeys[i].id) : '';
-        const m = id.match(/^InvestmentAllocation_(.+)_([a-z]{2,})$/i);
-        if (!m) continue;
-        const baseKey = String(m[1]);
-        const cc = String(m[2]).toLowerCase();
-        if (!countrySet[cc]) continue;
-        const perId = 'InvestmentAllocation_' + cc + '_' + baseKey;
-        ui.ensureParameterInput(perId, 'percentage');
-        try {
-          var rawAlloc = null;
-          try {
-            if (typeof document !== 'undefined') {
-              var elAlloc = document.getElementById(id);
-              if (elAlloc && elAlloc.value !== undefined) rawAlloc = String(elAlloc.value);
-            }
-          } catch (_) { rawAlloc = null; }
-          if (rawAlloc !== null && rawAlloc.trim() === '') {
-            ui.setValue(perId, '');
-          } else {
-            ui.setValue(perId, ui.getValue(id));
-          }
-        } catch (_) { }
-      }
-    }
-  } catch (_) { }
 
   // Legacy fallback: map global pension contribution fields to StartCountry-prefixed fields
   try {
@@ -1450,20 +1321,6 @@ function deserializeSimulation(content, ui) {
     params.investmentAllocationsByCountry = {};
     params.investmentAllocationsByCountry[startCountry] = params.investmentAllocationsByKey;
     // Keep legacy field for backward compat with old code paths
-  }
-
-  // Clear Person 2 fields if they weren't present in the loaded scenario
-  // This prevents old single-person scenarios from retaining Person 2 data from previously loaded joint scenarios
-  if (!p2StartingAgeExists) {
-    try {
-      ui.setValue('P2StartingAge', '');
-      ui.setValue('P2RetirementAge', '');
-      ui.setValue('P2StatePensionWeekly', '');
-      ui.setValue('InitialPensionP2', '');
-      ui.setValue('PensionContributionPercentageP2', '');
-    } catch (e) {
-      // Skip if parameters don't exist in the UI
-    }
   }
 
   // Load events
@@ -1595,22 +1452,6 @@ function getRateForKey(key, rateBands) {
   var defaultRate = rateBands[bandKeys[0]];
   // Ensure we return a valid number, default to 1.0 if undefined
   return (typeof defaultRate === 'number' && !isNaN(defaultRate)) ? defaultRate : 1.0;
-}
-
-/**
- * Normalize legacy investment keys to namespaced format.
- * Keys without underscore are treated as belonging to StartCountry.
- * @param {string} key - Investment key (e.g., 'indexFunds' or 'indexFunds_ie')
- * @param {string} startCountry - Start country code (e.g., 'IE')
- * @returns {string} Namespaced key (e.g., 'indexFunds_ie')
- */
-function normalizeInvestmentKey(key, startCountry) {
-  if (!key || typeof key !== 'string') return key;
-  // If key already has underscore, assume it's namespaced
-  if (key.indexOf('_') >= 0) return key;
-  // Legacy key without namespace: append StartCountry
-  var countryCode = (startCountry || 'ie').toLowerCase();
-  return key + '_' + countryCode;
 }
 
 // ============================================================

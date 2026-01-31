@@ -279,6 +279,7 @@ class TestFramework {
       // Read and execute core files in the sandbox
       const coreFiles = [
         'Events.js',
+        'LegacyScenarioAdapter.js',
         'Utils.js',
         'EconomicData.js',
         'Config.js',
