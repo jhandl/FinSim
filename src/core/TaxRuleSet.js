@@ -751,6 +751,26 @@ class TaxRuleSet {
   getPinnedIncomeTypes() {
     return Array.isArray(this.raw.pinnedIncomeTypes) ? this.raw.pinnedIncomeTypes : [];
   }
+
+  /**
+   * Return the drawdown priorities configuration array from the tax rules.
+   * Each entry defines a priority type with its canonical identifier, label, and UI field ID.
+   * Returns an empty array if not configured (backward compatibility).
+   * @returns {Array} Array of priority configuration objects
+   */
+  getDrawdownPriorities() {
+    return Array.isArray(this.raw.drawdownPriorities) ? this.raw.drawdownPriorities : [];
+  }
+
+  /**
+   * Find an investment type by its key.
+   * Wrapper around findInvestmentTypeByKey for naming consistency with other getters.
+   * @param {string} key - The investment type key to look up
+   * @returns {Object|null} The investment type object, or null if not found
+   */
+  getInvestmentType(key) {
+    return this.findInvestmentTypeByKey(key);
+  }
 }
 
 // Make TaxRuleSet available in the context (e.g., for tests)

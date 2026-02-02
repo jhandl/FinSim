@@ -63,9 +63,9 @@ class Taxman {
     }
   };
 
-  declareNonEuSharesIncome(money, description) {
+  declareInvestmentTypeIncome(money, investmentTypeKey, description) {
     if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
-      throw new Error('declareNonEuSharesIncome requires a Money object');
+      throw new Error('declareInvestmentTypeIncome requires a Money object');
     }
     var residenceCurrency = this.residenceCurrency;
     if (money.currency !== residenceCurrency) {
@@ -73,10 +73,13 @@ class Taxman {
     }
 
     const amount = money.amount;
-    this.nonEuShares += amount;
-    this.attributionManager.record('nonEuShares', description, amount);
+    this.investmentTypeIncome[investmentTypeKey] = (this.investmentTypeIncome[investmentTypeKey] || 0) + amount;
+    this.attributionManager.record('investmentTypeIncome:' + investmentTypeKey, description, amount);
 
-    Money.add(this.nonEuSharesMoney, money);
+    if (!this.investmentTypeIncomeMoney[investmentTypeKey]) {
+      this.investmentTypeIncomeMoney[investmentTypeKey] = Money.zero(money.currency, money.country);
+    }
+    Money.add(this.investmentTypeIncomeMoney[investmentTypeKey], money);
   };
 
   declarePrivatePensionIncome(money, person, description) {
@@ -291,9 +294,10 @@ class Taxman {
 
   netIncome() {
     this.computeTaxes();
+    let investmentTypeGross = Object.values(this.investmentTypeIncome || {}).reduce((sum, val) => sum + val, 0);
     let gross = this.income - (this.pensionContribAmountP1 + this.pensionContribAmountP2) +
       (this.privatePensionP1 + this.privatePensionP2) +
-      this.statePension + this.investmentIncome + this.nonEuShares;
+      this.statePension + this.investmentIncome + investmentTypeGross;
 
     const totalTax = this.getAllTaxesTotal();
     return gross - totalTax;
@@ -304,7 +308,7 @@ class Taxman {
     this.currentYear = (typeof year === 'number') ? year : (this.currentYear || null);
     this.gains = {};
     this.income = 0;
-    this.nonEuShares = 0;
+    this.investmentTypeIncome = {};
     this.statePension = 0;
     this.privatePensionP1 = 0;
     this.privatePensionP2 = 0;
@@ -361,7 +365,7 @@ class Taxman {
     }
     // Money accumulators (maintained alongside numeric fields for currency context)
     this.incomeMoney = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
-    this.nonEuSharesMoney = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
+    this.investmentTypeIncomeMoney = {};
     this.statePensionMoney = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
     this.privatePensionP1Money = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
     this.privatePensionP2Money = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
@@ -525,12 +529,14 @@ class Taxman {
     if (this.privatePensionP1 > 0) taxableIncomeAttribution.add('Private Pension P1', this.privatePensionP1);
     if (this.privatePensionP2 > 0) taxableIncomeAttribution.add('Private Pension P2', this.privatePensionP2);
 
-    // Add non-EU shares income
-    const nonEuSharesAttribution = this.attributionManager.getAttribution('nonEuShares');
-    if (nonEuSharesAttribution) {
-      const nonEuSharesBreakdown = nonEuSharesAttribution.getBreakdown();
-      for (const source in nonEuSharesBreakdown) {
-        taxableIncomeAttribution.add(source, nonEuSharesBreakdown[source]);
+    // Add investment type income sources (RSUs, etc.)
+    for (const typeKey in this.investmentTypeIncome) {
+      const attr = this.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
+      if (attr) {
+        const breakdown = attr.getBreakdown();
+        for (const source in breakdown) {
+          taxableIncomeAttribution.add(source, breakdown[source]);
+        }
       }
     }
 
@@ -620,11 +626,13 @@ class Taxman {
         const bd = incAttr.getBreakdown();
         for (const k in bd) baseMap[k] = (baseMap[k] || 0) + bd[k];
       }
-      // Include non-EU shares attribution (common non-employment income bucket)
-      const neAttr = this.attributionManager.getAttribution('nonEuShares');
-      if (neAttr) {
-        const bd2 = neAttr.getBreakdown();
-        for (const k in bd2) baseMap[k] = (baseMap[k] || 0) + bd2[k];
+      // Include all investment type income attribution (e.g. RSUs - common non-employment income bucket)
+      for (const typeKey in this.investmentTypeIncome) {
+        const neAttr = this.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
+        if (neAttr) {
+          const bd2 = neAttr.getBreakdown();
+          for (const k in bd2) baseMap[k] = (baseMap[k] || 0) + bd2[k];
+        }
       }
       // Remove salary sources to focus on non-employment income
       var removeSalary = function (list) {
@@ -700,10 +708,12 @@ class Taxman {
     const nonPayeIncomeAttribution = {};
     const incomeAttr = this.attributionManager.getAttribution('income');
     if (incomeAttr) Object.assign(nonPayeIncomeAttribution, incomeAttr.getBreakdown());
-    const nonEuAttr = this.attributionManager.getAttribution('nonEuShares');
-    if (nonEuAttr) {
-      const ne = nonEuAttr.getBreakdown();
-      for (const k in ne) nonPayeIncomeAttribution[k] = (nonPayeIncomeAttribution[k] || 0) + ne[k];
+    for (const typeKey in this.investmentTypeIncome) {
+      const neAttr = this.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
+      if (neAttr) {
+        const ne = neAttr.getBreakdown();
+        for (const k in ne) nonPayeIncomeAttribution[k] = (nonPayeIncomeAttribution[k] || 0) + ne[k];
+      }
     }
     // Remove PAYE salary descriptions to avoid double-charging social contributions like PRSI.
     const removeSalarySources = (list) => {
@@ -860,15 +870,17 @@ class Taxman {
       const privPension = personIdx === 1 ? this.privatePensionP1 : this.privatePensionP2;
       if (privPension > 0) attr.add(`Private Pension P${personIdx}`, privPension);
 
-      // Default base includes non-EU shares when tax base is 'income'
+      // Default base includes investment type income (RSUs, etc.) when tax base is 'income'
       const base = taxObj && taxObj.base ? taxObj.base : 'income';
       if (base === 'income') {
-        const neAttr = this.attributionManager.getAttribution('nonEuShares');
-        if (neAttr) {
-          const bd = neAttr.getBreakdown();
-          for (const source in bd) {
-            const part = this.person2Ref ? bd[source] / 2 : bd[source];
-            attr.add(source, part);
+        for (const typeKey in this.investmentTypeIncome) {
+          const neAttr = this.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
+          if (neAttr) {
+            const bd = neAttr.getBreakdown();
+            for (const source in bd) {
+              const part = this.person2Ref ? bd[source] / 2 : bd[source];
+              attr.add(source, part);
+            }
           }
         }
       }
@@ -1080,7 +1092,10 @@ class Taxman {
       };
     }
     copy.income = this.income;
-    copy.nonEuShares = this.nonEuShares;
+    copy.investmentTypeIncome = {};
+    for (let key of Object.keys(this.investmentTypeIncome || {})) {
+      copy.investmentTypeIncome[key] = this.investmentTypeIncome[key];
+    }
     copy.statePension = this.statePension;
     copy.privatePensionP1 = this.privatePensionP1;
     copy.privatePensionP2 = this.privatePensionP2;
@@ -1133,19 +1148,25 @@ class Taxman {
     cloneCurrency = cloneCurrency || 'EUR';
     cloneCountry = cloneCountry || 'ie';
 
-    copy.incomeMoney = Money.from(this.income, cloneCurrency, cloneCountry);
-    copy.nonEuSharesMoney = Money.from(this.nonEuShares, cloneCurrency, cloneCountry);
-    copy.statePensionMoney = Money.from(this.statePension, cloneCurrency, cloneCountry);
-    copy.privatePensionP1Money = Money.from(this.privatePensionP1, cloneCurrency, cloneCountry);
-    copy.privatePensionP2Money = Money.from(this.privatePensionP2, cloneCurrency, cloneCountry);
-    copy.privatePensionLumpSumP1Money = Money.from(this.privatePensionLumpSumP1, cloneCurrency, cloneCountry);
-    copy.privatePensionLumpSumP2Money = Money.from(this.privatePensionLumpSumP2, cloneCurrency, cloneCountry);
-    copy.investmentIncomeMoney = Money.from(this.investmentIncome, cloneCurrency, cloneCountry);
+    copy.incomeMoney = this.incomeMoney ? Money.create(this.incomeMoney.amount, this.incomeMoney.currency, this.incomeMoney.country) : null;
+    copy.investmentTypeIncomeMoney = {};
+    for (let key of Object.keys(this.investmentTypeIncomeMoney || {})) {
+      var m = this.investmentTypeIncomeMoney[key];
+      if (m) copy.investmentTypeIncomeMoney[key] = Money.create(m.amount, m.currency, m.country);
+    }
+    copy.statePensionMoney = this.statePensionMoney ? Money.create(this.statePensionMoney.amount, this.statePensionMoney.currency, this.statePensionMoney.country) : null;
+    copy.privatePensionP1Money = this.privatePensionP1Money ? Money.create(this.privatePensionP1Money.amount, this.privatePensionP1Money.currency, this.privatePensionP1Money.country) : null;
+    copy.privatePensionP2Money = this.privatePensionP2Money ? Money.create(this.privatePensionP2Money.amount, this.privatePensionP2Money.currency, this.privatePensionP2Money.country) : null;
+    copy.privatePensionLumpSumP1Money = this.privatePensionLumpSumP1Money ? Money.create(this.privatePensionLumpSumP1Money.amount, this.privatePensionLumpSumP1Money.currency, this.privatePensionLumpSumP1Money.country) : null;
+    copy.privatePensionLumpSumP2Money = this.privatePensionLumpSumP2Money ? Money.create(this.privatePensionLumpSumP2Money.amount, this.privatePensionLumpSumP2Money.currency, this.privatePensionLumpSumP2Money.country) : null;
+    copy.investmentIncomeMoney = this.investmentIncomeMoney ? Money.create(this.investmentIncomeMoney.amount, this.investmentIncomeMoney.currency, this.investmentIncomeMoney.country) : null;
     if (copy.gains) {
       for (let rateKey of Object.keys(copy.gains)) {
         var bucket = copy.gains[rateKey];
-        if (bucket) {
-          bucket.amountMoney = Money.from(bucket.amount, cloneCurrency, cloneCountry);
+        var sourceBucket = this.gains[rateKey];
+        if (bucket && sourceBucket && sourceBucket.amountMoney) {
+          var sm = sourceBucket.amountMoney;
+          bucket.amountMoney = Money.create(sm.amount, sm.currency, sm.country);
         }
       }
     }

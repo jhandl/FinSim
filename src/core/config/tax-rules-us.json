@@ -83,6 +83,49 @@
       "taxation": {
         "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
       }
+    },
+    {
+      "key": "rsu_us",
+      "label": "RSUs",
+      "baseRef": "globalEquity",
+      "baseCurrency": "USD",
+      "assetCountry": "us",
+      "residenceScope": "global",
+      "sellWhenReceived": true,
+      "excludeFromAllocations": true,
+      "taxation": {
+        "capitalGains": {
+          "rateRef": "capitalGainsTax.rate",
+          "allowLossOffset": true
+        }
+      }
+    }
+  ],
+  "drawdownPriorities": [
+    {
+      "type": "cash",
+      "label": "Cash",
+      "fieldId": "PriorityCash"
+    },
+    {
+      "type": "pension",
+      "label": "Pension",
+      "fieldId": "PriorityPension"
+    },
+    {
+      "type": "indexFunds",
+      "label": "Index Funds",
+      "fieldId": "PriorityFunds"
+    },
+    {
+      "type": "shares",
+      "label": "Shares",
+      "fieldId": "PriorityShares"
+    },
+    {
+      "type": "rsu",
+      "label": "RSUs",
+      "fieldId": "PriorityRSU"
     }
   ],
 

@@ -526,16 +526,53 @@ class UIManager {
     params.drawdownPrioritiesByKey = {};
     const defaultPriority = 4;
     const allocCountries = Object.keys(params.investmentAllocationsByCountry || {});
+    
     for (let ci = 0; ci < allocCountries.length; ci++) {
       const cc = allocCountries[ci];
-      const allocMap = params.investmentAllocationsByCountry[cc] || {};
-      const keys = Object.keys(allocMap);
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
-        if (!key) continue;
-        if (key.indexOf('indexFunds_') === 0) params.drawdownPrioritiesByKey[key] = params.priorityFunds;
-        else if (key.indexOf('shares_') === 0) params.drawdownPrioritiesByKey[key] = params.priorityShares;
-        else params.drawdownPrioritiesByKey[key] = defaultPriority;
+      const ruleset = Config.getInstance().getCachedTaxRuleSet(cc);
+      if (!ruleset) continue;
+
+      // Build priority type -> fieldId lookup from config
+      // Example: { "indexFunds": "PriorityFunds", "shares": "PriorityShares" }
+      const priorities = (typeof ruleset.getDrawdownPriorities === 'function') ? ruleset.getDrawdownPriorities() : [];
+      const priorityMap = {};
+      for (let pi = 0; pi < priorities.length; pi++) {
+        const p = priorities[pi];
+        if (p && p.type && p.fieldId) {
+          priorityMap[p.type] = p.fieldId;
+        }
+      }
+
+      // Map each investment type to its priority
+      const types = (typeof ruleset.getResolvedInvestmentTypes === 'function') ? ruleset.getResolvedInvestmentTypes() : [];
+      for (let ti = 0; ti < types.length; ti++) {
+        const type = types[ti];
+        if (!type || !type.key) continue;
+
+        // Determine priority type: explicit 'type' property or derived from key (prefix before last underscore)
+        let typeKey = type.type;
+        if (!typeKey) {
+          const suffix = '_' + cc;
+          if (String(type.key).toLowerCase().endsWith(suffix)) {
+            typeKey = String(type.key).slice(0, String(type.key).length - suffix.length);
+          } else {
+            typeKey = type.key;
+          }
+        }
+
+        // Look up priority fieldId
+        const fieldId = priorityMap[typeKey];
+        if (fieldId) {
+          const val = this.ui.getValue(fieldId);
+          if (val !== null && val !== '' && val !== undefined) {
+            params.drawdownPrioritiesByKey[type.key] = val;
+          } else {
+            params.drawdownPrioritiesByKey[type.key] = defaultPriority;
+          }
+        } else {
+          // No priority config for this type - use default
+          params.drawdownPrioritiesByKey[type.key] = defaultPriority;
+        }
       }
     }
 

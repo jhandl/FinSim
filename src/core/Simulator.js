@@ -414,6 +414,7 @@ function validatePerCountryInputs(startCountry, events, params) {
       for (var ti = 0; ti < types.length; ti++) {
         var t = types[ti] || {};
         if (!t.key) continue;
+        if (t.excludeFromAllocations) continue;
         if (allocMap[t.key] === undefined || allocMap[t.key] === null) {
           allocMissing.push(code);
           break;
@@ -1289,7 +1290,7 @@ function processEvents() {
           attributionManager.record('incomersus', entry.eventId, entryConvertedAmount);
           if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
             const rsuMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
-            revenue.declareNonEuSharesIncome(rsuMoney, entry.eventId);
+            revenue.declareInvestmentTypeIncome(rsuMoney, 'rsu_' + currentCountry, entry.eventId);
             declaredEntries[entryKey] = true;
           }
           break;

@@ -201,6 +201,50 @@
           "allowLossOffset": true
         }
       }
+    },
+    {
+      "key": "rsu_ie",
+      "label": "RSUs",
+      "baseRef": "globalEquity",
+      "baseCurrency": "EUR",
+      "assetCountry": "ie",
+      "residenceScope": "local",
+      "sellWhenReceived": true,
+      "excludeFromAllocations": true,
+      "taxation": {
+        "capitalGains": {
+          "rateRef": "capitalGainsTax.rate",
+          "annualExemptionRef": "capitalGainsTax.annualExemption",
+          "allowLossOffset": true
+        }
+      }
+    }
+  ],
+  "drawdownPriorities": [
+    {
+      "type": "cash",
+      "label": "Cash",
+      "fieldId": "PriorityCash"
+    },
+    {
+      "type": "pension",
+      "label": "Pension",
+      "fieldId": "PriorityPension"
+    },
+    {
+      "type": "indexFunds",
+      "label": "Index Funds",
+      "fieldId": "PriorityFunds"
+    },
+    {
+      "type": "shares",
+      "label": "Shares",
+      "fieldId": "PriorityShares"
+    },
+    {
+      "type": "rsu",
+      "label": "RSUs",
+      "fieldId": "PriorityRSU"
     }
   ],
   "pinnedIncomeTypes": [
