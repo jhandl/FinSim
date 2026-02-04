@@ -312,8 +312,22 @@ class FormatUtils {
     return value;
   }
 
-  // Expand ${var,format} placeholders using Config values
-  static processVariables(text) {
+  // Expand ${var,format} placeholders using Config values and optional runtime context.
+  // Runs iteratively so placeholders introduced by replacements are also resolved.
+  static processVariables(text, context = null) {
+    if (!text || typeof text !== 'string') return text;
+
+    let current = text;
+    const maxPasses = 6;
+    for (let pass = 0; pass < maxPasses; pass++) {
+      const next = FormatUtils._processVariablesSinglePass(current, context);
+      if (next === current) return next;
+      current = next;
+    }
+    return current;
+  }
+
+  static _processVariablesSinglePass(text, context = null) {
     let config = null;
     try {
       if (typeof Config !== 'undefined') {
@@ -323,10 +337,34 @@ class FormatUtils {
     } catch (_) {
       // Config not initialized yet; continue with null to allow fallbacks
     }
-    if (!text || typeof text !== 'string') return text;
 
     return text.replace(/\${([^}]+)}/g, (match, variable) => {
       let [varToken, format] = variable.split(',').map(s => s.trim());
+
+      if (varToken.startsWith('investmentType.')) {
+        if (context && context.investmentType) {
+          const path = varToken.substring('investmentType.'.length).split('.');
+          let value = context.investmentType;
+          for (let i = 0; i < path.length && value !== undefined && value !== null; i++) {
+            value = value[path[i]];
+          }
+          if (value !== undefined && value !== null) {
+            return FormatUtils.formatValue(value, format);
+          }
+        }
+        return match;
+      }
+
+      if (varToken.startsWith('taxRules.') && context && context.taxRules) {
+        const path = varToken.substring('taxRules.'.length).split('.');
+        let value = context.taxRules;
+        for (let i = 0; i < path.length && value !== undefined && value !== null; i++) {
+          value = value[path[i]];
+        }
+        if (value !== undefined && value !== null) {
+          return FormatUtils.formatValue(value, format);
+        }
+      }
 
       // Handle special timeUnit variable for age/year mode
       if (varToken === 'timeUnit') {
@@ -414,14 +452,14 @@ class FormatUtils {
   }
 
   // Recursively process variables in strings within an object/array structure
-  static processVariablesInObject(obj) {
+  static processVariablesInObject(obj, context = null) {
     if (obj === null || obj === undefined) return obj;
-    if (typeof obj === 'string') return FormatUtils.processVariables(obj);
-    if (Array.isArray(obj)) return obj.map(item => FormatUtils.processVariablesInObject(item));
+    if (typeof obj === 'string') return FormatUtils.processVariables(obj, context);
+    if (Array.isArray(obj)) return obj.map(item => FormatUtils.processVariablesInObject(item, context));
     if (typeof obj === 'object') {
       const processed = {};
       for (const [key, value] of Object.entries(obj)) {
-        processed[key] = FormatUtils.processVariablesInObject(value);
+        processed[key] = FormatUtils.processVariablesInObject(value, context);
       }
       return processed;
     }

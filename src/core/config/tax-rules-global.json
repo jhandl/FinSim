@@ -7,7 +7,8 @@
       "shortLabel": "Eq",
       "baseCurrency": "USD",
       "assetCountry": "us",
-      "residenceScope": "global"
+      "residenceScope": "global",
+      "helpText": "Represents broadly diversified equity investments like global index funds or ETFs. For reference, the average growth rate of the S&P500 over the last 30 years has been around 10%."
     },
     {
       "baseKey": "globalBonds",
@@ -15,7 +16,8 @@
       "shortLabel": "Bd",
       "baseCurrency": "USD",
       "assetCountry": "us",
-      "residenceScope": "global"
+      "residenceScope": "global",
+      "helpText": "Represents diversified bond investments (government or corporate). Bonds typically offer lower returns than equities but with lower volatility."
     }
   ],
   "assetTaxes": {

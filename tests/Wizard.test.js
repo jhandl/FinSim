@@ -81,6 +81,31 @@ const setupMocks = () => {
   // Mock fetch
   global.fetch = jest.fn();
 
+  // Mock Config
+  global.Config = {
+    getInstance: jest.fn(() => ({
+      getStartCountry: jest.fn(() => 'ie'), // Updated from getActiveCountryCode
+      getInvestmentBaseTypes: jest.fn(() => [
+        { baseKey: 'globalEquity', label: 'Global Equity' }
+      ]),
+      getInvestmentBaseTypeByKey: jest.fn(key => {
+        if (key === 'globalEquity') return { label: 'Global Equity', helpText: 'Global Help' };
+        return null;
+      }),
+      getCachedTaxRuleSet: jest.fn(() => ({
+        getInvestmentType: jest.fn(key => {
+          if (key === 'indexFunds_ie') return { label: 'Index Funds', helpText: 'Exit Tax' };
+          if (key === 'shares_ie') return { label: 'Shares', helpText: 'CGT' };
+          return null;
+        }),
+        getResolvedInvestmentTypes: jest.fn(() => [
+          { key: 'indexFunds_ie', label: 'Index Funds', baseRef: 'globalEquity' },
+          { key: 'shares_ie', label: 'Shares' } // Local
+        ])
+      }))
+    }))
+  };
+
   return { mockDriver, mockDriverInstance, mockWebUIInstance };
 };
 
@@ -102,6 +127,188 @@ class TestWizard {
     this.scrollFrozen = false;
     this.savedScrollPos = 0;
     this.currentTourId = 'full';
+  }
+
+  _sortInvestmentTypes(types) {
+    if (!Array.isArray(types)) return [];
+    return types.slice().sort((a, b) => {
+      const aHas = !!(a.baseRef || a.baseKey);
+      const bHas = !!(b.baseRef || b.baseKey);
+      if (aHas === bHas) return 0;
+      return aHas ? 1 : -1;
+    });
+  }
+
+  processAgeYearInContent(content, context = null) {
+    if (typeof content === 'string') {
+      let processed = global.FormatUtils.replaceAgeYearPlaceholders(content);
+      
+      // Process investment type placeholders if context provided
+      if (context && context.investmentType) {
+        processed = processed.replace(/\$\{investmentType\.label\}/g, context.investmentType.label);
+        processed = processed.replace(/\$\{investmentType\.helpText\}/g, context.investmentType.helpText);
+      }
+      
+      return processed;
+    }
+    if (Array.isArray(content)) {
+      return content.map(item => this.processAgeYearInContent(item, context));
+    }
+    if (content && typeof content === 'object') {
+      const processed = {};
+      for (const [key, value] of Object.entries(content)) {
+        processed[key] = this.processAgeYearInContent(value, context);
+      }
+      return processed;
+    }
+    return content;
+  }
+
+  resolveInvestmentTypeContext(element) {
+    if (!element || !element.id) return null;
+    
+    const fieldId = element.id;
+    let typeKey = null;
+    
+    // Pattern matching for investment fields
+    const patterns = [
+      /^InitialCapital_(.+)$/,
+      /^InvestmentAllocation_([a-z]{2})_(.+)$/, // Relocation format: {cc}_{baseKey}
+      /^InvestmentAllocation_(.+)$/,             // Legacy format: {typeKey}
+      /^GlobalAssetGrowth_(.+)$/,
+      /^GlobalAssetVolatility_(.+)$/,
+      /^LocalAssetGrowth_[a-z]{2}_(.+)$/,
+      /^LocalAssetVolatility_[a-z]{2}_(.+)$/,
+      /^(.+)GrowthRate$/,
+      /^(.+)GrowthStdDev$/
+    ];
+    
+    let ccFromId = null;
+
+    for (const pattern of patterns) {
+      const match = fieldId.match(pattern);
+      if (match) {
+        if (match.length === 3) {
+          ccFromId = match[1];
+          typeKey = match[2];
+        } else {
+          typeKey = match[1];
+        }
+        break;
+      }
+    }
+    
+    if (!typeKey) return null;
+    
+    const config = global.Config.getInstance();
+    const activeCountry = ccFromId || config.getStartCountry();
+    const ruleset = config.getCachedTaxRuleSet(activeCountry);
+    
+    if (ruleset && typeof ruleset.getInvestmentType === 'function') {
+      let lookupKey = typeKey;
+      if (ccFromId) {
+        lookupKey = `${typeKey}_${ccFromId}`;
+      }
+      let investmentType = ruleset.getInvestmentType(lookupKey);
+      if (!investmentType && ccFromId) {
+        investmentType = ruleset.getInvestmentType(typeKey);
+      }
+      if (investmentType) {
+        return {
+          investmentType: {
+            label: investmentType.label || '',
+            helpText: investmentType.helpText || ''
+          }
+        };
+      }
+    }
+
+    const baseType = config.getInvestmentBaseTypeByKey(typeKey);
+    if (baseType) {
+      return {
+        investmentType: {
+          label: baseType.label || '',
+          helpText: baseType.helpText || ''
+        }
+      };
+    }
+    
+    return null;
+  }
+
+  expandDynamicSteps(steps) {
+    if (!steps || !Array.isArray(steps)) return [];
+    
+    const expanded = [];
+    const config = global.Config.getInstance();
+    const activeCountry = config.getStartCountry();
+    const ruleset = config.getCachedTaxRuleSet(activeCountry);
+    let investmentTypes = ruleset ? (ruleset.getResolvedInvestmentTypes() || []) : [];
+    investmentTypes = this._sortInvestmentTypes(investmentTypes);
+    const baseTypes = config.getInvestmentBaseTypes() || [];
+
+    for (const step of steps) {
+      if (step.dynamicInvestmentField) {
+        const fieldType = step.dynamicInvestmentField;
+        
+        if (fieldType === 'InitialCapital') {
+          for (const type of investmentTypes) {
+            const newStep = JSON.parse(JSON.stringify(step));
+            delete newStep.dynamicInvestmentField;
+            newStep.element = `#InitialCapital_${type.key}`;
+            expanded.push(newStep);
+          }
+        } else if (fieldType === 'InvestmentAllocation') {
+          for (const type of investmentTypes) {
+            // RSU filtering removed to match WebUI
+            
+            // Legacy
+            const stepLegacy = JSON.parse(JSON.stringify(step));
+            delete stepLegacy.dynamicInvestmentField;
+            stepLegacy.element = `#InvestmentAllocation_${type.key}`;
+            expanded.push(stepLegacy);
+
+            // Relocation
+            let baseKey = type.key;
+            const suffix = '_' + activeCountry.toLowerCase();
+            if (baseKey.toLowerCase().endsWith(suffix)) {
+              baseKey = baseKey.substring(0, baseKey.length - suffix.length);
+            }
+            const stepReloc = JSON.parse(JSON.stringify(step));
+            delete stepReloc.dynamicInvestmentField;
+            stepReloc.element = `#InvestmentAllocation_${activeCountry.toLowerCase()}_${baseKey}`;
+            expanded.push(stepReloc);
+          }
+        } else if (fieldType === 'PensionContribution') {
+          const newStep = JSON.parse(JSON.stringify(step));
+          delete newStep.dynamicInvestmentField;
+          newStep.element = `#PensionContributionPercentage`; 
+          expanded.push(newStep);
+          const newStepCountry = JSON.parse(JSON.stringify(step));
+          delete newStepCountry.dynamicInvestmentField;
+          newStepCountry.element = `#P1PensionContrib_${activeCountry.toLowerCase()}`;
+          expanded.push(newStepCountry);
+        } else if (fieldType === 'GlobalAssetGrowth') {
+          for (const base of baseTypes) {
+            const newStep = JSON.parse(JSON.stringify(step));
+            delete newStep.dynamicInvestmentField;
+            newStep.element = `#GlobalAssetGrowth_${base.baseKey}`;
+            expanded.push(newStep);
+          }
+        } else if (fieldType === 'LocalAssetGrowth') {
+          for (const type of investmentTypes) {
+            if (type.baseRef) continue; 
+            const newStep = JSON.parse(JSON.stringify(step));
+            delete newStep.dynamicInvestmentField;
+            newStep.element = `#${type.key}GrowthRate`;
+            expanded.push(newStep);
+          }
+        }
+      } else {
+        expanded.push(step);
+      }
+    }
+    return expanded;
   }
 
   detectMobile() {
@@ -761,6 +968,99 @@ describe('Wizard Component', () => {
 
       expect(runTourSpy).toHaveBeenCalledTimes(4);
       runTourSpy.mockRestore();
+    });
+  });
+
+  describe('Investment Type Context Resolution', () => {
+    test('should resolve context for InitialCapital fields', () => {
+      const element = { id: 'InitialCapital_indexFunds_ie' };
+      const context = wizard.resolveInvestmentTypeContext(element);
+      expect(context).not.toBeNull();
+      expect(context.investmentType.label).toBe('Index Funds');
+      expect(context.investmentType.helpText).toBe('Exit Tax');
+    });
+    
+    test('should resolve context for allocation fields', () => {
+      const element = { id: 'InvestmentAllocation_shares_ie' };
+      const context = wizard.resolveInvestmentTypeContext(element);
+      expect(context).not.toBeNull();
+      expect(context.investmentType.label).toBe('Shares');
+    });
+
+    test('should resolve context for relocation allocation fields', () => {
+      const element = { id: 'InvestmentAllocation_ie_shares' }; // Constructed to match {cc}_{baseKey} logic where key=shares_ie
+      // Wait, if key is shares_ie, baseKey is shares. So ID is InvestmentAllocation_ie_shares.
+      // My logic: cc=ie, base=shares. lookupKey=shares_ie.
+      // Mock Config needs to return correct type for shares_ie.
+      // The existing mock for getInvestmentType handles 'shares_ie'.
+      const context = wizard.resolveInvestmentTypeContext(element);
+      expect(context).not.toBeNull();
+      expect(context.investmentType.label).toBe('Shares');
+    });
+    
+    test('should return null for non-investment fields', () => {
+      const element = { id: 'RetirementAge' };
+      const context = wizard.resolveInvestmentTypeContext(element);
+      expect(context).toBeNull();
+    });
+    
+    test('should process placeholders in content', () => {
+      const content = 'Value of ${investmentType.label}: ${investmentType.helpText}';
+      const context = { investmentType: { label: 'Test', helpText: 'Help' } };
+      const processed = wizard.processAgeYearInContent(content, context);
+      expect(processed).toBe('Value of Test: Help');
+    });
+  });
+
+  describe('Dynamic Step Expansion', () => {
+    test('should expand InitialCapital template', () => {
+      const steps = [
+        { dynamicInvestmentField: 'InitialCapital', popover: { title: 'Test' } },
+        { dynamicInvestmentField: 'InvestmentAllocation', popover: { title: 'Alloc' } }
+      ];
+      const expanded = wizard.expandDynamicSteps(steps);
+      // InitialCapital: 2 types -> 2 steps
+      // InvestmentAllocation: 2 types -> 4 steps (legacy + relocation for each)
+      expect(expanded).toHaveLength(6); 
+      // Sorted: Shares (local) first, then Index Funds (global wrapper)
+      expect(expanded[0].element).toBe('#InitialCapital_shares_ie');
+      expect(expanded[1].element).toBe('#InitialCapital_indexFunds_ie');
+      
+      // Verify InvestmentAllocation steps
+      const allocSteps = expanded.slice(2);
+      expect(allocSteps[0].element).toBe('#InvestmentAllocation_shares_ie');
+      expect(allocSteps[1].element).toBe('#InvestmentAllocation_ie_shares');
+      expect(allocSteps[2].element).toBe('#InvestmentAllocation_indexFunds_ie');
+      expect(allocSteps[3].element).toBe('#InvestmentAllocation_ie_indexFunds');
+    });
+
+    test('should expand GlobalAssetGrowth template', () => {
+      const steps = [
+        { dynamicInvestmentField: 'GlobalAssetGrowth', popover: { title: 'Test' } }
+      ];
+      const expanded = wizard.expandDynamicSteps(steps);
+      expect(expanded).toHaveLength(1);
+      expect(expanded[0].element).toBe('#GlobalAssetGrowth_globalEquity');
+    });
+
+    test('should expand LocalAssetGrowth template', () => {
+      const steps = [
+        { dynamicInvestmentField: 'LocalAssetGrowth', popover: { title: 'Test' } }
+      ];
+      const expanded = wizard.expandDynamicSteps(steps);
+      expect(expanded).toHaveLength(1);
+      // indexFunds_ie has baseRef, so it's skipped. shares_ie is local.
+      expect(expanded[0].element).toBe('#shares_ieGrowthRate');
+    });
+
+    test('should expand PensionContribution template', () => {
+      const steps = [
+        { dynamicInvestmentField: 'PensionContribution', popover: { title: 'Pension' } }
+      ];
+      const expanded = wizard.expandDynamicSteps(steps);
+      expect(expanded).toHaveLength(2);
+      expect(expanded[0].element).toBe('#PensionContributionPercentage'); // Legacy
+      expect(expanded[1].element).toBe('#P1PensionContrib_ie'); // Country
     });
   });
 });

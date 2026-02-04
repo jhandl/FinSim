@@ -659,6 +659,8 @@ class WebUI extends AbstractUI {
 
   renderInvestmentParameterFields(investmentTypes) {
     const types = Array.isArray(investmentTypes) ? investmentTypes : [];
+    const allocationTypes = types.filter(t => !(t && t.excludeFromAllocations));
+    const excludedFromAllocationsTypes = types.filter(t => t && t.excludeFromAllocations);
     this._lastInvestmentTypesForGrowthRates = types;
 
     // Capture existing growth rate/volatility values before removing dynamic fields.
@@ -714,6 +716,16 @@ class WebUI extends AbstractUI {
     hideGrowthRow('indexFundsGrowthRate');
     hideGrowthRow('sharesGrowthRate');
 
+    // Keep hidden parameter inputs for excluded-from-allocations types so
+    // serialization/deserialization paths that read by key continue to work.
+    for (let i = 0; i < excludedFromAllocationsTypes.length; i++) {
+      const t = excludedFromAllocationsTypes[i] || {};
+      const key = t.key;
+      if (!key) continue;
+      this.ensureParameterInput('InitialCapital_' + key, 'currency');
+      this.ensureParameterInput('InvestmentAllocation_' + key, 'percentage');
+    }
+
     // Ensure per-type growth inputs exist for local investments (no baseRef) for serialization/back-compat.
     // Non-local wrappers (with baseRef) use asset-level params and don't need wrapper-level inputs.
     for (let i = 0; i < types.length; i++) {
@@ -747,8 +759,8 @@ class WebUI extends AbstractUI {
     if (startGroup) {
       // Per Phase 7 design: starting position initial capital remains StartCountry-only.
       // IDs intentionally remain `InitialCapital_{typeKey}` (no country prefix).
-      for (let i = 0; i < types.length; i++) {
-        const t = types[i] || {};
+      for (let i = 0; i < allocationTypes.length; i++) {
+        const t = allocationTypes[i] || {};
         const key = t.key;
         if (!key) continue;
         const labelText = t.label || key;
@@ -779,7 +791,7 @@ class WebUI extends AbstractUI {
 
     // Allocations: if relocation is enabled AND MV-* events exist, render per-country allocation inputs
     // and use the chips as a context switcher (show/hide per-country containers).
-    this.refreshCountryChipsFromScenario(types);
+    this.refreshCountryChipsFromScenario(allocationTypes);
 
     const tbody = document.querySelector('#growthRates table.growth-rates-table tbody');
     const inflationInput = document.getElementById('Inflation');
@@ -1309,7 +1321,8 @@ class WebUI extends AbstractUI {
       chipContainer.style.display = 'none';
       this.allocationsCountryChipSelector = null;
 
-      const types = this._sortInvestmentTypes(Array.isArray(fallbackStartTypes) ? fallbackStartTypes : []);
+      const types = this._sortInvestmentTypes(Array.isArray(fallbackStartTypes) ? fallbackStartTypes : [])
+        .filter(t => !(t && t.excludeFromAllocations));
       const startCountry = (cfg.getStartCountry() || '').toLowerCase();
 
       // Render global allocation fields using GlobalAllocation_* keys (independent of per-country fields).
@@ -1370,7 +1383,8 @@ class WebUI extends AbstractUI {
       this.allocationsCountryChipSelector = null;
 
       const relocationEnabled = cfg.isRelocationEnabled && cfg.isRelocationEnabled();
-      const types = this._sortInvestmentTypes(Array.isArray(fallbackStartTypes) ? fallbackStartTypes : []);
+      const types = this._sortInvestmentTypes(Array.isArray(fallbackStartTypes) ? fallbackStartTypes : [])
+        .filter(t => !(t && t.excludeFromAllocations));
       const startCountry = (cfg.getStartCountry() || '').toLowerCase();
 
       if (relocationEnabled) {
@@ -1515,7 +1529,7 @@ class WebUI extends AbstractUI {
       const code = scenarioCountries[ci];
       const rs = cfg.getCachedTaxRuleSet(code);
       let invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
-      invTypes = this._sortInvestmentTypes(invTypes);
+      invTypes = this._sortInvestmentTypes(invTypes).filter(t => !(t && t.excludeFromAllocations));
       const countryContainer = document.createElement('div');
       countryContainer.setAttribute('data-country-allocation-container', 'true');
       countryContainer.setAttribute('data-country-code', code);

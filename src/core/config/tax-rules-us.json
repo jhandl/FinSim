@@ -58,6 +58,11 @@
     "statePensionIncreaseBands": {  },
     "pensionSystem": { "type": "mixed" },
     "taxAdvantaged": true,
+    "wizardHelp": {
+      "label": "Retirement Accounts",
+      "contributionDescriptionP1": "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age as per the tax rules. Do not include employer matching contributions here; there's another place for that.</p>",
+      "contributionDescriptionP2": "<p>How much of your partner's age-dependent maximum they want to pay out of their gross salary into their private pension scheme.</p><p>If you enter 100% here, your partner will contribute the maximum allowed for their age. This field is only used in two-person simulation mode.</p>"
+    },
     "definedBenefit": { "treatment": "privatePension" }
   },
 
@@ -72,7 +77,8 @@
       "residenceScope": "global",
       "taxation": {
         "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
-      }
+      },
+      "helpText": "US Index Funds are subject to Capital Gains Tax upon sale. Long-term gains are typically taxed at a preferential rate compared to ordinary income."
     },
     {
       "key": "usShares",
@@ -82,7 +88,8 @@
       "residenceScope": "global",
       "taxation": {
         "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
-      }
+      },
+      "helpText": "Individual shares are subject to Capital Gains Tax upon sale. Long-term gains are typically taxed at a preferential rate."
     },
     {
       "key": "rsu_us",
@@ -98,7 +105,8 @@
           "rateRef": "capitalGainsTax.rate",
           "allowLossOffset": true
         }
-      }
+      },
+      "helpText": "RSUs are taxed as ordinary income at vesting. Subsequent gains on the sale of shares are subject to Capital Gains Tax."
     }
   ],
   "drawdownPriorities": [

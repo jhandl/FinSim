@@ -32,8 +32,7 @@
         "uiInput": {
           "required": false,
           "section": "personalCircumstances",
-          "label": "Personal Tax Credit",
-          "tooltip": "Override the standard personal tax credit if you have a special case. Leave blank to use the default value from tax rules."
+          "label": "Personal Tax Credit"
         }
       },
       "employee": {
@@ -163,6 +162,11 @@
       "type": "mixed"
     },
     "taxAdvantaged": true,
+    "helpText": {
+      "label": "Private Pension",
+      "contributionDescriptionP1": "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age as per the tax rules. Do not include employer matching contributions here; there's another place for that.</p>",
+      "contributionDescriptionP2": "<p>How much of your partner's age-dependent maximum they want to pay out of their gross salary into their private pension scheme.</p><p>If you enter 100% here, your partner will contribute the maximum allowed for their age. This field is only used in two-person simulation mode.</p>"
+    },
     "definedBenefit": {
       "treatment": "privatePension"
     }
@@ -186,7 +190,8 @@
           "allowLossOffset": false,
           "eligibleForAnnualExemption": false
         }
-      }
+      },
+      "helpText": "Irish and EU/EEA-domiciled Index Funds (including ETFs) are subject to Exit Tax at ${investmentType.taxation.exitTax.rate,percentage} with a ${investmentType.taxation.exitTax.deemedDisposalYears}-year deemed disposal rule."
     },
     {
       "key": "shares_ie",
@@ -200,7 +205,8 @@
           "annualExemptionRef": "capitalGainsTax.annualExemption",
           "allowLossOffset": true
         }
-      }
+      },
+      "helpText": "Individual shares and investment trusts are subject to Capital Gains Tax at ${taxRules.capitalGainsTax.rate,percentage} on disposal."
     },
     {
       "key": "rsu_ie",
@@ -217,7 +223,8 @@
           "annualExemptionRef": "capitalGainsTax.annualExemption",
           "allowLossOffset": true
         }
-      }
+      },
+      "helpText": "Restricted Stock Units are taxed as employment income (IT/USC/PRSI) at vesting based on market value. Subsequent disposal of vested shares is subject to Capital Gains Tax at ${taxRules.capitalGainsTax.rate,percentage}."
     }
   ],
   "drawdownPriorities": [

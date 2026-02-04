@@ -77,51 +77,318 @@ class Wizard {
         });
       }
 
-      // Create working config with age/year placeholders processed
+      // Create working config (placeholders will be processed on demand in start/_runTour)
       this.config = JSON.parse(JSON.stringify(this.originalConfig));
-      if (this.config.steps) {
-        this.config.steps = this.config.steps.map(step => {
-          if (step.popover) {
-            if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
-              // Re-render with ContentRenderer to process age/year placeholders
-              step.popover.description = ContentRenderer.render(
-                step.popover.contentType,
-                this.processAgeYearInContent(step.popover.content),
-                { context: 'wizard', compact: true }
-              );
-            } else if (step.popover.description) {
-              // Process age/year placeholders in legacy HTML descriptions
-              step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
-            }
-          }
-          return step;
-        });
-      }
     } catch (error) {
       console.error('Failed to load wizard configuration:', error);
     }
   }
 
+  _sortInvestmentTypes(types) {
+    if (!Array.isArray(types)) return [];
+    // Sort: types without (baseRef || baseKey) come first (matching WebUI logic)
+    return types.slice().sort((a, b) => {
+      const aHas = !!(a.baseRef || a.baseKey);
+      const bHas = !!(b.baseRef || b.baseKey);
+      if (aHas === bHas) return 0;
+      return aHas ? 1 : -1;
+    });
+  }
+
   /**
-   * Recursively processes age/year placeholders in structured content
+   * Expands dynamic steps into concrete steps based on active configuration
+   * @param {Array} steps - The raw steps from configuration
+   * @returns {Array} The expanded steps
+   */
+  expandDynamicSteps(steps) {
+    if (!steps || !Array.isArray(steps)) return [];
+    
+    const expanded = [];
+    const config = Config.getInstance();
+    const activeCountry = config.getStartCountry();
+    const ruleset = config.getCachedTaxRuleSet(activeCountry);
+    let investmentTypes = ruleset ? (ruleset.getResolvedInvestmentTypes() || []) : [];
+    investmentTypes = this._sortInvestmentTypes(investmentTypes);
+    const baseTypes = config.getInvestmentBaseTypes() || [];
+
+    for (const step of steps) {
+      if (step.dynamicInvestmentField) {
+        const fieldType = step.dynamicInvestmentField;
+        
+        if (fieldType === 'InitialCapital') {
+          // Iterate all investment types
+          for (const type of investmentTypes) {
+            const newStep = JSON.parse(JSON.stringify(step));
+            delete newStep.dynamicInvestmentField;
+            newStep.element = `#InitialCapital_${type.key}`;
+            expanded.push(newStep);
+          }
+        } else if (fieldType === 'InvestmentAllocation') {
+          // Iterate types (RSUs included as WebUI renders them)
+          for (const type of investmentTypes) {
+            
+            // 1. Legacy/No-Relocation format: InvestmentAllocation_{key} (e.g. indexFunds_ie)
+            const stepLegacy = JSON.parse(JSON.stringify(step));
+            delete stepLegacy.dynamicInvestmentField;
+            stepLegacy.element = `#InvestmentAllocation_${type.key}`;
+            expanded.push(stepLegacy);
+
+            // 2. Relocation format: InvestmentAllocation_{country}_{baseKey} (e.g. ie_indexFunds)
+            // Derive baseKey by stripping country suffix if present
+            let baseKey = type.key;
+            const suffix = '_' + activeCountry.toLowerCase();
+            if (baseKey.toLowerCase().endsWith(suffix)) {
+              baseKey = baseKey.substring(0, baseKey.length - suffix.length);
+            }
+            // Only add if baseKey differs or if format logic dictates (WebUI uses both depending on mode)
+            // But since filterValidSteps removes non-existent ones, it's safe to add both variations.
+            const stepReloc = JSON.parse(JSON.stringify(step));
+            delete stepReloc.dynamicInvestmentField;
+            stepReloc.element = `#InvestmentAllocation_${activeCountry.toLowerCase()}_${baseKey}`;
+            expanded.push(stepReloc);
+          }
+        } else if (fieldType === 'PensionContribution') {
+          const newStep = JSON.parse(JSON.stringify(step));
+          delete newStep.dynamicInvestmentField;
+          // Legacy hidden field (for back-compat)
+          newStep.element = `#PensionContributionPercentage`; 
+          expanded.push(newStep);
+          
+          // Per-country field (visible)
+          const newStepCountry = JSON.parse(JSON.stringify(step));
+          delete newStepCountry.dynamicInvestmentField;
+          newStepCountry.element = `#P1PensionContrib_${activeCountry.toLowerCase()}`;
+          expanded.push(newStepCountry);
+        } else if (fieldType === 'PensionContributionP2') {
+          const newStep = JSON.parse(JSON.stringify(step));
+          delete newStep.dynamicInvestmentField;
+          // Legacy hidden field
+          newStep.element = `#PensionContributionPercentageP2`;
+          expanded.push(newStep);
+          
+          // Per-country field (visible)
+          const newStepCountry = JSON.parse(JSON.stringify(step));
+          delete newStepCountry.dynamicInvestmentField;
+          newStepCountry.element = `#P2PensionContrib_${activeCountry.toLowerCase()}`;
+          expanded.push(newStepCountry);
+        } else if (fieldType === 'PensionContributionCapped') {
+          const newStep = JSON.parse(JSON.stringify(step));
+          delete newStep.dynamicInvestmentField;
+          // Legacy hidden field
+          newStep.element = `#PensionContributionCappedToggle`;
+          expanded.push(newStep);
+          
+          // Per-country field (visible)
+          const newStepCountry = JSON.parse(JSON.stringify(step));
+          delete newStepCountry.dynamicInvestmentField;
+          newStepCountry.element = `#PensionCappedToggle_${activeCountry.toLowerCase()}`;
+          expanded.push(newStepCountry);
+        } else if (fieldType === 'GlobalAssetGrowth') {
+          for (const base of baseTypes) {
+            const newStep = JSON.parse(JSON.stringify(step));
+            delete newStep.dynamicInvestmentField;
+            newStep.element = `#GlobalAssetGrowth_${base.baseKey}`;
+            expanded.push(newStep);
+          }
+        } else if (fieldType === 'GlobalAssetVolatility') {
+          for (const base of baseTypes) {
+            const newStep = JSON.parse(JSON.stringify(step));
+            delete newStep.dynamicInvestmentField;
+            newStep.element = `#GlobalAssetVolatility_${base.baseKey}`;
+            expanded.push(newStep);
+          }
+        } else if (fieldType === 'LocalAssetGrowth') {
+          for (const type of investmentTypes) {
+            if (type.baseRef) continue; // Skip global
+            const newStep = JSON.parse(JSON.stringify(step));
+            delete newStep.dynamicInvestmentField;
+            newStep.element = `#${type.key}GrowthRate`;
+            expanded.push(newStep);
+          }
+        } else if (fieldType === 'LocalAssetVolatility') {
+          for (const type of investmentTypes) {
+            if (type.baseRef) continue; // Skip global
+            const newStep = JSON.parse(JSON.stringify(step));
+            delete newStep.dynamicInvestmentField;
+            newStep.element = `#${type.key}GrowthStdDev`;
+            expanded.push(newStep);
+          }
+        }
+      } else {
+        expanded.push(step);
+      }
+    }
+    return expanded;
+  }
+
+  /**
+   * Recursively processes placeholders in structured content
    * @param {Object|Array|string} content - Content to process
+   * @param {Object} context - Optional context with investmentType data
    * @returns {Object|Array|string} Content with placeholders replaced
    */
-  processAgeYearInContent(content) {
+  processAgeYearInContent(content, context = null) {
     if (typeof content === 'string') {
-      return FormatUtils.replaceAgeYearPlaceholders(content);
+      const withAgeYear = FormatUtils.replaceAgeYearPlaceholders(content);
+      return FormatUtils.processVariables(withAgeYear, context);
     }
     if (Array.isArray(content)) {
-      return content.map(item => this.processAgeYearInContent(item));
+      return content.map(item => this.processAgeYearInContent(item, context));
     }
     if (content && typeof content === 'object') {
       const processed = {};
       for (const [key, value] of Object.entries(content)) {
-        processed[key] = this.processAgeYearInContent(value);
+        processed[key] = this.processAgeYearInContent(value, context);
       }
       return processed;
     }
     return content;
+  }
+
+  /**
+   * Resolves investment type context from a focused element's ID
+   * @param {HTMLElement} element - The focused element
+   * @returns {Object|null} Context object with investmentType {label, helpText} or null
+   */
+  resolveInvestmentTypeContext(element) {
+    if (!element || !element.id) return null;
+    
+    const fieldId = element.id;
+    let typeKey = null;
+    let ccFromId = null;
+    let isPensionField = false;
+    let pensionNeedsStartCountry = false;
+    
+    // Pension field patterns
+    const pensionPatterns = [
+      { regex: /^P1PensionContrib_([a-z]{2})$/, ccIndex: 1 },
+      { regex: /^P2PensionContrib_([a-z]{2})$/, ccIndex: 1 },
+      { regex: /^PensionCappedToggle_([a-z]{2})$/, ccIndex: 1 },
+      { regex: /^InitialPension$/ },
+      { regex: /^InitialPensionP2$/ },
+      { regex: /^PensionGrowthRate$/ },
+      { regex: /^PensionGrowthStdDev$/ },
+      { regex: /^PriorityPension$/ }
+    ];
+
+    for (const pattern of pensionPatterns) {
+      const match = fieldId.match(pattern.regex);
+      if (match) {
+        isPensionField = true;
+        if (pattern.ccIndex) {
+          ccFromId = match[pattern.ccIndex];
+        } else {
+          pensionNeedsStartCountry = true;
+        }
+        break;
+      }
+    }
+
+    if (isPensionField) {
+      const config = Config.getInstance();
+      if (pensionNeedsStartCountry && !ccFromId) {
+        ccFromId = config.getStartCountry();
+      }
+      const activeCountry = ccFromId || config.getStartCountry();
+      const ruleset = config.getCachedTaxRuleSet(activeCountry);
+      return {
+        taxRules: ruleset.raw,
+        investmentType: ruleset.raw.pensionRules.helpText
+      };
+    }
+
+    // Pattern matching for investment fields
+    // InitialCapital_{typeKey}, InvestmentAllocation_{typeKey}, 
+    // GlobalAssetGrowth_{baseKey}, GlobalAssetVolatility_{baseKey}
+    // LocalAssetGrowth_{cc}_{baseKey}, LocalAssetVolatility_{cc}_{baseKey}
+    
+    const patterns = [
+      /^InitialCapital_(.+)$/,
+      /^InvestmentAllocation_([a-z]{2})_(.+)$/, // Relocation format: {cc}_{baseKey}
+      /^InvestmentAllocation_(.+)$/,             // Legacy format: {typeKey}
+      /^GlobalAssetGrowth_(.+)$/,
+      /^GlobalAssetVolatility_(.+)$/,
+      /^LocalAssetGrowth_[a-z]{2}_(.+)$/,
+      /^LocalAssetVolatility_[a-z]{2}_(.+)$/,
+      /^(.+)GrowthRate$/,
+      /^(.+)GrowthStdDev$/
+    ];
+    
+    if (!typeKey) {
+      for (const pattern of patterns) {
+        const match = fieldId.match(pattern);
+        if (match) {
+          if (match.length === 3) {
+            // Captured country code and base key
+            ccFromId = match[1];
+            typeKey = match[2];
+          } else {
+            typeKey = match[1];
+          }
+          break;
+        }
+      }
+    }
+    
+    if (!typeKey) return null;
+    
+    // Get active country and fetch investment type
+    const config = Config.getInstance();
+    // Use extracted country code if available (multi-country allocations), otherwise start country
+    const activeCountry = ccFromId || config.getStartCountry();
+    const ruleset = config.getCachedTaxRuleSet(activeCountry);
+    
+    // Check for investment type in active ruleset
+    if (ruleset && typeof ruleset.getInvestmentType === 'function') {
+      // If we parsed {cc}_{baseKey}, construct the likely key: {baseKey}_{cc}
+      // Note: TaxRuleSet keys usually follow {base}_{cc} pattern, but can be arbitrary.
+      // We should try looking up by typeKey (if legacy) OR by constructed key (if reloc).
+      let lookupKey = typeKey;
+      if (ccFromId) {
+        lookupKey = `${typeKey}_${ccFromId}`; // Reconstruct key like 'indexFunds_ie'
+      }
+
+      let investmentType = ruleset.getInvestmentType(lookupKey);
+      
+      // Fallback: if reconstruction failed, maybe typeKey IS the key (if key doesn't follow pattern)
+      if (!investmentType && ccFromId) {
+        investmentType = ruleset.getInvestmentType(typeKey);
+      }
+
+      if (investmentType) {
+        const contextType = {};
+        for (const key in investmentType) {
+          if (Object.prototype.hasOwnProperty.call(investmentType, key)) {
+            contextType[key] = investmentType[key];
+          }
+        }
+        if (contextType.label === undefined || contextType.label === null) contextType.label = '';
+        if (contextType.helpText === undefined || contextType.helpText === null) contextType.helpText = '';
+        return {
+          taxRules: ruleset.raw,
+          investmentType: contextType
+        };
+      }
+    }
+
+    // Check for global base type
+    const baseType = config.getInvestmentBaseTypeByKey(typeKey);
+    if (baseType) {
+      const contextType = {};
+      for (const key in baseType) {
+        if (Object.prototype.hasOwnProperty.call(baseType, key)) {
+          contextType[key] = baseType[key];
+        }
+      }
+      if (contextType.label === undefined || contextType.label === null) contextType.label = '';
+      if (contextType.helpText === undefined || contextType.helpText === null) contextType.helpText = '';
+      return {
+        taxRules: (ruleset && ruleset.raw) ? ruleset.raw : null,
+        investmentType: contextType
+      };
+    }
+    
+    return null;
   }
 
   getEventTableState() {
@@ -299,6 +566,109 @@ class Wizard {
     return true;
   }
 
+  _getStepVisualPosition(step) {
+    if (!step || !step.element) return null;
+    const element = document.querySelector(step.element);
+    if (!element || !this.isElementVisible(element)) return null;
+    const rect = element.getBoundingClientRect();
+    return {
+      top: rect.top,
+      left: rect.left,
+      element: element
+    };
+  }
+
+  _sortStepRunByVisualOrder(run) {
+    const decorated = run.map((step, index) => ({
+      step: step,
+      index: index,
+      position: this._getStepVisualPosition(step)
+    }));
+
+    decorated.sort((a, b) => {
+      if (!a.position || !b.position) return a.index - b.index;
+
+      const topDelta = a.position.top - b.position.top;
+      if (Math.abs(topDelta) > 1) return topDelta;
+
+      const leftDelta = a.position.left - b.position.left;
+      if (Math.abs(leftDelta) > 1) return leftDelta;
+
+      if (a.position.element !== b.position.element && typeof Node !== 'undefined') {
+        const rel = a.position.element.compareDocumentPosition(b.position.element);
+        if (rel & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+        if (rel & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+      }
+
+      return a.index - b.index;
+    });
+
+    return decorated.map(item => item.step);
+  }
+
+  sortStepsByVisualOrder(steps) {
+    if (!Array.isArray(steps) || steps.length < 2) return steps || [];
+
+    const sorted = [];
+    let i = 0;
+
+    while (i < steps.length) {
+      const card = steps[i] && steps[i].card ? steps[i].card : null;
+      let j = i + 1;
+
+      while (j < steps.length) {
+        const nextCard = steps[j] && steps[j].card ? steps[j].card : null;
+        if (nextCard !== card) break;
+        j++;
+      }
+
+      const run = steps.slice(i, j);
+      if (card && run.length > 1) {
+        sorted.push.apply(sorted, this._sortStepRunByVisualOrder(run));
+      } else {
+        sorted.push.apply(sorted, run);
+      }
+      i = j;
+    }
+
+    return sorted;
+  }
+
+  resolveDynamicStepSelector(selector) {
+    if (!selector || selector.charAt(0) !== '#') return selector;
+    if (selector !== '#StatePensionWeekly' && selector !== '#P2StatePensionWeekly' && selector !== '#PersonalTaxCredit') {
+      return selector;
+    }
+
+    const config = Config.getInstance();
+    let activeCountry = config.getStartCountry();
+    try {
+      const webUI = (typeof WebUI !== 'undefined' && WebUI.getInstance) ? WebUI.getInstance() : null;
+      if (webUI && webUI.countryTabSyncManager && typeof webUI.countryTabSyncManager.getSelectedCountry === 'function') {
+        const selected = webUI.countryTabSyncManager.getSelectedCountry('personalCircumstances');
+        if (selected) activeCountry = selected;
+      }
+    } catch (_) { }
+
+    const cc = String(activeCountry || '').toLowerCase();
+    if (!cc) return selector;
+
+    if (selector === '#StatePensionWeekly') {
+      const mapped = '#StatePension_' + cc;
+      return document.querySelector(mapped) ? mapped : selector;
+    }
+    if (selector === '#P2StatePensionWeekly') {
+      const mapped = '#P2StatePension_' + cc;
+      return document.querySelector(mapped) ? mapped : selector;
+    }
+    if (selector === '#PersonalTaxCredit') {
+      const mapped = '#TaxCredit_personal_' + cc;
+      return document.querySelector(mapped) ? mapped : selector;
+    }
+
+    return selector;
+  }
+
   filterValidSteps(stepsOverride = null) {
     // Decide which set of steps we are filtering
     const sourceSteps = stepsOverride || (this.config ? this.config.steps : []);
@@ -366,6 +736,8 @@ class Wizard {
       }
 
       if (!step.element.includes('Event') || step.element.startsWith('#AccordionEventTypeToggle')) {
+        step.element = this.resolveDynamicStepSelector(step.element);
+
         // Special case for data-section: find the visible element and update selector
         if (step.element === '.data-section') {
           const elements = document.querySelectorAll(step.element);
@@ -627,10 +999,10 @@ class Wizard {
           }
         });
 
-        return deduped;
+        return this.sortStepsByVisualOrder(deduped);
       }
 
-      return filteredSteps;
+      return this.sortStepsByVisualOrder(filteredSteps);
   }
 
   // BEGIN ADD: Ensure first accordion item expanded for wizard selectors
@@ -1798,7 +2170,9 @@ class Wizard {
       return [];
     }
 
-    const stepsCopy = this.originalConfig.steps.map(step => JSON.parse(JSON.stringify(step)));
+    // Expand dynamic steps first so we have the concrete elements to filter
+    const expandedSteps = this.expandDynamicSteps(this.originalConfig.steps);
+    const stepsCopy = JSON.parse(JSON.stringify(expandedSteps));
 
     // BEGIN ADD: Detect current mode for filtering/selector swapping
     const currentMode = this.getCurrentEventsMode ? this.getCurrentEventsMode() : 'table';
@@ -1832,17 +2206,23 @@ class Wizard {
 
     // Process content with age/year placeholders for UI display
     filtered.forEach(step => {
+      let context = null;
+      if (step.element) {
+        const el = document.querySelector(step.element);
+        context = this.resolveInvestmentTypeContext(el);
+      }
+
       if (step.popover) {
         if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
           // Re-render with ContentRenderer to process age/year placeholders
           step.popover.description = ContentRenderer.render(
             step.popover.contentType,
-            this.processAgeYearInContent(step.popover.content),
+            this.processAgeYearInContent(step.popover.content, context),
             { context: 'wizard', compact: true }
           );
         } else if (step.popover.description) {
           // Process age/year placeholders in legacy HTML descriptions
-          step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
+          step.popover.description = this.processAgeYearInContent(step.popover.description, context);
         }
       }
     });
@@ -1883,27 +2263,13 @@ class Wizard {
     // Load or refresh configuration
     if (!this.config) {
       await this.loadConfig();
-    } else {
-      // Refresh working config from original with current age/year mode
-      this.config = JSON.parse(JSON.stringify(this.originalConfig));
-      if (this.config.steps) {
-        this.config.steps = this.config.steps.map(step => {
-          if (step.popover) {
-            if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
-              // Re-render with ContentRenderer to process age/year placeholders
-              step.popover.description = ContentRenderer.render(
-                step.popover.contentType,
-                this.processAgeYearInContent(step.popover.content),
-                { context: 'wizard', compact: true }
-              );
-            } else if (step.popover.description) {
-              // Process age/year placeholders in legacy HTML descriptions
-              step.popover.description = FormatUtils.replaceAgeYearPlaceholders(step.popover.description);
-            }
-          }
-          return step;
-        });
-      }
+    }
+    
+    // Always refresh working config from original AND expand dynamic steps based on current country
+    // This ensures that if the user switched country, the wizard steps are updated.
+    this.config = JSON.parse(JSON.stringify(this.originalConfig));
+    if (this.config.steps) {
+      this.config.steps = this.expandDynamicSteps(this.config.steps);
     }
 
     // Set tour type and get filtered steps
@@ -1923,6 +2289,27 @@ class Wizard {
 
       // Set the actual tour ID for display purposes
       this.currentTourId = type;
+
+      // Process content for each step with context
+      steps.forEach(step => {
+        let context = null;
+        if (step.element) {
+          const el = document.querySelector(step.element);
+          context = this.resolveInvestmentTypeContext(el);
+        }
+
+        if (step.popover) {
+          if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
+            step.popover.description = ContentRenderer.render(
+              step.popover.contentType,
+              this.processAgeYearInContent(step.popover.content, context),
+              { context: 'wizard', compact: true }
+            );
+          } else if (step.popover.description) {
+            step.popover.description = this.processAgeYearInContent(step.popover.description, context);
+          }
+        }
+      });
 
       // Replace old welcome/how-to steps with welcome modal triggers (full tours only)
       if (type === 'full') {
@@ -2098,4 +2485,3 @@ class Wizard {
 if (typeof window !== 'undefined') {
   window.Wizard = Wizard;
 }
-

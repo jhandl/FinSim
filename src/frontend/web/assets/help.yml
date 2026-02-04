@@ -197,7 +197,7 @@ WizardSteps:
     tours: [full, mini]
     card: startingPosition
     popover:
-      description: "<p>Select your current country of residence.</p><p>This sets the active tax rules for calculations. You can add relocation events to change countries during the plan.</p>"
+      description: "<p>Select your current country of residence.</p><p>This sets the active tax rules for calculations. You can add a relocation event to move to another country, and that country's tax rules will then apply.</p>"
       side: "right"
       align: "start"
 
@@ -241,19 +241,11 @@ WizardSteps:
       side: "right"
       align: "start"
 
-  - element: "#InitialFunds"
+  - dynamicInvestmentField: "InitialCapital"
     tours: [full, mini]
     card: startingPosition
     popover:
-      description: "<p>The current value of your index funds investments (e.g. ETFs).</p><p>Keep in mind that since I don't know when you bought those funds I can't track their deemed disposal tax, so I 'buy' them at the start of the simulation and you will see the corresponding tax being paid ${deemedDisposalYears} years into the run and every ${deemedDisposalYears} years thereafter.</p>"
-      side: "right"
-      align: "start"
-  
-  - element: "#InitialShares"
-    tours: [full, mini]
-    card: startingPosition
-    popover:
-      description: "<p>The current value in your investment trusts or stocks.</p>"
+      description: "<p>The current value of your ${investmentType.label} investments.</p><p>${investmentType.helpText}</p>"
       side: "right"
       align: "start"
 
@@ -361,39 +353,31 @@ WizardSteps:
       side: "right"
       align: "start"
 
-  - element: "#FundsAllocation"
+  - dynamicInvestmentField: "InvestmentAllocation"
     tours: [full, mini]
     card: Allocations
     popover:
-      description: "<p>The percentage of your portfolio that you plan to have in index funds (e.g. ETFs).</p><p>Any cash remaining after funding your emergency stash will be invested in index funds in this proportion.</p><p>The sum of index funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
+      description: "<p>The percentage of your portfolio that you plan to allocate to ${investmentType.label}.</p><p>${investmentType.helpText}</p><p>Any cash remaining after funding your emergency stash will be invested according to these proportions. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
       side: "right"
       align: "start"
 
-  - element: "#SharesAllocation"
+  - dynamicInvestmentField: "PensionContribution"
     tours: [full, mini]
     card: Allocations
     popover:
-      description: "<p>The percentage of your portfolio that you plan to have in investment trusts or shares.</p><p>Any cash remaining after funding your emergency stash will be invested in trusts or shares in this proportion.</p><p>The sum of index funds and Individual Shares can't exceed 100%. If they add up to less than 100%, you'll be saving the remainder in cash.</p>"
+      description: "${investmentType.contributionDescriptionP1}"
       side: "right"
       align: "start"
 
-  - element: "#PensionContributionPercentage"
+  - dynamicInvestmentField: "PensionContributionP2"
     tours: [full, mini]
     card: Allocations
     popover:
-      description: "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age as per the tax rules. Do not include employer matching contributions here; there's another place for that.</p>"
+      description: "${investmentType.contributionDescriptionP2}"
       side: "right"
       align: "start"
 
-  - element: "#PensionContributionPercentageP2"
-    tours: [full, mini]
-    card: Allocations
-    popover:
-      description: "<p>How much of your partner's age-dependent maximum they want to pay out of their gross salary into their private pension scheme.</p><p>If you enter 100% here, your partner will contribute the maximum allowed for their age. This field is only used in two-person simulation mode.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#PensionContributionCappedToggle"
+  - dynamicInvestmentField: "PensionContributionCapped"
     tours: [full, mini]
     card: Allocations
     popover:
@@ -449,35 +433,35 @@ WizardSteps:
       side: "right"
       align: "start"
 
-  - element: "#FundsGrowthRate"
+  - dynamicInvestmentField: "GlobalAssetGrowth"
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>The expected average annual growth rate of your index funds (e.g. ETFs), not adjusted for inflation.</p><p>For reference, the average growth rate of the S&P500 over the last 30 years [has been around 10%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
+      description: "<p>The expected average annual growth rate of **${investmentType.label}**, not adjusted for inflation.</p><p>${investmentType.helpText}</p>"
       side: "right"
       align: "start"
 
-  - element: "#FundsGrowthStdDev"
+  - dynamicInvestmentField: "GlobalAssetVolatility"
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>The expected standard deviation of the annual growth rate of your index funds (e.g. ETFs).</p><p>This field is only used in variable rate simulation mode. For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
+      description: "<p>The expected standard deviation of the annual growth rate of **${investmentType.label}**.</p><p>This field is only used in variable rate simulation mode.</p><p>${investmentType.helpText}</p>"
       side: "right"
       align: "start"
 
-  - element: "#SharesGrowthRate"
+  - dynamicInvestmentField: "LocalAssetGrowth"
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>The expected average annual growth rate of your investment trusts or shares, not adjusted for inflation.</p><p>Keep in mind that investment trusts tend to have higher fees, so take that into account when calculating this number.</p>"
+      description: "<p>The expected average annual growth rate of **${investmentType.label}**, not adjusted for inflation.</p><p>${investmentType.helpText}</p>"
       side: "right"
       align: "start"
 
-  - element: "#SharesGrowthStdDev"
+  - dynamicInvestmentField: "LocalAssetVolatility"
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>The expected standard deviation of the annual growth rate of your investment trusts or shares.</p><p>This field is only used in variable rate simulation mode. For reference, the average volatility of the S&P500 over the last 30 years (including bull markets and crashes) [has been around 15%](https://curvo.eu/backtest/en/market-index/sp-500?currency=eur){historical performance,index}.</p>"
+      description: "<p>The expected standard deviation of the annual growth rate of **${investmentType.label}**.</p><p>This field is only used in variable rate simulation mode.</p><p>${investmentType.helpText}</p>"
       side: "right"
       align: "start"
 

@@ -100,7 +100,9 @@
           "rateRef": "capitalGainsTax.rate",
           "allowLossOffset": true
         }
-      }
+      },
+      "helpText": "MERVAL index shares are subject to capital gains tax at ${taxRules.capitalGainsTax.rate,percentage} on gains. Securities traded on the Argentine stock exchange may have exemptions under certain conditions. Losses can be offset against gains.",
+      "helpUrl": "https://www.afip.gob.ar/"
     },
     {
       "key": "shares_ar",
@@ -114,7 +116,27 @@
           "rateRef": "capitalGainsTax.rate",
           "allowLossOffset": true
         }
-      }
+      },
+      "helpText": "CEDEARs (Argentine Depositary Receipts) are subject to capital gains tax at ${taxRules.capitalGainsTax.rate,percentage} on gains. These represent shares of foreign companies traded on the Argentine exchange. Losses can be offset against gains.",
+      "helpUrl": "https://www.afip.gob.ar/"
+    },
+    {
+      "key": "rsu_ar",
+      "label": "RSUs",
+      "baseRef": "globalEquity",
+      "baseCurrency": "ARS",
+      "assetCountry": "ar",
+      "residenceScope": "local",
+      "sellWhenReceived": true,
+      "excludeFromAllocations": true,
+      "taxation": {
+        "capitalGains": {
+          "rateRef": "capitalGainsTax.rate",
+          "allowLossOffset": true
+        }
+      },
+      "helpText": "Restricted Stock Units are taxed as ordinary income at delivery (up to 35% withholding). Subsequent sale of vested shares is subject to capital gains tax at ${taxRules.capitalGainsTax.rate,percentage}.",
+      "helpUrl": "https://www.afip.gob.ar/"
     }
   ],
   "pinnedIncomeTypes": [
