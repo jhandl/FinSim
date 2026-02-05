@@ -24,20 +24,32 @@ module.exports = {
 
         // --- Realistic config file mock ---
         const configFiles = {
+            '1.25': {
+                latestVersion: '2.0',
+                defaultCountry: 'ie',
+                dataUpdateMessage: 'Multiple updates available',
+                someOtherConfigData: 'oldValue'
+            },
             '1.26': {
                 latestVersion: '1.27',
+                defaultCountry: 'ie',
                 dataUpdateMessage: 'New tax rates and calculations available',
                 someOtherConfigData: 'value1'
             },
             '1.27': {
-                latestVersion: '1.27', // Current version is latest
-                dataUpdateMessage: 'You have the latest data',
+                latestVersion: '2.0',
+                defaultCountry: 'ie',
+                dataUpdateMessage: 'New tax rates and calculations available',
                 someOtherConfigData: 'value2'
             },
-            '1.25': {
-                latestVersion: '1.27', // Older version
-                dataUpdateMessage: 'Multiple updates available',
-                someOtherConfigData: 'oldValue'
+            '2.0': {
+                latestVersion: '2.0',
+                codeUpdateMessage: '',
+                dataUpdateMessage: '',
+                relocationEnabled: true,
+                availableCountries: [{ code: 'ie', name: 'Ireland' }],
+                defaultCountry: 'ie',
+                applicationName: 'Test Simulator'
             }
         };
 
@@ -129,10 +141,10 @@ module.exports = {
         };
         
         try {
-            // Test 1: Data version update detected and applied silently (1.26 → 1.27)
+            // Test 1: Data version update detected and applied silently (1.26 → 2.0)
             await runTest('1.26');
-            if (currentVersion !== '1.27' || !versionUpdated) {
-                testResults.errors.push(`Test 1 Failed: Version not updated from 1.26 to 1.27. Got ${currentVersion}, updated: ${versionUpdated}`);
+            if (currentVersion !== '2.0' || !versionUpdated) {
+                testResults.errors.push(`Test 1 Failed: Version not updated from 1.26 to 2.0. Got ${currentVersion}, updated: ${versionUpdated}`);
                 testResults.success = false;
             }
             if (alertShown) {
@@ -144,7 +156,7 @@ module.exports = {
             await runTest('1.26', mockUi => {
                 alertResponse = false; // User clicks "no"
             });
-            if (currentVersion !== '1.27' || !versionUpdated) {
+            if (currentVersion !== '2.0' || !versionUpdated) {
                 testResults.errors.push(`Test 2 Failed: Version not updated silently. Got ${currentVersion}, updated: ${versionUpdated}`);
                 testResults.success = false;
             }
@@ -154,8 +166,8 @@ module.exports = {
             }
 
             // Test 3: No update needed (already on latest version)
-            await runTest('1.27');
-            if (currentVersion !== '1.27' || versionUpdated) {
+            await runTest('2.0');
+            if (currentVersion !== '2.0' || versionUpdated) {
                 testResults.errors.push(`Test 3 Failed: Version changed when no update needed. Got ${currentVersion}, updated: ${versionUpdated}`);
                 testResults.success = false;
             }
@@ -164,9 +176,9 @@ module.exports = {
                 testResults.success = false;
             }
 
-            // Test 4: Multiple version jump (1.25 → 1.27)
+            // Test 4: Multiple version jump (1.25 → 2.0)
             await runTest('1.25');
-            if (currentVersion !== '1.27' || !versionUpdated) {
+            if (currentVersion !== '2.0' || !versionUpdated) {
                 testResults.errors.push(`Test 4 Failed: Multiple version update failed. Got ${currentVersion}, updated: ${versionUpdated}`);
                 testResults.success = false;
             }
@@ -186,8 +198,13 @@ module.exports = {
                 setVersion: (v) => { currentVersion = v; versionUpdated = true; },
                 showAlert: (m) => true,
                 fetchUrl: async (url) => {
-                    if (url.match(/finsim-(\d+\.\d+)\.json$/)) {
-                        return JSON.stringify(configFiles['1.26']);
+                    const versionMatch = url.match(/finsim-(\d+\.\d+)\.json$/);
+                    if (versionMatch) {
+                        const requestedVersion = versionMatch[1];
+                        if (!configFiles[requestedVersion]) {
+                            throw new Error(`Config file not found for version ${requestedVersion}`);
+                        }
+                        return JSON.stringify(configFiles[requestedVersion]);
                     }
                     if (url.match(/tax-rules-global\.json$/)) {
                         return JSON.stringify({
@@ -227,8 +244,13 @@ module.exports = {
                 setVersion: () => {},
                 showAlert: () => false,
                 fetchUrl: async (url) => {
-                    if (url.match(/finsim-(\d+\.\d+)\.json$/)) {
-                        return JSON.stringify(configFiles['1.27']);
+                    const versionMatch = url.match(/finsim-(\d+\.\d+)\.json$/);
+                    if (versionMatch) {
+                        const requestedVersion = versionMatch[1];
+                        if (!configFiles[requestedVersion]) {
+                            throw new Error(`Config file not found for version ${requestedVersion}`);
+                        }
+                        return JSON.stringify(configFiles[requestedVersion]);
                     }
                     if (url.match(/tax-rules-global\.json$/)) {
                         return JSON.stringify({

@@ -1367,7 +1367,7 @@ function deserializeSimulation(content, ui) {
 
   // Migrate legacy flat allocations to per-country structure
   if (typeof params !== 'undefined' && !params.investmentAllocationsByCountry && params.investmentAllocationsByKey) {
-    var startCountry = (params.StartCountry || Config.getInstance().getStartCountry() || 'ie').toLowerCase();
+    var startCountry = (params.StartCountry || Config.getInstance().getStartCountry()).toLowerCase();
     params.investmentAllocationsByCountry = {};
     params.investmentAllocationsByCountry[startCountry] = params.investmentAllocationsByKey;
     // Keep legacy field for backward compat with old code paths
@@ -1516,7 +1516,7 @@ function getRateForKey(key, rateBands) {
  * @returns {string} Country code (lowercase)
  */
 function getCountryForAge(age, events, startCountry) {
-  var country = (startCountry || 'ie').toLowerCase();
+  var country = startCountry.toLowerCase();
   for (var i = 0; i < events.length; i++) {
     var e = events[i];
     if (e && e.type && e.type.indexOf('MV-') === 0 && age >= e.fromAge) {
@@ -1533,7 +1533,7 @@ function getCountryForAge(age, events, startCountry) {
  * @returns {Set} Set of country codes (lowercase)
  */
 function getUniqueCountries(events, startCountry) {
-  var country = (startCountry || 'ie').toLowerCase();
+  var country = startCountry.toLowerCase();
   var countries = new Set();
   countries.add(country);
   for (var i = 0; i < events.length; i++) {

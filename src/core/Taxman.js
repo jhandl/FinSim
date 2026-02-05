@@ -347,7 +347,7 @@ class Taxman {
     } else {
       this.dependentChildren = false;
     }
-    // Load the active ruleset (IE). Tests and WebUI preload it into Config for sync use.
+    // Load the active ruleset for the current country. Tests and WebUI preload into Config for sync use.
     const cfg = Config.getInstance();
     var countryCode = currentCountry || cfg.getDefaultCountry();
     this.ruleset = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(countryCode) : null;
@@ -364,14 +364,14 @@ class Taxman {
         : null;
     }
     // Money accumulators (maintained alongside numeric fields for currency context)
-    this.incomeMoney = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
+    this.incomeMoney = Money.zero(this.residenceCurrency, countryCode);
     this.investmentTypeIncomeMoney = {};
-    this.statePensionMoney = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
-    this.privatePensionP1Money = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
-    this.privatePensionP2Money = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
-    this.privatePensionLumpSumP1Money = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
-    this.privatePensionLumpSumP2Money = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
-    this.investmentIncomeMoney = Money.zero(this.residenceCurrency || 'EUR', currentCountry || 'ie');
+    this.statePensionMoney = Money.zero(this.residenceCurrency, countryCode);
+    this.privatePensionP1Money = Money.zero(this.residenceCurrency, countryCode);
+    this.privatePensionP2Money = Money.zero(this.residenceCurrency, countryCode);
+    this.privatePensionLumpSumP1Money = Money.zero(this.residenceCurrency, countryCode);
+    this.privatePensionLumpSumP2Money = Money.zero(this.residenceCurrency, countryCode);
+    this.investmentIncomeMoney = Money.zero(this.residenceCurrency, countryCode);
     // Track country history for cross-border taxation
     if (!this.countryHistory) this.countryHistory = [];
     if (currentCountry && (typeof this.currentYear === 'number')) {
@@ -1146,7 +1146,7 @@ class Taxman {
       cloneCurrency = this.ruleset.getCurrencyCode();
     }
     cloneCurrency = cloneCurrency || 'EUR';
-    cloneCountry = cloneCountry || 'ie';
+    cloneCountry = cloneCountry || Config.getInstance().getDefaultCountry();
 
     copy.incomeMoney = this.incomeMoney ? Money.create(this.incomeMoney.amount, this.incomeMoney.currency, this.incomeMoney.country) : null;
     copy.investmentTypeIncomeMoney = {};

@@ -609,6 +609,7 @@ test.describe('Events Autoscroll & Accordion behaviour', () => {
         (safe) => {
           const iframe = document.querySelector('#app-frame');
           const doc = iframe && iframe.contentDocument;
+          const win = iframe && iframe.contentWindow;
           if (!doc) return false;
 
           const items = doc.querySelectorAll('.events-accordion-item');
@@ -619,7 +620,8 @@ test.describe('Events Autoscroll & Accordion behaviour', () => {
           if (!content) return false;
 
           const rect = content.getBoundingClientRect();
-          return rect.bottom <= (window.innerHeight - safe + 2);
+          const vh = win ? win.innerHeight : window.innerHeight;
+          return rect.bottom <= (vh - safe + 2);
         },
         SAFE_MARGIN,
         { timeout: 20000 }
@@ -632,6 +634,7 @@ test.describe('Events Autoscroll & Accordion behaviour', () => {
         if (!iframe) { res.iframe = 'missing'; return res; }
         const doc = iframe.contentDocument;
         if (!doc) { res.doc = 'missing'; return res; }
+        const win = iframe.contentWindow;
 
         const items = doc.querySelectorAll('.events-accordion-item');
         res.itemCount = items.length;
@@ -643,8 +646,9 @@ test.describe('Events Autoscroll & Accordion behaviour', () => {
         if (content) {
           const rect = content.getBoundingClientRect();
           res.rectBottom = rect.bottom;
-          res.viewport = window.innerHeight;
-          res.diff = rect.bottom - (window.innerHeight - safe + 2);
+          const vh = win ? win.innerHeight : window.innerHeight;
+          res.viewport = vh;
+          res.diff = rect.bottom - (vh - safe + 2);
         }
         return res;
       }, SAFE_MARGIN);

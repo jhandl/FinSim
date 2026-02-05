@@ -261,10 +261,17 @@ module.exports = {
 
     if (missingStartFramework.loadScenario(missingStartScenario)) {
       installTestTaxRules(missingStartFramework, deepClone(BASE_RULES));
-      const missingStartResults = await missingStartFramework.runSimulation();
-      if (!missingStartResults || missingStartResults.success !== false) {
-        errors.push('Scenario without explicit StartCountry should fail when relocation is enabled');
-      } 
+      // Suppress expected console errors for this negative test case.
+      const originalConsoleErrorMissingStart = console.error;
+      console.error = () => {};
+      try {
+        const missingStartResults = await missingStartFramework.runSimulation();
+        if (!missingStartResults || missingStartResults.success !== false) {
+          errors.push('Scenario without explicit StartCountry should fail when relocation is enabled');
+        }
+      } finally {
+        console.error = originalConsoleErrorMissingStart;
+      }
     } else {
       errors.push('Failed to load missing StartCountry scenario');
     }

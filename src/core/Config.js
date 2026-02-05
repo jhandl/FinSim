@@ -215,12 +215,9 @@ class Config {
 
   /**
    * Return the default country code configured in the loaded app config.
-   * Falls back to 'ie' for backward compatibility if not set yet.
    */
   getDefaultCountry() {
-    return (this && typeof this.defaultCountry === 'string' && this.defaultCountry.trim().length > 0)
-      ? this.defaultCountry.trim().toLowerCase()
-      : 'ie';
+    return this.defaultCountry.trim().toLowerCase();
   }
 
   /**
@@ -230,7 +227,8 @@ class Config {
   getStartCountry() {
     if (Config.getInstance().isRelocationEnabled()) {
       const raw = this.ui.getStartCountryRaw();
-      if (raw) return raw.trim().toLowerCase();
+      if (!raw) throw new Error('StartCountry is required when relocation is enabled');
+      return raw.trim().toLowerCase();
     }
     return this.getDefaultCountry();
   }

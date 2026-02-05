@@ -102,7 +102,7 @@ graph TD
 *   **[`Events.js`](src/core/Events.js:1):** Defines the `SimEvent` class.
 *   **[`Taxman.js`](src/core/Taxman.js:1):** Responsible for all tax calculations (formerly `Revenue.js`).
 *   **[`TaxRuleSet.js`](src/core/TaxRuleSet.js:1):** Wraps country tax JSON and exposes getters consumed by `Taxman`.
-*   **[`InvestmentAsset.js`](src/core/InvestmentAsset.js:1):** The base class for core investment assets (`IndexFunds`, `Shares`) and generic types.
+*   **[`InvestmentAsset.js`](src/core/InvestmentAsset.js:1):** Base class for all investment types, providing portfolio management, tax declaration, and currency conversion. Instances are created by `InvestmentTypeFactory` from tax rule definitions.
 *   **[`Pension.js`](src/core/Pension.js:1):** Manages private pension pots, extending `InvestmentAsset`.
 *   **[`RealEstate.js`](src/core/RealEstate.js:1):** Manages real estate properties and mortgages.
 *   **[`Money.js`](src/core/Money.js:1):** Currency-aware value wrapper enforcing explicit currency tracking throughout calculations; both `Money.create()` (struct) and `new Money()` (instance) exist, and hot paths should stay lightweight.
@@ -113,6 +113,7 @@ graph TD
 *   **[`Attribution.js`](src/core/Attribution.js:1):** Primitive used to capture and aggregate per‑source contributions (income, taxes, gains).
 *   **[`AttributionManager.js`](src/core/AttributionManager.js:1):** Orchestrates yearly attribution tracking used across `Taxman` and the simulator.
 *   **[`InvestmentTypeFactory.js`](src/core/InvestmentTypeFactory.js:1):** Builds generic investment assets from tax‑rule `investmentTypes`, enabling dynamic per‑type assets beyond the legacy two (Funds/Shares).
+*   **[`LegacyScenarioAdapter.js`](src/core/LegacyScenarioAdapter.js:1):** Standalone module that maps legacy CSV field names (`InitialETFs`, `FundsAllocation`, `PriorityFunds`, etc.) to modern namespaced equivalents. Supports backward compatibility with `demo.csv` and older scenarios.
 
 #### Investment Management
 

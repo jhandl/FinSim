@@ -109,19 +109,18 @@ class TaxRuleSet {
         var latestYear = Math.max.apply(Math, years);
         var lcuPerUsd = fxSeries[latestYear];
         if (lcuPerUsd != null && typeof lcuPerUsd === 'number' && lcuPerUsd > 0) {
-          // Convert from LCU/USD to LCU/EUR using IE's FX rate (EUR is always 1.0, but IE's series gives EUR/USD)
-          // Try to get USD/EUR rate from IE's tax rules
+          // Convert from LCU/USD to LCU/EUR using the configured default country's FX series (EUR/USD).
           try {
             var cfg = Config.getInstance();
-            var ieRules = cfg && cfg.getCachedTaxRuleSet && cfg.getCachedTaxRuleSet('ie');
-            if (ieRules) {
-              var ieEconomic = ieRules.getEconomicData();
-              var ieFxSeries = ieEconomic && ieEconomic.timeSeries && ieEconomic.timeSeries.fx && ieEconomic.timeSeries.fx.series;
-              if (ieFxSeries) {
-                var ieYears = Object.keys(ieFxSeries).map(function(y) { return parseInt(y, 10); }).filter(function(y) { return !isNaN(y); });
-                if (ieYears.length > 0) {
-                  var ieLatestYear = Math.max.apply(Math, ieYears);
-                  var eurPerUsd = ieFxSeries[ieLatestYear]; // IE's FX is EUR per USD
+            var anchorRules = cfg && cfg.getCachedTaxRuleSet && cfg.getCachedTaxRuleSet(cfg.getDefaultCountry());
+            if (anchorRules) {
+              var anchorEconomic = anchorRules.getEconomicData();
+              var anchorFxSeries = anchorEconomic && anchorEconomic.timeSeries && anchorEconomic.timeSeries.fx && anchorEconomic.timeSeries.fx.series;
+              if (anchorFxSeries) {
+                var anchorYears = Object.keys(anchorFxSeries).map(function(y) { return parseInt(y, 10); }).filter(function(y) { return !isNaN(y); });
+                if (anchorYears.length > 0) {
+                  var anchorLatestYear = Math.max.apply(Math, anchorYears);
+                  var eurPerUsd = anchorFxSeries[anchorLatestYear]; // expected EUR per USD
                   if (eurPerUsd != null && typeof eurPerUsd === 'number' && eurPerUsd > 0) {
                     // Convert: LCU/EUR = (LCU/USD) * (USD/EUR) = (LCU/USD) / (EUR/USD)
                     fxValue = lcuPerUsd / eurPerUsd;

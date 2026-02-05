@@ -447,7 +447,7 @@ class TestFramework {
     } catch (error) {
       this.currentTest.errors.push(`Simulation error: ${error.message}`);
       console.error(`Simulation failed: ${error.message}`);
-      return null;
+      return { success: false, error: error.message };
     }
   }
 
@@ -772,7 +772,7 @@ class TestFramework {
       MockUIManager.prototype.readParameters = function(validate) {
         if (!testParams) return testParams;
 
-        var sc = String(testParams.StartCountry || 'ie').trim().toLowerCase();
+        var sc = String(testParams.StartCountry || Config.getInstance().getStartCountry()).trim().toLowerCase();
         var scenarioCountries = {};
         scenarioCountries[sc] = true;
         try {
@@ -1138,6 +1138,7 @@ class TestFramework {
       var mockUI = {
         getVersion: function() { var storedVersion = localStorage.getItem('finsim-version'); return storedVersion || '1.27'; },
         setVersion: function(version) { localStorage.setItem('finsim-version', version); },
+        getStartCountryRaw: function() { return testParams ? testParams.StartCountry : null; },
         fetchUrl: function(url) { var fs = require('fs'); var path = require('path'); if (url.startsWith('/src/core/config/')) { var filename = path.basename(url); var configPath = path.join(__dirname, 'config', filename); return fs.readFileSync(configPath, 'utf8'); } throw new Error('Unsupported URL pattern: ' + url); },
         showAlert: function(msg) { console.warn(msg); return true; },
         setError: function(err) { console.warn(err && err.message ? err.message : err); return true; },

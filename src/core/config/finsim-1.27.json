@@ -2,6 +2,7 @@
   "latestVersion": "2.0",
   "codeUpdateMessage": "",
   "dataUpdateMessage": "",
+  "defaultCountry": "ie",
   "simulationRuns": 2500,
   "pensionContribEarningLimit": 115000,
   "pensionLumpSumLimit": 0.25,
