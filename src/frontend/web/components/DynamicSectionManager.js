@@ -197,14 +197,17 @@ class DynamicSectionManager {
         }
       }
 
-      const MIN_COL_PX = 100;
-      const MAX_HEADER_EXTRA_PX = 90;
+      const HEADER_PADDING_PX = 12;
+      const MAX_HEADER_EXTRA_PX = 32;
       for (let i = 0; i < m.cellsByColumn.length; i++) {
         const dataW = m.maxPerColumn[i] || 0;
         const headerW = m.headerPerColumn[i] || 0;
         let w = dataW;
-        if (headerW > w) w = Math.max(w, MIN_COL_PX);
-        if (headerW) w = Math.max(w, Math.min(headerW, w + MAX_HEADER_EXTRA_PX));
+        if (headerW) {
+          const headerTarget = headerW + HEADER_PADDING_PX;
+          if (w <= 0) w = headerTarget;
+          else w = Math.max(w, Math.min(headerTarget, w + MAX_HEADER_EXTRA_PX));
+        }
         m.desiredPerColumn[i] = w;
       }
       m.totalNaturalWidth = m.desiredPerColumn.reduce((sum, w) => sum + (w || 0), 0);

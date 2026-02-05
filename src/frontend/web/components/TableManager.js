@@ -563,6 +563,7 @@ class TableManager {
       if (!tbody) return;
       try { this._applyVisibilityEngineToEnabledSections(tbody); } catch (_) { }
       this._applyPeriodZeroHideToDynamicSections(tbody);
+      this._syncDynamicSectionColSpansToSectionMaxVisible(tbody);
       this.dynamicSectionsManager.finalizeSectionWidths(tbody);
     } catch (_) { }
   }
@@ -1121,6 +1122,42 @@ class TableManager {
       const groupTh = document.querySelector(`#Data thead tr.header-groups th[data-group="${groupKey}"]`);
       if (!groupTh) continue;
       groupTh.colSpan = Math.max(1, this.dynamicSectionsManager.getMaxColumnCount(cfg.id));
+    }
+    try { if (this.webUI && typeof this.webUI.updateGroupBorders === 'function') { this.webUI.updateGroupBorders(); } } catch (_) { }
+  }
+
+  _getVisibleDynamicSectionCellCount(container) {
+    if (!container) return 0;
+    const cells = Array.from(container.querySelectorAll('.dynamic-section-cell[data-key]'));
+    let count = 0;
+    for (let i = 0; i < cells.length; i++) {
+      if (!(cells[i].style && cells[i].style.display === 'none')) count++;
+    }
+    return count;
+  }
+
+  _syncDynamicSectionColSpansToSectionMaxVisible(tbody) {
+    const sections = this.dynamicSectionsManager.getSections();
+    for (let i = 0; i < sections.length; i++) {
+      const cfg = sections[i];
+      const sectionId = cfg.id;
+      const selector = `.dynamic-section-container[data-section="${sectionId}"]`;
+      const containers = Array.from(tbody.querySelectorAll(selector));
+      if (containers.length === 0) continue;
+
+      let maxVisible = 0;
+      for (let c = 0; c < containers.length; c++) {
+        const visibleCount = this._getVisibleDynamicSectionCellCount(containers[c]);
+        if (visibleCount > maxVisible) maxVisible = visibleCount;
+      }
+      const targetColSpan = Math.max(1, maxVisible);
+
+      for (let c = 0; c < containers.length; c++) {
+        containers[c].colSpan = targetColSpan;
+      }
+
+      const groupTh = document.querySelector(`#Data thead tr.header-groups th[data-group="${cfg.groupKey}"]`);
+      if (groupTh) groupTh.colSpan = targetColSpan;
     }
     try { if (this.webUI && typeof this.webUI.updateGroupBorders === 'function') { this.webUI.updateGroupBorders(); } } catch (_) { }
   }
