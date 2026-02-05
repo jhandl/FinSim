@@ -41,21 +41,21 @@ module.exports = {
               shares_ie: 0.4
             },
             ar: {
-              indexFunds_ar: 0.8,
-              shares_ar: 0.2
+              merval_ar: 0.8,
+              cedear_ar: 0.2
             }
           },
           investmentGrowthRatesByKey: {
             indexFunds_ie: 0,
             shares_ie: 0,
-            indexFunds_ar: 0,
-            shares_ar: 0
+            merval_ar: 0,
+            cedear_ar: 0
           },
           investmentVolatilitiesByKey: {
             indexFunds_ie: 0,
             shares_ie: 0,
-            indexFunds_ar: 0,
-            shares_ar: 0
+            merval_ar: 0,
+            cedear_ar: 0
           },
           initialCapitalByKey: {
             indexFunds_ie: 30000,
@@ -108,10 +108,10 @@ module.exports = {
     const ieShares35 = row35.investmentCapitalByKey.shares_ie;
     const ieFunds36 = row36.investmentCapitalByKey.indexFunds_ie;
     const ieShares36 = row36.investmentCapitalByKey.shares_ie;
-    const arFunds35 = row35.investmentCapitalByKey.indexFunds_ar;
-    const arShares35 = row35.investmentCapitalByKey.shares_ar;
-    const arFunds36 = row36.investmentCapitalByKey.indexFunds_ar;
-    const arShares36 = row36.investmentCapitalByKey.shares_ar;
+    const arFunds35 = row35.investmentCapitalByKey.merval_ar;
+    const arShares35 = row35.investmentCapitalByKey.cedear_ar;
+    const arFunds36 = row36.investmentCapitalByKey.merval_ar;
+    const arShares36 = row36.investmentCapitalByKey.cedear_ar;
 
     if (typeof ieFunds34 !== 'number' || typeof ieShares34 !== 'number') {
       return { success: false, errors: ['Missing IE capital keys in investmentCapitalByKey at age 34'] };
@@ -135,13 +135,13 @@ module.exports = {
     // and FX changes can shift capital values even without contributions (especially for USD-denominated assets).
     // Instead, assert that AR assets were funded in the first AR year and are in ~80/20 ratio.
     if (arFunds35 <= 0) {
-      errors.push('Post-relocation: indexFunds_ar should be funded in the first AR year (80% allocation)');
+      errors.push('Post-relocation: merval_ar should be funded in the first AR year (80% allocation)');
     }
     if (arShares35 <= 0) {
-      errors.push('Post-relocation: shares_ar should be funded in the first AR year (20% allocation)');
+      errors.push('Post-relocation: cedear_ar should be funded in the first AR year (20% allocation)');
     }
     if (arFunds35 < arShares35 * 3) {
-      errors.push('Post-relocation: indexFunds_ar should be ~4x shares_ar in first AR year (80% vs 20%)');
+      errors.push('Post-relocation: merval_ar should be ~4x cedear_ar in first AR year (80% vs 20%)');
     }
 
     return { success: errors.length === 0, errors };

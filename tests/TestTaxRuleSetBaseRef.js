@@ -38,12 +38,12 @@ module.exports = {
         if (ieType.assetCountry !== 'ie') errors.push('indexFunds_ie should preserve local assetCountry ie');
       }
 
-      const arType = (arRules.getResolvedInvestmentTypes() || []).find(t => t && t.key === 'shares_ar');
+      const arType = (arRules.getResolvedInvestmentTypes() || []).find(t => t && t.key === 'cedear_ar');
       if (!arType) {
-        errors.push('Missing shares_ar after baseRef resolution');
+        errors.push('Missing cedear_ar after baseRef resolution');
       } else {
-        if (arType.baseKey !== 'globalEquity') errors.push('shares_ar should inherit baseKey globalEquity');
-        if (arType.label !== 'CEDEARs') errors.push('shares_ar should preserve local label');
+        if (arType.baseKey !== 'globalEquity') errors.push('cedear_ar should inherit baseKey globalEquity');
+        if (arType.label !== 'CEDEARs') errors.push('cedear_ar should preserve local label');
       }
     } catch (err) {
       errors.push('Unexpected error: ' + (err && err.message ? err.message : String(err)));

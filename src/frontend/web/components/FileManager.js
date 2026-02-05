@@ -8,13 +8,30 @@ class FileManager {
     this.setupLoadButton();
   }
 
-  updateLastSavedState() {
+  async _ensureScenarioTaxRuleSetsLoaded() {
+    const config = Config.getInstance();
+    const startCountry = config.getStartCountry();
+    if (!config.getCachedTaxRuleSet(startCountry)) {
+      await config.getTaxRuleSet(startCountry);
+    }
+    if (config.isRelocationEnabled()) {
+      const events = this.webUI.readEvents(false);
+      const result = await config.syncTaxRuleSetsWithEvents(events, startCountry);
+      if (result && result.failed && result.failed.length) {
+        throw new Error(`Failed to load tax rules for: ${result.failed.join(', ')}`);
+      }
+    }
+  }
+
+  async updateLastSavedState() {
     // Ensure this is called when the UI is in a known "clean" or "new scenario" state.
+    await this._ensureScenarioTaxRuleSetsLoaded();
     const snapshot = serializeSimulation(this.webUI);
     this.lastSavedState = snapshot;
   }
 
-  hasUnsavedChanges() {
+  async hasUnsavedChanges() {
+    await this._ensureScenarioTaxRuleSetsLoaded();
     const currentState = serializeSimulation(this.webUI);
 
     // If we haven't saved yet, treat as unsaved only if real data differs
@@ -75,6 +92,7 @@ class FileManager {
   }
 
   async saveToFile() {
+    await this._ensureScenarioTaxRuleSetsLoaded();
     const csvContent = serializeSimulation(this.webUI);
     const currentScenarioName = this.currentScenarioName || 'my scenario';
     const suggestedName = `${currentScenarioName.trim()}.csv`;
@@ -123,7 +141,7 @@ class FileManager {
     if (!file) return;
 
     // Check for unsaved changes before proceeding
-    if (this.hasUnsavedChanges()) {
+    if (await this.hasUnsavedChanges()) {
       const proceed = await this.webUI.showAlert("Loading a new scenario will overwrite any unsaved changes. Are you sure you want to proceed?", "Confirm Load", true);
       if (!proceed) {
         return; // User cancelled
@@ -135,7 +153,7 @@ class FileManager {
     try {
       const content = await file.text();
       await this.loadFromString(content, scenarioName);
-      this.updateLastSavedState(); // Ensure this is here
+      await this.updateLastSavedState(); // Ensure this is here
     } catch (error) {
       console.error(error);
       this.webUI.notificationUtils.showAlert('Error loading file: Please make sure this is a valid simulation save file.', 'Error');
@@ -147,7 +165,7 @@ class FileManager {
 
   async loadFromUrl(url, name) {
     // Check for unsaved changes before proceeding
-    if (this.hasUnsavedChanges()) {
+    if (await this.hasUnsavedChanges()) {
       const proceed = await this.webUI.showAlert("Loading the demo scenario will overwrite any unsaved changes. Are you sure you want to proceed?", "Confirm Load", true);
       if (!proceed) {
         return; // User cancelled
@@ -157,7 +175,7 @@ class FileManager {
     try {
       const content = await this.fetchUrl(url); // ensure await here
       await this.loadFromString(content, name);
-      this.updateLastSavedState(); // Update state after successful load and UI update
+      await this.updateLastSavedState(); // Update state after successful load and UI update
     } catch (error) {
       // Handle or propagate error, e.g., show a notification via webUI
       console.error(`Error in loadFromUrl for ${name}:`, error);
@@ -202,12 +220,73 @@ class FileManager {
     // Note: Simulation mode is already set by deserializeSimulation based on file version and P2 data
     // No need to override it here
 
-    const priorityIds = ['PriorityCash', 'PriorityPension', 'PriorityFunds', 'PriorityShares'];
+    const cfgForPriorities = Config.getInstance();
+    const startCountryForPriorities = cfgForPriorities.getStartCountry();
+    const scenarioCountrySetForPriorities = {};
+    scenarioCountrySetForPriorities[String(startCountryForPriorities || '').toLowerCase()] = true;
+    for (let i = 0; i < eventData.length; i++) {
+      const row = eventData[i] || [];
+      const rawType = row[0] ? String(row[0]) : '';
+      const type = rawType.indexOf(':') >= 0 ? rawType.split(':')[0] : rawType;
+      if (type && /^MV-[A-Z]{2,}$/.test(type)) {
+        scenarioCountrySetForPriorities[type.substring(3).toLowerCase()] = true;
+      }
+    }
+    const scenarioCountriesForPriorities = Object.keys(scenarioCountrySetForPriorities);
+    if (this.webUI.dragAndDrop && typeof this.webUI.dragAndDrop.renderPriorities === 'function') {
+      await this.webUI.dragAndDrop.renderPriorities();
+    }
+    const baseTypes = new Set();
+    baseTypes.add('cash');
+    baseTypes.add('pension');
+    for (let i = 0; i < scenarioCountriesForPriorities.length; i++) {
+      const country = scenarioCountriesForPriorities[i];
+      let rulesetForPriorityCountry = cfgForPriorities.getCachedTaxRuleSet(country);
+      if (!rulesetForPriorityCountry) {
+        rulesetForPriorityCountry = await cfgForPriorities.getTaxRuleSet(country);
+      }
+      const investmentTypes = rulesetForPriorityCountry.getResolvedInvestmentTypes() || [];
+      for (let j = 0; j < investmentTypes.length; j++) {
+        const type = investmentTypes[j];
+        if (!type || !type.key || type.sellWhenReceived) continue;
+        const baseType = String(type.key).split('_')[0];
+        if (baseType) baseTypes.add(baseType);
+      }
+    }
+    const priorityIds = Array.from(baseTypes)
+      .sort((a, b) => {
+        if (a === b) return 0;
+        if (a === 'cash') return -1;
+        if (b === 'cash') return 1;
+        if (a === 'pension') return -1;
+        if (b === 'pension') return 1;
+        return a.localeCompare(b);
+      })
+      .map(baseType => `Priority_${baseType}`);
+    const legacyPriorityById = {
+      Priority_cash: 'PriorityCash',
+      Priority_pension: 'PriorityPension',
+      Priority_indexFunds: 'PriorityFunds',
+      Priority_shares: 'PriorityShares'
+    };
+    const readPriorityValue = (fieldId) => {
+      const readFrom = (id) => {
+        const el = document.getElementById(id);
+        if (!el || el.value === undefined || String(el.value).trim() === '') return null;
+        const raw = parseInt(el.value, 10);
+        return Number.isFinite(raw) && raw > 0 ? raw : null;
+      };
+      let value = readFrom(fieldId);
+      if (value === null && legacyPriorityById[fieldId]) {
+        value = readFrom(legacyPriorityById[fieldId]);
+      }
+      return value || 0;
+    };
     const prioritiesContainer = document.querySelector('.priorities-container');
     if (prioritiesContainer) {
       const priorityValues = priorityIds.map(id => ({
         id: id,
-        value: parseInt(this.webUI.getValue(id)) || 0,
+        value: readPriorityValue(id),
         element: prioritiesContainer.querySelector(`[data-priority-id="${id}"]`)
       })).sort((a, b) => a.value - b.value);
 
@@ -417,19 +496,12 @@ class FileManager {
         }
       });
 
-      // Ensure all country rule sets are available before formatting currency inputs
-      try {
-        const cfg = Config.getInstance();
-        const countries = (typeof cfg.getAvailableCountries === 'function') ? cfg.getAvailableCountries() : [];
-        if (Array.isArray(countries) && countries.length > 0) {
-          await Promise.all(countries.map(c => {
-            try { return cfg.getTaxRuleSet(String(c.code).toLowerCase()); } catch (_) { return Promise.resolve(); }
-          }));
-        }
-      } catch (_) { /* harmless; formatting will fall back if not loaded */ }
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();
       this.webUI.eventsTableManager.updateEventRowsVisibilityAndTypes();
+      if (this.webUI.dragAndDrop && typeof this.webUI.dragAndDrop.renderPriorities === 'function') {
+        await this.webUI.dragAndDrop.renderPriorities();
+      }
 
       // TODO: This is the wrong place for this. It belongs in the UI side of things.
       if (this.webUI.eventAccordionManager) {

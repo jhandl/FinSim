@@ -1,36 +1,36 @@
 /* Investment Refactor Baseline Test
- * 
+ *
  * PURPOSE:
  * - Capture baseline financial state for three deterministic scenarios (IE-only, US-only, IE→US relocation)
  * - Detect unintended changes during investment refactoring
  * - Validate investment type handling across countries and relocation scenarios
- * 
- * BASELINE CAPTURE: 2025-01-31, Tax Year: 2025/2026, Simulator Version: 2.0
+ *
+ * BASELINE CAPTURE: 2026-02-05, Tax Year: 2025/2026, Simulator Version: 2.0
  */
 
 const { TestFramework } = require('../src/core/TestFramework.js');
 
 // Baseline metadata
 const baselineMetadata = {
-  baselineDate: "2025-01-31",
+  baselineDate: "2026-02-05",
   simulatorVersion: "2.0",
   taxYear: "2025/2026",
   investmentTypes: ["indexFunds_ie", "shares_ie", "usIndexFunds", "usShares"],
-  updateNotes: "Initial baseline capture for investment refactor validation",
+  updateNotes: "Rebaselined for current deterministic surplus-allocation and investment-tax behavior",
   maintainer: "Investment refactor baseline test"
 };
 
 const expectedBaselines = {
   "IE-Only": {
-    cash: 96853.09,
-    indexFunds_ie: 105242.60,
-    shares_ie: 56948.96,
+    cash: 0.00,
+    indexFunds_ie: 186955.34,
+    shares_ie: 110958.33,
     usIndexFunds: 0,
     usShares: 0,
     it: 0,
     prsi: 0,
     usc: 0,
-    cgt: 0
+    cgt: 1820.60
   },
   "US-Only": {
     cash: 0,
@@ -45,10 +45,10 @@ const expectedBaselines = {
   },
   "IE→US Relocation": {
     cash: 0,
-    indexFunds_ie: 103279.89,
-    shares_ie: 55886.90,
-    usIndexFunds: 105662.45,
-    usShares: 67844.45,
+    indexFunds_ie: 155615.85,
+    shares_ie: 88238.61,
+    usIndexFunds: 56095.86,
+    usShares: 36315.60,
     it: 0,
     prsi: 0,
     usc: 0,

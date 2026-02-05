@@ -68,8 +68,8 @@ const TestContributionCurrencyModeARAsset = {
           initialFunds: 0,
           initialShares: 0,
           retirementAge: 65,
-          FundsAllocation: 0.0,      // 0% allocation to indexFunds
-          SharesAllocation: 1.0,     // 100% allocation to shares (Global USD ETF)
+          FundsAllocation: 0.0,      // 0% allocation to MERVAL
+          SharesAllocation: 1.0,     // 100% allocation to CEDEARs (Global USD ETF)
           pensionPercentage: 0,
           pensionCapped: "No",
           growthRateFunds: 0,
@@ -158,22 +158,22 @@ const TestContributionCurrencyModeARAsset = {
       errors.push(`Cash expected ~1M ARS, got ${rowAge30.cash}`);
     }
 
-    // Validate sharesCapital - after Phase 1 refactor, capital() now consistently returns
+    // Validate cedearCapital - after Phase 1 refactor, capital() now consistently returns
     // residence currency. For Argentina residents, this means ARS, not USD.
     const capsByKey = rowAge30.investmentCapitalByKey || {};
-    let sharesCapital = 0;
+    let cedearCapital = 0;
     for (const k in capsByKey) {
-      if (k === 'shares' || k.indexOf('shares_') === 0) sharesCapital += capsByKey[k] || 0;
+      if (k === 'cedear' || k.indexOf('cedear_') === 0) cedearCapital += capsByKey[k] || 0;
     }
-    if (sharesCapital <= 0) {
-      errors.push(`sharesCapital should be positive (in ARS residence currency), got ${sharesCapital}`);
+    if (cedearCapital <= 0) {
+      errors.push(`cedearCapital should be positive (in ARS residence currency), got ${cedearCapital}`);
     }
 
     // Key assertion: sharesCapital should be in ARS (residence currency)
     // ARS amounts should be in the millions range (roughly 1500x larger than USD equivalent)
     // Expected: approximately testAmountARS (~3M ARS surplus)
-    if (sharesCapital < 100000) {
-      errors.push(`sharesCapital (${sharesCapital}) seems too small - should be in ARS (millions range). Expected ARS amount should be roughly ${testAmountARS} based on surplus`);
+    if (cedearCapital < 100000) {
+      errors.push(`cedearCapital (${cedearCapital}) seems too small - should be in ARS (millions range). Expected ARS amount should be roughly ${testAmountARS} based on surplus`);
     }
 
     // Validate that sharesCapital is consistent with ARS surplus
@@ -181,17 +181,17 @@ const TestContributionCurrencyModeARAsset = {
     // The actual invested amount will be less than 3M ARS due to taxes
     const expectedARSMin = testAmountARS * 0.3;  // At least 30% of expected (accounting for taxes reducing surplus)
     const expectedARSMax = testAmountARS * 2.0;  // At most 200% of expected (to account for tax/calculation variations)
-    if (sharesCapital < expectedARSMin || sharesCapital > expectedARSMax) {
-      errors.push(`sharesCapital (${sharesCapital} ARS) outside expected range [${expectedARSMin.toFixed(2)}, ${expectedARSMax.toFixed(2)}]. Expected roughly ${testAmountARS} ARS for ~3M ARS surplus`);
+    if (cedearCapital < expectedARSMin || cedearCapital > expectedARSMax) {
+      errors.push(`cedearCapital (${cedearCapital} ARS) outside expected range [${expectedARSMin.toFixed(2)}, ${expectedARSMax.toFixed(2)}]. Expected roughly ${testAmountARS} ARS for ~3M ARS surplus`);
     }
 
-    // Index funds should be 0 since allocation is 0%
-    let indexFundsCapital = 0;
+    // MERVAL should be 0 since allocation is 0%
+    let mervalCapital = 0;
     for (const k in capsByKey) {
-      if (k === 'indexFunds' || k.indexOf('indexFunds_') === 0) indexFundsCapital += capsByKey[k] || 0;
+      if (k === 'merval' || k.indexOf('merval_') === 0) mervalCapital += capsByKey[k] || 0;
     }
-    if (Math.abs(indexFundsCapital) > 100) {
-      errors.push(`indexFundsCapital should be 0, got ${indexFundsCapital}`);
+    if (Math.abs(mervalCapital) > 100) {
+      errors.push(`mervalCapital should be 0, got ${mervalCapital}`);
     }
 
     return {

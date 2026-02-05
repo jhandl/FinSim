@@ -56,6 +56,13 @@ async function run() {
     if (!Object.prototype.hasOwnProperty.call(volByKey, k)) continue;
     if (parseFloat(volByKey[k]) > 0) { hasVolatility = true; break; }
   }
+  if (!hasVolatility) {
+    for (var pk in params) {
+      if (!Object.prototype.hasOwnProperty.call(params, pk)) continue;
+      if (String(pk).indexOf('GlobalAssetVolatility_') !== 0) continue;
+      if (parseFloat(params[pk]) > 0) { hasVolatility = true; break; }
+    }
+  }
   montecarlo = (params.economyMode === 'montecarlo' && hasVolatility);
 
 
@@ -478,6 +485,22 @@ function initializeSimulationVariables() {
   // In deterministic mode, volatility must be zero (even if scenario provides stddev fields).
   // Monte Carlo mode is the only time stdev is applied.
   var volByKey = montecarlo ? (params.investmentVolatilitiesByKey || {}) : {};
+  // BaseRef wrappers read GlobalAssetVolatility_* directly from params in InvestmentTypeFactory.
+  // Zero those values in deterministic mode to keep deterministic runs truly non-stochastic.
+  var assetFactoryParams = params;
+  if (!montecarlo) {
+    assetFactoryParams = {};
+    for (var pk in params) {
+      if (!Object.prototype.hasOwnProperty.call(params, pk)) continue;
+      assetFactoryParams[pk] = params[pk];
+    }
+    for (var ak in assetFactoryParams) {
+      if (!Object.prototype.hasOwnProperty.call(assetFactoryParams, ak)) continue;
+      if (String(ak).indexOf('GlobalAssetVolatility_') === 0) {
+        assetFactoryParams[ak] = 0;
+      }
+    }
+  }
   // Initialize legacy single-country instruments for the StartCountry (used by some legacy columns/paths).
   var sc = String(params.StartCountry || config.getDefaultCountry()).toLowerCase();
   
@@ -506,7 +529,7 @@ function initializeSimulationVariables() {
       var code = countryOrder[ci];
       var rs = cfg.getCachedTaxRuleSet(code);
       if (rs && typeof InvestmentTypeFactory !== 'undefined') {
-        var assets = InvestmentTypeFactory.createAssets(rs, growthByKey, volByKey, params);
+        var assets = InvestmentTypeFactory.createAssets(rs, growthByKey, volByKey, assetFactoryParams);
         for (var ai = 0; ai < assets.length; ai++) {
           var a = assets[ai];
           if (a && a.key && !seenKeys[a.key]) {

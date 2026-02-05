@@ -111,26 +111,26 @@ describe('WebUI.renderInvestmentParameterFields', () => {
 
   test('creates wrapper-level inputs for local investments', () => {
      const types = [
-      { key: 'shares_ar', label: 'MERVAL', assetCountry: 'ar', residenceScope: 'local' } 
+      { key: 'cedear_ar', label: 'CEDEARs', assetCountry: 'ar', residenceScope: 'local' } 
     ];
     
     webUI.renderInvestmentParameterFields(types);
 
-    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('shares_arGrowthRate', 'percentage');
-    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('shares_arGrowthStdDev', 'percentage');
+    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('cedear_arGrowthRate', 'percentage');
+    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('cedear_arGrowthStdDev', 'percentage');
   });
 
   test('handles mixed list of types correctly', () => {
      const types = [
-      { key: 'shares_ar', label: 'MERVAL', assetCountry: 'ar', residenceScope: 'local' },
+      { key: 'cedear_ar', label: 'CEDEARs', assetCountry: 'ar', residenceScope: 'local' },
       { key: 'indexFunds_ie', label: 'Index Funds', baseRef: 'globalEquity', assetCountry: 'ie' }
     ];
     
     webUI.renderInvestmentParameterFields(types);
 
     // Local: Yes
-    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('shares_arGrowthRate', 'percentage');
-    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('shares_arGrowthStdDev', 'percentage');
+    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('cedear_arGrowthRate', 'percentage');
+    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('cedear_arGrowthStdDev', 'percentage');
 
     // Wrapper: No
     expect(webUI._takeOrCreateInput).not.toHaveBeenCalledWith('indexFunds_ieGrowthRate', 'percentage');

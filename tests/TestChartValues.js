@@ -61,6 +61,10 @@ const PARAM_KEY_MAP = {
   OldestChildBorn: 'oldestChildBorn',
   PersonalTaxCredit: 'personalTaxCredit',
   StatePensionWeekly: 'statePensionWeekly',
+  Priority_cash: 'priorityCash',
+  Priority_pension: 'priorityPension',
+  Priority_indexFunds: 'priorityFunds',
+  Priority_shares: 'priorityShares',
   PriorityCash: 'priorityCash',
   PriorityPension: 'priorityPension',
   PriorityFunds: 'priorityFunds',
@@ -79,12 +83,12 @@ const DEMO3_BASELINE = {
   // at relocation time. This keeps the emergency stash purchasing-power consistent
   // across countries (vs ballooning nominally under evolved FX).
   ages: {
-    40: { worth: 2365180583.0256557, cash: 14938121.255654156, netIncome: 833020387.0938061 },
-    65: { worth: 1741621933890.7112, cash: 4546507611.75827, netIncome: 8656794176.110376 },
-    80: { worth: 45498433381788.15, cash: 140509952772.85306, netIncome: 2562598167465.065 }
+    40: { worth: 2365180583.0256553, cash: 124374731.76741603, netIncome: 833020387.0938061 },
+    65: { worth: 1740350504460.907, cash: 48826750509.70023, netIncome: 8656794176.110376 },
+    80: { worth: 57926334851950.84, cash: 506702817737.4343, netIncome: 2556479405018.2817 }
   },
-  final: { age: 90, worth: 481812197657587.7, cash: 1383757107738.8225 },
-  maxWorth: 481812197657587.7
+  final: { age: 90, worth: 762037575014499.5, cash: 4966592634448.801 },
+  maxWorth: 762037575014499.5
 };
 
 // Tolerances for evolution FX mode (inflation-driven FX rates)
@@ -1006,6 +1010,9 @@ module.exports = {
     // demo3 regression
     const parsed = parseDemoCsvScenario(DEMO3_PATH);
     parsed.parameters.relocationEnabled = parsed.parameters.relocationEnabled !== false;
+    // Force deterministic mode for regression runs (single pass, no volatility).
+    parsed.parameters.economy_mode = 'deterministic';
+    parsed.parameters.economyMode = 'deterministic';
     const demoFramework = new TestFramework();
     if (!demoFramework.loadScenario({
       name: 'Demo3Regression',

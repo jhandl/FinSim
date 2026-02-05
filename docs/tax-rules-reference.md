@@ -226,7 +226,7 @@ These definitions control how `Equities` instances (index funds, shares) are tax
 
 Each entry in the `investmentTypes` array supports the following fields:
 
-- **`key`**: Stable identifier used in the core engine (e.g., `"indexFunds_ie"`, `"shares_ar"`).
+- **`key`**: Stable identifier used in the core engine (e.g., `"indexFunds_ie"`, `"cedear_ar"`).
 - **`label`**: Human-readable name displayed in the UI.
 - **`baseRef`** (optional): Reference to a global base type key (e.g., `"globalEquity"`).
   - Triggers a shallow merge: `{...baseType, ...localType}`.
@@ -286,7 +286,7 @@ Each entry in the `investmentTypes` array supports the following fields:
 **Example 2: AR CEDEARs (Global wrapper)**
 ```json
 {
-  "key": "shares_ar",
+  "key": "cedear_ar",
   "label": "CEDEARs",
   "baseRef": "globalEquity",
   "baseCurrency": "USD",
@@ -307,7 +307,7 @@ Each entry in the `investmentTypes` array supports the following fields:
 **Example 3: AR MERVAL (Pure local asset)**
 ```json
 {
-  "key": "indexFunds_ar",
+  "key": "merval_ar",
   "label": "MERVAL",
   "baseCurrency": "ARS",
   "assetCountry": "ar",
@@ -387,8 +387,8 @@ Document how growth/volatility parameters flow through the system:
 - **Format**: Whole number percentages
 
 **Allocation Parameters**:
-- **Generic**: `InvestmentAllocation_indexFunds_ie`, `InvestmentAllocation_shares_ar`
-- **Per-country (chip-driven)**: `InvestmentAllocation_ie_indexFunds`, `InvestmentAllocation_ar_shares`
+- **Generic**: `InvestmentAllocation_indexFunds_ie`, `InvestmentAllocation_cedear_ar`
+- **Per-country (chip-driven)**: `InvestmentAllocation_ie_indexFunds`, `InvestmentAllocation_ar_cedear`
 - **Location**: `src/frontend/web/WebUI.js` lines 568-569, `src/core/Utils.js` lines 599-600
 - **Format**: Whole number percentages
 

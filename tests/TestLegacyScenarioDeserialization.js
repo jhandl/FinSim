@@ -102,10 +102,10 @@ function seedLegacyDemoBaseParameterIds(ui) {
     'OldestChildBorn',
     'PersonalTaxCredit',
     'StatePensionWeekly',
-    'PriorityCash',
-    'PriorityPension',
-    'PriorityFunds',
-    'PriorityShares',
+    'Priority_cash',
+    'Priority_pension',
+    'Priority_indexFunds',
+    'Priority_shares',
     'P2StartingAge',
     'P2RetirementAge',
     'P2StatePensionWeekly',
@@ -186,9 +186,31 @@ module.exports = {
       }
 
       // Namespaced growth rates should be populated from legacy keys.
-      const fundsGrowth = doc.getElementById('indexFunds_ieGrowthRate');
-      if (!fundsGrowth || fundsGrowth.value !== '7') {
-        errors.push('indexFunds_ieGrowthRate expected 7, got ' + (fundsGrowth ? fundsGrowth.value : 'null'));
+      const globalGrowth = doc.getElementById('GlobalAssetGrowth_globalEquity');
+      if (!globalGrowth || globalGrowth.value !== '7') {
+        errors.push('GlobalAssetGrowth_globalEquity expected 7, got ' + (globalGrowth ? globalGrowth.value : 'null'));
+      }
+      const globalVol = doc.getElementById('GlobalAssetVolatility_globalEquity');
+      if (!globalVol || globalVol.value !== '15') {
+        errors.push('GlobalAssetVolatility_globalEquity expected 15, got ' + (globalVol ? globalVol.value : 'null'));
+      }
+
+      // Legacy priority fields should populate dynamic priority ids.
+      const priorityCash = doc.getElementById('Priority_cash');
+      if (!priorityCash || priorityCash.value !== '4') {
+        errors.push('Priority_cash expected 4, got ' + (priorityCash ? priorityCash.value : 'null'));
+      }
+      const priorityPension = doc.getElementById('Priority_pension');
+      if (!priorityPension || priorityPension.value !== '3') {
+        errors.push('Priority_pension expected 3, got ' + (priorityPension ? priorityPension.value : 'null'));
+      }
+      const priorityFunds = doc.getElementById('Priority_indexFunds');
+      if (!priorityFunds || priorityFunds.value !== '1') {
+        errors.push('Priority_indexFunds expected 1, got ' + (priorityFunds ? priorityFunds.value : 'null'));
+      }
+      const priorityShares = doc.getElementById('Priority_shares');
+      if (!priorityShares || priorityShares.value !== '2') {
+        errors.push('Priority_shares expected 2, got ' + (priorityShares ? priorityShares.value : 'null'));
       }
 
       // Also validate lower/odd casing normalization.

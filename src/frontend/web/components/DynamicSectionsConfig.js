@@ -75,6 +75,7 @@ const DYNAMIC_SECTIONS = [
       // Dynamic Income__ columns: use the union of investment types across cached rulesets.
       // This ensures relocated periods can still display income for asset keys originating
       // from a previous ruleset (e.g., "shares_ie" while resident in "ar").
+      // Ordering: types from non-current countries first, current country last.
       const typeByKey = {};
       const orderedKeys = [];
       const addTypes = (types) => {
@@ -89,13 +90,16 @@ const DYNAMIC_SECTIONS = [
           }
         }
       };
-      addTypes(taxRuleSet.getResolvedInvestmentTypes());
       const cached = config.listCachedRuleSets();
-      for (const cc in cached) {
+      const cachedKeys = Object.keys(cached || {});
+      for (let i = 0; i < cachedKeys.length; i++) {
+        const cc = cachedKeys[i];
+        if (cc === countryCode) continue;
         const rs = cached[cc];
-        if (!rs || rs === taxRuleSet) continue;
+        if (!rs) continue;
         addTypes(rs.getResolvedInvestmentTypes());
       }
+      addTypes(taxRuleSet.getResolvedInvestmentTypes());
 
       for (let i = 0; i < orderedKeys.length; i++) {
         const t = typeByKey[orderedKeys[i]];
@@ -137,6 +141,7 @@ const DYNAMIC_SECTIONS = [
       ];
 
       // Dynamic Capital__ columns: use the union of investment types across cached rulesets.
+      // Ordering: types from non-current countries first, current country last.
       const typeByKey = {};
       const orderedKeys = [];
       const addTypes = (types) => {
@@ -151,13 +156,16 @@ const DYNAMIC_SECTIONS = [
           }
         }
       };
-      addTypes(taxRuleSet.getResolvedInvestmentTypes());
       const cached = config.listCachedRuleSets();
-      for (const cc in cached) {
+      const cachedKeys = Object.keys(cached || {});
+      for (let i = 0; i < cachedKeys.length; i++) {
+        const cc = cachedKeys[i];
+        if (cc === countryCode) continue;
         const rs = cached[cc];
-        if (!rs || rs === taxRuleSet) continue;
+        if (!rs) continue;
         addTypes(rs.getResolvedInvestmentTypes());
       }
+      addTypes(taxRuleSet.getResolvedInvestmentTypes());
 
       for (let i = 0; i < orderedKeys.length; i++) {
         const t = typeByKey[orderedKeys[i]];

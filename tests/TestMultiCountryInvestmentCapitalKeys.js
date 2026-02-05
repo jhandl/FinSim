@@ -36,7 +36,7 @@ module.exports = {
           priorityShares: 3,
           investmentAllocationsByCountry: {
             ie: { indexFunds_ie: 0.5, shares_ie: 0.5 },
-            ar: { indexFunds_ar: 0.7, shares_ar: 0.3 }
+            ar: { merval_ar: 0.7, cedear_ar: 0.3 }
           },
           pensionContributionsByCountry: {
             ie: { p1Pct: 0, p2Pct: 0, capped: 'No' },
@@ -49,14 +49,14 @@ module.exports = {
           investmentGrowthRatesByKey: {
             indexFunds_ie: 0,
             shares_ie: 0,
-            indexFunds_ar: 0,
-            shares_ar: 0
+            merval_ar: 0,
+            cedear_ar: 0
           },
           investmentVolatilitiesByKey: {
             indexFunds_ie: 0,
             shares_ie: 0,
-            indexFunds_ar: 0,
-            shares_ar: 0
+            merval_ar: 0,
+            cedear_ar: 0
           }
         },
         events: [
@@ -91,18 +91,18 @@ module.exports = {
     }
 
     const caps = rowAfterMove.investmentCapitalByKey;
-    const requiredKeys = ['indexFunds_ie', 'shares_ie', 'indexFunds_ar', 'shares_ar'];
+    const requiredKeys = ['indexFunds_ie', 'shares_ie', 'merval_ar', 'cedear_ar'];
     for (let i = 0; i < requiredKeys.length; i++) {
       const key = requiredKeys[i];
       if (typeof caps[key] !== 'number') {
         errors.push('Missing or non-numeric capital for ' + key);
       }
     }
-    if (typeof caps.indexFunds_ar === 'number' && caps.indexFunds_ar <= 0) {
-      errors.push('Expected indexFunds_ar to be funded after relocation');
+    if (typeof caps.merval_ar === 'number' && caps.merval_ar <= 0) {
+      errors.push('Expected merval_ar to be funded after relocation');
     }
-    if (typeof caps.shares_ar === 'number' && caps.shares_ar <= 0) {
-      errors.push('Expected shares_ar to be funded after relocation');
+    if (typeof caps.cedear_ar === 'number' && caps.cedear_ar <= 0) {
+      errors.push('Expected cedear_ar to be funded after relocation');
     }
 
     return { success: errors.length === 0, errors };

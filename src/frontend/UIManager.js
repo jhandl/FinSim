@@ -309,10 +309,6 @@ class UIManager {
       growthRatePension: this.ui.getValue("PensionGrowthRate"),
       growthDevPension: this.ui.getValue("PensionGrowthStdDev"),
       inflation: this.ui.getValue("Inflation"),
-      priorityCash: this.ui.getValue("PriorityCash"),
-      priorityPension: this.ui.getValue("PriorityPension"),
-      priorityFunds: this.ui.getValue("PriorityFunds"),
-      priorityShares: this.ui.getValue("PriorityShares"),
       marriageYear: this.ui.getValue("MarriageYear"),
       youngestChildBorn: this.ui.getValue("YoungestChildBorn"),
       oldestChildBorn: this.ui.getValue("OldestChildBorn"),
@@ -339,7 +335,10 @@ class UIManager {
     const investmentAllocationsByCountry = {};
     const investmentGrowthRatesByKey = {};
     const investmentVolatilitiesByKey = {};
+    const globalBaseRefs = {};
     const startCountry = params.StartCountry.toLowerCase();
+    const perCountryEnabledVal = this.ui.getValue('perCountryInvestmentsEnabled');
+    const perCountryEnabled = (perCountryEnabledVal === 'on' || perCountryEnabledVal === true);
     investmentAllocationsByCountry[startCountry] = {};
     for (let i = 0; i < investmentTypes.length; i++) {
       const type = investmentTypes[i];
@@ -349,18 +348,55 @@ class UIManager {
       // or as per-country `InvestmentAllocation_{countryCode}_{baseKey}` when relocation UI is enabled.
       let alloc = 0;
       try {
-        alloc = this.ui.getValue(`InvestmentAllocation_${key}`);
+        if (!perCountryEnabled) {
+          const suffix = '_' + startCountry;
+          let baseKey = key;
+          if (String(key).toLowerCase().endsWith(suffix)) {
+            baseKey = String(key).slice(0, String(key).length - suffix.length);
+          }
+          const globalId = `GlobalAllocation_${baseKey}`;
+          if (typeof document === 'undefined' || document.getElementById(globalId)) {
+            alloc = this.ui.getValue(globalId);
+          } else {
+            alloc = this.ui.getValue(`InvestmentAllocation_${key}`);
+          }
+        } else {
+          alloc = this.ui.getValue(`InvestmentAllocation_${key}`);
+        }
       } catch (_) {
         alloc = 0;
       }
       investmentAllocationsByCountry[startCountry][key] = alloc;
-      investmentGrowthRatesByKey[key] = this.ui.getValue(`${key}GrowthRate`);
-      investmentVolatilitiesByKey[key] = this.ui.getValue(`${key}GrowthStdDev`);
+      if (!type.sellWhenReceived) {
+        if (type.baseRef) {
+          globalBaseRefs[type.baseRef] = true;
+        } else {
+          const growthId = `${key}GrowthRate`;
+          if (typeof document !== 'undefined' && !document.getElementById(growthId)) {
+            continue;
+          }
+          investmentGrowthRatesByKey[key] = this.ui.getValue(growthId);
+          investmentVolatilitiesByKey[key] = this.ui.getValue(`${key}GrowthStdDev`);
+        }
+      }        
     }
     params.initialCapitalByKey = initialCapitalByKey;
     params.investmentAllocationsByCountry = investmentAllocationsByCountry;
     params.investmentGrowthRatesByKey = investmentGrowthRatesByKey;
     params.investmentVolatilitiesByKey = investmentVolatilitiesByKey;
+
+    const baseRefKeys = Object.keys(globalBaseRefs);
+    for (let i = 0; i < baseRefKeys.length; i++) {
+      const baseRef = baseRefKeys[i];
+      const growthId = `GlobalAssetGrowth_${baseRef}`;
+      const volId = `GlobalAssetVolatility_${baseRef}`;
+      if (this.ui && typeof this.ui.ensureParameterInput === 'function') {
+        this.ui.ensureParameterInput(growthId, 'percentage');
+        this.ui.ensureParameterInput(volId, 'percentage');
+      }
+      params[growthId] = this.ui.getValue(growthId);
+      params[volId] = this.ui.getValue(volId);
+    }
 
     // Relocation-enabled: read per-country allocations from country-prefixed fields
     // Convention: InvestmentAllocation_{countryCode}_{typeKey} (typeKey without country suffix)
@@ -521,60 +557,62 @@ class UIManager {
       }
     }
 
+    const legacyPriorityIdsByBaseType = {
+      cash: 'PriorityCash',
+      pension: 'PriorityPension',
+      indexFunds: 'PriorityFunds',
+      shares: 'PriorityShares'
+    };
+    const readPriorityValue = (baseType, defaultValue) => {
+      const fieldId = 'Priority_' + baseType;
+      const legacyId = legacyPriorityIdsByBaseType[baseType];
+      let value;
+      if (typeof document === 'undefined' || document.getElementById(fieldId)) {
+        try {
+          value = this.ui.getValue(fieldId);
+        } catch (_) {
+          value = undefined;
+        }
+      }
+      if (value === null || value === '' || value === undefined) {
+        if (legacyId && (typeof document === 'undefined' || document.getElementById(legacyId))) {
+          try {
+            value = this.ui.getValue(legacyId);
+          } catch (_) {
+            value = undefined;
+          }
+        }
+      }
+      if (value === null || value === '' || value === undefined) {
+        return defaultValue;
+      }
+      return value;
+    };
+
+    params.priorityCash = readPriorityValue('cash', 1);
+    params.priorityPension = readPriorityValue('pension', 2);
+    params.priorityFunds = readPriorityValue('indexFunds', 3);
+    params.priorityShares = readPriorityValue('shares', 4);
+
     // Build drawdown priority map keyed by investment type key.
-    // Core consumes this directly; priorities are still expressed via the existing UI fields.
     params.drawdownPrioritiesByKey = {};
-    const defaultPriority = 4;
     const allocCountries = Object.keys(params.investmentAllocationsByCountry || {});
     
     for (let ci = 0; ci < allocCountries.length; ci++) {
       const cc = allocCountries[ci];
       const ruleset = Config.getInstance().getCachedTaxRuleSet(cc);
-      if (!ruleset) continue;
-
-      // Build priority type -> fieldId lookup from config
-      // Example: { "indexFunds": "PriorityFunds", "shares": "PriorityShares" }
-      const priorities = (typeof ruleset.getDrawdownPriorities === 'function') ? ruleset.getDrawdownPriorities() : [];
-      const priorityMap = {};
-      for (let pi = 0; pi < priorities.length; pi++) {
-        const p = priorities[pi];
-        if (p && p.type && p.fieldId) {
-          priorityMap[p.type] = p.fieldId;
-        }
-      }
-
-      // Map each investment type to its priority
       const types = (typeof ruleset.getResolvedInvestmentTypes === 'function') ? ruleset.getResolvedInvestmentTypes() : [];
       for (let ti = 0; ti < types.length; ti++) {
         const type = types[ti];
         if (!type || !type.key) continue;
-
-        // Determine priority type: explicit 'type' property or derived from key (prefix before last underscore)
-        let typeKey = type.type;
-        if (!typeKey) {
-          const suffix = '_' + cc;
-          if (String(type.key).toLowerCase().endsWith(suffix)) {
-            typeKey = String(type.key).slice(0, String(type.key).length - suffix.length);
-          } else {
-            typeKey = type.key;
-          }
-        }
-
-        // Look up priority fieldId
-        const fieldId = priorityMap[typeKey];
-        if (fieldId) {
-          const val = this.ui.getValue(fieldId);
-          if (val !== null && val !== '' && val !== undefined) {
-            params.drawdownPrioritiesByKey[type.key] = val;
-          } else {
-            params.drawdownPrioritiesByKey[type.key] = defaultPriority;
-          }
-        } else {
-          // No priority config for this type - use default
-          params.drawdownPrioritiesByKey[type.key] = defaultPriority;
-        }
+        if (type.sellWhenReceived) continue;
+        const baseType = String(type.key).split('_')[0];
+        const val = readPriorityValue(baseType, 4);
+        params.drawdownPrioritiesByKey[type.key] = val;
       }
     }
+    params.drawdownPrioritiesByKey.cash = readPriorityValue('cash', 1);
+    params.drawdownPrioritiesByKey.pension = readPriorityValue('pension', 2);
 
     // In deterministic mode, override volatility parameters to 0 to ensure fixed growth rates
     if (params.economyMode === 'deterministic') {
@@ -582,6 +620,9 @@ class UIManager {
       const volKeys = Object.keys(params.investmentVolatilitiesByKey);
       for (let i = 0; i < volKeys.length; i++) {
         params.investmentVolatilitiesByKey[volKeys[i]] = 0;
+      }
+      for (let i = 0; i < baseRefKeys.length; i++) {
+        params['GlobalAssetVolatility_' + baseRefKeys[i]] = 0;
       }
     }
 

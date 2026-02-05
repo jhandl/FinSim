@@ -45,14 +45,14 @@ module.exports = {
           investmentGrowthRatesByKey: {
             indexFunds_ie: 0,
             shares_ie: 0,
-            indexFunds_ar: 0,
-            shares_ar: 0
+            merval_ar: 0,
+            cedear_ar: 0
           },
           investmentVolatilitiesByKey: {
             indexFunds_ie: 0,
             shares_ie: 0,
-            indexFunds_ar: 0,
-            shares_ar: 0
+            merval_ar: 0,
+            cedear_ar: 0
           }
         },
         events: [
@@ -99,7 +99,7 @@ module.exports = {
           priorityShares: 3,
           investmentAllocationsByCountry: {
             ie: { indexFunds_ie: 0.5, shares_ie: 0.5 },
-            ar: { indexFunds_ar: 0.7, shares_ar: 0.3 }
+            ar: { merval_ar: 0.7, cedear_ar: 0.3 }
           },
           pensionContributionsByCountry: {
             ie: { p1Pct: 0.05, p2Pct: 0, capped: 'No' }
@@ -111,14 +111,14 @@ module.exports = {
           investmentGrowthRatesByKey: {
             indexFunds_ie: 0,
             shares_ie: 0,
-            indexFunds_ar: 0,
-            shares_ar: 0
+            merval_ar: 0,
+            cedear_ar: 0
           },
           investmentVolatilitiesByKey: {
             indexFunds_ie: 0,
             shares_ie: 0,
-            indexFunds_ar: 0,
-            shares_ar: 0
+            merval_ar: 0,
+            cedear_ar: 0
           }
         },
         events: [

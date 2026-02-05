@@ -109,33 +109,6 @@
       "helpText": "RSUs are taxed as ordinary income at vesting. Subsequent gains on the sale of shares are subject to Capital Gains Tax."
     }
   ],
-  "drawdownPriorities": [
-    {
-      "type": "cash",
-      "label": "Cash",
-      "fieldId": "PriorityCash"
-    },
-    {
-      "type": "pension",
-      "label": "Pension",
-      "fieldId": "PriorityPension"
-    },
-    {
-      "type": "indexFunds",
-      "label": "Index Funds",
-      "fieldId": "PriorityFunds"
-    },
-    {
-      "type": "shares",
-      "label": "Shares",
-      "fieldId": "PriorityShares"
-    },
-    {
-      "type": "rsu",
-      "label": "RSUs",
-      "fieldId": "PriorityRSU"
-    }
-  ],
 
   "pinnedIncomeTypes": [ "incomeSalaries", "incomeStatePension", "incomeCash" ]
 }

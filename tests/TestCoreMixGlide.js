@@ -181,10 +181,10 @@ module.exports = {
         priorityShares: 3,
         investmentAllocationsByCountry: {
           ie: { indexFunds_ie: 1, shares_ie: 0 },
-          ar: { indexFunds_ar: 1, shares_ar: 0 }
+          ar: { merval_ar: 1, cedear_ar: 0 }
         },
-        investmentGrowthRatesByKey: { indexFunds_ar: 0, shares_ie: 0 },
-        investmentVolatilitiesByKey: { indexFunds_ar: 0, shares_ie: 0 },
+        investmentGrowthRatesByKey: { merval_ar: 0, shares_ie: 0 },
+        investmentVolatilitiesByKey: { merval_ar: 0, shares_ie: 0 },
         GlobalAssetGrowth_globalEquity: 10,
         GlobalAssetGrowth_globalBonds: 0,
         GlobalAssetVolatility_globalEquity: 0,
@@ -193,10 +193,10 @@ module.exports = {
         MixConfig_ie_indexFunds_asset1: 'globalEquity',
         MixConfig_ie_indexFunds_asset2: 'globalBonds',
         MixConfig_ie_indexFunds_startAsset1Pct: 100,
-        MixConfig_ar_indexFunds_type: 'fixed',
-        MixConfig_ar_indexFunds_asset1: 'globalBonds',
-        MixConfig_ar_indexFunds_asset2: 'globalEquity',
-        MixConfig_ar_indexFunds_startAsset1Pct: 100
+        MixConfig_ar_merval_type: 'fixed',
+        MixConfig_ar_merval_asset1: 'globalBonds',
+        MixConfig_ar_merval_asset2: 'globalEquity',
+        MixConfig_ar_merval_startAsset1Pct: 100
       };
       const events = [
         { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 31, toAge: 31 },
@@ -210,7 +210,7 @@ module.exports = {
       } else {
         const assets = framework.simulationContext.investmentAssets || [];
         const ieEntry = assets.find(entry => entry && entry.key === 'indexFunds_ie');
-        const arEntry = assets.find(entry => entry && entry.key === 'indexFunds_ar');
+        const arEntry = assets.find(entry => entry && entry.key === 'merval_ar');
         const ieHoldings = ieEntry && ieEntry.asset ? ieEntry.asset.portfolio || [] : [];
         const arHoldings = arEntry && arEntry.asset ? arEntry.asset.portfolio || [] : [];
         const ieGrowth = ieHoldings.length ? ieHoldings[0].growth : null;

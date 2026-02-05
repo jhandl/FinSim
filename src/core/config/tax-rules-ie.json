@@ -227,33 +227,6 @@
       "helpText": "Restricted Stock Units are taxed as employment income (IT/USC/PRSI) at vesting based on market value. Subsequent disposal of vested shares is subject to Capital Gains Tax at ${taxRules.capitalGainsTax.rate,percentage}."
     }
   ],
-  "drawdownPriorities": [
-    {
-      "type": "cash",
-      "label": "Cash",
-      "fieldId": "PriorityCash"
-    },
-    {
-      "type": "pension",
-      "label": "Pension",
-      "fieldId": "PriorityPension"
-    },
-    {
-      "type": "indexFunds",
-      "label": "Index Funds",
-      "fieldId": "PriorityFunds"
-    },
-    {
-      "type": "shares",
-      "label": "Shares",
-      "fieldId": "PriorityShares"
-    },
-    {
-      "type": "rsu",
-      "label": "RSUs",
-      "fieldId": "PriorityRSU"
-    }
-  ],
   "pinnedIncomeTypes": [
     "incomeSalaries",
     "incomeStatePension",

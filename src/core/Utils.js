@@ -365,6 +365,32 @@ function serializeSimulation(ui) {
     }
   }
 
+  var priorityLegacyIdsByBaseType = {
+    cash: 'PriorityCash',
+    pension: 'PriorityPension',
+    indexFunds: 'PriorityFunds',
+    shares: 'PriorityShares'
+  };
+  var getPriorityValue = function(baseType, fallbackValue) {
+    var dynamicId = 'Priority_' + baseType;
+    var legacyId = priorityLegacyIdsByBaseType[baseType];
+    var value = null;
+    try {
+      if (typeof document === 'undefined' || document.getElementById(dynamicId)) {
+        value = ui.getValue(dynamicId);
+      }
+    } catch (_) { value = null; }
+    if (value === undefined || value === null || value === '') {
+      try {
+        if (legacyId && (typeof document === 'undefined' || document.getElementById(legacyId))) {
+          value = ui.getValue(legacyId);
+        }
+      } catch (_) { value = null; }
+    }
+    if (value === undefined || value === null || value === '') return fallbackValue;
+    return value;
+  };
+
   // Collect all parameters
   const parameters = {
     StartingAge: ui.getValue('StartingAge'),
@@ -383,10 +409,10 @@ function serializeSimulation(ui) {
     OldestChildBorn: ui.getValue('OldestChildBorn'),
     PersonalTaxCredit: ui.getValue('PersonalTaxCredit'),
     StatePensionWeekly: ui.getValue('StatePensionWeekly'),
-    PriorityCash: ui.getValue('PriorityCash'),
-    PriorityPension: ui.getValue('PriorityPension'),
-    PriorityFunds: ui.getValue('PriorityFunds'),
-    PriorityShares: ui.getValue('PriorityShares'),
+    PriorityCash: getPriorityValue('cash', 1),
+    PriorityPension: getPriorityValue('pension', 2),
+    PriorityFunds: getPriorityValue('indexFunds', 3),
+    PriorityShares: getPriorityValue('shares', 4),
     // Person 2 Parameters
     P2StartingAge: ui.getValue('P2StartingAge'),
     P2RetirementAge: ui.getValue('P2RetirementAge'),
@@ -401,6 +427,30 @@ function serializeSimulation(ui) {
     investmentStrategiesEnabled: ui.getValue('investmentStrategiesEnabled'),
     perCountryInvestmentsEnabled: ui.getValue('perCountryInvestmentsEnabled')
   };
+
+  var priorityBaseTypes = {};
+  priorityBaseTypes.cash = true;
+  priorityBaseTypes.pension = true;
+  for (var sci0 = 0; sci0 < scenarioCountries.length; sci0++) {
+    var cc0 = scenarioCountries[sci0];
+    var ruleset0 = config.getCachedTaxRuleSet(cc0);
+    if (!ruleset0 || typeof ruleset0.getResolvedInvestmentTypes !== 'function') continue;
+    var investmentTypes0 = ruleset0.getResolvedInvestmentTypes() || [];
+    for (var ti0 = 0; ti0 < investmentTypes0.length; ti0++) {
+      var invType0 = investmentTypes0[ti0];
+      if (!invType0 || !invType0.key || invType0.sellWhenReceived) continue;
+      var baseType0 = String(invType0.key).split('_')[0];
+      if (baseType0) priorityBaseTypes[baseType0] = true;
+    }
+  }
+  var priorityTypeKeys = Object.keys(priorityBaseTypes);
+  for (var pti = 0; pti < priorityTypeKeys.length; pti++) {
+    var baseType = priorityTypeKeys[pti];
+    var fallbackPriority = 4;
+    if (baseType === 'cash') fallbackPriority = 1;
+    if (baseType === 'pension') fallbackPriority = 2;
+    parameters['Priority_' + baseType] = getPriorityValue(baseType, fallbackPriority);
+  }
 
   // Dynamic investment parameters from StartCountry ruleset (generic fields only)
   for (var i = 0; i < investmentTypes.length; i++) {

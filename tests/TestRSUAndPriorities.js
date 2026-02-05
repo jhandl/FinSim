@@ -11,7 +11,7 @@ module.exports = {
 
     const testResults = { success: true, errors: [] };
 
-    const countries = ['ie', 'us'];
+    const countries = ['ie', 'us', 'ar'];
     
     try {
       for (const code of countries) {
@@ -19,20 +19,11 @@ module.exports = {
         const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
         const ruleset = new TaxRuleSet(raw);
 
-        // Verify Drawdown Priorities
+        // Verify Drawdown Priorities (config-driven list removed; should be empty)
         const priorities = ruleset.getDrawdownPriorities();
-        if (!Array.isArray(priorities) || priorities.length !== 5) {
+        if (!Array.isArray(priorities) || priorities.length !== 0) {
           testResults.success = false;
-          testResults.errors.push(code.toUpperCase() + ': Expected 5 drawdown priorities, found ' + (priorities ? priorities.length : 0));
-        } else {
-          const expectedTypes = ['cash', 'pension', 'indexFunds', 'shares', 'rsu'];
-          const actualTypes = priorities.map(p => p.type);
-          for (const type of expectedTypes) {
-            if (!actualTypes.includes(type)) {
-              testResults.success = false;
-              testResults.errors.push(code.toUpperCase() + ': Missing priority type ' + type);
-            }
-          }
+          testResults.errors.push(code.toUpperCase() + ': Expected 0 drawdown priorities, found ' + (priorities ? priorities.length : 0));
         }
 
         // Verify RSU Investment Type

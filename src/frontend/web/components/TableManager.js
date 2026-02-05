@@ -493,6 +493,10 @@ class TableManager {
           if (pvValue !== null && pvValue !== undefined && isFinite(pvValue)) {
             cellElement.setAttribute('data-pv-value', String(pvValue));
           }
+          if (isFinite(v)) {
+            const displayValue = v < 0 ? -Math.round(Math.abs(v)) : Math.round(v);
+            cellElement.setAttribute('data-display-value', String(displayValue));
+          }
         }
       } catch (_) { }
 
@@ -1031,6 +1035,10 @@ class TableManager {
         }
 
         contentEl.textContent = FormatUtils.formatCurrency(value, displayCurrencyCode, displayCountryForLocale);
+        if (isFinite(value)) {
+          const displayValue = value < 0 ? -Math.round(Math.abs(value)) : Math.round(value);
+          cell.setAttribute('data-display-value', String(displayValue));
+        }
       }
     }
 
@@ -1247,8 +1255,12 @@ class TableManager {
             if (!container) continue;
             const cell = container.querySelector(`.dynamic-section-cell[data-key="${key}"]`);
             if (!cell) continue;
-            const raw = cell.getAttribute('data-nominal-value');
-            const v = raw ? parseFloat(raw) : 0;
+            let raw = cell.getAttribute('data-display-value');
+            let v = raw ? parseFloat(raw) : NaN;
+            if (!isFinite(v)) {
+              raw = cell.getAttribute('data-nominal-value');
+              v = raw ? parseFloat(raw) : 0;
+            }
             if (isFinite(v) && v !== 0) { anyNonZero = true; break; }
           }
 

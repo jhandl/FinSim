@@ -717,8 +717,11 @@ class TestFramework {
             // Age and year are state values, not accumulated - don't divide by runs
             var numericFields = [
               'incomeSalaries','incomeRSUs','incomeRentals','incomePrivatePension','incomeStatePension',
-              'incomeCash','realEstateCapital','netIncome','expenses','pensionFund',
-              'cash','pensionContribution','withdrawalRate','worth'
+              'incomeCash','incomeDefinedBenefit','incomeTaxFree','realEstateCapital','netIncome','expenses',
+              'pensionFund','cash','pensionContribution','withdrawalRate','worth',
+              'incomeSalariesPV','incomeRSUsPV','incomeRentalsPV','incomePrivatePensionPV','incomeStatePensionPV',
+              'incomeCashPV','incomeDefinedBenefitPV','incomeTaxFreePV','realEstateCapitalPV','netIncomePV','expensesPV',
+              'pensionFundPV','cashPV','pensionContributionPV','worthPV'
             ];
             for (var fi = 0; fi < numericFields.length; fi++) {
               var key = numericFields[fi];
@@ -728,8 +731,14 @@ class TestFramework {
             if (r.investmentIncomeByKey) {
               for (var k in r.investmentIncomeByKey) { if (r.investmentIncomeByKey.hasOwnProperty(k)) { r.investmentIncomeByKey[k] = r.investmentIncomeByKey[k] / runs; } }
             }
+            if (r.investmentIncomeByKeyPV) {
+              for (var kp in r.investmentIncomeByKeyPV) { if (r.investmentIncomeByKeyPV.hasOwnProperty(kp)) { r.investmentIncomeByKeyPV[kp] = r.investmentIncomeByKeyPV[kp] / runs; } }
+            }
             if (r.investmentCapitalByKey) {
               for (var ck in r.investmentCapitalByKey) { if (r.investmentCapitalByKey.hasOwnProperty(ck)) { r.investmentCapitalByKey[ck] = r.investmentCapitalByKey[ck] / runs; } }
+            }
+            if (r.investmentCapitalByKeyPV) {
+              for (var ckp in r.investmentCapitalByKeyPV) { if (r.investmentCapitalByKeyPV.hasOwnProperty(ckp)) { r.investmentCapitalByKeyPV[ckp] = r.investmentCapitalByKeyPV[ckp] / runs; } }
             }
             if (r.taxByKey) {
               for (var t in r.taxByKey) { if (r.taxByKey.hasOwnProperty(t)) { r.taxByKey[t] = r.taxByKey[t] / runs; } }
@@ -811,90 +820,180 @@ class TestFramework {
         if (!testParams.investmentAllocationsByCountry) testParams.investmentAllocationsByCountry = {};
         if (!testParams.investmentAllocationsByCountry[sc]) testParams.investmentAllocationsByCountry[sc] = {};
 
-        // Legacy shorthand -> canonical namespaced keys for StartCountry
-        if (testParams.growthRateFunds !== undefined) testParams.investmentGrowthRatesByKey['indexFunds_' + sc] = testParams.growthRateFunds;
-        if (testParams.growthRateShares !== undefined) testParams.investmentGrowthRatesByKey['shares_' + sc] = testParams.growthRateShares;
-        if (testParams.growthDevFunds !== undefined) testParams.investmentVolatilitiesByKey['indexFunds_' + sc] = testParams.growthDevFunds;
-        if (testParams.growthDevShares !== undefined) testParams.investmentVolatilitiesByKey['shares_' + sc] = testParams.growthDevShares;
-        if (testParams.initialFunds !== undefined) testParams.initialCapitalByKey['indexFunds_' + sc] = testParams.initialFunds;
-        if (testParams.initialShares !== undefined) testParams.initialCapitalByKey['shares_' + sc] = testParams.initialShares;
-        if (testParams.FundsAllocation !== undefined) testParams.investmentAllocationsByCountry[sc]['indexFunds_' + sc] = testParams.FundsAllocation;
-        if (testParams.SharesAllocation !== undefined) testParams.investmentAllocationsByCountry[sc]['shares_' + sc] = testParams.SharesAllocation;
+        var legacyFundsFieldsPresent = (
+          testParams.growthRateFunds !== undefined ||
+          testParams.growthDevFunds !== undefined ||
+          testParams.initialFunds !== undefined ||
+          testParams.FundsAllocation !== undefined ||
+          testParams.InitialCapital_indexFunds !== undefined ||
+          testParams.InvestmentAllocation_indexFunds !== undefined ||
+          testParams.indexFundsGrowthRate !== undefined ||
+          testParams.indexFundsGrowthStdDev !== undefined ||
+          testParams.priorityFunds !== undefined
+        );
+        var legacySharesFieldsPresent = (
+          testParams.growthRateShares !== undefined ||
+          testParams.growthDevShares !== undefined ||
+          testParams.initialShares !== undefined ||
+          testParams.SharesAllocation !== undefined ||
+          testParams.InitialCapital_shares !== undefined ||
+          testParams.InvestmentAllocation_shares !== undefined ||
+          testParams.sharesGrowthRate !== undefined ||
+          testParams.sharesGrowthStdDev !== undefined ||
+          testParams.priorityShares !== undefined
+        );
+        var hasLegacyFundsOrShares = legacyFundsFieldsPresent || legacySharesFieldsPresent;
+        var setIfUndefined = function(map, key, value) {
+          if (!map) return;
+          if (map[key] === undefined) map[key] = value;
+        };
+
+        var _legacyTypeCache = {};
+        var _resolveRuleset = function(cc) {
+          var cfg = null;
+          try {
+            cfg = (typeof Config_instance !== 'undefined' && Config_instance) ? Config_instance : Config.getInstance();
+          } catch (e) {
+            throw new Error('Config not initialized for legacy investment mapping');
+          }
+          var rs = (cfg && typeof cfg.getCachedTaxRuleSet === 'function') ? cfg.getCachedTaxRuleSet(cc) : null;
+          if (!rs) {
+            var fs = require('fs');
+            var path = require('path');
+            var filePath = path.join(__dirname, 'config', 'tax-rules-' + cc + '.json');
+            var raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            rs = new TaxRuleSet(raw);
+          }
+          return rs;
+        };
+        var _getAllocatableTypes = function(cc) {
+          var rs = _resolveRuleset(cc);
+          var types = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
+          var out = [];
+          for (var ti = 0; ti < types.length; ti++) {
+            var t = types[ti] || {};
+            if (!t.key) continue;
+            if (t.excludeFromAllocations) continue;
+            if (t.sellWhenReceived) continue;
+            out.push(t.key);
+          }
+          return out;
+        };
+        var _getLegacyKeys = function(cc) {
+          if (_legacyTypeCache[cc]) return _legacyTypeCache[cc];
+          var types = _getAllocatableTypes(cc);
+          _legacyTypeCache[cc] = {
+            fundsKey: types[0] || null,
+            sharesKey: types[1] || null,
+            allocTypes: types
+          };
+          return _legacyTypeCache[cc];
+        };
+        var _requireLegacyKey = function(keys, which, cc) {
+          if (!keys || !keys[which]) throw new Error('Missing investment type for legacy mapping (' + which + ') in ' + cc);
+          return keys[which];
+        };
+        var _resolveTypeKey = function(cc, baseNorm) {
+          var keys = _getLegacyKeys(cc);
+          if (baseNorm === 'indexFunds') return _requireLegacyKey(keys, 'fundsKey', cc);
+          if (baseNorm === 'shares') return _requireLegacyKey(keys, 'sharesKey', cc);
+          if (keys && keys.allocTypes) {
+            for (var i = 0; i < keys.allocTypes.length; i++) {
+              if (keys.allocTypes[i] === baseNorm) return baseNorm;
+            }
+          }
+          return baseNorm + '_' + cc;
+        };
+
+        // Legacy shorthand -> canonical namespaced keys for StartCountry (via tax rules)
+        var scKeys = hasLegacyFundsOrShares ? _getLegacyKeys(sc) : null;
+        if (testParams.growthRateFunds !== undefined) setIfUndefined(testParams.investmentGrowthRatesByKey, _requireLegacyKey(scKeys, 'fundsKey', sc), testParams.growthRateFunds);
+        if (testParams.growthRateShares !== undefined) setIfUndefined(testParams.investmentGrowthRatesByKey, _requireLegacyKey(scKeys, 'sharesKey', sc), testParams.growthRateShares);
+        if (testParams.growthDevFunds !== undefined) setIfUndefined(testParams.investmentVolatilitiesByKey, _requireLegacyKey(scKeys, 'fundsKey', sc), testParams.growthDevFunds);
+        if (testParams.growthDevShares !== undefined) setIfUndefined(testParams.investmentVolatilitiesByKey, _requireLegacyKey(scKeys, 'sharesKey', sc), testParams.growthDevShares);
+        if (testParams.initialFunds !== undefined) setIfUndefined(testParams.initialCapitalByKey, _requireLegacyKey(scKeys, 'fundsKey', sc), testParams.initialFunds);
+        if (testParams.initialShares !== undefined) setIfUndefined(testParams.initialCapitalByKey, _requireLegacyKey(scKeys, 'sharesKey', sc), testParams.initialShares);
+        if (testParams.FundsAllocation !== undefined) setIfUndefined(testParams.investmentAllocationsByCountry[sc], _requireLegacyKey(scKeys, 'fundsKey', sc), testParams.FundsAllocation);
+        if (testParams.SharesAllocation !== undefined) setIfUndefined(testParams.investmentAllocationsByCountry[sc], _requireLegacyKey(scKeys, 'sharesKey', sc), testParams.SharesAllocation);
 
         // When relocations exist, project legacy scalar allocations/growth onto each scenario country
-        for (var cc in scenarioCountries) {
-          if (!Object.prototype.hasOwnProperty.call(scenarioCountries, cc)) continue;
-          if (!testParams.investmentAllocationsByCountry[cc]) testParams.investmentAllocationsByCountry[cc] = {};
-          if (testParams.FundsAllocation !== undefined) testParams.investmentAllocationsByCountry[cc]['indexFunds_' + cc] = testParams.FundsAllocation;
-          if (testParams.SharesAllocation !== undefined) testParams.investmentAllocationsByCountry[cc]['shares_' + cc] = testParams.SharesAllocation;
+        if (hasLegacyFundsOrShares) {
+          for (var cc in scenarioCountries) {
+            if (!Object.prototype.hasOwnProperty.call(scenarioCountries, cc)) continue;
+            if (!testParams.investmentAllocationsByCountry[cc]) testParams.investmentAllocationsByCountry[cc] = {};
+            var ccKeys = _getLegacyKeys(cc);
+            if (testParams.FundsAllocation !== undefined) setIfUndefined(testParams.investmentAllocationsByCountry[cc], _requireLegacyKey(ccKeys, 'fundsKey', cc), testParams.FundsAllocation);
+            if (testParams.SharesAllocation !== undefined) setIfUndefined(testParams.investmentAllocationsByCountry[cc], _requireLegacyKey(ccKeys, 'sharesKey', cc), testParams.SharesAllocation);
 
-          if (testParams.growthRateFunds !== undefined) testParams.investmentGrowthRatesByKey['indexFunds_' + cc] = testParams.growthRateFunds;
-          if (testParams.growthRateShares !== undefined) testParams.investmentGrowthRatesByKey['shares_' + cc] = testParams.growthRateShares;
-          if (testParams.growthDevFunds !== undefined) testParams.investmentVolatilitiesByKey['indexFunds_' + cc] = testParams.growthDevFunds;
-          if (testParams.growthDevShares !== undefined) testParams.investmentVolatilitiesByKey['shares_' + cc] = testParams.growthDevShares;
+            if (testParams.growthRateFunds !== undefined) setIfUndefined(testParams.investmentGrowthRatesByKey, _requireLegacyKey(ccKeys, 'fundsKey', cc), testParams.growthRateFunds);
+            if (testParams.growthRateShares !== undefined) setIfUndefined(testParams.investmentGrowthRatesByKey, _requireLegacyKey(ccKeys, 'sharesKey', cc), testParams.growthRateShares);
+            if (testParams.growthDevFunds !== undefined) setIfUndefined(testParams.investmentVolatilitiesByKey, _requireLegacyKey(ccKeys, 'fundsKey', cc), testParams.growthDevFunds);
+            if (testParams.growthDevShares !== undefined) setIfUndefined(testParams.investmentVolatilitiesByKey, _requireLegacyKey(ccKeys, 'sharesKey', cc), testParams.growthDevShares);
+          }
         }
 
         // Also support v2.0 save-file dynamic parameter naming (demo3.csv-like).
         if (testParams.InitialCapital_indexFunds !== undefined) {
           var ic = Number(testParams.InitialCapital_indexFunds);
-          if (isFinite(ic)) testParams.initialCapitalByKey['indexFunds_' + sc] = ic;
+          if (isFinite(ic)) setIfUndefined(testParams.initialCapitalByKey, _requireLegacyKey(scKeys, 'fundsKey', sc), ic);
         }
         if (testParams.InitialCapital_shares !== undefined) {
           var ic2 = Number(testParams.InitialCapital_shares);
-          if (isFinite(ic2)) testParams.initialCapitalByKey['shares_' + sc] = ic2;
+          if (isFinite(ic2)) setIfUndefined(testParams.initialCapitalByKey, _requireLegacyKey(scKeys, 'sharesKey', sc), ic2);
         }
         if (testParams.InvestmentAllocation_indexFunds !== undefined) {
           var a = parsePercent(testParams.InvestmentAllocation_indexFunds);
-          if (a !== null) testParams.investmentAllocationsByCountry[sc]['indexFunds_' + sc] = a;
+          if (a !== null) setIfUndefined(testParams.investmentAllocationsByCountry[sc], _requireLegacyKey(scKeys, 'fundsKey', sc), a);
         }
         if (testParams.InvestmentAllocation_shares !== undefined) {
           var a2 = parsePercent(testParams.InvestmentAllocation_shares);
-          if (a2 !== null) testParams.investmentAllocationsByCountry[sc]['shares_' + sc] = a2;
+          if (a2 !== null) setIfUndefined(testParams.investmentAllocationsByCountry[sc], _requireLegacyKey(scKeys, 'sharesKey', sc), a2);
         }
         if (testParams.indexFundsGrowthRate !== undefined) {
           var gr = parsePercent(testParams.indexFundsGrowthRate);
-          if (gr !== null) testParams.investmentGrowthRatesByKey['indexFunds_' + sc] = gr;
+          if (gr !== null) setIfUndefined(testParams.investmentGrowthRatesByKey, _requireLegacyKey(scKeys, 'fundsKey', sc), gr);
         }
         if (testParams.sharesGrowthRate !== undefined) {
           var gr2 = parsePercent(testParams.sharesGrowthRate);
-          if (gr2 !== null) testParams.investmentGrowthRatesByKey['shares_' + sc] = gr2;
+          if (gr2 !== null) setIfUndefined(testParams.investmentGrowthRatesByKey, _requireLegacyKey(scKeys, 'sharesKey', sc), gr2);
         }
         if (testParams.indexFundsGrowthStdDev !== undefined) {
           var sd = parsePercent(testParams.indexFundsGrowthStdDev);
-          if (sd !== null) testParams.investmentVolatilitiesByKey['indexFunds_' + sc] = sd;
+          if (sd !== null) setIfUndefined(testParams.investmentVolatilitiesByKey, _requireLegacyKey(scKeys, 'fundsKey', sc), sd);
         }
         if (testParams.sharesGrowthStdDev !== undefined) {
           var sd2 = parsePercent(testParams.sharesGrowthStdDev);
-          if (sd2 !== null) testParams.investmentVolatilitiesByKey['shares_' + sc] = sd2;
+          if (sd2 !== null) setIfUndefined(testParams.investmentVolatilitiesByKey, _requireLegacyKey(scKeys, 'sharesKey', sc), sd2);
         }
 
         // Propagate demo3.csv-like allocation/growth fields to each scenario country
         for (var cc2 in scenarioCountries) {
           if (!Object.prototype.hasOwnProperty.call(scenarioCountries, cc2)) continue;
           if (!testParams.investmentAllocationsByCountry[cc2]) testParams.investmentAllocationsByCountry[cc2] = {};
+          var cc2Keys = hasLegacyFundsOrShares ? _getLegacyKeys(cc2) : null;
           if (testParams.InvestmentAllocation_indexFunds !== undefined) {
             var aa = parsePercent(testParams.InvestmentAllocation_indexFunds);
-            if (aa !== null) testParams.investmentAllocationsByCountry[cc2]['indexFunds_' + cc2] = aa;
+            if (aa !== null) setIfUndefined(testParams.investmentAllocationsByCountry[cc2], _requireLegacyKey(cc2Keys, 'fundsKey', cc2), aa);
           }
           if (testParams.InvestmentAllocation_shares !== undefined) {
             var bb = parsePercent(testParams.InvestmentAllocation_shares);
-            if (bb !== null) testParams.investmentAllocationsByCountry[cc2]['shares_' + cc2] = bb;
+            if (bb !== null) setIfUndefined(testParams.investmentAllocationsByCountry[cc2], _requireLegacyKey(cc2Keys, 'sharesKey', cc2), bb);
           }
           if (testParams.indexFundsGrowthRate !== undefined) {
             var gg = parsePercent(testParams.indexFundsGrowthRate);
-            if (gg !== null) testParams.investmentGrowthRatesByKey['indexFunds_' + cc2] = gg;
+            if (gg !== null) setIfUndefined(testParams.investmentGrowthRatesByKey, _requireLegacyKey(cc2Keys, 'fundsKey', cc2), gg);
           }
           if (testParams.sharesGrowthRate !== undefined) {
             var gg2 = parsePercent(testParams.sharesGrowthRate);
-            if (gg2 !== null) testParams.investmentGrowthRatesByKey['shares_' + cc2] = gg2;
+            if (gg2 !== null) setIfUndefined(testParams.investmentGrowthRatesByKey, _requireLegacyKey(cc2Keys, 'sharesKey', cc2), gg2);
           }
           if (testParams.indexFundsGrowthStdDev !== undefined) {
             var ss = parsePercent(testParams.indexFundsGrowthStdDev);
-            if (ss !== null) testParams.investmentVolatilitiesByKey['indexFunds_' + cc2] = ss;
+            if (ss !== null) setIfUndefined(testParams.investmentVolatilitiesByKey, _requireLegacyKey(cc2Keys, 'fundsKey', cc2), ss);
           }
           if (testParams.sharesGrowthStdDev !== undefined) {
             var ss2 = parsePercent(testParams.sharesGrowthStdDev);
-            if (ss2 !== null) testParams.investmentVolatilitiesByKey['shares_' + cc2] = ss2;
+            if (ss2 !== null) setIfUndefined(testParams.investmentVolatilitiesByKey, _requireLegacyKey(cc2Keys, 'sharesKey', cc2), ss2);
           }
         }
 
@@ -945,7 +1044,7 @@ class TestFramework {
               if (base && ccAlloc) {
                 scenarioCountries[ccAlloc] = true;
                 var baseNorm = normalizeBaseKey(base);
-                var invKey = baseNorm + '_' + ccAlloc;
+                var invKey = _resolveTypeKey(ccAlloc, baseNorm);
                 setAlloc(ccAlloc, invKey, parsePercent(sval));
               }
               continue;
@@ -959,7 +1058,7 @@ class TestFramework {
                 var baseC = normalizeBaseKey(mC[1]);
                 var ccC = String(mC[2]).toLowerCase();
                 scenarioCountries[ccC] = true;
-                var invKeyC = baseC + '_' + ccC;
+                var invKeyC = _resolveTypeKey(ccC, baseC);
                 var cap = Number(sval);
                 if (isFinite(cap) && testParams.initialCapitalByKey[invKeyC] === undefined) {
                   testParams.initialCapitalByKey[invKeyC] = cap;
@@ -978,7 +1077,7 @@ class TestFramework {
                 var baseG = normalizeBaseKey(mG[1]);
                 var ccG = String(mG[2]).toLowerCase();
                 scenarioCountries[ccG] = true;
-                var invKeyG = baseG + '_' + ccG;
+                var invKeyG = _resolveTypeKey(ccG, baseG);
                 var rateVal = parsePercent(sval);
                 if (rateVal !== null) {
                   if (isStd) {
@@ -1022,10 +1121,13 @@ class TestFramework {
             }
           }
         } catch (_) { }
-        for (var cc in scenarioCountries) {
-          if (!Object.prototype.hasOwnProperty.call(scenarioCountries, cc)) continue;
-          if (testParams.priorityFunds !== undefined) testParams.drawdownPrioritiesByKey['indexFunds_' + cc] = testParams.priorityFunds;
-          if (testParams.priorityShares !== undefined) testParams.drawdownPrioritiesByKey['shares_' + cc] = testParams.priorityShares;
+        if (testParams.priorityFunds !== undefined || testParams.priorityShares !== undefined) {
+          for (var cc in scenarioCountries) {
+            if (!Object.prototype.hasOwnProperty.call(scenarioCountries, cc)) continue;
+            var pKeys = _getLegacyKeys(cc);
+            if (testParams.priorityFunds !== undefined) testParams.drawdownPrioritiesByKey[_requireLegacyKey(pKeys, 'fundsKey', cc)] = testParams.priorityFunds;
+            if (testParams.priorityShares !== undefined) testParams.drawdownPrioritiesByKey[_requireLegacyKey(pKeys, 'sharesKey', cc)] = testParams.priorityShares;
+          }
         }
 
         return testParams;

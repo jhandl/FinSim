@@ -40,7 +40,7 @@ class WebUI extends AbstractUI {
     this.eventsTableManager = new EventsTableManager(this);
     this.eventAccordionManager = new EventAccordionManager(this);
     this.eventsWizard = new EventsWizard(this);
-    this.dragAndDrop = new DragAndDrop();
+    this.dragAndDrop = new DragAndDrop(this);
 
     // Initialize WelcomeModal with error checking
     try {
@@ -599,12 +599,6 @@ class WebUI extends AbstractUI {
     setLabelFor('FundsAllocation', `${fundsLabel} Allocation`);
     setLabelFor('SharesAllocation', `${sharesLabel} Allocation`);
 
-    // Drawdown priorities (labels only)
-    const prFunds = document.querySelector('[data-priority-id="PriorityFunds"] .priority-label');
-    if (prFunds) prFunds.textContent = fundsLabel;
-    const prShares = document.querySelector('[data-priority-id="PriorityShares"] .priority-label');
-    if (prShares) prShares.textContent = sharesLabel;
-
     // Growth rates table row headings
     const setRowHeadingForInput = (inputId, label) => {
       const input = document.getElementById(inputId);
@@ -655,11 +649,15 @@ class WebUI extends AbstractUI {
     }
     const investmentTypes = ruleset.getResolvedInvestmentTypes() || [];
     this.renderInvestmentParameterFields(investmentTypes);
+    if (this.dragAndDrop && typeof this.dragAndDrop.renderPriorities === 'function') {
+      await this.dragAndDrop.renderPriorities();
+    }
   }
 
   renderInvestmentParameterFields(investmentTypes) {
     const types = Array.isArray(investmentTypes) ? investmentTypes : [];
     const allocationTypes = types.filter(t => !(t && t.excludeFromAllocations));
+    const economyTypes = types.filter(t => !(t && t.sellWhenReceived));
     const excludedFromAllocationsTypes = types.filter(t => t && t.excludeFromAllocations);
     this._lastInvestmentTypesForGrowthRates = types;
 
@@ -759,8 +757,8 @@ class WebUI extends AbstractUI {
     if (startGroup) {
       // Per Phase 7 design: starting position initial capital remains StartCountry-only.
       // IDs intentionally remain `InitialCapital_{typeKey}` (no country prefix).
-      for (let i = 0; i < allocationTypes.length; i++) {
-        const t = allocationTypes[i] || {};
+      for (let i = 0; i < economyTypes.length; i++) {
+        const t = economyTypes[i] || {};
         const key = t.key;
         if (!key) continue;
         const labelText = t.label || key;
@@ -880,8 +878,8 @@ class WebUI extends AbstractUI {
         });
 
         // Render local investment types for start country (when no chips shown)
-        for (let i = 0; i < types.length; i++) {
-          const t = types[i] || {};
+        for (let i = 0; i < economyTypes.length; i++) {
+          const t = economyTypes[i] || {};
           const key = t.key;
           if (!key) continue;
           
@@ -1034,7 +1032,7 @@ class WebUI extends AbstractUI {
           const code = scenarioCountries[ci];
           const rs = cfg.getCachedTaxRuleSet(code);
           const invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
-          const localTypes = invTypes.filter(t => (t && t.residenceScope || '').toLowerCase() === 'local' && !t.baseRef);
+          const localTypes = invTypes.filter(t => (t && t.residenceScope || '').toLowerCase() === 'local' && !t.baseRef && !(t && t.sellWhenReceived));
           for (let i = 0; i < localTypes.length; i++) {
             const t = localTypes[i] || {};
             const key = t.key;
@@ -1071,6 +1069,34 @@ class WebUI extends AbstractUI {
         }
       }
       this._growthRateCacheForRestore = null;
+    }
+
+    // Seed global asset rows from legacy wrapper-level growth inputs (baseRef types).
+    if (types && types.length) {
+      for (let i = 0; i < types.length; i++) {
+        const t = types[i] || {};
+        if (!t || !t.baseRef || !t.key || t.sellWhenReceived) continue;
+        const legacyGrowthId = t.key + 'GrowthRate';
+        const legacyVolId = t.key + 'GrowthStdDev';
+        const globalGrowthId = 'GlobalAssetGrowth_' + t.baseRef;
+        const globalVolId = 'GlobalAssetVolatility_' + t.baseRef;
+
+        const globalGrowthEl = document.getElementById(globalGrowthId);
+        const globalVolEl = document.getElementById(globalVolId);
+        const legacyGrowthEl = document.getElementById(legacyGrowthId);
+        const legacyVolEl = document.getElementById(legacyVolId);
+
+        if (globalGrowthEl && legacyGrowthEl) {
+          const gRaw = (globalGrowthEl.value !== undefined && globalGrowthEl.value !== null) ? String(globalGrowthEl.value).trim() : '';
+          const lRaw = (legacyGrowthEl.value !== undefined && legacyGrowthEl.value !== null) ? String(legacyGrowthEl.value).trim() : '';
+          if (!gRaw && lRaw) globalGrowthEl.value = legacyGrowthEl.value;
+        }
+        if (globalVolEl && legacyVolEl) {
+          const gRaw = (globalVolEl.value !== undefined && globalVolEl.value !== null) ? String(globalVolEl.value).trim() : '';
+          const lRaw = (legacyVolEl.value !== undefined && legacyVolEl.value !== null) ? String(legacyVolEl.value).trim() : '';
+          if (!gRaw && lRaw) globalVolEl.value = legacyVolEl.value;
+        }
+      }
     }
 
     // Re-apply economy mode visibility to newly created volatility cells
@@ -1333,6 +1359,22 @@ class WebUI extends AbstractUI {
         const baseKey = this._toBaseInvestmentKey(key, startCountry);
         const labelText = (t.label || baseKey);
         const inputId = 'GlobalAllocation_' + baseKey;
+        const legacyId = 'InvestmentAllocation_' + key;
+        const perCountryId = 'InvestmentAllocation_' + startCountry + '_' + baseKey;
+
+        if (!this._allocationValueCache[inputId]) {
+          if (this._allocationValueCache[perCountryId]) {
+            this._allocationValueCache[inputId] = this._allocationValueCache[perCountryId];
+          } else if (this._allocationValueCache[legacyId]) {
+            this._allocationValueCache[inputId] = this._allocationValueCache[legacyId];
+          }
+        }
+        if (!this._allocationValueCache[legacyId] && this._allocationValueCache[inputId]) {
+          this._allocationValueCache[legacyId] = this._allocationValueCache[inputId];
+        }
+        if (!this._allocationValueCache[perCountryId] && this._allocationValueCache[inputId]) {
+          this._allocationValueCache[perCountryId] = this._allocationValueCache[inputId];
+        }
 
         const wrapper = document.createElement('div');
         wrapper.className = 'input-wrapper';
@@ -3127,7 +3169,7 @@ class WebUI extends AbstractUI {
       link.addEventListener('click', async (e) => {
         e.preventDefault();
         // If there are unsaved changes, confirm with the user before navigating away
-        if (this.fileManager && this.fileManager.hasUnsavedChanges()) {
+        if (this.fileManager && await this.fileManager.hasUnsavedChanges()) {
           const proceed = await this.showAlert("You have unsaved changes. Are you sure you want to navigate away and lose them?", "Unsaved Changes", true);
           if (!proceed) {
             return; // User chose to stay on the page
@@ -3993,7 +4035,7 @@ class WebUI extends AbstractUI {
       if (match) {
         const from = this.getValue('StartCountry');
         const baselineSet = (this.fileManager && this.fileManager.lastSavedState !== null);
-        const wasDirty = (this.fileManager && this.fileManager.hasUnsavedChanges && this.fileManager.hasUnsavedChanges());
+        const wasDirty = (this.fileManager && this.fileManager.hasUnsavedChanges && await this.fileManager.hasUnsavedChanges());
         // Only auto-set if StartCountry is still "auto"/default (not user-selected) and hasn't started editing.
         const el = (typeof document !== 'undefined') ? document.getElementById('StartCountry') : null;
         const isAuto = !!(el && el.dataset && el.dataset.auto === '1');
@@ -4016,7 +4058,7 @@ class WebUI extends AbstractUI {
         // Auto-detected StartCountry is part of initial app state, not a user edit:
         // refresh baseline if one was already established.
         if (this.fileManager && baselineSet) {
-          this.fileManager.updateLastSavedState();
+          await this.fileManager.updateLastSavedState();
         }
       }
     } catch (e) {
@@ -4423,7 +4465,7 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     // (Initial row already added earlier)
 
     // Establish baseline for new scenario now that Config is initialized (avoids extra getVersion call)
-    webUi.fileManager.updateLastSavedState();
+    await webUi.fileManager.updateLastSavedState();
 
     // Load field labels configuration
     await webUi.fieldLabelsManager.loadLabels();

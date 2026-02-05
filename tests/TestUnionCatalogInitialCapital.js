@@ -33,20 +33,20 @@ module.exports = {
           investmentGrowthRatesByKey: {
             indexFunds_ie: 0,
             shares_ie: 0,
-            indexFunds_ar: 0,
-            shares_ar: 0
+            merval_ar: 0,
+            cedear_ar: 0
           },
           investmentVolatilitiesByKey: {
             indexFunds_ie: 0,
             shares_ie: 0,
-            indexFunds_ar: 0,
-            shares_ar: 0
+            merval_ar: 0,
+            cedear_ar: 0
           },
           initialCapitalByKey: {
             indexFunds_ie: 10000,
             shares_ie: 5000,
-            indexFunds_ar: 8000, // Should NOT seed
-            shares_ar: 3000      // Should NOT seed
+            merval_ar: 8000, // Should NOT seed
+            cedear_ar: 3000      // Should NOT seed
           }
         },
         events: [
@@ -72,7 +72,7 @@ module.exports = {
 
     const ctx = framework.simulationContext;
     const keys = vm.runInContext('investmentAssets && investmentAssets.map(function(a){ return a && a.key; })', ctx) || [];
-    const expectedKeys = ['indexFunds_ie', 'shares_ie', 'indexFunds_ar', 'shares_ar'];
+    const expectedKeys = ['indexFunds_ie', 'shares_ie', 'merval_ar', 'cedear_ar'];
     for (var ki = 0; ki < expectedKeys.length; ki++) {
       if (keys.indexOf(expectedKeys[ki]) === -1) {
         errors.push('Missing investment key in union catalog: ' + expectedKeys[ki]);
@@ -100,16 +100,16 @@ module.exports = {
         errors.push('shares_ie should seed to 5000; got ' + caps.shares_ie);
       }
 
-      if (typeof caps.indexFunds_ar !== 'number') {
-        errors.push('indexFunds_ar capital missing or non-numeric');
-      } else if (Math.abs(caps.indexFunds_ar) > 0.01) {
-        errors.push('indexFunds_ar should remain zero; got ' + caps.indexFunds_ar);
+      if (typeof caps.merval_ar !== 'number') {
+        errors.push('merval_ar capital missing or non-numeric');
+      } else if (Math.abs(caps.merval_ar) > 0.01) {
+        errors.push('merval_ar should remain zero; got ' + caps.merval_ar);
       }
 
-      if (typeof caps.shares_ar !== 'number') {
-        errors.push('shares_ar capital missing or non-numeric');
-      } else if (Math.abs(caps.shares_ar) > 0.01) {
-        errors.push('shares_ar should remain zero; got ' + caps.shares_ar);
+      if (typeof caps.cedear_ar !== 'number') {
+        errors.push('cedear_ar capital missing or non-numeric');
+      } else if (Math.abs(caps.cedear_ar) > 0.01) {
+        errors.push('cedear_ar should remain zero; got ' + caps.cedear_ar);
       }
     }
 

@@ -25,8 +25,12 @@ class LegacyScenarioAdapter {
       'SharesGrowthRate': 'sharesGrowthRate',
       'TrustGrowthStdDev': 'sharesGrowthStdDev',
       'SharesGrowthStdDev': 'sharesGrowthStdDev',
-      'PriorityETF': 'PriorityFunds',
-      'PriorityTrust': 'PriorityShares'
+      'PriorityCash': 'Priority_cash',
+      'PriorityPension': 'Priority_pension',
+      'PriorityFunds': 'Priority_indexFunds',
+      'PriorityShares': 'Priority_shares',
+      'PriorityETF': 'Priority_indexFunds',
+      'PriorityTrust': 'Priority_shares'
     };
 
     // Fields that require a country for proper normalization
@@ -52,6 +56,10 @@ class LegacyScenarioAdapter {
    */
   mapFieldName(key, startCountry, allowIeFallback = false) {
     const mappedKey = this.legacyFieldMap[key] || key;
+
+    // Legacy index funds growth/volatility should map to global equity settings.
+    if (mappedKey === 'indexFundsGrowthRate') return 'GlobalAssetGrowth_globalEquity';
+    if (mappedKey === 'indexFundsGrowthStdDev') return 'GlobalAssetVolatility_globalEquity';
     
     // Check if this is an investment field that needs normalization
     const isInvestmentField = this.investmentFields.includes(mappedKey);

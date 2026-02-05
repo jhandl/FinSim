@@ -246,6 +246,7 @@ module.exports = {
         StartCountry: 'ie',
         simulation_mode: 'single',
         economy_mode: 'montecarlo',
+        economyMode: 'montecarlo',
         monteCarloRuns: 200,
         GlobalAssetGrowth_globalEquity: 7
       };

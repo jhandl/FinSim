@@ -46,10 +46,10 @@ function createParameterDocument() {
   };
 }
 
-function createUi(doc) {
+function createUi(doc, events) {
   return {
     getVersion() { return '2.0'; },
-    getTableData() { return []; },
+    getTableData() { return events || []; },
     isPercentage(id) {
       const el = doc.getElementById(id);
       return !!(el && String(el.className || '').indexOf('percentage') >= 0);
@@ -100,8 +100,13 @@ module.exports = {
         getInstance: () => ({
           getStartCountry: () => 'ie',
           getDefaultCountry: () => 'ie',
-          getCachedTaxRuleSet: () => ({
-            getResolvedInvestmentTypes: () => ([{ key: 'indexFunds_ie' }, { key: 'shares_ie' }])
+          getCachedTaxRuleSet: (country) => ({
+            getResolvedInvestmentTypes: () => {
+              if (country === 'us') {
+                return [{ key: 'indexFunds_us' }, { key: 'bonds_us' }, { key: 'rsu_us', sellWhenReceived: true }];
+              }
+              return [{ key: 'indexFunds_ie' }, { key: 'shares_ie' }];
+            }
           }),
           isRelocationEnabled: () => true,
           getInvestmentBaseTypes: () => ([])
@@ -128,10 +133,11 @@ module.exports = {
       doc.ensureEl('OldestChildBorn', 'number').value = '';
       doc.ensureEl('PersonalTaxCredit', 'currency').value = '';
       doc.ensureEl('StatePensionWeekly', 'currency').value = '';
-      doc.ensureEl('PriorityCash', 'number').value = '1';
-      doc.ensureEl('PriorityPension', 'number').value = '2';
-      doc.ensureEl('PriorityFunds', 'number').value = '3';
-      doc.ensureEl('PriorityShares', 'number').value = '4';
+      doc.ensureEl('Priority_cash', 'number').value = '1';
+      doc.ensureEl('Priority_pension', 'number').value = '2';
+      doc.ensureEl('Priority_indexFunds', 'number').value = '3';
+      doc.ensureEl('Priority_shares', 'number').value = '4';
+      doc.ensureEl('Priority_bonds', 'number').value = '5';
       doc.ensureEl('P2StartingAge', 'number').value = '';
       doc.ensureEl('P2RetirementAge', 'number').value = '';
       doc.ensureEl('P2StatePensionWeekly', 'currency').value = '';
@@ -149,7 +155,7 @@ module.exports = {
       doc.ensureEl('simulation_mode', 'string').value = 'single';
       doc.ensureEl('economy_mode', 'string').value = 'deterministic';
 
-      const ui = createUi(doc);
+      const ui = createUi(doc, [['MV-US', 'Move to US', '', '', '', '']]);
       const csv = serializeSimulation(ui);
 
       if (csv.indexOf('InvestmentAllocation_indexFunds_ie,0') === -1) {
@@ -157,6 +163,24 @@ module.exports = {
       }
       if (csv.indexOf('InvestmentAllocation_shares_ie,') === -1) {
         errors.push('Expected InvestmentAllocation_shares_ie to serialize as empty.');
+      }
+      if (csv.indexOf('Priority_cash,1') === -1) {
+        errors.push('Expected Priority_cash to serialize as 1.');
+      }
+      if (csv.indexOf('Priority_pension,2') === -1) {
+        errors.push('Expected Priority_pension to serialize as 2.');
+      }
+      if (csv.indexOf('Priority_indexFunds,3') === -1) {
+        errors.push('Expected Priority_indexFunds to serialize as 3.');
+      }
+      if (csv.indexOf('Priority_shares,4') === -1) {
+        errors.push('Expected Priority_shares to serialize as 4.');
+      }
+      if (csv.indexOf('Priority_bonds,5') === -1) {
+        errors.push('Expected Priority_bonds to serialize as 5.');
+      }
+      if (csv.indexOf('Priority_rsu') >= 0) {
+        errors.push('Priority_rsu should not serialize when sellWhenReceived is true.');
       }
     } catch (err) {
       errors.push('Unexpected error: ' + (err && err.message ? err.message : String(err)));

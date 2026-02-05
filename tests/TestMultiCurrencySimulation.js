@@ -265,7 +265,7 @@ module.exports = {
         for (var i = 0; i < investmentAssets.length; i++) {
           var k = investmentAssets[i].key;
           if (k === 'indexFunds_ie' || k === 'indexFunds') ieAsset = investmentAssets[i].asset;
-          if (k === 'indexFunds_ar') arAsset = investmentAssets[i].asset;
+          if (k === 'merval_ar') arAsset = investmentAssets[i].asset;
         }
         
         // Check EUR holdings in IE asset

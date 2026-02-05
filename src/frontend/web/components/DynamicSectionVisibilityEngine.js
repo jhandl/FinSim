@@ -48,8 +48,12 @@ class DynamicSectionVisibilityEngine {
       if (!container) continue;
       const cell = container.querySelector(`.dynamic-section-cell[data-key="${key}"]`);
       if (!cell) continue;
-      const raw = cell.getAttribute('data-nominal-value');
-      const v = raw ? parseFloat(raw) : 0;
+      let raw = cell.getAttribute('data-display-value');
+      let v = raw ? parseFloat(raw) : NaN;
+      if (!isFinite(v)) {
+        raw = cell.getAttribute('data-nominal-value');
+        v = raw ? parseFloat(raw) : 0;
+      }
       if (isFinite(v) && v !== 0) return true;
     }
     return false;
@@ -145,4 +149,3 @@ this.DynamicSectionVisibilityEngine = DynamicSectionVisibilityEngine;
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { DynamicSectionVisibilityEngine };
 }
-

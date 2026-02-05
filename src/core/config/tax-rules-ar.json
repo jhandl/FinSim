@@ -90,7 +90,7 @@
   },
   "investmentTypes": [
     {
-      "key": "indexFunds_ar",
+      "key": "merval_ar",
       "label": "MERVAL",
       "baseCurrency": "ARS",
       "assetCountry": "ar",
@@ -105,7 +105,7 @@
       "helpUrl": "https://www.afip.gob.ar/"
     },
     {
-      "key": "shares_ar",
+      "key": "cedear_ar",
       "label": "CEDEARs",
       "baseRef": "globalEquity",
       "baseCurrency": "USD",

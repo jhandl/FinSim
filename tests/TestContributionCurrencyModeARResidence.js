@@ -105,40 +105,40 @@ const TestContributionCurrencyModeARResidence = {
       errors.push(`Cash expected ~1M ARS, got ${rowAge30.cash}`);
     }
 
-    // Local AR equity fund (indexFunds) should have capital in ARS
+    // Local AR equity fund (merval) should have capital in ARS
     // Initial savings 2M + net income surplus invested (less emergency stash 1M)
     // Net income after tax: ~5M - 3M - taxes = ~2M (roughly)
     // Surplus to invest: 2M (initial) + ~2M (surplus) - 1M (emergency) = ~3M ARS
     // Since base currency (ARS) matches residence currency (ARS), this should stay as ARS without conversion
     const capsByKey = rowAge30.investmentCapitalByKey || {};
-    let indexFundsCapital = 0;
+    let mervalCapital = 0;
     for (const k in capsByKey) {
-      if (k === 'indexFunds' || k.indexOf('indexFunds_') === 0) indexFundsCapital += capsByKey[k] || 0;
+      if (k === 'merval' || k.indexOf('merval_') === 0) mervalCapital += capsByKey[k] || 0;
     }
-    if (indexFundsCapital <= 0) {
-      errors.push(`indexFundsCapital should be positive (in ARS), got ${indexFundsCapital}`);
+    if (mervalCapital <= 0) {
+      errors.push(`mervalCapital should be positive (in ARS), got ${mervalCapital}`);
     }
 
     // Expected: approximately 3M ARS, but actual depends on tax calculations
     const expectedARSMin = 1000000;  // At least 1M ARS
     const expectedARSMax = 5000000;   // At most 5M ARS (accounting for variations)
-    if (indexFundsCapital < expectedARSMin || indexFundsCapital > expectedARSMax) {
-      errors.push(`indexFundsCapital (${indexFundsCapital} ARS) outside expected range [${expectedARSMin}, ${expectedARSMax}]`);
+    if (mervalCapital < expectedARSMin || mervalCapital > expectedARSMax) {
+      errors.push(`mervalCapital (${mervalCapital} ARS) outside expected range [${expectedARSMin}, ${expectedARSMax}]`);
     }
 
-    // Shares should remain at 0 since allocation is 0%
-    let sharesCapital = 0;
+    // CEDEARs should remain at 0 since allocation is 0%
+    let cedearCapital = 0;
     for (const k in capsByKey) {
-      if (k === 'shares' || k.indexOf('shares_') === 0) sharesCapital += capsByKey[k] || 0;
+      if (k === 'cedear' || k.indexOf('cedear_') === 0) cedearCapital += capsByKey[k] || 0;
     }
-    if (Math.abs(sharesCapital) > 100) {
-      errors.push(`sharesCapital should be 0, got ${sharesCapital}`);
+    if (Math.abs(cedearCapital) > 100) {
+      errors.push(`cedearCapital should be 0, got ${cedearCapital}`);
     }
 
     // Key assertion: indexFundsCapital should be in ARS (same order of magnitude as ARS amounts)
     // If it were incorrectly converted to USD, it would be much smaller (roughly 1/1500th)
-    if (indexFundsCapital < 100000) {
-      errors.push(`indexFundsCapital (${indexFundsCapital}) seems too small - might be incorrectly converted to USD instead of staying in ARS`);
+    if (mervalCapital < 100000) {
+      errors.push(`mervalCapital (${mervalCapital}) seems too small - might be incorrectly converted to USD instead of staying in ARS`);
     }
 
     return {
@@ -152,7 +152,6 @@ const TestContributionCurrencyModeARResidence = {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = TestContributionCurrencyModeARResidence;
 }
-
 
 
 
