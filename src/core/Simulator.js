@@ -163,6 +163,26 @@ function getResidencyTimeline(params, events) {
   return timeline;
 }
 
+function getCountryForAgeCached(age, events, startCountry) {
+  var actualAge = age;
+  var actualEvents = events;
+  var actualStart = startCountry;
+  if (Array.isArray(age)) {
+    actualEvents = age;
+    actualAge = events;
+  }
+  if (residencyTimeline && typeof actualAge === 'number') {
+    for (var i = 0; i < residencyTimeline.length; i++) {
+      var entry = residencyTimeline[i];
+      if (!entry) continue;
+      if (actualAge >= entry.fromAge && (entry.toAge === null || actualAge <= entry.toAge)) {
+        return entry.country;
+      }
+    }
+  }
+  return getCountryForAge(actualAge, actualEvents, actualStart);
+}
+
 function normalizeCurrency(code) {
   if (code === null || code === undefined) throw new Error('normalizeCurrency: code is null/undefined');
   return String(code).trim().toUpperCase();
@@ -517,7 +537,7 @@ function completeMissingCurrencyAndLinkedCountry(events, startCountry) {
     var evt = events[i];
     if (!evt || !evt.type) continue;
     if (evt.type.indexOf('MV-') === 0) continue;
-    var eventCountry = getCountryForAge(Number(evt.fromAge), events, startCountry);
+    var eventCountry = getCountryForAgeCached(Number(evt.fromAge), events, startCountry);
     if (!evt.linkedCountry) {
       evt.linkedCountry = eventCountry;
     }
@@ -1840,6 +1860,10 @@ function buildForeignTaxCredits(taxman, trailing) {
     if (taxman.taxTotals && typeof taxman.taxTotals[incomeKey] === 'number') {
       sourceTaxes.incomeTax = taxman.taxTotals[incomeKey];
     }
+    var gainsKey = 'capitalGains:' + t.country;
+    if (taxman.taxTotals && typeof taxman.taxTotals[gainsKey] === 'number') {
+      sourceTaxes.capitalGains = taxman.taxTotals[gainsKey];
+    }
     var mapped = taxman.aggregateTreatyBuckets(sourceTaxes, equivalents);
     for (var k in mapped) {
       buckets[k] = (buckets[k] || 0) + mapped[k];
@@ -2403,7 +2427,7 @@ function liquidateAll() {
  */
 function getAllocationsByYear(year) {
   // Derive residence country from person1.age (matches year loop context)
-  var residenceCountry = getCountryForAge(person1.age, events, params.StartCountry);
+  var residenceCountry = getCountryForAgeCached(person1.age, events, params.StartCountry);
 
   var countryAllocations = params.investmentAllocationsByCountry[residenceCountry];
   // Missing per-country allocations means "no investing" for this residence period.
@@ -2427,8 +2451,8 @@ function getPensionContributionsByCountry(year) {
  * @returns {string} - Country code (lowercase)
  */
 function getResidenceCountryForYear(year) {
-  var age = year - params.startingAge + person1.age;
-  var country = getCountryForAge(events, age, params.StartCountry);
+  var age = (person1 && typeof person1.age === 'number') ? person1.age : (year - params.startingAge + person1.age);
+  var country = getCountryForAgeCached(age, events, params.StartCountry);
   return country ? String(country).toLowerCase() : (params.StartCountry || '').toLowerCase();
 }
 

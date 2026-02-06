@@ -551,22 +551,37 @@ class Taxman {
     }
     if (residenceCountry) residenceCountry = String(residenceCountry).toLowerCase();
 
-    var addMetricToAttribution = (metricKey) => {
-      const attr = this.attributionManager.getAttribution(metricKey);
-      if (!attr) return;
+    var self = this;
+    var hadDomesticMetrics = false;
+    var addMetricToAttribution = function (metricKey) {
+      const attr = self.attributionManager.getAttribution(metricKey);
+      if (!attr) return false;
       const breakdown = attr.getBreakdown();
+      var hasAny = false;
       for (const source in breakdown) {
+        hasAny = true;
         taxableIncomeAttribution.add(source, breakdown[source]);
       }
+      if (hasAny) hadDomesticMetrics = true;
+      return hasAny;
     };
 
     // Add income sources
     if (taxBasis === 'domestic' && residenceCountry) {
-      addMetricToAttribution('incomesalaries');
       addMetricToAttribution('incomesalaries:' + residenceCountry);
-      addMetricToAttribution('incomerentals');
+      addMetricToAttribution('incomesalaries');
       addMetricToAttribution('incomerentals:' + residenceCountry);
+      addMetricToAttribution('incomerentals');
       addMetricToAttribution('incomedefinedbenefit');
+      if (!hadDomesticMetrics) {
+        const incomeAttribution = this.attributionManager.getAttribution('income');
+        if (incomeAttribution) {
+          const incomeBreakdown = incomeAttribution.getBreakdown();
+          for (const source in incomeBreakdown) {
+            taxableIncomeAttribution.add(source, incomeBreakdown[source]);
+          }
+        }
+      }
     } else {
       const incomeAttribution = this.attributionManager.getAttribution('income');
       if (incomeAttribution) {
@@ -579,8 +594,8 @@ class Taxman {
 
     // Add private pension income
     if (taxBasis === 'domestic' && residenceCountry) {
-      addMetricToAttribution('incomeprivatepension');
       addMetricToAttribution('incomeprivatepension:' + residenceCountry);
+      addMetricToAttribution('incomeprivatepension');
     } else {
       if (this.privatePensionP1 > 0) taxableIncomeAttribution.add('Private Pension P1', this.privatePensionP1);
       if (this.privatePensionP2 > 0) taxableIncomeAttribution.add('Private Pension P2', this.privatePensionP2);
@@ -685,13 +700,19 @@ class Taxman {
         const baseMap = {};
         var basis = ruleset.getTaxBasis();
         var cc = countryCode ? String(countryCode).toLowerCase() : null;
+        var hadDomestic = false;
 
         if (basis === 'domestic' && cc) {
           var addMetric = function (metricKey) {
             const attr = self.attributionManager.getAttribution(metricKey);
             if (!attr) return;
             const bd = attr.getBreakdown();
-            for (const k in bd) baseMap[k] = (baseMap[k] || 0) + bd[k];
+            var hasAny = false;
+            for (const k in bd) {
+              baseMap[k] = (baseMap[k] || 0) + bd[k];
+              hasAny = true;
+            }
+            if (hasAny) hadDomestic = true;
           };
           addMetric('incomerentals:' + cc);
           addMetric('incomeprivatepension:' + cc);
@@ -703,8 +724,29 @@ class Taxman {
             const neAttr = self.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
             if (neAttr) {
               const bd2 = neAttr.getBreakdown();
-              for (const k in bd2) baseMap[k] = (baseMap[k] || 0) + bd2[k];
+              var hasAny = false;
+              for (const k in bd2) {
+                baseMap[k] = (baseMap[k] || 0) + bd2[k];
+                hasAny = true;
+              }
+              if (hasAny) hadDomestic = true;
             }
+          }
+          if (!hadDomestic) {
+            const incAttr = self.attributionManager.getAttribution('income');
+            if (incAttr) {
+              const bd = incAttr.getBreakdown();
+              for (const k in bd) baseMap[k] = (baseMap[k] || 0) + bd[k];
+            }
+            var removeSalary = function (list) {
+              list.forEach(function (s) {
+                if (s && s.description && baseMap.hasOwnProperty(s.description)) delete baseMap[s.description];
+              });
+            };
+            removeSalary(self.salariesP1);
+            removeSalary(self.salariesP2);
+            if (self.privatePensionP1 > 0) baseMap['Private Pension P1'] = (baseMap['Private Pension P1'] || 0) + self.privatePensionP1;
+            if (self.privatePensionP2 > 0) baseMap['Private Pension P2'] = (baseMap['Private Pension P2'] || 0) + self.privatePensionP2;
           }
           return baseMap;
         }
