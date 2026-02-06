@@ -151,6 +151,23 @@ Placeholders for future wealth/inheritance taxes:
 
 These fields are reserved for possible future features.
 
+### 5.6 `propertyGainsTax` (optional)
+
+Configures how gains from property sales are taxed.
+
+- **`taxRef`**: Which tax base to inject gains into (`"capitalGains"` or `"incomeTax"`).
+- **`primaryResidenceExemption`**:
+  - `enabled`: Whether a primary residence exemption applies.
+  - `proportional`: Whether the exemption is proportional to qualifying occupancy.
+- **`holdingPeriodExemptionYears`**: Cliff exemption in years (number or `null`). If held years are >= this value, the gain is fully exempt.
+- **`residentsOnly`**: When true, tax only applies if the seller is resident in the source country at sale.
+- **`capitalGainsOptions`** (used when `taxRef = "capitalGains"`):
+  - `rateRef`: Reference to CGT rate (e.g., `"capitalGainsTax.rate"`).
+  - `eligibleForAnnualExemption`: Whether annual CGT exemption applies.
+  - `allowLossOffset`: Whether losses can offset gains.
+
+This section is optional; its absence means property gains taxation is not configured for that country. See the IE rules for the canonical example.
+
 ---
 
 ## 6. Pension Rules

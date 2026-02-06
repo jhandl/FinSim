@@ -111,6 +111,20 @@
     "allowLossOffset": true,
     "deemedDisposalYears": 8
   },
+  "propertyGainsTax": {
+    "taxRef": "capitalGains",
+    "primaryResidenceExemption": {
+      "enabled": true,
+      "proportional": true
+    },
+    "holdingPeriodExemptionYears": null,
+    "residentsOnly": false,
+    "capitalGainsOptions": {
+      "rateRef": "capitalGainsTax.rate",
+      "eligibleForAnnualExemption": true,
+      "allowLossOffset": true
+    }
+  },
   "dividendTax": {
     "rate": 0.33,
     "annualExemption": 0,

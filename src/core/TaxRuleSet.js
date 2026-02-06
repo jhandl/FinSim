@@ -696,6 +696,17 @@ class TaxRuleSet {
     return typeof cgt.rate === 'number' ? cgt.rate : 0;
   }
 
+  // ----- Property Gains Tax -----
+  getPropertyGainsTaxSpec() {
+    var pgt = this.raw.propertyGainsTax;
+    if (pgt && typeof pgt === 'object') return pgt;
+    return null;
+  }
+
+  hasPropertyGainsTax() {
+    return !!(this.raw.propertyGainsTax && typeof this.raw.propertyGainsTax === 'object');
+  }
+
   // ----- Investment Types (Generic) -----
   getInvestmentTypes() {
     return Array.isArray(this.raw.investmentTypes) ? this.raw.investmentTypes : [];
