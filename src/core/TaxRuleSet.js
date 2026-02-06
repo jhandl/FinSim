@@ -287,6 +287,42 @@ class TaxRuleSet {
     return {};
   }
 
+  getTaxBasis() {
+    var basis = this.raw.taxBasis;
+    if (basis === 'worldwide' || basis === 'domestic') return basis;
+    return 'worldwide';
+  }
+
+  getTreatyEquivalents() {
+    var equiv = this.raw.treatyEquivalents;
+    if (equiv && typeof equiv === 'object') return equiv;
+    return {};
+  }
+
+  hasTreatyWith(otherCountry) {
+    if (!otherCountry) return false;
+    var myCountry = this.getCountryCode();
+    if (!myCountry) return false;
+    var my = myCountry.toLowerCase();
+    var other = String(otherCountry).toLowerCase();
+    if (my === other) return false;
+
+    var cfg = Config.getInstance();
+    var globalRules = cfg.getGlobalTaxRules();
+    var treaties = globalRules.treaties || [];
+
+    for (var i = 0; i < treaties.length; i++) {
+      var pair = treaties[i];
+      if (!Array.isArray(pair) || pair.length !== 2) continue;
+      var c1 = String(pair[0]).toLowerCase();
+      var c2 = String(pair[1]).toLowerCase();
+      if ((c1 === my && c2 === other) || (c1 === other && c2 === my)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // ------ Generic Getters (Country-Neutral) ------
   /**
    * Return the raw income tax specification object.  Keys are optional and

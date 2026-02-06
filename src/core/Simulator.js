@@ -36,6 +36,8 @@ var residenceCurrency, currencyCountryCache;
 var economicData, baseCountryCode;
 // Module-level FX conversion cache - persists across Monte Carlo runs (FX rates are deterministic)
 var fxConversionCache = {};
+// Module-level residency timeline cache - persists across Monte Carlo runs
+var residencyTimeline = null;
 
 const Phases = {
   growth: 'growth',
@@ -44,11 +46,14 @@ const Phases = {
 
 
 async function run() {
+  residencyTimeline = null;
   if (!(await initializeSimulator())) {
     // If initialization fails (validation errors), ensure UI state is reset
     uiManager.ui.flush();
     return;
   }
+  residencyTimeline = getResidencyTimeline(params, events);
+
   // Monte Carlo mode is enabled when user selects it AND there are volatility values.
   var hasVolatility = (params.growthDevPension > 0);
   var volByKey = params.investmentVolatilitiesByKey || {};
@@ -101,6 +106,61 @@ function flagSimulationFailure(age) {
 function normalizeCountry(code) {
   if (code === null || code === undefined) throw new Error('normalizeCountry: code is null/undefined');
   return String(code).trim().toLowerCase();
+}
+
+function getResidencyTimeline(params, events) {
+  if (residencyTimeline) return residencyTimeline;
+  var cfg = Config.getInstance();
+  var startCountry = normalizeCountry((params && params.StartCountry) ? params.StartCountry : cfg.getDefaultCountry());
+  var startAge = (params && typeof params.startingAge === 'number') ? params.startingAge : 0;
+  var targetAge = (params && typeof params.targetAge === 'number') ? params.targetAge : null;
+  var moves = [];
+
+  for (var i = 0; i < events.length; i++) {
+    var e = events[i];
+    if (!e || !e.type) continue;
+    if (String(e.type).indexOf('MV-') !== 0) continue;
+    var age = (typeof e.fromAge === 'number') ? e.fromAge : parseFloat(e.fromAge);
+    if (!isFinite(age)) continue;
+    moves.push({
+      age: age,
+      country: normalizeCountry(e.type.substring(3)),
+      index: i
+    });
+  }
+
+  moves.sort(function (a, b) {
+    if (a.age === b.age) return a.index - b.index;
+    return a.age - b.age;
+  });
+
+  var timeline = [];
+  var currentCountry = startCountry;
+  var currentFromAge = startAge;
+
+  for (var j = 0; j < moves.length; j++) {
+    var mv = moves[j];
+    if (mv.age <= currentFromAge) {
+      currentCountry = mv.country;
+      continue;
+    }
+    timeline.push({
+      fromAge: currentFromAge,
+      toAge: mv.age - 1,
+      country: currentCountry
+    });
+    currentCountry = mv.country;
+    currentFromAge = mv.age;
+  }
+
+  timeline.push({
+    fromAge: currentFromAge,
+    toAge: (typeof targetAge === 'number') ? (targetAge - 1) : null,
+    country: currentCountry
+  });
+
+  residencyTimeline = timeline;
+  return timeline;
 }
 
 function normalizeCurrency(code) {
@@ -1765,6 +1825,42 @@ function buyPensionWithMix(pensionPot, amount, currency, country, mixConfig, cur
   }
 }
 
+function buildForeignTaxCredits(taxman, trailing) {
+  var ruleset = taxman.ruleset;
+  var equivalents = ruleset.getTreatyEquivalents();
+  var buckets = {};
+  var treatyFound = false;
+  for (var i = 0; i < trailing.length; i++) {
+    var t = trailing[i];
+    if (!t || !t.country) continue;
+    if (!ruleset.hasTreatyWith(t.country)) continue;
+    treatyFound = true;
+    var sourceTaxes = {};
+    var incomeKey = 'incomeTax:' + t.country;
+    if (taxman.taxTotals && typeof taxman.taxTotals[incomeKey] === 'number') {
+      sourceTaxes.incomeTax = taxman.taxTotals[incomeKey];
+    }
+    var mapped = taxman.aggregateTreatyBuckets(sourceTaxes, equivalents);
+    for (var k in mapped) {
+      buckets[k] = (buckets[k] || 0) + mapped[k];
+    }
+  }
+  if (!treatyFound) return null;
+  if (!buckets.income && !buckets.capitalGains && !buckets.dividends) return null;
+  buckets.treatyExists = true;
+  return buckets;
+}
+
+function computeNetIncomeWithForeignCredits(taxman) {
+  var trailing = taxman.getActiveCrossBorderTaxCountries();
+  if (trailing && trailing.length > 0) {
+    taxman.computeTaxes();
+    var credits = buildForeignTaxCredits(taxman, trailing);
+    return taxman.netIncome(credits);
+  }
+  return taxman.netIncome();
+}
+
 function rebalancePersonPensions(person) {
   var pensions = person.pensions;
   var keys = Object.keys(pensions).sort();
@@ -1786,7 +1882,7 @@ function rebalancePersonPensions(person) {
 
 
 function handleInvestments() {
-  netIncome = revenue.netIncome() + incomeTaxFree;
+  netIncome = computeNetIncomeWithForeignCredits(revenue) + incomeTaxFree;
   earnedNetIncome = netIncome;
   householdPhase = 'growth';
   if (person1.phase === Phases.retired && (!person2 || person2.phase === Phases.retired)) {
@@ -2157,7 +2253,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
   if (person2 && person2.phase === Phases.retired) {
     totalPensionCapital += person2.getTotalPensionCapital();
   }
-  var totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, clonedRevenue.netIncome()+incomeTaxFree);
+  var totalAvailable = Math.max(0, cash) + Math.max(0, totalPensionCapital) + Math.max(0, computeNetIncomeWithForeignCredits(clonedRevenue) + incomeTaxFree);
   if (needed > totalAvailable + 0.01) {
     liquidateAll();
     return;
@@ -2245,7 +2341,7 @@ function withdraw(cashPriority, pensionPriority, FundsPriority, SharesPriority) 
         }
       }
 
-      netIncome = cashWithdraw + revenue.netIncome() + incomeTaxFree;;
+      netIncome = cashWithdraw + computeNetIncomeWithForeignCredits(revenue) + incomeTaxFree;;
       if (keepTrying == false) { break; }
     }
   }
@@ -2294,7 +2390,7 @@ function liquidateAll() {
     }
   }
 
-  netIncome = cashWithdraw + revenue.netIncome() + incomeTaxFree;
+  netIncome = cashWithdraw + computeNetIncomeWithForeignCredits(revenue) + incomeTaxFree;
 }
 
 /**

@@ -2,6 +2,12 @@
   "country": "IE",
   "countryName": "Ireland",
   "version": "2025.12",
+  "taxBasis": "worldwide",
+  "treatyEquivalents": {
+    "incomeTax": "income",
+    "capitalGains": "capitalGains",
+    "dividends": "dividends"
+  },
   "updateMessage": "Incorporates Budget 2026 changes and PRSI increased to 4.2%",
   "locale": {
     "numberLocale": "en-IE",

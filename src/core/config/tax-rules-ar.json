@@ -2,6 +2,12 @@
   "country": "AR",
   "countryName": "Argentina",
   "version": "2025.12",
+  "taxBasis": "domestic",
+  "treatyEquivalents": {
+    "incomeTax": "income",
+    "capitalGains": "capitalGains",
+    "dividends": "dividends"
+  },
   "updateMessage": "",
   "locale": {
     "numberLocale": "es-AR",

@@ -265,13 +265,14 @@ class Taxman {
       description: description,
       category: (options && (options.category === 'exitTax' || options.category === 'cgt')) ? options.category : 'cgt',
       eligibleForAnnualExemption: options && typeof options.eligibleForAnnualExemption === 'boolean' ? options.eligibleForAnnualExemption : true,
-      allowLossOffset: options && typeof options.allowLossOffset === 'boolean' ? options.allowLossOffset : true
+      allowLossOffset: options && typeof options.allowLossOffset === 'boolean' ? options.allowLossOffset : true,
+      assetCountry: assetCountry ? String(assetCountry).toLowerCase() : null
     };
     rateBucket.entries.push(entry);
 
   };
 
-  computeTaxes() {
+  computeTaxes(foreignTaxCredits) {
     this.resetTaxAttributions();
     // Reset dynamic totals at start of each computation
     this.taxTotals = {};
@@ -286,14 +287,14 @@ class Taxman {
       }
     }
 
-    this.computeIT();
+    this.computeIT(foreignTaxCredits);
     this.computeSocialContributionsGeneric();
     this.computeAdditionalTaxesGeneric();
-    this.computeCGT();
+    this.computeCGT(foreignTaxCredits);
   };
 
-  netIncome() {
-    this.computeTaxes();
+  netIncome(foreignTaxCredits) {
+    this.computeTaxes(foreignTaxCredits);
     let investmentTypeGross = Object.values(this.investmentTypeIncome || {}).reduce((sum, val) => sum + val, 0);
     let gross = this.income - (this.pensionContribAmountP1 + this.pensionContribAmountP2) +
       (this.privatePensionP1 + this.privatePensionP2) +
@@ -427,6 +428,28 @@ class Taxman {
     return active;
   }
 
+  applyForeignTaxCredit(sourceTax, residenceTax, treatyExists) {
+    if (!treatyExists) return 0;
+    if (typeof sourceTax !== 'number' || sourceTax <= 0) return 0;
+    if (typeof residenceTax !== 'number' || residenceTax <= 0) return 0;
+    return Math.min(sourceTax, residenceTax);
+  }
+
+  aggregateTreatyBuckets(sourceTaxes, treatyEquivalents) {
+    var buckets = {};
+    if (!sourceTaxes || typeof sourceTaxes !== 'object') return buckets;
+    var equiv = treatyEquivalents || {};
+    for (var taxId in sourceTaxes) {
+      if (!Object.prototype.hasOwnProperty.call(sourceTaxes, taxId)) continue;
+      var bucket = equiv[taxId];
+      if (!bucket) continue;
+      var amount = sourceTaxes[taxId];
+      if (typeof amount !== 'number') continue;
+      buckets[bucket] = (buckets[bucket] || 0) + amount;
+    }
+    return buckets;
+  }
+
   resetTaxAttributions() {
     // Reset tax attributions to prevent double-counting when taxes are recomputed multiple times in the same year
     if (this.attributionManager && this.attributionManager.yearlyAttributions) {
@@ -512,25 +535,65 @@ class Taxman {
     return tax;
   }
 
-  computeIT() {
+  computeIT(foreignTaxCredits) {
     // Create an attribution object for taxable income
     const taxableIncomeAttribution = new Attribution('taxableIncome');
+    if (!this.ruleset) {
+      console.error("Taxman.computeIT: ruleset is null, cannot compute income tax");
+      return;
+    }
+    var taxBasis = this.ruleset.getTaxBasis();
+    var residenceCountry = null;
+    if (this.countryHistory && this.countryHistory.length) {
+      residenceCountry = this.countryHistory[this.countryHistory.length - 1].country;
+    } else if (this.ruleset && typeof this.ruleset.getCountryCode === 'function') {
+      residenceCountry = this.ruleset.getCountryCode();
+    }
+    if (residenceCountry) residenceCountry = String(residenceCountry).toLowerCase();
+
+    var addMetricToAttribution = (metricKey) => {
+      const attr = this.attributionManager.getAttribution(metricKey);
+      if (!attr) return;
+      const breakdown = attr.getBreakdown();
+      for (const source in breakdown) {
+        taxableIncomeAttribution.add(source, breakdown[source]);
+      }
+    };
 
     // Add income sources
-    const incomeAttribution = this.attributionManager.getAttribution('income');
-    if (incomeAttribution) {
-      const incomeBreakdown = incomeAttribution.getBreakdown();
-      for (const source in incomeBreakdown) {
-        taxableIncomeAttribution.add(source, incomeBreakdown[source]);
+    if (taxBasis === 'domestic' && residenceCountry) {
+      addMetricToAttribution('incomesalaries');
+      addMetricToAttribution('incomesalaries:' + residenceCountry);
+      addMetricToAttribution('incomerentals');
+      addMetricToAttribution('incomerentals:' + residenceCountry);
+      addMetricToAttribution('incomedefinedbenefit');
+    } else {
+      const incomeAttribution = this.attributionManager.getAttribution('income');
+      if (incomeAttribution) {
+        const incomeBreakdown = incomeAttribution.getBreakdown();
+        for (const source in incomeBreakdown) {
+          taxableIncomeAttribution.add(source, incomeBreakdown[source]);
+        }
       }
     }
 
     // Add private pension income
-    if (this.privatePensionP1 > 0) taxableIncomeAttribution.add('Private Pension P1', this.privatePensionP1);
-    if (this.privatePensionP2 > 0) taxableIncomeAttribution.add('Private Pension P2', this.privatePensionP2);
+    if (taxBasis === 'domestic' && residenceCountry) {
+      addMetricToAttribution('incomeprivatepension');
+      addMetricToAttribution('incomeprivatepension:' + residenceCountry);
+    } else {
+      if (this.privatePensionP1 > 0) taxableIncomeAttribution.add('Private Pension P1', this.privatePensionP1);
+      if (this.privatePensionP2 > 0) taxableIncomeAttribution.add('Private Pension P2', this.privatePensionP2);
+    }
 
     // Add investment type income sources (RSUs, etc.)
     for (const typeKey in this.investmentTypeIncome) {
+      if (taxBasis === 'domestic' && residenceCountry) {
+        if (typeKey.indexOf('_') > -1) {
+          const suffix = typeKey.split('_').pop();
+          if (suffix !== residenceCountry) continue;
+        }
+      }
       const attr = this.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
       if (attr) {
         const breakdown = attr.getBreakdown();
@@ -545,10 +608,6 @@ class Taxman {
     taxableIncomeAttribution.add('Their Pension Relief', -this.pensionContribReliefP2);
 
     // Determine brackets and married band increase using ruleset if available
-    if (!this.ruleset) {
-      console.error("Taxman.computeIT: ruleset is null, cannot compute income tax");
-      return;
-    }
     var itBands;
     var marriedBandIncrease = 0;
     var status = this.married ? 'married' : 'single';
@@ -619,46 +678,86 @@ class Taxman {
     // Apply trailing countries' income tax using their ruleset on non-employment and pension income
     const trailing = this.getActiveCrossBorderTaxCountries();
     if (trailing && trailing.length > 0) {
-      const baseMap = {};
-      // Start from the generic income attribution
-      const incAttr = this.attributionManager.getAttribution('income');
-      if (incAttr) {
-        const bd = incAttr.getBreakdown();
-        for (const k in bd) baseMap[k] = (baseMap[k] || 0) + bd[k];
-      }
-      // Include all investment type income attribution (e.g. RSUs - common non-employment income bucket)
-      for (const typeKey in this.investmentTypeIncome) {
-        const neAttr = this.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
-        if (neAttr) {
-          const bd2 = neAttr.getBreakdown();
-          for (const k in bd2) baseMap[k] = (baseMap[k] || 0) + bd2[k];
-        }
-      }
-      // Remove salary sources to focus on non-employment income
-      var removeSalary = function (list) {
-        list.forEach(function (s) {
-          if (s && s.description && baseMap.hasOwnProperty(s.description)) delete baseMap[s.description];
-        });
-      };
-      removeSalary(this.salariesP1);
-      removeSalary(this.salariesP2);
-      // Ensure private pension income is included explicitly
-      if (this.privatePensionP1 > 0) baseMap['Private Pension P1'] = (baseMap['Private Pension P1'] || 0) + this.privatePensionP1;
-      if (this.privatePensionP2 > 0) baseMap['Private Pension P2'] = (baseMap['Private Pension P2'] || 0) + this.privatePensionP2;
-
-      // Convert consolidated map to an Attribution for progressive computation
-      const xAttr = new Attribution('crossBorderIncome');
-      for (const src in baseMap) {
-        var val = baseMap[src];
-        if (val !== 0) xAttr.add(src, val);
-      }
-
-      // Compute tax for each trailing country using its own bands; no credits/currency conversion here
+      const self = this;
       var status = this.married ? 'married' : 'single';
+
+      var buildBaseMap = function (countryCode, ruleset) {
+        const baseMap = {};
+        var basis = ruleset.getTaxBasis();
+        var cc = countryCode ? String(countryCode).toLowerCase() : null;
+
+        if (basis === 'domestic' && cc) {
+          var addMetric = function (metricKey) {
+            const attr = self.attributionManager.getAttribution(metricKey);
+            if (!attr) return;
+            const bd = attr.getBreakdown();
+            for (const k in bd) baseMap[k] = (baseMap[k] || 0) + bd[k];
+          };
+          addMetric('incomerentals:' + cc);
+          addMetric('incomeprivatepension:' + cc);
+          for (const typeKey in self.investmentTypeIncome) {
+            if (typeKey.indexOf('_') > -1) {
+              const suffix = typeKey.split('_').pop();
+              if (suffix !== cc) continue;
+            }
+            const neAttr = self.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
+            if (neAttr) {
+              const bd2 = neAttr.getBreakdown();
+              for (const k in bd2) baseMap[k] = (baseMap[k] || 0) + bd2[k];
+            }
+          }
+          return baseMap;
+        }
+
+        // Worldwide: start from the generic income attribution
+        const incAttr = self.attributionManager.getAttribution('income');
+        if (incAttr) {
+          const bd = incAttr.getBreakdown();
+          for (const k in bd) baseMap[k] = (baseMap[k] || 0) + bd[k];
+        }
+        // Include all investment type income attribution (e.g. RSUs - common non-employment income bucket)
+        for (const typeKey in self.investmentTypeIncome) {
+          const neAttr = self.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
+          if (neAttr) {
+            const bd2 = neAttr.getBreakdown();
+            for (const k in bd2) baseMap[k] = (baseMap[k] || 0) + bd2[k];
+          }
+        }
+        // Remove salary sources to focus on non-employment income
+        var removeSalary = function (list) {
+          list.forEach(function (s) {
+            if (s && s.description && baseMap.hasOwnProperty(s.description)) delete baseMap[s.description];
+          });
+        };
+        removeSalary(self.salariesP1);
+        removeSalary(self.salariesP2);
+        // Ensure private pension income is included explicitly
+        if (self.privatePensionP1 > 0) baseMap['Private Pension P1'] = (baseMap['Private Pension P1'] || 0) + self.privatePensionP1;
+        if (self.privatePensionP2 > 0) baseMap['Private Pension P2'] = (baseMap['Private Pension P2'] || 0) + self.privatePensionP2;
+
+        return baseMap;
+      };
+
       for (var i = 0; i < trailing.length; i++) {
         var t = trailing[i];
+        var baseMap = buildBaseMap(t.country, t.ruleset);
+        const xAttr = new Attribution('crossBorderIncome');
+        for (const src in baseMap) {
+          var val = baseMap[src];
+          if (val !== 0) xAttr.add(src, val);
+        }
         var bands = t.ruleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
         this.computeProgressiveTax(bands, xAttr, 'incomeTax:' + t.country);
+      }
+    }
+
+    var creditBuckets = foreignTaxCredits || null;
+    if (creditBuckets && typeof creditBuckets.income === 'number') {
+      var currentTax = (this.taxTotals && typeof this.taxTotals['incomeTax'] === 'number') ? this.taxTotals['incomeTax'] : 0;
+      var treatyOk = !(creditBuckets.treatyExists === false);
+      var creditAmount = this.applyForeignTaxCredit(creditBuckets.income, currentTax, treatyOk);
+      if (creditAmount > 0) {
+        this._recordTax('incomeTax', 'Foreign Tax Credit', -creditAmount);
       }
     }
   };
@@ -992,11 +1091,19 @@ class Taxman {
     }
   }
 
-  computeCGT() {
+  computeCGT(foreignTaxCredits) {
     if (!this.ruleset) {
       console.error("Taxman.computeCGT: ruleset is null, cannot compute capital gains tax");
       return;
     }
+    var taxBasis = this.ruleset.getTaxBasis();
+    var residenceCountry = null;
+    if (this.countryHistory && this.countryHistory.length) {
+      residenceCountry = this.countryHistory[this.countryHistory.length - 1].country;
+    } else if (this.ruleset && typeof this.ruleset.getCountryCode === 'function') {
+      residenceCountry = this.ruleset.getCountryCode();
+    }
+    if (residenceCountry) residenceCountry = String(residenceCountry).toLowerCase();
     // Separate handling for Exit Tax vs CGT, and respect per-gain flags
     let totalTax = 0;
     const annualExemption = adjust(this.ruleset.getCapitalGainsAnnualExemption());
@@ -1032,6 +1139,9 @@ class Taxman {
       const entries = Array.isArray(bucket.entries) ? bucket.entries : [];
       for (const entry of entries) {
         if (!entry || entry.amount <= 0) continue; // Ignore non-positive entries here
+        if (taxBasis === 'domestic' && residenceCountry && entry.assetCountry && entry.assetCountry !== residenceCountry) {
+          continue;
+        }
         const numericRate = parseFloat(rate);
         let remainingForThis = entry.amount;
 
@@ -1071,6 +1181,16 @@ class Taxman {
 
     // Compute total tax combining exit tax and CGT (annual exemption already applied to CGT entries above)
     totalTax = totalExitTax + totalCGTTax;
+
+    var creditBuckets = foreignTaxCredits || null;
+    if (creditBuckets && typeof creditBuckets.capitalGains === 'number') {
+      var currentTax = (this.taxTotals && typeof this.taxTotals['capitalGains'] === 'number') ? this.taxTotals['capitalGains'] : 0;
+      var treatyOk = !(creditBuckets.treatyExists === false);
+      var creditAmount = this.applyForeignTaxCredit(creditBuckets.capitalGains, currentTax, treatyOk);
+      if (creditAmount > 0) {
+        this._recordTax('capitalGains', 'Foreign Tax Credit', -creditAmount);
+      }
+    }
 
     // Display-only attribution: show a CGT Relief line for tooltip without altering totals
     try {

@@ -2,6 +2,12 @@
   "country": "US",
   "countryName": "United States",
   "version": "2025.12",
+  "taxBasis": "worldwide",
+  "treatyEquivalents": {
+    "incomeTax": "income",
+    "capitalGains": "capitalGains",
+    "dividends": "dividends"
+  },
   "updateMessage": "Adds experimental support for US-style federal taxes (income tax + FICA + CGT) within FinSim.",
 
   "locale": { "numberLocale": "en-US", "currencyCode": "USD", "currencySymbol": "$" },

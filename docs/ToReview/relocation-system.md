@@ -219,6 +219,21 @@ Tax rules include `residencyRules` with `postEmigrationTaxYears` and `taxesForei
 
 `pensionSystem.type` (state_only, private_allowed, mixed) determines conflicts. Detector flags pensionable events after moving to state-only countries, prompting SI → SInp conversion.
 
+### Residency Timeline
+
+`getResidencyTimeline()` derives a cached residency timeline from `StartCountry` and MV-* events during `Simulator.run()`. The timeline is computed once per run and reused across Monte Carlo iterations for efficiency.
+
+Timeline shape:
+`[{ fromAge, toAge, country }]`
+
+### Tax Treaties
+
+Tax treaties are modeled as a simple existence check with standard foreign tax credits applied to treaty buckets. The treaty list lives in `src/core/config/tax-rules-global.json`, and currently includes an IE–US entry.
+
+Tax basis is configured per country via `taxBasis`:
+- `worldwide`: taxes worldwide income
+- `domestic`: taxes domestic income only
+
 ## User Interface
 
 ### Start Country Selection

@@ -20,6 +20,12 @@
       "helpText": "Represents diversified bond investments (government or corporate). Bonds typically offer lower returns than equities but with lower volatility."
     }
   ],
+  "treaties": [
+    [
+      "ie",
+      "us"
+    ]
+  ],
   "assetTaxes": {
     "dividend": {
       "us": 0.3
