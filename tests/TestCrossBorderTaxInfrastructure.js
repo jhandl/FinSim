@@ -243,13 +243,31 @@ module.exports = {
       + 'tm.salariesP2 = [];'
       + 'tm.person1Ref = { age: 40 };'
       + 'tm.gains = {};'
-      + 'tm.computeTaxes({ income: 50, treatyExists: true });'
-      + 'return tm.taxTotals["incomeTax"];'
+      + 'tm.computeTaxes({ income: 50, treatyExists: true, byCountry: { income: { us: 50 } } });'
+      + 'var countryAttr = tm.attributionManager.getAttribution("tax:incomeTax:us");'
+      + 'var countryCredit = 0;'
+      + 'var hasCountryLabel = false;'
+      + 'if (countryAttr) {'
+      + '  var bd = countryAttr.getBreakdown();'
+      + '  for (var key in bd) {'
+      + '    if (key === "Foreign Tax Credit (US)") {'
+      + '      countryCredit += bd[key];'
+      + '      hasCountryLabel = true;'
+      + '    }'
+      + '  }'
+      + '}'
+      + 'return { incomeTax: tm.taxTotals["incomeTax"], countryCredit: countryCredit, hasCountryLabel: hasCountryLabel };'
       + '})()',
       ctx
     );
-    if (ftcResults !== 50) {
+    if (ftcResults.incomeTax !== 50) {
       errors.push('Foreign tax credit should reduce income tax totals');
+    }
+    if (Math.abs(ftcResults.countryCredit + 50) > 1e-6) {
+      errors.push('Foreign tax credit should be attributed under tax:incomeTax:us as -50');
+    }
+    if (!ftcResults.hasCountryLabel) {
+      errors.push('Foreign tax credit country attribution should include label "Foreign Tax Credit (US)"');
     }
 
     // Test 8: Backward compatibility (single-country scenario sanity)

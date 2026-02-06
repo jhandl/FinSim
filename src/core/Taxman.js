@@ -158,13 +158,23 @@ class Taxman {
 
     const grossAmount = money.amount;
     
-    // Apply withholding tax if asset country is provided
+    // Apply withholding tax only for cross-border assets
     var withholdingAmount = 0;
     if (assetCountry) {
-      withholdingAmount = this.getWithholdingTax('dividend', assetCountry, grossAmount);
+      var residenceCountry = null;
+      if (this.countryHistory && this.countryHistory.length) {
+        residenceCountry = this.countryHistory[this.countryHistory.length - 1].country;
+      } else if (this.ruleset && typeof this.ruleset.getCountryCode === 'function') {
+        residenceCountry = this.ruleset.getCountryCode();
+      }
+      var isCrossBorder = !residenceCountry || String(assetCountry).toLowerCase() !== String(residenceCountry).toLowerCase();
+      if (isCrossBorder) {
+        withholdingAmount = this.getWithholdingTax('dividend', assetCountry, grossAmount);
+      }
       if (withholdingAmount > 0) {
         if (!this.withholdingEntries) this.withholdingEntries = [];
         this.withholdingEntries.push({
+          country: String(assetCountry).toLowerCase(),
           source: assetCountry.toUpperCase() + ' Dividend Withholding',
           amount: withholdingAmount
         });
@@ -220,13 +230,23 @@ class Taxman {
 
     const grossAmount = money.amount;
     
-    // Apply withholding tax if asset country is provided
+    // Apply withholding tax only for cross-border assets
     var withholdingAmount = 0;
     if (assetCountry) {
-      withholdingAmount = this.getWithholdingTax('capitalGains', assetCountry, grossAmount);
+      var residenceCountry = null;
+      if (this.countryHistory && this.countryHistory.length) {
+        residenceCountry = this.countryHistory[this.countryHistory.length - 1].country;
+      } else if (this.ruleset && typeof this.ruleset.getCountryCode === 'function') {
+        residenceCountry = this.ruleset.getCountryCode();
+      }
+      var isCrossBorder = !residenceCountry || String(assetCountry).toLowerCase() !== String(residenceCountry).toLowerCase();
+      if (isCrossBorder) {
+        withholdingAmount = this.getWithholdingTax('capitalGains', assetCountry, grossAmount);
+      }
       if (withholdingAmount > 0) {
         if (!this.withholdingEntries) this.withholdingEntries = [];
         this.withholdingEntries.push({
+          country: String(assetCountry).toLowerCase(),
           source: assetCountry.toUpperCase() + ' Capital Gains Withholding',
           amount: withholdingAmount
         });
@@ -283,6 +303,9 @@ class Taxman {
         var w = this.withholdingEntries[i];
         if (w && typeof w.amount === 'number' && w.amount !== 0) {
           this._recordTax('withholding', w.source || 'Withholding', w.amount);
+          if (w.country && this.attributionManager && typeof this.attributionManager.record === 'function') {
+            this.attributionManager.record('tax:withholding:' + String(w.country).toLowerCase(), w.source || 'Withholding', w.amount);
+          }
         }
       }
     }
@@ -433,6 +456,38 @@ class Taxman {
     if (typeof sourceTax !== 'number' || sourceTax <= 0) return 0;
     if (typeof residenceTax !== 'number' || residenceTax <= 0) return 0;
     return Math.min(sourceTax, residenceTax);
+  }
+
+  _recordForeignTaxCreditByCountry(taxId, bucketName, creditBuckets, creditAmount) {
+    if (!this.attributionManager || typeof this.attributionManager.record !== 'function') return;
+    if (!creditBuckets || !creditBuckets.byCountry || !creditBuckets.byCountry[bucketName]) return;
+    if (!(typeof creditAmount === 'number') || creditAmount <= 0) return;
+
+    var countryMap = creditBuckets.byCountry[bucketName];
+    var rawCountries = Object.keys(countryMap);
+    if (!rawCountries || rawCountries.length === 0) return;
+
+    var entries = [];
+    var totalForeign = 0;
+    for (var i = 0; i < rawCountries.length; i++) {
+      var rawCode = String(rawCountries[i] || '').toLowerCase();
+      var foreignAmount = countryMap[rawCountries[i]];
+      if (!rawCode) continue;
+      if (!(typeof foreignAmount === 'number') || foreignAmount <= 0) continue;
+      entries.push({ countryCode: rawCode, foreignAmount: foreignAmount });
+      totalForeign += foreignAmount;
+    }
+    if (!entries.length) return;
+    if (totalForeign <= 0) return;
+
+    var remaining = creditAmount;
+    for (var j = 0; j < entries.length; j++) {
+      var entry = entries[j];
+      var allocated = (j === entries.length - 1) ? remaining : (creditAmount * (entry.foreignAmount / totalForeign));
+      if (allocated <= 0) continue;
+      remaining -= allocated;
+      this.attributionManager.record('tax:' + taxId + ':' + entry.countryCode, 'Foreign Tax Credit (' + entry.countryCode.toUpperCase() + ')', -allocated);
+    }
   }
 
   aggregateTreatyBuckets(sourceTaxes, treatyEquivalents) {
@@ -800,6 +855,7 @@ class Taxman {
       var creditAmount = this.applyForeignTaxCredit(creditBuckets.income, currentTax, treatyOk);
       if (creditAmount > 0) {
         this._recordTax('incomeTax', 'Foreign Tax Credit', -creditAmount);
+        this._recordForeignTaxCreditByCountry('incomeTax', 'income', creditBuckets, creditAmount);
       }
     }
   };
@@ -1231,6 +1287,7 @@ class Taxman {
       var creditAmount = this.applyForeignTaxCredit(creditBuckets.capitalGains, currentTax, treatyOk);
       if (creditAmount > 0) {
         this._recordTax('capitalGains', 'Foreign Tax Credit', -creditAmount);
+        this._recordForeignTaxCreditByCountry('capitalGains', 'capitalGains', creditBuckets, creditAmount);
       }
     }
 

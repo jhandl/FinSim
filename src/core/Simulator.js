@@ -1849,6 +1849,7 @@ function buildForeignTaxCredits(taxman, trailing) {
   var ruleset = taxman.ruleset;
   var equivalents = ruleset.getTreatyEquivalents();
   var buckets = {};
+  var byCountry = {};
   var treatyFound = false;
   for (var i = 0; i < trailing.length; i++) {
     var t = trailing[i];
@@ -1867,10 +1868,13 @@ function buildForeignTaxCredits(taxman, trailing) {
     var mapped = taxman.aggregateTreatyBuckets(sourceTaxes, equivalents);
     for (var k in mapped) {
       buckets[k] = (buckets[k] || 0) + mapped[k];
+      if (!byCountry[k]) byCountry[k] = {};
+      byCountry[k][t.country] = (byCountry[k][t.country] || 0) + mapped[k];
     }
   }
   if (!treatyFound) return null;
   if (!buckets.income && !buckets.capitalGains && !buckets.dividends) return null;
+  buckets.byCountry = byCountry;
   buckets.treatyExists = true;
   return buckets;
 }
