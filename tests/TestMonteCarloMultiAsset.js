@@ -1,3 +1,4 @@
+// @finsim-test-speed: slow
 /* Monte Carlo Multi-Asset Portfolio Test
  * 
  * This test validates a diversified portfolio with pension (12% volatility), 

@@ -1,3 +1,4 @@
+// @finsim-test-speed: slow
 const { TestFramework } = require('../src/core/TestFramework.js');
 
 module.exports = {

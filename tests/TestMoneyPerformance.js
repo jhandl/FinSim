@@ -1,3 +1,4 @@
+// @finsim-test-speed: slow
 const { TestFramework } = require('../src/core/TestFramework.js');
 const vm = require('vm');
 const perfHooks = require('perf_hooks');

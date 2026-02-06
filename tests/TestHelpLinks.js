@@ -1,3 +1,4 @@
+// @finsim-test-speed: slow
 // Comprehensive test suite for validating help links in help.yml
 // Uses Playwright to fetch URLs with a real browser TLS fingerprint,
 // avoiding anti-bot detection that blocks Node.js fetch requests.

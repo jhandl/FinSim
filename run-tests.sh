@@ -30,13 +30,24 @@ show_usage() {
     echo "OPTIONS:"
     echo -e "  ${YELLOW}-t, --type TYPE${NC}   Run only tests of the specified type:"
     echo -e "                      ${GREEN}core${NC}       - Custom Node tests (TestFramework.js)"
+    echo -e "                      ${GREEN}fast${NC}       - Core tests excluding those tagged slow"
     echo -e "                      ${GREEN}jest${NC}       - Jest UI unit tests (*.test.js)"
     echo -e "                      ${GREEN}e2e${NC}        - Playwright browser tests (*.spec.js)"
     echo -e "                      ${GREEN}all${NC}        - All test types (default)"
     echo ""
+    echo "FAST CORE TAGGING:"
+    echo -e "  Core tests are included in fast by default."
+    echo -e "  Exclude a core test from fast by adding near the top of the file:"
+    echo -e "    ${GREEN}// @finsim-test-speed: slow${NC}"
+    echo ""
+    echo "AUTO-CLASSIFY (BY TIMING):"
+    echo -e "  ${GREEN}./run-tests.sh --classify-fast${NC}    # Times core tests and adds/removes the slow tag"
+    echo -e "  Control threshold with ${GREEN}FINSIM_FAST_MAX_MS${NC} (default: 2500ms)"
+    echo ""
     echo "EXAMPLES:"
     echo -e "  ${GREEN}./run-tests.sh${NC}                    # Run all tests"
     echo -e "  ${GREEN}./run-tests.sh --type core${NC}        # Run only core tests"
+    echo -e "  ${GREEN}./run-tests.sh --type fast${NC}        # Run fast core tests"
     echo -e "  ${GREEN}./run-tests.sh -t jest${NC}            # Run only Jest tests"
     echo -e "  ${GREEN}./run-tests.sh --type e2e${NC}         # Run only Playwright tests"
     echo -e "  ${GREEN}./run-tests.sh TestBasicTax${NC}       # Run specific test"
@@ -79,8 +90,17 @@ run_test() {
         
     # Create a simple Node.js command to run the test
     cd "$CORE_DIR"
-    node -e "
+    local output
+    output=$(node -e "
         const { TestFramework } = require('./TestFramework.js');
+        const __start = Date.now();
+        const __origExit = process.exit;
+        process.exit = (code) => {
+            if (process.env.FINSIM_EMIT_DURATION_MS === '1') {
+                console.log('__FINSIM_TEST_DURATION_MS=' + (Date.now() - __start));
+            }
+            __origExit(code);
+        };
         let testDefinition;
         try {
             testDefinition = require('$test_file');
@@ -92,6 +112,27 @@ run_test() {
             }
             console.error('❌ FAILED: $test_name');
             process.exit(1);
+        }
+
+        if (process.env.FINSIM_EMIT_META === '1') {
+            let meta = { montecarlo: false, performance: false };
+            try {
+                const category = (testDefinition && testDefinition.category) ? String(testDefinition.category) : '';
+                const name = (testDefinition && testDefinition.name) ? String(testDefinition.name) : '';
+                const description = (testDefinition && testDefinition.description) ? String(testDefinition.description) : '';
+                const params = (testDefinition && testDefinition.scenario && testDefinition.scenario.parameters) ? testDefinition.scenario.parameters : null;
+
+                meta.montecarlo =
+                    category.toLowerCase() === 'monte_carlo' ||
+                    (params && String(params.economy_mode || '').toLowerCase() === 'montecarlo') ||
+                    (params && typeof params.monteCarloRuns === 'number' && params.monteCarloRuns > 0);
+
+                meta.performance =
+                    category.toLowerCase() === 'performance' ||
+                    /perf|performance/i.test(name) ||
+                    /perf|performance/i.test(description);
+            } catch (e) {}
+            console.log('__FINSIM_TEST_META=' + JSON.stringify(meta));
         }
         
         // Check if this is a custom test
@@ -143,13 +184,171 @@ run_test() {
                     process.exit(1);
                 });
         }
-    "
+    " 2>&1)
+    local status=$?
+
+    if [ "$FINSIM_EMIT_DURATION_MS" == "1" ]; then
+        FINSIM_LAST_TEST_DURATION_MS=$(echo "$output" | sed -n 's/^__FINSIM_TEST_DURATION_MS=//p' | tail -n 1)
+    fi
+    if [ "$FINSIM_EMIT_DURATION_MS" == "1" ] || [ "$FINSIM_STORE_LAST_OUTPUT" == "1" ]; then
+        FINSIM_LAST_TEST_OUTPUT="$output"
+    fi
+
+    # Strip duration marker from normal output.
+    echo "$output" | grep -v '^__FINSIM_TEST_DURATION_MS=' | grep -v '^__FINSIM_TEST_META='
+    return $status
 }
 
 # Function to find all test files
 find_test_files() {
     # Exclude Jest tests (*.test.js) and Playwright tests (*.spec.js)
 find "$TESTS_DIR" -maxdepth 1 -name "*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort
+}
+
+# ------------------------------------------------------------------
+# Fast core tagging + timing classifier
+# ------------------------------------------------------------------
+core_test_get_speed_tag() {
+    local test_file="$1"
+    head -n 200 "$test_file" \
+        | grep -m1 -E '@finsim-test-speed:' \
+        | sed -E 's/.*@finsim-test-speed:[[:space:]]*//; s/[[:space:]]*$//' \
+        | tr '[:upper:]' '[:lower:]' \
+        | awk '{print $1}'
+}
+
+core_test_set_slow_tag() {
+    local test_file="$1"
+    local tmp="${test_file}.tmp.$$"
+
+    if grep -q -E '@finsim-test-speed:' "$test_file"; then
+        awk '
+            BEGIN { done = 0 }
+            {
+                if (done == 0 && $0 ~ /@finsim-test-speed:/) {
+                    sub(/@finsim-test-speed:[[:space:]]*(fast|slow)?/, "@finsim-test-speed: slow");
+                    done = 1;
+                }
+                print;
+            }
+        ' "$test_file" > "$tmp"
+        mv "$tmp" "$test_file"
+        return 0
+    fi
+
+    # Insert a slow tag near the top without disturbing shebangs.
+    awk '
+        NR == 1 && $0 ~ /^#!/ { print; print "// @finsim-test-speed: slow"; next }
+        NR == 1 { print "// @finsim-test-speed: slow" }
+        { print }
+    ' "$test_file" > "$tmp"
+    mv "$tmp" "$test_file"
+}
+
+core_test_clear_slow_tag() {
+    local test_file="$1"
+    local tmp="${test_file}.tmp.$$"
+
+    if ! grep -q -E '@finsim-test-speed:' "$test_file"; then
+        return 0
+    fi
+
+    awk '
+        BEGIN { removed = 0 }
+        {
+            if (removed == 0 && $0 ~ /@finsim-test-speed:/) { removed = 1; next }
+            print
+        }
+    ' "$test_file" > "$tmp"
+    mv "$tmp" "$test_file"
+}
+
+core_test_is_fast_eligible() {
+    local test_file="$1"
+    local speed
+    speed="$(core_test_get_speed_tag "$test_file")"
+    [ "$speed" != "slow" ]
+}
+
+classify_fast_core_tests() {
+    local max_ms="${FINSIM_FAST_MAX_MS:-2500}"
+    local test_files=($(find_test_files))
+
+    if [ ${#test_files[@]} -eq 0 ]; then
+        echo -e "${YELLOW}No core test files found in $TESTS_DIR${NC}"
+        return 0
+    fi
+
+    local passed=0
+    local failed=0
+    local slow_tagged=0
+    local slow_cleared=0
+
+    echo -e "${BLUE}Classifying core tests: slow if duration > ${max_ms}ms${NC}"
+    for test_file in "${test_files[@]}"; do
+        FINSIM_LAST_TEST_DURATION_MS=""
+        FINSIM_LAST_TEST_OUTPUT=""
+
+        local before
+        before="$(core_test_get_speed_tag "$test_file")"
+
+        if FINSIM_EMIT_DURATION_MS=1 FINSIM_EMIT_META=1 run_test "$test_file"; then
+            ((passed++))
+        else
+            # Some "core" tests are dependency-heavy (e.g., Playwright link checking) and are never intended for fast.
+            if echo "$FINSIM_LAST_TEST_OUTPUT" | grep -q -E "npx playwright install|Failed to load Playwright|Looks like Playwright"; then
+                if [ "$before" != "slow" ]; then
+                    core_test_set_slow_tag "$test_file"
+                    ((slow_tagged++))
+                fi
+                continue
+            fi
+
+            ((failed++))
+            continue
+        fi
+
+        # Category-based exclusions: performance tests and Monte Carlo tests are never part of fast.
+        if echo "$FINSIM_LAST_TEST_OUTPUT" | grep -q -E '^__FINSIM_TEST_META=.*"montecarlo"[[:space:]]*:[[:space:]]*true'; then
+            if [ "$before" != "slow" ]; then
+                core_test_set_slow_tag "$test_file"
+                ((slow_tagged++))
+            fi
+            continue
+        fi
+        if echo "$FINSIM_LAST_TEST_OUTPUT" | grep -q -E '^__FINSIM_TEST_META=.*"performance"[[:space:]]*:[[:space:]]*true'; then
+            if [ "$before" != "slow" ]; then
+                core_test_set_slow_tag "$test_file"
+                ((slow_tagged++))
+            fi
+            continue
+        fi
+
+        local dur="${FINSIM_LAST_TEST_DURATION_MS}"
+        if [ -z "$dur" ]; then
+            echo -e "${YELLOW}  Warning: missing duration marker for $(basename "$test_file") (leaving tag unchanged)${NC}"
+            continue
+        fi
+
+        if [ "$dur" -gt "$max_ms" ]; then
+            if [ "$before" != "slow" ]; then
+                core_test_set_slow_tag "$test_file"
+                ((slow_tagged++))
+            fi
+        else
+            if [ "$before" == "slow" ]; then
+                core_test_clear_slow_tag "$test_file"
+                ((slow_cleared++))
+            fi
+        fi
+    done
+
+    echo
+    echo -e " Classify results: ${GREEN}$passed passed${NC}, ${RED}$failed failed${NC}"
+    echo -e " Tag changes: ${YELLOW}$slow_tagged slow-tagged${NC}, ${YELLOW}$slow_cleared slow-tags removed${NC}"
+    echo
+
+    [ $failed -eq 0 ]
 }
 
 # Function to list available tests
@@ -199,31 +398,36 @@ list_tests() {
 main() {
     # Detect optional --runAll flag anywhere in args and export env for Playwright
     local RUN_ALL=false
-    # Test type filter: core, jest, e2e, all (default)
+    local CLASSIFY_FAST=false
+    # Test type filter: core, fast, jest, e2e, all (default)
     local TEST_TYPE="all"
     local new_args=()
 
     # Parse flags from arguments
     while [ $# -gt 0 ]; do
         case "$1" in
+            --classify-fast)
+                CLASSIFY_FAST=true
+                shift
+                ;;
             --runAll)
                 RUN_ALL=true
                 shift
                 ;;
             -t|--type)
                 if [ -z "$2" ] || [[ "$2" == -* ]]; then
-                    echo -e "${RED}Error: --type requires an argument (core, jest, e2e, all)${NC}"
+                    echo -e "${RED}Error: --type requires an argument (core, fast, jest, e2e, all)${NC}"
                     exit 1
                 fi
                 TEST_TYPE="$2"
                 # Validate test type
                 case "$TEST_TYPE" in
-                    core|jest|e2e|playwright|all)
+                    core|fast|jest|e2e|playwright|all)
                         # Valid type - normalize playwright to e2e
                         [ "$TEST_TYPE" == "playwright" ] && TEST_TYPE="e2e"
                         ;;
                     *)
-                        echo -e "${RED}Error: Invalid test type '$TEST_TYPE'. Use: core, jest, e2e, all${NC}"
+                        echo -e "${RED}Error: Invalid test type '$TEST_TYPE'. Use: core, fast, jest, e2e, all${NC}"
                         exit 1
                         ;;
                 esac
@@ -259,6 +463,11 @@ main() {
     # Check prerequisites
     check_prerequisites
 
+    if [ "$CLASSIFY_FAST" == true ]; then
+        classify_fast_core_tests
+        exit $?
+    fi
+
     # Optional: enable Money parity checks for verification runs.
     # Parity checks add overhead and should remain disabled by default.
     if [ "$ENABLE_PARITY_CHECKS" = "true" ]; then
@@ -272,13 +481,16 @@ main() {
         local failed=0
         local failed_tests=()
 
-        # Run core tests if type is 'all' or 'core'
-        if [ "$TEST_TYPE" == "all" ] || [ "$TEST_TYPE" == "core" ]; then
+        # Run core tests if type is 'all' or 'core' or 'fast'
+        if [ "$TEST_TYPE" == "all" ] || [ "$TEST_TYPE" == "core" ] || [ "$TEST_TYPE" == "fast" ]; then
             local test_files=($(find_test_files))
             if [ ${#test_files[@]} -eq 0 ]; then
                 echo -e "${YELLOW}No core test files found in $TESTS_DIR${NC}"
             else
                 for test_file in "${test_files[@]}"; do
+                    if [ "$TEST_TYPE" == "fast" ] && ! core_test_is_fast_eligible "$test_file"; then
+                        continue
+                    fi
                     local test_name=$(basename "$test_file" .js)
                     if run_test "$test_file"; then
                         ((passed++))
@@ -521,6 +733,26 @@ main() {
 
             if [ ${#test_files[@]} -eq 0 ]; then
                 echo -e "${RED}Error: No test files found for base name: $input_name${NC}"
+                exit 1
+            fi
+        fi
+
+        # Apply optional type filtering to matched files (useful with globs).
+        if [ "$TEST_TYPE" == "fast" ]; then
+            local filtered=()
+            for test_file in "${test_files[@]}"; do
+                case "$test_file" in
+                    *.test.js|*.spec.js)
+                        # fast is core-only
+                        ;;
+                    *.js)
+                        core_test_is_fast_eligible "$test_file" && filtered+=("$test_file")
+                        ;;
+                esac
+            done
+            test_files=("${filtered[@]}")
+            if [ ${#test_files[@]} -eq 0 ]; then
+                echo -e "${RED}Error: No fast-eligible core tests matched (tagged slow)${NC}"
                 exit 1
             fi
         fi

@@ -1,3 +1,4 @@
+// @finsim-test-speed: slow
 /* Monte Carlo High Volatility Stress Test
  * 
  * This test validates that EconomicData memoization works correctly under Monte Carlo stress.

@@ -1,3 +1,4 @@
+// @finsim-test-speed: slow
 /* Monte Carlo High Volatility Test
  * 
  * This test validates the statistical behavior of high volatility (25% std dev) Monte Carlo simulation.

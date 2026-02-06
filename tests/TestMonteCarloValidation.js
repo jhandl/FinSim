@@ -1,3 +1,4 @@
+// @finsim-test-speed: slow
 /* Monte Carlo Statistical Validation Test
  * 
  * This test implements proper statistical validation of Monte Carlo simulations by running
