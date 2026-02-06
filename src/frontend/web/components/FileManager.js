@@ -238,12 +238,16 @@ class FileManager {
     }
     const baseTypes = new Set();
     baseTypes.add('cash');
-    baseTypes.add('pension');
+    let includePension = false;
     for (let i = 0; i < scenarioCountriesForPriorities.length; i++) {
       const country = scenarioCountriesForPriorities[i];
       let rulesetForPriorityCountry = cfgForPriorities.getCachedTaxRuleSet(country);
       if (!rulesetForPriorityCountry) {
         rulesetForPriorityCountry = await cfgForPriorities.getTaxRuleSet(country);
+      }
+      if (rulesetForPriorityCountry && typeof rulesetForPriorityCountry.hasPrivatePensions === 'function' &&
+        rulesetForPriorityCountry.hasPrivatePensions()) {
+        includePension = true;
       }
       const investmentTypes = rulesetForPriorityCountry.getResolvedInvestmentTypes() || [];
       for (let j = 0; j < investmentTypes.length; j++) {
@@ -253,6 +257,7 @@ class FileManager {
         if (baseType) baseTypes.add(baseType);
       }
     }
+    if (includePension) baseTypes.add('pension');
     const priorityIds = Array.from(baseTypes)
       .sort((a, b) => {
         if (a === b) return 0;

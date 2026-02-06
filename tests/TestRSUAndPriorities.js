@@ -281,9 +281,18 @@ module.exports = {
                getDefaultCountry: function() { return 'ie'; },
                isRelocationEnabled: function() { return true; },
                getCachedTaxRuleSet: function(cc) {
-                 if (cc === 'ie') return { getResolvedInvestmentTypes: function() { return mockTypesIE; } };
-                 if (cc === 'us') return { getResolvedInvestmentTypes: function() { return mockTypesUS; } };
-                 return { getResolvedInvestmentTypes: function() { return []; } };
+                 if (cc === 'ie') return {
+                   getResolvedInvestmentTypes: function() { return mockTypesIE; },
+                   hasPrivatePensions: function() { return true; }
+                 };
+                 if (cc === 'us') return {
+                   getResolvedInvestmentTypes: function() { return mockTypesUS; },
+                   hasPrivatePensions: function() { return true; }
+                 };
+                 return {
+                   getResolvedInvestmentTypes: function() { return []; },
+                   hasPrivatePensions: function() { return false; }
+                 };
                },
                getTaxRuleSet: async function(cc) { return this.getCachedTaxRuleSet(cc); }
              };

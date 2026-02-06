@@ -794,8 +794,6 @@ class WebUI extends AbstractUI {
     const tbody = document.querySelector('#growthRates table.growth-rates-table tbody');
     const inflationInput = document.getElementById('Inflation');
     const inflationRow = inflationInput ? inflationInput.closest('tr') : null;
-    const pensionInput = document.getElementById('PensionGrowthRate');
-    const pensionRow = pensionInput ? pensionInput.closest('tr') : null;
     const setRowHeadingForInput = (inputId, label) => {
       const input = document.getElementById(inputId);
       if (!input) return;
@@ -866,11 +864,9 @@ class WebUI extends AbstractUI {
       const showCountryChips = this.perCountryInvestmentsEnabled && hasMV;
       if (!showCountryChips) {
         this.growthRatesCountryChipSelector = null;
-        setRowHeadingForInput('PensionGrowthRate', 'Pension');
         setRowHeadingForInput('Inflation', 'Inflation');
-        if (pensionRow) pensionRow.style.display = '';
         if (inflationRow) inflationRow.style.display = '';
-        const rows = tbody.querySelectorAll('[data-dynamic-pension-volatility="true"]');
+        const rows = tbody.querySelectorAll('[data-dynamic-inflation-row="true"]');
         rows.forEach(el => {
           const inputs = el.querySelectorAll('input');
           for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
@@ -890,20 +886,16 @@ class WebUI extends AbstractUI {
           const labelText = t.label || key;
           const growthId = key + 'GrowthRate';
           const volId = key + 'GrowthStdDev';
-          
+
           const tr = makeGrowthRow(labelText, growthId, volId);
-          if (pensionRow) {
-            tbody.insertBefore(tr, pensionRow);
-          } else {
-            tbody.appendChild(tr);
-          }
+          if (inflationRow) tbody.insertBefore(tr, inflationRow);
+          else tbody.appendChild(tr);
         }
       }
 
       if (showCountryChips) {
-        if (pensionRow) pensionRow.style.display = 'none';
         if (inflationRow) inflationRow.style.display = 'none';
-        const insertBeforeRow = pensionRow || inflationRow || null;
+        const insertBeforeRow = inflationRow || null;
 
         const chipsRow = document.createElement('tr');
         chipsRow.setAttribute('data-dynamic-investment-param', 'true');
@@ -933,7 +925,6 @@ class WebUI extends AbstractUI {
         const updateCountryLabels = (code) => {
           const cc = (code || '').toString().trim().toUpperCase();
           if (cc) {
-            setRowHeadingForInput('PensionGrowthRate', 'Pension (' + cc + ')');
             setRowHeadingForInput('Inflation', 'Inflation (' + cc + ')');
           }
         };
@@ -948,8 +939,8 @@ class WebUI extends AbstractUI {
           updateCountryLabels(selectedCode);
         };
 
-        const clearPensionInflationRows = () => {
-          const rows = tbody.querySelectorAll('[data-dynamic-pension-volatility="true"]');
+        const clearInflationRows = () => {
+          const rows = tbody.querySelectorAll('[data-dynamic-inflation-row="true"]');
           rows.forEach(el => {
             const inputs = el.querySelectorAll('input');
             for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
@@ -957,18 +948,14 @@ class WebUI extends AbstractUI {
           });
         };
 
-        const renderPensionInflationRows = (code) => {
+        const renderInflationRow = (code) => {
           const selectedCode = (code || '').toString().trim().toLowerCase();
-          clearPensionInflationRows();
+          clearInflationRows();
           if (!selectedCode) return;
           const cc = selectedCode.toUpperCase();
-          const pgId = 'PensionGrowth_' + selectedCode;
-          const pvId = 'PensionVolatility_' + selectedCode;
           const infId = 'Inflation_' + selectedCode;
-          const trPension = makeGrowthRow('Pension (' + cc + ')', pgId, pvId);
-          trPension.setAttribute('data-dynamic-pension-volatility', 'true');
           const trInflation = document.createElement('tr');
-          trInflation.setAttribute('data-dynamic-pension-volatility', 'true');
+          trInflation.setAttribute('data-dynamic-inflation-row', 'true');
           const infLabel = document.createElement('td');
           infLabel.textContent = 'Inflation (' + cc + ')';
           trInflation.appendChild(infLabel);
@@ -985,10 +972,8 @@ class WebUI extends AbstractUI {
           trInflation.appendChild(infGrowth);
           trInflation.appendChild(document.createElement('td'));
           if (insertBeforeRow) {
-            tbody.insertBefore(trPension, insertBeforeRow);
             tbody.insertBefore(trInflation, insertBeforeRow);
           } else {
-            tbody.appendChild(trPension);
             tbody.appendChild(trInflation);
           }
           this.formatUtils.setupPercentageInputs();
@@ -998,33 +983,19 @@ class WebUI extends AbstractUI {
         this.growthRatesCountryChipSelector = new CountryChipSelector(
           countries,
           selected,
-          (code) => { showGrowthCountry(code); renderPensionInflationRows(code); },
+          (code) => { showGrowthCountry(code); renderInflationRow(code); },
           'growthRates'
         );
         this.growthRatesCountryChipSelector.render(chipContainer);
 
-        const legacyPensionGrowth = this.getValue('PensionGrowthRate');
-        const legacyPensionVol = this.getValue('PensionGrowthStdDev');
         const legacyInflation = this.getValue('Inflation');
-        const legacyPgInput = document.getElementById('PensionGrowthRate');
-        const legacyPvInput = document.getElementById('PensionGrowthStdDev');
         const legacyInfInput = document.getElementById('Inflation');
-        const legacyPgRaw = legacyPgInput ? String(legacyPgInput.value || '').trim() : '';
-        const legacyPvRaw = legacyPvInput ? String(legacyPvInput.value || '').trim() : '';
         const legacyInfRaw = legacyInfInput ? String(legacyInfInput.value || '').trim() : '';
         const startCode = String(startCountry || '').toLowerCase();
         if (startCode) {
-          this.ensureParameterInput('PensionGrowth_' + startCode, 'percentage');
-          this.ensureParameterInput('PensionVolatility_' + startCode, 'percentage');
           this.ensureParameterInput('Inflation_' + startCode, 'percentage');
-          const startPg = document.getElementById('PensionGrowth_' + startCode);
-          const startPv = document.getElementById('PensionVolatility_' + startCode);
           const startInf = document.getElementById('Inflation_' + startCode);
-          const startPgLoaded = startPg && startPg.getAttribute('data-csv-loaded') === '1';
-          const startPvLoaded = startPv && startPv.getAttribute('data-csv-loaded') === '1';
           const startInfLoaded = startInf && startInf.getAttribute('data-csv-loaded') === '1';
-          if (startPg && !startPg.value && legacyPgRaw !== '' && !startPgLoaded) this.setValue(startPg.id, legacyPensionGrowth);
-          if (startPv && !startPv.value && legacyPvRaw !== '' && !startPvLoaded) this.setValue(startPv.id, legacyPensionVol);
           if (startInf && !startInf.value && legacyInfRaw !== '' && !startInfLoaded) this.setValue(startInf.id, legacyInflation);
         }
 
@@ -1055,7 +1026,7 @@ class WebUI extends AbstractUI {
         }
 
         showGrowthCountry(selected);
-        renderPensionInflationRows(selected);
+        renderInflationRow(selected);
         this.countryTabSyncManager.setSelectedCountry('growthRates', selected);
       }
     }

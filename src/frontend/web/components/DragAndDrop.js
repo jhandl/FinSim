@@ -138,11 +138,14 @@ class DragAndDrop {
     const scenarioCountries = this.webUI.getScenarioCountries();
     const baseTypes = new Set();
     baseTypes.add('cash');
-    baseTypes.add('pension');
+    let includePension = false;
 
     for (let i = 0; i < scenarioCountries.length; i++) {
       const country = scenarioCountries[i];
       const ruleset = cfg.getCachedTaxRuleSet(country);
+      if (ruleset && typeof ruleset.hasPrivatePensions === 'function' && ruleset.hasPrivatePensions()) {
+        includePension = true;
+      }
       const investmentTypes = ruleset.getResolvedInvestmentTypes() || [];
       for (let j = 0; j < investmentTypes.length; j++) {
         const type = investmentTypes[j];
@@ -153,6 +156,7 @@ class DragAndDrop {
         }
       }
     }
+    if (includePension) baseTypes.add('pension');
 
     const sortedBaseTypes = Array.from(baseTypes).sort((a, b) => {
       if (a === b) return 0;

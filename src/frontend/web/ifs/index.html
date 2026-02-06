@@ -330,17 +330,6 @@
           </thead>
           <tbody>
             <tr>
-              <td>Pension</td>
-              <td>
-                <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
-                    id="PensionGrowthRate" class="percentage" step="1" autocomplete="off"></div>
-              </td>
-              <td>
-                <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
-                    id="PensionGrowthStdDev" class="percentage" step="1" autocomplete="off"></div>
-              </td>
-            </tr>
-            <tr>
               <td>Index Funds</td>
               <td>
                 <div class="percentage-container"><input type="text" inputmode="numeric" pattern="[0-9]*"
@@ -370,6 +359,11 @@
             </tr>
           </tbody>
         </table>
+        <!-- Legacy hidden pension economy inputs (kept for CSV backward compatibility). -->
+        <div style="display: none;">
+          <input type="text" id="PensionGrowthRate" class="percentage" autocomplete="off">
+          <input type="text" id="PensionGrowthStdDev" class="percentage" autocomplete="off">
+        </div>
       </div>
     </div>
 
@@ -518,15 +512,15 @@
   <script src="/src/frontend/web/components/WizardRenderer.js?v=20251101"></script>
   <script src="/src/frontend/web/components/EventsWizard.js?v=20251109"></script>
   <script src="/src/frontend/web/components/ChartManager.js?v=2026-01-20-5"></script>
-  <script src="/src/frontend/web/components/FileManager.js?v=20260204-1"></script>
-  <script src="/src/frontend/web/components/DragAndDrop.js?v=20260205-1"></script>
+  <script src="/src/frontend/web/components/FileManager.js?v=20260206-1"></script>
+  <script src="/src/frontend/web/components/DragAndDrop.js?v=20260206-1"></script>
   <script src="/src/frontend/web/components/Wizard.js?v=20260204e"></script>
   <script src="/src/frontend/web/components/ContentRenderer.js?v=20251101"></script>
   <script src="/src/frontend/web/components/WelcomeModal.js?v=20251101"></script>
   <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
   <script src="/src/frontend/web/components/CountryTabSyncManager.js?v=20260114-1"></script>
   <script src="/src/frontend/web/components/CountryChipSelector.js?v=20260130-1"></script>
-  <script src="/src/frontend/web/WebUI.js?v=20260205-1"></script>
+  <script src="/src/frontend/web/WebUI.js?v=20260206-1"></script>
   <script src="/src/core/TaxRuleSet.js?v=20260205-2"></script>
   <script src="/src/core/Config.js?v=20260205-2"></script>
   <script src="/src/core/Events.js?v=2025-09-04"></script>

@@ -132,8 +132,6 @@ module.exports = {
       doc.ensureEl('GlobalAssetVolatility_globalEquity', 'percentage').value = '15';
       doc.ensureEl('LocalAssetGrowth_ie_shares', 'percentage').value = '5';
       doc.ensureEl('LocalAssetVolatility_ie_shares', 'percentage').value = '12';
-      doc.ensureEl('PensionGrowth_ie', 'percentage').value = '6';
-      doc.ensureEl('PensionVolatility_ie', 'percentage').value = '10';
       doc.ensureEl('Inflation_ie', 'percentage').value = '2';
       doc.ensureEl('PensionGrowthRate', 'percentage').value = '8';
       doc.ensureEl('PensionGrowthStdDev', 'percentage').value = '11';
@@ -156,12 +154,6 @@ module.exports = {
       }
       if (csv.indexOf('LocalAssetVolatility_ie_shares,12') === -1) {
         errors.push('Missing LocalAssetVolatility_ie_shares in CSV.');
-      }
-      if (csv.indexOf('PensionGrowth_ie,6') === -1) {
-        errors.push('Missing PensionGrowth_ie in CSV.');
-      }
-      if (csv.indexOf('PensionVolatility_ie,10') === -1) {
-        errors.push('Missing PensionVolatility_ie in CSV.');
       }
       if (csv.indexOf('Inflation_ie,2') === -1) {
         errors.push('Missing Inflation_ie in CSV.');
@@ -199,14 +191,6 @@ module.exports = {
       if (!lVol || lVol.value !== '12') {
         errors.push('LocalAssetVolatility_ie_shares did not deserialize.');
       }
-      const pGrow = doc2.getElementById('PensionGrowth_ie');
-      if (!pGrow || pGrow.value !== '6') {
-        errors.push('PensionGrowth_ie did not deserialize.');
-      }
-      const pVol = doc2.getElementById('PensionVolatility_ie');
-      if (!pVol || pVol.value !== '10') {
-        errors.push('PensionVolatility_ie did not deserialize.');
-      }
       const inf = doc2.getElementById('Inflation_ie');
       if (!inf || inf.value !== '2') {
         errors.push('Inflation_ie did not deserialize.');
@@ -226,20 +210,8 @@ module.exports = {
 
       csv = serializeSimulation(ui3);
 
-      if (csv.indexOf('PensionGrowth_ie,6') !== -1) {
-        errors.push('Legacy pension growth should not backfill PensionGrowth_ie.');
-      }
-      if (csv.indexOf('PensionVolatility_ie,12') !== -1) {
-        errors.push('Legacy pension volatility should not backfill PensionVolatility_ie.');
-      }
       if (csv.indexOf('Inflation_ie,2') !== -1) {
         errors.push('Legacy inflation should not backfill Inflation_ie.');
-      }
-      if (csv.indexOf('PensionGrowth_ie,') === -1) {
-        errors.push('Expected PensionGrowth_ie to serialize as empty.');
-      }
-      if (csv.indexOf('PensionVolatility_ie,') === -1) {
-        errors.push('Expected PensionVolatility_ie to serialize as empty.');
       }
       if (csv.indexOf('Inflation_ie,') === -1) {
         errors.push('Expected Inflation_ie to serialize as empty.');
@@ -269,14 +241,6 @@ module.exports = {
 
       deserializeSimulation(csv, ui4);
 
-      const dpGrow = doc4.getElementById('PensionGrowth_ie');
-      if (!dpGrow || dpGrow.value !== '') {
-        errors.push('PensionGrowth_ie should remain blank when serialized blank.');
-      }
-      const dpVol = doc4.getElementById('PensionVolatility_ie');
-      if (!dpVol || dpVol.value !== '') {
-        errors.push('PensionVolatility_ie should remain blank when serialized blank.');
-      }
       const dInf = doc4.getElementById('Inflation_ie');
       if (!dInf || dInf.value !== '') {
         errors.push('Inflation_ie should remain blank when serialized blank.');

@@ -101,7 +101,7 @@ function seedParameterIds(ui) {
 
 module.exports = {
   name: 'PensionVolatilityPerCountry',
-  description: 'Ensures legacy pension volatility defaults apply only to StartCountry and do not overwrite other countries.',
+  description: 'Ensures per-country pension volatility is not serialized or legacy-migrated (pension volatility is a legacy scalar only).',
   isCustomTest: true,
   async runCustomTest() {
     const errors = [];
@@ -142,7 +142,7 @@ module.exports = {
         return context;
       };
 
-      // Deserialize: legacy values should populate IE only.
+      // Deserialize: legacy pension volatility remains a scalar (no per-country pension volatility migration).
       const doc = createParameterDocument();
       const ctx = makeContext(doc);
       const ui = createUiSimulatingDomUtils(doc);
@@ -166,17 +166,16 @@ module.exports = {
       ].join('\n');
       ctx.deserializeSimulation(legacyCsv, ui);
 
+      const legacyVol = doc.getElementById('PensionGrowthStdDev');
       const ieVol = doc.getElementById('PensionVolatility_ie');
       const arVol = doc.getElementById('PensionVolatility_ar');
-      const legacyVol = doc.getElementById('PensionGrowthStdDev');
-      if (!ieVol || ieVol.value !== '10') {
-        errors.push('Expected PensionVolatility_ie to be 10 after legacy migration, got ' + (ieVol ? ieVol.value : 'null') + ' (legacy PensionGrowthStdDev=' + (legacyVol ? legacyVol.value : 'null') + ').');
-      }
-      if (!arVol || arVol.value !== '') {
-        errors.push('Expected PensionVolatility_ar to remain blank after legacy migration, got ' + (arVol ? arVol.value : 'null') + '.');
+      if (ieVol) errors.push('Did not expect PensionVolatility_ie to be created during legacy deserialize.');
+      if (arVol) errors.push('Did not expect PensionVolatility_ar to be created during legacy deserialize.');
+      if (!legacyVol || legacyVol.value !== '10') {
+        errors.push('Expected PensionGrowthStdDev to deserialize as 10, got ' + (legacyVol ? legacyVol.value : 'null') + '.');
       }
 
-      // Serialize: blank AR should not default to legacy volatility.
+      // Serialize: PensionVolatility_* keys are no longer written to CSV (even if present in UI).
       const doc2 = createParameterDocument();
       const ctx2 = makeContext(doc2);
       const ui2 = createUiSimulatingDomUtils(doc2, {
@@ -196,20 +195,8 @@ module.exports = {
       const lineIe = lines.find(l => l.indexOf('PensionVolatility_ie,') === 0);
       const lineAr = lines.find(l => l.indexOf('PensionVolatility_ar,') === 0);
 
-      if (!lineIe || lineIe.split(',')[1] !== '12%') {
-        errors.push('Expected PensionVolatility_ie to serialize as 12%.');
-      }
-      if (!lineAr) {
-        errors.push('Missing PensionVolatility_ar in serialized output.');
-      } else {
-        const arVal = lineAr.split(',')[1];
-        if (arVal !== '') {
-          errors.push('Expected PensionVolatility_ar to serialize as blank.');
-        }
-        if (arVal === '10' || arVal === '10%') {
-          errors.push('PensionVolatility_ar incorrectly defaulted to legacy value.');
-        }
-      }
+      if (lineIe) errors.push('Did not expect PensionVolatility_ie to be serialized.');
+      if (lineAr) errors.push('Did not expect PensionVolatility_ar to be serialized.');
 
     } catch (err) {
       errors.push('Unexpected error: ' + (err && err.message ? err.message : String(err)));

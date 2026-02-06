@@ -517,38 +517,14 @@ function serializeSimulation(ui) {
 
   for (var sci = 0; sci < scenarioCountries.length; sci++) {
     var cc2 = scenarioCountries[sci];
-    var pensionGrowthId = 'PensionGrowth_' + cc2;
-    var pensionVolId = 'PensionVolatility_' + cc2;
     var inflationId = 'Inflation_' + cc2;
-    var hadPgInput = false;
-    var hadPvInput = false;
     var hadInfInput = false;
     try {
       if (typeof document !== 'undefined') {
-        hadPgInput = !!document.getElementById(pensionGrowthId);
-        hadPvInput = !!document.getElementById(pensionVolId);
         hadInfInput = !!document.getElementById(inflationId);
       }
     } catch (_) { }
-    try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(pensionGrowthId, 'percentage'); } catch (_) { }
-    try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(pensionVolId, 'percentage'); } catch (_) { }
     try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(inflationId, 'percentage'); } catch (_) { }
-
-    var pgRaw = getRawInputValue(pensionGrowthId);
-    var pgVal = ui.getValue(pensionGrowthId);
-    var shouldWritePensionGrowth = economyFeatureActive || hadPgInput || !isMissingRaw(pgRaw);
-    if (shouldWritePensionGrowth) {
-      if (isMissingRaw(pgRaw)) pgVal = '';
-      parameters[pensionGrowthId] = pgVal;
-    }
-
-    var pvRaw = getRawInputValue(pensionVolId);
-    var pvVal = ui.getValue(pensionVolId);
-    var shouldWritePensionVol = economyFeatureActive || hadPvInput || !isMissingRaw(pvRaw);
-    if (shouldWritePensionVol) {
-      if (isMissingRaw(pvRaw)) pvVal = '';
-      parameters[pensionVolId] = pvVal;
-    }
 
     var infRaw = getRawInputValue(inflationId);
     var infVal = ui.getValue(inflationId);
@@ -980,8 +956,6 @@ function deserializeSimulation(content, ui) {
   var sawLegacyPensionContributionPercentage = false;
   var sawLegacyPensionContributionPercentageP2 = false;
   var sawLegacyPensionContributionCapped = false;
-  var sawPerCountryPensionGrowth = {};
-  var sawPerCountryPensionVolatility = {};
   var sawPerCountryInflation = {};
 
   for (let i = 0; i < lines.length; i++) {
@@ -999,12 +973,6 @@ function deserializeSimulation(content, ui) {
       let value = (commaIndex >= 0) ? line.substring(commaIndex + 1) : '';
 
       const actualKey = legacyAdapter.mapFieldName(key, startCountryForNormalization, isLegacyIeScenario);
-      if (/^PensionGrowth_[a-z]{2,}$/i.test(actualKey)) {
-        sawPerCountryPensionGrowth[String(actualKey.substring('PensionGrowth_'.length)).toLowerCase()] = true;
-      }
-      if (/^PensionVolatility_[a-z]{2,}$/i.test(actualKey)) {
-        sawPerCountryPensionVolatility[String(actualKey.substring('PensionVolatility_'.length)).toLowerCase()] = true;
-      }
       if (/^Inflation_[a-z]{2,}$/i.test(actualKey)) {
         sawPerCountryInflation[String(actualKey.substring('Inflation_'.length)).toLowerCase()] = true;
       }
@@ -1431,26 +1399,14 @@ function deserializeSimulation(content, ui) {
       return (raw === null || raw === undefined || String(raw).trim() === '');
     };
 
-    var legacyPensionGrowth = ui.getValue('PensionGrowthRate');
-    var legacyPensionVol = ui.getValue('PensionGrowthStdDev');
     var legacyInflation = ui.getValue('Inflation');
 
     for (var sci = 0; sci < scenarioCountries.length; sci++) {
       var cc = scenarioCountries[sci];
       var isStartCountry = (cc === sc2);
-      var pensionGrowthId = 'PensionGrowth_' + cc;
-      var pensionVolId = 'PensionVolatility_' + cc;
       var inflationId = 'Inflation_' + cc;
-      try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(pensionGrowthId, 'percentage'); } catch (_) { }
-      try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(pensionVolId, 'percentage'); } catch (_) { }
       try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(inflationId, 'percentage'); } catch (_) { }
 
-      if (isStartCountry && !sawPerCountryPensionGrowth[cc] && isMissingRaw(getRawInputValue(pensionGrowthId))) {
-        ui.setValue(pensionGrowthId, legacyPensionGrowth);
-      }
-      if (isStartCountry && !sawPerCountryPensionVolatility[cc] && isMissingRaw(getRawInputValue(pensionVolId))) {
-        ui.setValue(pensionVolId, legacyPensionVol);
-      }
       if (isStartCountry && !sawPerCountryInflation[cc] && isMissingRaw(getRawInputValue(inflationId))) {
         ui.setValue(inflationId, legacyInflation);
       }

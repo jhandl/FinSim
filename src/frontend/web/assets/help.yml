@@ -417,22 +417,6 @@ WizardSteps:
       side: "right"
       align: "center"
 
-  - element: "#PensionGrowthRate"
-    tours: [full, mini]
-    card: growthRates
-    popover:
-      description: "<p>The expected average annual growth rate of your private pension, not adjusted for inflation.</p><p>Keep in mind pension funds tend to invest more conservatively and have higher fees, so take that into account when calculating this number.</p>"
-      side: "right"
-      align: "start"
-
-  - element: "#PensionGrowthStdDev"
-    tours: [full, mini]
-    card: growthRates
-    popover:
-      description: "<p>The expected standard deviation of the annual growth rate of your private pension.</p><p>This field is only used in variable rate simulation mode. Keep in mind that pension funds tend to invest more conservatively so may have lower volatility than the stock market. Take that into account when calculating this number.</p>"
-      side: "right"
-      align: "start"
-
   - dynamicInvestmentField: "GlobalAssetGrowth"
     tours: [full, mini]
     card: growthRates
