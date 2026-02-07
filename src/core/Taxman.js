@@ -1586,7 +1586,7 @@ class Taxman {
       copy.gains[key] = {
         amount: gainData.amount,
         sources: {},
-        entries: Array.isArray(gainData.entries) ? gainData.entries.map(function (e) { return { amount: e.amount, description: e.description, category: e.category, eligibleForAnnualExemption: e.eligibleForAnnualExemption, allowLossOffset: e.allowLossOffset }; }) : []
+        entries: Array.isArray(gainData.entries) ? gainData.entries.map(function (e) { return { amount: e.amount, description: e.description, category: e.category, eligibleForAnnualExemption: e.eligibleForAnnualExemption, allowLossOffset: e.allowLossOffset, assetCountry: e.assetCountry }; }) : []
       };
     }
     copy.income = this.income;
