@@ -657,6 +657,96 @@ class TaxRuleSet {
     return order;
   }
 
+  /**
+   * Return an equivalence slot descriptor for a tax id so cross-country taxes
+   * can be matched by type/order when ids differ.
+   *
+   * Groups:
+   * - incomeTax: scalar slot (index 0)
+   * - capitalGains: scalar slot (index 0)
+   * - incomeDeductions: ordered slots of all non-incomeTax/non-capitalGains taxes
+   *   as they appear in getTaxOrder() (typically social contributions + additional taxes)
+   */
+  getTaxEquivalenceSlot(taxId) {
+    var idLower = String(taxId || '').toLowerCase();
+    if (!idLower) return null;
+    var order = this.getTaxOrder();
+    var deductionIndex = 0;
+    for (var i = 0; i < order.length; i++) {
+      var rawId = order[i];
+      var low = String(rawId || '').toLowerCase();
+      if (!low) continue;
+      if (low === 'incometax') {
+        if (low === idLower) return { group: 'incomeTax', index: 0 };
+        continue;
+      }
+      if (low === 'capitalgains') {
+        if (low === idLower) return { group: 'capitalGains', index: 0 };
+        continue;
+      }
+      if (low === idLower) return { group: 'incomeDeductions', index: deductionIndex };
+      deductionIndex++;
+    }
+    return null;
+  }
+
+  /**
+   * Return this ruleset tax id for the requested equivalence slot.
+   */
+  getTaxIdByEquivalenceSlot(group, index) {
+    var order = this.getTaxOrder();
+    if (group === 'incomeTax') {
+      for (var i = 0; i < order.length; i++) {
+        var tid = order[i];
+        if (String(tid || '').toLowerCase() === 'incometax') return tid;
+      }
+      return null;
+    }
+    if (group === 'capitalGains') {
+      for (var j = 0; j < order.length; j++) {
+        var tid2 = order[j];
+        if (String(tid2 || '').toLowerCase() === 'capitalgains') return tid2;
+      }
+      return null;
+    }
+    if (group !== 'incomeDeductions') return null;
+    var target = (typeof index === 'number') ? index : parseInt(index, 10);
+    if (!isFinite(target) || target < 0) return null;
+    var deductionIndex = 0;
+    for (var k = 0; k < order.length; k++) {
+      var tid3 = order[k];
+      var low = String(tid3 || '').toLowerCase();
+      if (!low || low === 'incometax' || low === 'capitalgains') continue;
+      if (deductionIndex === target) return tid3;
+      deductionIndex++;
+    }
+    return null;
+  }
+
+  /**
+   * Resolve the equivalent tax id for this ruleset tax id within a target ruleset.
+   * Matches by exact id first, then by equivalence slot (type/order).
+   */
+  getEquivalentTaxIdIn(targetRuleSet, taxId) {
+    if (!targetRuleSet || typeof targetRuleSet.getTaxOrder !== 'function') return null;
+    var sourceTaxId = String(taxId || '');
+    var sourceLower = sourceTaxId.toLowerCase();
+    if (!sourceTaxId) return null;
+
+    var targetOrder = targetRuleSet.getTaxOrder() || [];
+    for (var i = 0; i < targetOrder.length; i++) {
+      var targetId = targetOrder[i];
+      if (String(targetId || '').toLowerCase() === sourceLower) return targetId;
+    }
+
+    var slot = this.getTaxEquivalenceSlot(sourceTaxId);
+    if (!slot) return null;
+    if (typeof targetRuleSet.getTaxIdByEquivalenceSlot === 'function') {
+      return targetRuleSet.getTaxIdByEquivalenceSlot(slot.group, slot.index);
+    }
+    return null;
+  }
+
   // ----- Generic helpers for additional taxes -----
   /**
    * Return the configured exempt amount for an additional tax descriptor by name.

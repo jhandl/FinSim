@@ -7,14 +7,6 @@ function findRowByAge(rows, age) {
   return rows.find(row => row && typeof row === 'object' && Math.round(row.age) === age);
 }
 
-function buildEuroARRules() {
-  const clone = deepClone(AR_RULES);
-  if (!clone.locale) clone.locale = {};
-  clone.locale.currencyCode = 'EUR';
-  clone.locale.currencySymbol = '€';
-  return clone;
-}
-
 function sumBreakdown(breakdown) {
   if (!breakdown || typeof breakdown !== 'object') return 0;
   let total = 0;
@@ -77,7 +69,7 @@ module.exports = {
 
     installTestTaxRules(framework, {
       ie: deepClone(IE_RULES),
-      ar: buildEuroARRules()
+      ar: deepClone(AR_RULES)
     });
 
     const results = await framework.runSimulation();
@@ -95,6 +87,18 @@ module.exports = {
     const ieIncomeTaxTotal = sumBreakdown(ieIncomeTaxBreakdown);
     if (!(ieIncomeTaxTotal > 0)) {
       errors.push('Expected positive age-40 tax:incomeTax:ie from overlap IE salary source');
+    }
+
+    const iePrsiBreakdown = attrs['tax:prsi:ie'];
+    const iePrsiTotal = sumBreakdown(iePrsiBreakdown);
+    if (!(iePrsiTotal > 0)) {
+      errors.push('Expected positive age-40 tax:prsi:ie from overlap IE salary source');
+    }
+
+    const ieUscBreakdown = attrs['tax:usc:ie'];
+    const ieUscTotal = sumBreakdown(ieUscBreakdown);
+    if (!(ieUscTotal > 0)) {
+      errors.push('Expected positive age-40 tax:usc:ie from overlap IE salary source');
     }
 
     return { success: errors.length === 0, errors };

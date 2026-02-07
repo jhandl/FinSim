@@ -64,6 +64,12 @@ class Taxman {
     if (sourceCountry) {
       var src = String(sourceCountry).toLowerCase();
       this.salaryIncomeBySourceCountry[src] = (this.salaryIncomeBySourceCountry[src] || 0) + amount;
+      if (!this.salaryIncomeBySourceCountryByPerson[src]) {
+        this.salaryIncomeBySourceCountryByPerson[src] = {};
+      }
+      var sourceLabel = (person && this.person2Ref && person.id === this.person2Ref.id) ? 'Your Partner' : 'You';
+      this.salaryIncomeBySourceCountryByPerson[src][sourceLabel] =
+        (this.salaryIncomeBySourceCountryByPerson[src][sourceLabel] || 0) + amount;
     }
   };
 
@@ -459,6 +465,7 @@ class Taxman {
     this.totalSalaryP1 = 0;
     this.totalSalaryP2 = 0;
     this.salaryIncomeBySourceCountry = {};
+    this.salaryIncomeBySourceCountryByPerson = {};
     this.rentalIncomeBySource = {};
 
     // Dynamic tax totals map for country-neutral engine
@@ -744,7 +751,55 @@ class Taxman {
       }
       return converted;
     };
+    var getContributionRateForAge = function (contrib, age) {
+      var rate = (contrib && typeof contrib.rate === 'number') ? contrib.rate : 0;
+      var adj = (contrib && contrib.ageAdjustments && typeof contrib.ageAdjustments === 'object') ? contrib.ageAdjustments : {};
+      var thresholds = Object.keys(adj).map(function (k) { return parseInt(k); }).sort(function (a, b) { return a - b; });
+      for (var i = 0; i < thresholds.length; i++) {
+        if (typeof age === 'number' && age >= thresholds[i]) rate = adj[String(thresholds[i])];
+      }
+      return rate;
+    };
+    var taxman = this;
+    var recordSourceTaxWithBreakdown = function (taxId, fallbackSource, totalTax, sourceBreakdown) {
+      if (!(typeof totalTax === 'number') || totalTax <= 0) return;
+
+      var entries = [];
+      if (sourceBreakdown && typeof sourceBreakdown === 'object') {
+        var sourceNames = Object.keys(sourceBreakdown);
+        for (var i = 0; i < sourceNames.length; i++) {
+          var sourceName = sourceNames[i];
+          var sourceAmount = sourceBreakdown[sourceName];
+          if (!(typeof sourceAmount === 'number') || sourceAmount <= 0) continue;
+          entries.push({ source: sourceName, amount: sourceAmount });
+        }
+      }
+
+      if (!entries.length) {
+        taxman._recordTax(taxId, fallbackSource, totalTax);
+        return;
+      }
+
+      var totalBase = 0;
+      for (var j = 0; j < entries.length; j++) {
+        totalBase += entries[j].amount;
+      }
+      if (totalBase <= 0) {
+        taxman._recordTax(taxId, fallbackSource, totalTax);
+        return;
+      }
+
+      var remaining = totalTax;
+      for (var k = 0; k < entries.length; k++) {
+        var allocated = (k === entries.length - 1)
+          ? remaining
+          : (totalTax * (entries[k].amount / totalBase));
+        remaining -= allocated;
+        taxman._recordTax(taxId, entries[k].source, allocated);
+      }
+    };
     var sourceSalaryMap = this.salaryIncomeBySourceCountry || {};
+    var sourceSalaryByPersonMap = this.salaryIncomeBySourceCountryByPerson || {};
     var salaryCountries = Object.keys(sourceSalaryMap);
     for (var ss = 0; ss < salaryCountries.length; ss++) {
       var salaryCountryCode = String(salaryCountries[ss] || '').toLowerCase();
@@ -778,6 +833,7 @@ class Taxman {
       var sourceCurrencyCode = sourceRuleset.getCurrencyCode();
       var sourceBands = sourceRuleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
       var sourceBreakdown = sourceIncomeByCountry[sourceCountryCode];
+      var sourceSalaryBreakdown = sourceSalaryByPersonMap[sourceCountryCode] || null;
       if (sourceBreakdown.salary > 0) {
         var sourceSalaryBase = sourceBreakdown.salary;
         if (residenceCurrencyCode !== sourceCurrencyCode || residenceCountry !== sourceCountryCode) {
@@ -790,7 +846,84 @@ class Taxman {
         }
         if (sourceSalaryTax > 0) {
           foreignSalaryTaxes[sourceCountryCode] = (foreignSalaryTaxes[sourceCountryCode] || 0) + sourceSalaryTax;
-          this._recordTax('incomeTax:' + sourceCountryCode, 'Salary Income Tax (' + sourceCountryCode.toUpperCase() + ')', sourceSalaryTax);
+          recordSourceTaxWithBreakdown(
+            'incomeTax:' + sourceCountryCode,
+            'Salary Income Tax (' + sourceCountryCode.toUpperCase() + ')',
+            sourceSalaryTax,
+            sourceSalaryBreakdown
+          );
+        }
+
+        var sourceAge = this.person1Ref && typeof this.person1Ref.age === 'number' ? this.person1Ref.age : null;
+        var sourceContributions = sourceRuleset && typeof sourceRuleset.getSocialContributions === 'function'
+          ? sourceRuleset.getSocialContributions()
+          : [];
+        for (var sci = 0; sci < sourceContributions.length; sci++) {
+          var sourceContrib = sourceContributions[sci] || {};
+          var sourceContribTaxId = String(sourceContrib.id || sourceContrib.name || 'contrib').toLowerCase();
+          var sourceContribRate = getContributionRateForAge(sourceContrib, sourceAge);
+          if (!(typeof sourceContribRate === 'number') || sourceContribRate <= 0) continue;
+          var sourceContribBase = sourceSalaryBase;
+          if (typeof sourceContrib.incomeCap === 'number' && sourceContrib.incomeCap > 0) {
+            sourceContribBase = Math.min(sourceContribBase, sourceContrib.incomeCap);
+          }
+          var sourceContribTaxInSourceCurrency = sourceContribBase * sourceContribRate;
+          var sourceContribTax = sourceContribTaxInSourceCurrency;
+          if (residenceCurrencyCode !== sourceCurrencyCode || residenceCountry !== sourceCountryCode) {
+            sourceContribTax = convertBetweenCountries(sourceContribTaxInSourceCurrency, sourceCountryCode, residenceCountry);
+          }
+          if (sourceContribTax > 0) {
+            recordSourceTaxWithBreakdown(
+              sourceContribTaxId + ':' + sourceCountryCode,
+              String(sourceContrib.name || sourceContribTaxId) + ' Salary Tax (' + sourceCountryCode.toUpperCase() + ')',
+              sourceContribTax,
+              sourceSalaryBreakdown
+            );
+          }
+        }
+
+        var sourceAdditionalTaxes = sourceRuleset && typeof sourceRuleset.getAdditionalTaxes === 'function'
+          ? sourceRuleset.getAdditionalTaxes()
+          : [];
+        for (var sai = 0; sai < sourceAdditionalTaxes.length; sai++) {
+          var sourceAdditionalTax = sourceAdditionalTaxes[sai] || {};
+          var sourceAdditionalTaxId = String(sourceAdditionalTax.id || sourceAdditionalTax.name || 'addtax').toLowerCase();
+          var thresholdRaw = (sourceRuleset && typeof sourceRuleset.getAdditionalTaxIncomeExemptionThreshold === 'function')
+            ? sourceRuleset.getAdditionalTaxIncomeExemptionThreshold(sourceAdditionalTax.name)
+            : (typeof sourceAdditionalTax.incomeExemptionThreshold === 'number' ? sourceAdditionalTax.incomeExemptionThreshold : 0);
+          var deductibleRawExplicit = (sourceRuleset && typeof sourceRuleset.getAdditionalTaxDeductibleExemptionAmount === 'function')
+            ? sourceRuleset.getAdditionalTaxDeductibleExemptionAmount(sourceAdditionalTax.name)
+            : (typeof sourceAdditionalTax.deductibleExemptionAmount === 'number' ? sourceAdditionalTax.deductibleExemptionAmount : 0);
+          var legacyExemptRaw = (sourceRuleset && typeof sourceRuleset.getAdditionalTaxExemptAmount === 'function')
+            ? sourceRuleset.getAdditionalTaxExemptAmount(sourceAdditionalTax.name)
+            : (typeof sourceAdditionalTax.exemptAmount === 'number' ? sourceAdditionalTax.exemptAmount : 0);
+          var threshold = (typeof thresholdRaw === 'number') ? thresholdRaw : 0;
+          var deductibleRaw = deductibleRawExplicit > 0 ? deductibleRawExplicit : legacyExemptRaw;
+          var deductible = (typeof deductibleRaw === 'number') ? deductibleRaw : 0;
+          if (threshold > 0 && sourceSalaryBase <= threshold) continue;
+          var taxableBase = sourceSalaryBase - deductible;
+          if (taxableBase <= 0) continue;
+
+          var sourceAdditionalBands = sourceAdditionalTax.brackets || {};
+          try {
+            if (sourceRuleset && typeof sourceRuleset.getAdditionalTaxBandsFor === 'function') {
+              sourceAdditionalBands = sourceRuleset.getAdditionalTaxBandsFor(sourceAdditionalTax.name, sourceAge, sourceSalaryBase) || sourceAdditionalBands;
+            }
+          } catch (_) { }
+
+          var sourceAdditionalTaxInSourceCurrency = this.computeTaxFromBands(sourceAdditionalBands, taxableBase);
+          var sourceAdditionalTaxAmount = sourceAdditionalTaxInSourceCurrency;
+          if (residenceCurrencyCode !== sourceCurrencyCode || residenceCountry !== sourceCountryCode) {
+            sourceAdditionalTaxAmount = convertBetweenCountries(sourceAdditionalTaxInSourceCurrency, sourceCountryCode, residenceCountry);
+          }
+          if (sourceAdditionalTaxAmount > 0) {
+            recordSourceTaxWithBreakdown(
+              sourceAdditionalTaxId + ':' + sourceCountryCode,
+              String(sourceAdditionalTax.name || sourceAdditionalTaxId) + ' Salary Tax (' + sourceCountryCode.toUpperCase() + ')',
+              sourceAdditionalTaxAmount,
+              sourceSalaryBreakdown
+            );
+          }
         }
       }
       if (sourceBreakdown.pension > 0) {
@@ -1614,6 +1747,13 @@ class Taxman {
 
     copy.salariesP1 = this.salariesP1.map(s => ({ ...s }));
     copy.salariesP2 = this.salariesP2.map(s => ({ ...s }));
+    copy.salaryIncomeBySourceCountry = this.salaryIncomeBySourceCountry ? { ...this.salaryIncomeBySourceCountry } : {};
+    copy.salaryIncomeBySourceCountryByPerson = {};
+    var sourceCountryKeys = Object.keys(this.salaryIncomeBySourceCountryByPerson || {});
+    for (var i = 0; i < sourceCountryKeys.length; i++) {
+      var cc = sourceCountryKeys[i];
+      copy.salaryIncomeBySourceCountryByPerson[cc] = { ...this.salaryIncomeBySourceCountryByPerson[cc] };
+    }
 
     copy.taxTotals = this.taxTotals ? { ...this.taxTotals } : {};
 

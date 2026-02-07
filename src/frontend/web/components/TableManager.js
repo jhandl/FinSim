@@ -337,7 +337,8 @@ class TableManager {
 
       // Add tooltip for attributable values
       let hasTooltip = false;
-      if (data.Attributions) {
+      const attributions = data.attributions;
+      if (attributions) {
         // Convert table column key to lowercase to match attribution keys
         const keyLower = key.toLowerCase();
         let attributionKey = keyLower;
@@ -350,42 +351,42 @@ class TableManager {
         let breakdown = null;
         if (keyLower === 'incomeprivatepension') {
           // Combine private pension and defined benefit attributions
-          const privatePensionBreakdown = data.Attributions['incomeprivatepension'] || {};
-          const definedBenefitBreakdown = data.Attributions['incomedefinedbenefit'] || {};
+          const privatePensionBreakdown = attributions['incomeprivatepension'] || {};
+          const definedBenefitBreakdown = attributions['incomedefinedbenefit'] || {};
           breakdown = { ...privatePensionBreakdown, ...definedBenefitBreakdown };
         } else if (keyLower === 'incomecash') {
           // Combine cash withdrawal and tax-free income attributions
-          const cashBreakdown = data.Attributions['incomecash'] || {};
-          const taxFreeBreakdown = data.Attributions['incometaxfree'] || {};
+          const cashBreakdown = attributions['incomecash'] || {};
+          const taxFreeBreakdown = attributions['incometaxfree'] || {};
           breakdown = { ...cashBreakdown, ...taxFreeBreakdown };
         } else {
           // Check for specific attribution first, then fall back to general 'income' for income columns
-          breakdown = data.Attributions[attributionKey];
+          breakdown = attributions[attributionKey];
           // Special handling for dynamic tax columns: map 'Tax__<id>' and 'Tax__<id>:<country>'
           if (!breakdown && taxId) {
             if (taxCountry) {
-              breakdown = data.Attributions['tax:' + taxId + ':' + taxCountry]
-                || data.Attributions['tax:' + taxId.toLowerCase() + ':' + taxCountry]
+              breakdown = attributions['tax:' + taxId + ':' + taxCountry]
+                || attributions['tax:' + taxId.toLowerCase() + ':' + taxCountry]
                 || breakdown;
             } else {
-              breakdown = data.Attributions['tax:' + taxId]
-                || data.Attributions['tax:' + taxId.toLowerCase()]
+              breakdown = attributions['tax:' + taxId]
+                || attributions['tax:' + taxId.toLowerCase()]
                 || breakdown;
             }
             // Backward-compat fallback: AttributionPopulator may flatten tax metrics under "tax".
             // Use it so deduction cells still surface attribution tooltips.
-            if (!breakdown && data.Attributions.tax) {
-              breakdown = data.Attributions.tax;
+            if (!breakdown && attributions.tax) {
+              breakdown = attributions.tax;
             }
           }
-          if (!breakdown && keyLower.indexOf('income') === 0 && data.Attributions.income) {
-            breakdown = data.Attributions.income;
+          if (!breakdown && keyLower.indexOf('income') === 0 && attributions.income) {
+            breakdown = attributions.income;
           }
 
           // Consolidated display for capital gains tax: show pre-relief by category and relief at end
-          if (key === 'Tax__capitalGains' && !taxCountry && data.Attributions) {
+          if (key === 'Tax__capitalGains' && !taxCountry && attributions) {
             try {
-              const cap = data.Attributions['tax:capitalGains'] || {};
+              const cap = attributions['tax:capitalGains'] || {};
               let fundsPost = 0;
               let sharesPost = 0;
               let relief = 0; // positive value for magnitude
@@ -484,29 +485,33 @@ class TableManager {
           let structuredTaxLines = null;
           if (taxId) {
             const taxRuleSet = Config.getInstance().getCachedTaxRuleSet(currentCountry);
-            const taxName = (taxRuleSet && typeof taxRuleSet.getDisplayNameForTax === 'function')
-              ? taxRuleSet.getDisplayNameForTax(taxId)
-              : taxId;
 
             if (taxCountry) {
-              const sourceBreakdown = data.Attributions['tax:' + taxId + ':' + taxCountry]
-                || data.Attributions['tax:' + taxId.toLowerCase() + ':' + taxCountry]
+              const sourceBreakdown = attributions['tax:' + taxId + ':' + taxCountry]
+                || attributions['tax:' + taxId.toLowerCase() + ':' + taxCountry]
                 || breakdown
                 || {};
               const sourceEntries = Object.entries(sourceBreakdown);
               let sourceTaxAmount = 0;
+              structuredTaxLines = [];
               for (let i = 0; i < sourceEntries.length; i++) {
                 const source = sourceEntries[i][0];
                 const amount = sourceEntries[i][1];
                 if (typeof amount !== 'number') continue;
                 if (String(source).indexOf('Foreign Tax Credit') === 0) continue;
                 sourceTaxAmount += amount;
+                structuredTaxLines.push({
+                  source: source + ' (' + taxCountry.toUpperCase() + ')',
+                  amount: amount
+                });
               }
-              structuredTaxLines = [
-                { source: taxCountry.toUpperCase() + ' ' + taxName, amount: sourceTaxAmount }
-              ];
+              if (structuredTaxLines.length === 0 && sourceTaxAmount !== 0) {
+                structuredTaxLines = [
+                  { source: taxCountry.toUpperCase(), amount: sourceTaxAmount }
+                ];
+              }
 
-              const withholdingBreakdown = data.Attributions['tax:withholding:' + taxCountry] || {};
+              const withholdingBreakdown = attributions['tax:withholding:' + taxCountry] || {};
               const withholdingEntries = Object.entries(withholdingBreakdown);
               let withholdingAmount = 0;
               for (let i = 0; i < withholdingEntries.length; i++) {
@@ -516,24 +521,22 @@ class TableManager {
               }
               if (withholdingAmount !== 0) {
                 structuredTaxLines.push({
-                  source: taxCountry.toUpperCase() + ' withholding',
+                  source: 'withholding (' + taxCountry.toUpperCase() + ')',
                   amount: withholdingAmount
                 });
               }
             } else {
-              const residenceBreakdown = data.Attributions['tax:' + taxId]
-                || data.Attributions['tax:' + taxId.toLowerCase()]
+              const residenceBreakdown = attributions['tax:' + taxId]
+                || attributions['tax:' + taxId.toLowerCase()]
                 || breakdown
                 || {};
               const residenceEntries = Object.entries(residenceBreakdown);
-              let residenceTaxBeforeCredits = 0;
-              let netTaxAmount = 0;
+              const residenceTaxLines = [];
               const creditByLabel = {};
               for (let i = 0; i < residenceEntries.length; i++) {
                 const source = residenceEntries[i][0];
                 const amount = residenceEntries[i][1];
                 if (typeof amount !== 'number') continue;
-                netTaxAmount += amount;
                 if (String(source).indexOf('Foreign Tax Credit') === 0) {
                   const match = /Foreign Tax Credit\s*\(([^)]+)\)/i.exec(String(source));
                   const label = (match && match[1])
@@ -542,14 +545,55 @@ class TableManager {
                   creditByLabel[label] = (creditByLabel[label] || 0) + amount;
                   continue;
                 }
-                residenceTaxBeforeCredits += amount;
+                if (amount === 0) continue;
+                residenceTaxLines.push({
+                  source: source,
+                  amount: amount
+                });
               }
 
+              const foreignTaxLines = [];
+              const attributionKeys = Object.keys(attributions || {});
+              for (let i = 0; i < attributionKeys.length; i++) {
+                const metricKey = attributionKeys[i];
+                const match = /^tax:([^:]+):([a-z]{2,})$/i.exec(String(metricKey || ''));
+                if (!match) continue;
+                const sourceTaxId = String(match[1] || '');
+                const foreignCountry = String(match[2] || '').toLowerCase();
+                if (!foreignCountry || foreignCountry === currentCountry) continue;
+                const sourceRuleSet = Config.getInstance().getCachedTaxRuleSet(foreignCountry);
+                let mappedResidenceTaxId = null;
+                if (sourceRuleSet && typeof sourceRuleSet.getEquivalentTaxIdIn === 'function') {
+                  mappedResidenceTaxId = sourceRuleSet.getEquivalentTaxIdIn(taxRuleSet, sourceTaxId);
+                } else if (String(sourceTaxId).toLowerCase() === String(taxId || '').toLowerCase()) {
+                  mappedResidenceTaxId = taxId;
+                }
+                if (!mappedResidenceTaxId || String(mappedResidenceTaxId).toLowerCase() !== String(taxId || '').toLowerCase()) continue;
+                const sourceBreakdown = attributions[metricKey] || {};
+                const sourceEntries = Object.entries(sourceBreakdown);
+                for (let j = 0; j < sourceEntries.length; j++) {
+                  const source = sourceEntries[j][0];
+                  const amount = sourceEntries[j][1];
+                  if (typeof amount !== 'number') continue;
+                  if (String(source).indexOf('Foreign Tax Credit') === 0) continue;
+                  if (amount === 0) continue;
+                  foreignTaxLines.push({
+                    source: source + ' (' + foreignCountry.toUpperCase() + ')',
+                    amount: amount
+                  });
+                }
+              }
+
+              foreignTaxLines.sort((a, b) => String(a.source).localeCompare(String(b.source)));
               const creditLabels = Object.keys(creditByLabel).sort();
-              if (creditLabels.length > 0) {
-                structuredTaxLines = [
-                  { source: currentCountry.toUpperCase() + ' ' + taxName, amount: residenceTaxBeforeCredits }
-                ];
+              if (creditLabels.length > 0 || foreignTaxLines.length > 0 || residenceTaxLines.length > 0) {
+                structuredTaxLines = [];
+                for (let i = 0; i < residenceTaxLines.length; i++) {
+                  structuredTaxLines.push(residenceTaxLines[i]);
+                }
+                for (let i = 0; i < foreignTaxLines.length; i++) {
+                  structuredTaxLines.push(foreignTaxLines[i]);
+                }
                 for (let i = 0; i < creditLabels.length; i++) {
                   const creditLabel = creditLabels[i];
                   structuredTaxLines.push({
@@ -557,10 +601,6 @@ class TableManager {
                     amount: creditByLabel[creditLabel]
                   });
                 }
-                structuredTaxLines.push({
-                  source: 'Net ' + taxName,
-                  amount: netTaxAmount
-                });
               }
             }
           }

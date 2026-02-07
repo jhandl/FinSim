@@ -213,36 +213,85 @@ const DYNAMIC_SECTIONS = [
       ];
 
       const taxOrder = taxRuleSet.getTaxOrder();
+      const residenceTaxSet = {};
+      for (let i = 0; i < taxOrder.length; i++) {
+        const tid = String(taxOrder[i] || '').toLowerCase();
+        if (tid) residenceTaxSet[tid] = true;
+      }
       const lowerCountryCode = String(countryCode || '').toLowerCase();
       const cachedRuleSets = config.listCachedRuleSets();
-      const foreignCountries = Object.keys(cachedRuleSets || {})
-        .filter((code) => code !== lowerCountryCode)
-        .sort();
 
       const sampleAttributions = [];
       if (typeof window !== 'undefined' && Array.isArray(window.dataSheet) && window.dataSheet.length > 1) {
         for (let i = 1; i < window.dataSheet.length; i++) {
           const row = window.dataSheet[i];
-          if (row && row.Attributions) {
-            sampleAttributions.push(row.Attributions);
+          const attrs = row && row.attributions;
+          if (attrs) {
+            sampleAttributions.push(attrs);
           }
         }
       }
 
-      const hasCrossBorderMetric = (taxId, foreignCountry) => {
-        if (sampleAttributions.length === 0) return true;
-        const metricKey = 'tax:' + taxId + ':' + foreignCountry;
-        for (let i = 0; i < sampleAttributions.length; i++) {
-          const metric = sampleAttributions[i][metricKey];
+      const sourceOnlyTaxIdsByCountry = {};
+      const cachedCountries = Object.keys(cachedRuleSets || {}).sort();
+      for (let ci = 0; ci < cachedCountries.length; ci++) {
+        const foreignCountry = String(cachedCountries[ci] || '').toLowerCase();
+        if (!foreignCountry || foreignCountry === lowerCountryCode) continue;
+        const sourceRuleSet = cachedRuleSets[foreignCountry];
+        if (!sourceRuleSet || typeof sourceRuleSet.getTaxOrder !== 'function') continue;
+        const sourceTaxOrder = sourceRuleSet.getTaxOrder() || [];
+        for (let ti = 0; ti < sourceTaxOrder.length; ti++) {
+          const sourceTaxId = String(sourceTaxOrder[ti] || '');
+          const sourceTaxIdLower = sourceTaxId.toLowerCase();
+          if (!sourceTaxId) continue;
+          let mappedTaxId = null;
+          if (sourceRuleSet && typeof sourceRuleSet.getEquivalentTaxIdIn === 'function') {
+            mappedTaxId = sourceRuleSet.getEquivalentTaxIdIn(taxRuleSet, sourceTaxId);
+          } else if (residenceTaxSet[sourceTaxIdLower]) {
+            mappedTaxId = sourceTaxId;
+          }
+          if (mappedTaxId) continue;
+          if (!sourceOnlyTaxIdsByCountry[foreignCountry]) sourceOnlyTaxIdsByCountry[foreignCountry] = {};
+          sourceOnlyTaxIdsByCountry[foreignCountry][sourceTaxId] = true;
+        }
+      }
+
+      for (let i = 0; i < sampleAttributions.length; i++) {
+        const attrs = sampleAttributions[i];
+        if (!attrs || typeof attrs !== 'object') continue;
+        const metricKeys = Object.keys(attrs);
+        for (let mk = 0; mk < metricKeys.length; mk++) {
+          const metricKey = metricKeys[mk];
+          const match = /^tax:([^:]+):([a-z]{2,})$/i.exec(metricKey);
+          if (!match) continue;
+          const taxId = String(match[1] || '');
+          const taxIdLower = taxId.toLowerCase();
+          const foreignCountry = String(match[2] || '').toLowerCase();
+          if (!foreignCountry || foreignCountry === lowerCountryCode) continue;
+          const sourceRuleSet = cachedRuleSets ? cachedRuleSets[foreignCountry] : null;
+          let mappedTaxId = null;
+          if (sourceRuleSet && typeof sourceRuleSet.getEquivalentTaxIdIn === 'function') {
+            mappedTaxId = sourceRuleSet.getEquivalentTaxIdIn(taxRuleSet, taxId);
+          } else if (residenceTaxSet[taxIdLower]) {
+            mappedTaxId = taxId;
+          }
+          if (mappedTaxId) continue;
+          const metric = attrs[metricKey];
           if (!metric || typeof metric !== 'object') continue;
           const sources = Object.keys(metric);
+          let hasAmount = false;
           for (let j = 0; j < sources.length; j++) {
             const amount = metric[sources[j]];
-            if (typeof amount === 'number' && amount !== 0) return true;
+            if (typeof amount === 'number' && amount !== 0) {
+              hasAmount = true;
+              break;
+            }
           }
+          if (!hasAmount) continue;
+          if (!sourceOnlyTaxIdsByCountry[foreignCountry]) sourceOnlyTaxIdsByCountry[foreignCountry] = {};
+          sourceOnlyTaxIdsByCountry[foreignCountry][taxId] = true;
         }
-        return false;
-      };
+      }
 
       taxOrder.forEach((taxId) => {
         const taxLabel = taxRuleSet.getDisplayNameForTax(taxId);
@@ -252,17 +301,30 @@ const DYNAMIC_SECTIONS = [
           label: taxLabel,
           tooltip: taxTooltip
         });
+      });
 
-        for (let i = 0; i < foreignCountries.length; i++) {
-          const foreignCountry = foreignCountries[i];
-          if (!hasCrossBorderMetric(taxId, foreignCountry)) continue;
+      const sourceOnlyCountries = Object.keys(sourceOnlyTaxIdsByCountry).sort();
+      for (let i = 0; i < sourceOnlyCountries.length; i++) {
+        const foreignCountry = sourceOnlyCountries[i];
+        const sourceRuleSet = cachedRuleSets ? cachedRuleSets[foreignCountry] : null;
+        const sourceTaxIds = Object.keys(sourceOnlyTaxIdsByCountry[foreignCountry] || {}).sort();
+        for (let j = 0; j < sourceTaxIds.length; j++) {
+          const sourceTaxId = sourceTaxIds[j];
+          const sourceTaxLabel = (sourceRuleSet && typeof sourceRuleSet.getDisplayNameForTax === 'function')
+            ? sourceRuleSet.getDisplayNameForTax(sourceTaxId)
+            : sourceTaxId;
+          const sourceTaxTooltip = (sourceRuleSet && typeof sourceRuleSet.getTooltipForTax === 'function')
+            ? sourceRuleSet.getTooltipForTax(sourceTaxId)
+            : null;
           columns.push({
-            key: `Tax__${taxId}:${foreignCountry}`,
-            label: `${taxLabel} (${foreignCountry.toUpperCase()})`,
-            tooltip: `${taxTooltip} paid to ${foreignCountry.toUpperCase()}`
+            key: `Tax__${sourceTaxId}:${foreignCountry}`,
+            label: `${sourceTaxLabel} (${foreignCountry.toUpperCase()})`,
+            tooltip: sourceTaxTooltip
+              ? `${sourceTaxTooltip} paid to ${foreignCountry.toUpperCase()}`
+              : `Tax paid to ${foreignCountry.toUpperCase()}`
           });
         }
-      });
+      }
 
       return columns;
     }

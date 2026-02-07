@@ -58,7 +58,7 @@ async function getRowWarningText(frame, rowIndex1Based) {
   }, rowIndex1Based);
 }
 
-test('cross-border tax columns appear when cross-border flows exist', async ({ page }) => {
+test('matching foreign tax types are aggregated into residence columns', async ({ page }) => {
   const frame = await loadSimulator(page);
   await seedEvents(page, frame, [
     { type: 'SI', alias: 'Domestic Salary', amount: '50000', fromAge: 30, toAge: 35, currency: 'USD' },
@@ -70,7 +70,7 @@ test('cross-border tax columns appear when cross-border flows exist', async ({ p
   await waitForDataRows(frame);
   await ensureDetailedDataTableVisible(frame);
 
-  const hasCrossBorderColumn = await frame.locator('body').evaluate(() => {
+  const hasSplitIncomeTaxColumn = await frame.locator('body').evaluate(() => {
     const taxHeaderCells = Array.from(document.querySelectorAll('#Data tbody tr.tax-header .dynamic-section-cell[data-key]'));
     const visibleCells = taxHeaderCells.filter(cell => {
       const style = window.getComputedStyle(cell);
@@ -79,7 +79,7 @@ test('cross-border tax columns appear when cross-border flows exist', async ({ p
     const keys = visibleCells.map(cell => (cell.dataset && cell.dataset.key) ? cell.dataset.key : '');
     return keys.some(key => /^Tax__incomeTax:[a-z]{2}$/i.test(key));
   });
-  expect(hasCrossBorderColumn).toBeTruthy();
+  expect(hasSplitIncomeTaxColumn).toBeFalsy();
 });
 
 test('attribution tooltip shows source tax, residence tax, and foreign tax credit', async ({ page }) => {

@@ -214,7 +214,7 @@ class UIManager {
       CashPV: dataSheet[row].cashPV / scale,
       PensionContributionPV: dataSheet[row].pensionContributionPV / scale,
       WorthPV: dataSheet[row].worthPV / scale,
-      Attributions: dataSheet[row].attributions
+      attributions: dataSheet[row].attributions
     };
 
     // Add dynamic per-investment-type fields so the table can render N investment types
@@ -256,8 +256,56 @@ class UIManager {
 
       // Add dynamic tax totals with display names from tax ruleset
       const taxMap = dataSheet[row].taxByKey || {};
-      for (const tId in taxMap) {
-        data['Tax__' + tId] = taxMap[tId] / scale;
+      const age = dataSheet[row].age;
+      const residenceCountry = RelocationUtils.getCountryForAge(age, this.ui) || Config.getInstance().getDefaultCountry();
+      const residenceRuleSet = Config.getInstance().getCachedTaxRuleSet(residenceCountry);
+      const residenceTaxOrder = (residenceRuleSet && typeof residenceRuleSet.getTaxOrder === 'function')
+        ? residenceRuleSet.getTaxOrder()
+        : [];
+      const residenceTaxSet = {};
+      for (let i = 0; i < residenceTaxOrder.length; i++) {
+        const taxId = String(residenceTaxOrder[i] || '').toLowerCase();
+        if (taxId) residenceTaxSet[taxId] = true;
+      }
+      const getResidenceTaxIdByLower = (taxIdLower) => {
+        for (let i = 0; i < residenceTaxOrder.length; i++) {
+          const rid = residenceTaxOrder[i];
+          if (String(rid || '').toLowerCase() === taxIdLower) return rid;
+        }
+        return null;
+      };
+
+      const displayTaxMap = {};
+      for (const rawTaxId in taxMap) {
+        const taxAmount = taxMap[rawTaxId];
+        if (typeof taxAmount !== 'number') continue;
+        const rawTaxIdStr = String(rawTaxId || '');
+        if (!rawTaxIdStr) continue;
+        const sep = rawTaxIdStr.indexOf(':');
+        if (sep > 0) {
+          const baseTaxId = rawTaxIdStr.substring(0, sep);
+          const baseTaxIdLower = baseTaxId.toLowerCase();
+          const sourceCountryCode = String(rawTaxIdStr.substring(sep + 1) || '').toLowerCase();
+          let displayTaxId = null;
+          if (residenceTaxSet[baseTaxIdLower]) {
+            displayTaxId = getResidenceTaxIdByLower(baseTaxIdLower) || baseTaxId;
+          } else if (sourceCountryCode && residenceRuleSet) {
+            const sourceRuleSet = Config.getInstance().getCachedTaxRuleSet(sourceCountryCode);
+            if (sourceRuleSet && typeof sourceRuleSet.getEquivalentTaxIdIn === 'function') {
+              displayTaxId = sourceRuleSet.getEquivalentTaxIdIn(residenceRuleSet, baseTaxId);
+            }
+          }
+          if (!displayTaxId) displayTaxId = rawTaxIdStr;
+          if (!displayTaxMap[displayTaxId]) displayTaxMap[displayTaxId] = 0;
+          displayTaxMap[displayTaxId] += taxAmount;
+        } else {
+          if (!displayTaxMap[rawTaxIdStr]) displayTaxMap[rawTaxIdStr] = 0;
+          displayTaxMap[rawTaxIdStr] += taxAmount;
+        }
+      }
+
+      for (const displayTaxId in displayTaxMap) {
+        data['Tax__' + displayTaxId] = displayTaxMap[displayTaxId] / scale;
       }
       // Add Tax PV fields for present-value mode support on deduction columns
       // These are computed by PresentValueCalculator and stored directly on dataSheet[row]
@@ -269,10 +317,10 @@ class UIManager {
 
       // Also add legacy hardcoded tax fields for backward compatibility with existing UI components
       // These will be dynamically populated from the taxByKey map
-      if (taxMap.incomeTax !== undefined) data.IT = taxMap.incomeTax / scale;
-      if (taxMap.prsi !== undefined) data.PRSI = taxMap.prsi / scale;
-      if (taxMap.usc !== undefined) data.USC = taxMap.usc / scale;
-      if (taxMap.capitalGains !== undefined) data.CGT = taxMap.capitalGains / scale;
+      if (displayTaxMap.incomeTax !== undefined) data.IT = displayTaxMap.incomeTax / scale;
+      if (displayTaxMap.prsi !== undefined) data.PRSI = displayTaxMap.prsi / scale;
+      if (displayTaxMap.usc !== undefined) data.USC = displayTaxMap.usc / scale;
+      if (displayTaxMap.capitalGains !== undefined) data.CGT = displayTaxMap.capitalGains / scale;
     } catch (_) { }
 
     return data;
