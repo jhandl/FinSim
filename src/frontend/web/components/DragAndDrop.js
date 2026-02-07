@@ -136,13 +136,24 @@ class DragAndDrop {
     const startRuleset = cfg.getCachedTaxRuleSet(startCountry);
     const startTypes = startRuleset.getResolvedInvestmentTypes() || [];
     const scenarioCountries = this.webUI.getScenarioCountries();
+    const showCountrySuffix = cfg.isRelocationEnabled() && scenarioCountries.length > 1;
     const baseTypes = new Set();
+    const baseTypeCountries = {};
     baseTypes.add('cash');
     let includePension = false;
 
+    const countriesForTypes = [];
+    if (startCountry) countriesForTypes.push(startCountry);
     for (let i = 0; i < scenarioCountries.length; i++) {
-      const country = scenarioCountries[i];
+      if (countriesForTypes.indexOf(scenarioCountries[i]) === -1) {
+        countriesForTypes.push(scenarioCountries[i]);
+      }
+    }
+
+    for (let i = 0; i < countriesForTypes.length; i++) {
+      const country = countriesForTypes[i];
       const ruleset = cfg.getCachedTaxRuleSet(country);
+      if (!ruleset) continue;
       if (ruleset && typeof ruleset.hasPrivatePensions === 'function' && ruleset.hasPrivatePensions()) {
         includePension = true;
       }
@@ -153,6 +164,14 @@ class DragAndDrop {
         const baseType = String(type.key).split('_')[0];
         if (baseType) {
           baseTypes.add(baseType);
+        }
+        const keyParts = String(type.key).split('_');
+        if (keyParts.length < 2) continue;
+        const countrySuffix = keyParts[keyParts.length - 1].toLowerCase();
+        if (!countrySuffix) continue;
+        if (!cfg.getCachedTaxRuleSet(countrySuffix)) continue;
+        if (!baseTypeCountries[baseType]) {
+          baseTypeCountries[baseType] = countrySuffix;
         }
       }
     }
@@ -175,6 +194,12 @@ class DragAndDrop {
         const startType = startTypes.find(t => t && t.key && String(t.key).split('_')[0] === baseType);
         if (startType && startType.label) {
           label = startType.label;
+        }
+        if (showCountrySuffix && baseTypeCountries[baseType]) {
+          const suffix = '(' + baseTypeCountries[baseType].toUpperCase() + ')';
+          if (String(label).toUpperCase().indexOf(suffix) === -1) {
+            label = label + ' ' + suffix;
+          }
         }
       }
       return {

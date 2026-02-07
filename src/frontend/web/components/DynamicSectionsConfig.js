@@ -187,13 +187,19 @@ const DYNAMIC_SECTIONS = [
     isGroupBoundary: true,
     enableVisibilityEngine: false,
     pinnedKeys: [],
-    zeroHide: { keys: ['PensionContribution'] },
+    zeroHide: {
+      keys: ['PensionContribution'],
+      matcher: (key) => {
+        return key.indexOf('Tax__') === 0 && key.indexOf(':') > 0;
+      }
+    },
     emptyState: {
       minWidthByKey: { PensionContribution: 'label' },
       minWeightAvgFactorByKey: { PensionContribution: 0.85 }
     },
     getColumns: (countryCode) => {
-      const taxRuleSet = Config.getInstance().getCachedTaxRuleSet(countryCode);
+      const config = Config.getInstance();
+      const taxRuleSet = config.getCachedTaxRuleSet(countryCode);
       if (!taxRuleSet) {
         throw new Error(`TaxRuleSet not cached for country: ${countryCode}`);
       }
@@ -207,12 +213,55 @@ const DYNAMIC_SECTIONS = [
       ];
 
       const taxOrder = taxRuleSet.getTaxOrder();
+      const lowerCountryCode = String(countryCode || '').toLowerCase();
+      const cachedRuleSets = config.listCachedRuleSets();
+      const foreignCountries = Object.keys(cachedRuleSets || {})
+        .filter((code) => code !== lowerCountryCode)
+        .sort();
+
+      const sampleAttributions = [];
+      if (typeof window !== 'undefined' && Array.isArray(window.dataSheet) && window.dataSheet.length > 1) {
+        for (let i = 1; i < window.dataSheet.length; i++) {
+          const row = window.dataSheet[i];
+          if (row && row.Attributions) {
+            sampleAttributions.push(row.Attributions);
+          }
+        }
+      }
+
+      const hasCrossBorderMetric = (taxId, foreignCountry) => {
+        if (sampleAttributions.length === 0) return true;
+        const metricKey = 'tax:' + taxId + ':' + foreignCountry;
+        for (let i = 0; i < sampleAttributions.length; i++) {
+          const metric = sampleAttributions[i][metricKey];
+          if (!metric || typeof metric !== 'object') continue;
+          const sources = Object.keys(metric);
+          for (let j = 0; j < sources.length; j++) {
+            const amount = metric[sources[j]];
+            if (typeof amount === 'number' && amount !== 0) return true;
+          }
+        }
+        return false;
+      };
+
       taxOrder.forEach((taxId) => {
+        const taxLabel = taxRuleSet.getDisplayNameForTax(taxId);
+        const taxTooltip = taxRuleSet.getTooltipForTax(taxId);
         columns.push({
           key: `Tax__${taxId}`,
-          label: taxRuleSet.getDisplayNameForTax(taxId),
-          tooltip: taxRuleSet.getTooltipForTax(taxId)
+          label: taxLabel,
+          tooltip: taxTooltip
         });
+
+        for (let i = 0; i < foreignCountries.length; i++) {
+          const foreignCountry = foreignCountries[i];
+          if (!hasCrossBorderMetric(taxId, foreignCountry)) continue;
+          columns.push({
+            key: `Tax__${taxId}:${foreignCountry}`,
+            label: `${taxLabel} (${foreignCountry.toUpperCase()})`,
+            tooltip: `${taxTooltip} paid to ${foreignCountry.toUpperCase()}`
+          });
+        }
       });
 
       return columns;
