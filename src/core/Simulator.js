@@ -1305,7 +1305,6 @@ function processEvents() {
           var declaredRate = 0;
           var salarySourceCountry = normalizeCountry(entry.sourceCountry || bucketCountry);
           if (!salarySourceCountry) salarySourceCountry = normalizeCountry(bucketCountry);
-          var explicitSalarySourceCountry = entry.sourceCountry ? normalizeCountry(entry.sourceCountry) : null;
 
           // Use consolidated total for incomeSalaries accumulation (only once per currency bucket)
           var consolidatedSalary = categoryTotalsByType['salary'] || 0;
@@ -1431,7 +1430,7 @@ function processEvents() {
 
           if (!declaredEntries[entryKey]) {
             const salaryMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
-            revenue.declareSalaryIncome(salaryMoney, declaredRate, salaryPerson, entry.eventId, explicitSalarySourceCountry);
+            revenue.declareSalaryIncome(salaryMoney, declaredRate, salaryPerson, entry.eventId, salarySourceCountry);
             declaredEntries[entryKey] = true;
           }
           break;

@@ -432,6 +432,32 @@ class UIManager {
             const baseKey = (String(key).toLowerCase().endsWith(suffix)) ? String(key).slice(0, String(key).length - suffix.length) : String(key);
             const fieldId = `InvestmentAllocation_${c}_${baseKey}`;
             investmentAllocationsByCountry[c][key] = this.ui.getValue(fieldId);
+
+            // Relocation economy panel stores local wrapper rates under:
+            // LocalAssetGrowth_{country}_{baseKey} / LocalAssetVolatility_{country}_{baseKey}
+            // Read them here so non-start-country local wrappers (e.g. merval_ar) are not left at 0.
+            if (!type.sellWhenReceived) {
+              if (type.baseRef) {
+                globalBaseRefs[type.baseRef] = true;
+              } else {
+                const localGrowthId = `LocalAssetGrowth_${c}_${baseKey}`;
+                const localVolId = `LocalAssetVolatility_${c}_${baseKey}`;
+                const hasGrowthInput = (typeof document === 'undefined') || !!document.getElementById(localGrowthId);
+                const hasVolInput = (typeof document === 'undefined') || !!document.getElementById(localVolId);
+                if (hasGrowthInput) {
+                  const growthVal = this.ui.getValue(localGrowthId);
+                  if (growthVal !== null && growthVal !== undefined && growthVal !== '') {
+                    investmentGrowthRatesByKey[key] = growthVal;
+                  }
+                }
+                if (hasVolInput) {
+                  const volVal = this.ui.getValue(localVolId);
+                  if (volVal !== null && volVal !== undefined && volVal !== '') {
+                    investmentVolatilitiesByKey[key] = volVal;
+                  }
+                }
+              }
+            }
           }
         }
 

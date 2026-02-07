@@ -543,6 +543,44 @@ function runTest() {
     }
   }
 
+  // Test Case 6: Tax attributions must keep full tax keys (no generic "tax" flattening)
+  {
+    const dataRow = { attributions: {}, taxByKey: {} };
+    const attributionManager = new MockAttributionManager();
+    attributionManager.record('tax:incomeTax', 'Salary', 100);
+    attributionManager.record('tax:incomeTax', 'Foreign Tax Credit (AR)', -10);
+    attributionManager.record('tax:prsi', 'Salary', 40);
+    attributionManager.record('tax:usc', 'Salary', 30);
+    attributionManager.record('tax:incomeTax:ar', 'Salary Income Tax (AR)', 55);
+    const revenue = { taxTotals: { incomeTax: 90, prsi: 40, usc: 30, 'incomeTax:ar': 55 } };
+
+    AttributionPopulator.populateAttributionFields(dataRow, [], attributionManager, revenue);
+
+    const it = dataRow.attributions['tax:incomeTax'];
+    const prsi = dataRow.attributions['tax:prsi'];
+    const usc = dataRow.attributions['tax:usc'];
+    const arIt = dataRow.attributions['tax:incomeTax:ar'];
+
+    if (!it || !withinTolerance(it['Salary'], 100, 0.01)) {
+      errors.push("Tax key preservation: expected tax:incomeTax Salary = 100");
+    }
+    if (!it || !withinTolerance(it['Foreign Tax Credit (AR)'], -10, 0.01)) {
+      errors.push("Tax key preservation: expected tax:incomeTax Foreign Tax Credit (AR) = -10");
+    }
+    if (!prsi || !withinTolerance(prsi['Salary'], 40, 0.01)) {
+      errors.push("Tax key preservation: expected tax:prsi Salary = 40");
+    }
+    if (!usc || !withinTolerance(usc['Salary'], 30, 0.01)) {
+      errors.push("Tax key preservation: expected tax:usc Salary = 30");
+    }
+    if (!arIt || !withinTolerance(arIt['Salary Income Tax (AR)'], 55, 0.01)) {
+      errors.push("Tax key preservation: expected tax:incomeTax:ar Salary Income Tax (AR) = 55");
+    }
+    if (dataRow.attributions['tax']) {
+      errors.push("Tax key preservation: unexpected flattened dataRow.attributions.tax bucket");
+    }
+  }
+
   return errors;
 }
 

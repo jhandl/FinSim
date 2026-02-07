@@ -32,13 +32,15 @@ function populateAttributionFields(dataRow, investmentAssets, attributionManager
 
   const currentAttributions = attributionManager.getAllAttributions();
   for (const metric in currentAttributions) {
-    // Extract base metric name (remove country suffix if present)
+    // Preserve full tax keys (e.g. tax:incomeTax, tax:incomeTax:us).
+    // Non-tax metrics keep legacy flattening by base metric with country-qualified sources.
+    var isTaxMetric = metric.indexOf('tax:') === 0;
     var baseMetric = metric;
     var countryCode = null;
-    if (metric.indexOf(':') > 0) {
-      var parts = metric.split(':');
-      baseMetric = parts[0];
-      countryCode = parts[1];
+    if (!isTaxMetric && metric.indexOf(':') > 0) {
+      var sep = metric.indexOf(':');
+      baseMetric = metric.substring(0, sep);
+      countryCode = metric.substring(sep + 1);
     }
 
     if (!dataRow.attributions[baseMetric]) {
@@ -48,9 +50,9 @@ function populateAttributionFields(dataRow, investmentAssets, attributionManager
     try {
       const breakdown = currentAttributions[metric].getBreakdown();
       for (const source in breakdown) {
-        // Qualify source with country code for display if present
+        // Qualify non-tax sources with country code for display if present
         var displaySource = source;
-        if (countryCode) {
+        if (countryCode && !isTaxMetric) {
           displaySource = source + ' (' + countryCode.toUpperCase() + ')';
         }
 
