@@ -1,6 +1,10 @@
 const vm = require('vm');
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelpers.js');
+const CrossBorderInvestmentTaxation = require('./TestCrossBorderInvestmentTaxation.js');
+const SalaryPensionCrossBorder = require('./TestSalaryPensionCrossBorder.js');
+const RentalIncomeCrossBorder = require('./TestRentalIncomeCrossBorder.js');
+const TestPropertySaleTaxation = require('./TestPropertySaleTaxation.js');
 
 const TRAILING_RULES = {
   xx: {
@@ -267,6 +271,231 @@ module.exports = {
     const trailingZ = JSON.parse(trailingZJson);
     if (Array.isArray(trailingZ) && trailingZ.indexOf('zz') !== -1) {
       errors.push('Trailing list should not include current country ZZ');
+    }
+
+    // Expand coverage by running the dedicated cross-border suites from this authoritative test entry point.
+    const delegatedSuites = [
+      CrossBorderInvestmentTaxation,
+      SalaryPensionCrossBorder,
+      RentalIncomeCrossBorder,
+      TestPropertySaleTaxation
+    ];
+    for (let ds = 0; ds < delegatedSuites.length; ds++) {
+      const suite = delegatedSuites[ds];
+      if (!suite || typeof suite.runCustomTest !== 'function') {
+        errors.push(`Delegated suite missing runCustomTest(): ${suite && suite.name ? suite.name : 'unknown'}`);
+        continue;
+      }
+      const delegatedResult = await suite.runCustomTest();
+      if (!delegatedResult || delegatedResult.success !== true) {
+        const delegatedErrors = (delegatedResult && Array.isArray(delegatedResult.errors)) ? delegatedResult.errors : ['Unknown failure'];
+        for (let de = 0; de < delegatedErrors.length; de++) {
+          errors.push(`[${suite.name}] ${delegatedErrors[de]}`);
+        }
+      }
+    }
+
+    // Additional mixed and edge coverage in one place.
+    const mixedEdgeFramework = new TestFramework();
+    if (!mixedEdgeFramework.loadCoreModules()) {
+      errors.push('Failed to load core modules for mixed/edge cross-border cases');
+    } else {
+      mixedEdgeFramework.ensureVMUIManagerMocks(null, null);
+      const mixedCtx = mixedEdgeFramework.simulationContext;
+      await vm.runInContext('Config.initialize(WebUI.getInstance())', mixedCtx);
+      await vm.runInContext('Promise.all([Config.getInstance().getTaxRuleSet("us"), Config.getInstance().getTaxRuleSet("ar")])', mixedCtx);
+      await vm.runInContext('params = { taxCreditsByCountry: { ie: { personal: 0 } } };', mixedCtx);
+
+      const mixedJson = vm.runInContext(`
+        (function () {
+          function makeTaxman() {
+            currentCountry = 'ie';
+            residenceCurrency = 'EUR';
+            year = 2026;
+            var attributionManager = new AttributionManager();
+            attributionManager.currentCountry = 'ie';
+            attributionManager.year = 2026;
+            attributionManager.yearlyAttributions = {};
+            var person1 = { id: 'P1', age: 45 };
+            var tm = new Taxman();
+            tm.reset(person1, null, attributionManager, 'ie', 2026);
+            tm.ruleset = Config.getInstance().getCachedTaxRuleSet('ie');
+            tm.attributionManager = attributionManager;
+            tm.countryHistory = [{ country: 'ie', fromYear: 2026 }];
+            tm.married = false;
+            tm.dependentChildren = false;
+            tm.privatePensionP1 = 0;
+            tm.privatePensionP2 = 0;
+            tm.privatePensionLumpSumP1 = 0;
+            tm.privatePensionLumpSumP2 = 0;
+            tm.privatePensionLumpSumCountP1 = 0;
+            tm.privatePensionLumpSumCountP2 = 0;
+            tm.pensionContribReliefP1 = 0;
+            tm.pensionContribReliefP2 = 0;
+            tm.investmentTypeIncome = {};
+            tm.salariesP1 = [];
+            tm.salariesP2 = [];
+            tm.totalSalaryP1 = 0;
+            tm.totalSalaryP2 = 0;
+            tm.salaryIncomeBySourceCountry = {};
+            tm.rentalIncomeBySource = {};
+            tm.person1Ref = person1;
+            tm.person2Ref = null;
+            tm.gains = {};
+            tm.taxTotals = {};
+            tm.residenceCurrency = 'EUR';
+            return tm;
+          }
+
+          function foreignCreditAbs(tm) {
+            var attr = tm.attributionManager.getAttribution('tax:incomeTax');
+            if (!attr) return 0;
+            var breakdown = attr.getBreakdown();
+            return breakdown['Foreign Tax Credit'] ? -breakdown['Foreign Tax Credit'] : 0;
+          }
+
+          function countryCreditAbs(tm, cc) {
+            var key = 'tax:incomeTax:' + cc;
+            var attr = tm.attributionManager.getAttribution(key);
+            if (!attr) return 0;
+            var breakdown = attr.getBreakdown();
+            var label = 'Foreign Tax Credit (' + String(cc).toUpperCase() + ')';
+            return breakdown[label] ? -breakdown[label] : 0;
+          }
+
+          // Mixed scenario: salary + investment + rental from two source countries.
+          var mixed = makeTaxman();
+          mixed.declareSalaryIncome(Money.from(20000, 'EUR', 'ie'), 0, mixed.person1Ref, 'US Salary', 'us');
+          mixed.declareSalaryIncome(Money.from(10000, 'EUR', 'ie'), 0, mixed.person1Ref, 'AR Salary', 'ar');
+          mixed.declareRentalIncome(Money.from(7000, 'EUR', 'ie'), 'us', 'US Rental');
+          mixed.declareInvestmentIncome(Money.from(5000, 'EUR', 'ie'), 'US Dividend', 'us');
+          mixed.computeTaxes();
+          var withholding = mixed.taxTotals && mixed.taxTotals.withholding ? mixed.taxTotals.withholding : 0;
+          mixed.computeTaxes({
+            income: withholding,
+            treatyExists: true,
+            byCountry: { income: { us: withholding } }
+          });
+
+          // Domestic only: no foreign buckets and no foreign credits.
+          var domestic = makeTaxman();
+          domestic.declareSalaryIncome(Money.from(50000, 'EUR', 'ie'), 0, domestic.person1Ref, 'IE Salary', null);
+          domestic.computeIT();
+
+          // Max FTC cap: credit cannot exceed residence income tax.
+          var cap = makeTaxman();
+          cap.declareOtherIncome(Money.from(1000, 'EUR', 'ie'), 'Baseline');
+          cap.computeTaxes();
+          var beforeCapTax = cap.taxTotals && cap.taxTotals.incomeTax ? cap.taxTotals.incomeTax : 0;
+          cap.computeTaxes({
+            income: beforeCapTax * 5,
+            treatyExists: true,
+            byCountry: { income: { us: beforeCapTax * 5 } }
+          });
+          var afterCapTax = cap.taxTotals && cap.taxTotals.incomeTax ? cap.taxTotals.incomeTax : 0;
+
+          // Residence-country treaty status across relocations.
+          var ieRules = Config.getInstance().getCachedTaxRuleSet('ie');
+          var usRules = Config.getInstance().getCachedTaxRuleSet('us');
+          var arRules = Config.getInstance().getCachedTaxRuleSet('ar');
+
+          return JSON.stringify({
+            mixed: {
+              sourceUs: mixed.taxTotals['incomeTax:us'] || 0,
+              sourceAr: mixed.taxTotals['incomeTax:ar'] || 0,
+              foreignCredit: foreignCreditAbs(mixed),
+              usCountryCredit: countryCreditAbs(mixed, 'us'),
+              arCountryCredit: countryCreditAbs(mixed, 'ar')
+            },
+            domestic: {
+              foreignTaxKeys: Object.keys(domestic.taxTotals || {}).filter(function (k) { return k.indexOf(':') !== -1; }),
+              foreignCredit: foreignCreditAbs(domestic)
+            },
+            maxCredit: {
+              before: beforeCapTax,
+              after: afterCapTax,
+              applied: beforeCapTax - afterCapTax
+            },
+            relocationTreaties: {
+              usHasIe: usRules.hasTreatyWith('ie'),
+              arHasIe: arRules.hasTreatyWith('ie'),
+              ieHasUs: ieRules.hasTreatyWith('us'),
+              ieHasAr: ieRules.hasTreatyWith('ar')
+            }
+          });
+        })();
+      `, mixedCtx);
+
+      const mixedEdge = JSON.parse(mixedJson);
+      if (!(mixedEdge.mixed.sourceUs > 0 && mixedEdge.mixed.sourceAr > 0)) {
+        errors.push('Mixed case: expected source-country incomeTax buckets for both US and AR.');
+      }
+      if (!(mixedEdge.mixed.foreignCredit > 0 && mixedEdge.mixed.usCountryCredit > 0)) {
+        errors.push('Mixed case: expected treaty foreign tax credit allocation for US sources.');
+      }
+      if (Math.abs(mixedEdge.mixed.arCountryCredit) > 1e-9) {
+        errors.push('Mixed case: expected no AR foreign tax credit allocation (no treaty).');
+      }
+      if (mixedEdge.domestic.foreignTaxKeys.length !== 0) {
+        errors.push('Domestic edge case: expected no foreign tax buckets for domestic-only income.');
+      }
+      if (Math.abs(mixedEdge.domestic.foreignCredit) > 1e-9) {
+        errors.push('Domestic edge case: expected zero foreign tax credit.');
+      }
+      if (!(mixedEdge.maxCredit.after >= 0)) {
+        errors.push('Maximum credit edge case: income tax should never become negative.');
+      }
+      if (Math.abs(mixedEdge.maxCredit.applied - mixedEdge.maxCredit.before) > 1e-6) {
+        errors.push('Maximum credit edge case: credit should be capped at the residence tax amount.');
+      }
+      if (!(mixedEdge.relocationTreaties.ieHasUs && !mixedEdge.relocationTreaties.ieHasAr && mixedEdge.relocationTreaties.usHasIe && !mixedEdge.relocationTreaties.arHasIe)) {
+        errors.push('Relocation treaty edge case: expected IE<->US treaty and no treaty with AR.');
+      }
+    }
+
+    // Backward compatibility: single-country scenario should not create cross-border tax buckets.
+    const singleCountryFramework = new TestFramework();
+    const singleCountry = {
+      name: 'SingleCountryBackwardCompat',
+      description: 'Verify single-country scenarios work unchanged',
+      scenario: {
+        parameters: {
+          startingAge: 30,
+          targetAge: 40,
+          retirementAge: 65,
+          initialSavings: 10000,
+          initialPension: 0,
+          initialFunds: 0,
+          initialShares: 0,
+          emergencyStash: 0,
+          inflation: 0,
+          StartCountry: 'ie',
+          simulation_mode: 'single',
+          economy_mode: 'deterministic'
+        },
+        events: [
+          { type: 'SI', id: 'salary', amount: 50000, fromAge: 30, toAge: 40, currency: 'EUR' }
+        ]
+      },
+      assertions: []
+    };
+    if (!singleCountryFramework.loadScenario(singleCountry)) {
+      errors.push('Backward compatibility case: failed to load single-country scenario.');
+    } else {
+      const singleCountryResults = await singleCountryFramework.runSimulation();
+      if (!singleCountryResults || !singleCountryResults.success) {
+        errors.push('Backward compatibility case: single-country simulation failed.');
+      } else {
+        const taxTotalsJson = vm.runInContext(
+          'JSON.stringify(revenue && revenue.taxTotals ? revenue.taxTotals : {})',
+          singleCountryFramework.simulationContext
+        );
+        const taxTotals = JSON.parse(taxTotalsJson || '{}');
+        const foreignTaxKeys = Object.keys(taxTotals).filter(key => key.indexOf(':') !== -1);
+        if (foreignTaxKeys.length !== 0) {
+          errors.push(`Backward compatibility case: expected no cross-border tax buckets, got ${foreignTaxKeys.join(', ')}`);
+        }
+      }
     }
 
     return { success: errors.length === 0, errors };

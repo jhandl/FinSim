@@ -372,6 +372,11 @@ class TableManager {
                 || data.Attributions['tax:' + taxId.toLowerCase()]
                 || breakdown;
             }
+            // Backward-compat fallback: AttributionPopulator may flatten tax metrics under "tax".
+            // Use it so deduction cells still surface attribution tooltips.
+            if (!breakdown && data.Attributions.tax) {
+              breakdown = data.Attributions.tax;
+            }
           }
           if (!breakdown && keyLower.indexOf('income') === 0 && data.Attributions.income) {
             breakdown = data.Attributions.income;

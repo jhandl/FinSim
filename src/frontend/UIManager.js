@@ -932,6 +932,7 @@ class UIManager {
     if (validate) {
       this.validateEventFields(events);
       this.validateMortgageEvents(events);
+      this.validateRentalIncomeEvents(events);
       this.validateAgeYearFields(events);
       this.validateRequiredEvents(events);
     }
@@ -985,6 +986,31 @@ class UIManager {
         }
         if (!found) {
           this.ui.setWarning(`Events[${m + 1},1]`, `Couldn't find a purchase event for the property '${events[m].id}'.`);
+          errors = true;
+        }
+      }
+    }
+  }
+
+  validateRentalIncomeEvents(events) {
+    for (let ri = 0; ri < events.length; ri++) {
+      if (events[ri].type === 'RI') {
+        let found = false;
+        for (let r = 0; r < events.length; r++) {
+          if (events[r].type === 'R' && events[r].id === events[ri].id) {
+            found = true;
+            if (events[ri].fromAge < events[r].fromAge) {
+              this.ui.setWarning(`Events[${ri + 1},3]`, "Rental income cannot start before the property purchase.");
+              errors = true;
+            }
+            if (events[r].toAge && events[ri].toAge > events[r].toAge) {
+              this.ui.setWarning(`Events[${ri + 1},4]`, "Rental income cannot extend beyond the property sale.");
+              errors = true;
+            }
+          }
+        }
+        if (!found) {
+          this.ui.setWarning(`Events[${ri + 1},1]`, `Couldn't find a property event for rental income '${events[ri].id}'.`);
           errors = true;
         }
       }
