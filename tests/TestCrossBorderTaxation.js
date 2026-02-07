@@ -132,7 +132,7 @@ module.exports = {
           { type: 'SI', id: 'salary-xx', amount: 60000, fromAge: 30, toAge: 34, currency: 'XXX' },
           { type: 'UI', id: 'bonus-xx', amount: 10000, fromAge: 32, toAge: 32, currency: 'XXX' },
           { type: 'MV-yy', id: 'move-to-yy', amount: 0, fromAge: 35, toAge: 35 },
-          { type: 'SI', id: 'salary-yy', amount: 80000, fromAge: 35, toAge: 38, currency: 'YYY' },
+          { type: 'SI', id: 'salary-yy', amount: 80000, fromAge: 35, toAge: 38, currency: 'YYY', linkedCountry: 'xx' },
           { type: 'RI', id: 'rental-yy', amount: 5000, fromAge: 35, toAge: 37, currency: 'YYY' },
           { type: 'MV-zz', id: 'move-to-zz', amount: 0, fromAge: 39, toAge: 39 },
           { type: 'SI', id: 'salary-zz', amount: 70000, fromAge: 39, toAge: 40, currency: 'ZZZ' }
@@ -158,7 +158,13 @@ module.exports = {
             __crossBorderYearLog.push({
               year: this.currentYear,
               currentCountry: (this.countryHistory && this.countryHistory.length > 0) ? this.countryHistory[this.countryHistory.length - 1].country : null,
-              trailingCountries: trailing.map(function(entry){ return entry.country; })
+              trailingCountries: trailing.map(function(entry){ return entry.country; }),
+              salaryCountryMetrics: Object.keys((this.attributionManager && this.attributionManager.yearlyAttributions) || {})
+                .filter(function(key){ return key.indexOf('incomesalaries:') === 0; }),
+              pensionCountryMetrics: Object.keys((this.attributionManager && this.attributionManager.yearlyAttributions) || {})
+                .filter(function(key){ return key.indexOf('incomeprivatepension:') === 0; }),
+              sourceIncomeTaxKeys: Object.keys(this.taxTotals || {})
+                .filter(function(key){ return key.indexOf('incomeTax:') === 0; })
             });
           } catch (err) {
             __crossBorderYearLog.push({ year: this.currentYear, error: String(err && err.message ? err.message : err) });
@@ -225,6 +231,9 @@ module.exports = {
     const trailingEntry = targetYears[yearDuringTrailing];
     if (!trailingEntry || trailingEntry.trailingCountries.indexOf('xx') === -1) {
       errors.push('Trailing tax countries should include origin XX in first 3 years post-move');
+    }
+    if (!trailingEntry || !Array.isArray(trailingEntry.sourceIncomeTaxKeys) || trailingEntry.sourceIncomeTaxKeys.indexOf('incomeTax:xx') === -1) {
+      errors.push('Expected source-country income tax bucket incomeTax:xx when salary is linked to XX');
     }
 
     const nearExpiryEntry = targetYears[yearNearExpiry];

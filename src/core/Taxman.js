@@ -14,7 +14,7 @@ class Taxman {
     }
   }
 
-  declareSalaryIncome(money, contribRate, person, description) {
+  declareSalaryIncome(money, contribRate, person, description, sourceCountry) {
     // Validate Money object
     if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
       throw new Error('declareSalaryIncome requires a Money object');
@@ -60,6 +60,10 @@ class Taxman {
       if (this.salariesP2.length > 1) {
         this.salariesP2.sort((a, b) => a.amount - b.amount);
       }
+    }
+    if (sourceCountry) {
+      var src = String(sourceCountry).toLowerCase();
+      this.salaryIncomeBySourceCountry[src] = (this.salaryIncomeBySourceCountry[src] || 0) + amount;
     }
   };
 
@@ -432,6 +436,7 @@ class Taxman {
     this.salariesP2 = [];
     this.totalSalaryP1 = 0;
     this.totalSalaryP2 = 0;
+    this.salaryIncomeBySourceCountry = {};
 
     // Dynamic tax totals map for country-neutral engine
     this.taxTotals = {};
@@ -686,6 +691,100 @@ class Taxman {
       residenceCountry = this.ruleset.getCountryCode();
     }
     if (residenceCountry) residenceCountry = String(residenceCountry).toLowerCase();
+    var status = this.married ? 'married' : 'single';
+    var residenceCurrencyCode = this.residenceCurrency || (this.ruleset && this.ruleset.getCurrencyCode ? this.ruleset.getCurrencyCode() : null);
+    var taxYear = (typeof this.currentYear === 'number')
+      ? this.currentYear
+      : (Config.getInstance().getSimulationStartYear ? Config.getInstance().getSimulationStartYear() : null);
+
+    var sourceIncomeByCountry = {};
+    var foreignSalaryTaxes = {};
+    var foreignPensionTaxes = {};
+    var cfg = Config.getInstance();
+    var econData = cfg.getEconomicData ? cfg.getEconomicData() : null;
+    var baseYear = cfg.getSimulationStartYear ? cfg.getSimulationStartYear() : taxYear;
+    var convertBetweenCountries = function (value, fromCountryCode, toCountryCode) {
+      if (!(typeof value === 'number')) return value;
+      var fromCode = String(fromCountryCode || '').toLowerCase();
+      var toCode = String(toCountryCode || '').toLowerCase();
+      if (!fromCode || !toCode || fromCode === toCode) return value;
+      if (!econData || !econData.ready) {
+        throw new Error('EconomicData not ready for source-country tax conversion');
+      }
+      var converted = econData.convert(value, fromCode.toUpperCase(), toCode.toUpperCase(), taxYear, {
+        baseYear: baseYear,
+        fxMode: 'evolution'
+      });
+      if (converted === null || !Number.isFinite(converted)) {
+        throw new Error('Source-country tax conversion failed for ' + fromCode + ' -> ' + toCode);
+      }
+      return converted;
+    };
+    var sourceSalaryMap = this.salaryIncomeBySourceCountry || {};
+    var salaryCountries = Object.keys(sourceSalaryMap);
+    for (var ss = 0; ss < salaryCountries.length; ss++) {
+      var salaryCountryCode = String(salaryCountries[ss] || '').toLowerCase();
+      if (!salaryCountryCode || salaryCountryCode === residenceCountry) continue;
+      var salaryAmount = sourceSalaryMap[salaryCountries[ss]];
+      if (!(typeof salaryAmount === 'number') || salaryAmount <= 0) continue;
+      if (!sourceIncomeByCountry[salaryCountryCode]) sourceIncomeByCountry[salaryCountryCode] = { salary: 0, pension: 0 };
+      sourceIncomeByCountry[salaryCountryCode].salary += salaryAmount;
+    }
+    var yearlyAttributions = (this.attributionManager && this.attributionManager.yearlyAttributions) ? this.attributionManager.yearlyAttributions : {};
+    var attributionKeys = Object.keys(yearlyAttributions);
+    for (var ak = 0; ak < attributionKeys.length; ak++) {
+      var metricKey = attributionKeys[ak];
+      var isPensionMetric = metricKey.indexOf('incomeprivatepension:') === 0;
+      if (!isPensionMetric) continue;
+      var keyParts = metricKey.split(':');
+      var sourceCountry = keyParts.length > 1 ? String(keyParts[1] || '').toLowerCase() : '';
+      if (!sourceCountry || sourceCountry === residenceCountry) continue;
+      var srcAttr = this.attributionManager.getAttribution(metricKey);
+      if (!srcAttr) continue;
+      var srcTotal = srcAttr.getTotal();
+      if (!(typeof srcTotal === 'number') || srcTotal <= 0) continue;
+      if (!sourceIncomeByCountry[sourceCountry]) sourceIncomeByCountry[sourceCountry] = { salary: 0, pension: 0 };
+      if (isPensionMetric) sourceIncomeByCountry[sourceCountry].pension += srcTotal;
+    }
+
+    var sourceCountries = Object.keys(sourceIncomeByCountry);
+    for (var sc = 0; sc < sourceCountries.length; sc++) {
+      var sourceCountryCode = sourceCountries[sc];
+      var sourceRuleset = Config.getInstance().getCachedTaxRuleSet(sourceCountryCode);
+      var sourceCurrencyCode = sourceRuleset.getCurrencyCode();
+      var sourceBands = sourceRuleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
+      var sourceBreakdown = sourceIncomeByCountry[sourceCountryCode];
+      if (sourceBreakdown.salary > 0) {
+        var sourceSalaryBase = sourceBreakdown.salary;
+        if (residenceCurrencyCode !== sourceCurrencyCode || residenceCountry !== sourceCountryCode) {
+          sourceSalaryBase = convertBetweenCountries(sourceSalaryBase, residenceCountry, sourceCountryCode);
+        }
+        var sourceSalaryTaxInSourceCurrency = this.computeTaxFromBands(sourceBands, sourceSalaryBase);
+        var sourceSalaryTax = sourceSalaryTaxInSourceCurrency;
+        if (residenceCurrencyCode !== sourceCurrencyCode || residenceCountry !== sourceCountryCode) {
+          sourceSalaryTax = convertBetweenCountries(sourceSalaryTaxInSourceCurrency, sourceCountryCode, residenceCountry);
+        }
+        if (sourceSalaryTax > 0) {
+          foreignSalaryTaxes[sourceCountryCode] = (foreignSalaryTaxes[sourceCountryCode] || 0) + sourceSalaryTax;
+          this._recordTax('incomeTax:' + sourceCountryCode, 'Salary Income Tax (' + sourceCountryCode.toUpperCase() + ')', sourceSalaryTax);
+        }
+      }
+      if (sourceBreakdown.pension > 0) {
+        var sourcePensionBase = sourceBreakdown.pension;
+        if (residenceCurrencyCode !== sourceCurrencyCode || residenceCountry !== sourceCountryCode) {
+          sourcePensionBase = convertBetweenCountries(sourcePensionBase, residenceCountry, sourceCountryCode);
+        }
+        var sourcePensionTaxInSourceCurrency = this.computeTaxFromBands(sourceBands, sourcePensionBase);
+        var sourcePensionTax = sourcePensionTaxInSourceCurrency;
+        if (residenceCurrencyCode !== sourceCurrencyCode || residenceCountry !== sourceCountryCode) {
+          sourcePensionTax = convertBetweenCountries(sourcePensionTaxInSourceCurrency, sourceCountryCode, residenceCountry);
+        }
+        if (sourcePensionTax > 0) {
+          foreignPensionTaxes[sourceCountryCode] = (foreignPensionTaxes[sourceCountryCode] || 0) + sourcePensionTax;
+          this._recordTax('incomeTax:' + sourceCountryCode, 'Private Pension Tax (' + sourceCountryCode.toUpperCase() + ')', sourcePensionTax);
+        }
+      }
+    }
 
     var self = this;
     var hadDomesticMetrics = false;
@@ -761,7 +860,6 @@ class Taxman {
     // Determine brackets and married band increase using ruleset if available
     var itBands;
     var marriedBandIncrease = 0;
-    var status = this.married ? 'married' : 'single';
     itBands = this.ruleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
     if (this.married) {
       const p1TotalSalary = this.totalSalaryP1 || 0;
@@ -929,14 +1027,47 @@ class Taxman {
       }
     }
 
+    var totalForeignIncomeTax = 0;
+    var hasTreaty = false;
+    var combinedIncomeCreditByCountry = {};
+    var sourceCountryCodes = Object.keys(foreignSalaryTaxes);
+    for (var fs = 0; fs < sourceCountryCodes.length; fs++) {
+      var salaryCountry = sourceCountryCodes[fs];
+      if (!this.ruleset.hasTreatyWith(salaryCountry)) continue;
+      totalForeignIncomeTax += foreignSalaryTaxes[salaryCountry];
+      combinedIncomeCreditByCountry[salaryCountry] = (combinedIncomeCreditByCountry[salaryCountry] || 0) + foreignSalaryTaxes[salaryCountry];
+      hasTreaty = true;
+    }
+    var pensionCountryCodes = Object.keys(foreignPensionTaxes);
+    for (var fp = 0; fp < pensionCountryCodes.length; fp++) {
+      var pensionCountry = pensionCountryCodes[fp];
+      if (!this.ruleset.hasTreatyWith(pensionCountry)) continue;
+      totalForeignIncomeTax += foreignPensionTaxes[pensionCountry];
+      combinedIncomeCreditByCountry[pensionCountry] = (combinedIncomeCreditByCountry[pensionCountry] || 0) + foreignPensionTaxes[pensionCountry];
+      hasTreaty = true;
+    }
+
     var creditBuckets = foreignTaxCredits || null;
-    if (creditBuckets && typeof creditBuckets.income === 'number') {
+    if (creditBuckets && typeof creditBuckets.income === 'number' && !(creditBuckets.treatyExists === false)) {
+      totalForeignIncomeTax += creditBuckets.income;
+      hasTreaty = true;
+      var externalByCountry = (creditBuckets.byCountry && creditBuckets.byCountry.income) ? creditBuckets.byCountry.income : null;
+      if (externalByCountry) {
+        var externalCountries = Object.keys(externalByCountry);
+        for (var ec = 0; ec < externalCountries.length; ec++) {
+          var externalCountry = String(externalCountries[ec] || '').toLowerCase();
+          if (!externalCountry) continue;
+          combinedIncomeCreditByCountry[externalCountry] = (combinedIncomeCreditByCountry[externalCountry] || 0) + externalByCountry[externalCountries[ec]];
+        }
+      }
+    }
+
+    if (totalForeignIncomeTax > 0) {
       var currentTax = (this.taxTotals && typeof this.taxTotals['incomeTax'] === 'number') ? this.taxTotals['incomeTax'] : 0;
-      var treatyOk = !(creditBuckets.treatyExists === false);
-      var creditAmount = this.applyForeignTaxCredit(creditBuckets.income, currentTax, treatyOk);
+      var creditAmount = this.applyForeignTaxCredit(totalForeignIncomeTax, currentTax, hasTreaty);
       if (creditAmount > 0) {
         this._recordTax('incomeTax', 'Foreign Tax Credit', -creditAmount);
-        this._recordForeignTaxCreditByCountry('incomeTax', 'income', creditBuckets, creditAmount);
+        this._recordForeignTaxCreditByCountry('incomeTax', 'income', { byCountry: { income: combinedIncomeCreditByCountry } }, creditAmount);
       }
     }
   };

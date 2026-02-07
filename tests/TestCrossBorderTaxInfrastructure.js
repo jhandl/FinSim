@@ -30,6 +30,7 @@ module.exports = {
     framework.ensureVMUIManagerMocks(null, null);
     const ctx = framework.simulationContext;
     await vm.runInContext('Config.initialize(WebUI.getInstance())', ctx);
+    await vm.runInContext('Promise.all([Config.getInstance().getTaxRuleSet("us"), Config.getInstance().getTaxRuleSet("ar")])', ctx);
 
     // Test 1: Residency timeline derivation + caching
     const timelineParams = { StartCountry: 'ie', startingAge: 30, targetAge: 60 };

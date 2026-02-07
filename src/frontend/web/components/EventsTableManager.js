@@ -1912,6 +1912,19 @@ class EventsTableManager {
     this._afterResolutionAction(rowId);
   }
 
+  linkIncomeToCountry(rowId, country) {
+    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+    if (!row) return;
+    let selectedCountry = country;
+    if (!selectedCountry) {
+      const adjPanelSelect = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.country-selector');
+      selectedCountry = adjPanelSelect ? adjPanelSelect.value : '';
+    }
+    if (!selectedCountry) return;
+    this.getOrCreateHiddenInput(row, 'event-linked-country', selectedCountry);
+    this._afterResolutionAction(rowId);
+  }
+
   convertToPensionless(rowId) {
     const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
     if (!row) return;

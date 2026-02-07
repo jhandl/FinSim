@@ -84,7 +84,7 @@ const DEMO3_BASELINE = {
   // across countries (vs ballooning nominally under evolved FX).
   ages: {
     40: { worth: 2365180583.0256553, cash: 171444637.52584127, netIncome: 1222198247.6035347 },
-    65: { worth: 1740350504460.907, cash: 48826750509.70023, netIncome: 8656794176.110376 },
+    65: { worth: 1740350504460.907, cash: 48826750509.70023, netIncome: 7770827383.114312 },
     80: { worth: 57926334851950.84, cash: 506702817737.4343, netIncome: 2556479405018.2817 }
   },
   final: { age: 90, worth: 762037575014499.5, cash: 4966592634448.801 },

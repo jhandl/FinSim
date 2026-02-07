@@ -540,6 +540,9 @@ function completeMissingCurrencyAndLinkedCountry(events, startCountry) {
     var eventCountry = getCountryForAgeCached(Number(evt.fromAge), events, startCountry);
     if (!evt.linkedCountry) {
       evt.linkedCountry = eventCountry;
+      evt.__autoLinkedCountry = true;
+    } else {
+      evt.__autoLinkedCountry = false;
     }
     if (!evt.currency) {
       evt.currency = getCurrencyForCountry(evt.linkedCountry);
@@ -1330,6 +1333,9 @@ function processEvents() {
           var salaryPerson = entry.personRef || person1;
           var isPensionable = entry.pensionable && salaryPerson && typeof salaryPerson.getPensionForCountry === 'function';
           var declaredRate = 0;
+          var salarySourceCountry = normalizeCountry(entry.sourceCountry || bucketCountry);
+          if (!salarySourceCountry) salarySourceCountry = normalizeCountry(bucketCountry);
+          var explicitSalarySourceCountry = entry.sourceCountry ? normalizeCountry(entry.sourceCountry) : null;
 
           // Use consolidated total for incomeSalaries accumulation (only once per currency bucket)
           var consolidatedSalary = categoryTotalsByType['salary'] || 0;
@@ -1455,7 +1461,7 @@ function processEvents() {
 
           if (!declaredEntries[entryKey]) {
             const salaryMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
-            revenue.declareSalaryIncome(salaryMoney, declaredRate, salaryPerson, entry.eventId);
+            revenue.declareSalaryIncome(salaryMoney, declaredRate, salaryPerson, entry.eventId, explicitSalarySourceCountry);
             declaredEntries[entryKey] = true;
           }
           break;
@@ -1730,12 +1736,14 @@ function processEvents() {
       case 'SI':
         if (inScope) {
           var salaryInfo = getEventCurrencyInfo(event, currentCountry);
+          var salarySourceCountry = (event.linkedCountry && !event.__autoLinkedCountry) ? normalizeCountry(event.linkedCountry) : null;
           recordIncomeEntry(flowState, salaryInfo, amount, {
             type: 'salary',
             eventId: event.id,
             match: event.match || 0,
             personRef: person1,
-            pensionable: true
+            pensionable: true,
+            sourceCountry: salarySourceCountry
           });
         }
         break;
@@ -1743,12 +1751,14 @@ function processEvents() {
       case 'SInp':
         if (inScope) {
           var salaryNpInfo = getEventCurrencyInfo(event, currentCountry);
+          var salaryNpSourceCountry = (event.linkedCountry && !event.__autoLinkedCountry) ? normalizeCountry(event.linkedCountry) : null;
           recordIncomeEntry(flowState, salaryNpInfo, amount, {
             type: 'salary',
             eventId: event.id,
             match: 0,
             personRef: person1,
-            pensionable: false
+            pensionable: false,
+            sourceCountry: salaryNpSourceCountry
           });
         }
         break;
@@ -1756,21 +1766,25 @@ function processEvents() {
       case 'SI2':
         if (inScope && person2) {
           var salary2Info = getEventCurrencyInfo(event, currentCountry);
+          var salary2SourceCountry = (event.linkedCountry && !event.__autoLinkedCountry) ? normalizeCountry(event.linkedCountry) : null;
           recordIncomeEntry(flowState, salary2Info, amount, {
             type: 'salary',
             eventId: event.id,
             match: event.match || 0,
             personRef: person2,
-            pensionable: true
+            pensionable: true,
+            sourceCountry: salary2SourceCountry
           });
         } else if (inScope) {
           var salaryFallbackInfo = getEventCurrencyInfo(event, currentCountry);
+          var salaryFallbackSourceCountry = (event.linkedCountry && !event.__autoLinkedCountry) ? normalizeCountry(event.linkedCountry) : null;
           recordIncomeEntry(flowState, salaryFallbackInfo, amount, {
             type: 'salary',
             eventId: event.id,
             match: 0,
             personRef: person1,
-            pensionable: false
+            pensionable: false,
+            sourceCountry: salaryFallbackSourceCountry
           });
         }
         break;
@@ -1778,12 +1792,14 @@ function processEvents() {
       case 'SI2np':
         if (inScope && person2) {
           var salary2npInfo = getEventCurrencyInfo(event, currentCountry);
+          var salary2npSourceCountry = (event.linkedCountry && !event.__autoLinkedCountry) ? normalizeCountry(event.linkedCountry) : null;
           recordIncomeEntry(flowState, salary2npInfo, amount, {
             type: 'salary',
             eventId: event.id,
             match: 0,
             personRef: person2,
-            pensionable: false
+            pensionable: false,
+            sourceCountry: salary2npSourceCountry
           });
         }
         break;

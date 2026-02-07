@@ -202,6 +202,28 @@ var RelocationImpactAssistant = {
         countries.forEach(function (country) { const selected = country.code.toLowerCase() === detectedCountry ? 'selected' : ''; optionsHTML += '<option value="' + country.code.toLowerCase() + '" ' + selected + '>' + country.name + '</option>'; });
         containerAttributes = ' data-from-country="' + originalCountry + '" data-to-country="' + detectedCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + toCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
         addAction(actions, { action: 'link', tabLabel: 'Link To Country', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<p class="micro-note">Detected country: ' + detectedCountryName + '. Change if the property belongs to a different jurisdiction.</p><div class="country-selector-inline"><label for="country-select-' + rowId + '">Country</label><select class="country-selector link-country-selector" id="country-select-' + rowId + '" data-row-id="' + rowId + '" data-from-country="' + originalCountry + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '">' + optionsHTML + '</select></div><div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-label">Current</div><div class="part-detail">' + currentFormatted + ' (read-only)</div></div><div class="split-part-info"><div class="part-label">Converted Amount</div><div class="part-detail"><input type="text" class="link-amount-input" value="' + suggestedFormatted + '" placeholder="Amount"></div><div class="ppp-hint">PPP suggestion</div></div></div><p class="micro-note">Apply links this property to the selected country, converts the amount using purchasing power parity, and updates the currency to match.</p>' });
+      } else if (event.type === 'S' || event.type === 'PP' || event.type === 'SI' || event.type === 'SI2' || event.type === 'SInp' || event.type === 'SI2np') {
+        const countries = Config.getInstance().getAvailableCountries();
+        const selectedCountry = (event.linkedCountry ? String(event.linkedCountry).toLowerCase() : '') || destCountry || originCountry || startCountry;
+        const selectedCountryObj = countries.find(function (c) { return c.code.toLowerCase() === selectedCountry; });
+        const selectedCountryName = selectedCountryObj ? selectedCountryObj.name : (selectedCountry ? selectedCountry.toUpperCase() : '');
+        const amountCountry = selectedCountry || originCountry;
+        const amountMeta = getSymbolAndLocaleByCountry(amountCountry);
+        const amountFormatted = fmtWithSymbol(amountMeta.symbol, amountMeta.locale, baseAmountSanitized);
+        let optionsHTML = '';
+        countries.forEach(function (country) {
+          const code = String(country.code || '').toLowerCase();
+          const selected = code === selectedCountry ? 'selected' : '';
+          optionsHTML += '<option value="' + code + '" ' + selected + '>' + country.name + '</option>';
+        });
+        addAction(actions, {
+          action: 'link',
+          tabLabel: 'Link To Country',
+          buttonLabel: 'Apply',
+          buttonClass: 'event-wizard-button resolution-apply',
+          buttonAttrs: ' data-row-id="' + rowId + '"',
+          bodyHtml: '<p class="micro-note">Select the source country for this income stream. Amount stays unchanged.</p><div class="country-selector-inline"><label for="country-select-' + rowId + '">Country</label><select class="country-selector" id="country-select-' + rowId + '" data-row-id="' + rowId + '">' + optionsHTML + '</select></div><div class="resolution-quick-action"><p class="micro-note">Current amount: ' + (amountFormatted || String(baseAmountSanitized || '')) + ' (read-only).</p><p class="micro-note">Apply links this salary/pension event to ' + selectedCountryName + ' for source-country taxation. No PPP conversion is applied.</p></div>'
+        });
       } else {
         const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originCountry, destCountry));
         const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
@@ -309,7 +331,11 @@ var RelocationImpactAssistant = {
       case 'link': {
         const country = payload && payload.country;
         const convertedAmount = payload && payload.convertedAmount;
-        if (typeof etm.linkPropertyToCountry === 'function') etm.linkPropertyToCountry(rowId, country, convertedAmount);
+        if (event && (event.type === 'S' || event.type === 'PP' || event.type === 'SI' || event.type === 'SI2' || event.type === 'SInp' || event.type === 'SI2np')) {
+          if (typeof etm.linkIncomeToCountry === 'function') etm.linkIncomeToCountry(rowId, country);
+        } else {
+          if (typeof etm.linkPropertyToCountry === 'function') etm.linkPropertyToCountry(rowId, country, convertedAmount);
+        }
         break;
       }
       case 'convert': {

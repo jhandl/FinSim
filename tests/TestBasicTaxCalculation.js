@@ -59,6 +59,7 @@ module.exports = {
         amount: 50000,             // €50,000 annual salary
         fromAge: 30,
         toAge: 34,                 // 5 years of income (ages 30, 31, 32, 33, 34)
+        linkedCountry: 'ie',       // Explicit domestic source-country link should remain backward-compatible
         rate: 0,                   // No pension contribution rate
         match: 0                   // No employer match
       }
