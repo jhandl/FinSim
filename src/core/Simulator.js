@@ -1259,70 +1259,40 @@ function processEvents() {
           }
           if (purchaseBasisConverted > 0 && entryConvertedAmount > purchaseBasisConverted) {
             var gain = entryConvertedAmount - purchaseBasisConverted;
-            var propertyCountry = entry.propertyCountry || realEstate.getLinkedCountry(propertyId);
+            var propertyCountry = entry.propertyCountry;
+            var heldYears = entry.heldYears;
+            var residentCountryAtSale = entry.residentCountryAtSale;
+            var primaryResidenceProportion = entry.primaryResidenceProportion;
 
-            // Get property purchase and sale ages from events
-            var purchaseAge = null;
-            var saleAge = person1.age;
-            for (var ei = 0; ei < events.length; ei++) {
-              var evt = events[ei];
-              if (evt && evt.id === propertyId && evt.type === 'R') {
-                purchaseAge = evt.fromAge;
-                break;
+            // Load source-country Taxman for property taxation
+            var sourceTaxman = revenue;
+            if (propertyCountry && propertyCountry !== currentCountry) {
+              var sourceRuleset = Config.getInstance().getCachedTaxRuleSet(propertyCountry);
+              if (sourceRuleset) {
+                sourceTaxman = new Taxman();
+                sourceTaxman.reset(person1, person2, attributionManager, propertyCountry, year);
+                sourceTaxman.ruleset = sourceRuleset;
+                sourceTaxman.residenceCurrency = residenceCurrency;
               }
             }
 
-            if (purchaseAge !== null) {
-              var heldYears = saleAge - purchaseAge;
-              var residentCountryAtSale = getCountryForAgeCached(saleAge, events, params.StartCountry);
+            var gainMoney = Money.create(gain, residenceCurrency, currentCountry);
+            sourceTaxman.declarePropertyGain(
+              gainMoney,
+              heldYears,
+              residentCountryAtSale,
+              primaryResidenceProportion,
+              propertyCountry,
+              'Property Sale (' + propertyId + ')'
+            );
 
-              // Get rental events for this property
-              var rentalEvents = [];
-              for (var ri = 0; ri < events.length; ri++) {
-                var revt = events[ri];
-                if (revt && revt.type === 'RI' && revt.id === propertyId) {
-                  rentalEvents.push(revt);
-                }
-              }
-
-              var primaryResidenceProportion = realEstate.getPrimaryResidenceProportion(
-                propertyId,
-                purchaseAge,
-                saleAge,
-                residencyTimeline,
-                rentalEvents
-              );
-
-              // Load source-country Taxman for property taxation
-              var sourceTaxman = revenue;
-              if (propertyCountry && propertyCountry !== currentCountry) {
-                var sourceRuleset = Config.getInstance().getCachedTaxRuleSet(propertyCountry);
-                if (sourceRuleset) {
-                  sourceTaxman = new Taxman();
-                  sourceTaxman.reset(person1, person2, attributionManager, propertyCountry, year);
-                  sourceTaxman.ruleset = sourceRuleset;
-                  sourceTaxman.residenceCurrency = residenceCurrency;
-                }
-              }
-
-              var gainMoney = Money.create(gain, residenceCurrency, currentCountry);
-              sourceTaxman.declarePropertyGain(
-                gainMoney,
-                heldYears,
-                residentCountryAtSale,
-                primaryResidenceProportion,
-                propertyCountry,
-                'Property Sale (' + propertyId + ')'
-              );
-
-              // If source-country taxation occurred, compute and record source tax
-              if (sourceTaxman !== revenue) {
-                sourceTaxman.computeTaxes();
-                var sourceTax = sourceTaxman.getAllTaxesTotal();
-                if (sourceTax > 0) {
-                  var taxMetricKey = 'tax:capitalGains:' + propertyCountry;
-                  attributionManager.record(taxMetricKey, 'Property Sale Tax (' + propertyId + ')', sourceTax);
-                }
+            // If source-country taxation occurred, compute and record source tax
+            if (sourceTaxman !== revenue) {
+              sourceTaxman.computeTaxes();
+              var sourceTax = sourceTaxman.getAllTaxesTotal();
+              if (sourceTax > 0) {
+                var taxMetricKey = 'tax:capitalGains:' + propertyCountry;
+                attributionManager.record(taxMetricKey, 'Property Sale Tax (' + propertyId + ')', sourceTax);
               }
             }
           }
@@ -1688,6 +1658,8 @@ function processEvents() {
       var propertyCurrency = null;
       var propertyCountry = null;
       var purchaseBasis = 0;
+      var purchaseAge = event.fromAge;
+      var saleAge = person1.age;
       if (realEstate && typeof realEstate.getCurrency === 'function') {
         propertyCurrency = realEstate.getCurrency(event.id);
       }
@@ -1702,6 +1674,24 @@ function processEvents() {
         currency: propertyCurrency || saleInfo.currency,
         country: propertyCountry || saleInfo.country
       };
+      var salePropertyCountry = propertyCountry || saleEntryInfo.country;
+      var heldYears = saleAge - purchaseAge;
+      var residentCountryAtSale = getCountryForAgeCached(saleAge, events, params.StartCountry);
+      var rentalEvents = [];
+      for (var ri = 0; ri < events.length; ri++) {
+        var rentalEvent = events[ri];
+        if (rentalEvent && rentalEvent.type === 'RI' && rentalEvent.id === event.id) {
+          rentalEvents.push(rentalEvent);
+        }
+      }
+      var primaryResidenceProportion = realEstate.calculatePrimaryResidenceProportion(
+        salePropertyCountry,
+        event.id,
+        purchaseAge,
+        saleAge,
+        residencyTimeline,
+        rentalEvents
+      );
       // sell() returns numeric amount in the property's native currency.
       var saleProceeds = realEstate.sell(event.id);
       recordIncomeEntry(saleState, saleEntryInfo, saleProceeds, {
@@ -1709,7 +1699,10 @@ function processEvents() {
         eventId: event.id,
         label: 'Sale (' + event.id + ')',
         purchaseBasis: purchaseBasis,
-        propertyCountry: propertyCountry
+        propertyCountry: salePropertyCountry,
+        heldYears: heldYears,
+        residentCountryAtSale: residentCountryAtSale,
+        primaryResidenceProportion: primaryResidenceProportion
       });
     }
   }

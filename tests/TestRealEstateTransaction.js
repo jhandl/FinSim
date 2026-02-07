@@ -78,14 +78,12 @@ const TestRealEstateTransaction = {
       }
     },
     {
-      type: "comparison",
+      type: "exact_value",
       target: "age",
       age: 65,
       field: "cgt",
-      expected: {
-        operator: ">",
-        value: 0 // Property sale gains are taxable in this scenario
-      }
+      expected: 0, // Full primary-residence exemption under IE propertyGainsTax rules
+      tolerance: 0.01
     }
   ]
 };

@@ -68,12 +68,8 @@ class RealEstate {
     return basis;
   }
 
-  getPrimaryResidenceProportion(id, purchaseAge, saleAge, residencyTimeline, rentalEvents) {
-    if (!(id in this.properties)) return 0;
-    var property = this.properties[id];
-    var propertyCountry = property.getLinkedCountry();
+  calculatePrimaryResidenceProportion(propertyCountry, propertyId, purchaseAge, saleAge, residencyTimeline, rentalEvents) {
     if (!propertyCountry) return 0;
-
     var totalYears = saleAge - purchaseAge;
     if (totalYears <= 0) return 0;
 
@@ -94,7 +90,7 @@ class RealEstate {
       if (rentalEvents) {
         for (var j = 0; j < rentalEvents.length; j++) {
           var rental = rentalEvents[j];
-          if (rental.id === id && age >= rental.fromAge && age <= rental.toAge) {
+          if (rental.id === propertyId && age >= rental.fromAge && age <= rental.toAge) {
             isRented = true;
             break;
           }
@@ -107,6 +103,20 @@ class RealEstate {
     }
 
     return primaryYears / totalYears;
+  }
+
+  getPrimaryResidenceProportion(id, purchaseAge, saleAge, residencyTimeline, rentalEvents) {
+    if (!(id in this.properties)) return 0;
+    var property = this.properties[id];
+    var propertyCountry = property.getLinkedCountry();
+    return this.calculatePrimaryResidenceProportion(
+      propertyCountry,
+      id,
+      purchaseAge,
+      saleAge,
+      residencyTimeline,
+      rentalEvents
+    );
   }
 
   /**
