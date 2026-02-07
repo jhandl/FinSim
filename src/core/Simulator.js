@@ -1499,13 +1499,14 @@ function processEvents() {
           }
           // Determine if country qualification is needed for rental attribution
           var rentalMetricKey = 'incomerentals';
-          if (bucketCountry && bucketCountry !== currentCountry) {
-            rentalMetricKey = 'incomerentals:' + bucketCountry;
+          var sourceCountry = normalizeCountry(entry.sourceCountry || currentCountry);
+          if (sourceCountry && sourceCountry !== currentCountry) {
+            rentalMetricKey = 'incomerentals:' + sourceCountry;
           }
           attributionManager.record(rentalMetricKey, entry.eventId, entryConvertedAmount);
           if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
-            const otherIncomeMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
-            revenue.declareOtherIncome(otherIncomeMoney, entry.eventId);
+            const rentalIncomeMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
+            revenue.declareRentalIncome(rentalIncomeMoney, sourceCountry, entry.eventId);
             declaredEntries[entryKey] = true;
           }
           break;
@@ -1816,10 +1817,13 @@ function processEvents() {
 
       case 'RI':
         if (inScope) {
-          var rentalInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
+          var propertyCountry = realEstate.getLinkedCountry(event.id);
+          var sourceCountry = normalizeCountry(propertyCountry || event.linkedCountry || currentCountry);
+          var rentalInfo = getEventCurrencyInfo(event, sourceCountry);
           recordIncomeEntry(flowState, rentalInfo, amount, {
             type: 'rental',
-            eventId: event.id
+            eventId: event.id,
+            sourceCountry: sourceCountry
           });
         }
         break;

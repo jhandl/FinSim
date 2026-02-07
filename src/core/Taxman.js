@@ -208,6 +208,28 @@ class Taxman {
     Money.add(this.incomeMoney, money);
   };
 
+  declareRentalIncome(money, sourceCountry, description) {
+    if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
+      throw new Error('declareRentalIncome requires a Money object');
+    }
+    var residenceCurrency = this.residenceCurrency;
+    if (money.currency !== residenceCurrency) {
+      throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
+    }
+
+    const amount = money.amount;
+    this.income += amount;
+    this.attributionManager.record('income', description, amount);
+
+    Money.add(this.incomeMoney, money);
+
+    var normalizedSource = sourceCountry ? String(sourceCountry).toLowerCase() : null;
+    if (normalizedSource) {
+      if (!this.rentalIncomeBySource) this.rentalIncomeBySource = {};
+      this.rentalIncomeBySource[normalizedSource] = (this.rentalIncomeBySource[normalizedSource] || 0) + amount;
+    }
+  };
+
   /**
    * Calculate withholding tax for investment income based on asset country.
    * @param {string} incomeType - Type of income ('dividend', 'interest', 'capitalGains')
@@ -437,6 +459,7 @@ class Taxman {
     this.totalSalaryP1 = 0;
     this.totalSalaryP2 = 0;
     this.salaryIncomeBySourceCountry = {};
+    this.rentalIncomeBySource = {};
 
     // Dynamic tax totals map for country-neutral engine
     this.taxTotals = {};
@@ -700,6 +723,7 @@ class Taxman {
     var sourceIncomeByCountry = {};
     var foreignSalaryTaxes = {};
     var foreignPensionTaxes = {};
+    var foreignRentalTaxes = {};
     var cfg = Config.getInstance();
     var econData = cfg.getEconomicData ? cfg.getEconomicData() : null;
     var baseYear = cfg.getSimulationStartYear ? cfg.getSimulationStartYear() : taxYear;
@@ -1027,6 +1051,41 @@ class Taxman {
       }
     }
 
+    // Apply source-country taxation for foreign rental income.
+    if (this.rentalIncomeBySource) {
+      var rentalSourceCountries = Object.keys(this.rentalIncomeBySource);
+      for (var ri = 0; ri < rentalSourceCountries.length; ri++) {
+        var rentalSourceCountry = String(rentalSourceCountries[ri] || '').toLowerCase();
+        if (!rentalSourceCountry || rentalSourceCountry === residenceCountry) continue;
+        var rentalAmount = this.rentalIncomeBySource[rentalSourceCountries[ri]];
+        if (!(typeof rentalAmount === 'number') || rentalAmount <= 0) continue;
+
+        try {
+          var rentalRuleset = Config.getInstance().getCachedTaxRuleSet(rentalSourceCountry);
+          if (!rentalRuleset) continue;
+
+          var rentalSourceCurrencyCode = rentalRuleset.getCurrencyCode();
+          var rentalBands = rentalRuleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
+          var rentalTaxBase = rentalAmount;
+          if (residenceCurrencyCode !== rentalSourceCurrencyCode || residenceCountry !== rentalSourceCountry) {
+            rentalTaxBase = convertBetweenCountries(rentalTaxBase, residenceCountry, rentalSourceCountry);
+          }
+
+          var rentalTaxInSourceCurrency = this.computeTaxFromBands(rentalBands, rentalTaxBase);
+          var rentalTax = rentalTaxInSourceCurrency;
+          if (residenceCurrencyCode !== rentalSourceCurrencyCode || residenceCountry !== rentalSourceCountry) {
+            rentalTax = convertBetweenCountries(rentalTaxInSourceCurrency, rentalSourceCountry, residenceCountry);
+          }
+          if (rentalTax > 0) {
+            foreignRentalTaxes[rentalSourceCountry] = (foreignRentalTaxes[rentalSourceCountry] || 0) + rentalTax;
+            this._recordTax('incomeTax:' + rentalSourceCountry, 'Rental Income Tax (' + rentalSourceCountry.toUpperCase() + ')', rentalTax);
+          }
+        } catch (err) {
+          console.warn('Could not load tax rules for rental source country: ' + rentalSourceCountry);
+        }
+      }
+    }
+
     var totalForeignIncomeTax = 0;
     var hasTreaty = false;
     var combinedIncomeCreditByCountry = {};
@@ -1044,6 +1103,14 @@ class Taxman {
       if (!this.ruleset.hasTreatyWith(pensionCountry)) continue;
       totalForeignIncomeTax += foreignPensionTaxes[pensionCountry];
       combinedIncomeCreditByCountry[pensionCountry] = (combinedIncomeCreditByCountry[pensionCountry] || 0) + foreignPensionTaxes[pensionCountry];
+      hasTreaty = true;
+    }
+    var rentalCountryCodes = Object.keys(foreignRentalTaxes);
+    for (var fr = 0; fr < rentalCountryCodes.length; fr++) {
+      var rentalCountry = rentalCountryCodes[fr];
+      if (!this.ruleset.hasTreatyWith(rentalCountry)) continue;
+      totalForeignIncomeTax += foreignRentalTaxes[rentalCountry];
+      combinedIncomeCreditByCountry[rentalCountry] = (combinedIncomeCreditByCountry[rentalCountry] || 0) + foreignRentalTaxes[rentalCountry];
       hasTreaty = true;
     }
 

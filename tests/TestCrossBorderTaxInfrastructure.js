@@ -271,7 +271,96 @@ module.exports = {
       errors.push('Foreign tax credit country attribution should include label "Foreign Tax Credit (US)"');
     }
 
-    // Test 8: Backward compatibility (single-country scenario sanity)
+    // Test 8: Cross-border rental source taxation + treaty credit behavior
+    const rentalResults = vm.runInContext(
+      '(function () {'
+      + 'var makeRules = function(country, code, rate) {'
+      + '  return {'
+      + '    country: country.toUpperCase(),'
+      + '    countryName: country.toUpperCase(),'
+      + '    version: "test-rental-1",'
+      + '    taxBasis: "worldwide",'
+      + '    treatyEquivalents: { incomeTax: "income", capitalGains: "capitalGains", dividends: "dividends" },'
+      + '    locale: { currencyCode: code, currencySymbol: code },'
+      + '    economicData: {'
+      + '      inflation: { cpi: 0, year: 2025 },'
+      + '      purchasingPowerParity: { value: 1, year: 2025 },'
+      + '      exchangeRate: { perEur: 1, asOf: "2025-01-01" }'
+      + '    },'
+      + '    incomeTax: {'
+      + '      bracketsByStatus: { single: { "0": rate }, singleWithDependents: { "0": rate }, married: { "0": rate } },'
+      + '      taxCredits: {},'
+      + '      jointBandIncreaseMax: 0,'
+      + '      ageExemptionAge: 999,'
+      + '      ageExemptionLimit: 0'
+      + '    },'
+      + '    residencyRules: { postEmigrationTaxYears: 0, taxesForeignIncome: false },'
+      + '    pensionRules: { systemType: "mixed", lumpSumTaxBands: { "0": 0 } },'
+      + '    capitalGainsTax: { rate: 0.1, annualExemption: 0 },'
+      + '    investmentTypes: []'
+      + '  };'
+      + '};'
+      + 'var cfg = Config.getInstance();'
+      + 'cfg._taxRuleSets = cfg._taxRuleSets || {};'
+      + 'cfg._taxRuleSets.ie = new TaxRuleSet(makeRules("ie", "EUR", 0.2));'
+      + 'cfg._taxRuleSets.us = new TaxRuleSet(makeRules("us", "USD", 0.1));'
+      + 'cfg._taxRuleSets.ar = new TaxRuleSet(makeRules("ar", "ARS", 0.15));'
+      + 'if (cfg._economicData && typeof cfg._economicData.refreshFromConfig === "function") {'
+      + '  cfg._economicData.refreshFromConfig(cfg);'
+      + '}'
+      + 'if (typeof params === "undefined" || !params) params = {};'
+      + 'var run = function(sourceCountry) {'
+      + '  var tm = new Taxman();'
+      + '  tm.ruleset = cfg.getCachedTaxRuleSet("ie");'
+      + '  tm.residenceCurrency = "EUR";'
+      + '  tm.attributionManager = new AttributionManager();'
+      + '  tm.attributionManager.currentCountry = "ie";'
+      + '  tm.attributionManager.year = 2025;'
+      + '  tm.attributionManager.yearlyAttributions = {};'
+      + '  tm.countryHistory = [{ country: "ie", fromYear: 2025 }];'
+      + '  tm.married = false;'
+      + '  tm.dependentChildren = false;'
+      + '  tm.privatePensionP1 = 0;'
+      + '  tm.privatePensionP2 = 0;'
+      + '  tm.privatePensionLumpSumCountP1 = 0;'
+      + '  tm.privatePensionLumpSumCountP2 = 0;'
+      + '  tm.pensionContribReliefP1 = 0;'
+      + '  tm.pensionContribReliefP2 = 0;'
+      + '  tm.investmentTypeIncome = {};'
+      + '  tm.salariesP1 = [];'
+      + '  tm.salariesP2 = [];'
+      + '  tm.person1Ref = { age: 40 };'
+      + '  tm.taxTotals = {};'
+      + '  tm.currentYear = 2025;'
+      + '  tm.income = 0;'
+      + '  tm.incomeMoney = Money.zero("EUR", "ie");'
+      + '  tm.salaryIncomeBySourceCountry = {};'
+      + '  tm.rentalIncomeBySource = {};'
+      + '  tm.declareRentalIncome(Money.from(10000, "EUR", "ie"), sourceCountry, "rental-" + sourceCountry);'
+      + '  tm.computeIT();'
+      + '  return {'
+      + '    residenceTax: tm.taxTotals["incomeTax"] || 0,'
+      + '    sourceTax: tm.taxTotals["incomeTax:" + sourceCountry] || 0'
+      + '  };'
+      + '};'
+      + 'return { treaty: run("us"), noTreaty: run("ar") };'
+      + '})()',
+      ctx
+    );
+    if (Math.abs(rentalResults.treaty.residenceTax - 1000) > 1e-6) {
+      errors.push('Treaty rental income should apply foreign tax credit and reduce residence tax to 1000');
+    }
+    if (Math.abs(rentalResults.treaty.sourceTax - 1000) > 1e-6) {
+      errors.push('Treaty rental income should record source-country tax bucket incomeTax:us = 1000');
+    }
+    if (Math.abs(rentalResults.noTreaty.residenceTax - 2000) > 1e-6) {
+      errors.push('Non-treaty rental income should keep full residence tax at 2000');
+    }
+    if (Math.abs(rentalResults.noTreaty.sourceTax - 1500) > 1e-6) {
+      errors.push('Non-treaty rental income should record source-country tax bucket incomeTax:ar = 1500');
+    }
+
+    // Test 9: Backward compatibility (single-country scenario sanity)
     const singleCountryScenario = {
       name: 'CrossBorderInfraSingleCountry',
       description: 'Sanity check for single-country scenarios with new infrastructure.',
