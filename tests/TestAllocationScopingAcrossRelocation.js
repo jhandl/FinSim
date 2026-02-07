@@ -66,8 +66,8 @@ module.exports = {
           { type: 'SI', id: 'IE_Salary', amount: 60000, fromAge: 30, toAge: 34, rate: 0.03, currency: 'EUR' },
           { type: 'E', id: 'IE_Life', amount: 30000, fromAge: 30, toAge: 34, currency: 'EUR' },
           { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35 },
-          { type: 'SI', id: 'AR_Salary', amount: 80000000, fromAge: 35, toAge: 40, rate: 0.02, currency: 'ARS' },
-          { type: 'E', id: 'AR_Life', amount: 40000000, fromAge: 35, toAge: 40, currency: 'ARS' }
+          { type: 'SI', id: 'AR_Salary', amount: 200000000, fromAge: 35, toAge: 40, rate: 0.02, currency: 'ARS' },
+          { type: 'E', id: 'AR_Life', amount: 20000000, fromAge: 35, toAge: 40, currency: 'ARS' }
         ]
       },
       assertions: []

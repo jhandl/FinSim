@@ -21,6 +21,12 @@ const TRAILING_RULES = {
       brackets: { '0': 0.2 },
       taxCredits: { employee: 0, personal: 0 }
     },
+    socialContributions: [
+      { name: 'PRSI', rate: 0.05 }
+    ],
+    additionalTaxes: [
+      { name: 'USC', brackets: { '0': 0.03 } }
+    ],
     residencyRules: {
       postEmigrationTaxYears: 3,
       taxesForeignIncome: true
@@ -136,8 +142,7 @@ module.exports = {
           { type: 'SI', id: 'salary-xx', amount: 60000, fromAge: 30, toAge: 34, currency: 'XXX' },
           { type: 'UI', id: 'bonus-xx', amount: 10000, fromAge: 32, toAge: 32, currency: 'XXX' },
           { type: 'MV-yy', id: 'move-to-yy', amount: 0, fromAge: 35, toAge: 35 },
-          { type: 'SI', id: 'salary-yy', amount: 80000, fromAge: 35, toAge: 38, currency: 'YYY', linkedCountry: 'xx' },
-          { type: 'RI', id: 'rental-yy', amount: 5000, fromAge: 35, toAge: 37, currency: 'YYY' },
+          { type: 'SI', id: 'salary-yy', amount: 80000, fromAge: 35, toAge: 38, currency: 'YYY' },
           { type: 'MV-zz', id: 'move-to-zz', amount: 0, fromAge: 39, toAge: 39 },
           { type: 'SI', id: 'salary-zz', amount: 70000, fromAge: 39, toAge: 40, currency: 'ZZZ' }
         ]
@@ -167,8 +172,8 @@ module.exports = {
                 .filter(function(key){ return key.indexOf('incomesalaries:') === 0; }),
               pensionCountryMetrics: Object.keys((this.attributionManager && this.attributionManager.yearlyAttributions) || {})
                 .filter(function(key){ return key.indexOf('incomeprivatepension:') === 0; }),
-              sourceIncomeTaxKeys: Object.keys(this.taxTotals || {})
-                .filter(function(key){ return key.indexOf('incomeTax:') === 0; })
+              sourceTaxKeys: Object.keys(this.taxTotals || {})
+                .filter(function(key){ return key.indexOf(':') !== -1; })
             });
           } catch (err) {
             __crossBorderYearLog.push({ year: this.currentYear, error: String(err && err.message ? err.message : err) });
@@ -228,21 +233,41 @@ module.exports = {
     const startYearRow = findRowByAge(rows, 30);
     const baseYear = startYearRow ? startYearRow.year : (rows[0] && rows[0].year);
 
-    const yearDuringTrailing = baseYear + (36 - 30); // Age 36 year (1 year post move)
-    const yearNearExpiry = baseYear + (38 - 30);     // Age 38 year (final trailing year)
-    const yearBeyondTrailing = baseYear + (39 - 30); // Age 39 year (trailing expired)
+    const yearAtExit = baseYear + (35 - 30);         // Age 35 year (move year, trailing starts)
+    const yearNearExpiry = baseYear + (37 - 30);     // Age 37 year (final trailing year)
+    const yearBeyondTrailing = baseYear + (38 - 30); // Age 38 year (trailing expired)
+    const yearAfterSecondMove = baseYear + (39 - 30);
 
-    const trailingEntry = targetYears[yearDuringTrailing];
+    const trailingEntry = targetYears[yearAtExit];
     if (!trailingEntry || trailingEntry.trailingCountries.indexOf('xx') === -1) {
-      errors.push('Trailing tax countries should include origin XX in first 3 years post-move');
+      errors.push('Trailing tax countries should include origin XX starting in move year (Y+0)');
     }
-    if (!trailingEntry || !Array.isArray(trailingEntry.sourceIncomeTaxKeys) || trailingEntry.sourceIncomeTaxKeys.indexOf('incomeTax:xx') === -1) {
-      errors.push('Expected source-country income tax bucket incomeTax:xx when salary is linked to XX');
+    if (!trailingEntry || !Array.isArray(trailingEntry.sourceTaxKeys) || trailingEntry.sourceTaxKeys.indexOf('incomeTax:xx') === -1) {
+      errors.push('Expected trailing source-country income tax bucket incomeTax:xx for foreign salary');
+    }
+    if (!trailingEntry || !Array.isArray(trailingEntry.sourceTaxKeys) || trailingEntry.sourceTaxKeys.indexOf('prsi:xx') === -1) {
+      errors.push('Expected trailing source-country social contribution bucket prsi:xx');
+    }
+    if (!trailingEntry || !Array.isArray(trailingEntry.sourceTaxKeys) || trailingEntry.sourceTaxKeys.indexOf('usc:xx') === -1) {
+      errors.push('Expected trailing source-country additional tax bucket usc:xx');
     }
 
     const nearExpiryEntry = targetYears[yearNearExpiry];
     if (!nearExpiryEntry || nearExpiryEntry.trailingCountries.indexOf('xx') === -1) {
       errors.push('Trailing tax should still include XX during configured period');
+    }
+    const beyondTrailingEntry = targetYears[yearBeyondTrailing];
+    if (beyondTrailingEntry && beyondTrailingEntry.trailingCountries.indexOf('xx') !== -1) {
+      errors.push('Trailing tax for XX should end after Y+2');
+    }
+    if (beyondTrailingEntry && Array.isArray(beyondTrailingEntry.sourceTaxKeys) && beyondTrailingEntry.sourceTaxKeys.indexOf('incomeTax:xx') !== -1) {
+      errors.push('incomeTax:xx should not be present after trailing period ends');
+    }
+    if (beyondTrailingEntry && Array.isArray(beyondTrailingEntry.sourceTaxKeys) && beyondTrailingEntry.sourceTaxKeys.indexOf('prsi:xx') !== -1) {
+      errors.push('prsi:xx should not be present after trailing period ends');
+    }
+    if (beyondTrailingEntry && Array.isArray(beyondTrailingEntry.sourceTaxKeys) && beyondTrailingEntry.sourceTaxKeys.indexOf('usc:xx') !== -1) {
+      errors.push('usc:xx should not be present after trailing period ends');
     }
 
     const futureTrailingJson = vm.runInContext(`
@@ -263,7 +288,7 @@ module.exports = {
       (function(){
         var taxman = revenue;
         if (!taxman) return [];
-        taxman.currentYear = ${yearBeyondTrailing};
+        taxman.currentYear = ${yearAfterSecondMove};
         var list = taxman.getActiveCrossBorderTaxCountries();
         return JSON.stringify(list ? list.map(function(e){ return e.country; }) : []);
       })();

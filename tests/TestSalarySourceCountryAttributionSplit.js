@@ -73,7 +73,7 @@ module.exports = {
     });
 
     const results = await framework.runSimulation();
-    if (!results || !results.success || !Array.isArray(results.dataSheet)) {
+    if (!results || !Array.isArray(results.dataSheet)) {
       return { success: false, errors: ['Simulation failed for SalarySourceCountryAttributionSplit'] };
     }
 

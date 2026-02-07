@@ -550,15 +550,15 @@ class Taxman {
       var trailingYears = residencyRules.postEmigrationTaxYears || 0;
       var taxesForeign = residencyRules.taxesForeignIncome || false;
 
-      // Include trailing taxation for full calendar years AFTER exit, inclusive of the final year.
+      // Include trailing taxation starting in the relocation year.
       // Example: postEmigrationTaxYears = 3, exit at Y:
-      // active in Y+1, Y+2, Y+3 (yearsSinceExit = 1..3); not active at Y (0) or Y+4 (4).
-      if (trailingYears > 0 && yearsSinceExit >= 1 && yearsSinceExit <= trailingYears && taxesForeign) {
+      // active in Y+0, Y+1, Y+2 (yearsSinceExit = 0..2); not active at Y+3 (3).
+      if (trailingYears > 0 && yearsSinceExit >= 0 && yearsSinceExit < trailingYears && taxesForeign) {
         active.push({
           country: entry.country,
           exitYear: exitYear,
           yearsSinceExit: yearsSinceExit,
-          remainingYears: (trailingYears - yearsSinceExit + 1),
+          remainingYears: (trailingYears - yearsSinceExit),
           ruleset: prevRuleset
         });
       }
@@ -1080,8 +1080,7 @@ class Taxman {
       this._recordTax('incomeTax', 'Tax Credit', -Math.min(tax, credit));
     }
 
-    // Minimal cross-border trailing income tax application
-    // Apply trailing countries' income tax using their ruleset on non-employment and pension income
+    // Apply trailing countries' income tax using their ruleset on trailing-income base
     const trailing = this.getActiveCrossBorderTaxCountries();
     if (trailing && trailing.length > 0) {
       const self = this;
@@ -1105,6 +1104,7 @@ class Taxman {
             }
             if (hasAny) hadDomestic = true;
           };
+          addMetric('incomesalaries:' + cc);
           addMetric('incomerentals:' + cc);
           addMetric('incomeprivatepension:' + cc);
           for (const typeKey in self.investmentTypeIncome) {
@@ -1129,13 +1129,6 @@ class Taxman {
               const bd = incAttr.getBreakdown();
               for (const k in bd) baseMap[k] = (baseMap[k] || 0) + bd[k];
             }
-            var removeSalary = function (list) {
-              list.forEach(function (s) {
-                if (s && s.description && baseMap.hasOwnProperty(s.description)) delete baseMap[s.description];
-              });
-            };
-            removeSalary(self.salariesP1);
-            removeSalary(self.salariesP2);
             if (self.privatePensionP1 > 0) baseMap['Private Pension P1'] = (baseMap['Private Pension P1'] || 0) + self.privatePensionP1;
             if (self.privatePensionP2 > 0) baseMap['Private Pension P2'] = (baseMap['Private Pension P2'] || 0) + self.privatePensionP2;
           }
@@ -1156,14 +1149,6 @@ class Taxman {
             for (const k in bd2) baseMap[k] = (baseMap[k] || 0) + bd2[k];
           }
         }
-        // Remove salary sources to focus on non-employment income
-        var removeSalary = function (list) {
-          list.forEach(function (s) {
-            if (s && s.description && baseMap.hasOwnProperty(s.description)) delete baseMap[s.description];
-          });
-        };
-        removeSalary(self.salariesP1);
-        removeSalary(self.salariesP2);
         // Ensure private pension income is included explicitly
         if (self.privatePensionP1 > 0) baseMap['Private Pension P1'] = (baseMap['Private Pension P1'] || 0) + self.privatePensionP1;
         if (self.privatePensionP2 > 0) baseMap['Private Pension P2'] = (baseMap['Private Pension P2'] || 0) + self.privatePensionP2;
@@ -1173,14 +1158,112 @@ class Taxman {
 
       for (var i = 0; i < trailing.length; i++) {
         var t = trailing[i];
-        var baseMap = buildBaseMap(t.country, t.ruleset);
-        const xAttr = new Attribution('crossBorderIncome');
+        var trailingCountryCode = String(t.country || '').toLowerCase();
+        var trailingRuleset = t.ruleset;
+        if (!trailingCountryCode || !trailingRuleset) continue;
+
+        var sourceCurrencyCode = trailingRuleset.getCurrencyCode();
+        var sourceAge = this.person1Ref && typeof this.person1Ref.age === 'number' ? this.person1Ref.age : null;
+        var needsConversion = (residenceCurrencyCode !== sourceCurrencyCode || residenceCountry !== trailingCountryCode);
+        var sourceBaseMap = {};
+        var sourceBaseTotal = 0;
+        var baseMap = buildBaseMap(trailingCountryCode, trailingRuleset);
         for (const src in baseMap) {
           var val = baseMap[src];
-          if (val !== 0) xAttr.add(src, val);
+          if (!(typeof val === 'number') || val === 0) continue;
+          var sourceVal = val;
+          if (needsConversion) {
+            sourceVal = convertBetweenCountries(sourceVal, residenceCountry, trailingCountryCode);
+          }
+          sourceBaseMap[src] = sourceVal;
+          sourceBaseTotal += sourceVal;
         }
-        var bands = t.ruleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
-        this.computeProgressiveTax(bands, xAttr, 'incomeTax:' + t.country);
+        if (sourceBaseTotal <= 0) continue;
+
+        var convertTaxToResidence = function (sourceTaxAmount) {
+          if (!(typeof sourceTaxAmount === 'number') || sourceTaxAmount <= 0) return 0;
+          if (!needsConversion) return sourceTaxAmount;
+          return convertBetweenCountries(sourceTaxAmount, trailingCountryCode, residenceCountry);
+        };
+
+        // Income tax (source country)
+        var sourceIncomeBands = trailingRuleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
+        var sourceIncomeTax = this.computeTaxFromBands(sourceIncomeBands, sourceBaseTotal);
+        var sourceIncomeTaxResidence = convertTaxToResidence(sourceIncomeTax);
+        if (sourceIncomeTaxResidence > 0) {
+          recordSourceTaxWithBreakdown(
+            'incomeTax:' + trailingCountryCode,
+            'Trailing Income Tax (' + trailingCountryCode.toUpperCase() + ')',
+            sourceIncomeTaxResidence,
+            baseMap
+          );
+        }
+
+        // Social contributions (source country, e.g., PRSI)
+        var sourceContributions = trailingRuleset && typeof trailingRuleset.getSocialContributions === 'function'
+          ? trailingRuleset.getSocialContributions()
+          : [];
+        for (var tc = 0; tc < sourceContributions.length; tc++) {
+          var sourceContrib = sourceContributions[tc] || {};
+          var sourceContribTaxId = String(sourceContrib.id || sourceContrib.name || 'contrib').toLowerCase();
+          var sourceContribRate = getContributionRateForAge(sourceContrib, sourceAge);
+          if (!(typeof sourceContribRate === 'number') || sourceContribRate <= 0) continue;
+          var sourceContribBase = sourceBaseTotal;
+          if (typeof sourceContrib.incomeCap === 'number' && sourceContrib.incomeCap > 0) {
+            sourceContribBase = Math.min(sourceContribBase, sourceContrib.incomeCap);
+          }
+          var sourceContribTaxInSourceCurrency = sourceContribBase * sourceContribRate;
+          var sourceContribTax = convertTaxToResidence(sourceContribTaxInSourceCurrency);
+          if (sourceContribTax > 0) {
+            recordSourceTaxWithBreakdown(
+              sourceContribTaxId + ':' + trailingCountryCode,
+              String(sourceContrib.name || sourceContribTaxId) + ' Trailing Tax (' + trailingCountryCode.toUpperCase() + ')',
+              sourceContribTax,
+              baseMap
+            );
+          }
+        }
+
+        // Additional taxes (source country, e.g., USC)
+        var sourceAdditionalTaxes = trailingRuleset && typeof trailingRuleset.getAdditionalTaxes === 'function'
+          ? trailingRuleset.getAdditionalTaxes()
+          : [];
+        for (var ta = 0; ta < sourceAdditionalTaxes.length; ta++) {
+          var sourceAdditionalTax = sourceAdditionalTaxes[ta] || {};
+          var sourceAdditionalTaxId = String(sourceAdditionalTax.id || sourceAdditionalTax.name || 'addtax').toLowerCase();
+          var thresholdRaw = (trailingRuleset && typeof trailingRuleset.getAdditionalTaxIncomeExemptionThreshold === 'function')
+            ? trailingRuleset.getAdditionalTaxIncomeExemptionThreshold(sourceAdditionalTax.name)
+            : (typeof sourceAdditionalTax.incomeExemptionThreshold === 'number' ? sourceAdditionalTax.incomeExemptionThreshold : 0);
+          var deductibleRawExplicit = (trailingRuleset && typeof trailingRuleset.getAdditionalTaxDeductibleExemptionAmount === 'function')
+            ? trailingRuleset.getAdditionalTaxDeductibleExemptionAmount(sourceAdditionalTax.name)
+            : (typeof sourceAdditionalTax.deductibleExemptionAmount === 'number' ? sourceAdditionalTax.deductibleExemptionAmount : 0);
+          var legacyExemptRaw = (trailingRuleset && typeof trailingRuleset.getAdditionalTaxExemptAmount === 'function')
+            ? trailingRuleset.getAdditionalTaxExemptAmount(sourceAdditionalTax.name)
+            : (typeof sourceAdditionalTax.exemptAmount === 'number' ? sourceAdditionalTax.exemptAmount : 0);
+          var threshold = (typeof thresholdRaw === 'number') ? thresholdRaw : 0;
+          var deductibleRaw = deductibleRawExplicit > 0 ? deductibleRawExplicit : legacyExemptRaw;
+          var deductible = (typeof deductibleRaw === 'number') ? deductibleRaw : 0;
+          if (threshold > 0 && sourceBaseTotal <= threshold) continue;
+          var sourceAdditionalBase = sourceBaseTotal - deductible;
+          if (sourceAdditionalBase <= 0) continue;
+
+          var sourceAdditionalBands = sourceAdditionalTax.brackets || {};
+          try {
+            if (trailingRuleset && typeof trailingRuleset.getAdditionalTaxBandsFor === 'function') {
+              sourceAdditionalBands = trailingRuleset.getAdditionalTaxBandsFor(sourceAdditionalTax.name, sourceAge, sourceBaseTotal) || sourceAdditionalBands;
+            }
+          } catch (_) { }
+          var sourceAdditionalTaxInSourceCurrency = this.computeTaxFromBands(sourceAdditionalBands, sourceAdditionalBase);
+          var sourceAdditionalTaxAmount = convertTaxToResidence(sourceAdditionalTaxInSourceCurrency);
+          if (sourceAdditionalTaxAmount > 0) {
+            recordSourceTaxWithBreakdown(
+              sourceAdditionalTaxId + ':' + trailingCountryCode,
+              String(sourceAdditionalTax.name || sourceAdditionalTaxId) + ' Trailing Tax (' + trailingCountryCode.toUpperCase() + ')',
+              sourceAdditionalTaxAmount,
+              baseMap
+            );
+          }
+        }
       }
     }
 

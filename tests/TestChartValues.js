@@ -83,9 +83,9 @@ const DEMO3_BASELINE = {
   // at relocation time. This keeps the emergency stash purchasing-power consistent
   // across countries (vs ballooning nominally under evolved FX).
   ages: {
-    // Age-40 baseline updated after source-country salary overlap taxes
-    // (including equivalent social/additional taxes) were corrected.
-    40: { worth: 2365180583.0256553, cash: 113892125.32058409, netIncome: 815974923.077936 },
+    // Age-40 baseline updated after relocation-year trailing taxation applies
+    // to all source-country income-side taxes (income tax + deductions).
+    40: { worth: 2365180583.0256553, cash: 0, netIncome: 135543979.2246256 },
     65: { worth: 1740350504460.907, cash: 48826750509.70023, netIncome: 7770827383.114312 },
     80: { worth: 57926334851950.84, cash: 506702817737.4343, netIncome: 2556479405018.2817 }
   },
