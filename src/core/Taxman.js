@@ -292,6 +292,87 @@ class Taxman {
 
   };
 
+  declarePropertyGain(money, heldYears, residentCountryAtSale, primaryResidenceProportion, propertyCountry, description) {
+    if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
+      throw new Error('declarePropertyGain requires a Money object');
+    }
+    var residenceCurrency = this.residenceCurrency;
+    if (money.currency !== residenceCurrency) {
+      throw new Error('Taxman expects residence currency (' + residenceCurrency + '), got ' + money.currency);
+    }
+
+    if (!this.ruleset || !this.ruleset.hasPropertyGainsTax()) {
+      return;
+    }
+
+    var spec = this.ruleset.getPropertyGainsTaxSpec();
+    if (!spec || !spec.taxRef) {
+      return;
+    }
+
+    var gainAmount = money.amount;
+    if (gainAmount <= 0) return;
+
+    // Eligibility gate: holding period cliff exemption
+    if (spec.holdingPeriodExemptionYears && typeof spec.holdingPeriodExemptionYears === 'number') {
+      if (heldYears >= spec.holdingPeriodExemptionYears) {
+        return;
+      }
+    }
+
+    // Eligibility gate: residents-only taxation
+    if (spec.residentsOnly === true) {
+      var sourceCountry = (propertyCountry || '').toLowerCase();
+      var residentCountry = (residentCountryAtSale || '').toLowerCase();
+      if (sourceCountry !== residentCountry) {
+        return;
+      }
+    }
+
+    // Apply proportional primary residence exemption
+    var taxableGain = gainAmount;
+    if (spec.primaryResidenceExemption && spec.primaryResidenceExemption.enabled === true) {
+      var proportion = (typeof primaryResidenceProportion === 'number') ? primaryResidenceProportion : 0;
+      if (proportion > 0) {
+        if (spec.primaryResidenceExemption.proportional === true) {
+          taxableGain = gainAmount * (1 - proportion);
+        } else {
+          if (proportion >= 1) {
+            return;
+          }
+        }
+      }
+    }
+
+    if (taxableGain <= 0) return;
+
+    var taxableGainMoney = Money.create(taxableGain, money.currency, money.country);
+
+    // Declare into referenced tax base
+    if (spec.taxRef === 'capitalGains') {
+      var cgtOptions = spec.capitalGainsOptions || {};
+      var rate = 0;
+      if (cgtOptions.rateRef) {
+        var parts = cgtOptions.rateRef.split('.');
+        if (parts.length === 2 && parts[0] === 'capitalGainsTax' && parts[1] === 'rate') {
+          rate = this.ruleset.getCapitalGainsRate();
+        }
+      } else if (typeof cgtOptions.rate === 'number') {
+        rate = cgtOptions.rate;
+      }
+
+      var options = {
+        category: 'cgt',
+        eligibleForAnnualExemption: (cgtOptions.eligibleForAnnualExemption === true),
+        allowLossOffset: (cgtOptions.allowLossOffset === true)
+      };
+
+      this.declareInvestmentGains(taxableGainMoney, rate, description, options, propertyCountry);
+    } else if (spec.taxRef === 'incomeTax') {
+      this.declareOtherIncome(taxableGainMoney, description);
+    }
+  }
+
   computeTaxes(foreignTaxCredits) {
     this.resetTaxAttributions();
     // Reset dynamic totals at start of each computation

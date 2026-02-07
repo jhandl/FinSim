@@ -59,6 +59,56 @@ class RealEstate {
     return null;
   }
 
+  getPurchaseBasis(id) {
+    if (!(id in this.properties)) return 0;
+    var property = this.properties[id];
+    var basis = 0;
+    if (property.paid) basis += property.paid.amount;
+    if (property.borrowed) basis += property.borrowed.amount;
+    return basis;
+  }
+
+  getPrimaryResidenceProportion(id, purchaseAge, saleAge, residencyTimeline, rentalEvents) {
+    if (!(id in this.properties)) return 0;
+    var property = this.properties[id];
+    var propertyCountry = property.getLinkedCountry();
+    if (!propertyCountry) return 0;
+
+    var totalYears = saleAge - purchaseAge;
+    if (totalYears <= 0) return 0;
+
+    var primaryYears = 0;
+    for (var age = purchaseAge; age < saleAge; age++) {
+      var residentCountry = null;
+      if (residencyTimeline) {
+        for (var i = 0; i < residencyTimeline.length; i++) {
+          var entry = residencyTimeline[i];
+          if (age >= entry.fromAge && (entry.toAge === null || age <= entry.toAge)) {
+            residentCountry = entry.country;
+            break;
+          }
+        }
+      }
+
+      var isRented = false;
+      if (rentalEvents) {
+        for (var j = 0; j < rentalEvents.length; j++) {
+          var rental = rentalEvents[j];
+          if (rental.id === id && age >= rental.fromAge && age <= rental.toAge) {
+            isRented = true;
+            break;
+          }
+        }
+      }
+
+      if (residentCountry === propertyCountry && !isRented) {
+        primaryYears++;
+      }
+    }
+
+    return primaryYears / totalYears;
+  }
+
   /**
    * Get total value of all properties in their native currencies (summed without conversion).
    * 

@@ -78,12 +78,14 @@ const TestRealEstateTransaction = {
       }
     },
     {
-      type: "exact_value", 
-      target: "age", 
+      type: "comparison",
+      target: "age",
       age: 65,
-      field: "cgt", // Expecting 0 based on previous observations
-      expected: 0, 
-      tolerance: 1
+      field: "cgt",
+      expected: {
+        operator: ">",
+        value: 0 // Property sale gains are taxable in this scenario
+      }
     }
   ]
 };
