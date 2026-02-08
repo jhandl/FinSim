@@ -195,6 +195,21 @@ class FileManager {
       }
     } catch (_) { }
 
+    // Reset currency selectors to default state before loading
+    if (this.webUI.chartManager) {
+      this.webUI.chartManager.reportingCurrency = null; // Force reset
+      this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+    }
+    if (this.webUI.tableManager) {
+      this.webUI.tableManager.reportingCurrency = null; // Force reset
+      this.webUI.tableManager.setupTableCurrencyControls();
+    }
+
+    const parameterInputs = document.querySelectorAll('.parameters-section input');
+    for (let i = 0; i < parameterInputs.length; i++) {
+      parameterInputs[i].value = '';
+    }
+
     this.webUI.clearAllWarnings();
     this.webUI.tableManager.clearContent('Events');
     this.webUI.tableManager.clearExtraDataRows(0);

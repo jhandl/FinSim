@@ -390,16 +390,6 @@ class WebUI extends AbstractUI {
   }
 
   async loadFromFile(file) {
-    // Explicitly reset currency selectors to default state before loading
-    if (this.chartManager) {
-      this.chartManager.reportingCurrency = null; // Force reset
-      this.chartManager.setupChartCurrencyControls(this);
-    }
-    if (this.tableManager) {
-      this.tableManager.reportingCurrency = null; // Force reset
-      this.tableManager.setupTableCurrencyControls();
-    }
-
     await this.fileManager.loadFromFile(file);
     RelocationUtils.extractRelocationTransitions(this, this.chartManager);
     // Rebuild currency selector now that scenario events (and currencies) are available
@@ -414,16 +404,6 @@ class WebUI extends AbstractUI {
   }
 
   async loadFromUrl(url, name) {
-    // Explicitly reset currency selectors to default state before loading
-    if (this.chartManager) {
-      this.chartManager.reportingCurrency = null; // Force reset
-      this.chartManager.setupChartCurrencyControls(this);
-    }
-    if (this.tableManager) {
-      this.tableManager.reportingCurrency = null; // Force reset
-      this.tableManager.setupTableCurrencyControls();
-    }
-
     await this.fileManager.loadFromUrl(url, name);
     RelocationUtils.extractRelocationTransitions(this, this.chartManager);
     // Rebuild currency selector now that scenario events (and currencies) are available
