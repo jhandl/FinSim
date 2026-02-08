@@ -1263,21 +1263,11 @@ function processEvents() {
             var heldYears = entry.heldYears;
             var residentCountryAtSale = entry.residentCountryAtSale;
             var primaryResidenceProportion = entry.primaryResidenceProportion;
-
-            // Load source-country Taxman for property taxation
-            var sourceTaxman = revenue;
-            if (propertyCountry && propertyCountry !== currentCountry) {
-              var sourceRuleset = Config.getInstance().getCachedTaxRuleSet(propertyCountry);
-              if (sourceRuleset) {
-                sourceTaxman = new Taxman();
-                sourceTaxman.reset(person1, person2, attributionManager, propertyCountry, year);
-                sourceTaxman.ruleset = sourceRuleset;
-                sourceTaxman.residenceCurrency = residenceCurrency;
-              }
-            }
-
             var gainMoney = Money.create(gain, residenceCurrency, currentCountry);
-            sourceTaxman.declarePropertyGain(
+            var sourceTaxman = null;
+
+            // Residence-country tax always applies according to active residency rules.
+            revenue.declarePropertyGain(
               gainMoney,
               heldYears,
               residentCountryAtSale,
@@ -1286,13 +1276,33 @@ function processEvents() {
               'Property Sale (' + propertyId + ')'
             );
 
-            // If source-country taxation occurred, compute and record source tax
-            if (sourceTaxman !== revenue) {
+            // Source-country tax also applies for cross-border property sales.
+            if (propertyCountry && propertyCountry !== currentCountry) {
+              var sourceRuleset = Config.getInstance().getCachedTaxRuleSet(propertyCountry);
+              if (sourceRuleset) {
+                sourceTaxman = new Taxman();
+                sourceTaxman.reset(person1, person2, attributionManager, propertyCountry, year);
+                sourceTaxman.ruleset = sourceRuleset;
+                sourceTaxman.residenceCurrency = residenceCurrency;
+                sourceTaxman.declarePropertyGain(
+                  gainMoney,
+                  heldYears,
+                  propertyCountry,
+                  primaryResidenceProportion,
+                  propertyCountry,
+                  'Property Sale (' + propertyId + ')'
+                );
+              }
+            }
+
+            if (sourceTaxman) {
               sourceTaxman.computeTaxes();
-              var sourceTax = sourceTaxman.getAllTaxesTotal();
-              if (sourceTax > 0) {
-                var taxMetricKey = 'tax:capitalGains:' + propertyCountry;
-                attributionManager.record(taxMetricKey, 'Property Sale Tax (' + propertyId + ')', sourceTax);
+              var sourceTaxTotals = sourceTaxman.taxTotals || {};
+              for (var sourceTaxKey in sourceTaxTotals) {
+                if (!Object.prototype.hasOwnProperty.call(sourceTaxTotals, sourceTaxKey)) continue;
+                var sourceTaxAmount = sourceTaxTotals[sourceTaxKey];
+                if (!(typeof sourceTaxAmount === 'number') || sourceTaxAmount <= 0) continue;
+                revenue.declareExternalTax(sourceTaxKey, propertyCountry, 'Property Sale Tax (' + propertyId + ')', sourceTaxAmount);
               }
             }
           }
@@ -1945,6 +1955,15 @@ function buildForeignTaxCredits(taxman, trailing) {
   var buckets = {};
   var byCountry = {};
   var treatyFound = false;
+  var includedCapitalGainsCountries = {};
+  var addMappedCredits = function (countryCode, sourceTaxes) {
+    var mapped = taxman.aggregateTreatyBuckets(sourceTaxes, equivalents);
+    for (var k in mapped) {
+      buckets[k] = (buckets[k] || 0) + mapped[k];
+      if (!byCountry[k]) byCountry[k] = {};
+      byCountry[k][countryCode] = (byCountry[k][countryCode] || 0) + mapped[k];
+    }
+  };
   for (var i = 0; i < trailing.length; i++) {
     var t = trailing[i];
     if (!t || !t.country) continue;
@@ -1958,12 +1977,25 @@ function buildForeignTaxCredits(taxman, trailing) {
     var gainsKey = 'capitalGains:' + t.country;
     if (taxman.taxTotals && typeof taxman.taxTotals[gainsKey] === 'number') {
       sourceTaxes.capitalGains = taxman.taxTotals[gainsKey];
+      includedCapitalGainsCountries[String(t.country).toLowerCase()] = true;
     }
-    var mapped = taxman.aggregateTreatyBuckets(sourceTaxes, equivalents);
-    for (var k in mapped) {
-      buckets[k] = (buckets[k] || 0) + mapped[k];
-      if (!byCountry[k]) byCountry[k] = {};
-      byCountry[k][t.country] = (byCountry[k][t.country] || 0) + mapped[k];
+    addMappedCredits(t.country, sourceTaxes);
+  }
+
+  // Include source-country CGT buckets even when they are not from trailing residency
+  // (e.g. property sales taxed at source regardless of residency).
+  if (taxman.taxTotals) {
+    var taxKeys = Object.keys(taxman.taxTotals);
+    for (var ti = 0; ti < taxKeys.length; ti++) {
+      var taxKey = taxKeys[ti];
+      if (taxKey.indexOf('capitalGains:') !== 0) continue;
+      var sourceCountry = String(taxKey.substring('capitalGains:'.length) || '').toLowerCase();
+      if (!sourceCountry || includedCapitalGainsCountries[sourceCountry]) continue;
+      if (!ruleset.hasTreatyWith(sourceCountry)) continue;
+      var sourceAmount = taxman.taxTotals[taxKey];
+      if (!(typeof sourceAmount === 'number') || sourceAmount <= 0) continue;
+      treatyFound = true;
+      addMappedCredits(sourceCountry, { capitalGains: sourceAmount });
     }
   }
   if (!treatyFound) return null;
@@ -1975,10 +2007,23 @@ function buildForeignTaxCredits(taxman, trailing) {
 
 function computeNetIncomeWithForeignCredits(taxman) {
   var trailing = taxman.getActiveCrossBorderTaxCountries();
-  if (trailing && trailing.length > 0) {
+  var hasExternalCapitalGains = false;
+  if (taxman.externalTaxEntries && taxman.externalTaxEntries.length > 0) {
+    for (var i = 0; i < taxman.externalTaxEntries.length; i++) {
+      var ext = taxman.externalTaxEntries[i];
+      if (ext && ext.taxId === 'capitalGains' && typeof ext.amount === 'number' && ext.amount > 0) {
+        hasExternalCapitalGains = true;
+        break;
+      }
+    }
+  }
+  if ((trailing && trailing.length > 0) || hasExternalCapitalGains) {
     taxman.computeTaxes();
     var credits = buildForeignTaxCredits(taxman, trailing);
-    return taxman.netIncome(credits);
+    if (credits) {
+      return taxman.netIncome(credits);
+    }
+    return taxman.netIncome();
   }
   return taxman.netIncome();
 }

@@ -1,23 +1,23 @@
-/* Investment Refactor Baseline Test
+/* Investment Balances Across Residency Scenarios Test
  *
  * PURPOSE:
- * - Capture baseline financial state for three deterministic scenarios (IE-only, US-only, IE→US relocation)
- * - Detect unintended changes during investment refactoring
+ * - Capture baseline financial state for three residency scenarios (IE-only, US-only, IE→US relocation)
+ * - Detect unintended changes in investment outcomes across residency scenarios
  * - Validate investment type handling across countries and relocation scenarios
  *
- * BASELINE CAPTURE: 2026-02-05, Tax Year: 2025/2026, Simulator Version: 2.0
+ * BASELINE CAPTURE: 2026-02-08, Tax Year: 2025/2026, Simulator Version: 2.0
  */
 
 const { TestFramework } = require('../src/core/TestFramework.js');
 
 // Baseline metadata
 const baselineMetadata = {
-  baselineDate: "2026-02-05",
+  baselineDate: "2026-02-08",
   simulatorVersion: "2.0",
   taxYear: "2025/2026",
   investmentTypes: ["indexFunds_ie", "shares_ie", "usIndexFunds", "usShares"],
-  updateNotes: "Rebaselined for current deterministic surplus-allocation and investment-tax behavior",
-  maintainer: "Investment refactor baseline test"
+  updateNotes: "Rebaselined for residency-scope tax changes affecting IE→US relocation investment balances",
+  maintainer: "Investment balances across residency scenarios test"
 };
 
 const expectedBaselines = {
@@ -45,10 +45,10 @@ const expectedBaselines = {
   },
   "IE→US Relocation": {
     cash: 0,
-    indexFunds_ie: 155615.85,
+    indexFunds_ie: 141484.39,
     shares_ie: 88238.61,
-    usIndexFunds: 25727.08,
-    usShares: 16820.86,
+    usIndexFunds: 20191.91,
+    usShares: 15854.88,
     it: 0,
     prsi: 0,
     usc: 0,
@@ -94,8 +94,8 @@ function extractFinalValues(rows) {
 }
 
 module.exports = {
-  name: "Investment Refactor Baseline",
-  description: "Baseline test for investment refactor validation - IE-only, US-only, and IE→US relocation scenarios",
+  name: "Investment Balances Across Residency Scenarios",
+  description: "Validates final investment balances and tax buckets for IE-only, US-only, and IE→US relocation scenarios",
   isCustomTest: true,
   async runCustomTest() {
     const framework = new TestFramework();

@@ -375,6 +375,19 @@ class InvestmentAsset {
             activeDeemedDisposalYears = t.taxation.exitTax.deemedDisposalYears;
           }
         }
+        if ((!activeDeemedDisposalYears || activeDeemedDisposalYears <= 0) && revenue && typeof revenue.getActiveCrossBorderTaxCountries === 'function') {
+          var trailingCountries = revenue.getActiveCrossBorderTaxCountries();
+          for (var ti = 0; ti < trailingCountries.length; ti++) {
+            var trailing = trailingCountries[ti];
+            var trailingRuleset = trailing ? trailing.ruleset : null;
+            if (!trailingRuleset || typeof trailingRuleset.findInvestmentTypeByKey !== 'function') continue;
+            var trailingType = trailingRuleset.findInvestmentTypeByKey(this.key);
+            if (trailingType && trailingType.taxation && trailingType.taxation.exitTax && typeof trailingType.taxation.exitTax.deemedDisposalYears === 'number') {
+              activeDeemedDisposalYears = trailingType.taxation.exitTax.deemedDisposalYears;
+              break;
+            }
+          }
+        }
       } catch (_) {
         // Fallback to initial value if resolution fails
         activeDeemedDisposalYears = this._deemedDisposalYears;

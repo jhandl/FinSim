@@ -405,6 +405,17 @@ class Taxman {
     }
   }
 
+  declareExternalTax(taxId, countryCode, source, amount) {
+    if (typeof amount !== 'number' || amount === 0) return;
+    if (!this.externalTaxEntries) this.externalTaxEntries = [];
+    this.externalTaxEntries.push({
+      taxId: taxId ? String(taxId) : '',
+      country: countryCode ? String(countryCode).toLowerCase() : '',
+      source: source || 'External Tax',
+      amount: amount
+    });
+  }
+
   computeTaxes(foreignTaxCredits) {
     this.resetTaxAttributions();
     // Reset dynamic totals at start of each computation
@@ -420,6 +431,18 @@ class Taxman {
             this.attributionManager.record('tax:withholding:' + String(w.country).toLowerCase(), w.source || 'Withholding', w.amount);
           }
         }
+      }
+    }
+
+    if (this.externalTaxEntries && this.externalTaxEntries.length > 0) {
+      for (var e = 0; e < this.externalTaxEntries.length; e++) {
+        var x = this.externalTaxEntries[e];
+        if (!x || typeof x.amount !== 'number' || x.amount === 0) continue;
+        var baseTaxId = x.taxId ? String(x.taxId) : '';
+        if (!baseTaxId) continue;
+        var normalizedCountry = x.country ? String(x.country).toLowerCase() : '';
+        var fullTaxId = normalizedCountry ? (baseTaxId + ':' + normalizedCountry) : baseTaxId;
+        this._recordTax(fullTaxId, x.source || 'External Tax', x.amount);
       }
     }
 
@@ -472,6 +495,7 @@ class Taxman {
     this.taxTotals = {};
     // Withholding declarations are accumulated during the year and materialized during computeTaxes()
     this.withholdingEntries = [];
+    this.externalTaxEntries = [];
 
     this.person1Ref = person1 || null;
     this.person2Ref = person2_optional || null;
@@ -1775,6 +1799,71 @@ class Taxman {
     // Compute total tax combining exit tax and CGT (annual exemption already applied to CGT entries above)
     totalTax = totalExitTax + totalCGTTax;
 
+    // Apply trailing countries' CGT/Exit Tax while post-emigration residency is active.
+    var trailing = this.getActiveCrossBorderTaxCountries();
+    if (trailing && trailing.length > 0) {
+      var taxForTrailingCountry = (trailingRuleset, trailingCountryCode) => {
+        var trailingBasis = trailingRuleset.getTaxBasis();
+        var trailingAnnualExemption = adjust(trailingRuleset.getCapitalGainsAnnualExemption());
+        var trailingRemainingExemption = trailingAnnualExemption;
+        var trailingRemainingLosses = 0;
+
+        for (const trailingRateKey in this.gains) {
+          const trailingBucket = this.gains[trailingRateKey];
+          const trailingEntries = Array.isArray(trailingBucket.entries) ? trailingBucket.entries : [];
+          for (const trailingEntry of trailingEntries) {
+            if (!trailingEntry || trailingEntry.category !== 'cgt' || trailingEntry.amount >= 0 || !trailingEntry.allowLossOffset) continue;
+            if (trailingBasis === 'domestic' && trailingCountryCode && trailingEntry.assetCountry && trailingEntry.assetCountry !== trailingCountryCode) {
+              continue;
+            }
+            trailingRemainingLosses += (-trailingEntry.amount);
+          }
+        }
+
+        let trailingTotalTax = 0;
+        for (const rate of sortedByRate) {
+          const trailingBucket = this.gains[rate];
+          const trailingEntries = Array.isArray(trailingBucket.entries) ? trailingBucket.entries : [];
+          for (const trailingEntry of trailingEntries) {
+            if (!trailingEntry || trailingEntry.amount <= 0) continue;
+            if (trailingBasis === 'domestic' && trailingCountryCode && trailingEntry.assetCountry && trailingEntry.assetCountry !== trailingCountryCode) {
+              continue;
+            }
+            const trailingRate = parseFloat(rate);
+            let trailingTaxableAmount = trailingEntry.amount;
+
+            if (trailingEntry.category === 'cgt' && trailingEntry.allowLossOffset && trailingRemainingLosses > 0) {
+              const usedTrailingLoss = Math.min(trailingRemainingLosses, trailingTaxableAmount);
+              trailingRemainingLosses -= usedTrailingLoss;
+              trailingTaxableAmount -= usedTrailingLoss;
+            }
+
+            if (trailingEntry.category === 'cgt' && trailingEntry.eligibleForAnnualExemption && trailingRemainingExemption > 0 && trailingTaxableAmount > 0) {
+              const usedTrailingExemption = Math.min(trailingRemainingExemption, trailingTaxableAmount);
+              trailingRemainingExemption -= usedTrailingExemption;
+              trailingTaxableAmount -= usedTrailingExemption;
+            }
+
+            if (trailingTaxableAmount > 0) {
+              trailingTotalTax += trailingTaxableAmount * trailingRate;
+            }
+          }
+        }
+        return trailingTotalTax;
+      };
+
+      for (var ti = 0; ti < trailing.length; ti++) {
+        var trailingEntry = trailing[ti];
+        var trailingCountryCode = trailingEntry && trailingEntry.country ? String(trailingEntry.country).toLowerCase() : '';
+        var trailingRuleset = trailingEntry ? trailingEntry.ruleset : null;
+        if (!trailingCountryCode || !trailingRuleset) continue;
+        var trailingTax = taxForTrailingCountry(trailingRuleset, trailingCountryCode);
+        if (trailingTax > 0) {
+          this._recordTax('capitalGains:' + trailingCountryCode, 'Trailing Capital Gains Tax (' + trailingCountryCode.toUpperCase() + ')', trailingTax);
+        }
+      }
+    }
+
     var creditBuckets = foreignTaxCredits || null;
     if (creditBuckets && typeof creditBuckets.capitalGains === 'number') {
       var currentTax = (this.taxTotals && typeof this.taxTotals['capitalGains'] === 'number') ? this.taxTotals['capitalGains'] : 0;
@@ -1839,6 +1928,14 @@ class Taxman {
     }
 
     copy.taxTotals = this.taxTotals ? { ...this.taxTotals } : {};
+    copy.externalTaxEntries = Array.isArray(this.externalTaxEntries) ? this.externalTaxEntries.map(function (x) {
+      return {
+        taxId: x.taxId,
+        country: x.country,
+        source: x.source,
+        amount: x.amount
+      };
+    }) : [];
 
     copy.ruleset = this.ruleset;
     copy.residenceCurrency = this.residenceCurrency;
