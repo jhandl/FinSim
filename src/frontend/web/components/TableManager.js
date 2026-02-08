@@ -1179,7 +1179,11 @@ class TableManager {
           value = nominal; // Fall back to nominal value if calculation failed
         }
 
+        const infoIcon = contentEl.querySelector('.cell-info-icon');
         contentEl.textContent = FormatUtils.formatCurrency(value, displayCurrencyCode, displayCountryForLocale);
+        if (infoIcon) {
+          contentEl.appendChild(infoIcon);
+        }
         if (isFinite(value)) {
           const displayValue = value < 0 ? -Math.round(Math.abs(value)) : Math.round(value);
           cell.setAttribute('data-display-value', String(displayValue));
