@@ -1,6 +1,6 @@
 # FinSim Architecture Quality Report
 
-Date: 2026-01-03  
+Date: 2026-02-08  
 Scope: repository-level architecture (core engine + web frontend + test harness)  
 Method: static review of key modules and cross-cutting patterns; no runtime profiling.
 
@@ -8,7 +8,19 @@ Method: static review of key modules and cross-cutting patterns; no runtime prof
 
 FinSim has a strong “static-site, config-driven simulator” architecture with a clear *intentional* separation between `src/core/` (GAS-compatible engine) and `src/frontend/` (UI environments). Several subsystems demonstrate high-quality shared logic (tax rules via JSON + `TaxRuleSet`, FX/CPI/PPP via `EconomicData`, currency-tagged amounts via `Money`, dynamic investments via `InvestmentTypeFactory`, PV via `PresentValueCalculator`).
 
+The architecture has recently been enhanced with a robust **Cross-Border Tax Engine** that orchestrates multi-country taxation, treaty application, and foreign tax credits without compromising the single-environment compatibility.
+
 The main architectural tension is that the core execution path is still largely organized around **module-level global state** (notably `src/core/Simulator.js`) and a UI shim (`src/frontend/UIManager.js`) that is coupled to both core globals and browser DOM. This increases cognitive load and coupling, makes boundaries more porous than intended, and raises the cost of extensibility (especially for multi-country and UI feature growth).
+
+## Cross-Border Tax Architecture
+
+**Overall: Strong**
+
+The new cross-border tax system introduces several robust architectural patterns:
+- **Residency Timeline (Cached):** `src/core/Simulator.js` computes a run-scope residency timeline once per simulation, decoupling high-frequency tax checks from event parsing.
+- **Source-Country Injection:** `Taxman` can instantiate secondary `Taxman` instances (or reload rulesets) to compute source-country taxes on specific income streams (e.g., property gains, foreign salary) before applying them as credits in the residence country.
+- **Foreign Tax Credit Logic:** `Taxman.applyForeignTaxCredit()` centralizes the complex logic of treaty verification and credit limitation (capped by residence tax), ensuring consistency across all income types.
+- **Economic Data Conversion:** The usage of `EconomicData` for all currency conversions (with 'evolution', 'ppp', 'constant' modes) ensures that cross-border calculations remain consistent with the broader simulation economy.
 
 ## Cohesion
 

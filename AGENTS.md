@@ -178,6 +178,7 @@ Investment wrappers are defined in country tax rules (`investmentTypes` in `tax-
 *   **Loading/caching:** `Config.getTaxRuleSet(code)` loads and caches a `TaxRuleSet`; the preloaded IE ruleset is available synchronously via `Config.getCachedTaxRuleSet('ie')`.
 *   **API:** `TaxRuleSet` exposes income tax bands/credits and age exemptions, PRSI by age, USC brackets (including reduced age/income bands), CGT annual exemption and rate, pension rules (lump‑sum bands, contribution limits, drawdown), and investment type definitions.
 *   **Usage:** `Taxman` consumes the active ruleset to compute income tax, social contributions, additional taxes, and capital gains/exit taxes with attribution. Investment types determine whether assets are taxed under Exit Tax or CGT, and can drive dynamic per-type assets/columns.
+*   **Cross-Border Capabilities:** `Taxman` can load multiple rulesets during a single simulation run to calculate source-country taxation on foreign income and apply foreign tax credits where treaties exist.
 
 ### 3.4. Event Management (Table + Accordion + Wizard)
 
@@ -224,7 +225,10 @@ Key traits:
 *   **Country timeline:** Derived from `MV-*` events.
 *   **Economic context:** `linkedCountry` can drive the inflation/currency basis for an event.
 *   **Split chains:** `linkedEventId` supports traceable event splits and guided resolution flows.
-*   **Cross-border taxation:** `Taxman` derives the active country from relocation events, can apply trailing residency rules (e.g., IE’s three-year tail), and loads the matching `TaxRuleSet` on demand.
+*   **Cross-border taxation:** `Taxman` derives the active country from relocation events and handles complex multi-jurisdiction logic:
+    *   **Source-Country Taxation:** Income/gains linked to a specific country (e.g., property in previous residence) are taxed using that country's ruleset.
+    *   **Trailing Residency:** Supports post-emigration tax rules (e.g., IE’s three-year ordinary residence tail).
+    *   **Foreign Tax Credits:** Automatically applies credits for foreign tax paid if a tax treaty exists between the source and residence countries.
 
 Relocation UI support:
 
