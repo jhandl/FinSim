@@ -2157,6 +2157,10 @@ footer {
   font-size: 1.25rem;
 }
 
+.mix-config-modal.modal-content .modal-body {
+  padding-bottom: 0rem;
+}
+
 .mix-config-modal .modal-header .tab-toggle {
   margin-left: auto;
   margin-bottom: 0;
@@ -2223,12 +2227,12 @@ footer {
   height: 34px;
   text-align: right;
   flex-shrink: 0;
-  margin-top: -15px; /* Center with slider track: (8px top margin + 10px slider half-height) - 17px input half-height */
+  margin-top: 0px; /* Center with slider track when label is on top (desktop) */
 }
 
 .mix-config-modal .mix-inline input[type="range"] {
   width: 100%;
-  margin: 8px 0; /* Standard slider margin */
+  margin: 0 0 8px 0; /* Standard slider margin, removed top margin for desktop */
   cursor: pointer;
   padding: 0;
 }
@@ -2239,6 +2243,19 @@ footer {
   white-space: nowrap;
   text-align: center;
   width: 100%;
+  margin-bottom: 0; /* Tight for desktop */
+}
+
+@media (max-width: 768px) {
+  .mix-config-modal .mix-inline input[type="text"] {
+    margin-top: 22px; /* Adjusted for larger mobile gap */
+  }
+  .mix-config-modal .mix-inline input[type="range"] {
+    margin-top: 5px; /* Thumb-safe gap */
+  }
+  .mix-config-modal .mix-slider-label {
+    margin-bottom: 6px; /* Thumb-safe gap */
+  }
 }
 
 .mix-config-modal .mix-inline select {
@@ -2251,6 +2268,17 @@ footer {
 
 .mix-config-modal .mix-section {
   margin-bottom: 1.25rem;
+}
+
+.mix-config-modal .mix-section.mix-target {
+  margin-bottom: 20px;
+}
+
+.mix-config-modal .mix-chart-container {
+  width: 80%;
+  margin: 0rem auto 1.5rem auto;
+  height: 100px;
+  max-height: 100px;
 }
 
 /* Status indicator clickable when error */

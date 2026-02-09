@@ -1931,12 +1931,15 @@ class WebUI extends AbstractUI {
               </div>
             </div>
           </div>
+          <div class="mix-chart-container" style="display:none;">
+            <canvas id="mixConfigChart"></canvas>
+          </div>
           <div class="mix-section">
             <div class="mix-inline">
               <input id="mixConfigStartAge" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Age">
               <div class="mix-slider-wrapper">
-                <input id="mixConfigStartSlider" type="range" min="0" max="100" step="5">
                 <span class="mix-slider-label" id="mixConfigStartLabel"></span>
+                <input id="mixConfigStartSlider" type="range" min="0" max="100" step="5">
               </div>
             </div>
           </div>
@@ -1944,8 +1947,8 @@ class WebUI extends AbstractUI {
             <div class="mix-inline">
               <input id="mixConfigTargetAge" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="Age">
               <div class="mix-slider-wrapper">
-                <input id="mixConfigEndSlider" type="range" min="0" max="100" step="5">
                 <span class="mix-slider-label" id="mixConfigEndLabel"></span>
+                <input id="mixConfigEndSlider" type="range" min="0" max="100" step="5">
               </div>
             </div>
           </div>
@@ -1973,6 +1976,8 @@ class WebUI extends AbstractUI {
     const startLabel = modal.querySelector('#mixConfigStartLabel');
     const endLabel = modal.querySelector('#mixConfigEndLabel');
     const targetSection = modal.querySelector('.mix-target');
+    const chartContainer = modal.querySelector('.mix-chart-container');
+    const chartCanvas = modal.querySelector('#mixConfigChart');
 
     const closeModal = () => this._closeMixConfigModal();
     cancelBtn.addEventListener('click', closeModal);
@@ -1996,6 +2001,8 @@ class WebUI extends AbstractUI {
       startLabel: startLabel,
       endLabel: endLabel,
       targetSection: targetSection,
+      chartContainer: chartContainer,
+      chartCanvas: chartCanvas,
       asset1Dropdown: null,
       asset2Dropdown: null,
       asset1Value: '',
@@ -2133,13 +2140,129 @@ class WebUI extends AbstractUI {
       targetAgeOverridden: (targetAgeOverride === 'yes' || targetAgeOverride === 'true')
     };
 
+    // Forward declarations for circular dependencies
+    let updateChart;
+    let updateSliderLabels;
+
     const updateMode = () => {
       const glideOn = modal.tabGlide.classList.contains('mode-toggle-active');
       modal.targetSection.style.display = glideOn ? '' : 'none';
       modal.startAgeInput.style.display = glideOn ? '' : 'none';
+      modal.chartContainer.style.display = glideOn ? '' : 'none';
+      if (glideOn) updateChart();
     };
 
-    const updateSliderLabels = () => {
+    updateChart = () => {
+      if (!modal.tabGlide.classList.contains('mode-toggle-active')) return;
+      
+      const startAge = parseInt(modal.startAgeInput.value, 10) || 0;
+      const endAge = parseInt(modal.targetAgeInput.value, 10) || 0;
+      const simTargetAge = parseInt(this.getValue('TargetAge'), 10) || 100;
+      
+      const startVal = parseInt(modal.startSlider.value, 10);
+      const endVal = parseInt(modal.endSlider.value, 10);
+      const startPct1 = isNaN(startVal) ? 0 : startVal;
+      const endPct1 = isNaN(endVal) ? 0 : endVal;
+
+      const labels = [];
+      const data = [];
+      
+      // Calculate points for the chart
+      // 1. Current age (startingAge of sim)
+      const currentSimAge = parseInt(this.getValue(isP2Mix ? 'P2StartingAge' : 'StartingAge'), 10) || 0;
+      
+      // We want to show the range from currentSimAge to simTargetAge
+      const minAge = currentSimAge;
+      const maxAge = simTargetAge;
+      
+      if (minAge >= maxAge) return;
+
+      const getPctAtAge = (age) => {
+        if (age <= startAge) return startPct1;
+        if (age >= endAge) return endPct1;
+        if (startAge >= endAge) return startPct1;
+        const ratio = (age - startAge) / (endAge - startAge);
+        return startPct1 + ratio * (endPct1 - startPct1);
+      };
+
+      // Create a few data points for the line
+      const ages = [minAge];
+      if (startAge > minAge && startAge < maxAge) ages.push(startAge);
+      if (endAge > minAge && endAge < maxAge) ages.push(endAge);
+      ages.push(maxAge);
+      
+      // Remove duplicates and sort
+      const uniqueAges = [...new Set(ages)].sort((a, b) => a - b);
+      
+      const chartData = uniqueAges.map(age => ({ x: age, y: getPctAtAge(age) }));
+
+      if (modal.chart) {
+        modal.chart.data.datasets[0].data = chartData;
+        modal.chart.options.scales.x.min = minAge;
+        modal.chart.options.scales.x.max = maxAge;
+        // Update ticks to show relevant ages
+        modal.chart.options.scales.x.afterBuildTicks = (scale) => {
+          const ticks = [{ value: minAge }, { value: maxAge }];
+          if (startAge > minAge && startAge < maxAge) ticks.push({ value: startAge });
+          if (endAge > minAge && endAge < maxAge) ticks.push({ value: endAge });
+          scale.ticks = ticks.sort((a, b) => a.value - b.value);
+        };
+        modal.chart.update('none');
+      } else if (typeof Chart !== 'undefined') {
+        modal.chart = new Chart(modal.chartCanvas, {
+          type: 'line',
+          data: {
+            datasets: [{
+              data: chartData,
+              borderColor: '#3498db',
+              backgroundColor: 'rgba(52, 152, 219, 0.1)',
+              borderWidth: 2,
+              pointRadius: 3,
+              fill: true,
+              tension: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { enabled: false }
+            },
+            scales: {
+              x: {
+                type: 'linear',
+                min: minAge,
+                max: maxAge,
+                ticks: {
+                  maxTicksLimit: 4,
+                  stepSize: 1,
+                  font: { size: 10 },
+                  callback: (value) => Math.round(value)
+                },
+                afterBuildTicks: (scale) => {
+                  const ticks = [{ value: minAge }, { value: maxAge }];
+                  if (startAge > minAge && startAge < maxAge) ticks.push({ value: startAge });
+                  if (endAge > minAge && endAge < maxAge) ticks.push({ value: endAge });
+                  scale.ticks = ticks.sort((a, b) => a.value - b.value);
+                }
+              },
+              y: {
+                min: 0,
+                max: 100,
+                ticks: {
+                  stepSize: 50,
+                  font: { size: 10 },
+                  callback: (value) => value + '%'
+                }
+              }
+            }
+          }
+        });
+      }
+    };
+
+    updateSliderLabels = () => {
       const asset1Key = modal.asset1Value;
       const asset2Key = modal.asset2Value;
       const asset1Label = labelMap[asset1Key] || asset1Key || 'Asset1';
@@ -2150,7 +2273,11 @@ class WebUI extends AbstractUI {
       const endPct1 = isNaN(endVal) ? 0 : endVal;
       modal.startLabel.textContent = `${this._stripGlobalPrefix(asset1Label)}:${startPct1}% ${this._stripGlobalPrefix(asset2Label)}:${100 - startPct1}%`;
       modal.endLabel.textContent = `${this._stripGlobalPrefix(asset1Label)}:${endPct1}% ${this._stripGlobalPrefix(asset2Label)}:${100 - endPct1}%`;
+      updateChart();
     };
+
+    updateMode();
+    updateSliderLabels();
 
     modal.tabFixed.onclick = () => {
       modal.tabFixed.classList.add('mode-toggle-active');
@@ -2166,7 +2293,8 @@ class WebUI extends AbstractUI {
 
     modal.startSlider.oninput = updateSliderLabels;
     modal.endSlider.oninput = updateSliderLabels;
-    modal.targetAgeInput.oninput = () => { state.targetAgeOverridden = true; };
+    modal.startAgeInput.oninput = updateChart;
+    modal.targetAgeInput.oninput = () => { state.targetAgeOverridden = true; updateChart(); };
 
     modal.applyBtn.onclick = () => {
       const isGlideMode = modal.tabGlide.classList.contains('mode-toggle-active');
