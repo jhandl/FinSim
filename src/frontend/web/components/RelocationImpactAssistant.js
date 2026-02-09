@@ -147,6 +147,7 @@ var RelocationImpactAssistant = {
         const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
         const originCountryCode = originCountry ? originCountry.toUpperCase() : '';
         addAction(actions, { action: 'keep_property', tabLabel: 'Keep Property', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Keep the property and associated mortgage. We will link both to ' + originCountryCode + ' and keep values in ' + originCurrency + '.</p></div>' });
+        addAction(actions, { action: 'rent_out', tabLabel: 'Rent Out', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Keep the property and start renting it out. We will create a Rental Income event starting at the relocation age.</p></div>' });
         addAction(actions, { action: 'sell_property', tabLabel: 'Sell Property', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Sell the property at the relocation boundary and stop the associated mortgage payments from that age.</p></div>' });
       } else {
         const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originCountry, destCountry));
@@ -348,6 +349,10 @@ var RelocationImpactAssistant = {
       }
       case 'keep_property': {
         try { this._keepProperty(event, payload, env); } catch (_) { }
+        break;
+      }
+      case 'rent_out': {
+        try { this._rentOutProperty(event, payload, env); } catch (_) { }
         break;
       }
       case 'sell_property': {
@@ -682,6 +687,32 @@ var RelocationImpactAssistant = {
       }
       RelocationImpactAssistant._refreshImpacts();
     } catch (e) { try { console.error('Error in _sellProperty:', e); } catch (_) { } }
+  },
+
+  _rentOutProperty: function (event, payload, env) {
+    try {
+      this._keepProperty(event, payload, env);
+
+      var webUI = (env && env.webUI) ? env.webUI : (typeof WebUI !== 'undefined' ? WebUI.getInstance() : null);
+      var etm = (env && env.eventsTableManager) ? env.eventsTableManager : (webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null);
+      if (!etm) return;
+
+      var events = (webUI && typeof webUI.readEvents === 'function') ? webUI.readEvents(false) : [];
+      var mv = events.find(function (e) { return e && e.id === (event.relocationImpact && event.relocationImpact.mvEventId); });
+      var relocationAge = mv ? mv.fromAge : null;
+
+      if (relocationAge && typeof etm.addEventFromWizardWithSorting === 'function') {
+        etm.addEventFromWizardWithSorting({
+          eventType: 'RI',
+          name: event.id,
+          amount: '',
+          fromAge: relocationAge,
+          toAge: event.toAge
+        });
+      }
+
+      RelocationImpactAssistant._refreshImpacts();
+    } catch (e) { try { console.error('Error in _rentOutProperty:', e); } catch (_) { } }
   },
 
   _refreshImpacts: function () {

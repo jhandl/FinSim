@@ -506,16 +506,23 @@ main() {
         if [ "$TEST_TYPE" == "all" ] || [ "$TEST_TYPE" == "jest" ]; then
             cd "$ROOT_DIR"
 
-            # Run Jest with JSON output to capture pass/fail counts
-            TEMP_JSON=$(mktemp)
-            if JEST_OUTPUT=$(npx jest --runInBand --json --outputFile "$TEMP_JSON" 2>&1); then
-                echo -e "✅ PASSED: JestUITests"
-                ((passed++))
-            else
-                echo "$JEST_OUTPUT"
-                echo -e "❌ FAILED: JestUITests"
-                ((failed++))
-                failed_tests+=("JestUITests")
+            local jest_files=($(find "$TESTS_DIR" -maxdepth 1 -name "*.test.js" -type f | sort))
+            
+            if [ ${#jest_files[@]} -gt 0 ]; then
+                for test_file in "${jest_files[@]}"; do
+                    local test_name=$(basename "$test_file" .test.js)
+                    
+                    # Run individual Jest test
+                    if JEST_OUTPUT=$(npx jest --runInBand "$test_file" 2>&1); then
+                        echo -e "✅ PASSED: $test_name"
+                        ((passed++))
+                    else
+                        echo "$JEST_OUTPUT"
+                        echo -e "❌ FAILED: $test_name"
+                        ((failed++))
+                        failed_tests+=("$test_name")
+                    fi
+                done
             fi
         fi
 
