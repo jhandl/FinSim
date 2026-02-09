@@ -1674,6 +1674,13 @@ class EventsTableManager {
     const part2Amount = (typeof part2AmountNum === 'number') ? String(part2AmountNum) : '';
     const destRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
     const destCurrency = destRuleSet ? destRuleSet.getCurrencyCode() : 'EUR';
+
+    let part2EventType = event.type;
+    if (destRuleSet && typeof destRuleSet.hasPrivatePensions === 'function' && !destRuleSet.hasPrivatePensions()) {
+      if (event.type === 'SI') part2EventType = 'SInp';
+      else if (event.type === 'SI2') part2EventType = 'SI2np';
+    }
+
     const linkedEventId = 'split_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     // Prefer parsing the original row's displayed amount using the origin country's locale
     const originalAmountRaw = (row.querySelector && row.querySelector('.event-amount') ? row.querySelector('.event-amount').value : (event && event.amount));
@@ -1700,7 +1707,7 @@ class EventsTableManager {
     const part1Row = this.createEventRow(event.type, event.id, part1Amount, event.fromAge, relocationAge, rateForInput, matchForInput);
     this.getOrCreateHiddenInput(part1Row, 'event-linked-event-id', linkedEventId);
     if (fromCountryHint) this.getOrCreateHiddenInput(part1Row, 'event-country', String(fromCountryHint).toLowerCase());
-    const part2Row = this.createEventRow(event.type, event.id, part2Amount, relocationAge, event.toAge, rateForInput, matchForInput);
+    const part2Row = this.createEventRow(part2EventType, event.id, part2Amount, relocationAge, event.toAge, rateForInput, matchForInput);
     this.getOrCreateHiddenInput(part2Row, 'event-linked-event-id', linkedEventId);
     this.getOrCreateHiddenInput(part2Row, 'event-currency', destCurrency);
     if (toCountryHint) this.getOrCreateHiddenInput(part2Row, 'event-country', String(toCountryHint).toLowerCase());
