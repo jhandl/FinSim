@@ -3881,6 +3881,9 @@ class WebUI extends AbstractUI {
       label.textContent = 'Current Country';
       wrapper.appendChild(label);
 
+      const availableCountries = config.getAvailableCountries();
+      const options = availableCountries.map(c => ({ value: c.code, label: c.name }));
+
       // Create hidden input
       const hiddenInput = document.createElement('input');
       hiddenInput.type = 'hidden';
@@ -3891,7 +3894,13 @@ class WebUI extends AbstractUI {
       // without being treated as a user edit.
       // IMPORTANT: do NOT call config.getStartCountry() here because StartCountry doesn't exist yet
       // and getStartCountry() reads it when relocation is enabled.
-      hiddenInput.value = config.getDefaultCountry();
+      let initialCountry = config.getDefaultCountry();
+      const cachedGeo = localStorage.getItem('geoCountry');
+      if (cachedGeo) {
+        const cachedMatch = options.find(o => String(o.value).trim().toLowerCase() === String(cachedGeo).trim().toLowerCase());
+        if (cachedMatch) initialCountry = cachedMatch.value;
+      }
+      hiddenInput.value = initialCountry;
       hiddenInput.dataset.auto = '1';
       wrapper.appendChild(hiddenInput);
       hiddenInput.addEventListener('change', async () => {
@@ -3925,10 +3934,6 @@ class WebUI extends AbstractUI {
       } else {
         inputGroup.appendChild(wrapper);
       }
-
-      // Populate options
-      const availableCountries = config.getAvailableCountries();
-      const options = availableCountries.map(c => ({ value: c.code, label: c.name }));
 
       this.startCountryDropdown = DropdownUtils.create({
         toggleEl: toggleSpan,
@@ -3972,16 +3977,17 @@ class WebUI extends AbstractUI {
       this.ensureParameterInput('StartCountry', 'string');
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const response = await fetch('https://ipapi.co/country/', { signal: controller.signal });
+      const { country } = await fetch("https://finsim.ie/_geo", { signal: controller.signal }).then(r => r.json());
       clearTimeout(timeoutId);
-      const countryRaw = (await response.text());
-      const country = typeof countryRaw === 'string' ? countryRaw.trim().toLowerCase() : '';
       if (!country) return;
+      const countryCode = String(country).trim().toLowerCase();
+      console.log('country', countryCode);
+      localStorage.setItem('geoCountry', countryCode);
       const config = Config.getInstance();
       const available = config.getAvailableCountries();
       const match = available.find(function (c) {
         var code = (c && c.code != null) ? String(c.code) : '';
-        return code.trim().toLowerCase() === country;
+        return code.trim().toLowerCase() === countryCode;
       });
       if (match) {
         const from = this.getValue('StartCountry');
