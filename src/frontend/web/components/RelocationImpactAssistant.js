@@ -119,7 +119,7 @@ var RelocationImpactAssistant = {
       }
     }
     const startCountry = Config.getInstance().getStartCountry();
-    if (!mvEvent && impactCategory !== 'split_orphan') return '';
+    if (!mvEvent && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift') return '';
     const destCountry = mvEvent ? mvEvent.type.substring(3).toLowerCase() : startCountry;
     const originCountry = mvEvent && (env && env.eventsTableManager && typeof env.eventsTableManager.getOriginCountry === 'function') ? env.eventsTableManager.getOriginCountry(mvEvent, startCountry) : startCountry;
     const relocationAge = mvEvent ? mvEvent.fromAge : null;
@@ -259,6 +259,56 @@ var RelocationImpactAssistant = {
         addAction(actions, { action: 'peg', tabLabel: 'Keep Original Currency', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion to ' + (destCurrencyCode || destCurrency || 'the destination currency') + ' will occur.</p></div>' });
         addAction(actions, { action: 'review', tabLabel: 'Mark As Reviewed', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply records this relocation impact as reviewed without changing the amount or currency.</p></div>' });
       }
+    } else if (event.relocationImpact.category === 'split_relocation_shift') {
+      let splitShiftDetails = event.relocationImpact.details;
+      if (typeof splitShiftDetails === 'string') {
+        try { splitShiftDetails = JSON.parse(splitShiftDetails); } catch (_) { splitShiftDetails = null; }
+      }
+      const relocationAgeFromDetails = splitShiftDetails && splitShiftDetails.relocationAge != null ? Number(splitShiftDetails.relocationAge) : NaN;
+      const relocationAgeResolved = !isNaN(relocationAgeFromDetails) ? relocationAgeFromDetails : Number(relocationAge);
+      const relocationAgeLabel = !isNaN(relocationAgeResolved) ? relocationAgeResolved : relocationAge;
+      const expectedPart1ToAge = !isNaN(relocationAgeResolved) ? (relocationAgeResolved - 1) : '';
+      addAction(actions, {
+        action: 'adapt_split_to_move',
+        tabLabel: 'Adapt Split Age',
+        buttonLabel: 'Apply',
+        buttonClass: 'event-wizard-button resolution-apply',
+        buttonAttrs: ' data-row-id="' + rowId + '"',
+        bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Adjust this split to the new relocation age (' + relocationAgeLabel + ').</p><p class="micro-note">Apply updates Part 1 to end at age ' + expectedPart1ToAge + ' and Part 2 to start at age ' + relocationAgeLabel + '.</p></div>'
+      });
+      addAction(actions, {
+        action: 'keep_split_as_is',
+        tabLabel: 'Leave As Is',
+        buttonLabel: 'Apply',
+        buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
+        buttonAttrs: ' data-row-id="' + rowId + '"',
+        bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Keep both halves at their current ages. The split remains linked and will be marked as reviewed.</p></div>'
+      });
+    } else if (event.relocationImpact.category === 'sale_relocation_shift') {
+      let saleShiftDetails = event.relocationImpact.details;
+      if (typeof saleShiftDetails === 'string') {
+        try { saleShiftDetails = JSON.parse(saleShiftDetails); } catch (_) { saleShiftDetails = null; }
+      }
+      const relocationAgeFromDetails = saleShiftDetails && saleShiftDetails.relocationAge != null ? Number(saleShiftDetails.relocationAge) : NaN;
+      const relocationAgeResolved = !isNaN(relocationAgeFromDetails) ? relocationAgeFromDetails : Number(relocationAge);
+      const expectedToAge = !isNaN(relocationAgeResolved) ? (relocationAgeResolved - 1) : '';
+      const currentToAge = saleShiftDetails && saleShiftDetails.currentToAge != null ? saleShiftDetails.currentToAge : event.toAge;
+      addAction(actions, {
+        action: 'adapt_sale_to_move',
+        tabLabel: 'Adapt Sale Age',
+        buttonLabel: 'Apply',
+        buttonClass: 'event-wizard-button resolution-apply',
+        buttonAttrs: ' data-row-id="' + rowId + '"',
+        bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">This property sale is currently set to age ' + currentToAge + '.</p><p class="micro-note">Apply aligns the sale with relocation by setting To Age to ' + expectedToAge + '.</p></div>'
+      });
+      addAction(actions, {
+        action: 'keep_sale_as_is',
+        tabLabel: 'Leave As Is',
+        buttonLabel: 'Apply',
+        buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
+        buttonAttrs: ' data-row-id="' + rowId + '"',
+        bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Keep the current sale timing and mark this impact as reviewed.</p></div>'
+      });
     } else if (event.relocationImpact.category === 'split_orphan') {
       let splitDetails = event.relocationImpact.details;
       if (typeof splitDetails === 'string') {
@@ -388,6 +438,22 @@ var RelocationImpactAssistant = {
       }
       case 'join_split': {
         if (typeof etm.joinSplitEvents === 'function') etm.joinSplitEvents(rowId, eventId);
+        break;
+      }
+      case 'adapt_split_to_move': {
+        if (typeof etm.adaptSplitToRelocationAge === 'function') etm.adaptSplitToRelocationAge(rowId, eventId);
+        break;
+      }
+      case 'keep_split_as_is': {
+        if (typeof etm.keepSplitAsIs === 'function') etm.keepSplitAsIs(rowId, eventId);
+        break;
+      }
+      case 'adapt_sale_to_move': {
+        if (typeof etm.adaptSaleToRelocationAge === 'function') etm.adaptSaleToRelocationAge(rowId, eventId);
+        break;
+      }
+      case 'keep_sale_as_is': {
+        if (typeof etm.keepSaleAsIs === 'function') etm.keepSaleAsIs(rowId, eventId);
         break;
       }
       case 'keep_property': {
@@ -680,6 +746,7 @@ var RelocationImpactAssistant = {
 
     etm._applyToRealEstatePair(baseRow, function (row) {
       if (typeof etm._removeHiddenInput === 'function') etm._removeHiddenInput(row, 'event-relocation-sell-mv-id');
+      if (typeof etm._removeHiddenInput === 'function') etm._removeHiddenInput(row, 'event-relocation-sell-anchor-age');
       etm.getOrCreateHiddenInput(row, 'event-linked-country', origin);
       if (originCurrency) etm.getOrCreateHiddenInput(row, 'event-currency', originCurrency);
     });
@@ -726,6 +793,7 @@ var RelocationImpactAssistant = {
     etm._applyToRealEstatePair(baseRow, function (row) {
       setToAgeGuarded(row, cutoffAge);
       if (sellMarkerId) etm.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', sellMarkerId);
+      etm.getOrCreateHiddenInput(row, 'event-relocation-sell-anchor-age', String(relocationAge));
     });
     etm._suppressSellMarkerClear = previousSuppress;
     this._refreshImpacts(env);

@@ -255,6 +255,104 @@ module.exports = {
         assert(p2Impact && p2Impact.category === 'split_orphan', 'Part 2 should be flagged when relocation no longer aligns with split');
       });
 
+      // Test 8e: Relocation-linked split should be flagged for age-shift adaptation.
+      runTest('8e', function () {
+        const mv = makeEvent({ id: 'mv_split_linked', type: 'MV-bb', fromAge: 50, toAge: 50, relocationLinkId: 'mvlink_split_1' });
+        const part1 = makeEvent({
+          id: 'salary_split_linked_p1',
+          type: 'SI',
+          fromAge: 30,
+          toAge: 35,
+          linkedEventId: 'split_linked_1',
+          relocationSplitMvId: 'mvlink_split_1',
+          relocationSplitAnchorAge: 35,
+          currency: 'AAA'
+        });
+        const part2 = makeEvent({
+          id: 'salary_split_linked_p2',
+          type: 'SI',
+          fromAge: 35,
+          toAge: 40,
+          linkedEventId: 'split_linked_1',
+          relocationSplitMvId: 'mvlink_split_1',
+          relocationSplitAnchorAge: 35,
+          currency: 'BBB'
+        });
+        const result = runDetector([part1, part2, mv], 'aa');
+        const p1Impact = result.find(e => e.id === 'salary_split_linked_p1').relocationImpact;
+        const p2Impact = result.find(e => e.id === 'salary_split_linked_p2').relocationImpact;
+        assert(p1Impact && p1Impact.category === 'split_relocation_shift', 'Part 1 should be flagged for relocation-linked split age shift');
+        assert(p2Impact && p2Impact.category === 'split_relocation_shift', 'Part 2 should be flagged for relocation-linked split age shift');
+        assert.strictEqual(p1Impact.mvEventId, 'mv_split_linked', 'Split shift impact should point to linked relocation');
+      });
+
+      // Test 8f: Relocation-linked sold property should be flagged for age-shift adaptation.
+      runTest('8f', function () {
+        const mv = makeEvent({ id: 'mv_sale_linked', type: 'MV-bb', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_sale_1' });
+        const property = makeEvent({
+          id: 'sale_home',
+          type: 'R',
+          fromAge: 30,
+          toAge: 39,
+          relocationSellMvId: 'mvlink_sale_1',
+          relocationSellAnchorAge: 40
+        });
+        const mortgage = makeEvent({
+          id: 'sale_home',
+          type: 'M',
+          fromAge: 30,
+          toAge: 39,
+          relocationSellMvId: 'mvlink_sale_1',
+          relocationSellAnchorAge: 40
+        });
+        const result = runDetector([property, mortgage, mv], 'aa');
+        const rImpact = result.find(e => e.type === 'R').relocationImpact;
+        const mImpact = result.find(e => e.type === 'M').relocationImpact;
+        assert(rImpact && rImpact.category === 'sale_relocation_shift', 'Property should be flagged for relocation-linked sale age shift');
+        assert(mImpact && mImpact.category === 'sale_relocation_shift', 'Mortgage should be flagged for relocation-linked sale age shift');
+      });
+
+      // Test 8g: Relocation-linked sold property aligned to relocation age remains resolved.
+      runTest('8g', function () {
+        const mv = makeEvent({ id: 'mv_sale_aligned', type: 'MV-bb', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_sale_2' });
+        const property = makeEvent({
+          id: 'sale_home_aligned',
+          type: 'R',
+          fromAge: 30,
+          toAge: 44,
+          relocationSellMvId: 'mvlink_sale_2',
+          relocationSellAnchorAge: 45
+        });
+        const result = runDetector([property, mv], 'aa');
+        assert(!result.find(e => e.id === 'sale_home_aligned').relocationImpact, 'Aligned sold property should not be re-flagged');
+      });
+
+      // Test 8h: Manual split-half age edits should not trigger relocation-age-shift impact.
+      runTest('8h', function () {
+        const mv = makeEvent({ id: 'mv_split_manual', type: 'MV-bb', fromAge: 40, toAge: 40, relocationLinkId: 'mvlink_split_manual_1' });
+        const part1 = makeEvent({
+          id: 'salary_split_manual_p1',
+          type: 'SI',
+          fromAge: 30,
+          toAge: 36,
+          linkedEventId: 'split_manual_keep_1',
+          relocationSplitMvId: 'mvlink_split_manual_1',
+          relocationSplitAnchorAge: 40
+        });
+        const part2 = makeEvent({
+          id: 'salary_split_manual_p2',
+          type: 'SInp',
+          fromAge: 42,
+          toAge: 50,
+          linkedEventId: 'split_manual_keep_1',
+          relocationSplitMvId: 'mvlink_split_manual_1',
+          relocationSplitAnchorAge: 40
+        });
+        const result = runDetector([part1, part2, mv], 'aa');
+        assert(!result.find(e => e.id === 'salary_split_manual_p1').relocationImpact, 'Part 1 manual age edits should not trigger relocation-age-shift impact');
+        assert(!result.find(e => e.id === 'salary_split_manual_p2').relocationImpact, 'Part 2 manual age edits should not trigger relocation-age-shift impact');
+      });
+
       // Test 9: Resolution detection via property linking.
       runTest('9', function () {
         const mv = makeEvent({ id: 'mv_prop_res', type: 'MV-bb', fromAge: 35, toAge: 35 });

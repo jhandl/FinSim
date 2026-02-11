@@ -548,7 +548,7 @@ describe('Relocation Split No Pension', () => {
     expect(remaining.querySelector('.event-linked-event-id')).toBeNull();
   });
 
-  test('manual age edits unlink split linkage for non-real-estate events', () => {
+  test('manual age edits keep split linkage for non-real-estate events', () => {
     document.body.innerHTML = `
       <table id="Events">
         <tbody>
@@ -590,11 +590,11 @@ describe('Relocation Split No Pension', () => {
     secondFromAge.value = '36';
     secondFromAge.dispatchEvent(new Event('change', { bubbles: true }));
 
-    expect(document.querySelector('tr[data-row-id="row-1"] .event-linked-event-id')).toBeNull();
-    expect(document.querySelector('tr[data-row-id="row-2"] .event-linked-event-id')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-1"] .event-linked-event-id').value).toBe('split_manual_1');
+    expect(document.querySelector('tr[data-row-id="row-2"] .event-linked-event-id').value).toBe('split_manual_1');
   });
 
-  test('changing relocation age auto-adjusts split halves', () => {
+  test('changing relocation age no longer auto-adjusts split halves', () => {
     document.body.innerHTML = `
       <table id="Events">
         <tbody>
@@ -643,7 +643,82 @@ describe('Relocation Split No Pension', () => {
     mvFromAge.value = '37';
     mvFromAge.dispatchEvent(new Event('change', { bubbles: true }));
 
-    expect(document.querySelector('tr[data-row-id="row-1"] .event-to-age').value).toBe('36');
-    expect(document.querySelector('tr[data-row-id="row-2"] .event-from-age').value).toBe('37');
+    expect(document.querySelector('tr[data-row-id="row-1"] .event-to-age').value).toBe('34');
+    expect(document.querySelector('tr[data-row-id="row-2"] .event-from-age').value).toBe('35');
+    expect(document.querySelector('tr[data-row-id="row-1"] .event-linked-event-id').value).toBe('split_manual_2');
+    expect(document.querySelector('tr[data-row-id="row-2"] .event-linked-event-id').value).toBe('split_manual_2');
+  });
+
+  test('adapt split preserves post-relocation start-age delta after relocation move', () => {
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-mv" data-event-id="mv-runtime-delta">
+            <td><div class="event-type-container"><input class="event-type" value="MV-us"></div></td>
+            <td><input class="event-name" value="Relocation"></td>
+            <td><input class="event-from-age" value="40"></td>
+            <td><input class="event-to-age" value="40"></td>
+            <td><input class="event-relocation-link-id" value="mvlink_delta_1"></td>
+          </tr>
+          <tr data-row-id="row-1">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-from-age" value="30"></td>
+            <td><input class="event-to-age" value="39"></td>
+            <td><input class="event-linked-event-id" value="split_delta_1"></td>
+            <td><input class="event-relocation-split-mv-id" value="mvlink_delta_1"></td>
+          </tr>
+          <tr data-row-id="row-2">
+            <td><div class="event-type-container"><input class="event-type" value="SInp"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-from-age" value="42"></td>
+            <td><input class="event-to-age" value="60"></td>
+            <td><input class="event-linked-event-id" value="split_delta_1"></td>
+            <td><input class="event-relocation-split-mv-id" value="mvlink_delta_1"></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    constructorNoops.filter((method) => method !== 'setupEventTypeChangeHandler').forEach((method) => {
+      jest.spyOn(EventsTableManager.prototype, method).mockImplementation(() => {});
+    });
+    jest.spyOn(EventsTableManager.prototype, '_scheduleRelocationReanalysis').mockImplementation(() => {});
+
+    const events = [
+      { id: 'Relocation', type: 'MV-us', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_delta_1', _mvRuntimeId: 'mv-runtime-delta' },
+      { id: 'Job', type: 'SI', fromAge: 30, toAge: 39, linkedEventId: 'split_delta_1', relocationSplitMvId: 'mvlink_delta_1' },
+      {
+        id: 'Job',
+        type: 'SInp',
+        fromAge: 42,
+        toAge: 60,
+        linkedEventId: 'split_delta_1',
+        relocationSplitMvId: 'mvlink_delta_1',
+        relocationImpact: { category: 'split_relocation_shift', mvEventId: 'Relocation' }
+      }
+    ];
+
+    const webUIStub = {
+      readEvents: jest.fn(() => events),
+      getValue: jest.fn(() => 'single'),
+      formatUtils: {
+        setupCurrencyInputs: jest.fn(),
+        setupPercentageInputs: jest.fn()
+      }
+    };
+
+    const manager = new EventsTableManager(webUIStub);
+    manager._mvAgesByRowId['row-mv'] = 40;
+    jest.spyOn(manager, '_afterResolutionAction').mockImplementation(() => {});
+
+    const mvFromAge = document.querySelector('tr[data-row-id="row-mv"] .event-from-age');
+    mvFromAge.value = '45';
+    mvFromAge.dispatchEvent(new Event('change', { bubbles: true }));
+
+    manager.adaptSplitToRelocationAge('row-2');
+
+    expect(document.querySelector('tr[data-row-id="row-1"] .event-to-age').value).toBe('44');
+    expect(document.querySelector('tr[data-row-id="row-2"] .event-from-age').value).toBe('47');
   });
 });

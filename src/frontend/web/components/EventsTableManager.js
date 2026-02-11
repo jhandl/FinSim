@@ -10,6 +10,7 @@ class EventsTableManager {
     this._detectorTimeout = null; // For debouncing detector calls
     this._lastDetectorRun = 0; // Timestamp of last detector run (for throttling)
     this._mvAgesByRowId = {};
+    this._mvAgeShiftByMarkerId = {};
     this.setupAddEventButton();
     this.setupEventTableRowDelete();
     this.setupEventTypeChangeHandler();
@@ -392,14 +393,14 @@ class EventsTableManager {
             const cachedOldAge = Number(rowKey ? this._mvAgesByRowId[rowKey] : NaN);
             const focusedOldAge = Number(e.target.dataset ? e.target.dataset.mvPrevAge : NaN);
             const newAge = Number(e.target.value);
-            const markerIds = this._getRelocationMarkerIdsForRow(row);
             const oldAge = !isNaN(focusedOldAge) ? focusedOldAge : cachedOldAge;
             if (!isNaN(oldAge) && !isNaN(newAge) && oldAge !== newAge) {
-              this._syncSplitChainsForRelocationAgeShift(oldAge, newAge);
+              this._recordRelocationAgeShiftForRow(row, oldAge, newAge);
             }
-            this._syncSoldRealEstateForRelocationAgeShift(newAge, markerIds);
             if (rowKey && !isNaN(newAge)) this._mvAgesByRowId[rowKey] = newAge;
             if (!isNaN(newAge) && e.target.dataset) e.target.dataset.mvPrevAge = String(newAge);
+            // No auto-adjustment when relocation age changes.
+            // Split/sold events are flagged for explicit resolution.
           }
         }
 
@@ -410,18 +411,10 @@ class EventsTableManager {
           if ((typeValue === 'R' || typeValue === 'M') && !this._suppressSellMarkerClear) {
             this._applyToRealEstatePair(row, (pairRow) => {
               this._removeHiddenInput(pairRow, 'event-relocation-sell-mv-id');
+              this._removeHiddenInput(pairRow, 'event-relocation-sell-anchor-age');
             });
           }
         }
-        if (e.target.classList.contains('event-from-age') || e.target.classList.contains('event-to-age')) {
-          const row = e.target.closest('tr');
-          const typeInput = row ? row.querySelector('.event-type') : null;
-          const typeValue = typeInput ? typeInput.value : '';
-          if (!typeValue || typeValue.indexOf('MV-') !== 0) {
-            this._clearLinkedSplitMarker(row);
-          }
-        }
-
         // Always re-analyze on any change to table inputs
         this._scheduleRelocationReanalysis();
 
@@ -545,6 +538,43 @@ class EventsTableManager {
       const rowKey = row && row.dataset ? (row.dataset.rowId || row.dataset.eventId || '') : '';
       if (!rowKey) continue;
       this._mvAgesByRowId[rowKey] = fromAge;
+    }
+  }
+
+  _recordRelocationAgeShiftForRow(row, oldAge, newAge) {
+    if (!row) return;
+    if (isNaN(oldAge) || isNaN(newAge) || oldAge === newAge) return;
+    const delta = newAge - oldAge;
+    if (!delta) return;
+    const markerIds = this._getRelocationMarkerIdsForRow(row);
+    for (let i = 0; i < markerIds.length; i++) {
+      const key = String(markerIds[i] || '');
+      if (!key) continue;
+      const prev = Number(this._mvAgeShiftByMarkerId[key] || 0);
+      this._mvAgeShiftByMarkerId[key] = prev + delta;
+    }
+  }
+
+  _consumeRelocationAgeShift(markerIds) {
+    if (!markerIds || !markerIds.length) return null;
+    let foundValue = null;
+    for (let i = 0; i < markerIds.length; i++) {
+      const key = String(markerIds[i] || '');
+      if (!key) continue;
+      if (this._mvAgeShiftByMarkerId[key] === undefined) continue;
+      const value = Number(this._mvAgeShiftByMarkerId[key]);
+      if (foundValue === null && !isNaN(value)) foundValue = value;
+      delete this._mvAgeShiftByMarkerId[key];
+    }
+    return foundValue;
+  }
+
+  _clearRelocationAgeShift(markerIds) {
+    if (!markerIds || !markerIds.length) return;
+    for (let i = 0; i < markerIds.length; i++) {
+      const key = String(markerIds[i] || '');
+      if (!key) continue;
+      delete this._mvAgeShiftByMarkerId[key];
     }
   }
 
@@ -1391,10 +1421,12 @@ class EventsTableManager {
     const part1Row = this.createEventRow(event.type, event.id, part1Amount, event.fromAge, part1ToAge, rateForInput, matchForInput);
     this.getOrCreateHiddenInput(part1Row, 'event-linked-event-id', linkedEventId);
     if (splitMvId) this.getOrCreateHiddenInput(part1Row, 'event-relocation-split-mv-id', splitMvId);
+    if (!isNaN(relocationAgeNum)) this.getOrCreateHiddenInput(part1Row, 'event-relocation-split-anchor-age', String(relocationAgeNum));
     if (fromCountryHint) this.getOrCreateHiddenInput(part1Row, 'event-country', String(fromCountryHint).toLowerCase());
     const part2Row = this.createEventRow(part2EventType, event.id, part2Amount, relocationAge, event.toAge, rateForInput, matchForInput);
     this.getOrCreateHiddenInput(part2Row, 'event-linked-event-id', linkedEventId);
     if (splitMvId) this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-mv-id', splitMvId);
+    if (!isNaN(relocationAgeNum)) this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-age', String(relocationAgeNum));
     this.getOrCreateHiddenInput(part2Row, 'event-currency', destCurrency);
     if (toCountryHint) this.getOrCreateHiddenInput(part2Row, 'event-country', String(toCountryHint).toLowerCase());
 
@@ -1564,6 +1596,203 @@ class EventsTableManager {
 
     const mergedRowId = mergedRow && mergedRow.dataset ? mergedRow.dataset.rowId : resolvedRowId;
     this._afterResolutionAction(mergedRowId);
+  }
+
+  _findRelocationEventForImpactedRow(row) {
+    if (!row) return null;
+    const tableRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
+    const rowIndex = tableRows.indexOf(row);
+    if (rowIndex === -1) return null;
+    const events = this.webUI.readEvents(false) || [];
+    const event = events[rowIndex];
+    if (!event || !event.relocationImpact || !event.relocationImpact.mvEventId) return null;
+    const mvImpactId = event.relocationImpact.mvEventId;
+    const mvEvent = events.find(e => e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId || e.relocationLinkId === mvImpactId));
+    if (!mvEvent) return null;
+    return { events: events, event: event, mvEvent: mvEvent, mvImpactId: mvImpactId };
+  }
+
+  adaptSplitToRelocationAge(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
+    const linkedEventIdInput = row.querySelector('.event-linked-event-id');
+    const linkedEventId = linkedEventIdInput ? linkedEventIdInput.value : '';
+    if (!linkedEventId) return;
+
+    const impacted = this._findRelocationEventForImpactedRow(row);
+    if (!impacted || !impacted.mvEvent) return;
+    const relocationAge = Number(impacted.mvEvent.fromAge);
+    if (isNaN(relocationAge)) return;
+    const splitMarkerInput = row.querySelector('.event-relocation-split-mv-id');
+    const splitMarkerId = splitMarkerInput ? String(splitMarkerInput.value || '') : '';
+    const markerCandidates = [];
+    if (splitMarkerId) markerCandidates.push(splitMarkerId);
+    if (impacted.mvImpactId) markerCandidates.push(String(impacted.mvImpactId));
+    if (impacted.mvEvent && impacted.mvEvent.relocationLinkId) markerCandidates.push(String(impacted.mvEvent.relocationLinkId));
+    const fallbackLinkId = this._getRelocationLinkIdByImpactId(impacted.mvImpactId);
+    if (fallbackLinkId) markerCandidates.push(String(fallbackLinkId));
+    const ageShift = this._consumeRelocationAgeShift(Array.from(new Set(markerCandidates)));
+
+    const allRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    const splitRows = allRows.filter(r => {
+      const idInput = r.querySelector('.event-linked-event-id');
+      return idInput && idInput.value === linkedEventId;
+    });
+    if (splitRows.length < 2) return;
+
+    splitRows.sort((a, b) => {
+      const aFrom = Number(a.querySelector('.event-from-age') ? a.querySelector('.event-from-age').value : '');
+      const bFrom = Number(b.querySelector('.event-from-age') ? b.querySelector('.event-from-age').value : '');
+      if (aFrom !== bFrom) return aFrom - bFrom;
+      const aTo = Number(a.querySelector('.event-to-age') ? a.querySelector('.event-to-age').value : '');
+      const bTo = Number(b.querySelector('.event-to-age') ? b.querySelector('.event-to-age').value : '');
+      return aTo - bTo;
+    });
+
+    const firstRow = splitRows[0];
+    const secondRow = splitRows[1];
+    const firstFromInput = firstRow.querySelector('.event-from-age');
+    const firstToInput = firstRow.querySelector('.event-to-age');
+    const secondFromInput = secondRow.querySelector('.event-from-age');
+    const secondToInput = secondRow.querySelector('.event-to-age');
+    if (!firstFromInput || !firstToInput || !secondFromInput || !secondToInput) return;
+
+    const firstFrom = Number(firstFromInput.value);
+    const firstTo = Number(firstToInput.value);
+    const secondFrom = Number(secondFromInput.value);
+    const secondTo = Number(secondToInput.value);
+    if (isNaN(firstFrom) || isNaN(firstTo) || isNaN(secondFrom) || isNaN(secondTo)) return;
+    let nextPart1To;
+    let nextPart2From;
+    if (ageShift !== null && !isNaN(Number(ageShift))) {
+      const shift = Number(ageShift);
+      nextPart1To = firstTo + shift;
+      nextPart2From = secondFrom + shift;
+    } else {
+      const isOverlappingBoundary = (firstTo === secondFrom);
+      nextPart1To = isOverlappingBoundary ? relocationAge : (relocationAge - 1);
+      nextPart2From = relocationAge;
+    }
+
+    // Relocation moved before the split range: keep destination-side row only.
+    if (nextPart1To < firstFrom) {
+      secondFromInput.value = String(firstFrom);
+      this._removeHiddenInput(secondRow, 'event-linked-event-id');
+      this._removeHiddenInput(secondRow, 'event-relocation-split-mv-id');
+      this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-age');
+      this._removeHiddenInput(secondRow, 'event-resolution-override');
+      this._removeRowAndResolutionPanel(firstRow);
+      this._afterResolutionAction(resolvedRowId);
+      return;
+    }
+
+    // Relocation moved after the split range: keep origin-side row only.
+    if (nextPart2From > secondTo) {
+      firstToInput.value = String(secondTo);
+      this._removeHiddenInput(firstRow, 'event-linked-event-id');
+      this._removeHiddenInput(firstRow, 'event-relocation-split-mv-id');
+      this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-age');
+      this._removeHiddenInput(firstRow, 'event-resolution-override');
+      this._removeRowAndResolutionPanel(secondRow);
+      this._afterResolutionAction(resolvedRowId);
+      return;
+    }
+
+    firstToInput.value = String(nextPart1To);
+    secondFromInput.value = String(nextPart2From);
+    this.getOrCreateHiddenInput(firstRow, 'event-relocation-split-anchor-age', String(relocationAge));
+    this.getOrCreateHiddenInput(secondRow, 'event-relocation-split-anchor-age', String(relocationAge));
+    this._removeHiddenInput(firstRow, 'event-resolution-override');
+    this._removeHiddenInput(secondRow, 'event-resolution-override');
+    this._afterResolutionAction(resolvedRowId);
+  }
+
+  keepSplitAsIs(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
+    const linkedEventIdInput = row.querySelector('.event-linked-event-id');
+    const linkedEventId = linkedEventIdInput ? linkedEventIdInput.value : '';
+    if (!linkedEventId) return;
+    const impacted = this._findRelocationEventForImpactedRow(row);
+    const splitMarkerInput = row.querySelector('.event-relocation-split-mv-id');
+    const splitMarkerId = splitMarkerInput ? String(splitMarkerInput.value || '') : '';
+    const splitMarkerCandidates = [];
+    if (splitMarkerId) splitMarkerCandidates.push(splitMarkerId);
+    if (impacted && impacted.mvImpactId) splitMarkerCandidates.push(String(impacted.mvImpactId));
+    if (impacted && impacted.mvEvent && impacted.mvEvent.relocationLinkId) splitMarkerCandidates.push(String(impacted.mvEvent.relocationLinkId));
+    if (splitMarkerCandidates.length) this._clearRelocationAgeShift(Array.from(new Set(splitMarkerCandidates)));
+
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    for (let i = 0; i < rows.length; i++) {
+      const idInput = rows[i].querySelector('.event-linked-event-id');
+      if (idInput && idInput.value === linkedEventId) {
+        this.getOrCreateHiddenInput(rows[i], 'event-resolution-override', '1');
+      }
+    }
+    this._afterResolutionAction(resolvedRowId);
+  }
+
+  adaptSaleToRelocationAge(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
+    const impacted = this._findRelocationEventForImpactedRow(row);
+    if (!impacted || !impacted.mvEvent) return;
+
+    const relocationAge = Number(impacted.mvEvent.fromAge);
+    if (isNaN(relocationAge)) return;
+    const cutoffAge = relocationAge - 1;
+    const mvImpactId = impacted.mvImpactId;
+    const saleMarkerInput = row.querySelector('.event-relocation-sell-mv-id');
+    const existingSaleMarker = saleMarkerInput ? String(saleMarkerInput.value || '') : '';
+    const sellMarkerId = this._getRelocationLinkIdByImpactId(mvImpactId) || String(mvImpactId || '');
+    const saleMarkerCandidates = [];
+    if (existingSaleMarker) saleMarkerCandidates.push(existingSaleMarker);
+    if (sellMarkerId) saleMarkerCandidates.push(sellMarkerId);
+    if (mvImpactId) saleMarkerCandidates.push(String(mvImpactId));
+    if (impacted.mvEvent && impacted.mvEvent.relocationLinkId) saleMarkerCandidates.push(String(impacted.mvEvent.relocationLinkId));
+    const saleAgeShift = this._consumeRelocationAgeShift(Array.from(new Set(saleMarkerCandidates)));
+
+    const previousSuppress = this._suppressSellMarkerClear;
+    this._suppressSellMarkerClear = true;
+    this._applyToRealEstatePair(row, (pairRow) => {
+      const fromAgeInput = pairRow.querySelector('.event-from-age');
+      const fromAge = Number(fromAgeInput ? fromAgeInput.value : '');
+      const toAgeInput = pairRow.querySelector('.event-to-age');
+      const currentToAge = Number(toAgeInput ? toAgeInput.value : '');
+      const targetToAge = (saleAgeShift !== null && !isNaN(Number(saleAgeShift)) && !isNaN(currentToAge))
+        ? (currentToAge + Number(saleAgeShift))
+        : cutoffAge;
+      if (!isNaN(fromAge) && targetToAge < fromAge) {
+        this._removeHiddenInput(pairRow, 'event-relocation-sell-mv-id');
+        this._removeHiddenInput(pairRow, 'event-relocation-sell-anchor-age');
+        this._removeHiddenInput(pairRow, 'event-resolution-override');
+        return;
+      }
+      if (toAgeInput) toAgeInput.value = String(targetToAge);
+      if (sellMarkerId) this.getOrCreateHiddenInput(pairRow, 'event-relocation-sell-mv-id', sellMarkerId);
+      this.getOrCreateHiddenInput(pairRow, 'event-relocation-sell-anchor-age', String(relocationAge));
+      this._removeHiddenInput(pairRow, 'event-resolution-override');
+    });
+    this._suppressSellMarkerClear = previousSuppress;
+    this._afterResolutionAction(resolvedRowId);
+  }
+
+  keepSaleAsIs(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (row) {
+      const impacted = this._findRelocationEventForImpactedRow(row);
+      const saleMarkerInput = row.querySelector('.event-relocation-sell-mv-id');
+      const saleMarkerId = saleMarkerInput ? String(saleMarkerInput.value || '') : '';
+      const markerCandidates = [];
+      if (saleMarkerId) markerCandidates.push(saleMarkerId);
+      if (impacted && impacted.mvImpactId) markerCandidates.push(String(impacted.mvImpactId));
+      if (impacted && impacted.mvEvent && impacted.mvEvent.relocationLinkId) markerCandidates.push(String(impacted.mvEvent.relocationLinkId));
+      if (markerCandidates.length) this._clearRelocationAgeShift(Array.from(new Set(markerCandidates)));
+    }
+    this.markAsReviewed(rowId, eventId);
   }
 
   pegCurrencyToOriginal(rowId, currencyCode, linkedCountry, eventId) {
@@ -1737,6 +1966,7 @@ class EventsTableManager {
     for (let i = 0; i < targetRows.length; i++) {
       this.getOrCreateHiddenInput(targetRows[i], 'event-linked-country', selectedCountry);
       this._removeHiddenInput(targetRows[i], 'event-relocation-sell-mv-id');
+      this._removeHiddenInput(targetRows[i], 'event-relocation-sell-anchor-age');
       if (currency) this.getOrCreateHiddenInput(targetRows[i], 'event-currency', currency);
       // Update amount if conversion was provided
       if (typeof convertedAmountNum === 'number' && !isNaN(convertedAmountNum)) {

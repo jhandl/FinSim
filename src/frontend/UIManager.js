@@ -994,12 +994,22 @@ class UIManager {
 
             const splitMvIdInput = domRow.querySelector('.event-relocation-split-mv-id');
             if (splitMvIdInput && splitMvIdInput.value) eventObj.relocationSplitMvId = splitMvIdInput.value;
+            const splitAnchorAgeInput = domRow.querySelector('.event-relocation-split-anchor-age');
+            if (splitAnchorAgeInput && splitAnchorAgeInput.value !== '') {
+              const splitAnchorAge = Number(splitAnchorAgeInput.value);
+              if (!isNaN(splitAnchorAge)) eventObj.relocationSplitAnchorAge = splitAnchorAge;
+            }
 
             const relocationLinkIdInput = domRow.querySelector('.event-relocation-link-id');
             if (relocationLinkIdInput && relocationLinkIdInput.value) eventObj.relocationLinkId = relocationLinkIdInput.value;
 
             const sellMvIdInput = domRow.querySelector('.event-relocation-sell-mv-id');
             if (sellMvIdInput && sellMvIdInput.value) eventObj.relocationSellMvId = sellMvIdInput.value;
+            const sellAnchorAgeInput = domRow.querySelector('.event-relocation-sell-anchor-age');
+            if (sellAnchorAgeInput && sellAnchorAgeInput.value !== '') {
+              const sellAnchorAge = Number(sellAnchorAgeInput.value);
+              if (!isNaN(sellAnchorAge)) eventObj.relocationSellAnchorAge = sellAnchorAge;
+            }
 
             const overrideInput = domRow.querySelector('.event-resolution-override');
             if (overrideInput && overrideInput.value) eventObj.resolutionOverride = overrideInput.value;

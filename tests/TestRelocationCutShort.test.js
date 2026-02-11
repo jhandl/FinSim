@@ -264,4 +264,102 @@ describe('Relocation cut-short resolution', () => {
     expect(propertyRow.querySelector('.event-to-age').value).toBe('49');
     expect(mortgageRow.querySelector('.event-to-age').value).toBe('49');
   });
+
+  test('split relocation age-shift panel exposes adapt/leave actions', () => {
+    setupConfigStub();
+    buildTableDom('SI');
+
+    const eventRow = document.querySelector('tr[data-row-id="row-1"]');
+    const event = {
+      id: 'Salary',
+      type: 'SI',
+      fromAge: 30,
+      toAge: 60,
+      amount: 100000,
+      relocationImpact: {
+        category: 'split_relocation_shift',
+        mvEventId: 'Move_US',
+        details: { relocationAge: 45, part1ToAge: 34, part2FromAge: 35 }
+      }
+    };
+    const relocationEvent = {
+      id: 'Move_US',
+      type: 'MV-us',
+      fromAge: 45,
+      toAge: 45
+    };
+    const env = {
+      webUI: {
+        readEvents: jest.fn(() => [event, relocationEvent]),
+        updateStatusForRelocationImpacts: jest.fn(),
+        eventAccordionManager: { refresh: jest.fn() }
+      },
+      eventsTableManager: {
+        getOriginCountry: jest.fn(() => 'ar'),
+        adaptSplitToRelocationAge: jest.fn(),
+        keepSplitAsIs: jest.fn()
+      }
+    };
+
+    RelocationImpactAssistant.renderPanelForTableRow(eventRow, event, env);
+
+    const panel = document.querySelector('.resolution-panel-row');
+    expect(panel).toBeTruthy();
+    expect(panel.querySelector('.resolution-tab[data-action="adapt_split_to_move"]')).toBeTruthy();
+    expect(panel.querySelector('.resolution-tab[data-action="keep_split_as_is"]')).toBeTruthy();
+
+    const adaptButton = panel.querySelector('.resolution-detail[data-action="adapt_split_to_move"] .resolution-apply');
+    expect(adaptButton).toBeTruthy();
+    adaptButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(env.eventsTableManager.adaptSplitToRelocationAge).toHaveBeenCalledWith('row-1', 'event-1');
+  });
+
+  test('sale relocation age-shift panel exposes adapt/leave actions', () => {
+    setupConfigStub();
+    buildRealEstateTableDom();
+
+    const eventRow = document.querySelector('tr[data-row-id="row-r"]');
+    const event = {
+      id: 'House',
+      type: 'R',
+      fromAge: 30,
+      toAge: 39,
+      amount: 300000,
+      relocationImpact: {
+        category: 'sale_relocation_shift',
+        mvEventId: 'Move_US',
+        details: { relocationAge: 45, currentToAge: 39, expectedToAge: 44 }
+      }
+    };
+    const relocationEvent = {
+      id: 'Move_US',
+      type: 'MV-us',
+      fromAge: 45,
+      toAge: 45
+    };
+    const env = {
+      webUI: {
+        readEvents: jest.fn(() => [event, relocationEvent]),
+        updateStatusForRelocationImpacts: jest.fn(),
+        eventAccordionManager: { refresh: jest.fn() }
+      },
+      eventsTableManager: {
+        getOriginCountry: jest.fn(() => 'ar'),
+        adaptSaleToRelocationAge: jest.fn(),
+        keepSaleAsIs: jest.fn()
+      }
+    };
+
+    RelocationImpactAssistant.renderPanelForTableRow(eventRow, event, env);
+
+    const panel = document.querySelector('.resolution-panel-row');
+    expect(panel).toBeTruthy();
+    expect(panel.querySelector('.resolution-tab[data-action="adapt_sale_to_move"]')).toBeTruthy();
+    expect(panel.querySelector('.resolution-tab[data-action="keep_sale_as_is"]')).toBeTruthy();
+
+    const adaptButton = panel.querySelector('.resolution-detail[data-action="adapt_sale_to_move"] .resolution-apply');
+    expect(adaptButton).toBeTruthy();
+    adaptButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(env.eventsTableManager.adaptSaleToRelocationAge).toHaveBeenCalledWith('row-r', 'event-r');
+  });
 });

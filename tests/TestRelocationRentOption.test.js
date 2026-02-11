@@ -269,7 +269,7 @@ describe('Relocation Rent Option', () => {
     expect(mortgageSellMv).toBe('mvlink_1700000000_test');
   });
 
-  test('marked sold real-estate rows follow relocation age changes, unmarked rows do not', () => {
+  test('marked sold real-estate rows keep timing when relocation age changes', () => {
     const configStub = {
       isRelocationEnabled: () => true,
       getDefaultCountry: () => 'ar',
@@ -322,9 +322,10 @@ describe('Relocation Rent Option', () => {
       </table>
     `;
 
-    constructorNoops.forEach((method) => {
+    constructorNoops.filter((method) => method !== 'setupEventTypeChangeHandler').forEach((method) => {
       jest.spyOn(EventsTableManager.prototype, method).mockImplementation(() => {});
     });
+    jest.spyOn(EventsTableManager.prototype, '_scheduleRelocationReanalysis').mockImplementation(() => {});
 
     const webUIStub = {
       readEvents: jest.fn(() => []),
@@ -336,10 +337,12 @@ describe('Relocation Rent Option', () => {
     };
     const manager = new EventsTableManager(webUIStub);
 
-    manager._syncSoldRealEstateForRelocationAgeShift(45, ['mvlink_test_1']);
+    const mvFromAge = document.querySelector('tr[data-row-id="row-mv"] .event-from-age');
+    mvFromAge.value = '45';
+    mvFromAge.dispatchEvent(new Event('change', { bubbles: true }));
 
-    expect(document.querySelector('tr[data-row-id="row-r1"] .event-to-age').value).toBe('44');
-    expect(document.querySelector('tr[data-row-id="row-m1"] .event-to-age').value).toBe('44');
+    expect(document.querySelector('tr[data-row-id="row-r1"] .event-to-age').value).toBe('39');
+    expect(document.querySelector('tr[data-row-id="row-m1"] .event-to-age').value).toBe('39');
     expect(document.querySelector('tr[data-row-id="row-r1"] .event-relocation-sell-mv-id').value).toBe('mvlink_test_1');
     expect(document.querySelector('tr[data-row-id="row-m1"] .event-relocation-sell-mv-id').value).toBe('mvlink_test_1');
     expect(document.querySelector('tr[data-row-id="row-r2"] .event-to-age').value).toBe('39');
@@ -390,7 +393,7 @@ describe('Relocation Rent Option', () => {
     expect(document.querySelector('tr[data-row-id="row-m1"] .event-relocation-sell-mv-id')).toBeNull();
   });
 
-  test('relocation age change updates sold property timing even without cached previous MV age', () => {
+  test('relocation age change keeps sold property timing even without cached previous MV age', () => {
     document.body.innerHTML = `
       <table id="Events">
         <tbody>
@@ -441,10 +444,97 @@ describe('Relocation Rent Option', () => {
     mvFromAge.value = '45';
     mvFromAge.dispatchEvent(new Event('change', { bubbles: true }));
 
-    expect(document.querySelector('tr[data-row-id="row-r1"] .event-to-age').value).toBe('44');
-    expect(document.querySelector('tr[data-row-id="row-m1"] .event-to-age').value).toBe('44');
+    expect(document.querySelector('tr[data-row-id="row-r1"] .event-to-age').value).toBe('39');
+    expect(document.querySelector('tr[data-row-id="row-m1"] .event-to-age').value).toBe('39');
     expect(document.querySelector('tr[data-row-id="row-r1"] .event-relocation-sell-mv-id').value).toBe('mvlink_test_3');
     expect(document.querySelector('tr[data-row-id="row-m1"] .event-relocation-sell-mv-id').value).toBe('mvlink_test_3');
+  });
+
+  test('adapt sale preserves manual sale-age delta after relocation move', () => {
+    const configStub = {
+      isRelocationEnabled: () => true,
+      getDefaultCountry: () => 'ar',
+      getStartCountry: () => 'ar',
+      getCountryNameByCode: () => 'Argentina',
+      getCachedTaxRuleSet: () => ({
+        getCurrencySymbol: () => '$',
+        getNumberLocale: () => 'en-US',
+        getCurrencyCode: () => 'USD'
+      }),
+      getEconomicData: () => ({ ready: false, getFX: jest.fn(() => 1.0), getPPP: jest.fn(() => 1.0) }),
+      getAvailableCountries: () => [
+        { code: 'ar', name: 'Argentina' },
+        { code: 'us', name: 'United States' }
+      ]
+    };
+    global.Config = { getInstance: () => configStub };
+
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-mv" data-event-id="mv-runtime-delta">
+            <td><div class="event-type-container"><input class="event-type" value="MV-us" /></div></td>
+            <td><input class="event-name" value="Relocation" /></td>
+            <td><input class="event-from-age" value="40" /></td>
+            <td><input class="event-to-age" value="40" /></td>
+            <td><input class="event-relocation-link-id" value="mvlink_sale_delta_1" /></td>
+          </tr>
+          <tr data-row-id="row-r1">
+            <td><div class="event-type-container"><input class="event-type" value="R" /></div></td>
+            <td><input class="event-name" value="HomeA" /></td>
+            <td><input class="event-from-age" value="30" /></td>
+            <td><input class="event-to-age" value="37" /></td>
+            <td><input class="event-relocation-sell-mv-id" value="mvlink_sale_delta_1" /></td>
+          </tr>
+          <tr data-row-id="row-m1">
+            <td><div class="event-type-container"><input class="event-type" value="M" /></div></td>
+            <td><input class="event-name" value="HomeA" /></td>
+            <td><input class="event-from-age" value="30" /></td>
+            <td><input class="event-to-age" value="37" /></td>
+            <td><input class="event-relocation-sell-mv-id" value="mvlink_sale_delta_1" /></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    constructorNoops.filter((method) => method !== 'setupEventTypeChangeHandler').forEach((method) => {
+      jest.spyOn(EventsTableManager.prototype, method).mockImplementation(() => {});
+    });
+    jest.spyOn(EventsTableManager.prototype, '_scheduleRelocationReanalysis').mockImplementation(() => {});
+
+    const events = [
+      { id: 'Relocation', type: 'MV-us', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_sale_delta_1', _mvRuntimeId: 'mv-runtime-delta' },
+      {
+        id: 'HomeA',
+        type: 'R',
+        fromAge: 30,
+        toAge: 37,
+        relocationSellMvId: 'mvlink_sale_delta_1',
+        relocationImpact: { category: 'sale_relocation_shift', mvEventId: 'Relocation' }
+      },
+      { id: 'HomeA', type: 'M', fromAge: 30, toAge: 37, relocationSellMvId: 'mvlink_sale_delta_1' }
+    ];
+    const webUIStub = {
+      readEvents: jest.fn(() => events),
+      getValue: jest.fn(() => 'single'),
+      formatUtils: {
+        setupCurrencyInputs: jest.fn(),
+        setupPercentageInputs: jest.fn()
+      }
+    };
+
+    const manager = new EventsTableManager(webUIStub);
+    manager._mvAgesByRowId['row-mv'] = 40;
+    jest.spyOn(manager, '_afterResolutionAction').mockImplementation(() => {});
+
+    const mvFromAge = document.querySelector('tr[data-row-id="row-mv"] .event-from-age');
+    mvFromAge.value = '45';
+    mvFromAge.dispatchEvent(new Event('change', { bubbles: true }));
+
+    manager.adaptSaleToRelocationAge('row-r1');
+
+    expect(document.querySelector('tr[data-row-id="row-r1"] .event-to-age').value).toBe('42');
+    expect(document.querySelector('tr[data-row-id="row-m1"] .event-to-age').value).toBe('42');
   });
 
   test('relocation rows get a stable generated MV link id', () => {

@@ -57,6 +57,10 @@ var RelocationImpactDetector = {
             // Skip events explicitly overridden or parts of a split chain
             if (event.resolutionOverride) continue;
             if (event.linkedEventId) continue;
+            // Sold real-estate rows linked to a relocation are handled by
+            // addSoldRealEstateShiftImpacts so users can explicitly re-align
+            // sale timing when relocation age changes.
+            if ((event.type === 'R' || event.type === 'M') && event.relocationSellMvId) continue;
 
             // Check if event crosses THIS MV's boundary (not the next one)
             var eFrom = Number(event.fromAge);
@@ -73,6 +77,7 @@ var RelocationImpactDetector = {
             // Skip MV events and Stock Market events
             if (event.type && (event.type.indexOf('MV-') === 0 || event.type === 'SM')) continue;
             if (event.resolutionOverride) continue;
+            if ((event.type === 'R' || event.type === 'M') && event.relocationSellMvId) continue;
 
             var eFrom2 = Number(event.fromAge);
             if (!isNaN(eFrom2) && eFrom2 >= mvFromAge && (!nextMvEvent || eFrom2 < nextMvFromAge)) {
@@ -112,6 +117,7 @@ var RelocationImpactDetector = {
           }
         }
         this.validateRealEstateLinkedCountries(events, mvEvents, startCountry);
+        this.addSoldRealEstateShiftImpacts(events, mvEvents);
       }
 
       this.addOrphanSplitImpacts(events, mvEvents);
@@ -190,6 +196,52 @@ var RelocationImpactDetector = {
     this.addImpact(event, 'simple', message, this.getMvImpactId(mvEvent), true);
   },
 
+  getMvEventByImpactRef: function (mvEvents, ref) {
+    if (!mvEvents || !mvEvents.length) return null;
+    var needle = String(ref || '');
+    if (!needle) return null;
+    for (var i = 0; i < mvEvents.length; i++) {
+      var mv = mvEvents[i];
+      if (!mv) continue;
+      if ((mv._mvRuntimeId && String(mv._mvRuntimeId) === needle) ||
+        (mv.id && String(mv.id) === needle) ||
+        (mv.relocationLinkId && String(mv.relocationLinkId) === needle)) {
+        return mv;
+      }
+    }
+    return null;
+  },
+
+  addSoldRealEstateShiftImpacts: function (events, mvEvents) {
+    if (!events || !events.length || !mvEvents || !mvEvents.length) return;
+    for (var i = 0; i < events.length; i++) {
+      var event = events[i];
+      if (!event || event.resolutionOverride) continue;
+      if (event.type !== 'R' && event.type !== 'M') continue;
+      if (!event.relocationSellMvId) continue;
+
+      var markerId = String(event.relocationSellMvId);
+      var mvEvent = this.getMvEventByImpactRef(mvEvents, markerId);
+      if (!mvEvent) continue;
+
+      var relocationAge = Number(mvEvent.fromAge);
+      var anchorAge = Number(event.relocationSellAnchorAge);
+      if (isNaN(relocationAge) || isNaN(anchorAge)) continue;
+      if (relocationAge === anchorAge) continue;
+
+      var expectedToAge = relocationAge - 1;
+      var message = 'Relocation age changed from ' + anchorAge + ' to ' + relocationAge + '. Update this sale timing or keep it as-is.';
+      var details = {
+        relocationAge: relocationAge,
+        previousRelocationAge: anchorAge,
+        expectedToAge: expectedToAge,
+        currentToAge: event.toAge,
+        sellMarkerId: markerId
+      };
+      this.addImpact(event, 'sale_relocation_shift', message, this.getMvImpactId(mvEvent), true, details);
+    }
+  },
+
   addOrphanSplitImpacts: function (events, mvEvents) {
     var chains = {};
     for (var i = 0; i < events.length; i++) {
@@ -210,10 +262,46 @@ var RelocationImpactDetector = {
         if (aFrom !== bFrom) return aFrom - bFrom;
         return Number(a.toAge) - Number(b.toAge);
       });
-      if (this.hasRelocationBoundaryForSplitChain(chain, mvEvents)) continue;
-
       var first = chain[0];
       var last = chain[chain.length - 1];
+      var splitMarkerId = '';
+      for (var n = 0; n < chain.length; n++) {
+        if (chain[n] && chain[n].relocationSplitMvId) {
+          splitMarkerId = String(chain[n].relocationSplitMvId);
+          break;
+        }
+      }
+
+      if (splitMarkerId) {
+        var markerMv = this.getMvEventByImpactRef(mvEvents, splitMarkerId);
+        if (markerMv) {
+          var markerAge = Number(markerMv.fromAge);
+          var anchorAge = NaN;
+          for (var a = 0; a < chain.length; a++) {
+            var candidateAnchor = Number(chain[a] && chain[a].relocationSplitAnchorAge);
+            if (!isNaN(candidateAnchor)) { anchorAge = candidateAnchor; break; }
+          }
+          if (!isNaN(anchorAge) && markerAge !== anchorAge) {
+            var shiftDetails = {
+              linkedEventId: String(chainIds[j]),
+              relocationAge: markerAge,
+              previousRelocationAge: anchorAge,
+              part1ToAge: first ? first.toAge : '',
+              part2FromAge: (chain.length > 1 && chain[1]) ? chain[1].fromAge : '',
+              amount: first ? first.amount : '',
+              currency: (first && first.currency) ? String(first.currency).toUpperCase() : ''
+            };
+            var shiftMessage = 'Relocation age changed from ' + anchorAge + ' to ' + markerAge + '. Update both halves or keep their current ages.';
+            for (var s = 0; s < chain.length; s++) {
+              this.addImpact(chain[s], 'split_relocation_shift', shiftMessage, this.getMvImpactId(markerMv), true, shiftDetails);
+            }
+          }
+          continue;
+        }
+      }
+
+      if (this.hasRelocationBoundaryForSplitChain(chain, mvEvents)) continue;
+
       var details = {
         linkedEventId: String(chainIds[j]),
         amount: first ? first.amount : '',
