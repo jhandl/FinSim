@@ -4109,7 +4109,6 @@ class WebUI extends AbstractUI {
       clearTimeout(timeoutId);
       if (!country) return;
       const countryCode = String(country).trim().toLowerCase();
-      console.log('country', countryCode);
       localStorage.setItem('geoCountry', countryCode);
       const config = Config.getInstance();
       const available = config.getAvailableCountries();
