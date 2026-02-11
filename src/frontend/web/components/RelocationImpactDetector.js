@@ -22,100 +22,99 @@ var RelocationImpactDetector = {
       }
 
       var mvEvents = this.buildRelocationTimeline(events);
-      if (mvEvents.length === 0) {
-        this.clearAllImpacts(events);
-        return { totalImpacted: 0 };
-      }
-
       // IMPORTANT: Start fresh every time – clear ALL impacts so stale flags don't persist
       // when MV dates move or event spans change.
       this.clearAllImpacts(events);
 
-      // Analyze for each MV event
-      for (var idx = 0; idx < mvEvents.length; idx++) {
-        var mvEvent = mvEvents[idx];
-        var nextMvEvent = (idx + 1 < mvEvents.length) ? mvEvents[idx + 1] : null;
-        var destinationCountry = mvEvent.type.substring(3).toLowerCase();
-        var mvFromAge = Number(mvEvent.fromAge);
-        var nextMvFromAge = nextMvEvent ? Number(nextMvEvent.fromAge) : NaN;
+      if (mvEvents.length > 0) {
+        // Analyze for each MV event
+        for (var idx = 0; idx < mvEvents.length; idx++) {
+          var mvEvent = mvEvents[idx];
+          var mvImpactId = this.getMvImpactId(mvEvent);
+          var nextMvEvent = (idx + 1 < mvEvents.length) ? mvEvents[idx + 1] : null;
+          var destinationCountry = mvEvent.type.substring(3).toLowerCase();
+          var mvFromAge = Number(mvEvent.fromAge);
+          var nextMvFromAge = nextMvEvent ? Number(nextMvEvent.fromAge) : NaN;
 
-        // Determine origin country (the country being left)
-        var originCountry = startCountry;
-        if (idx > 0) {
-          originCountry = mvEvents[idx - 1].type.substring(3).toLowerCase();
-        }
-
-        // Check if destination country ruleset is missing
-        var destinationRuleset = Config.getInstance().getCachedTaxRuleSet(destinationCountry);
-        if (!destinationRuleset) {
-          var message = 'Tax rules for ' + Config.getInstance().getCountryNameByCode(destinationCountry) + ' are not available. Please remove or change this relocation event.';
-          this.addImpact(mvEvent, 'missing_ruleset', message, mvEvent.id, false);
-        }
-
-        // Boundary crossers: events that span THIS MV's boundary only
-        for (var j = 0; j < events.length; j++) {
-          var event = events[j];
-          // Skip MV events and Stock Market events
-          if (event.type && (event.type.indexOf('MV-') === 0 || event.type === 'SM')) continue;
-          // Skip events explicitly overridden or parts of a split chain
-          if (event.resolutionOverride) continue;
-          if (event.linkedEventId) continue;
-
-          // Check if event crosses THIS MV's boundary (not the next one)
-          var eFrom = Number(event.fromAge);
-          var eTo = Number(event.toAge);
-          if (!isNaN(eTo) && !isNaN(eFrom) && eFrom < mvFromAge && eTo >= mvFromAge) {
-            var message = this.generateImpactMessage('boundary', event, mvEvent, destinationCountry);
-            this.addImpact(event, 'boundary', message, mvEvent.id, false);
+          // Determine origin country (the country being left)
+          var originCountry = startCountry;
+          if (idx > 0) {
+            originCountry = mvEvents[idx - 1].type.substring(3).toLowerCase();
           }
-        }
 
-        // Events in jurisdiction: classify as simple (time-only) within [mvAge, nextMvAge)
-        for (var j = 0; j < events.length; j++) {
-          var event = events[j];
-          // Skip MV events and Stock Market events
-          if (event.type && (event.type.indexOf('MV-') === 0 || event.type === 'SM')) continue;
-          if (event.resolutionOverride) continue;
-
-          var eFrom2 = Number(event.fromAge);
-          if (!isNaN(eFrom2) && eFrom2 >= mvFromAge && (!nextMvEvent || eFrom2 < nextMvFromAge)) {
-            var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry);
-            this.addImpact(event, 'simple', message, mvEvent.id, true);
+          // Check if destination country ruleset is missing
+          var destinationRuleset = Config.getInstance().getCachedTaxRuleSet(destinationCountry);
+          if (!destinationRuleset) {
+            var message = 'Tax rules for ' + Config.getInstance().getCountryNameByCode(destinationCountry) + ' are not available. Please remove or change this relocation event.';
+            this.addImpact(mvEvent, 'missing_ruleset', message, mvImpactId, false);
           }
-        }
 
-        // Detect local investment holdings for each MV event
-        if (investmentContext) {
-          var localHoldings = [];
-          for (var i = 0; i < investmentContext.investmentAssets.length; i++) {
-            var invAsset = investmentContext.investmentAssets[i];
-            var capital = investmentContext.capsByKey[invAsset.key];
-            if (invAsset.residenceScope === 'local' &&
-              invAsset.assetCountry === originCountry &&
-              capital > 0) {
-              localHoldings.push({
-                key: invAsset.key,
-                label: invAsset.label,
-                currency: invAsset.baseCurrency,
-                capital: capital
-              });
+          // Boundary crossers: events that span THIS MV's boundary only
+          for (var j = 0; j < events.length; j++) {
+            var event = events[j];
+            // Skip MV events and Stock Market events
+            if (event.type && (event.type.indexOf('MV-') === 0 || event.type === 'SM')) continue;
+            // Skip events explicitly overridden or parts of a split chain
+            if (event.resolutionOverride) continue;
+            if (event.linkedEventId) continue;
+
+            // Check if event crosses THIS MV's boundary (not the next one)
+            var eFrom = Number(event.fromAge);
+            var eTo = Number(event.toAge);
+            if (!isNaN(eTo) && !isNaN(eFrom) && eFrom < mvFromAge && eTo >= mvFromAge) {
+              var message = this.generateImpactMessage('boundary', event, mvEvent, destinationCountry);
+              this.addImpact(event, 'boundary', message, mvImpactId, false);
             }
           }
 
-          if (localHoldings.length > 0) {
-            var localHoldingsMessage = this.generateLocalHoldingsMessage(localHoldings, mvEvent, destinationCountry);
-            var serializedLocalHoldings = '';
-            try {
-              serializedLocalHoldings = JSON.stringify(localHoldings);
-            } catch (_) {
-              serializedLocalHoldings = '';
+          // Events in jurisdiction: classify as simple (time-only) within [mvAge, nextMvAge)
+          for (var j = 0; j < events.length; j++) {
+            var event = events[j];
+            // Skip MV events and Stock Market events
+            if (event.type && (event.type.indexOf('MV-') === 0 || event.type === 'SM')) continue;
+            if (event.resolutionOverride) continue;
+
+            var eFrom2 = Number(event.fromAge);
+            if (!isNaN(eFrom2) && eFrom2 >= mvFromAge && (!nextMvEvent || eFrom2 < nextMvFromAge)) {
+              var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry);
+              this.addImpact(event, 'simple', message, mvImpactId, true);
             }
-            this.addImpact(mvEvent, 'local_holdings', localHoldingsMessage, mvEvent.id, false, serializedLocalHoldings || undefined);
+          }
+
+          // Detect local investment holdings for each MV event
+          if (investmentContext) {
+            var localHoldings = [];
+            for (var i = 0; i < investmentContext.investmentAssets.length; i++) {
+              var invAsset = investmentContext.investmentAssets[i];
+              var capital = investmentContext.capsByKey[invAsset.key];
+              if (invAsset.residenceScope === 'local' &&
+                invAsset.assetCountry === originCountry &&
+                capital > 0) {
+                localHoldings.push({
+                  key: invAsset.key,
+                  label: invAsset.label,
+                  currency: invAsset.baseCurrency,
+                  capital: capital
+                });
+              }
+            }
+
+            if (localHoldings.length > 0) {
+              var localHoldingsMessage = this.generateLocalHoldingsMessage(localHoldings, mvEvent, destinationCountry);
+              var serializedLocalHoldings = '';
+              try {
+                serializedLocalHoldings = JSON.stringify(localHoldings);
+              } catch (_) {
+                serializedLocalHoldings = '';
+              }
+              this.addImpact(mvEvent, 'local_holdings', localHoldingsMessage, mvImpactId, false, serializedLocalHoldings || undefined);
+            }
           }
         }
+        this.validateRealEstateLinkedCountries(events, mvEvents, startCountry);
       }
 
-      this.validateRealEstateLinkedCountries(events, mvEvents, startCountry);
+      this.addOrphanSplitImpacts(events, mvEvents);
 
       // Final pass: remove impacts for events that are already resolved
       for (var k = 0; k < events.length; k++) {
@@ -178,13 +177,76 @@ var RelocationImpactDetector = {
     return chosen;
   },
 
+  getMvImpactId: function (mvEvent) {
+    return mvEvent ? (mvEvent._mvRuntimeId || mvEvent.id || '') : '';
+  },
+
   ensureSimpleImpact: function (event, mvEvents, startCountry) {
     if (event.relocationImpact && event.relocationImpact.category === 'simple') return;
     if (event.relocationImpact) delete event.relocationImpact;
     var mvEvent = this.getMvEventForAge(mvEvents, Number(event.fromAge));
     var destinationCountry = mvEvent ? mvEvent.type.substring(3).toLowerCase() : startCountry;
     var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry);
-    this.addImpact(event, 'simple', message, mvEvent ? mvEvent.id : '', true);
+    this.addImpact(event, 'simple', message, this.getMvImpactId(mvEvent), true);
+  },
+
+  addOrphanSplitImpacts: function (events, mvEvents) {
+    var chains = {};
+    for (var i = 0; i < events.length; i++) {
+      var event = events[i];
+      if (!event || !event.linkedEventId || event.resolutionOverride) continue;
+      var key = String(event.linkedEventId);
+      if (!chains[key]) chains[key] = [];
+      chains[key].push(event);
+    }
+
+    var chainIds = Object.keys(chains);
+    for (var j = 0; j < chainIds.length; j++) {
+      var chain = chains[chainIds[j]];
+      if (!chain || chain.length < 2) continue;
+      chain.sort(function (a, b) {
+        var aFrom = Number(a.fromAge);
+        var bFrom = Number(b.fromAge);
+        if (aFrom !== bFrom) return aFrom - bFrom;
+        return Number(a.toAge) - Number(b.toAge);
+      });
+      if (this.hasRelocationBoundaryForSplitChain(chain, mvEvents)) continue;
+
+      var first = chain[0];
+      var last = chain[chain.length - 1];
+      var details = {
+        linkedEventId: String(chainIds[j]),
+        amount: first ? first.amount : '',
+        currency: (first && first.currency) ? String(first.currency).toUpperCase() : '',
+        fromAge: first ? first.fromAge : '',
+        toAge: last ? last.toAge : ''
+      };
+      var message = 'This split no longer matches any relocation boundary. Join both halves back into a single event.';
+      for (var k = 0; k < chain.length; k++) {
+        this.addImpact(chain[k], 'split_orphan', message, '', true, details);
+      }
+    }
+  },
+
+  hasRelocationBoundaryForSplitChain: function (chain, mvEvents) {
+    if (!chain || chain.length < 2 || !mvEvents || mvEvents.length === 0) return false;
+    var boundaries = [];
+    for (var i = 0; i < chain.length - 1; i++) {
+      var leftTo = Number(chain[i].toAge);
+      var rightFrom = Number(chain[i + 1].fromAge);
+      if (!isNaN(leftTo) && !isNaN(rightFrom) && (leftTo === rightFrom || leftTo + 1 === rightFrom)) {
+        boundaries.push(rightFrom);
+      }
+    }
+    if (!boundaries.length) return false;
+    for (var j = 0; j < mvEvents.length; j++) {
+      var mvAge = Number(mvEvents[j].fromAge);
+      if (isNaN(mvAge)) continue;
+      for (var k = 0; k < boundaries.length; k++) {
+        if (mvAge === boundaries[k]) return true;
+      }
+    }
+    return false;
   },
 
   validateRealEstateLinkedCountries: function (events, mvEvents, startCountry) {
@@ -306,8 +368,8 @@ var RelocationImpactDetector = {
       // or for real-estate events if a linked country has been set (indicating jurisdiction is tied).
       resolved = !!(event.linkedEventId || (event.currency && event.linkedCountry) || ((event.type === 'R' || event.type === 'M') && event.linkedCountry));
     } else if (event.relocationImpact.category === 'simple') {
-      // Consider simple resolved if linked country is set or converted type acknowledged
-      resolved = !!(event.linkedCountry || event.type === 'SInp' || event.type === 'SI2np');
+      // Consider simple resolved if the event belongs to a split chain, has explicit jurisdiction, or salary conversion is acknowledged
+      resolved = !!(event.linkedEventId || event.linkedCountry || event.type === 'SInp' || event.type === 'SI2np');
     } else if (event.relocationImpact.category === 'local_holdings') {
       // Consider resolved if user has marked as reviewed
       // (Keep/sell/reinvest actions will be handled via custom resolution, not field changes)

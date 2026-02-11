@@ -1,23 +1,25 @@
 /* RelocationImpactAssistant centralizes inline resolution panel rendering and actions for both table and accordion views. The legacy relocation modal has been removed. */
+
 var RelocationImpactAssistant = {
 
   // Public API
   renderPanelForTableRow: function (rowEl, event, env) {
     if (!rowEl || !event || !event.relocationImpact) return;
     const existingPanel = rowEl.nextElementSibling;
+    const rowId = rowEl && rowEl.dataset ? rowEl.dataset.rowId : undefined;
+    const eventId = rowEl && rowEl.dataset ? rowEl.dataset.eventId : undefined;
     if (existingPanel && existingPanel.classList && existingPanel.classList.contains('resolution-panel-row')) return;
     this.collapseAllPanels();
-    const rowId = rowEl && rowEl.dataset ? rowEl.dataset.rowId : undefined;
     const panelRow = document.createElement('tr');
     panelRow.className = 'resolution-panel-row';
     const panelCell = document.createElement('td');
     const colCount = (rowEl && rowEl.children && rowEl.children.length) || (document.querySelectorAll('#Events thead th').length) || 1;
     panelCell.colSpan = colCount;
-    panelCell.innerHTML = this.createPanelHtml(event, rowId, env);
+    panelCell.innerHTML = this.createPanelHtml(event, rowId, env, eventId);
     panelRow.appendChild(panelCell);
     rowEl.insertAdjacentElement('afterend', panelRow);
     this._animateOpen(panelCell);
-    this._bindPanelInteractions(panelCell, { context: 'table', rowId: rowId, event: event, env: env });
+    this._bindPanelInteractions(panelCell, { context: 'table', rowId: rowId, eventId: eventId, event: event, env: env });
     this._setupCollapseTriggers({ context: 'table', anchorEl: panelRow, rowId: rowId });
     if (panelCell) this.attachSplitTooltip(panelCell);
   },
@@ -33,7 +35,11 @@ var RelocationImpactAssistant = {
       const current = expander.scrollHeight; expander.style.height = current + 'px';
       // eslint-disable-next-line no-unused-expressions
       expander.offsetHeight; requestAnimationFrame(function () { expander.style.height = '0px'; });
-      const onClosed = function (e) { if (e.target !== expander) return; expander.removeEventListener('transitionend', onClosed); if (panelRow.parentNode) panelRow.remove(); };
+      const onClosed = function (e) {
+        if (e.target !== expander) return;
+        expander.removeEventListener('transitionend', onClosed);
+        if (panelRow.parentNode) panelRow.remove();
+      };
       expander.addEventListener('transitionend', onClosed);
     } else {
       if (panelRow.parentNode) panelRow.remove();
@@ -60,13 +66,14 @@ var RelocationImpactAssistant = {
     if (!content) return;
     const existing = content.querySelector('.resolution-panel-container') || content.querySelector('.resolution-panel-expander');
     if (existing) return;
+    const eventId = itemEl && itemEl.dataset ? itemEl.dataset.eventId : undefined;
     const wrapper = content.querySelector('.accordion-item-content-wrapper') || content;
-    const html = this.createPanelHtml(event, event.rowId, env);
+    const html = this.createPanelHtml(event, event.rowId, env, eventId);
     wrapper.insertAdjacentHTML('afterbegin', html);
     const container = content.querySelector('.resolution-panel-container');
     const expander = content.querySelector('.resolution-panel-expander');
     this._animateOpen(expander || container);
-    this._bindPanelInteractions(container || content, { context: 'accordion', accordionItem: itemEl, event: event, env: env });
+    this._bindPanelInteractions(container || content, { context: 'accordion', accordionItem: itemEl, eventId: eventId, event: event, env: env });
     this._setupCollapseTriggers({ context: 'accordion', anchorEl: itemEl, accordionId: event.accordionId });
     if (container) this.attachSplitTooltip(container);
   },
@@ -77,12 +84,14 @@ var RelocationImpactAssistant = {
     this._collapseAccordionPanel(itemEl);
   },
 
-  createPanelHtml: function (event, rowId, env) {
+  createPanelHtml: function (event, rowId, env, eventId) {
     // Based on table manager implementation
     const events = (env && env.webUI && typeof env.webUI.readEvents === 'function') ? env.webUI.readEvents(false) : [];
+    const impactCategory = event && event.relocationImpact ? event.relocationImpact.category : '';
     const mvEventId = event && event.relocationImpact ? event.relocationImpact.mvEventId : null;
-    // If readEvents returns 0 events, try to find mvEvent from DOM directly
-    let mvEvent = events.find(function (e) { return e && e.id === mvEventId; });
+    let mvEvent = events.find(function (e) {
+      return e && (e.id === mvEventId || e._mvRuntimeId === mvEventId);
+    });
     if (!mvEvent && mvEventId) {
       // Fallback: find mvEvent from DOM by looking for the row with matching event name/id
       try {
@@ -109,11 +118,11 @@ var RelocationImpactAssistant = {
         // Fallback failed, continue with null mvEvent
       }
     }
-    if (!mvEvent) return '';
-    const destCountry = mvEvent.type.substring(3).toLowerCase();
     const startCountry = Config.getInstance().getStartCountry();
-    const originCountry = (env && env.eventsTableManager && typeof env.eventsTableManager.getOriginCountry === 'function') ? env.eventsTableManager.getOriginCountry(mvEvent, startCountry) : startCountry;
-    const relocationAge = mvEvent.fromAge;
+    if (!mvEvent && impactCategory !== 'split_orphan') return '';
+    const destCountry = mvEvent ? mvEvent.type.substring(3).toLowerCase() : startCountry;
+    const originCountry = mvEvent && (env && env.eventsTableManager && typeof env.eventsTableManager.getOriginCountry === 'function') ? env.eventsTableManager.getOriginCountry(mvEvent, startCountry) : startCountry;
+    const relocationAge = mvEvent ? mvEvent.fromAge : null;
 
     let content = '';
     const econ = Config.getInstance().getEconomicData();
@@ -155,13 +164,19 @@ var RelocationImpactAssistant = {
         const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
         const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
         const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
+        const isIncomeOrExpenseType = ['S', 'PP', 'SI', 'SI2', 'SInp', 'SI2np', 'UI', 'RI', 'DBI', 'FI', 'E'].indexOf(event.type) !== -1;
+        const relocationAgeNum = Number(relocationAge);
+        const cutShortToAge = isNaN(relocationAgeNum) ? relocationAge : (relocationAgeNum - 1);
         const fromMeta = getSymbolAndLocaleByCountry(originCountry);
         const toMeta = getSymbolAndLocaleByCountry(destCountry);
         const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
         const part1AmountFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmountSanitized);
         const inputFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : '';
         containerAttributes = ' data-from-country="' + originCountry + '" data-to-country="' + destCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
-        addAction(actions, { action: 'split', tabLabel: 'Split Event', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-label">Part 1: Age ' + event.fromAge + '-' + relocationAge + '</div><div class="part-detail">' + part1AmountFormatted + ' (read-only)</div></div><div class="split-part-info"><div class="part-label">Part 2: Age ' + relocationAge + '-' + event.toAge + '</div><div class="part-detail"><input type="text" class="part2-amount-input" value="' + inputFormatted + '" placeholder="Amount">' + destCurrency + '</div><div class="ppp-hint">PPP suggestion</div></div></div><p class="micro-note">Apply creates a new event starting at age ' + relocationAge + ' in ' + (destCurrencyCode || destCurrency) + '. Adjust the Part 2 amount to what the move will cost in the destination currency.</p></div>' });
+        addAction(actions, { action: 'split', tabLabel: 'Split Event', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-label">Part 1: Age ' + event.fromAge + '-' + cutShortToAge + '</div><div class="part-detail">' + part1AmountFormatted + ' (read-only)</div></div><div class="split-part-info"><div class="part-label">Part 2: Age ' + relocationAge + '-' + event.toAge + '</div><div class="part-detail"><input type="text" class="part2-amount-input" value="' + inputFormatted + '" placeholder="Amount">' + destCurrency + '</div><div class="ppp-hint">PPP suggestion</div></div></div><p class="micro-note">Apply creates a new event starting at age ' + relocationAge + ' in ' + (destCurrencyCode || destCurrency) + '. Adjust the Part 2 amount to what the move will cost in the destination currency.</p></div>' });
+        if (isIncomeOrExpenseType) {
+          addAction(actions, { action: 'cut_short', tabLabel: 'Cut Short', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply ends this event before relocation by setting To Age to ' + cutShortToAge + '.</p></div>' });
+        }
         addAction(actions, { action: 'peg', tabLabel: 'Keep Original Currency', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply keeps this event denominated in ' + originCurrency + ', leaving the current value (' + (part1AmountFormatted || originCurrency) + ') unchanged after the move.</p><p class="micro-note">Choose this when you prefer to convert the amount manually later.</p></div>' });
       }
     } else if (event.relocationImpact.category === 'simple') {
@@ -244,6 +259,24 @@ var RelocationImpactAssistant = {
         addAction(actions, { action: 'peg', tabLabel: 'Keep Original Currency', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion to ' + (destCurrencyCode || destCurrency || 'the destination currency') + ' will occur.</p></div>' });
         addAction(actions, { action: 'review', tabLabel: 'Mark As Reviewed', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply records this relocation impact as reviewed without changing the amount or currency.</p></div>' });
       }
+    } else if (event.relocationImpact.category === 'split_orphan') {
+      let splitDetails = event.relocationImpact.details;
+      if (typeof splitDetails === 'string') {
+        try { splitDetails = JSON.parse(splitDetails); } catch (_) { splitDetails = null; }
+      }
+      const mergedFromAge = splitDetails && splitDetails.fromAge != null ? splitDetails.fromAge : event.fromAge;
+      const mergedToAge = splitDetails && splitDetails.toAge != null ? splitDetails.toAge : event.toAge;
+      const firstHalfAmount = splitDetails && splitDetails.amount != null ? splitDetails.amount : event.amount;
+      const firstHalfCurrency = splitDetails && splitDetails.currency ? String(splitDetails.currency).toUpperCase() : (event.currency ? String(event.currency).toUpperCase() : '');
+      const amountLabel = (firstHalfAmount != null && firstHalfAmount !== '') ? String(firstHalfAmount) + (firstHalfCurrency ? ' ' + firstHalfCurrency : '') : 'the first-half amount';
+      addAction(actions, {
+        action: 'join_split',
+        tabLabel: 'Join Halves',
+        buttonLabel: 'Apply',
+        buttonClass: 'event-wizard-button resolution-apply',
+        buttonAttrs: ' data-row-id="' + rowId + '"',
+        bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">This split no longer matches a relocation boundary. Join both halves back into one event.</p><p class="micro-note">Apply restores a single event from age ' + mergedFromAge + ' to ' + mergedToAge + ' using ' + amountLabel + '.</p></div>'
+      });
     } else if (event.relocationImpact.category === 'local_holdings') {
       // Local investment holdings resolution panel
       const localHoldingsDetails = (function parseLocalHoldings(detailsPayload) {
@@ -303,7 +336,7 @@ var RelocationImpactAssistant = {
     if (!actions.length) return content;
     const impactCause = (event.relocationImpact.message || '').trim() || 'Relocation impact detected for this event.';
     const tabsHtml = actions.map(function (ac) { return '<button type="button" class="resolution-tab" id="' + ac.tabId + '" role="tab" aria-selected="false" aria-controls="' + ac.detailId + '" data-action="' + ac.action + '" tabindex="0">' + ac.tabLabel + '</button>'; }).join('');
-    const detailsHtml = actions.map(function (ac) { const btnClass = ac.buttonClass || 'event-wizard-button resolution-apply'; const attrs = ac.buttonAttrs || ''; return '<div class="resolution-detail" id="' + ac.detailId + '" role="tabpanel" aria-labelledby="' + ac.tabId + '" data-action="' + ac.action + '" hidden aria-hidden="true"><div class="resolution-detail-content">' + ac.bodyHtml + '</div><div class="resolution-detail-footer"><button type="button" class="' + btnClass + '" data-action="' + ac.action + '"' + attrs + '>' + ac.buttonLabel + '</button></div></div>'; }).join('');
+    const detailsHtml = actions.map(function (ac) { const btnClass = ac.buttonClass || 'event-wizard-button resolution-apply'; const attrs = ac.buttonAttrs || ''; const eventAttrs = eventId ? ' data-event-id="' + eventId + '"' : ''; return '<div class="resolution-detail" id="' + ac.detailId + '" role="tabpanel" aria-labelledby="' + ac.tabId + '" data-action="' + ac.action + '" hidden aria-hidden="true"><div class="resolution-detail-content">' + ac.bodyHtml + '</div><div class="resolution-detail-footer"><button type="button" class="' + btnClass + '" data-action="' + ac.action + '"' + attrs + eventAttrs + '>' + ac.buttonLabel + '</button></div></div>'; }).join('');
     content = '<div class="resolution-panel-expander"><div class="resolution-panel-container"' + containerAttributes + '><div class="resolution-panel-header"><h4>' + impactCause + '</h4><button class="panel-close-btn">×</button></div><div class="resolution-panel-body"><div class="resolution-tab-strip" role="tablist" aria-label="Resolution actions" aria-orientation="horizontal">' + tabsHtml + '</div><div class="resolution-details">' + detailsHtml + '</div></div></div></div>';
     return content;
   },
@@ -312,39 +345,49 @@ var RelocationImpactAssistant = {
     if (!env || !env.eventsTableManager) return;
     const etm = env.eventsTableManager;
     const rowId = payload && payload.rowId;
+    const eventId = payload && payload.eventId;
     switch (action) {
       case 'split': {
         const override = payload && payload.part2Amount;
-        if (typeof etm.splitEventAtRelocation === 'function') etm.splitEventAtRelocation(rowId, override);
+        if (typeof etm.splitEventAtRelocation === 'function') etm.splitEventAtRelocation(rowId, override, eventId);
+        break;
+      }
+      case 'cut_short': {
+        if (typeof etm.cutShortEventAtRelocation === 'function') etm.cutShortEventAtRelocation(rowId, eventId);
         break;
       }
       case 'peg': {
         const currency = payload && payload.currency;
-        if (typeof etm.pegCurrencyToOriginal === 'function') etm.pegCurrencyToOriginal(rowId, currency);
+        const fromCountry = payload && payload.fromCountry;
+        if (typeof etm.pegCurrencyToOriginal === 'function') etm.pegCurrencyToOriginal(rowId, currency, fromCountry, eventId);
         break;
       }
       case 'accept': {
         const amount = payload && payload.suggestedAmount;
         const currency = payload && payload.suggestedCurrency;
-        if (typeof etm.acceptSuggestion === 'function') etm.acceptSuggestion(rowId, amount, currency);
+        if (typeof etm.acceptSuggestion === 'function') etm.acceptSuggestion(rowId, amount, currency, eventId);
         break;
       }
       case 'link': {
         const country = payload && payload.country;
         const convertedAmount = payload && payload.convertedAmount;
         if (event && (event.type === 'S' || event.type === 'PP' || event.type === 'SI' || event.type === 'SI2' || event.type === 'SInp' || event.type === 'SI2np')) {
-          if (typeof etm.linkIncomeToCountry === 'function') etm.linkIncomeToCountry(rowId, country);
+          if (typeof etm.linkIncomeToCountry === 'function') etm.linkIncomeToCountry(rowId, country, eventId);
         } else {
-          if (typeof etm.linkPropertyToCountry === 'function') etm.linkPropertyToCountry(rowId, country, convertedAmount);
+          if (typeof etm.linkPropertyToCountry === 'function') etm.linkPropertyToCountry(rowId, country, convertedAmount, eventId);
         }
         break;
       }
       case 'convert': {
-        if (typeof etm.convertToPensionless === 'function') etm.convertToPensionless(rowId);
+        if (typeof etm.convertToPensionless === 'function') etm.convertToPensionless(rowId, eventId);
         break;
       }
       case 'review': {
-        if (typeof etm.markAsReviewed === 'function') etm.markAsReviewed(rowId);
+        if (typeof etm.markAsReviewed === 'function') etm.markAsReviewed(rowId, eventId);
+        break;
+      }
+      case 'join_split': {
+        if (typeof etm.joinSplitEvents === 'function') etm.joinSplitEvents(rowId, eventId);
         break;
       }
       case 'keep_property': {
@@ -363,7 +406,7 @@ var RelocationImpactAssistant = {
       case 'plan_sale':
       case 'plan_reinvest': {
         // All three actions simply mark the impact as reviewed
-        if (typeof etm.markAsReviewed === 'function') etm.markAsReviewed(rowId);
+        if (typeof etm.markAsReviewed === 'function') etm.markAsReviewed(rowId, eventId);
         break;
       }
       default:
@@ -517,7 +560,18 @@ var RelocationImpactAssistant = {
       const btn = e.target && e.target.closest && e.target.closest('.resolution-apply');
       if (!btn) return; e.preventDefault(); e.stopPropagation();
       const action = btn.getAttribute('data-action');
-      const payload = { rowId: (btn.getAttribute('data-row-id') || (ctx && ctx.rowId)), currency: btn.getAttribute('data-currency'), suggestedAmount: btn.getAttribute('data-suggested-amount'), suggestedCurrency: btn.getAttribute('data-suggested-currency') };
+      const panelContainer = (interactionRoot.classList && interactionRoot.classList.contains('resolution-panel-container'))
+        ? interactionRoot
+        : (interactionRoot.querySelector && interactionRoot.querySelector('.resolution-panel-container'));
+      const payload = {
+        rowId: (btn.getAttribute('data-row-id') || (ctx && ctx.rowId)),
+        eventId: (btn.getAttribute('data-event-id') || (ctx && ctx.eventId)),
+        currency: btn.getAttribute('data-currency'),
+        suggestedAmount: btn.getAttribute('data-suggested-amount'),
+        suggestedCurrency: btn.getAttribute('data-suggested-currency'),
+        fromCountry: panelContainer ? panelContainer.getAttribute('data-from-country') : null,
+        toCountry: panelContainer ? panelContainer.getAttribute('data-to-country') : null
+      };
       if (action === 'split') { const detail = btn.closest('.resolution-detail'); const input = detail ? detail.querySelector('.part2-amount-input') : null; payload.part2Amount = input ? input.value : undefined; }
       else if (action === 'link') { const detail = btn.closest('.resolution-detail'); const sel = detail ? detail.querySelector('.country-selector') : null; const amountInput = detail ? detail.querySelector('.link-amount-input') : null; payload.country = sel ? sel.value : undefined; payload.convertedAmount = amountInput ? amountInput.value : undefined; }
       self.handlePanelAction(ctx.event, action, payload, ctx.env);
@@ -606,127 +660,116 @@ var RelocationImpactAssistant = {
     this._teardownCollapseTriggers(item);
   },
 
-  // Legacy property helpers (used by keep/sell actions)
+  // Property helpers (used by keep/sell actions)
   _keepProperty: function (event, payload, env) {
-    try {
-      var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
-      var etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
-      if (!etm) return;
-      var rowId = payload && payload.rowId;
-      var baseRow = null;
-      try { if (rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]'); } catch (_) { }
-      var startCountry = Config.getInstance().getStartCountry();
-      var origin = typeof etm.detectPropertyCountry === 'function' ? etm.detectPropertyCountry(Number(event.fromAge), startCountry) : startCountry;
-      var rs = null; try { rs = Config.getInstance().getCachedTaxRuleSet(origin); } catch (_) { }
-      var originCurrency = rs && typeof rs.getCurrencyCode === 'function' ? rs.getCurrencyCode() : null;
-      function findRowsByIdAndType(id, type) {
-        var rows = Array.from(document.querySelectorAll('#Events tbody tr'));
-        return rows.filter(function (r) { var t = r.querySelector('.event-type'); var n = r.querySelector('.event-name'); return t && n && t.value === type && n.value === id; });
-      }
-      var propRows = [];
-      var mortRows = [];
-      if (baseRow && typeof etm._applyToRealEstatePair === 'function') {
-        // Use the row context to update both R and M with the same name/id
-        etm._applyToRealEstatePair(baseRow, function (r) {
-          var t = r && r.querySelector ? (r.querySelector('.event-type') && r.querySelector('.event-type').value) : '';
-          if (t === 'R') propRows.push(r); else if (t === 'M') mortRows.push(r);
-          etm.getOrCreateHiddenInput(r, 'event-linked-country', origin);
-          if (originCurrency) etm.getOrCreateHiddenInput(r, 'event-currency', originCurrency);
-        });
-      } else {
-        // Fallback: locate rows by event.id (name)
-        propRows = findRowsByIdAndType(event.id, 'R');
-        for (var i = 0; i < propRows.length; i++) {
-          etm.getOrCreateHiddenInput(propRows[i], 'event-linked-country', origin);
-          if (originCurrency) etm.getOrCreateHiddenInput(propRows[i], 'event-currency', originCurrency);
-        }
-        mortRows = findRowsByIdAndType(event.id, 'M');
-        for (var j = 0; j < mortRows.length; j++) {
-          etm.getOrCreateHiddenInput(mortRows[j], 'event-linked-country', origin);
-          if (originCurrency) etm.getOrCreateHiddenInput(mortRows[j], 'event-currency', originCurrency);
-        }
-      }
-      RelocationImpactAssistant._refreshImpacts();
-    } catch (e) { try { console.error('Error in _keepProperty:', e); } catch (_) { } }
+    var webUI = env && env.webUI ? env.webUI : null;
+    var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
+    if (!webUI || !etm || typeof etm._applyToRealEstatePair !== 'function') return;
+
+    var rowId = payload && payload.rowId;
+    var eventId = payload && payload.eventId;
+    var baseRow = null;
+    if (typeof etm._findEventRow === 'function') baseRow = etm._findEventRow(rowId, eventId);
+    if (!baseRow && rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]');
+    if (!baseRow) return;
+
+    var startCountry = Config.getInstance().getStartCountry();
+    var origin = typeof etm.detectPropertyCountry === 'function' ? etm.detectPropertyCountry(Number(event.fromAge), startCountry) : startCountry;
+    var rs = Config.getInstance().getCachedTaxRuleSet(origin);
+    var originCurrency = rs && typeof rs.getCurrencyCode === 'function' ? rs.getCurrencyCode() : null;
+
+    etm._applyToRealEstatePair(baseRow, function (row) {
+      if (typeof etm._removeHiddenInput === 'function') etm._removeHiddenInput(row, 'event-relocation-sell-mv-id');
+      etm.getOrCreateHiddenInput(row, 'event-linked-country', origin);
+      if (originCurrency) etm.getOrCreateHiddenInput(row, 'event-currency', originCurrency);
+    });
+    this._refreshImpacts(env);
   },
 
   _sellProperty: function (event, payload, env) {
-    try {
-      var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
-      var etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
-      if (!etm) return;
-      var events = webUI.readEvents(false) || [];
-      var mv = events.find(function (e) { return e && e.id === (event.relocationImpact && event.relocationImpact.mvEventId); });
-      if (!mv) return;
-      var relocationAge = Number(mv.fromAge);
-      var rowId = payload && payload.rowId;
-      var baseRow = null;
-      try { if (rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]'); } catch (_) { }
+    var webUI = env && env.webUI ? env.webUI : null;
+    var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
+    if (!webUI || !etm || typeof etm._applyToRealEstatePair !== 'function') return;
 
-      function findRowsByIdAndType(id, type) {
-        var rows = Array.from(document.querySelectorAll('#Events tbody tr'));
-        return rows.filter(function (r) { var t = r.querySelector('.event-type'); var n = r.querySelector('.event-name'); return t && n && t.value === type && n.value === id; });
-      }
-      function setToAgeGuarded(row, age) {
-        var toAgeInput = row.querySelector('.event-to-age');
-        if (!toAgeInput) return;
-        var existing = Number(toAgeInput.value);
-        if (isNaN(existing) || existing > age) {
-          toAgeInput.value = String(age);
-          toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      }
+    var events = webUI.readEvents(false) || [];
+    var mvImpactId = event.relocationImpact && event.relocationImpact.mvEventId;
+    var mv = events.find(function (e) { return e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId); });
+    if (!mv) return;
 
-      if (baseRow && typeof etm._applyToRealEstatePair === 'function') {
-        etm._applyToRealEstatePair(baseRow, function (r) { setToAgeGuarded(r, relocationAge); });
-      } else {
-        var propRows = findRowsByIdAndType(event.id, 'R');
-        for (var i = 0; i < propRows.length; i++) setToAgeGuarded(propRows[i], relocationAge);
-        var mortRows = findRowsByIdAndType(event.id, 'M');
-        for (var j = 0; j < mortRows.length; j++) setToAgeGuarded(mortRows[j], relocationAge);
+    var sellMarkerId = '';
+    if (typeof etm._getRelocationLinkIdByImpactId === 'function') {
+      sellMarkerId = String(etm._getRelocationLinkIdByImpactId(mvImpactId) || '');
+    }
+    if (!sellMarkerId && mvImpactId) sellMarkerId = String(mvImpactId);
+
+    var relocationAge = Number(mv.fromAge);
+    var cutoffAge = relocationAge - 1;
+    var rowId = payload && payload.rowId;
+    var eventId = payload && payload.eventId;
+    var baseRow = null;
+    if (typeof etm._findEventRow === 'function') baseRow = etm._findEventRow(rowId, eventId);
+    if (!baseRow && rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]');
+    if (!baseRow) return;
+
+    function setToAgeGuarded(row, age) {
+      var toAgeInput = row.querySelector('.event-to-age');
+      if (!toAgeInput) return;
+      var existing = Number(toAgeInput.value);
+      if (isNaN(existing) || existing > age) {
+        toAgeInput.value = String(age);
+        toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
       }
-      RelocationImpactAssistant._refreshImpacts();
-    } catch (e) { try { console.error('Error in _sellProperty:', e); } catch (_) { } }
+    }
+
+    var previousSuppress = etm._suppressSellMarkerClear;
+    etm._suppressSellMarkerClear = true;
+    etm._applyToRealEstatePair(baseRow, function (row) {
+      setToAgeGuarded(row, cutoffAge);
+      if (sellMarkerId) etm.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', sellMarkerId);
+    });
+    etm._suppressSellMarkerClear = previousSuppress;
+    this._refreshImpacts(env);
   },
 
   _rentOutProperty: function (event, payload, env) {
-    try {
-      this._keepProperty(event, payload, env);
+    this._keepProperty(event, payload, env);
 
-      var webUI = (env && env.webUI) ? env.webUI : (typeof WebUI !== 'undefined' ? WebUI.getInstance() : null);
-      var etm = (env && env.eventsTableManager) ? env.eventsTableManager : (webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null);
-      if (!etm) return;
+    var webUI = env && env.webUI ? env.webUI : null;
+    var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
+    if (!webUI || !etm) return;
 
-      var events = (webUI && typeof webUI.readEvents === 'function') ? webUI.readEvents(false) : [];
-      var mv = events.find(function (e) { return e && e.id === (event.relocationImpact && event.relocationImpact.mvEventId); });
-      var relocationAge = mv ? mv.fromAge : null;
+    var events = webUI.readEvents(false) || [];
+    var mvImpactId = event.relocationImpact && event.relocationImpact.mvEventId;
+    var mv = events.find(function (e) { return e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId); });
+    var relocationAge = mv ? mv.fromAge : null;
 
-      if (relocationAge && typeof etm.addEventFromWizardWithSorting === 'function') {
-        etm.addEventFromWizardWithSorting({
-          eventType: 'RI',
-          name: event.id,
-          amount: '',
-          fromAge: relocationAge,
-          toAge: event.toAge
-        });
-      }
+    if (relocationAge && typeof etm.addEventFromWizardWithSorting === 'function') {
+      etm.addEventFromWizardWithSorting({
+        eventType: 'RI',
+        name: event.id,
+        amount: '',
+        fromAge: relocationAge,
+        toAge: event.toAge
+      });
+    }
 
-      RelocationImpactAssistant._refreshImpacts();
-    } catch (e) { try { console.error('Error in _rentOutProperty:', e); } catch (_) { } }
+    this._refreshImpacts(env);
   },
 
-  _refreshImpacts: function () {
-    try {
-      var webUI = typeof WebUI !== 'undefined' ? WebUI.getInstance() : null;
-      var etm = webUI && webUI.eventsTableManager ? webUI.eventsTableManager : null;
-      if (!etm) return;
-      var events = webUI.readEvents(false);
-      var startCountry = Config.getInstance().getStartCountry();
-      if (typeof RelocationImpactDetector !== 'undefined') { RelocationImpactDetector.analyzeEvents(events, startCountry); }
-      etm.updateRelocationImpactIndicators(events);
-      if (typeof webUI.updateStatusForRelocationImpacts === 'function') { webUI.updateStatusForRelocationImpacts(events); }
-      if (webUI.eventAccordionManager && typeof webUI.eventAccordionManager.refresh === 'function') { webUI.eventAccordionManager.refresh(); }
-    } catch (e) { try { console.error('Error refreshing relocation impacts:', e); } catch (_) { } }
+  _refreshImpacts: function (env) {
+    var webUI = env && env.webUI ? env.webUI : null;
+    var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
+    if (!webUI || !etm) return;
+    if (typeof etm.recomputeRelocationImpacts === 'function') {
+      etm.recomputeRelocationImpacts();
+      return;
+    }
+    var events = webUI.readEvents(false);
+    var startCountry = Config.getInstance().getStartCountry();
+    if (typeof RelocationImpactDetector !== 'undefined') RelocationImpactDetector.analyzeEvents(events, startCountry);
+    etm.updateRelocationImpactIndicators(events);
+    if (typeof webUI.updateStatusForRelocationImpacts === 'function') webUI.updateStatusForRelocationImpacts(events);
+    if (webUI.eventAccordionManager && typeof webUI.eventAccordionManager.refresh === 'function') webUI.eventAccordionManager.refresh();
   }
 };
 

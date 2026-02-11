@@ -820,6 +820,24 @@ function serializeSimulation(ui) {
             metaPairs.push('linkedEventId=' + encodeURIComponent(linkedEventIdInput.value));
           }
         } catch (_e3) { }
+        try {
+          var splitMvIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-split-mv-id') : null;
+          if (splitMvIdInput && splitMvIdInput.value) {
+            metaPairs.push('splitMvId=' + encodeURIComponent(splitMvIdInput.value));
+          }
+        } catch (_e3c) { }
+        try {
+          var mvLinkIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-link-id') : null;
+          if (mvLinkIdInput && mvLinkIdInput.value) {
+            metaPairs.push('mvLinkId=' + encodeURIComponent(mvLinkIdInput.value));
+          }
+        } catch (_e3a) { }
+        try {
+          var sellMvIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-sell-mv-id') : null;
+          if (sellMvIdInput && sellMvIdInput.value) {
+            metaPairs.push('sellMvId=' + encodeURIComponent(sellMvIdInput.value));
+          }
+        } catch (_e3b) { }
         var resolvedMeta = null;
         try {
           var resolutionOverrideInput = rowEl.querySelector ? rowEl.querySelector('.event-resolution-override') : null;

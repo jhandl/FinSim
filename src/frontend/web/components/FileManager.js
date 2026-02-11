@@ -394,7 +394,7 @@ class FileManager {
           const row = this.webUI.eventsTableManager.createEventRow(type, name, amount, fromAge || '', toAge || '', displayRate, displayMatch);
           tbody.appendChild(row);
 
-          // Parse optional Meta column to restore hidden fields (currency, linkedCountry, linkedEventId, resolved)
+          // Parse optional Meta column to restore hidden fields (currency, linkedCountry, linkedEventId, splitMvId, mvLinkId, sellMvId, resolved)
           try {
             if (meta && typeof meta === 'string') {
               // Meta format: key=value;key=value (values URL-encoded)
@@ -499,6 +499,9 @@ class FileManager {
                 }
               }
               if (metaValues.linkedEventId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-event-id', metaValues.linkedEventId);
+              if (metaValues.splitMvId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-mv-id', metaValues.splitMvId);
+              if (metaValues.mvLinkId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-link-id', metaValues.mvLinkId);
+              if (metaValues.sellMvId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', metaValues.sellMvId);
               if (metaValues.resolved === '1') {
                 this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-resolution-override', '1');
               }

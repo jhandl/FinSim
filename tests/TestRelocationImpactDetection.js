@@ -212,6 +212,49 @@ module.exports = {
         assert(!salaryEvt.relocationImpact, 'Linked split should resolve boundary impact');
       });
 
+      // Test 8b: Split chain should keep both halves resolved (no new simple impact on part 2).
+      runTest('8b', function () {
+        const mv = makeEvent({ id: 'mv_split_pair', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const part1 = makeEvent({ id: 'salary_split_p1', type: 'SI', fromAge: 30, toAge: 35, linkedEventId: 'split_pair_1' });
+        const part2 = makeEvent({ id: 'salary_split_p2', type: 'SI', fromAge: 35, toAge: 40, linkedEventId: 'split_pair_1' });
+        const result = runDetector([part1, part2, mv], 'aa');
+        assert(!result.find(e => e.id === 'salary_split_p1').relocationImpact, 'Split part 1 should remain resolved');
+        assert(!result.find(e => e.id === 'salary_split_p2').relocationImpact, 'Split part 2 should remain resolved');
+      });
+
+      // Test 8b2: Non-overlapping split chain (toAge + 1 = fromAge) should remain resolved.
+      runTest('8b2', function () {
+        const mv = makeEvent({ id: 'mv_split_pair_non_overlap', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const part1 = makeEvent({ id: 'salary_split_non_overlap_p1', type: 'SI', fromAge: 30, toAge: 34, linkedEventId: 'split_pair_2' });
+        const part2 = makeEvent({ id: 'salary_split_non_overlap_p2', type: 'SI', fromAge: 35, toAge: 40, linkedEventId: 'split_pair_2' });
+        const result = runDetector([part1, part2, mv], 'aa');
+        assert(!result.find(e => e.id === 'salary_split_non_overlap_p1').relocationImpact, 'Non-overlap split part 1 should remain resolved');
+        assert(!result.find(e => e.id === 'salary_split_non_overlap_p2').relocationImpact, 'Non-overlap split part 2 should remain resolved');
+      });
+
+      // Test 8c: Split halves should be re-flagged when the relocation event is removed.
+      runTest('8c', function () {
+        const part1 = makeEvent({ id: 'salary_split_removed_p1', type: 'SI', fromAge: 30, toAge: 35, linkedEventId: 'split_removed_1', currency: 'AAA' });
+        const part2 = makeEvent({ id: 'salary_split_removed_p2', type: 'SI', fromAge: 35, toAge: 40, linkedEventId: 'split_removed_1', currency: 'BBB' });
+        const result = runDetector([part1, part2], 'aa');
+        const p1Impact = result.find(e => e.id === 'salary_split_removed_p1').relocationImpact;
+        const p2Impact = result.find(e => e.id === 'salary_split_removed_p2').relocationImpact;
+        assert(p1Impact && p1Impact.category === 'split_orphan', 'Part 1 should be flagged as orphan split when move is removed');
+        assert(p2Impact && p2Impact.category === 'split_orphan', 'Part 2 should be flagged as orphan split when move is removed');
+      });
+
+      // Test 8d: Split halves should be re-flagged when relocation no longer matches split boundary.
+      runTest('8d', function () {
+        const mv = makeEvent({ id: 'mv_split_shifted', type: 'MV-bb', fromAge: 50, toAge: 50 });
+        const part1 = makeEvent({ id: 'salary_split_shifted_p1', type: 'SI', fromAge: 30, toAge: 35, linkedEventId: 'split_shifted_1', currency: 'AAA' });
+        const part2 = makeEvent({ id: 'salary_split_shifted_p2', type: 'SI', fromAge: 35, toAge: 40, linkedEventId: 'split_shifted_1', currency: 'BBB' });
+        const result = runDetector([part1, part2, mv], 'aa');
+        const p1Impact = result.find(e => e.id === 'salary_split_shifted_p1').relocationImpact;
+        const p2Impact = result.find(e => e.id === 'salary_split_shifted_p2').relocationImpact;
+        assert(p1Impact && p1Impact.category === 'split_orphan', 'Part 1 should be flagged when relocation no longer aligns with split');
+        assert(p2Impact && p2Impact.category === 'split_orphan', 'Part 2 should be flagged when relocation no longer aligns with split');
+      });
+
       // Test 9: Resolution detection via property linking.
       runTest('9', function () {
         const mv = makeEvent({ id: 'mv_prop_res', type: 'MV-bb', fromAge: 35, toAge: 35 });
@@ -341,6 +384,30 @@ module.exports = {
         assert.strictEqual(fxAmt, Math.round(10000 * 1.5), 'FX amount should reflect nominal FX');
         assert.strictEqual(pppAmt, Math.round(10000 * 2.0), 'PPP amount should reflect PPP ratio');
         assert.notStrictEqual(pppAmt, fxAmt, 'PPP and FX suggestions should differ when PPP ≠ FX');
+      });
+
+      // Test 13b: Orphan split panel should render without an MV event and offer join action.
+      runTest('13b', function () {
+        const evt = makeEvent({
+          id: 'salary_orphan_panel', type: 'SI', amount: 10000, fromAge: 30, toAge: 40,
+          relocationImpact: {
+            category: 'split_orphan',
+            message: 'stale split',
+            mvEventId: '',
+            autoResolvable: true,
+            details: { linkedEventId: 'split_x', amount: 10000, currency: 'AAA', fromAge: 30, toAge: 40 }
+          }
+        });
+        const env = {
+          webUI: { readEvents: () => [] },
+          eventsTableManager: {
+            getStartCountry: () => 'aa',
+            getOriginCountry: () => 'aa'
+          }
+        };
+        const html = RelocationImpactAssistant.createPanelHtml(evt, 'row_orphan', env);
+        assert(html && html.indexOf('resolution-panel-container') !== -1, 'Orphan split panel should be generated without MV event');
+        assert(html.indexOf('data-action="join_split"') !== -1, 'Orphan split panel should expose join action');
       });
 
       // Test 14: PPP fallback to FX when PPP unavailable.

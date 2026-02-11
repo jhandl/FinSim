@@ -9,6 +9,7 @@ class EventsTableManager {
     this.tooltipTimeout = null; // Reference to tooltip delay timeout
     this._detectorTimeout = null; // For debouncing detector calls
     this._lastDetectorRun = 0; // Timestamp of last detector run (for throttling)
+    this._mvAgesByRowId = {};
     this.setupAddEventButton();
     this.setupEventTableRowDelete();
     this.setupEventTypeChangeHandler();
@@ -28,6 +29,7 @@ class EventsTableManager {
     this.initializeCarets();
     // Check for empty state on initial load
     setTimeout(() => this.checkEmptyState(), 0);
+    setTimeout(() => this._captureRelocationAges(), 0);
 
     /* NEW: Apply saved preferences (view mode + age/year mode) & defaults */
     setTimeout(() => this._applySavedPreferences(), 0);
@@ -381,6 +383,45 @@ class EventsTableManager {
     const eventsTable = document.getElementById('Events');
     if (eventsTable) {
       eventsTable.addEventListener('change', (e) => {
+        if (e.target.classList.contains('event-from-age')) {
+          const row = e.target.closest('tr');
+          const typeInput = row ? row.querySelector('.event-type') : null;
+          const typeValue = typeInput ? typeInput.value : '';
+          if (typeValue && typeValue.indexOf('MV-') === 0) {
+            const rowKey = row && row.dataset ? (row.dataset.rowId || row.dataset.eventId || '') : '';
+            const cachedOldAge = Number(rowKey ? this._mvAgesByRowId[rowKey] : NaN);
+            const focusedOldAge = Number(e.target.dataset ? e.target.dataset.mvPrevAge : NaN);
+            const newAge = Number(e.target.value);
+            const markerIds = this._getRelocationMarkerIdsForRow(row);
+            const oldAge = !isNaN(focusedOldAge) ? focusedOldAge : cachedOldAge;
+            if (!isNaN(oldAge) && !isNaN(newAge) && oldAge !== newAge) {
+              this._syncSplitChainsForRelocationAgeShift(oldAge, newAge);
+            }
+            this._syncSoldRealEstateForRelocationAgeShift(newAge, markerIds);
+            if (rowKey && !isNaN(newAge)) this._mvAgesByRowId[rowKey] = newAge;
+            if (!isNaN(newAge) && e.target.dataset) e.target.dataset.mvPrevAge = String(newAge);
+          }
+        }
+
+        if (e.target.classList.contains('event-to-age')) {
+          const row = e.target.closest('tr');
+          const typeInput = row ? row.querySelector('.event-type') : null;
+          const typeValue = typeInput ? typeInput.value : '';
+          if ((typeValue === 'R' || typeValue === 'M') && !this._suppressSellMarkerClear) {
+            this._applyToRealEstatePair(row, (pairRow) => {
+              this._removeHiddenInput(pairRow, 'event-relocation-sell-mv-id');
+            });
+          }
+        }
+        if (e.target.classList.contains('event-from-age') || e.target.classList.contains('event-to-age')) {
+          const row = e.target.closest('tr');
+          const typeInput = row ? row.querySelector('.event-type') : null;
+          const typeValue = typeInput ? typeInput.value : '';
+          if (!typeValue || typeValue.indexOf('MV-') !== 0) {
+            this._clearLinkedSplitMarker(row);
+          }
+        }
+
         // Always re-analyze on any change to table inputs
         this._scheduleRelocationReanalysis();
 
@@ -394,6 +435,15 @@ class EventsTableManager {
             // If event type changed to/from MV- relocation, update currency selector
             const isOldRelocation = oldType && oldType.indexOf('MV-') === 0;
             const isNewRelocation = newType && newType.indexOf('MV-') === 0;
+            const rowKey = row && row.dataset ? (row.dataset.rowId || row.dataset.eventId || '') : '';
+            if (isNewRelocation) {
+              this._getOrCreateRelocationLinkId(row);
+              const fromAgeInput = row.querySelector('.event-from-age');
+              const fromAge = Number(fromAgeInput ? fromAgeInput.value : '');
+              if (rowKey && !isNaN(fromAge)) this._mvAgesByRowId[rowKey] = fromAge;
+            } else if (rowKey && this._mvAgesByRowId[rowKey] !== undefined) {
+              delete this._mvAgesByRowId[rowKey];
+            }
             if (isOldRelocation !== isNewRelocation) {
               if (Config.getInstance().isRelocationEnabled()) {
                 if (this.webUI.chartManager) {
@@ -413,6 +463,16 @@ class EventsTableManager {
       });
 
       // Also listen for input changes on all event fields to update wizard icons
+      eventsTable.addEventListener('focusin', (e) => {
+        if (!e.target.classList.contains('event-from-age')) return;
+        const row = e.target.closest('tr');
+        const typeInput = row ? row.querySelector('.event-type') : null;
+        const typeValue = typeInput ? typeInput.value : '';
+        if (typeValue && typeValue.indexOf('MV-') === 0) {
+          e.target.dataset.mvPrevAge = e.target.value;
+        }
+      });
+
       eventsTable.addEventListener('input', (e) => {
         if (e.target.matches('.event-name, .event-amount, .event-from-age, .event-to-age, .event-rate, .event-match')) {
           const row = e.target.closest('tr');
@@ -464,6 +524,209 @@ class EventsTableManager {
         console.error('Error analyzing relocation impacts:', err);
       }
     }, 400);
+  }
+
+  _removeHiddenInput(row, className) {
+    if (!row || !className) return;
+    const input = row.querySelector('.' + className);
+    if (input && input.parentNode) input.remove();
+  }
+
+  _captureRelocationAges() {
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const typeInput = row.querySelector('.event-type');
+      const typeValue = typeInput ? String(typeInput.value || '') : '';
+      if (!typeValue || typeValue.indexOf('MV-') !== 0) continue;
+      const fromAgeInput = row.querySelector('.event-from-age');
+      const fromAge = Number(fromAgeInput ? fromAgeInput.value : '');
+      if (isNaN(fromAge)) continue;
+      const rowKey = row && row.dataset ? (row.dataset.rowId || row.dataset.eventId || '') : '';
+      if (!rowKey) continue;
+      this._mvAgesByRowId[rowKey] = fromAge;
+    }
+  }
+
+  _clearLinkedSplitMarker(row) {
+    if (!row) return;
+    const linkedInput = row.querySelector('.event-linked-event-id');
+    const linkedId = linkedInput ? String(linkedInput.value || '') : '';
+    if (!linkedId) return;
+
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    for (let i = 0; i < rows.length; i++) {
+      const chainInput = rows[i].querySelector('.event-linked-event-id');
+      const chainId = chainInput ? String(chainInput.value || '') : '';
+      if (chainId !== linkedId) continue;
+      this._removeHiddenInput(rows[i], 'event-linked-event-id');
+      this._removeHiddenInput(rows[i], 'event-relocation-split-mv-id');
+    }
+  }
+
+  _getRelocationMarkerIdsForRow(row) {
+    if (!row) return [];
+    const ids = [];
+    const linkId = this._getOrCreateRelocationLinkId(row);
+    if (linkId) ids.push(String(linkId));
+    const nameInput = row.querySelector('.event-name');
+    const rowName = nameInput ? String(nameInput.value || '') : '';
+    if (rowName) ids.push(rowName);
+    const runtimeId = row && row.dataset ? String(row.dataset.eventId || '') : '';
+    if (runtimeId) ids.push(runtimeId);
+    return Array.from(new Set(ids));
+  }
+
+  _getOrCreateRelocationLinkId(row) {
+    if (!row) return '';
+    const existing = row.querySelector('.event-relocation-link-id');
+    if (existing && existing.value) return String(existing.value);
+    const linkId = 'mvlink_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    this.getOrCreateHiddenInput(row, 'event-relocation-link-id', linkId);
+    return linkId;
+  }
+
+  _getRelocationLinkIdByImpactId(mvImpactId) {
+    const needle = String(mvImpactId || '');
+    if (!needle) return '';
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+
+    // Runtime row ids are stable and unique; prefer them to names.
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const typeInput = row.querySelector('.event-type');
+      const typeValue = typeInput ? String(typeInput.value || '') : '';
+      if (!typeValue || typeValue.indexOf('MV-') !== 0) continue;
+      const rowRuntimeId = row && row.dataset ? String(row.dataset.eventId || '') : '';
+      if (rowRuntimeId === needle) return this._getOrCreateRelocationLinkId(row);
+    }
+
+    // Name fallback is only safe when exactly one MV row has that name.
+    let nameMatch = null;
+    let nameMatches = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const typeInput = row.querySelector('.event-type');
+      const typeValue = typeInput ? String(typeInput.value || '') : '';
+      if (!typeValue || typeValue.indexOf('MV-') !== 0) continue;
+      const nameInput = row.querySelector('.event-name');
+      const rowName = nameInput ? String(nameInput.value || '') : '';
+      if (rowName === needle) {
+        nameMatches++;
+        nameMatch = row;
+      }
+    }
+    return (nameMatches === 1 && nameMatch) ? this._getOrCreateRelocationLinkId(nameMatch) : '';
+  }
+
+  _removeRowAndResolutionPanel(row) {
+    if (!row) return;
+    const next = row.nextElementSibling;
+    if (next && next.classList && next.classList.contains('resolution-panel-row')) next.remove();
+    row.remove();
+  }
+
+  _syncSplitChainsForRelocationAgeShift(oldAge, newAge) {
+    if (isNaN(oldAge) || isNaN(newAge) || oldAge === newAge) return;
+
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    const chains = {};
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const linkedInput = row.querySelector('.event-linked-event-id');
+      const linkedId = linkedInput ? String(linkedInput.value || '') : '';
+      if (!linkedId) continue;
+      if (!chains[linkedId]) chains[linkedId] = [];
+      chains[linkedId].push(row);
+    }
+
+    const chainIds = Object.keys(chains);
+    for (let i = 0; i < chainIds.length; i++) {
+      const splitRows = chains[chainIds[i]];
+      if (!splitRows || splitRows.length !== 2) continue;
+
+      splitRows.sort((a, b) => {
+        const aFrom = Number(a.querySelector('.event-from-age') ? a.querySelector('.event-from-age').value : '');
+        const bFrom = Number(b.querySelector('.event-from-age') ? b.querySelector('.event-from-age').value : '');
+        if (aFrom !== bFrom) return aFrom - bFrom;
+        const aTo = Number(a.querySelector('.event-to-age') ? a.querySelector('.event-to-age').value : '');
+        const bTo = Number(b.querySelector('.event-to-age') ? b.querySelector('.event-to-age').value : '');
+        return aTo - bTo;
+      });
+
+      const firstRow = splitRows[0];
+      const secondRow = splitRows[1];
+      const firstFromInput = firstRow.querySelector('.event-from-age');
+      const firstToInput = firstRow.querySelector('.event-to-age');
+      const secondFromInput = secondRow.querySelector('.event-from-age');
+      const secondToInput = secondRow.querySelector('.event-to-age');
+      if (!firstFromInput || !firstToInput || !secondFromInput || !secondToInput) continue;
+
+      const firstFrom = Number(firstFromInput.value);
+      const firstTo = Number(firstToInput.value);
+      const secondFrom = Number(secondFromInput.value);
+      const secondTo = Number(secondToInput.value);
+      if (isNaN(firstFrom) || isNaN(firstTo) || isNaN(secondFrom) || isNaN(secondTo)) continue;
+
+      const matchesOldBoundary = (secondFrom === oldAge) || (firstTo === oldAge) || (firstTo + 1 === oldAge);
+      if (!matchesOldBoundary) continue;
+
+      const isOverlappingBoundary = (firstTo === secondFrom);
+      const nextPart1To = isOverlappingBoundary ? newAge : (newAge - 1);
+
+      // Relocation moved before the split range: keep destination-side row only.
+      if (nextPart1To < firstFrom) {
+        secondFromInput.value = String(firstFrom);
+        this._removeHiddenInput(secondRow, 'event-linked-event-id');
+        this._removeHiddenInput(secondRow, 'event-relocation-split-mv-id');
+        this._removeRowAndResolutionPanel(firstRow);
+        continue;
+      }
+
+      // Relocation moved after the split range: keep origin-side row only.
+      if (newAge > secondTo) {
+        firstToInput.value = String(secondTo);
+        this._removeHiddenInput(firstRow, 'event-linked-event-id');
+        this._removeHiddenInput(firstRow, 'event-relocation-split-mv-id');
+        this._removeRowAndResolutionPanel(secondRow);
+        continue;
+      }
+
+      firstToInput.value = String(nextPart1To);
+      secondFromInput.value = String(newAge);
+    }
+  }
+
+  _syncSoldRealEstateForRelocationAgeShift(newAge, mvImpactIds) {
+    if (isNaN(newAge)) return;
+    if (!mvImpactIds || mvImpactIds.length === 0) return;
+
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    const cutoffAge = newAge - 1;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const markerInput = row.querySelector('.event-relocation-sell-mv-id');
+      const markerValue = markerInput ? String(markerInput.value || '') : '';
+      if (!markerValue || mvImpactIds.indexOf(markerValue) === -1) continue;
+
+      const typeInput = row.querySelector('.event-type');
+      const typeValue = typeInput ? typeInput.value : '';
+      if (typeValue !== 'R' && typeValue !== 'M') continue;
+
+      const fromAgeInput = row.querySelector('.event-from-age');
+      const fromAge = Number(fromAgeInput ? fromAgeInput.value : '');
+      if (!isNaN(fromAge) && cutoffAge < fromAge) {
+        this._removeHiddenInput(row, 'event-relocation-sell-mv-id');
+        continue;
+      }
+
+      const toAgeInput = row.querySelector('.event-to-age');
+      if (!toAgeInput) continue;
+      this._suppressSellMarkerClear = true;
+      toAgeInput.value = String(cutoffAge);
+      toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
+      this._suppressSellMarkerClear = false;
+    }
   }
 
   setupSimulationModeChangeHandler() {
@@ -899,6 +1162,9 @@ class EventsTableManager {
         // Click handler: toggle resolution panel (open/close)
         badge.addEventListener('click', (e) => {
           e.stopPropagation();
+          document.querySelectorAll('.visualization-tooltip').forEach(function (tooltipEl) {
+            TooltipUtils.hideTooltip(tooltipEl);
+          });
           const rowId = row.dataset.rowId;
           const isOpen = (row.nextElementSibling && row.nextElementSibling.classList && row.nextElementSibling.classList.contains('resolution-panel-row'));
           if (isOpen) {
@@ -987,6 +1253,9 @@ class EventsTableManager {
         event.relocationImpact.details = row.dataset.relocationImpactDetails;
       }
     }
+    if (event.relocationImpact && row.dataset.relocationImpactDetails && event.relocationImpact.details == null) {
+      event.relocationImpact.details = row.dataset.relocationImpactDetails;
+    }
 
     if (!event.relocationImpact) return;
     const env = { webUI: this.webUI, eventsTableManager: this, config: (typeof Config !== 'undefined' ? Config.getInstance() : null), formatUtils: this.webUI && this.webUI.formatUtils };
@@ -1002,615 +1271,26 @@ class EventsTableManager {
     RelocationImpactAssistant.collapsePanelForTableRow(row);
   }
 
-  /**
-   * Create HTML content for the resolution panel
-   */
-  handleResolutionTabSelection(rootEl, tabButton) {
-    if (!rootEl || !tabButton) return;
-    const action = tabButton.getAttribute('data-action');
-    if (!action) return;
-
-    const tabs = rootEl.querySelectorAll('.resolution-tab');
-    tabs.forEach(tab => {
-      const isActive = (tab === tabButton);
-      tab.classList.toggle('resolution-tab-active', isActive);
-      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      tab.setAttribute('tabindex', isActive ? '0' : '-1');
-    });
-
-    const details = rootEl.querySelectorAll('.resolution-detail');
-    let selectedDetail = null;
-    details.forEach(detail => {
-      const matches = detail.getAttribute('data-action') === action;
-      if (matches) {
-        selectedDetail = detail;
-        if (!detail.classList.contains('resolution-detail-active') || detail.hasAttribute('hidden')) {
-          this._animateOpenResolutionDetail(detail);
-        } else {
-          detail.setAttribute('aria-hidden', 'false');
-          detail.style.pointerEvents = '';
-        }
-      } else if (!detail.hasAttribute('hidden') || detail.classList.contains('resolution-detail-active')) {
-        this._animateCloseResolutionDetail(detail);
+  _findEventRow(rowId, eventId) {
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    // Row id is the canonical table identity; prefer it over event ids (which can be duplicated).
+    if (rowId) {
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].dataset && rows[i].dataset.rowId === rowId) return rows[i];
       }
-    });
-
-    if (selectedDetail && typeof selectedDetail.scrollIntoView === 'function' && rootEl.closest('.events-accordion')) {
-      selectedDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
+    if (eventId) {
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].dataset && rows[i].dataset.eventId === eventId) return rows[i];
+      }
+    }
+    return null;
   }
 
-  _clearResolutionDetailTransition(detail) {
-    if (!detail) return;
-    if (detail._resolutionDetailTimer) {
-      clearTimeout(detail._resolutionDetailTimer);
-      detail._resolutionDetailTimer = null;
-    }
-    if (detail._resolutionDetailHandler) {
-      detail.removeEventListener('transitionend', detail._resolutionDetailHandler);
-      detail._resolutionDetailHandler = null;
-    }
-  }
-
-  _animateOpenResolutionDetail(detail) {
-    if (!detail) return;
-    this._clearResolutionDetailTransition(detail);
-
-    detail.classList.add('resolution-detail-active');
-    detail.removeAttribute('hidden');
-    detail.setAttribute('aria-hidden', 'false');
-    detail.style.pointerEvents = 'auto';
-
-    const targetHeight = detail.scrollHeight;
-    detail.style.overflow = 'hidden';
-    detail.style.transition = 'none';
-    detail.style.height = '0px';
-    detail.style.opacity = '0';
-    // Force reflow to ensure the browser applies starting values
-    // eslint-disable-next-line no-unused-expressions
-    detail.offsetHeight;
-    detail.style.transition = 'height 0.24s ease, opacity 0.18s ease';
-    detail.style.height = targetHeight + 'px';
-    detail.style.opacity = '1';
-
-    const onEnd = (evt) => {
-      if (evt && evt.target !== detail) return;
-      if (detail._resolutionDetailTimer) {
-        clearTimeout(detail._resolutionDetailTimer);
-        detail._resolutionDetailTimer = null;
-      }
-      detail.style.transition = '';
-      detail.style.height = 'auto';
-      detail.style.opacity = '';
-      detail.style.overflow = '';
-      detail.style.pointerEvents = '';
-      detail._resolutionDetailHandler = null;
-      detail.removeEventListener('transitionend', onEnd);
-    };
-    detail._resolutionDetailHandler = onEnd;
-    detail.addEventListener('transitionend', onEnd);
-    detail._resolutionDetailTimer = setTimeout(() => {
-      if (detail._resolutionDetailHandler) {
-        onEnd({ target: detail });
-      }
-    }, 320);
-  }
-
-  _animateCloseResolutionDetail(detail) {
-    if (!detail) return;
-    this._clearResolutionDetailTransition(detail);
-    detail.style.pointerEvents = 'none';
-    detail.setAttribute('aria-hidden', 'true');
-
-    const startHeight = detail.scrollHeight;
-    if (!startHeight) {
-      detail.classList.remove('resolution-detail-active');
-      detail.setAttribute('hidden', 'hidden');
-      detail.style.transition = '';
-      detail.style.height = '';
-      detail.style.opacity = '';
-      detail.style.overflow = '';
-      detail.style.pointerEvents = '';
-      detail._resolutionDetailHandler = null;
-      return;
-    }
-    const computedStyle = (typeof window !== 'undefined' && window.getComputedStyle) ? window.getComputedStyle(detail) : null;
-    detail.style.overflow = 'hidden';
-    detail.style.transition = 'none';
-    detail.style.height = startHeight + 'px';
-    detail.style.opacity = computedStyle ? computedStyle.opacity || '1' : '1';
-    // Force reflow with explicit height before collapsing
-    // eslint-disable-next-line no-unused-expressions
-    detail.offsetHeight;
-    detail.style.transition = 'height 0.24s ease, opacity 0.18s ease';
-    detail.style.height = '0px';
-    detail.style.opacity = '0';
-
-    const onEnd = (evt) => {
-      if (evt && evt.target !== detail) return;
-      if (detail._resolutionDetailTimer) {
-        clearTimeout(detail._resolutionDetailTimer);
-        detail._resolutionDetailTimer = null;
-      }
-      detail.classList.remove('resolution-detail-active');
-      detail.setAttribute('hidden', 'hidden');
-      detail.style.transition = '';
-      detail.style.height = '';
-      detail.style.opacity = '';
-      detail.style.overflow = '';
-      detail.style.pointerEvents = '';
-      detail._resolutionDetailHandler = null;
-      detail.removeEventListener('transitionend', onEnd);
-    };
-    detail._resolutionDetailHandler = onEnd;
-    detail.addEventListener('transitionend', onEnd);
-    detail._resolutionDetailTimer = setTimeout(() => {
-      if (detail._resolutionDetailHandler) {
-        onEnd({ target: detail });
-      }
-    }, 320);
-  }
-
-  bindResolutionTabAccessibility(rootEl) {
-    if (!rootEl || rootEl._resolutionTabKeyboardBound) return;
-    const keyHandler = (event) => {
-      this._handleResolutionTabKeydown(rootEl, event);
-    };
-    rootEl.addEventListener('keydown', keyHandler);
-    rootEl._resolutionTabKeyboardBound = true;
-  }
-
-  _handleResolutionTabKeydown(rootEl, event) {
-    if (!event || event.defaultPrevented) return;
-    const tab = event.target && event.target.closest && event.target.closest('.resolution-tab');
-    if (!tab) return;
-    const key = event.key;
-    if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return;
-    const tabs = Array.from(rootEl.querySelectorAll('.resolution-tab'));
-    if (!tabs.length) return;
-    const currentIndex = tabs.indexOf(tab);
-    if (currentIndex === -1) return;
-
-    let nextIndex = currentIndex;
-    if (key === 'ArrowRight') {
-      nextIndex = (currentIndex + 1) % tabs.length;
-    } else if (key === 'ArrowLeft') {
-      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-    } else if (key === 'Home') {
-      nextIndex = 0;
-    } else if (key === 'End') {
-      nextIndex = tabs.length - 1;
-    }
-
-    if (nextIndex === currentIndex) return;
-    event.preventDefault();
-    const nextTab = tabs[nextIndex];
-    if (nextTab) {
-      if (typeof nextTab.focus === 'function') {
-        nextTab.focus();
-      }
-      this.handleResolutionTabSelection(rootEl, nextTab);
-    }
-  }
-
-  createResolutionPanelContent(event, rowId) {
-    const mvEvent = this.webUI.readEvents(false).find(e => e.id === event.relocationImpact.mvEventId);
-    if (!mvEvent) return '';
-    const destCountry = mvEvent.type.substring(3).toLowerCase();
-    const startCountry = Config.getInstance().getStartCountry();
-    const originCountry = this.getOriginCountry(mvEvent, startCountry);
-    const relocationAge = mvEvent.fromAge;
-    // Economic context removed for compact layout
-
-    let content = '';
-
-    // Economic data for tooltip context
-    const econ = Config.getInstance().getEconomicData();
-    const baseAmountSanitized = (function (a) {
-      var s = (a == null) ? '' : String(a);
-      s = s.replace(/[^0-9.\-]/g, '');
-      var n = Number(s);
-      return isNaN(n) ? Number(a) : n;
-    })(event.amount);
-    const fxRate = econ && econ.ready ? econ.getFX(originCountry, destCountry) : null;
-    const pppRatio = econ && econ.ready ? econ.getPPP(originCountry, destCountry) : null;
-    const fxAmount = (fxRate != null && !isNaN(baseAmountSanitized)) ? Math.round(baseAmountSanitized * fxRate) : null;
-    const pppAmount = (pppRatio != null && !isNaN(baseAmountSanitized)) ? Math.round(baseAmountSanitized * pppRatio) : null;
-    let fxDate = null;
-    if (econ && econ.data) {
-      var toEntry = econ.data[String(destCountry).toUpperCase()];
-      fxDate = toEntry && toEntry.fx_date ? toEntry.fx_date : null;
-    }
-
-    function getSymbolAndLocaleByCountry(countryCode) {
-      try {
-        const rs = Config.getInstance().getCachedTaxRuleSet(countryCode);
-        const ls = (FormatUtils && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
-        return {
-          symbol: rs && typeof rs.getCurrencySymbol === 'function' ? rs.getCurrencySymbol() : (ls.currencySymbol || ''),
-          locale: rs && typeof rs.getNumberLocale === 'function' ? rs.getNumberLocale() : (ls.numberLocale || 'en-US')
-        };
-      } catch (_) {
-        const ls = (FormatUtils && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
-        return { symbol: ls.currencySymbol || '', locale: ls.numberLocale || 'en-US' };
-      }
-    }
-
-    function fmtWithSymbol(symbol, locale, value) {
-      if (value == null || value === '' || isNaN(Number(value))) return '';
-      const num = Number(value);
-      try {
-        const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num);
-        return (symbol || '') + formatted;
-      } catch (_) {
-        return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      }
-    }
-
-    const actions = [];
-    let containerAttributes = '';
-
-    function addAction(actionConfig) {
-      if (!actionConfig || !actionConfig.action) return;
-      actionConfig.tabId = 'resolution-tab-' + rowId + '-' + actionConfig.action;
-      actionConfig.detailId = 'resolution-detail-' + rowId + '-' + actionConfig.action;
-      actions.push(actionConfig);
-    }
-
-    if (event.relocationImpact.category === 'boundary') {
-      // boundary: R/M -> Keep/Sell; Others -> Split/Peg
-      if (event.type === 'R' || event.type === 'M') {
-        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
-        const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
-        const originCountryCode = originCountry ? originCountry.toUpperCase() : '';
-
-        addAction({
-          action: 'keep_property',
-          tabLabel: 'Keep Property',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}"`,
-          bodyHtml: `
-            <div class="resolution-quick-action">
-              <p class="micro-note">Keep the property and associated mortgage. We will link both to ${originCountryCode} and keep values in ${originCurrency}.</p>
-            </div>
-          `
-        });
-
-        addAction({
-          action: 'sell_property',
-          tabLabel: 'Sell Property',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}"`,
-          bodyHtml: `
-            <div class="resolution-quick-action">
-              <p class="micro-note">Sell the property at the relocation boundary and stop the associated mortgage payments from that age.</p>
-            </div>
-          `
-        });
-      } else {
-        const pppSuggestionRaw = this.calculatePPPSuggestion(event.amount, originCountry, destCountry);
-        const pppSuggestionNum = Number(pppSuggestionRaw);
-        const pppSuggestion = isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum);
-        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
-        const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
-        const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
-        const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
-        const fromMeta = getSymbolAndLocaleByCountry(originCountry);
-        const toMeta = getSymbolAndLocaleByCountry(destCountry);
-        const originCountryCode = originCountry ? originCountry.toUpperCase() : '';
-        const destCountryCode = destCountry ? destCountry.toUpperCase() : '';
-        const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
-        const part1AmountFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmountSanitized);
-        const inputFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : pppSuggestion;
-        const originalAmountFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmountSanitized);
-        containerAttributes = ` data-from-country="${originCountry}" data-to-country="${destCountry}" data-from-currency="${originCurrency}" data-to-currency="${destCurrency}" data-base-amount="${isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)}" data-fx="${fxRate != null ? fxRate : ''}" data-fx-date="${fxDate || ''}" data-ppp="${pppRatio != null ? pppRatio : ''}" data-fx-amount="${fxAmount != null ? fxAmount : ''}" data-ppp-amount="${pppAmount != null ? pppAmount : ''}"`;
-
-        addAction({
-          action: 'split',
-          tabLabel: 'Split Event',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}"`,
-          bodyHtml: `
-            <div class="split-preview-inline compact">
-              <div class="split-parts-container">
-                <div class="split-part-info">
-                  <div class="part-label">Part 1: Age ${event.fromAge}-${relocationAge}</div>
-                  <div class="part-detail">${part1AmountFormatted} (read-only)</div>
-                </div>
-                <div class="split-part-info">
-                  <div class="part-label">Part 2: Age ${relocationAge}-${event.toAge}</div>
-                  <div class="part-detail">
-                    <input type="text" class="part2-amount-input" value="${inputFormatted}" placeholder="Amount">
-                    ${destCurrency}
-                  </div>
-                  <div class="ppp-hint">PPP suggestion</div>
-                </div>
-              </div>
-              <p class="micro-note">Apply creates a new event starting at age ${relocationAge} in ${destCurrencyCode || destCurrency}. Adjust the Part 2 amount to what the move will cost in the destination currency.</p>
-            </div>
-          `
-        });
-
-        addAction({
-          action: 'peg',
-          tabLabel: 'Keep Original Currency',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}" data-currency="${originCurrency}"`,
-          bodyHtml: `
-            <div class="resolution-quick-action">
-              <p class="micro-note">Apply keeps this event denominated in ${originCurrency}, leaving the current value (${originalAmountFormatted || originCurrency}) unchanged after the move to ${destCurrencyCode || destCurrency || 'the destination currency'}.</p>
-              <p class="micro-note">Choose this when you prefer to convert the amount manually later.</p>
-            </div>
-          `
-        });
-      }
-    } else if (event.relocationImpact.category === 'simple') {
-      // simple: R/M with missing linkedCountry -> Link To Country
-      if ((event.type === 'R' || event.type === 'M') && !event.linkedCountry) {
-        const countries = Config.getInstance().getAvailableCountries();
-        const detectedCountry = this.detectPropertyCountry(event.fromAge, startCountry);
-        const detectedCountryObj = countries.find(c => c.code.toLowerCase() === detectedCountry);
-        const detectedCountryName = detectedCountryObj ? detectedCountryObj.name : (detectedCountry ? detectedCountry.toUpperCase() : '');
-        const ruleSet = Config.getInstance().getCachedTaxRuleSet(detectedCountry);
-        const currency = ruleSet ? ruleSet.getCurrencyCode() : 'EUR';
-
-        let optionsHTML = '';
-        countries.forEach(country => {
-          const selected = country.code.toLowerCase() === detectedCountry ? 'selected' : '';
-          optionsHTML += `<option value="${country.code.toLowerCase()}" ${selected}>${country.name}</option>`;
-        });
-
-        addAction({
-          action: 'link',
-          tabLabel: 'Link To Country',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}"`,
-          bodyHtml: `
-            <p class="micro-note">Detected country: ${detectedCountryName}. Change if the property belongs to a different jurisdiction.</p>
-            <div class="country-selector-inline">
-              <label for="country-select-${rowId}">Country</label>
-              <select class="country-selector" id="country-select-${rowId}" data-row-id="${rowId}">
-                ${optionsHTML}
-              </select>
-            </div>
-            <p class="micro-note">Apply links this property to the selected country and updates its currency to match (default ${currency}).</p>
-          `
-        });
-      } else if ((event.type === 'SI' || event.type === 'SI2')) {
-        // SI/SI2: Offer currency/amount actions; if destination is state_only, conversion is implied on Accept
-        const pppSuggestionRaw = this.calculatePPPSuggestion(event.amount, originCountry, destCountry);
-        const pppSuggestionNum = Number(pppSuggestionRaw);
-        const pppSuggestion = isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum);
-        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
-        const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
-        const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
-        const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
-        const fromMeta = getSymbolAndLocaleByCountry(originCountry);
-        const toMeta = getSymbolAndLocaleByCountry(destCountry);
-        const currentAmountNum = Number(baseAmountSanitized);
-        const percentage = (!isNaN(pppSuggestionNum) && !isNaN(currentAmountNum) && currentAmountNum !== 0)
-          ? (((pppSuggestionNum / currentAmountNum - 1) * 100).toFixed(1))
-          : '0.0';
-        const currentFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, currentAmountNum);
-        const suggestedFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : pppSuggestion;
-        const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
-        const destCountryLabel = (destCountry ? destCountry.toUpperCase() : '') || 'destination country';
-        containerAttributes = ` data-from-country="${originCountry}" data-to-country="${destCountry}" data-from-currency="${originCurrency}" data-to-currency="${destCurrency}" data-base-amount="${isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)}" data-fx="${fxRate != null ? fxRate : ''}" data-fx-date="${fxDate || ''}" data-ppp="${pppRatio != null ? pppRatio : ''}" data-fx-amount="${fxAmount != null ? fxAmount : ''}" data-ppp-amount="${pppAmount != null ? pppAmount : ''}"`;
-
-        addAction({
-          action: 'accept',
-          tabLabel: 'Apply Suggested Amount',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}" data-suggested-amount="${pppSuggestion}" data-suggested-currency="${destCurrency}"`,
-          bodyHtml: `
-            <div class="suggestion-comparison compact">
-              <div class="comparison-row">
-                <span class="comparison-label">Current</span>
-                <span class="comparison-value">${currentFormatted}</span>
-              </div>
-              <div class="comparison-row">
-                <span class="comparison-label">Suggested</span>
-                <span class="comparison-value">${suggestedFormatted}</span>
-              </div>
-              <div class="difference">Δ ${percentage}%</div>
-            </div>
-            <p class="micro-note">Apply updates the amount to ${suggestedFormatted} (${destCurrencyCode || destCurrency}) so it reflects purchasing power in ${destCountryLabel}.</p>
-            <p class="micro-note">Note: If the destination has a state-only pension system, this action will convert the salary to a non-pensionable type.</p>
-            `
-        });
-
-        addAction({
-          action: 'peg',
-          tabLabel: 'Keep Original Currency',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}" data-currency="${originCurrency}"`,
-          bodyHtml: `
-            <div class="resolution-quick-action">
-              <p class="micro-note">Apply keeps the current value (${currentFormatted || originCurrency}) in ${originCurrency}. No conversion to ${destCurrencyCode || destCurrency || 'the destination currency'} will occur.</p>
-              <p class="micro-note">Use this when you prefer to keep the origin currency; pension conversion is not needed in this case.</p>
-            </div>
-          `
-        });
-
-        addAction({
-          action: 'review',
-          tabLabel: 'Mark As Reviewed',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}"`,
-          bodyHtml: `
-            <div class="resolution-quick-action">
-              <p class="micro-note">Apply records this relocation impact as reviewed without changing the event’s amount or currency.</p>
-            </div>
-          `
-        });
-      } else {
-        // Else: Accept (PPP), Peg, Review
-        const pppSuggestionRaw = this.calculatePPPSuggestion(event.amount, originCountry, destCountry);
-        const pppSuggestionNum = Number(pppSuggestionRaw);
-        const pppSuggestion = isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum);
-        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
-        const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
-        const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
-        const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
-        const fromMeta = getSymbolAndLocaleByCountry(originCountry);
-        const toMeta = getSymbolAndLocaleByCountry(destCountry);
-        const currentAmountNum = Number(baseAmountSanitized);
-        const percentage = (!isNaN(pppSuggestionNum) && !isNaN(currentAmountNum) && currentAmountNum !== 0)
-          ? (((pppSuggestionNum / currentAmountNum - 1) * 100).toFixed(1))
-          : '0.0';
-        const currentFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, currentAmountNum);
-        const suggestedFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : pppSuggestion;
-        const originCountryCode = originCountry ? originCountry.toUpperCase() : '';
-        const destCountryCode = destCountry ? destCountry.toUpperCase() : '';
-        const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
-        const destCountryLabel = destCountryCode || 'destination country';
-        containerAttributes = ` data-from-country="${originCountry}" data-to-country="${destCountry}" data-from-currency="${originCurrency}" data-to-currency="${destCurrency}" data-base-amount="${isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)}" data-fx="${fxRate != null ? fxRate : ''}" data-fx-date="${fxDate || ''}" data-ppp="${pppRatio != null ? pppRatio : ''}" data-fx-amount="${fxAmount != null ? fxAmount : ''}" data-ppp-amount="${pppAmount != null ? pppAmount : ''}"`;
-
-        addAction({
-          action: 'accept',
-          tabLabel: 'Apply Suggested Amount',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}" data-suggested-amount="${pppSuggestion}" data-suggested-currency="${destCurrency}"`,
-          bodyHtml: `
-          <div class="suggestion-comparison compact">
-            <div class="comparison-row">
-              <span class="comparison-label">Current</span>
-              <span class="comparison-value">${currentFormatted}</span>
-            </div>
-            <div class="comparison-row">
-              <span class="comparison-label">Suggested</span>
-              <span class="comparison-value">${suggestedFormatted}</span>
-            </div>
-            <div class="difference">Δ ${percentage}%</div>
-          </div>
-          <p class="micro-note">Apply updates the amount to ${suggestedFormatted} (${destCurrencyCode || destCurrency}) so it reflects purchasing power in ${destCountryLabel}.</p>
-          `
-        });
-
-        addAction({
-          action: 'peg',
-          tabLabel: 'Keep Original Currency',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}" data-currency="${originCurrency}"`,
-          bodyHtml: `
-          <div class="resolution-quick-action">
-            <p class="micro-note">Apply keeps the current value (${currentFormatted || originCurrency}) in ${originCurrency}. No conversion to ${destCurrencyCode || destCurrency || 'the destination currency'} will occur.</p>
-            <p class="micro-note">Use this when you prefer to adjust the amount manually later but still clear the warning.</p>
-          </div>
-        `
-        });
-
-        addAction({
-          action: 'review',
-          tabLabel: 'Mark As Reviewed',
-          buttonLabel: 'Apply',
-          buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply',
-          buttonAttrs: ` data-row-id="${rowId}"`,
-          bodyHtml: `
-          <div class="resolution-quick-action">
-            <p class="micro-note">Apply records this relocation impact as reviewed without changing the event’s amount or currency. Only use this if you have reconciled the numbers elsewhere.</p>
-            <p class="micro-note">Current value remains ${currentFormatted || originCurrency}.</p>
-          </div>
-        `
-        });
-      }
-    }
-
-    if (!actions.length) return content;
-
-    const impactCause = (event.relocationImpact.message || '').trim() || 'Relocation impact detected for this event.';
-
-    const tabsHtml = actions.map(actionConfig => (
-      `<button type="button" class="resolution-tab" id="${actionConfig.tabId}" role="tab" aria-selected="false" aria-controls="${actionConfig.detailId}" data-action="${actionConfig.action}" tabindex="0">${actionConfig.tabLabel}</button>`
-    )).join('');
-
-    const detailsHtml = actions.map(actionConfig => {
-      const buttonClass = actionConfig.buttonClass || 'event-wizard-button resolution-apply';
-      const buttonAttrs = actionConfig.buttonAttrs || '';
-      return `
-        <div class="resolution-detail" id="${actionConfig.detailId}" role="tabpanel" aria-labelledby="${actionConfig.tabId}" data-action="${actionConfig.action}" hidden aria-hidden="true">
-          <div class="resolution-detail-content">
-            ${actionConfig.bodyHtml}
-          </div>
-          <div class="resolution-detail-footer">
-            <button type="button" class="${buttonClass}" data-action="${actionConfig.action}"${buttonAttrs}>${actionConfig.buttonLabel}</button>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    content = `
-      <div class="resolution-panel-expander">
-        <div class="resolution-panel-container"${containerAttributes}>
-          <div class="resolution-panel-header">
-            <h4>${impactCause}</h4>
-            <button class="panel-close-btn">×</button>
-          </div>
-          <div class="resolution-panel-body">
-            <div class="resolution-tab-strip" role="tablist" aria-label="Resolution actions" aria-orientation="horizontal">
-              ${tabsHtml}
-            </div>
-            <div class="resolution-details">
-              ${detailsHtml}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    return content;
-  }
-
-  /**
-   * Setup event listeners for panel collapse triggers
-   */
-  _setupPanelCollapseTriggers(rowId, panelRow) {
-    // Click-outside handler
-    const clickOutsideHandler = (e) => {
-      if (!panelRow.contains(e.target) && !panelRow.previousElementSibling.contains(e.target)) {
-        this.collapseResolutionPanel(rowId);
-      }
-    };
-    document.addEventListener('click', clickOutsideHandler);
-    panelRow._clickOutsideHandler = clickOutsideHandler;
-
-    // ESC key handler
-    const escHandler = (e) => {
-      if (e.key === 'Escape') {
-        this.collapseResolutionPanel(rowId);
-      }
-    };
-    document.addEventListener('keydown', escHandler);
-    panelRow._escHandler = escHandler;
-  }
-
-  /**
-   * Remove event listeners for panel collapse triggers
-   */
-  _removePanelCollapseTriggers(panelRow) {
-    if (panelRow._clickOutsideHandler) {
-      document.removeEventListener('click', panelRow._clickOutsideHandler);
-      delete panelRow._clickOutsideHandler;
-    }
-    if (panelRow._escHandler) {
-      document.removeEventListener('keydown', panelRow._escHandler);
-      delete panelRow._escHandler;
-    }
-  }
-
-  splitEventAtRelocation(rowId, part2AmountOverride) {
-    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  splitEventAtRelocation(rowId, part2AmountOverride, eventId) {
+    const row = this._findEventRow(rowId, eventId);
     if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
     // Get event data from events array using row index (avoid relying on dataset.eventId)
     const tableRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
     const rowIndex = tableRows.indexOf(row);
@@ -1625,9 +1305,12 @@ class EventsTableManager {
       part2AmountRaw = adjPanelInput ? adjPanelInput.value : '';
     }
     // Identify MV event and destination up-front for robust locale parsing
-    const mvEvent = events.find(e => e.id === event.relocationImpact.mvEventId);
+    const mvImpactId = event.relocationImpact.mvEventId;
+    const mvEvent = events.find(e => e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId));
     if (!mvEvent) return;
     const relocationAge = mvEvent.fromAge;
+    const relocationAgeNum = Number(relocationAge);
+    const part1ToAge = isNaN(relocationAgeNum) ? relocationAge : (relocationAgeNum - 1);
     const destCountry = mvEvent.type.substring(3).toLowerCase();
 
     // Determine locale hints from the inline resolution panel
@@ -1682,6 +1365,7 @@ class EventsTableManager {
     }
 
     const linkedEventId = 'split_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const splitMvId = this._getRelocationLinkIdByImpactId(mvImpactId) || String(mvImpactId || '');
     // Prefer parsing the original row's displayed amount using the origin country's locale
     const originalAmountRaw = (row.querySelector && row.querySelector('.event-amount') ? row.querySelector('.event-amount').value : (event && event.amount));
     const part1AmountNum = parseByCountry(originalAmountRaw, fromCountryHint);
@@ -1704,11 +1388,13 @@ class EventsTableManager {
     const rateForInput = normalizePercentForInput(event && event.rate);
     const matchForInput = normalizePercentForInput(event && event.match);
 
-    const part1Row = this.createEventRow(event.type, event.id, part1Amount, event.fromAge, relocationAge, rateForInput, matchForInput);
+    const part1Row = this.createEventRow(event.type, event.id, part1Amount, event.fromAge, part1ToAge, rateForInput, matchForInput);
     this.getOrCreateHiddenInput(part1Row, 'event-linked-event-id', linkedEventId);
+    if (splitMvId) this.getOrCreateHiddenInput(part1Row, 'event-relocation-split-mv-id', splitMvId);
     if (fromCountryHint) this.getOrCreateHiddenInput(part1Row, 'event-country', String(fromCountryHint).toLowerCase());
     const part2Row = this.createEventRow(part2EventType, event.id, part2Amount, relocationAge, event.toAge, rateForInput, matchForInput);
     this.getOrCreateHiddenInput(part2Row, 'event-linked-event-id', linkedEventId);
+    if (splitMvId) this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-mv-id', splitMvId);
     this.getOrCreateHiddenInput(part2Row, 'event-currency', destCurrency);
     if (toCountryHint) this.getOrCreateHiddenInput(part2Row, 'event-country', String(toCountryHint).toLowerCase());
 
@@ -1730,12 +1416,12 @@ class EventsTableManager {
       match: matchForInput || ''
     };
     // Ensure resolution panel is collapsed/removed before deleting the original row to avoid orphaned panel DOM
-    this.collapseResolutionPanel(rowId);
+    this.collapseResolutionPanel(resolvedRowId);
     row.classList.add('deleting-fade');
     setTimeout(() => {
       row.remove();
       // Recompute after original row removal so counts and badges align
-      this._afterResolutionAction(rowId);
+      this._afterResolutionAction(resolvedRowId);
       // After table and accordion refresh/sort, animate the new table row
       if (typeof this.animateNewTableRow === 'function') {
         setTimeout(() => { this.animateNewTableRow(newEventData); }, 400);
@@ -1753,8 +1439,8 @@ class EventsTableManager {
         if (!toAgeInput) return;
         // Keep earlier end if it already ends before relocation
         const existing = Number(toAgeInput.value);
-        if (isNaN(existing) || existing > relocationAge) {
-          toAgeInput.value = String(relocationAge);
+        if (isNaN(existing) || existing > part1ToAge) {
+          toAgeInput.value = String(part1ToAge);
           toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
       });
@@ -1778,19 +1464,166 @@ class EventsTableManager {
     }
   }
 
-  pegCurrencyToOriginal(rowId, currencyCode) {
-    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  cutShortEventAtRelocation(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
     if (!row) return;
-    // Set currency on current row
-    this.getOrCreateHiddenInput(row, 'event-currency', currencyCode);
-    // Also apply to paired real-estate rows if applicable
-    this._applyToRealEstatePair(row, (r) => this.getOrCreateHiddenInput(r, 'event-currency', currencyCode));
-    this._afterResolutionAction(rowId);
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
+    const tableRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
+    const rowIndex = tableRows.indexOf(row);
+    if (rowIndex === -1) return;
+    const events = this.webUI.readEvents(false);
+    const event = events[rowIndex];
+    if (!event || !event.relocationImpact) return;
+    const mvImpactId = event.relocationImpact.mvEventId;
+    const mvEvent = events.find(e => e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId));
+    if (!mvEvent) return;
+    const relocationAge = Number(mvEvent.fromAge);
+    const cutShortToAge = relocationAge - 1;
+    const toAgeInput = row.querySelector('.event-to-age');
+    if (toAgeInput) {
+      const existingToAge = Number(toAgeInput.value);
+      if (isNaN(existingToAge) || existingToAge > cutShortToAge) {
+        toAgeInput.value = String(cutShortToAge);
+        toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    this._afterResolutionAction(resolvedRowId);
   }
 
-  acceptSuggestion(rowId, suggestedAmount, suggestedCurrency) {
-    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  joinSplitEvents(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
     if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
+    const linkedEventIdInput = row.querySelector('.event-linked-event-id');
+    const linkedEventId = linkedEventIdInput ? linkedEventIdInput.value : '';
+    if (!linkedEventId) return;
+
+    const allRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    const splitRows = allRows.filter(r => {
+      const idInput = r.querySelector('.event-linked-event-id');
+      return idInput && idInput.value === linkedEventId;
+    });
+    if (splitRows.length < 2) return;
+
+    const getNum = (rowEl, selector) => {
+      const input = rowEl.querySelector(selector);
+      const n = Number(input ? input.value : '');
+      return isNaN(n) ? Number.POSITIVE_INFINITY : n;
+    };
+    splitRows.sort((a, b) => {
+      const fromDiff = getNum(a, '.event-from-age') - getNum(b, '.event-from-age');
+      if (fromDiff !== 0) return fromDiff;
+      return getNum(a, '.event-to-age') - getNum(b, '.event-to-age');
+    });
+
+    const firstRow = splitRows[0];
+    const lastRow = splitRows[splitRows.length - 1];
+
+    const mergedType = firstRow.querySelector('.event-type') ? firstRow.querySelector('.event-type').value : '';
+    const mergedName = firstRow.querySelector('.event-name') ? firstRow.querySelector('.event-name').value : '';
+    const mergedAmount = firstRow.querySelector('.event-amount') ? firstRow.querySelector('.event-amount').value : '';
+    const mergedFromAge = firstRow.querySelector('.event-from-age') ? firstRow.querySelector('.event-from-age').value : '';
+    const mergedToAge = lastRow.querySelector('.event-to-age') ? lastRow.querySelector('.event-to-age').value : '';
+    const mergedRate = firstRow.querySelector('.event-rate') ? firstRow.querySelector('.event-rate').value : '';
+    const mergedMatch = firstRow.querySelector('.event-match') ? firstRow.querySelector('.event-match').value : '';
+
+    const mergedRow = this.createEventRow(
+      mergedType,
+      mergedName,
+      mergedAmount,
+      mergedFromAge,
+      mergedToAge,
+      mergedRate,
+      mergedMatch
+    );
+
+    const firstCurrency = firstRow.querySelector('.event-currency');
+    if (firstCurrency && firstCurrency.value) this.getOrCreateHiddenInput(mergedRow, 'event-currency', firstCurrency.value);
+    const firstLinkedCountry = firstRow.querySelector('.event-linked-country');
+    if (firstLinkedCountry && firstLinkedCountry.value) this.getOrCreateHiddenInput(mergedRow, 'event-linked-country', firstLinkedCountry.value);
+    const firstCountryHint = firstRow.querySelector('.event-country');
+    if (firstCountryHint && firstCountryHint.value) this.getOrCreateHiddenInput(mergedRow, 'event-country', firstCountryHint.value);
+
+    this.collapseResolutionPanel(resolvedRowId);
+    firstRow.insertAdjacentElement('beforebegin', mergedRow);
+    for (let i = 0; i < splitRows.length; i++) splitRows[i].remove();
+
+    if (this.webUI && this.webUI.formatUtils) {
+      this.webUI.formatUtils.setupCurrencyInputs();
+      this.webUI.formatUtils.setupPercentageInputs();
+    }
+
+    if (this.sortKeys && this.sortKeys.length > 0 && typeof this.applySort === 'function') {
+      this.applySort();
+    } else {
+      const ageInput = document.querySelector('#Events tbody tr .event-from-age');
+      if (ageInput) {
+        ageInput.dispatchEvent(new Event('blur', { bubbles: true }));
+      }
+    }
+
+    const mergedRowId = mergedRow && mergedRow.dataset ? mergedRow.dataset.rowId : resolvedRowId;
+    this._afterResolutionAction(mergedRowId);
+  }
+
+  pegCurrencyToOriginal(rowId, currencyCode, linkedCountry, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
+    let resolvedLinkedCountry = linkedCountry ? String(linkedCountry).toLowerCase() : '';
+    if (!resolvedLinkedCountry) {
+      const events = this.webUI.readEvents(false) || [];
+      let mvEvent = null;
+      const mvImpactId = row.dataset ? row.dataset.relocationImpactMvId : '';
+      if (mvImpactId) mvEvent = events.find(e => e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId));
+      if (!mvEvent) {
+        const visibleRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
+        const rowIndex = visibleRows.indexOf(row);
+        const rowEvent = (rowIndex >= 0 && rowIndex < events.length) ? events[rowIndex] : null;
+        const rowMvId = rowEvent && rowEvent.relocationImpact ? rowEvent.relocationImpact.mvEventId : '';
+        if (rowMvId) mvEvent = events.find(e => e && (e.id === rowMvId || e._mvRuntimeId === rowMvId));
+        if (!mvEvent && rowEvent) {
+          const mvEvents = events
+            .filter(e => e && e.type && e.type.indexOf('MV-') === 0)
+            .sort((a, b) => Number(a.fromAge) - Number(b.fromAge));
+          const fromAge = Number(rowEvent.fromAge);
+          const toAge = Number(rowEvent.toAge);
+          for (let i = 0; i < mvEvents.length; i++) {
+            const mvAge = Number(mvEvents[i].fromAge);
+            if (!isNaN(fromAge) && !isNaN(toAge) && fromAge < mvAge && toAge >= mvAge) {
+              mvEvent = mvEvents[i];
+              break;
+            }
+          }
+          if (!mvEvent) {
+            for (let i = 0; i < mvEvents.length; i++) {
+              const mvAge = Number(mvEvents[i].fromAge);
+              if (!isNaN(fromAge) && fromAge >= mvAge) mvEvent = mvEvents[i];
+              else break;
+            }
+          }
+        }
+      }
+      if (mvEvent) resolvedLinkedCountry = this.getOriginCountry(mvEvent, Config.getInstance().getStartCountry());
+      if (!resolvedLinkedCountry) resolvedLinkedCountry = Config.getInstance().getStartCountry();
+    }
+    // Set currency on current row
+    this.getOrCreateHiddenInput(row, 'event-currency', currencyCode);
+    if (resolvedLinkedCountry) this.getOrCreateHiddenInput(row, 'event-linked-country', resolvedLinkedCountry);
+    this.getOrCreateHiddenInput(row, 'event-resolution-override', '1');
+    // Also apply to paired real-estate rows if applicable
+    this._applyToRealEstatePair(row, (r) => {
+      this.getOrCreateHiddenInput(r, 'event-currency', currencyCode);
+      if (resolvedLinkedCountry) this.getOrCreateHiddenInput(r, 'event-linked-country', resolvedLinkedCountry);
+      this.getOrCreateHiddenInput(r, 'event-resolution-override', '1');
+    });
+    this._afterResolutionAction(resolvedRowId);
+  }
+
+  acceptSuggestion(rowId, suggestedAmount, suggestedCurrency, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
     const amountInput = row.querySelector('.event-amount');
     if (amountInput) {
       const num = Number(suggestedAmount);
@@ -1817,7 +1650,8 @@ class EventsTableManager {
         const visibleRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(rr => rr && rr.style.display !== 'none' && !(rr.classList && rr.classList.contains('resolution-panel-row')));
         const idx = visibleRows.indexOf(row);
         const ev = idx >= 0 ? events[idx] : null;
-        const mv = ev && ev.relocationImpact ? events.find(e => e && e.id === ev.relocationImpact.mvEventId) : null;
+        const mvImpactId = ev && ev.relocationImpact ? ev.relocationImpact.mvEventId : null;
+        const mv = mvImpactId ? events.find(e => e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId)) : null;
         dest = mv ? mv.type.substring(3).toLowerCase() : null;
       }
       if (dest) {
@@ -1825,7 +1659,7 @@ class EventsTableManager {
         if (rs && typeof rs.getPensionSystemType === 'function' && rs.getPensionSystemType() === 'state_only') {
           const newType = currentType === 'SI' ? 'SInp' : 'SI2np';
           typeInput.value = newType;
-          const toggleEl = row.querySelector(`#EventTypeToggle_${rowId}`);
+          const toggleEl = row.querySelector(`#EventTypeToggle_${resolvedRowId}`);
           if (toggleEl) toggleEl.textContent = newType;
           if (row._eventTypeDropdown && typeof row._eventTypeDropdown.setValue === 'function') {
             row._eventTypeDropdown.setValue(newType);
@@ -1835,12 +1669,13 @@ class EventsTableManager {
         }
       }
     }
-    this._afterResolutionAction(rowId);
+    this._afterResolutionAction(resolvedRowId);
   }
 
-  linkPropertyToCountry(rowId, selectedCountryOverride, convertedAmountOverride) {
-    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  linkPropertyToCountry(rowId, selectedCountryOverride, convertedAmountOverride, eventId) {
+    const row = this._findEventRow(rowId, eventId);
     if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
     // Prefer override (accordion) else read from adjacent table panel select
     let selectedCountry = selectedCountryOverride;
     if (!selectedCountry) {
@@ -1901,6 +1736,7 @@ class EventsTableManager {
 
     for (let i = 0; i < targetRows.length; i++) {
       this.getOrCreateHiddenInput(targetRows[i], 'event-linked-country', selectedCountry);
+      this._removeHiddenInput(targetRows[i], 'event-relocation-sell-mv-id');
       if (currency) this.getOrCreateHiddenInput(targetRows[i], 'event-currency', currency);
       // Update amount if conversion was provided
       if (typeof convertedAmountNum === 'number' && !isNaN(convertedAmountNum)) {
@@ -1916,12 +1752,13 @@ class EventsTableManager {
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();
     }
-    this._afterResolutionAction(rowId);
+    this._afterResolutionAction(resolvedRowId);
   }
 
-  linkIncomeToCountry(rowId, country) {
-    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  linkIncomeToCountry(rowId, country, eventId) {
+    const row = this._findEventRow(rowId, eventId);
     if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
     let selectedCountry = country;
     if (!selectedCountry) {
       const adjPanelSelect = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.country-selector');
@@ -1929,12 +1766,13 @@ class EventsTableManager {
     }
     if (!selectedCountry) return;
     this.getOrCreateHiddenInput(row, 'event-linked-country', selectedCountry);
-    this._afterResolutionAction(rowId);
+    this._afterResolutionAction(resolvedRowId);
   }
 
-  convertToPensionless(rowId) {
-    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  convertToPensionless(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
     if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
     const typeInput = row.querySelector('.event-type');
     if (!typeInput) return;
     const currentType = typeInput.value;
@@ -1942,12 +1780,12 @@ class EventsTableManager {
     if (currentType !== 'SI' && currentType !== 'SI2') return;
     const newType = currentType === 'SI' ? 'SInp' : 'SI2np';
     typeInput.value = newType;
-    const toggleEl = row.querySelector(`#EventTypeToggle_${rowId}`);
+    const toggleEl = row.querySelector(`#EventTypeToggle_${resolvedRowId}`);
     if (toggleEl) toggleEl.textContent = newType;
     if (row._eventTypeDropdown) row._eventTypeDropdown.setValue(newType);
     this.updateFieldVisibility(typeInput);
     typeInput.dispatchEvent(new Event('change', { bubbles: true }));
-    this._afterResolutionAction(rowId);
+    this._afterResolutionAction(resolvedRowId);
   }
 
   // Helper: apply function to all rows with same id for both R and M
@@ -1963,14 +1801,15 @@ class EventsTableManager {
     for (let i = 0; i < targets.length; i++) fn(targets[i]);
   }
 
-  markAsReviewed(rowId) {
-    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  markAsReviewed(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
     if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
     // Always apply review override to the current row
     this.getOrCreateHiddenInput(row, 'event-resolution-override', '1');
     // Also apply to paired real-estate rows if applicable (R/M with same id)
     this._applyToRealEstatePair(row, (r) => this.getOrCreateHiddenInput(r, 'event-resolution-override', '1'));
-    this._afterResolutionAction(rowId);
+    this._afterResolutionAction(resolvedRowId);
   }
 
   _afterResolutionAction(rowId) {
@@ -2076,7 +1915,8 @@ class EventsTableManager {
   getOriginCountry(mvEvent, startCountry) {
     const events = this.webUI.readEvents(false);
     const mvEvents = events.filter(e => e.type && e.type.indexOf('MV-') === 0).sort((a, b) => a.fromAge - b.fromAge);
-    const index = mvEvents.findIndex(e => e.id === mvEvent.id);
+    const mvImpactId = mvEvent ? (mvEvent.id || mvEvent._mvRuntimeId || '') : '';
+    const index = mvEvents.findIndex(e => e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId));
     if (index > 0) {
       return mvEvents[index - 1].type.substring(3).toLowerCase();
     }
@@ -2904,7 +2744,54 @@ class EventsTableManager {
   setupAutoSortOnBlur() {
     const eventsTable = document.getElementById('Events');
     if (!eventsTable) return;
+    const shouldSuppressSortForTarget = (target) => {
+      if (!target || typeof target.closest !== 'function') return false;
+      return !!(
+        target.closest('.relocation-impact-badge') ||
+        target.closest('.resolution-panel-row') ||
+        target.closest('.resolution-panel-container') ||
+        target.closest('.resolution-apply') ||
+        target.closest('.resolution-tab') ||
+        target.closest('.panel-close-btn')
+      );
+    };
+    const markSuppressSort = (target) => {
+      if (!shouldSuppressSortForTarget(target)) return;
+      this._suppressAutoSortUntil = Date.now() + 750;
+    };
+    eventsTable.addEventListener('pointerdown', (e) => {
+      markSuppressSort(e.target);
+    }, true);
+    eventsTable.addEventListener('mousedown', (e) => {
+      markSuppressSort(e.target);
+    }, true);
+    eventsTable.addEventListener('touchstart', (e) => {
+      markSuppressSort(e.target);
+    }, true);
     eventsTable.addEventListener('blur', (e) => {
+      if (this._suppressAutoSortUntil && Date.now() < this._suppressAutoSortUntil) return;
+      const related = e.relatedTarget;
+      const relatedIsRelocationBadge = !!(
+        related &&
+        (
+          (related.classList && related.classList.contains('relocation-impact-badge')) ||
+          (typeof related.closest === 'function' && related.closest('.relocation-impact-badge'))
+        )
+      );
+      const relatedIsResolutionControl = !!(
+        related &&
+        (
+          (related.classList && related.classList.contains('resolution-apply')) ||
+          (typeof related.closest === 'function' && (
+            related.closest('.resolution-panel-row') ||
+            related.closest('.resolution-panel-container') ||
+            related.closest('.resolution-tab') ||
+            related.closest('.panel-close-btn')
+          ))
+        )
+      );
+      if (relatedIsRelocationBadge) return;
+      if (relatedIsResolutionControl) return;
       if (e.target.matches('input') && this.sortKeys.length > 0) {
         this.applySort();
       }

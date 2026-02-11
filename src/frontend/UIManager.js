@@ -876,7 +876,9 @@ class UIManager {
     try {
       if (typeof document !== 'undefined') {
         __visibleEventRows = Array.from(document.querySelectorAll('#Events tbody tr'))
-          .filter(function (row) { return row && row.style.display !== 'none'; });
+          .filter(function (row) {
+            return row && row.style.display !== 'none' && !(row.classList && row.classList.contains('resolution-panel-row'));
+          });
       }
     } catch (_) { /* Non-DOM environments (GAS) */ }
 
@@ -967,6 +969,15 @@ class UIManager {
       );
       events.push(eventObj);
 
+      // Always mirror the runtime row id for MV events so relocation references stay stable
+      // even when names are duplicated or later edited.
+      if (/^MV-[A-Z]{2,}$/.test(type) && __visibleEventRows) {
+        const domRow = __visibleEventRows[events.length - 1];
+        if (domRow && domRow.dataset && domRow.dataset.eventId) {
+          eventObj._mvRuntimeId = domRow.dataset.eventId;
+        }
+      }
+
       // Read hidden fields from DOM row (mirror accordion extraction)
       try {
         if (__visibleEventRows) {
@@ -980,6 +991,15 @@ class UIManager {
 
             const linkedEventIdInput = domRow.querySelector('.event-linked-event-id');
             if (linkedEventIdInput && linkedEventIdInput.value) eventObj.linkedEventId = linkedEventIdInput.value;
+
+            const splitMvIdInput = domRow.querySelector('.event-relocation-split-mv-id');
+            if (splitMvIdInput && splitMvIdInput.value) eventObj.relocationSplitMvId = splitMvIdInput.value;
+
+            const relocationLinkIdInput = domRow.querySelector('.event-relocation-link-id');
+            if (relocationLinkIdInput && relocationLinkIdInput.value) eventObj.relocationLinkId = relocationLinkIdInput.value;
+
+            const sellMvIdInput = domRow.querySelector('.event-relocation-sell-mv-id');
+            if (sellMvIdInput && sellMvIdInput.value) eventObj.relocationSellMvId = sellMvIdInput.value;
 
             const overrideInput = domRow.querySelector('.event-resolution-override');
             if (overrideInput && overrideInput.value) eventObj.resolutionOverride = overrideInput.value;

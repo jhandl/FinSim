@@ -151,10 +151,10 @@ describe('Relocation local holdings panels', () => {
     expect(reviewButton.getAttribute('data-row-id')).toBe('row-1');
     reviewButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(actionSpy).toHaveBeenCalled();
-    expect(markSpy).toHaveBeenCalledWith('row-1');
+    expect(markSpy).toHaveBeenCalled();
+    expect(markSpy.mock.calls[0][0]).toBe('row-1');
   });
 });
-
 
 
 
