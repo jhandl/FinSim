@@ -3948,6 +3948,21 @@ footer {
   }
 }
 
+/* Flash for age inputs auto-updated when relocation age changes */
+#Events .event-from-age.age-auto-changed,
+#Events .event-to-age.age-auto-changed {
+  animation: ageAutoChangedFlash 0.7s ease-out forwards;
+}
+
+@keyframes ageAutoChangedFlash {
+  0% {
+    background-color: rgba(144, 238, 144, 0.7);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
 @keyframes tableRowDeleteFade {
   0% {
     opacity: 1;

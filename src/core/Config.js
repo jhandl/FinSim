@@ -242,6 +242,16 @@ class Config {
   }
 
   /**
+   * Return whether auto-shift on relocation age change is enabled.
+   * When true, changing a relocation's fromAge automatically shifts split/sale event ages.
+   * When false or absent, impacted events are flagged for explicit resolution.
+   * Falls back to false if not set.
+   */
+  shouldAutoShiftOnRelocationAgeChange() {
+    return this.autoShiftOnRelocationAgeChange === true;
+  }
+
+  /**
    * Return whether relocation features are enabled in the loaded app config.
    * Falls back to false if not set.
    */

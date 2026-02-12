@@ -407,8 +407,10 @@ describe('Relocation Split No Pension', () => {
     const manager = new EventsTableManager(webUIStub);
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-1"]'), 'event-linked-event-id', 'split_sync_1');
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-2"]'), 'event-linked-event-id', 'split_sync_1');
+    manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-1"]'), 'event-relocation-split-mv-id', 'mvlink_test');
+    manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-2"]'), 'event-relocation-split-mv-id', 'mvlink_test');
 
-    manager._syncSplitChainsForRelocationAgeShift(35, 37);
+    manager._syncSplitChainsForRelocationAgeShift(2, ['mvlink_test'], 37);
 
     const first = document.querySelector('tr[data-row-id="row-1"]');
     const second = document.querySelector('tr[data-row-id="row-2"]');
@@ -470,8 +472,10 @@ describe('Relocation Split No Pension', () => {
     const manager = new EventsTableManager(webUIStub);
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-1"]'), 'event-linked-event-id', 'split_sync_2');
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-2"]'), 'event-linked-event-id', 'split_sync_2');
+    manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-1"]'), 'event-relocation-split-mv-id', 'mvlink_test');
+    manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-2"]'), 'event-relocation-split-mv-id', 'mvlink_test');
 
-    manager._syncSplitChainsForRelocationAgeShift(35, 45);
+    manager._syncSplitChainsForRelocationAgeShift(10, ['mvlink_test'], 45);
 
     const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
     expect(rows).toHaveLength(1);
@@ -533,9 +537,11 @@ describe('Relocation Split No Pension', () => {
     const manager = new EventsTableManager(webUIStub);
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-1"]'), 'event-linked-event-id', 'split_sync_3');
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-2"]'), 'event-linked-event-id', 'split_sync_3');
+    manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-1"]'), 'event-relocation-split-mv-id', 'mvlink_test');
+    manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-2"]'), 'event-relocation-split-mv-id', 'mvlink_test');
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-2"]'), 'event-currency', 'BBB');
 
-    manager._syncSplitChainsForRelocationAgeShift(35, 30);
+    manager._syncSplitChainsForRelocationAgeShift(-5, ['mvlink_test'], 30);
 
     const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
     expect(rows).toHaveLength(1);

@@ -259,7 +259,7 @@ describe('Relocation cut-short resolution', () => {
     expect(propertyRow.querySelector('.event-to-age').value).toBe('39');
     expect(mortgageRow.querySelector('.event-to-age').value).toBe('39');
 
-    manager._syncSoldRealEstateForRelocationAgeShift(50, ['Move_US']);
+    manager._syncSoldRealEstateForRelocationAgeShift(10, ['Move_US'], 50);
 
     expect(propertyRow.querySelector('.event-to-age').value).toBe('49');
     expect(mortgageRow.querySelector('.event-to-age').value).toBe('49');
