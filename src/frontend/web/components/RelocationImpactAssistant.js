@@ -146,7 +146,12 @@ var RelocationImpactAssistant = {
       try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch (_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
     }
 
-    const addAction = function (arr, cfg) { if (!cfg || !cfg.action) return; cfg.tabId = 'resolution-tab-' + rowId + '-' + cfg.action; cfg.detailId = 'resolution-detail-' + rowId + '-' + cfg.action; arr.push(cfg); };
+    const addAction = function (arr, cfg) {
+      if (!cfg || !cfg.action) return;
+      cfg.tabId = 'resolution-tab-' + rowId + '-' + cfg.action;
+      cfg.detailId = 'resolution-detail-' + rowId + '-' + cfg.action;
+      arr.push(cfg);
+    };
     const actions = [];
     let containerAttributes = '';
 
@@ -155,9 +160,9 @@ var RelocationImpactAssistant = {
         const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
         const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
         const originCountryCode = originCountry ? originCountry.toUpperCase() : '';
-        addAction(actions, { action: 'keep_property', tabLabel: 'Keep Property', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Keep the property and associated mortgage. We will link both to ' + originCountryCode + ' and keep values in ' + originCurrency + '.</p></div>' });
-        addAction(actions, { action: 'rent_out', tabLabel: 'Rent Out', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Keep the property and start renting it out. We will create a Rental Income event starting at the relocation age.</p></div>' });
-        addAction(actions, { action: 'sell_property', tabLabel: 'Sell Property', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Sell the property at the relocation boundary and stop the associated mortgage payments from that age.</p></div>' });
+        addAction(actions, { action: 'keep_property', tabLabel: 'Keep Property', instantApply: true, tooltip: 'Keep the property and associated mortgage.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+        addAction(actions, { action: 'rent_out', tabLabel: 'Rent Out', instantApply: true, tooltip: 'Keep the property and start renting it out after the relocation.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+        addAction(actions, { action: 'sell_property', tabLabel: 'Sell Property', instantApply: true, tooltip: 'Sell the property when relocating.', buttonAttrs: ' data-row-id="' + rowId + '"' });
       } else {
         const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originCountry, destCountry));
         const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
@@ -173,11 +178,11 @@ var RelocationImpactAssistant = {
         const part1AmountFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmountSanitized);
         const inputFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : '';
         containerAttributes = ' data-from-country="' + originCountry + '" data-to-country="' + destCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
-        addAction(actions, { action: 'split', tabLabel: 'Split Event', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-label">Part 1: Age ' + event.fromAge + '-' + cutShortToAge + '</div><div class="part-detail">' + part1AmountFormatted + '</div></div><div class="split-part-info"><div class="part-label">Part 2: Age ' + relocationAge + '-' + event.toAge + '</div><div class="part-detail"><input type="text" class="part2-amount-input" value="' + inputFormatted + '" placeholder="Amount">' + destCurrency + '</div><div class="ppp-hint">PPP suggestion</div></div></div><p class="micro-note">Apply creates a new event starting at age ' + relocationAge + ' in ' + (destCurrencyCode || destCurrency) + '. Adjust the Part 2 amount to what the move will cost in the destination currency.</p></div>' });
+        addAction(actions, { action: 'split', tabLabel: 'Split Event', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-label">Part 1: Age ' + event.fromAge + '-' + cutShortToAge + '</div><div class="part-detail">' + part1AmountFormatted + '</div></div><div class="split-part-info"><div class="part-label">Part 2: Age ' + relocationAge + '-' + event.toAge + '</div><div class="part-detail"><input type="text" class="part2-amount-input" value="' + inputFormatted + '" placeholder="Amount">' + destCurrency + '</div><div class="ppp-hint">PPP suggestion</div></div></div><p class="micro-note">Apply creates a new event starting at age ' + relocationAge + ' in ' + (destCurrencyCode || destCurrency) + '. Adjust the Part 2 amount to the equivalent value in the destination currency.</p></div>' });
         if (isIncomeOrExpenseType) {
-          addAction(actions, { action: 'cut_short', tabLabel: 'Cut Short', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply ends this event before relocation by setting To Age to ' + cutShortToAge + '.</p></div>' });
+          addAction(actions, { action: 'cut_short', tabLabel: 'Cut Short', instantApply: true, tooltip: 'End this event before relocation.', buttonAttrs: ' data-row-id="' + rowId + '"' });
         }
-        addAction(actions, { action: 'peg', tabLabel: 'Keep as is', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply keeps this event denominated in ' + originCurrency + ', leaving the current value (' + (part1AmountFormatted || originCurrency) + ') unchanged after the move.</p><p class="micro-note">Choose this when you prefer to convert the amount manually later.</p></div>' });
+        addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Let this event continue unchanged after the relocation.', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
       }
     } else if (event.relocationImpact.category === 'simple') {
       if ((event.type === 'R' || event.type === 'M') && !event.linkedCountry) {
@@ -255,9 +260,9 @@ var RelocationImpactAssistant = {
         const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
         const destCountryLabel = (destCountry ? destCountry.toUpperCase() : '') || 'destination country';
         containerAttributes = ' data-from-country="' + originCountry + '" data-to-country="' + destCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
-        addAction(actions, { action: 'accept', tabLabel: 'Apply Suggested Amount', buttonLabel: 'Apply', buttonClass: 'event-wizard-button resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-suggested-amount="' + (isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum)) + '" data-suggested-currency="' + destCurrency + '"', bodyHtml: '<div class="suggestion-comparison compact"><div class="comparison-row"><span class="comparison-label">Current</span><span class="comparison-value">' + currentFormatted + '</span></div><div class="comparison-row"><span class="comparison-label">Suggested</span><span class="comparison-value">' + suggestedFormatted + '</span></div><div class="difference">Δ ' + percentage + '%</div></div><p class="micro-note">Apply updates the amount to ' + suggestedFormatted + ' (' + (destCurrencyCode || destCurrency) + ') so it reflects purchasing power in ' + destCountryLabel + '.</p>' });
-        addAction(actions, { action: 'peg', tabLabel: 'Keep as is', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion to ' + (destCurrencyCode || destCurrency || 'the destination currency') + ' will occur.</p></div>' });
-        addAction(actions, { action: 'review', tabLabel: 'Mark As Reviewed', buttonLabel: 'Apply', buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Apply records this relocation impact as reviewed without changing the amount or currency.</p></div>' });
+        addAction(actions, { action: 'accept', tabLabel: 'Apply Suggested Amount', instantApply: true, tooltip: 'Updates the amount to ' + suggestedFormatted + ' (' + (destCurrencyCode || destCurrency) + ') so it reflects purchasing power in ' + destCountryLabel + '.', buttonAttrs: ' data-row-id="' + rowId + '" data-suggested-amount="' + (isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum)) + '" data-suggested-currency="' + destCurrency + '"' });
+        addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion to ' + (destCurrencyCode || destCurrency || 'the destination currency') + ' will occur.', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
+        addAction(actions, { action: 'review', tabLabel: 'Mark As Reviewed', instantApply: true, tooltip: 'Records this relocation impact as reviewed without changing the amount or currency.', buttonAttrs: ' data-row-id="' + rowId + '"' });
       }
     } else if (event.relocationImpact.category === 'split_relocation_shift') {
       let splitShiftDetails = event.relocationImpact.details;
@@ -271,18 +276,16 @@ var RelocationImpactAssistant = {
       addAction(actions, {
         action: 'adapt_split_to_move',
         tabLabel: 'Adapt Split Age',
-        buttonLabel: 'Apply',
-        buttonClass: 'event-wizard-button resolution-apply',
-        buttonAttrs: ' data-row-id="' + rowId + '"',
-        bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Adjust this split to the new relocation age (' + relocationAgeLabel + ').</p><p class="micro-note">Apply updates Part 1 to end at age ' + expectedPart1ToAge + ' and Part 2 to start at age ' + relocationAgeLabel + '.</p></div>'
+        instantApply: true,
+        tooltip: 'Updates Part 1 to end at age ' + expectedPart1ToAge + ' and Part 2 to start at age ' + relocationAgeLabel + '.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
       });
       addAction(actions, {
         action: 'keep_split_as_is',
         tabLabel: 'Leave As Is',
-        buttonLabel: 'Apply',
-        buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
-        buttonAttrs: ' data-row-id="' + rowId + '"',
-        bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Keep both halves at their current ages. The split remains linked and will be marked as reviewed.</p></div>'
+        instantApply: true,
+        tooltip: 'Keep both halves at their current ages. The split remains linked and will be marked as reviewed.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
       });
     } else if (event.relocationImpact.category === 'sale_relocation_shift') {
       let saleShiftDetails = event.relocationImpact.details;
@@ -296,18 +299,16 @@ var RelocationImpactAssistant = {
       addAction(actions, {
         action: 'adapt_sale_to_move',
         tabLabel: 'Adapt Sale Age',
-        buttonLabel: 'Apply',
-        buttonClass: 'event-wizard-button resolution-apply',
-        buttonAttrs: ' data-row-id="' + rowId + '"',
-        bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">This property sale is currently set to age ' + currentToAge + '.</p><p class="micro-note">Apply aligns the sale with relocation by setting To Age to ' + expectedToAge + '.</p></div>'
+        instantApply: true,
+        tooltip: 'Aligns the sale with relocation by setting To Age to ' + expectedToAge + '.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
       });
       addAction(actions, {
         action: 'keep_sale_as_is',
         tabLabel: 'Leave As Is',
-        buttonLabel: 'Apply',
-        buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
-        buttonAttrs: ' data-row-id="' + rowId + '"',
-        bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">Keep the current sale timing and mark this impact as reviewed.</p></div>'
+        instantApply: true,
+        tooltip: 'Keep the current sale timing and mark this impact as reviewed.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
       });
     } else if (event.relocationImpact.category === 'split_orphan') {
       let splitDetails = event.relocationImpact.details;
@@ -322,10 +323,9 @@ var RelocationImpactAssistant = {
       addAction(actions, {
         action: 'join_split',
         tabLabel: 'Join Halves',
-        buttonLabel: 'Apply',
-        buttonClass: 'event-wizard-button resolution-apply',
-        buttonAttrs: ' data-row-id="' + rowId + '"',
-        bodyHtml: '<div class="resolution-quick-action"><p class="micro-note">This split no longer matches a relocation boundary. Join both halves back into one event.</p><p class="micro-note">Apply restores a single event from age ' + mergedFromAge + ' to ' + mergedToAge + ' using ' + amountLabel + '.</p></div>'
+        instantApply: true,
+        tooltip: 'Restores a single event from age ' + mergedFromAge + ' to ' + mergedToAge + ' using ' + amountLabel + '.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
       });
     } else if (event.relocationImpact.category === 'local_holdings') {
       // Local investment holdings resolution panel
@@ -344,50 +344,50 @@ var RelocationImpactAssistant = {
         if (parsed && Array.isArray(parsed.localHoldings)) return parsed.localHoldings;
         return [];
       })(event.relocationImpact.details);
-      const holdingsContextHtml = (function renderLocalHoldingsSummary(items) {
-        if (!items || !items.length) return '';
-        const listItems = items.map(function (item) {
-          const label = item && item.label ? String(item.label) : 'Holding';
-          const currency = item && item.currency ? String(item.currency).toUpperCase() : '';
-          const currencySuffix = currency ? ' (' + currency + ')' : '';
-          return '<li>' + label + currencySuffix + '</li>';
-        }).join('');
-        return '<div class="local-holdings-summary"><p class="micro-note">Local holdings detected:</p><ul class="micro-note local-holdings-list">' + listItems + '</ul></div>';
-      })(localHoldingsDetails);
+      const holdingsPrefix = (localHoldingsDetails && localHoldingsDetails.length)
+        ? localHoldingsDetails.map(function (item) { const label = item && item.label ? String(item.label) : 'Holding'; const cur = item && item.currency ? String(item.currency).toUpperCase() : ''; return label + (cur ? ' (' + cur + ')' : ''); }).join(', ') + '. '
+        : '';
 
       addAction(actions, {
         action: 'keep_holdings',
         tabLabel: 'Keep Holdings',
-        buttonLabel: 'Mark as Reviewed',
-        buttonClass: 'event-wizard-button event-wizard-button-secondary resolution-apply',
-        buttonAttrs: ' data-row-id="' + rowId + '"',
-        bodyHtml: holdingsContextHtml + '<div class="resolution-quick-action"><p class="micro-note">Keep your local investment holdings as-is. You can continue to hold these investments after relocation, though they remain tied to the origin country\'s market and currency.</p><p class="micro-note">Note: Tax treatment will follow your new country of residence.</p></div>'
+        instantApply: true,
+        tooltip: holdingsPrefix + 'Keep your local investment holdings as-is. You can continue to hold these investments after relocation, though they remain tied to the origin country\'s market and currency. Tax treatment will follow your new country of residence.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
       });
 
       addAction(actions, {
         action: 'plan_sale',
         tabLabel: 'Plan to Sell',
-        buttonLabel: 'Mark as Reviewed',
-        buttonClass: 'event-wizard-button resolution-apply',
-        buttonAttrs: ' data-row-id="' + rowId + '"',
-        bodyHtml: holdingsContextHtml + '<div class="resolution-quick-action"><p class="micro-note">Plan to sell these holdings around the time of relocation. You can model the sale by adding a stock market event (SM) at the relocation age with negative growth to simulate liquidation.</p><p class="micro-note">Proceeds will be converted to your new residence currency.</p></div>'
+        instantApply: true,
+        tooltip: holdingsPrefix + 'Plan to sell these holdings around the time of relocation. You can model the sale by adding a stock market event (SM) at the relocation age with negative growth to simulate liquidation. Proceeds will be converted to your new residence currency.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
       });
 
       addAction(actions, {
         action: 'plan_reinvest',
         tabLabel: 'Plan to Reinvest',
-        buttonLabel: 'Mark as Reviewed',
-        buttonClass: 'event-wizard-button event-wizard-button-tertiary resolution-apply',
-        buttonAttrs: ' data-row-id="' + rowId + '"',
-        bodyHtml: holdingsContextHtml + '<div class="resolution-quick-action"><p class="micro-note">Plan to sell local holdings and reinvest in global or destination-country investments. Model this by:</p><ol class="micro-note"><li>Add a stock market event (SM) at relocation age to simulate sale</li><li>Adjust your investment mix parameters to reflect new allocation</li></ol><p class="micro-note">The simulator will automatically invest surplus in your configured mix.</p></div>'
+        instantApply: true,
+        tooltip: holdingsPrefix + 'Plan to sell local holdings and reinvest in global or destination-country investments. Add a stock market event (SM) at relocation age to simulate sale, then adjust your investment mix parameters. The simulator will automatically invest surplus in your configured mix.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
       });
     }
 
     if (!actions.length) return content;
     const impactCause = (event.relocationImpact.message || '').trim() || 'Relocation impact detected for this event.';
-    const tabsHtml = actions.map(function (ac) { return '<button type="button" class="resolution-tab" id="' + ac.tabId + '" role="tab" aria-selected="false" aria-controls="' + ac.detailId + '" data-action="' + ac.action + '" tabindex="0">' + ac.tabLabel + '</button>'; }).join('');
-    const detailsHtml = actions.map(function (ac) { const btnClass = ac.buttonClass || 'event-wizard-button resolution-apply'; const attrs = ac.buttonAttrs || ''; const eventAttrs = eventId ? ' data-event-id="' + eventId + '"' : ''; return '<div class="resolution-detail" id="' + ac.detailId + '" role="tabpanel" aria-labelledby="' + ac.tabId + '" data-action="' + ac.action + '" hidden aria-hidden="true"><div class="resolution-detail-content">' + ac.bodyHtml + '</div><div class="resolution-detail-footer"><button type="button" class="' + btnClass + '" data-action="' + ac.action + '"' + attrs + eventAttrs + '>' + ac.buttonLabel + '</button></div></div>'; }).join('');
-    content = '<div class="resolution-panel-expander"><div class="resolution-panel-container"' + containerAttributes + '><div class="resolution-panel-header"><h4>' + impactCause + '</h4><button class="panel-close-btn">×</button></div><div class="resolution-panel-body"><div class="resolution-tab-strip" role="tablist" aria-label="Resolution actions" aria-orientation="horizontal">' + tabsHtml + '</div><div class="resolution-details">' + detailsHtml + '</div></div></div></div>';
+    const instantActions = actions.filter(function (ac) { return ac.instantApply; });
+    const inputActions = actions.filter(function (ac) { return !ac.instantApply; });
+    const instantButtonsHtml = instantActions.map(function (ac) {
+      const attrs = (ac.buttonAttrs || '') + (eventId ? ' data-event-id="' + eventId + '"' : '');
+      const tooltipAttr = ac.tooltip ? ' data-tooltip="' + String(ac.tooltip).replace(/"/g, '&quot;') + '"' : '';
+      return '<button type="button" class="resolution-tab resolution-instant-btn" id="' + ac.tabId + '" data-action="' + ac.action + '"' + attrs + tooltipAttr + '>' + ac.tabLabel + '</button>';
+    }).join('');
+    const tabsHtml = inputActions.map(function (ac) { return '<button type="button" class="resolution-tab" id="' + ac.tabId + '" role="tab" aria-selected="false" aria-controls="' + ac.detailId + '" data-action="' + ac.action + '" tabindex="0">' + ac.tabLabel + '</button>'; }).join('');
+    const detailsHtml = inputActions.map(function (ac) { const btnClass = ac.buttonClass || 'event-wizard-button resolution-apply'; const attrs = ac.buttonAttrs || ''; const eventAttrs = eventId ? ' data-event-id="' + eventId + '"' : ''; return '<div class="resolution-detail" id="' + ac.detailId + '" role="tabpanel" aria-labelledby="' + ac.tabId + '" data-action="' + ac.action + '" hidden aria-hidden="true"><div class="resolution-detail-content">' + ac.bodyHtml + '</div><div class="resolution-detail-footer"><button type="button" class="' + btnClass + '" data-action="' + ac.action + '"' + attrs + eventAttrs + '>' + ac.buttonLabel + '</button></div></div>'; }).join('');
+    let bodyContent = '';
+    if (instantButtonsHtml || tabsHtml) bodyContent += '<div class="resolution-tab-strip" role="tablist" aria-label="Resolution actions" aria-orientation="horizontal">' + instantButtonsHtml + tabsHtml + '</div>';
+    if (tabsHtml) bodyContent += '<div class="resolution-details">' + detailsHtml + '</div>';
+    content = '<div class="resolution-panel-expander"><div class="resolution-panel-container"' + containerAttributes + '><div class="resolution-panel-header"><h4>' + impactCause + '</h4><button class="panel-close-btn">×</button></div><div class="resolution-panel-body">' + bodyContent + '</div></div></div>';
     return content;
   },
 
@@ -621,6 +621,28 @@ var RelocationImpactAssistant = {
     }
 
     interactionRoot.addEventListener('click', function (e) {
+      const instantBtn = e.target && e.target.closest && e.target.closest('.resolution-instant-btn');
+      if (instantBtn) {
+        e.preventDefault(); e.stopPropagation();
+        const action = instantBtn.getAttribute('data-action');
+        const panelContainer = (interactionRoot.classList && interactionRoot.classList.contains('resolution-panel-container'))
+          ? interactionRoot
+          : (interactionRoot.querySelector && interactionRoot.querySelector('.resolution-panel-container'));
+        const payload = {
+          rowId: (instantBtn.getAttribute('data-row-id') || (ctx && ctx.rowId)),
+          eventId: (instantBtn.getAttribute('data-event-id') || (ctx && ctx.eventId)),
+          currency: instantBtn.getAttribute('data-currency'),
+          suggestedAmount: instantBtn.getAttribute('data-suggested-amount'),
+          suggestedCurrency: instantBtn.getAttribute('data-suggested-currency'),
+          fromCountry: panelContainer ? panelContainer.getAttribute('data-from-country') : null,
+          toCountry: panelContainer ? panelContainer.getAttribute('data-to-country') : null
+        };
+        self.handlePanelAction(ctx.event, action, payload, ctx.env);
+        self._refreshImpacts(ctx.env);
+        if (ctx.context === 'table') self.collapsePanelForTableRow(document.querySelector('tr[data-row-id="' + payload.rowId + '"]'));
+        else if (ctx.context === 'accordion') self._collapseAccordionPanel(ctx.accordionItem);
+        return;
+      }
       const tab = e.target && e.target.closest && e.target.closest('.resolution-tab');
       if (tab) { e.preventDefault(); self._handleTabSelection(interactionRoot, tab); return; }
       const btn = e.target && e.target.closest && e.target.closest('.resolution-apply');
@@ -643,6 +665,13 @@ var RelocationImpactAssistant = {
       self.handlePanelAction(ctx.event, action, payload, ctx.env);
     });
     this._bindTabKeyboard(interactionRoot);
+    if (typeof TooltipUtils !== 'undefined' && TooltipUtils.attachTooltip) {
+      const instantBtns = interactionRoot.querySelectorAll('.resolution-instant-btn[data-tooltip]');
+      instantBtns.forEach(function (btn) {
+        const tooltip = btn.getAttribute('data-tooltip');
+        if (tooltip) TooltipUtils.attachTooltip(btn, tooltip, { hoverDelay: 300, touchDelay: 400 });
+      });
+    }
   },
 
   _handleTabSelection: function (rootEl, tabButton) {
