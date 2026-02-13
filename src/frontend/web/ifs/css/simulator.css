@@ -30,6 +30,9 @@
   /* Welcome modal item spacing */
   --welcome-space-above-line: 0.5rem;
   --welcome-space-below-line: -0.5rem;
+
+  /* Shared min-width for amount inputs (events table + resolution panel) */
+  --event-amount-input-min-width: 90px;
 }
 
 * {
@@ -1235,6 +1238,12 @@ th {
   overflow-y: auto;
 }
 
+/* Events table container: resolution panel tracks this width so it doesn't get clipped */
+.events-section .table-container {
+  container-type: inline-size;
+  container-name: events-table;
+}
+
 
 
 .growth-rates-table {
@@ -1368,8 +1377,8 @@ th {
 }
 
 #Events td:nth-child(3) input {
-  min-width: 90px;
-  max-width: 90px;
+  min-width: var(--event-amount-input-min-width);
+  max-width: var(--event-amount-input-min-width);
 }
 
 #Events td:nth-child(6) input {
@@ -4482,6 +4491,17 @@ footer {
     padding: 0;
   }
 
+  /* Compensate: dropdown shrinks by badge growth (28→36 = 8px) so it doesn't push against name */
+  .event-type-dd.has-impact-badge .pseudo-select {
+    min-width: 150px;
+    max-width: 150px;
+  }
+
+  .event-type-dd.has-wizard-icons.has-impact-badge .pseudo-select {
+    min-width: 118px;
+    max-width: 118px;
+  }
+
   .accordion-impact-badge {
     display: inline-block;
     /* Ensure inline-block on mobile too */
@@ -4519,6 +4539,9 @@ footer {
   height: 0;
   overflow: hidden;
   transition: height 0.28s ease;
+  /* Track table-container width so panel adapts to visible area and doesn't get clipped */
+  max-width: 100cqw;
+  box-sizing: border-box;
 }
 
 /* Expander drives height animation to smoothly shift content (ACCORDION view) */
@@ -4535,6 +4558,7 @@ footer {
   /* drastically reduced */
   background: white;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
 }
 
 /* Smooth fade/slide animation for panel content */
@@ -4593,10 +4617,16 @@ footer {
 }
 
 .resolution-tab-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
+  flex-direction: row;
   gap: 0.35rem;
   margin: 0.25rem 0 0.35rem;
+}
+
+.resolution-tab-strip .resolution-tab {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .resolution-tab {
@@ -4610,7 +4640,7 @@ footer {
   font-weight: 600;
   letter-spacing: 0.01em;
   color: #2b3035;
-  background: #f1f4f8;
+  background: transparent;
   border: 1px solid #d0d6dd;
   border-radius: 6px;
   cursor: pointer;
@@ -4647,6 +4677,13 @@ footer {
   position: relative;
 }
 
+.resolution-detail[data-action="split"] {
+  max-width: 75%;
+  margin-left: auto;
+  margin-right: auto;
+  transition: max-width 0.2s ease;
+}
+
 .resolution-detail {
   border-top: 1px solid #e9ecef;
   margin: 0;
@@ -4674,6 +4711,7 @@ footer {
 
 .resolution-detail-footer {
   display: flex;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   gap: 0.25rem;
   margin-top: 0.3rem;
@@ -4683,6 +4721,16 @@ footer {
   min-height: 32px;
   padding: 0.3rem 0.85rem;
   font-size: 0.78rem;
+}
+
+.resolution-detail-footer .resolution-confirm-btn {
+  background: #fff3cd;
+  border-color: #ffeaa7;
+}
+
+.resolution-detail-footer .resolution-confirm-btn:hover:not(:disabled) {
+  background: #ffe69c;
+  border-color: #f5d76e;
 }
 
 .resolution-quick-action {
@@ -4722,6 +4770,7 @@ footer {
   background: #f8f9fa;
   border-top: 1px solid #e9ecef;
   display: flex;
+  flex-wrap: nowrap;
   gap: 0.25rem;
   justify-content: flex-end;
 }
@@ -4732,6 +4781,10 @@ footer {
 @media (max-width: 768px) {
   .resolution-panel-container {
     margin: 0.25rem;
+  }
+
+  .resolution-detail[data-action="split"] {
+    max-width: 90%;
   }
 
   .resolution-panel-header,
@@ -4750,7 +4803,6 @@ footer {
   }
 
   .resolution-tab-strip {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 0.3rem;
   }
 
@@ -4771,10 +4823,59 @@ footer {
     padding: 0.4rem;
   }
 
+  /* Split (and link) tab: keep Confirm button compact and right-aligned; no wrap */
+  .resolution-detail[data-action="split"] .resolution-detail-footer,
+  .resolution-detail[data-action="link"] .resolution-detail-footer {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .resolution-detail[data-action="split"] .resolution-detail-footer .event-wizard-button,
+  .resolution-detail[data-action="link"] .resolution-detail-footer .event-wizard-button {
+    width: auto;
+    min-height: 32px;
+    padding: 0.3rem 0.85rem;
+  }
+
   .panel-close-btn {
     width: 36px;
     height: 36px;
     font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 663px) {
+  .resolution-detail[data-action="split"] {
+    max-width: 100%;
+  }
+}
+
+/* Very narrow: action buttons stack vertically (same breakpoint as before) */
+@media (max-width: 480px) {
+  .resolution-tab-strip {
+    flex-direction: column;
+  }
+
+  .resolution-tab-strip .resolution-tab {
+    flex: none;
+    width: 100%;
+    min-width: unset;
+  }
+
+  .resolution-detail[data-action="split"] .resolution-detail-footer,
+  .resolution-detail[data-action="link"] .resolution-detail-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .resolution-detail[data-action="split"] .resolution-detail-footer .event-wizard-button,
+  .resolution-detail[data-action="link"] .resolution-detail-footer .event-wizard-button {
+    flex: none;
+    min-width: unset;
+    width: 100%;
+    min-height: 42px;
+    padding: 0.4rem;
   }
 }
 
@@ -4896,6 +4997,9 @@ footer {
   border: 1px solid #ffeaa7;
   border-radius: 4px;
   font-size: 0.8rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .split-part-info .part-label {
@@ -4909,6 +5013,16 @@ footer {
   margin: 0.15rem 0;
   /* reduced */
   color: #666;
+}
+
+.split-part-info .part-line {
+  font-weight: 600;
+  color: #856404;
+  font-size: 0.8rem;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 /* Unified input styling for split preview across table (inside #Events) and accordion */
@@ -4930,6 +5044,18 @@ footer {
   /* override table defaults */
   max-width: none;
   /* override table defaults */
+}
+
+/* Resolution panel Before/After: use same min-width as events table amount column */
+.split-preview-inline .split-part-info .part-line .part2-amount-input,
+.split-preview-inline .split-part-info .part-line .link-amount-input,
+#Events .split-preview-inline .split-part-info .part-line .part2-amount-input,
+#Events .split-preview-inline .split-part-info .part-line .link-amount-input {
+  flex: 0 0 auto;
+  width: var(--event-amount-input-min-width);
+  min-width: var(--event-amount-input-min-width);
+  max-width: var(--event-amount-input-min-width);
+  margin-top: 0;
 }
 
 .ppp-hint {
@@ -5013,11 +5139,14 @@ footer {
   background: white;
 }
 
-@media (max-width: 768px) {
+/* Split before/after sections stack only on very narrow viewports */
+@media (max-width: 480px) {
   .split-parts-container {
     grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: 768px) {
   .economic-data-table {
     font-size: 0.75rem;
   }

@@ -526,8 +526,7 @@ class EventsTableManager {
           RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
           this.webUI.tableManager.setupTableCurrencyControls();
         }
-        // Intentionally avoid refreshing the accordion here to preserve focus/expansion after edit + outside click.
-        // Accordion will refresh through explicit actions (sorting, deletions, wizard actions) and on initial load.
+        // Accordion summaries refresh after impact update via updateRelocationImpactIndicators.
       } catch (err) {
         console.error('Error analyzing relocation impacts:', err);
       }
@@ -1257,6 +1256,15 @@ class EventsTableManager {
         }
       }
     });
+
+    if (this.viewMode === 'accordion' && this.webUI && this.webUI.eventAccordionManager) {
+      const accordionManager = this.webUI.eventAccordionManager;
+      if (accordionManager.events && accordionManager.events.length) {
+        accordionManager.events.forEach((ev) => {
+          accordionManager.refreshEventSummary(ev);
+        });
+      }
+    }
   }
 
   /**
@@ -2435,11 +2443,6 @@ class EventsTableManager {
       // No sorting active – let highlight animation handle any needed scrolling
     }
 
-    // Refresh accordion with highlight if it's active
-    if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
-      this.webUI.eventAccordionManager.refreshWithNewEventAnimation(eventData, newEventId);
-    }
-
     // Call detector after replacing row
     if (Config.getInstance().isRelocationEnabled()) {
       try {
@@ -2451,6 +2454,10 @@ class EventsTableManager {
       } catch (err) {
         console.error('Error analyzing relocation impacts:', err);
       }
+    }
+    // Refresh accordion with highlight if it's active
+    if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+      this.webUI.eventAccordionManager.refreshWithNewEventAnimation(eventData, newEventId);
     }
     // Refresh chart relocation transitions
     if (this.webUI.chartManager) {
@@ -3586,6 +3593,11 @@ class EventsTableManager {
     // After sorting completes, animate the new table row highlight smoothly
     if (typeof this.animateNewTableRow === 'function') {
       setTimeout(() => { this.animateNewTableRow(eventData); }, 400);
+    }
+
+    // Recompute relocation impacts before accordion refresh so badges show in cards view
+    if (typeof this.recomputeRelocationImpacts === 'function') {
+      this.recomputeRelocationImpacts();
     }
 
     // Refresh accordion if active

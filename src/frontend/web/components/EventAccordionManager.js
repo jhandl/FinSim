@@ -376,14 +376,23 @@ class EventAccordionManager {
           return;
         }
         e.preventDefault();
-        this.toggleAccordionItem(event.accordionId);
+        // When expanding and event has impact, open resolution panel too (easier on mobile)
+        if (event.relocationImpact && !this.expandedItems.has(event.accordionId)) {
+          this.expandResolutionPanel(event.accordionId);
+        } else {
+          this.toggleAccordionItem(event.accordionId);
+        }
       });
     }
 
     if (expandBtn) {
       expandBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.toggleAccordionItem(event.accordionId);
+        if (event.relocationImpact && !this.expandedItems.has(event.accordionId)) {
+          this.expandResolutionPanel(event.accordionId);
+        } else {
+          this.toggleAccordionItem(event.accordionId);
+        }
       });
     }
 
@@ -896,6 +905,11 @@ class EventAccordionManager {
               event.type = full;
               if (toggleEl) toggleEl.textContent = `→ ${name}`;
 
+              // Recompute impacts so badges show in cards view immediately
+              if (typeof etm.recomputeRelocationImpacts === 'function') {
+                etm.recomputeRelocationImpacts();
+              }
+
               // Honor wizard toggle: if off, stop here; fields stay blank
               if (!etm.isEventsWizardEnabled()) {
                 return;
@@ -1397,12 +1411,25 @@ class EventAccordionManager {
     if (!updatedEvent) return;
 
     updatedEvent.accordionId = event.accordionId;
+    if (event.id) updatedEvent.id = event.id;
+    if (event.tableRowIndex !== undefined) updatedEvent.tableRowIndex = event.tableRowIndex;
+    // Keep the existing event reference up to date so header handlers stay accurate.
+    Object.assign(event, updatedEvent);
 
     // Update the summary in the header
     const summaryContainer = accordionItem.querySelector('.accordion-item-summary');
     if (summaryContainer) {
       const summaryRenderer = new EventSummaryRenderer(this.webUI);
       summaryContainer.innerHTML = summaryRenderer.generateSummary(updatedEvent);
+      // Re-attach impact badge handlers/tooltip since the header HTML was replaced.
+      const impactBadge = summaryContainer.querySelector('.relocation-impact-badge');
+      if (impactBadge && event.relocationImpact) {
+        TooltipUtils.attachTooltip(impactBadge, event.relocationImpact.message, { hoverDelay: 300, touchDelay: 400 });
+        impactBadge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.expandResolutionPanel(event.accordionId);
+        });
+      }
       // Re-apply header warning mirror only if not expanded; otherwise clear header
       const accItem = accordionItem.closest('.events-accordion-item');
       const rowRef = this.findTableRowForEvent(updatedEvent);
@@ -1658,6 +1685,9 @@ class EventAccordionManager {
     if (this.webUI.eventsTableManager) {
       const result = this.webUI.eventsTableManager.createEventFromWizard(eventData);
       id = result.id;
+    }
+    if (this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.recomputeRelocationImpacts === 'function') {
+      this.webUI.eventsTableManager.recomputeRelocationImpacts();
     }
 
     // Handle sorting and animation for accordion view
