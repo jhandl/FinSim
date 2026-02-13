@@ -139,14 +139,14 @@ describe('Relocation local holdings panels', () => {
     expect(panelSpy.mock.calls[0][1]).toBe('row-1');
     const panelMarkup = document.querySelector('.resolution-panel-row').innerHTML;
     expect(panelMarkup).toContain('data-row-id');
-    const holdingsItems = document.querySelectorAll('.local-holdings-list li');
-    expect(holdingsItems.length).toBeGreaterThan(0);
-    expect(holdingsItems[0].textContent).toContain('Argentina Equity Fund');
-    expect(holdingsItems[0].textContent).toContain('ARS');
+    const keepHoldingsButton = document.querySelector('.resolution-instant-btn[data-action="keep_holdings"]');
+    expect(keepHoldingsButton).toBeTruthy();
+    expect(keepHoldingsButton.getAttribute('data-tooltip')).toContain('Argentina Equity Fund');
+    expect(keepHoldingsButton.getAttribute('data-tooltip')).toContain('(ARS)');
 
     const actionSpy = jest.spyOn(RelocationImpactAssistant, 'handlePanelAction');
     const markSpy = jest.spyOn(manager, 'markAsReviewed').mockImplementation(() => {});
-    const reviewButton = document.querySelector('.resolution-detail button[data-action="keep_holdings"]');
+    const reviewButton = document.querySelector('.resolution-instant-btn[data-action="keep_holdings"]');
     expect(reviewButton).toBeTruthy();
     expect(reviewButton.getAttribute('data-row-id')).toBe('row-1');
     reviewButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -155,7 +155,6 @@ describe('Relocation local holdings panels', () => {
     expect(markSpy.mock.calls[0][0]).toBe('row-1');
   });
 });
-
 
 
 

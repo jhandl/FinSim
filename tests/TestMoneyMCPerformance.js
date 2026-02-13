@@ -3,7 +3,7 @@ const { TestFramework } = require('../src/core/TestFramework.js');
 
 module.exports = {
   name: 'MoneyMCPerformance',
-  description: 'Validates Money refactor does not slow down 2500-simulation Monte Carlo runs by >5%',
+  description: 'Validates Money refactor does not slow down Monte Carlo runs by >5%',
   isCustomTest: true,
   async runCustomTest() {
     const framework = new TestFramework();
@@ -35,8 +35,7 @@ module.exports = {
           inflation: 0.02,
           StartCountry: 'ie',
           simulation_mode: 'single',
-          economy_mode: 'montecarlo',
-          monteCarloRuns: 2500
+          economy_mode: 'montecarlo'
         },
         events: [
           { type: 'SI', id: 'salary', amount: 50000, fromAge: 30, toAge: 35, rate: 0.03, match: 0 }
@@ -55,8 +54,9 @@ module.exports = {
       return { success: false, errors: ['Simulation failed'] };
     }
 
-    if (!results.montecarlo || results.runs !== 2500) {
-      return { success: false, errors: ['Expected Monte Carlo mode with 2500 runs (gate not exercised)'] };
+    const expectedRuns = framework.simulationContext.config.simulationRuns;
+    if (!results.montecarlo || results.runs !== expectedRuns) {
+      return { success: false, errors: [`Expected Monte Carlo mode with configured runs=${expectedRuns} (got montecarlo=${!!results.montecarlo}, runs=${results.runs})`] };
     }
 
     // Performance gate: average ms per Monte Carlo simulation must remain within 5% of baseline.

@@ -88,6 +88,7 @@ class MonteCarloTestRunner {
       const simResult = await framework.runSimulation();
 
       if (simResult && simResult.success) {
+        simResult.configuredRuns = vm.runInContext('config.simulationRuns', ctx);
         results.push(simResult);
       }
     }
@@ -194,7 +195,6 @@ module.exports = {
           StartCountry: 'ie'
           , simulation_mode: 'single'
           , economy_mode: 'montecarlo'
-          , monteCarloRuns: 2500
         },
         events: []  // No events for clean volatility testing
       };
@@ -221,11 +221,12 @@ module.exports = {
           continue;
         }
 
-        // Gate: ensure all runs actually executed Monte Carlo mode (2500 sims per run).
+        // Gate: ensure all runs actually executed Monte Carlo mode with configured run count.
         for (const result of results) {
           if (result && result.success) {
-            if (!result.montecarlo || result.runs !== 2500) {
-              testResults.errors.push(`${scenario.name}: Expected Monte Carlo mode with 2500 runs (got montecarlo=${!!result.montecarlo}, runs=${result.runs})`);
+            const expectedRuns = result.configuredRuns;
+            if (!result.montecarlo || result.runs !== expectedRuns) {
+              testResults.errors.push(`${scenario.name}: Expected Monte Carlo mode with configured runs=${expectedRuns} (got montecarlo=${!!result.montecarlo}, runs=${result.runs})`);
               testResults.success = false;
               continue;
             }

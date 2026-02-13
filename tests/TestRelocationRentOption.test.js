@@ -153,15 +153,10 @@ describe('Relocation Rent Option', () => {
     const buttons = panel.querySelectorAll('button[data-action="rent_out"]');
     expect(buttons.length).toBeGreaterThan(0);
     expect(buttons[0].textContent).toBe('Rent Out');
-    
-    // Click the button (we need to trigger the click on the "Apply" button within the detail view)
-    // First, find the detail section for rent_out
-    const detail = panel.querySelector('.resolution-detail[data-action="rent_out"]');
-    expect(detail).toBeTruthy();
-    
-    const applyButton = detail.querySelector('button.resolution-apply');
+
+    const applyButton = panel.querySelector('.resolution-instant-btn[data-action="rent_out"]');
     expect(applyButton).toBeTruthy();
-    
+
     applyButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     
     expect(rentOutSpy).toHaveBeenCalled();

@@ -150,7 +150,8 @@ describe('Relocation cut-short resolution', () => {
       },
       eventsTableManager: {
         getOriginCountry: jest.fn(() => 'ar'),
-        cutShortEventAtRelocation: jest.fn()
+        cutShortEventAtRelocation: jest.fn(),
+        updateRelocationImpactIndicators: jest.fn()
       }
     };
 
@@ -160,7 +161,7 @@ describe('Relocation cut-short resolution', () => {
     expect(panel).toBeTruthy();
     expect(panel.querySelector('.resolution-tab[data-action="cut_short"]')).toBeTruthy();
 
-    const applyButton = panel.querySelector('.resolution-detail[data-action="cut_short"] .resolution-apply');
+    const applyButton = panel.querySelector('.resolution-instant-btn[data-action="cut_short"]');
     expect(applyButton).toBeTruthy();
     applyButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
@@ -297,7 +298,8 @@ describe('Relocation cut-short resolution', () => {
       eventsTableManager: {
         getOriginCountry: jest.fn(() => 'ar'),
         adaptSplitToRelocationAge: jest.fn(),
-        keepSplitAsIs: jest.fn()
+        keepSplitAsIs: jest.fn(),
+        updateRelocationImpactIndicators: jest.fn()
       }
     };
 
@@ -308,7 +310,7 @@ describe('Relocation cut-short resolution', () => {
     expect(panel.querySelector('.resolution-tab[data-action="adapt_split_to_move"]')).toBeTruthy();
     expect(panel.querySelector('.resolution-tab[data-action="keep_split_as_is"]')).toBeTruthy();
 
-    const adaptButton = panel.querySelector('.resolution-detail[data-action="adapt_split_to_move"] .resolution-apply');
+    const adaptButton = panel.querySelector('.resolution-instant-btn[data-action="adapt_split_to_move"]');
     expect(adaptButton).toBeTruthy();
     adaptButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(env.eventsTableManager.adaptSplitToRelocationAge).toHaveBeenCalledWith('row-1', 'event-1');
@@ -346,7 +348,8 @@ describe('Relocation cut-short resolution', () => {
       eventsTableManager: {
         getOriginCountry: jest.fn(() => 'ar'),
         adaptSaleToRelocationAge: jest.fn(),
-        keepSaleAsIs: jest.fn()
+        keepSaleAsIs: jest.fn(),
+        updateRelocationImpactIndicators: jest.fn()
       }
     };
 
@@ -357,7 +360,7 @@ describe('Relocation cut-short resolution', () => {
     expect(panel.querySelector('.resolution-tab[data-action="adapt_sale_to_move"]')).toBeTruthy();
     expect(panel.querySelector('.resolution-tab[data-action="keep_sale_as_is"]')).toBeTruthy();
 
-    const adaptButton = panel.querySelector('.resolution-detail[data-action="adapt_sale_to_move"] .resolution-apply');
+    const adaptButton = panel.querySelector('.resolution-instant-btn[data-action="adapt_sale_to_move"]');
     expect(adaptButton).toBeTruthy();
     adaptButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(env.eventsTableManager.adaptSaleToRelocationAge).toHaveBeenCalledWith('row-r', 'event-r');
