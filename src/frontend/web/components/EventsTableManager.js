@@ -480,16 +480,6 @@ class EventsTableManager {
             this.updateWizardIconsVisibility(row);
           }
         }
-        // Re-analyze (debounced) after input changes
-        // Skip reanalysis when editing MV fromAge with autoShift on: reanalysis would show badges before the change handler runs.
-        let skipForMvAutoShift = false;
-        if (e.target.classList.contains('event-from-age') && row) {
-          const typeInput = row.querySelector('.event-type');
-          const typeValue = typeInput ? typeInput.value : '';
-          const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
-          skipForMvAutoShift = typeValue && typeValue.indexOf('MV-') === 0 && cfg && cfg.shouldAutoShiftOnRelocationAgeChange && cfg.shouldAutoShiftOnRelocationAgeChange();
-        }
-        if (!skipForMvAutoShift) this._scheduleRelocationReanalysis();
       });
     }
   }

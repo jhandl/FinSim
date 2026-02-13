@@ -1031,13 +1031,8 @@ class EventAccordionManager {
 
           if (validation.isValid) {
             this.clearFieldValidation(input);
-            this.syncFieldToTable(event, field.tableClass, value);
           } else {
             this.showFieldValidation(input, validation.message, validation.isWarningOnly);
-            // Still sync to table for non-critical errors
-            if (validation.isWarningOnly) {
-              this.syncFieldToTable(event, field.tableClass, value);
-            }
           }
         });
 
