@@ -714,13 +714,17 @@ var RelocationImpactAssistant = {
     if (!opts || !opts.anchorEl) return;
     const anchor = opts.anchorEl;
     const self = this;
+    if (opts.context === 'accordion') {
+      const escHandlerAccordion = function (e) { if (e && e.key === 'Escape') { self._collapseAccordionPanel(anchor); } };
+      document.addEventListener('keydown', escHandlerAccordion);
+      anchor._panelEscHandler = escHandlerAccordion;
+      return;
+    }
     const clickOutsideHandler = function (e) {
       try {
         if (opts.context === 'table') {
           const row = anchor.previousElementSibling;
           if (row && !anchor.contains(e.target) && !row.contains(e.target)) { self.collapsePanelForTableRow(row); }
-        } else if (opts.context === 'accordion') {
-          if (!anchor.contains(e.target)) self._collapseAccordionPanel(anchor);
         }
       } catch (_) { }
     };

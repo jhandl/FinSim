@@ -422,6 +422,11 @@ class EventAccordionManager {
       (document.querySelector(`[data-accordion-id="${accordionId}"]`) && document.querySelector(`[data-accordion-id="${accordionId}"]`).closest('.events-accordion-item')));
     if (!item) return;
     const event = this.events.find(e => e.accordionId === accordionId);
+    if (event && !event.relocationImpact) {
+      const tableRow = this.findTableRowForEvent(event);
+      const freshEvent = tableRow ? this.extractEventFromRow(tableRow) : null;
+      if (freshEvent && freshEvent.relocationImpact) Object.assign(event, freshEvent);
+    }
     if (!event || !event.relocationImpact) return;
     if (!this.expandedItems.has(accordionId)) { this.toggleAccordionItem(accordionId); }
     const content = item.querySelector('.accordion-item-content');
@@ -561,7 +566,8 @@ class EventAccordionManager {
         expandBtn.classList.add('expanded');
         expandBtn.title = 'Collapse';
         this.expandedItems.add(accordionId);
-        // Do not auto-open resolution panels; user will open explicitly if desired
+        // Keep panel behavior consistent no matter how the impacted item was expanded.
+        if (event && event.relocationImpact) this.expandResolutionPanel(accordionId);
         // Ensure the expanded item is fully visible in the viewport (see scroll helper below)
         // Use a transitionend listener to ensure we scroll *after* the panel
         // is fully expanded (covers manual clicks as well as programmatic).
