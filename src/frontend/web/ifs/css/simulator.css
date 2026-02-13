@@ -4725,12 +4725,16 @@ footer {
 
 .resolution-detail-footer .resolution-confirm-btn {
   background: #fff3cd;
-  border-color: #ffeaa7;
+  border-color: #ddd;
+  width: auto;
+  min-width: 7.5rem;
+  min-height: 32px;
+  padding: 0.3rem 0.85rem;
+  align-self: flex-end;
 }
 
 .resolution-detail-footer .resolution-confirm-btn:hover:not(:disabled) {
   background: #ffe69c;
-  border-color: #f5d76e;
 }
 
 .resolution-quick-action {
@@ -4876,6 +4880,15 @@ footer {
     width: 100%;
     min-height: 42px;
     padding: 0.4rem;
+  }
+
+  .resolution-detail[data-action="split"] .resolution-detail-footer .resolution-confirm-btn,
+  .resolution-detail[data-action="link"] .resolution-detail-footer .resolution-confirm-btn {
+    width: auto;
+    min-width: 7.5rem;
+    min-height: 32px;
+    padding: 0.3rem 0.85rem;
+    align-self: flex-end;
   }
 }
 

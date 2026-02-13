@@ -890,6 +890,7 @@ class EventAccordionManager {
           // Handle Relocation (MV) specially to open country selection modal in card mode
           if (val === 'MV' && this.webUI && this.webUI.eventsTableManager) {
             const etm = this.webUI.eventsTableManager;
+            const currentValues = this.preserveCurrentFieldValues(container);
             // If underlying table row for this accordion event is empty NOP, mark for replacement
             const rowRef = this.findTableRowForEvent(event);
             const wasEmpty = rowRef && typeof etm.isEventEmpty === 'function' ? etm.isEventEmpty(rowRef) : false;
@@ -904,10 +905,25 @@ class EventAccordionManager {
               this.syncFieldToTableWithoutDefaults(event, '.event-type', full);
               event.type = full;
               if (toggleEl) toggleEl.textContent = `→ ${name}`;
+              this.updateAccordionFieldVisibility(container, event, currentValues);
+              this.refreshEventSummary(event);
+              const accordionItem = container.closest('.events-accordion-item');
+              if (accordionItem) {
+                accordionItem.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market');
+                const newColorClass = this.getEventColorClass(full);
+                if (newColorClass) accordionItem.classList.add(newColorClass);
+              }
+              this.applySortingWithAnimation();
 
               // Recompute impacts so badges show in cards view immediately
               if (typeof etm.recomputeRelocationImpacts === 'function') {
-                etm.recomputeRelocationImpacts();
+                etm.recomputeRelocationImpacts({ skipAccordionRefresh: true });
+                const updatedTableRow = this.findTableRowForEvent(event);
+                if (updatedTableRow) {
+                  const updatedEvent = this.extractEventFromRow(updatedTableRow);
+                  if (updatedEvent) event.relocationImpact = updatedEvent.relocationImpact;
+                }
+                this.refreshEventSummary(event);
               }
 
               // Honor wizard toggle: if off, stop here; fields stay blank

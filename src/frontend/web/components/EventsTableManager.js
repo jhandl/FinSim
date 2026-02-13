@@ -359,7 +359,7 @@ class EventsTableManager {
   }
 
   // Single recomputation call used post-deletion regardless of row position/animation path
-  recomputeRelocationImpacts() {
+  recomputeRelocationImpacts(options = {}) {
     const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
     if (!cfg || !cfg.isRelocationEnabled || !cfg.isRelocationEnabled()) return;
     const events = this.webUI.readEvents(false);
@@ -377,7 +377,7 @@ class EventsTableManager {
     this.updateRelocationImpactIndicators(events);
     this.webUI.updateStatusForRelocationImpacts(events);
     // Ensure accordion view reflects latest table state
-    if (this.webUI.eventAccordionManager) this.webUI.eventAccordionManager.refresh();
+    if (!options.skipAccordionRefresh && this.webUI.eventAccordionManager) this.webUI.eventAccordionManager.refresh();
   }
 
   setupEventTypeChangeHandler() {

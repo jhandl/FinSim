@@ -97,6 +97,9 @@ eventTypes:
     placeholders:
       rate: ""
 
+  MV: # Relocation
+    amount: "Relocation cost"
+
   SM: # Stock Market
     fromAge: "Start ${timeUnit}"
     toAge: "End ${timeUnit}"

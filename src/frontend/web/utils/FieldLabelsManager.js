@@ -50,7 +50,10 @@ class FieldLabelsManager {
     let label;
 
     // Check for event-specific override
-    const eventConfig = this.labels.eventTypes?.[eventType];
+    let eventConfig = this.labels.eventTypes?.[eventType];
+    if (!eventConfig && typeof eventType === 'string' && eventType.indexOf('MV-') === 0) {
+      eventConfig = this.labels.eventTypes?.MV;
+    }
     if (eventConfig && eventConfig[fieldName]) {
       label = eventConfig[fieldName];
     } else {
@@ -75,7 +78,10 @@ class FieldLabelsManager {
     }
 
     // Check for event-specific placeholder
-    const eventConfig = this.labels.eventTypes?.[eventType];
+    let eventConfig = this.labels.eventTypes?.[eventType];
+    if (!eventConfig && typeof eventType === 'string' && eventType.indexOf('MV-') === 0) {
+      eventConfig = this.labels.eventTypes?.MV;
+    }
     if (eventConfig?.placeholders?.[fieldName] !== undefined) {
       return eventConfig.placeholders[fieldName];
     }
@@ -93,6 +99,9 @@ class FieldLabelsManager {
       if (eventType === 'SM') return 'Market Growth';
       if (eventType === 'M') return 'Interest Rate';
       return 'Growth Rate';
+    }
+    if (fieldName === 'amount' && typeof eventType === 'string' && eventType.indexOf('MV-') === 0) {
+      return 'Relocation cost';
     }
 
     const defaults = {
@@ -149,6 +158,9 @@ class FieldLabelsManager {
         M: {
           rate: "Interest Rate",
           placeholders: { rate: "" }
+        },
+        MV: {
+          amount: "Relocation cost"
         }
       }
     };
