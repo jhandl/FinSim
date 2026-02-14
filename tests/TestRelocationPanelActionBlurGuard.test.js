@@ -51,7 +51,7 @@ describe('Relocation panel blur auto-sort guard', () => {
   });
 
   test('does not auto-sort when blur originates from resolution panel click with missing relatedTarget', () => {
-    const webUIStub = { getValue: jest.fn(() => 'single') };
+    const webUIStub = { getValue: jest.fn(() => 'single'), readEvents: jest.fn(() => []) };
     const manager = new EventsTableManager(webUIStub);
     manager.sortKeys = [{ col: 'from-age', dir: 'asc' }];
     jest.runOnlyPendingTimers();
@@ -71,7 +71,7 @@ describe('Relocation panel blur auto-sort guard', () => {
   });
 
   test('peg resolution stores currency linkage and marks row reviewed', () => {
-    const webUIStub = { getValue: jest.fn(() => 'single') };
+    const webUIStub = { getValue: jest.fn(() => 'single'), readEvents: jest.fn(() => []) };
     const manager = new EventsTableManager(webUIStub);
     jest.runOnlyPendingTimers();
     const afterSpy = jest.spyOn(manager, '_afterResolutionAction').mockImplementation(() => {});

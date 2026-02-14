@@ -5108,6 +5108,55 @@ footer {
   margin-top: 0;
 }
 
+/* Split amount update editor: keep yellow panel style but avoid full-width block */
+.split-value-editor-inline {
+  margin: 0.35rem 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.split-value-editor-inline .split-value-preview {
+  display: inline-block;
+  width: auto;
+  max-width: 100%;
+  text-align: left;
+  margin: 0;
+}
+
+.split-value-editor-inline .split-value-preview .split-parts-container {
+  grid-template-columns: 1fr;
+  margin-bottom: 0;
+  width: auto;
+}
+
+.split-value-editor-inline .split-value-preview .split-part-info {
+  padding: 0.35rem 0.45rem;
+}
+
+.split-value-editor-inline .split-value-preview .split-part-info .part-line {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.split-value-editor-inline .split-value-preview .split-value-amount-input,
+#Events .split-value-editor-inline .split-value-preview .split-value-amount-input {
+  flex: 0 0 auto;
+  width: var(--event-amount-input-min-width);
+  min-width: var(--event-amount-input-min-width);
+  max-width: var(--event-amount-input-min-width);
+  padding: 0.3rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  height: auto;
+  background: #fff;
+  box-sizing: border-box;
+}
+
 .ppp-hint {
   font-size: 0.72rem;
   /* slightly smaller */

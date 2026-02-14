@@ -235,6 +235,14 @@ class EventAccordionManager {
       if (overrideInput && overrideInput.value) {
         event.resolutionOverride = overrideInput.value;
       }
+      const overrideMvIdInput = row.querySelector('.event-resolution-mv-id');
+      if (overrideMvIdInput && overrideMvIdInput.value) {
+        event.resolutionOverrideMvId = overrideMvIdInput.value;
+      }
+      const overrideCategoryInput = row.querySelector('.event-resolution-category');
+      if (overrideCategoryInput && overrideCategoryInput.value) {
+        event.resolutionOverrideCategory = overrideCategoryInput.value;
+      }
 
       // Prefer robust dataset-based relocation impact propagated by table manager
       if (row.dataset && row.dataset.relocationImpact === '1') {
@@ -244,6 +252,9 @@ class EventAccordionManager {
           autoResolvable: row.dataset.relocationImpactAuto === '1',
           mvEventId: row.dataset.relocationImpactMvId || undefined
         };
+        if (row.dataset.relocationImpactDetails) {
+          event.relocationImpact.details = row.dataset.relocationImpactDetails;
+        }
       } else {
         // Fallback to reading from events array via matching by eventId when available
         const tableEvents = this.webUI.readEvents(false);

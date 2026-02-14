@@ -152,6 +152,8 @@ module.exports = {
 
         // Set resolutionOverride and check clearance
         mvResult.resolutionOverride = 'reviewed';
+        mvResult.resolutionOverrideMvId = mvResult.relocationImpact.mvEventId || 'mv5';
+        mvResult.resolutionOverrideCategory = mvResult.relocationImpact.category;
         RelocationImpactDetector.clearResolvedImpacts(mvResult);
         assert(!mvResult.relocationImpact, 'resolutionOverride should clear local_holdings impact');
       })();

@@ -827,6 +827,12 @@ function serializeSimulation(ui) {
           }
         } catch (_e3c) { }
         try {
+          var splitAnchorAmountInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-split-anchor-amount') : null;
+          if (splitAnchorAmountInput && splitAnchorAmountInput.value !== '') {
+            metaPairs.push('splitAnchorAmount=' + encodeURIComponent(splitAnchorAmountInput.value));
+          }
+        } catch (_e3d) { }
+        try {
           var mvLinkIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-link-id') : null;
           if (mvLinkIdInput && mvLinkIdInput.value) {
             metaPairs.push('mvLinkId=' + encodeURIComponent(mvLinkIdInput.value));
@@ -844,6 +850,14 @@ function serializeSimulation(ui) {
           if (resolutionOverrideInput && resolutionOverrideInput.value) {
             resolvedMeta = '1';
             metaPairs.push('resolved=1');
+            var resolutionMvIdInput = rowEl.querySelector ? rowEl.querySelector('.event-resolution-mv-id') : null;
+            if (resolutionMvIdInput && resolutionMvIdInput.value) {
+              metaPairs.push('resolvedMvId=' + encodeURIComponent(resolutionMvIdInput.value));
+            }
+            var resolutionCategoryInput = rowEl.querySelector ? rowEl.querySelector('.event-resolution-category') : null;
+            if (resolutionCategoryInput && resolutionCategoryInput.value) {
+              metaPairs.push('resolvedCategory=' + encodeURIComponent(resolutionCategoryInput.value));
+            }
           }
         } catch (_e4) { }
         try {

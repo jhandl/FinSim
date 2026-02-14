@@ -1017,6 +1017,11 @@ class UIManager {
               const splitAnchorAge = Number(splitAnchorAgeInput.value);
               if (!isNaN(splitAnchorAge)) eventObj.relocationSplitAnchorAge = splitAnchorAge;
             }
+            const splitAnchorAmountInput = domRow.querySelector('.event-relocation-split-anchor-amount');
+            if (splitAnchorAmountInput && splitAnchorAmountInput.value !== '') {
+              const splitAnchorAmount = Number(splitAnchorAmountInput.value);
+              if (!isNaN(splitAnchorAmount)) eventObj.relocationSplitAnchorAmount = splitAnchorAmount;
+            }
 
             const relocationLinkIdInput = domRow.querySelector('.event-relocation-link-id');
             if (relocationLinkIdInput && relocationLinkIdInput.value) eventObj.relocationLinkId = relocationLinkIdInput.value;
@@ -1031,6 +1036,10 @@ class UIManager {
 
             const overrideInput = domRow.querySelector('.event-resolution-override');
             if (overrideInput && overrideInput.value) eventObj.resolutionOverride = overrideInput.value;
+            const overrideMvIdInput = domRow.querySelector('.event-resolution-mv-id');
+            if (overrideMvIdInput && overrideMvIdInput.value) eventObj.resolutionOverrideMvId = overrideMvIdInput.value;
+            const overrideCategoryInput = domRow.querySelector('.event-resolution-category');
+            if (overrideCategoryInput && overrideCategoryInput.value) eventObj.resolutionOverrideCategory = overrideCategoryInput.value;
           }
         }
       } catch (_) { /* never block readEvents on hidden-field hydration */ }
@@ -1046,6 +1055,9 @@ class UIManager {
               autoResolvable: domRow.dataset.relocationImpactAuto === '1',
               mvEventId: domRow.dataset.relocationImpactMvId || undefined
             };
+            if (domRow.dataset.relocationImpactDetails) {
+              eventObj.relocationImpact.details = domRow.dataset.relocationImpactDetails;
+            }
           }
         }
       } catch (_) { /* never block readEvents on hydration */ }

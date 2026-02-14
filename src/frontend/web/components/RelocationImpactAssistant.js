@@ -88,6 +88,10 @@ var RelocationImpactAssistant = {
     // Based on table manager implementation
     const events = (env && env.webUI && typeof env.webUI.readEvents === 'function') ? env.webUI.readEvents(false) : [];
     const impactCategory = event && event.relocationImpact ? event.relocationImpact.category : '';
+    let impactDetails = event && event.relocationImpact ? event.relocationImpact.details : null;
+    if (typeof impactDetails === 'string') {
+      try { impactDetails = JSON.parse(impactDetails); } catch (_) { impactDetails = null; }
+    }
     const mvEventId = event && event.relocationImpact ? event.relocationImpact.mvEventId : null;
     let mvEvent = events.find(function (e) {
       return e && (e.id === mvEventId || e._mvRuntimeId === mvEventId);
@@ -118,7 +122,8 @@ var RelocationImpactAssistant = {
       }
     }
     const startCountry = Config.getInstance().getStartCountry();
-    if (!mvEvent && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift') return '';
+    const canRenderWithoutMv = (impactCategory === 'simple' && (event.type === 'R' || event.type === 'M'));
+    if (!mvEvent && !canRenderWithoutMv && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift' && impactCategory !== 'split_amount_shift') return '';
     const destCountry = mvEvent ? String(mvEvent.name || '').trim().toLowerCase() : startCountry;
     const originCountry = mvEvent && (env && env.eventsTableManager && typeof env.eventsTableManager.getOriginCountry === 'function') ? env.eventsTableManager.getOriginCountry(mvEvent, startCountry) : startCountry;
     const relocationAge = mvEvent ? mvEvent.fromAge : null;
@@ -184,15 +189,18 @@ var RelocationImpactAssistant = {
         addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Let this event continue unchanged after the relocation.', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
       }
     } else if (event.relocationImpact.category === 'simple') {
-      if ((event.type === 'R' || event.type === 'M') && !event.linkedCountry) {
+      const hasStaleRealEstateLink = !!(impactDetails && impactDetails.previousLinkedCountry);
+      if ((event.type === 'R' || event.type === 'M') && (!event.linkedCountry || hasStaleRealEstateLink)) {
         const countries = Config.getInstance().getAvailableCountries();
-        const detectedCountry = (env && env.eventsTableManager && env.eventsTableManager.detectPropertyCountry) ? env.eventsTableManager.detectPropertyCountry(event.fromAge, startCountry) : startCountry;
+        const detectedCountryFromDetails = impactDetails && impactDetails.detectedCountry ? String(impactDetails.detectedCountry).toLowerCase() : '';
+        const detectedCountry = detectedCountryFromDetails || ((env && env.eventsTableManager && env.eventsTableManager.detectPropertyCountry) ? env.eventsTableManager.detectPropertyCountry(event.fromAge, startCountry) : startCountry);
         const detectedCountryObj = countries.find(function (c) { return c.code.toLowerCase() === detectedCountry; });
         const detectedCountryName = detectedCountryObj ? detectedCountryObj.name : (detectedCountry ? detectedCountry.toUpperCase() : '');
 
         // Find the original country from the event's currency
         const eventCurrency = event.currency ? String(event.currency).toUpperCase().trim() : null;
-        let originalCountry = null;
+        const staleLinkedCountry = impactDetails && impactDetails.previousLinkedCountry ? String(impactDetails.previousLinkedCountry).toLowerCase() : '';
+        let originalCountry = staleLinkedCountry || null;
         if (eventCurrency) {
           for (let i = 0; i < countries.length; i++) {
             const rs = Config.getInstance().getCachedTaxRuleSet(countries[i].code.toLowerCase());
@@ -263,6 +271,43 @@ var RelocationImpactAssistant = {
         addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion to ' + (destCurrencyCode || destCurrency || 'the destination currency') + ' will occur.', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
         addAction(actions, { action: 'review', tabLabel: 'Mark As Reviewed', instantApply: true, tooltip: 'Records this relocation impact as reviewed without changing the amount or currency.', buttonAttrs: ' data-row-id="' + rowId + '"' });
       }
+    } else if (event.relocationImpact.category === 'split_amount_shift') {
+      let splitAmountDetails = event.relocationImpact.details;
+      if (typeof splitAmountDetails === 'string') {
+        try { splitAmountDetails = JSON.parse(splitAmountDetails); } catch (_) { splitAmountDetails = null; }
+      }
+      const suggestedAmount = splitAmountDetails && splitAmountDetails.suggestedAmount != null ? Number(splitAmountDetails.suggestedAmount) : NaN;
+      const originCountryForSplit = splitAmountDetails && splitAmountDetails.originCountry
+        ? String(splitAmountDetails.originCountry).toLowerCase()
+        : originCountry;
+      const destinationCountry = splitAmountDetails && splitAmountDetails.destinationCountry
+        ? String(splitAmountDetails.destinationCountry).toLowerCase()
+        : destCountry;
+      const baseAmount = splitAmountDetails && splitAmountDetails.part1Amount != null ? Number(splitAmountDetails.part1Amount) : NaN;
+      const fxForSplit = econ && econ.ready ? econ.getFX(originCountryForSplit, destinationCountry) : null;
+      const pppForSplit = econ && econ.ready ? econ.getPPP(originCountryForSplit, destinationCountry) : null;
+      const fxAmountForSplit = (fxForSplit != null && !isNaN(baseAmount)) ? Math.round(baseAmount * fxForSplit) : null;
+      const pppAmountForSplit = (pppForSplit != null && !isNaN(baseAmount)) ? Math.round(baseAmount * pppForSplit) : null;
+      const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destinationCountry);
+      const destCurrency = toRuleSet && toRuleSet.getCurrencyCode ? toRuleSet.getCurrencyCode() : '';
+      containerAttributes = ' data-from-country="' + originCountryForSplit + '" data-to-country="' + destinationCountry + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmount) ? '' : String(baseAmount)) + '" data-fx="' + (fxForSplit != null ? fxForSplit : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppForSplit != null ? pppForSplit : '') + '" data-fx-amount="' + (fxAmountForSplit != null ? fxAmountForSplit : '') + '" data-ppp-amount="' + (pppAmountForSplit != null ? pppAmountForSplit : '') + '"';
+      const toMeta = getSymbolAndLocaleByCountry(destinationCountry);
+      const suggestedFormatted = !isNaN(suggestedAmount) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, suggestedAmount) : '';
+      addAction(actions, {
+        action: 'keep_split_value_as_is',
+        tabLabel: 'Leave as is',
+        instantApply: true,
+        tooltip: 'Keep Part 2 at its current value and mark this split as reviewed until Part 1 changes again.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
+      });
+      addAction(actions, {
+        action: 'update_split_value',
+        tabLabel: 'Update value',
+        buttonLabel: 'Confirm',
+        buttonClass: 'event-wizard-button resolution-apply resolution-confirm-btn',
+        buttonAttrs: ' data-row-id="' + rowId + '"',
+        bodyHtml: '<div class="split-value-editor-inline"><div class="split-preview-inline compact split-value-preview"><div class="split-parts-container"><div class="split-part-info"><div class="part-line">Updated Part 2 (' + (destCurrency || '') + '): <input type="text" class="part2-amount-input split-value-amount-input" value="' + suggestedFormatted + '" placeholder="Amount"></div></div></div></div></div>'
+      });
     } else if (event.relocationImpact.category === 'split_relocation_shift') {
       let splitShiftDetails = event.relocationImpact.details;
       if (typeof splitShiftDetails === 'string') {
@@ -445,6 +490,15 @@ var RelocationImpactAssistant = {
       }
       case 'keep_split_as_is': {
         if (typeof etm.keepSplitAsIs === 'function') etm.keepSplitAsIs(rowId, eventId);
+        break;
+      }
+      case 'keep_split_value_as_is': {
+        if (typeof etm.keepSplitValueAsIs === 'function') etm.keepSplitValueAsIs(rowId, eventId);
+        break;
+      }
+      case 'update_split_value': {
+        const amount = payload && payload.suggestedAmount;
+        if (typeof etm.updateSplitValue === 'function') etm.updateSplitValue(rowId, amount, eventId);
         break;
       }
       case 'adapt_sale_to_move': {
@@ -660,6 +714,7 @@ var RelocationImpactAssistant = {
         toCountry: panelContainer ? panelContainer.getAttribute('data-to-country') : null
       };
       if (action === 'split') { const detail = btn.closest('.resolution-detail'); const input = detail ? detail.querySelector('.part2-amount-input') : null; payload.part2Amount = input ? input.value : undefined; }
+      else if (action === 'update_split_value') { const detail = btn.closest('.resolution-detail'); const input = detail ? detail.querySelector('.split-value-amount-input') : null; payload.suggestedAmount = input ? input.value : payload.suggestedAmount; }
       else if (action === 'link') { const detail = btn.closest('.resolution-detail'); const sel = detail ? detail.querySelector('.country-selector') : null; const amountInput = detail ? detail.querySelector('.link-amount-input') : null; payload.country = sel ? sel.value : undefined; payload.convertedAmount = amountInput ? amountInput.value : undefined; }
       self.handlePanelAction(ctx.event, action, payload, ctx.env);
     });

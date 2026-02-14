@@ -54,13 +54,13 @@ var RelocationImpactDetector = {
             var event = events[j];
             // Skip MV events and Stock Market events
             if (event.type && (isRelocationEvent(event) || event.type === 'SM')) continue;
-            // Skip events explicitly overridden or parts of a split chain
-            if (event.resolutionOverride) continue;
+            // Skip events explicitly reviewed for this relocation/category, or parts of a split chain
+            if (this.hasMatchingResolutionOverrideFor(event, mvImpactId, 'boundary', mvEvent)) continue;
             if (event.linkedEventId) continue;
             // Sold real-estate rows linked to a relocation are handled by
             // addSoldRealEstateShiftImpacts so users can explicitly re-align
             // sale timing when relocation age changes.
-            if ((event.type === 'R' || event.type === 'M') && event.relocationSellMvId) continue;
+            if (this.isProtectedBySellMarkerForMv(event, mvEvents, mvImpactId)) continue;
 
             // Check if event crosses THIS MV's boundary (not the next one)
             var eFrom = Number(event.fromAge);
@@ -76,8 +76,8 @@ var RelocationImpactDetector = {
             var event = events[j];
             // Skip MV events and Stock Market events
             if (event.type && (isRelocationEvent(event) || event.type === 'SM')) continue;
-            if (event.resolutionOverride) continue;
-            if ((event.type === 'R' || event.type === 'M') && event.relocationSellMvId) continue;
+            if (this.hasMatchingResolutionOverrideFor(event, mvImpactId, 'simple', mvEvent)) continue;
+            if (this.isProtectedBySellMarkerForMv(event, mvEvents, mvImpactId)) continue;
 
             var eFrom2 = Number(event.fromAge);
             if (!isNaN(eFrom2) && eFrom2 >= mvFromAge && (!nextMvEvent || eFrom2 < nextMvFromAge)) {
@@ -116,15 +116,16 @@ var RelocationImpactDetector = {
             }
           }
         }
-        this.validateRealEstateLinkedCountries(events, mvEvents, startCountry);
         this.addSoldRealEstateShiftImpacts(events, mvEvents);
       }
 
+      this.validateRealEstateLinkedCountries(events, mvEvents, startCountry);
+      this.addSplitAmountShiftImpacts(events, mvEvents, startCountry);
       this.addOrphanSplitImpacts(events, mvEvents);
 
       // Final pass: remove impacts for events that are already resolved
       for (var k = 0; k < events.length; k++) {
-        this.clearResolvedImpacts(events[k]);
+        this.clearResolvedImpacts(events[k], mvEvents);
       }
 
       // Build summary
@@ -195,13 +196,45 @@ var RelocationImpactDetector = {
     return mvEvent ? (mvEvent._mvRuntimeId || mvEvent.id || '') : '';
   },
 
-  ensureSimpleImpact: function (event, mvEvents, startCountry) {
+  getImpactReferenceCandidates: function (mvImpactId, mvEvent) {
+    var candidates = [];
+    if (mvImpactId) candidates.push(String(mvImpactId));
+    if (mvEvent) {
+      if (mvEvent._mvRuntimeId) candidates.push(String(mvEvent._mvRuntimeId));
+      if (mvEvent.id) candidates.push(String(mvEvent.id));
+      if (mvEvent.relocationLinkId) candidates.push(String(mvEvent.relocationLinkId));
+    }
+    return candidates;
+  },
+
+  hasMatchingResolutionOverrideFor: function (event, mvImpactId, category, mvEvent) {
+    if (!event || !event.resolutionOverride) return false;
+    var overrideCategory = String(event.resolutionOverrideCategory || '');
+    if (overrideCategory && category && overrideCategory !== String(category)) return false;
+    var overrideRef = String(event.resolutionOverrideMvId || '');
+    if (!overrideRef) return false;
+    var candidates = this.getImpactReferenceCandidates(mvImpactId, mvEvent);
+    for (var i = 0; i < candidates.length; i++) {
+      if (candidates[i] === overrideRef) return true;
+    }
+    return false;
+  },
+
+  isProtectedBySellMarkerForMv: function (event, mvEvents, mvImpactId) {
+    if (!event || (event.type !== 'R' && event.type !== 'M')) return false;
+    if (!event.relocationSellMvId) return false;
+    var markerMv = this.getMvEventByImpactRef(mvEvents, String(event.relocationSellMvId));
+    if (!markerMv) return false;
+    return this.getMvImpactId(markerMv) === String(mvImpactId || '');
+  },
+
+  ensureSimpleImpact: function (event, mvEvents, startCountry, details) {
     if (event.relocationImpact && event.relocationImpact.category === 'simple') return;
     if (event.relocationImpact) delete event.relocationImpact;
     var mvEvent = this.getMvEventForAge(mvEvents, Number(event.fromAge));
     var destinationCountry = mvEvent ? getRelocationCountryCode(mvEvent) : startCountry;
     var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry);
-    this.addImpact(event, 'simple', message, this.getMvImpactId(mvEvent), true);
+    this.addImpact(event, 'simple', message, this.getMvImpactId(mvEvent), true, details);
   },
 
   getMvEventByImpactRef: function (mvEvents, ref) {
@@ -224,13 +257,14 @@ var RelocationImpactDetector = {
     if (!events || !events.length || !mvEvents || !mvEvents.length) return;
     for (var i = 0; i < events.length; i++) {
       var event = events[i];
-      if (!event || event.resolutionOverride) continue;
+      if (!event) continue;
       if (event.type !== 'R' && event.type !== 'M') continue;
       if (!event.relocationSellMvId) continue;
 
       var markerId = String(event.relocationSellMvId);
       var mvEvent = this.getMvEventByImpactRef(mvEvents, markerId);
       if (!mvEvent) continue;
+      if (this.hasMatchingResolutionOverrideFor(event, this.getMvImpactId(mvEvent), 'sale_relocation_shift', mvEvent)) continue;
 
       var relocationAge = Number(mvEvent.fromAge);
       var anchorAge = Number(event.relocationSellAnchorAge);
@@ -254,7 +288,7 @@ var RelocationImpactDetector = {
     var chains = {};
     for (var i = 0; i < events.length; i++) {
       var event = events[i];
-      if (!event || !event.linkedEventId || event.resolutionOverride) continue;
+      if (!event || !event.linkedEventId) continue;
       var key = String(event.linkedEventId);
       if (!chains[key]) chains[key] = [];
       chains[key].push(event);
@@ -324,6 +358,105 @@ var RelocationImpactDetector = {
     }
   },
 
+  parseSplitAmountValue: function (amount) {
+    var raw = (amount == null) ? '' : String(amount);
+    var sanitized = raw.replace(/[^0-9.\-]/g, '');
+    var numeric = Number(sanitized);
+    if (isNaN(numeric)) numeric = Number(amount);
+    return isNaN(numeric) ? NaN : numeric;
+  },
+
+  amountsRoughlyEqual: function (a, b) {
+    if (isNaN(a) || isNaN(b)) return false;
+    return Math.abs(a - b) < 0.5;
+  },
+
+  calculateSplitAmountSuggestion: function (baseAmount, fromCountry, toCountry) {
+    var numeric = this.parseSplitAmountValue(baseAmount);
+    if (isNaN(numeric)) return NaN;
+    var economicData = Config.getInstance().getEconomicData();
+    if (!economicData || !economicData.ready) return Math.round(numeric);
+    var pppRatio = economicData.getPPP(fromCountry, toCountry);
+    if (pppRatio === null) {
+      var fxRate = economicData.getFX(fromCountry, toCountry);
+      if (fxRate === null) return Math.round(numeric);
+      return Math.round(numeric * fxRate);
+    }
+    return Math.round(numeric * pppRatio);
+  },
+
+  addSplitAmountShiftImpacts: function (events, mvEvents, startCountry) {
+    if (!events || !events.length) return;
+    var chains = {};
+    for (var i = 0; i < events.length; i++) {
+      var event = events[i];
+      if (!event || !event.linkedEventId) continue;
+      var key = String(event.linkedEventId);
+      if (!chains[key]) chains[key] = [];
+      chains[key].push(event);
+    }
+
+    var chainIds = Object.keys(chains);
+    for (var j = 0; j < chainIds.length; j++) {
+      var chain = chains[chainIds[j]];
+      if (!chain || chain.length < 2) continue;
+      chain.sort(function (a, b) {
+        var aFrom = Number(a.fromAge);
+        var bFrom = Number(b.fromAge);
+        if (aFrom !== bFrom) return aFrom - bFrom;
+        return Number(a.toAge) - Number(b.toAge);
+      });
+      var first = chain[0];
+      var second = chain[1];
+      if (!first || !second) continue;
+      if (second.relocationSplitAnchorAmount == null || second.relocationSplitAnchorAmount === '') continue;
+
+      var splitMarkerId = '';
+      for (var n = 0; n < chain.length; n++) {
+        if (chain[n] && chain[n].relocationSplitMvId) {
+          splitMarkerId = String(chain[n].relocationSplitMvId);
+          break;
+        }
+      }
+      if (!splitMarkerId) continue;
+      var markerMv = this.getMvEventByImpactRef(mvEvents, splitMarkerId);
+      if (!markerMv) continue;
+
+      var anchorAmount = this.parseSplitAmountValue(second.relocationSplitAnchorAmount);
+      var updatedPart1Amount = this.parseSplitAmountValue(first.amount);
+      if (isNaN(anchorAmount) || isNaN(updatedPart1Amount)) continue;
+      if (this.amountsRoughlyEqual(anchorAmount, updatedPart1Amount)) continue;
+
+      var markerAge = Number(markerMv.fromAge);
+      if (isNaN(markerAge)) continue;
+      var originCountry = this.getCountryAtAge(mvEvents, startCountry, markerAge - 1);
+      var destinationCountry = getRelocationCountryCode(markerMv);
+      var suggestedAmount = this.calculateSplitAmountSuggestion(updatedPart1Amount, originCountry, destinationCountry);
+      var destinationRuleSet = Config.getInstance().getCachedTaxRuleSet(destinationCountry);
+      var suggestedCurrency = destinationRuleSet && destinationRuleSet.getCurrencyCode ? String(destinationRuleSet.getCurrencyCode()).toUpperCase() : '';
+      var currentPart2Amount = this.parseSplitAmountValue(second.amount);
+      if (!isNaN(currentPart2Amount) && this.amountsRoughlyEqual(currentPart2Amount, suggestedAmount)) {
+        continue;
+      }
+
+      var suggestedLabel = !isNaN(suggestedAmount) ? (String(suggestedAmount) + (suggestedCurrency ? (' ' + suggestedCurrency) : '')) : '';
+      var message = suggestedLabel
+        ? ('Part 1 amount changed. Suggested Part 2 value: ' + suggestedLabel + '. Update Part 2 value or leave it as is.')
+        : 'Part 1 amount changed. Update Part 2 value or leave it as is.';
+      var details = {
+        linkedEventId: String(chainIds[j]),
+        anchorAmount: anchorAmount,
+        part1Amount: updatedPart1Amount,
+        suggestedAmount: suggestedAmount,
+        suggestedCurrency: suggestedCurrency,
+        currentPart2Amount: isNaN(currentPart2Amount) ? second.amount : currentPart2Amount,
+        originCountry: originCountry,
+        destinationCountry: destinationCountry
+      };
+      this.addImpact(second, 'split_amount_shift', message, this.getMvImpactId(markerMv), true, details);
+    }
+  },
+
   hasRelocationBoundaryForSplitChain: function (chain, mvEvents) {
     if (!chain || chain.length < 2 || !mvEvents || mvEvents.length === 0) return false;
     var boundaries = [];
@@ -374,11 +507,27 @@ var RelocationImpactDetector = {
 
       if (!mismatch) continue;
 
-      if (r) { r.linkedCountry = null; r.currency = null; }
-      if (m) { m.linkedCountry = null; m.currency = null; }
+      var rDetails = null;
+      var mDetails = null;
+      if (r) {
+        rDetails = {
+          previousLinkedCountry: rLinked || '',
+          previousCurrency: r.currency ? String(r.currency).toUpperCase() : '',
+          detectedCountry: rCountry || ''
+        };
+        r.linkedCountry = null; r.currency = null;
+      }
+      if (m) {
+        mDetails = {
+          previousLinkedCountry: mLinked || '',
+          previousCurrency: m.currency ? String(m.currency).toUpperCase() : '',
+          detectedCountry: mCountry || ''
+        };
+        m.linkedCountry = null; m.currency = null;
+      }
 
-      if (r) this.ensureSimpleImpact(r, mvEvents, startCountry);
-      if (m) this.ensureSimpleImpact(m, mvEvents, startCountry);
+      if (r) this.ensureSimpleImpact(r, mvEvents, startCountry, rDetails);
+      if (m) this.ensureSimpleImpact(m, mvEvents, startCountry, mDetails);
     }
   },
 
@@ -421,7 +570,7 @@ var RelocationImpactDetector = {
           return 'Does this ' + noun + ' continue after your move to ' + destinationCountryName + '?';
         }
       case 'simple':
-        if (this.checkPensionConflict(event, destinationCountry, mvEvent.fromAge)) {
+        if (mvEvent && this.checkPensionConflict(event, destinationCountry, mvEvent.fromAge)) {
           return 'Are you converting this salary to a non-pensionable salary after your move to ' + destinationCountryName + '?';
         } else {
           return 'Is this ' + noun + ' still relevant after your move to ' + destinationCountryName + '?';
@@ -454,10 +603,14 @@ var RelocationImpactDetector = {
   /**
    * Removes relocationImpact if the event is resolved.
    * @param {Object} event - SimEvent object
+   * @param {Array} mvEvents - Relocation timeline for scoped resolution matching
    */
-  clearResolvedImpacts: function (event) {
+  clearResolvedImpacts: function (event, mvEvents) {
     if (!event || !event.relocationImpact) return;
-    if (event.resolutionOverride) { delete event.relocationImpact; return; }
+    var impactMvId = event.relocationImpact ? event.relocationImpact.mvEventId : '';
+    var impactCategory = event.relocationImpact ? event.relocationImpact.category : '';
+    var impactMvEvent = this.getMvEventByImpactRef(mvEvents, impactMvId);
+    if (this.hasMatchingResolutionOverrideFor(event, impactMvId, impactCategory, impactMvEvent)) { delete event.relocationImpact; return; }
     var resolved = false;
     if (event.relocationImpact.category === 'boundary') {
       // Consider boundary resolved if the event was explicitly split/linked, pegged to a currency,
@@ -466,10 +619,6 @@ var RelocationImpactDetector = {
     } else if (event.relocationImpact.category === 'simple') {
       // Consider simple resolved if the event belongs to a split chain, has explicit jurisdiction, or salary conversion is acknowledged
       resolved = !!(event.linkedEventId || event.linkedCountry || event.type === 'SInp' || event.type === 'SI2np');
-    } else if (event.relocationImpact.category === 'local_holdings') {
-      // Consider resolved if user has marked as reviewed
-      // (Keep/sell/reinvest actions will be handled via custom resolution, not field changes)
-      resolved = !!(event.resolutionOverride);
     }
     if (resolved) delete event.relocationImpact;
   },

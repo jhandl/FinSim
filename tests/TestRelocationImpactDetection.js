@@ -354,6 +354,75 @@ module.exports = {
         assert(!result.find(e => e.id === 'salary_split_manual_p2').relocationImpact, 'Part 2 manual age edits should not trigger relocation-age-shift impact');
       });
 
+      // Test 8i: Split part-1 amount changes should flag part-2 with a recalculated suggestion.
+      runTest('8i', function () {
+        econ = new EconomicData({
+          AA: { country: 'AA', currency: 'AAA', cpi: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', cpi: 3.0, ppp: 2.0, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
+        });
+        const mv = makeEvent({ id: 'mv_split_amount_shift', type: 'MV', name: 'BB', fromAge: 35, toAge: 35, relocationLinkId: 'mvlink_split_amount_shift' });
+        const part1 = makeEvent({
+          id: 'salary_split_amount_p1',
+          type: 'SI',
+          amount: 12000,
+          fromAge: 30,
+          toAge: 34,
+          linkedEventId: 'split_amount_shift_1',
+          relocationSplitMvId: 'mvlink_split_amount_shift'
+        });
+        const part2 = makeEvent({
+          id: 'salary_split_amount_p2',
+          type: 'SInp',
+          amount: 20000,
+          fromAge: 35,
+          toAge: 40,
+          currency: 'BBB',
+          linkedEventId: 'split_amount_shift_1',
+          relocationSplitMvId: 'mvlink_split_amount_shift',
+          relocationSplitAnchorAmount: 10000
+        });
+        const result = runDetector([part1, part2, mv], 'aa');
+        const p1Impact = result.find(e => e.id === 'salary_split_amount_p1').relocationImpact;
+        const p2Impact = result.find(e => e.id === 'salary_split_amount_p2').relocationImpact;
+        assert(!p1Impact, 'Part 1 should not be flagged for split amount change');
+        assert(p2Impact && p2Impact.category === 'split_amount_shift', 'Part 2 should be flagged when split Part 1 amount changes');
+        assert.strictEqual(Number(p2Impact.details.suggestedAmount), 24000, 'Part 2 suggestion should be recalculated from the updated Part 1 amount');
+
+        const acknowledged = runDetector([
+          part1,
+          Object.assign({}, part2, { relocationSplitAnchorAmount: 12000 }),
+          mv
+        ], 'aa');
+        assert(!acknowledged.find(e => e.id === 'salary_split_amount_p2').relocationImpact, 'Updating split anchor amount should clear split amount impact');
+      });
+
+      // Test 8j: Stale sold-property marker from a removed relocation must not suppress a new boundary impact.
+      runTest('8j', function () {
+        const mvNew = makeEvent({ id: 'mv_new_sale_boundary', type: 'MV', name: 'BB', fromAge: 37, toAge: 37 });
+        const property = makeEvent({
+          id: 'home_sale_stale_marker',
+          type: 'R',
+          fromAge: 35,
+          toAge: 44,
+          relocationSellMvId: 'mvlink_removed_old_move',
+          relocationSellAnchorAge: 45
+        });
+        const mortgage = makeEvent({
+          id: 'home_sale_stale_marker',
+          type: 'M',
+          fromAge: 35,
+          toAge: 44,
+          relocationSellMvId: 'mvlink_removed_old_move',
+          relocationSellAnchorAge: 45
+        });
+        const result = runDetector([property, mortgage, mvNew], 'aa');
+        const propertyImpact = result.find(e => e.type === 'R').relocationImpact;
+        const mortgageImpact = result.find(e => e.type === 'M').relocationImpact;
+        assert(propertyImpact && propertyImpact.category === 'boundary', 'Property should be re-flagged when stale sell marker no longer matches a relocation');
+        assert(mortgageImpact && mortgageImpact.category === 'boundary', 'Mortgage should be re-flagged when stale sell marker no longer matches a relocation');
+        assert.strictEqual(propertyImpact.mvEventId, 'mv_new_sale_boundary', 'Property impact should reference the new relocation');
+      });
+
       // Test 9: Resolution detection via property linking.
       runTest('9', function () {
         const mv = makeEvent({ id: 'mv_prop_res', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
@@ -381,9 +450,36 @@ module.exports = {
       // Test 11: Manual override skips analysis.
       runTest('11', function () {
         const mv = makeEvent({ id: 'mv_override', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
-        const expense = makeEvent({ id: 'expense_override', type: 'E', fromAge: 36, toAge: 38, resolutionOverride: '1' });
+        const expense = makeEvent({
+          id: 'expense_override',
+          type: 'E',
+          fromAge: 36,
+          toAge: 38,
+          resolutionOverride: '1',
+          resolutionOverrideMvId: 'mv_override',
+          resolutionOverrideCategory: 'simple'
+        });
         const result = runDetector([expense, mv], 'aa');
         assert(!result.find(e => e.id === 'expense_override').relocationImpact, 'Override should prevent flagging');
+      });
+
+      // Test 11b: Override tied to a different relocation must not mute current impacts.
+      runTest('11b', function () {
+        const mvOld = makeEvent({ id: 'mv_old', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
+        const mvNew = makeEvent({ id: 'mv_new', type: 'MV', name: 'CC', fromAge: 45, toAge: 45 });
+        const expense = makeEvent({
+          id: 'expense_new_move',
+          type: 'E',
+          fromAge: 46,
+          toAge: 48,
+          resolutionOverride: '1',
+          resolutionOverrideMvId: 'mv_old',
+          resolutionOverrideCategory: 'simple'
+        });
+        const result = runDetector([expense, mvOld, mvNew], 'aa');
+        const impact = result.find(e => e.id === 'expense_new_move').relocationImpact;
+        assert(impact, 'Event should be impacted by the new relocation');
+        assert.strictEqual(impact.mvEventId, 'mv_new', 'Old relocation override must not suppress new relocation impacts');
       });
 
       // Negative case: No MV events clears impacts.
@@ -391,6 +487,19 @@ module.exports = {
         const salary = makeEvent({ id: 'no_mv_salary', type: 'SI', fromAge: 30, toAge: 40 });
         const result = runDetector([salary], 'aa');
         assert(!result.find(e => e.id === 'no_mv_salary').relocationImpact, 'Without MV events nothing should be flagged');
+      });
+
+      // Negative/real-estate stale-link case: no MV events still flags stale linked property country/currency.
+      runTest('Neg-NoMV-RealEstateStaleLink', function () {
+        const property = makeEvent({ id: 'home_stale_no_mv', type: 'R', fromAge: 65, toAge: 80, linkedCountry: 'bb', currency: 'BBB' });
+        const mortgage = makeEvent({ id: 'home_stale_no_mv', type: 'M', fromAge: 65, toAge: 80, linkedCountry: 'bb', currency: 'BBB' });
+        const result = runDetector([property, mortgage], 'aa');
+        const propertyResult = result.find(e => e.type === 'R');
+        const mortgageResult = result.find(e => e.type === 'M');
+        assert(propertyResult.relocationImpact, 'Stale linked-country property should be re-flagged even without MV events');
+        assert.strictEqual(propertyResult.relocationImpact.category, 'simple');
+        assert(mortgageResult.relocationImpact, 'Stale linked-country mortgage should be re-flagged even without MV events');
+        assert.strictEqual(mortgageResult.relocationImpact.category, 'simple');
       });
 
       // Negative case: Relocation disabled clears impacts.
@@ -507,6 +616,78 @@ module.exports = {
         const html = RelocationImpactAssistant.createPanelHtml(evt, 'row_orphan', env);
         assert(html && html.indexOf('resolution-panel-container') !== -1, 'Orphan split panel should be generated without MV event');
         assert(html.indexOf('data-action="join_split"') !== -1, 'Orphan split panel should expose join action');
+      });
+
+      // Test 13c: Real-estate stale link must reuse Link To Country panel (not generic amount panel).
+      runTest('13c', function () {
+        const evt = makeEvent({
+          id: 'property_stale_link_panel',
+          type: 'R',
+          amount: 10000,
+          fromAge: 65,
+          toAge: 80,
+          linkedCountry: 'bb',
+          currency: 'BBB',
+          relocationImpact: {
+            category: 'simple',
+            message: 'stale linked country',
+            mvEventId: '',
+            autoResolvable: true,
+            details: {
+              previousLinkedCountry: 'bb',
+              previousCurrency: 'BBB',
+              detectedCountry: 'aa'
+            }
+          }
+        });
+        const env = {
+          webUI: { readEvents: () => [evt] },
+          eventsTableManager: {
+            getStartCountry: () => 'aa',
+            getOriginCountry: () => 'aa',
+            detectPropertyCountry: () => 'aa'
+          }
+        };
+        const html = RelocationImpactAssistant.createPanelHtml(evt, 'row_stale_link', env);
+        assert(html && html.indexOf('resolution-panel-container') !== -1, 'Stale-link real-estate panel should be generated');
+        assert(html.indexOf('data-action="link"') !== -1, 'Stale-link real-estate panel should expose Link To Country action');
+        assert(html.indexOf('data-action="accept"') === -1, 'Stale-link real-estate panel must not expose generic Apply Suggested Amount action');
+        assert(html.indexOf('data-from-country="bb"') !== -1, 'Stale-link panel should use previous linked country as conversion source');
+        assert(html.indexOf('data-to-country="aa"') !== -1, 'Stale-link panel should target current detected country');
+      });
+
+      // Test 13d: Split amount-shift panel should expose leave/update actions with editable suggested amount.
+      runTest('13d', function () {
+        const mv = makeEvent({ id: 'mv_split_panel', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
+        const evt = makeEvent({
+          id: 'salary_split_value_panel',
+          type: 'SInp',
+          amount: 20000,
+          fromAge: 35,
+          toAge: 40,
+          relocationImpact: {
+            category: 'split_amount_shift',
+            message: 'Part 1 amount changed. Update Part 2 value or leave it as is.',
+            mvEventId: 'mv_split_panel',
+            autoResolvable: true,
+            details: {
+              suggestedAmount: 24000,
+              destinationCountry: 'bb'
+            }
+          }
+        });
+        const env = {
+          webUI: { readEvents: () => [mv, evt] },
+          eventsTableManager: {
+            getStartCountry: () => 'aa',
+            getOriginCountry: () => 'aa'
+          }
+        };
+        const html = RelocationImpactAssistant.createPanelHtml(evt, 'row_split_value', env);
+        assert(html && html.indexOf('resolution-panel-container') !== -1, 'Split amount-shift panel should be generated');
+        assert(html.indexOf('data-action="keep_split_value_as_is"') !== -1, 'Split amount-shift panel should expose Leave as is action');
+        assert(html.indexOf('data-action="update_split_value"') !== -1, 'Split amount-shift panel should expose Update value action');
+        assert(html.indexOf('split-value-amount-input') !== -1, 'Update value panel should expose editable amount input');
       });
 
       // Test 14: PPP fallback to FX when PPP unavailable.

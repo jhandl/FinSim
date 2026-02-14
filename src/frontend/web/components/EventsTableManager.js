@@ -548,6 +548,12 @@ class EventsTableManager {
     if (!row || !className) return;
     const input = row.querySelector('.' + className);
     if (input && input.parentNode) input.remove();
+    if (className === 'event-resolution-override') {
+      const scopeInput = row.querySelector('.event-resolution-mv-id');
+      if (scopeInput && scopeInput.parentNode) scopeInput.remove();
+      const categoryInput = row.querySelector('.event-resolution-category');
+      if (categoryInput && categoryInput.parentNode) categoryInput.remove();
+    }
   }
 
   _captureRelocationAges() {
@@ -654,6 +660,32 @@ class EventsTableManager {
     }
 
     return '';
+  }
+
+  _getResolutionScopeForRow(row) {
+    if (!row) return { mvId: '', category: '' };
+    const impacted = this._findRelocationEventForImpactedRow(row);
+    let mvId = '';
+    if (impacted && impacted.mvEvent) {
+      mvId = impacted.mvEvent.relocationLinkId || impacted.mvImpactId || '';
+    } else if (impacted && impacted.mvImpactId) {
+      mvId = impacted.mvImpactId;
+    } else if (row.dataset) {
+      mvId = row.dataset.relocationImpactMvId || '';
+    }
+    const category = row.dataset ? String(row.dataset.relocationImpactCategory || '') : '';
+    return { mvId: String(mvId || ''), category: category };
+  }
+
+  _setResolutionOverride(row, scope) {
+    if (!row) return;
+    this.getOrCreateHiddenInput(row, 'event-resolution-override', '1');
+    const mvId = scope && scope.mvId ? String(scope.mvId) : '';
+    const category = scope && scope.category ? String(scope.category) : '';
+    if (mvId) this.getOrCreateHiddenInput(row, 'event-resolution-mv-id', mvId);
+    else this._removeHiddenInput(row, 'event-resolution-mv-id');
+    if (category) this.getOrCreateHiddenInput(row, 'event-resolution-category', category);
+    else this._removeHiddenInput(row, 'event-resolution-category');
   }
 
   _removeRowAndResolutionPanel(row) {
@@ -907,8 +939,9 @@ class EventsTableManager {
     if (newMode === 'year') {
       const startingAgeInput = 'StartingAge';
       const startingAgeVal = parseInt(this.webUI.getValue(startingAgeInput)) || 0;
+      const hasConfiguredEvents = this.hasConfiguredEvents();
 
-      if (startingAgeVal === 0) {
+      if (startingAgeVal === 0 && hasConfiguredEvents) {
         // Inform the user and highlight the missing field
         if (typeof this.webUI.showToast === 'function') {
           this.webUI.showToast('Please enter your current age in order to switch to year mode.', 'Current Age Needed', 7);
@@ -965,6 +998,14 @@ class EventsTableManager {
 
     // Persist preference
     localStorage.setItem('ageYearMode', newMode);
+  }
+
+  hasConfiguredEvents() {
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(row =>
+      !(row.classList && row.classList.contains('resolution-panel-row')) &&
+      row.style.display !== 'none'
+    );
+    return rows.some(row => !this.isEventEmpty(row));
   }
 
   updateTableHeaders() {
@@ -1472,6 +1513,9 @@ class EventsTableManager {
     this.getOrCreateHiddenInput(part2Row, 'event-linked-event-id', linkedEventId);
     if (splitMvId) this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-mv-id', splitMvId);
     if (!isNaN(relocationAgeNum)) this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-age', String(relocationAgeNum));
+    if (typeof part1AmountNum === 'number' && !isNaN(part1AmountNum)) {
+      this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-amount', String(part1AmountNum));
+    }
     this.getOrCreateHiddenInput(part2Row, 'event-currency', destCurrency);
     if (toCountryHint) this.getOrCreateHiddenInput(part2Row, 'event-country', String(toCountryHint).toLowerCase());
 
@@ -1768,15 +1812,94 @@ class EventsTableManager {
     if (impacted && impacted.mvImpactId) splitMarkerCandidates.push(String(impacted.mvImpactId));
     if (impacted && impacted.mvEvent && impacted.mvEvent.relocationLinkId) splitMarkerCandidates.push(String(impacted.mvEvent.relocationLinkId));
     if (splitMarkerCandidates.length) this._clearRelocationAgeShift(Array.from(new Set(splitMarkerCandidates)));
+    const resolutionScope = this._getResolutionScopeForRow(row);
 
     const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
     for (let i = 0; i < rows.length; i++) {
       const idInput = rows[i].querySelector('.event-linked-event-id');
       if (idInput && idInput.value === linkedEventId) {
-        this.getOrCreateHiddenInput(rows[i], 'event-resolution-override', '1');
+        this._setResolutionOverride(rows[i], resolutionScope);
       }
     }
     this._afterResolutionAction(resolvedRowId);
+  }
+
+  keepSplitValueAsIs(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
+    const linkedEventIdInput = row.querySelector('.event-linked-event-id');
+    const linkedEventId = linkedEventIdInput ? linkedEventIdInput.value : '';
+    if (!linkedEventId) return;
+
+    const allRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    const splitRows = allRows.filter(r => {
+      const idInput = r.querySelector('.event-linked-event-id');
+      return idInput && idInput.value === linkedEventId;
+    });
+    if (splitRows.length < 2) return;
+    splitRows.sort((a, b) => {
+      const aFrom = Number(a.querySelector('.event-from-age') ? a.querySelector('.event-from-age').value : '');
+      const bFrom = Number(b.querySelector('.event-from-age') ? b.querySelector('.event-from-age').value : '');
+      if (aFrom !== bFrom) return aFrom - bFrom;
+      const aTo = Number(a.querySelector('.event-to-age') ? a.querySelector('.event-to-age').value : '');
+      const bTo = Number(b.querySelector('.event-to-age') ? b.querySelector('.event-to-age').value : '');
+      return aTo - bTo;
+    });
+    const part1Row = splitRows[0];
+    const part2Row = splitRows[1];
+    const part1AmountInput = part1Row.querySelector('.event-amount');
+    if (!part1AmountInput) return;
+    const part1Amount = Number(String(part1AmountInput.value || '').replace(/[^0-9.\-]/g, ''));
+    if (isNaN(part1Amount)) return;
+    this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-amount', String(part1Amount));
+    this._afterResolutionAction(resolvedRowId);
+  }
+
+  updateSplitValue(rowId, suggestedAmount, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
+    const amountInput = row.querySelector('.event-amount');
+    if (amountInput) {
+      const panelContainer = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.resolution-panel-container');
+      const toCountryHint = panelContainer ? panelContainer.getAttribute('data-to-country') : null;
+      const parseByCountry = (val, countryCode) => {
+        if (val == null) return undefined;
+        let s = String(val);
+        try {
+          const cfg = Config.getInstance();
+          const rs = countryCode ? cfg.getCachedTaxRuleSet(countryCode) : null;
+          const locale = rs && rs.getNumberLocale ? rs.getNumberLocale() : (FormatUtils.getLocaleSettings ? FormatUtils.getLocaleSettings().numberLocale : 'en-US');
+          const symbol = rs && rs.getCurrencySymbol ? rs.getCurrencySymbol() : (FormatUtils.getLocaleSettings ? FormatUtils.getLocaleSettings().currencySymbol : '');
+          if (symbol) {
+            const escSym = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            s = s.replace(new RegExp(escSym, 'g'), '');
+          }
+          s = s.replace(/\s+/g, '');
+          const parts = new Intl.NumberFormat(locale).formatToParts(12345.6);
+          const group = (parts.find(p => p.type === 'group') || {}).value || ',';
+          const decimal = (parts.find(p => p.type === 'decimal') || {}).value || '.';
+          s = s.split(group).join('');
+          if (decimal !== '.') s = s.split(decimal).join('.');
+          const n = parseFloat(s);
+          return isNaN(n) ? undefined : n;
+        } catch (_) {
+          try {
+            const n = FormatUtils.parseCurrency(s);
+            return (typeof n === 'number' && !isNaN(n)) ? n : undefined;
+          } catch (__) { return undefined; }
+        }
+      };
+      const amountNum = parseByCountry(suggestedAmount, toCountryHint);
+      amountInput.value = isNaN(amountNum) ? '' : String(amountNum);
+      if (this.webUI && this.webUI.formatUtils && typeof this.webUI.formatUtils.setupCurrencyInputs === 'function') {
+        this.webUI.formatUtils.setupCurrencyInputs();
+        amountInput.dispatchEvent(new Event('blur', { bubbles: true }));
+      }
+      amountInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    this.keepSplitValueAsIs(resolvedRowId, eventId);
   }
 
   adaptSaleToRelocationAge(rowId, eventId) {
@@ -1881,15 +2004,16 @@ class EventsTableManager {
       if (mvEvent) resolvedLinkedCountry = this.getOriginCountry(mvEvent, Config.getInstance().getStartCountry());
       if (!resolvedLinkedCountry) resolvedLinkedCountry = Config.getInstance().getStartCountry();
     }
+    const resolutionScope = this._getResolutionScopeForRow(row);
     // Set currency on current row
     this.getOrCreateHiddenInput(row, 'event-currency', currencyCode);
     if (resolvedLinkedCountry) this.getOrCreateHiddenInput(row, 'event-linked-country', resolvedLinkedCountry);
-    this.getOrCreateHiddenInput(row, 'event-resolution-override', '1');
+    this._setResolutionOverride(row, resolutionScope);
     // Also apply to paired real-estate rows if applicable
     this._applyToRealEstatePair(row, (r) => {
       this.getOrCreateHiddenInput(r, 'event-currency', currencyCode);
       if (resolvedLinkedCountry) this.getOrCreateHiddenInput(r, 'event-linked-country', resolvedLinkedCountry);
-      this.getOrCreateHiddenInput(r, 'event-resolution-override', '1');
+      this._setResolutionOverride(r, resolutionScope);
     });
     this._afterResolutionAction(resolvedRowId);
   }
@@ -2080,10 +2204,11 @@ class EventsTableManager {
     const row = this._findEventRow(rowId, eventId);
     if (!row) return;
     const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
+    const resolutionScope = this._getResolutionScopeForRow(row);
     // Always apply review override to the current row
-    this.getOrCreateHiddenInput(row, 'event-resolution-override', '1');
+    this._setResolutionOverride(row, resolutionScope);
     // Also apply to paired real-estate rows if applicable (R/M with same id)
-    this._applyToRealEstatePair(row, (r) => this.getOrCreateHiddenInput(r, 'event-resolution-override', '1'));
+    this._applyToRealEstatePair(row, (r) => this._setResolutionOverride(r, resolutionScope));
     this._afterResolutionAction(resolvedRowId);
   }
 
@@ -2421,9 +2546,10 @@ class EventsTableManager {
 
     typeInput.value = eventType || '';
     const rowId = row.dataset ? row.dataset.rowId : '';
-    const toggleEl = rowId
+    let toggleEl = rowId
       ? row.querySelector(`#EventTypeToggle_${rowId}`)
       : row.querySelector('.event-type-dd .dd-toggle');
+    if (!toggleEl) toggleEl = row.querySelector('.event-type-dd .dd-toggle');
     if (toggleEl && label) toggleEl.textContent = label;
 
     this.updateFieldVisibility(typeInput);
@@ -2445,9 +2571,10 @@ class EventsTableManager {
     nameInput.value = upperCode;
 
     const rowId = row.dataset ? row.dataset.rowId : '';
-    const countryToggleEl = rowId
+    let countryToggleEl = rowId
       ? row.querySelector(`#EventCountryToggle_${rowId}`)
       : row.querySelector('.event-country-dd .dd-toggle');
+    if (!countryToggleEl) countryToggleEl = row.querySelector('.event-country-dd .dd-toggle');
     if (countryToggleEl) {
       countryToggleEl.textContent = label || 'Select country';
     }
