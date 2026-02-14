@@ -239,13 +239,20 @@ class FileManager {
     const startCountryForPriorities = cfgForPriorities.getStartCountry();
     const scenarioCountrySetForPriorities = {};
     scenarioCountrySetForPriorities[String(startCountryForPriorities || '').toLowerCase()] = true;
+    const availableForPriorities = cfgForPriorities.getAvailableCountries() || [];
+    const validPriorityCountries = {};
+    for (let i = 0; i < availableForPriorities.length; i++) {
+      const item = availableForPriorities[i] || {};
+      const itemCode = String(item.code || '').trim().toLowerCase();
+      if (itemCode) validPriorityCountries[itemCode] = true;
+    }
     for (let i = 0; i < eventData.length; i++) {
       const row = eventData[i] || [];
       const rawType = row[0] ? String(row[0]) : '';
       const type = rawType.indexOf(':') >= 0 ? rawType.split(':')[0] : rawType;
       if (type === 'MV') {
-        const code = String(row[1] || '').trim().toLowerCase();
-        if (code) scenarioCountrySetForPriorities[code] = true;
+        const code = getRelocationCountryCode({ type: 'MV', name: row[1] });
+        if (code && validPriorityCountries[code]) scenarioCountrySetForPriorities[code] = true;
       }
     }
     const scenarioCountriesForPriorities = Object.keys(scenarioCountrySetForPriorities);

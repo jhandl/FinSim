@@ -894,6 +894,7 @@ class EventAccordionManager {
         selectedValue: event.type,
         onSelect: async (val, label) => {
           if (val !== event.type) {
+            const wasRelocation = event.type === 'MV';
             // Update the hidden input
             typeInput.value = val;
 
@@ -902,9 +903,34 @@ class EventAccordionManager {
 
             // Preserve current field values before updating table
             const currentValues = this.preserveCurrentFieldValues(container);
+            if (!wasRelocation && val === 'MV') {
+              currentValues.name = '';
+            }
 
             // Update the table with the new event type (without setting defaults)
             this.syncFieldToTableWithoutDefaults(event, '.event-type', val);
+            if (!wasRelocation && val === 'MV') {
+              const nameField = container.querySelector('.accordion-edit-name');
+              if (nameField) {
+                nameField.value = '';
+                this.clearFieldValidation(nameField);
+              }
+              this.syncFieldToTableWithoutDefaults(event, '.event-name', '');
+              event.name = '';
+              const countryToggle = container.querySelector(`#AccordionEventCountryToggle_${event.rowId}`);
+              if (countryToggle) countryToggle.textContent = 'Select country';
+              if (container._eventCountryDropdown && typeof container._eventCountryDropdown.setOptions === 'function') {
+                const countries = Config.getInstance().getAvailableCountries();
+                const opts = Array.isArray(countries)
+                  ? countries.map(c => ({
+                    value: String(c.code).toUpperCase(),
+                    label: c.name,
+                    selected: false
+                  }))
+                  : [];
+                container._eventCountryDropdown.setOptions(opts);
+              }
+            }
 
             // Update the event object for immediate UI refresh
             event.type = val;
@@ -1671,15 +1697,12 @@ class EventAccordionManager {
   /**
    * Add event from wizard data
    */
-  addEventFromWizard(eventData) {
-    // Create the event in the table (just creates, no sorting/refreshing)
+  async addEventFromWizard(eventData) {
+    // Create the event in the table using the shared table-manager flow
     let id = null;
     if (this.webUI.eventsTableManager) {
-      const result = this.webUI.eventsTableManager.createEventFromWizard(eventData);
-      id = result.id;
-    }
-    if (this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.recomputeRelocationImpacts === 'function') {
-      this.webUI.eventsTableManager.recomputeRelocationImpacts();
+      const result = await this.webUI.eventsTableManager.addEventFromWizardWithSorting(eventData);
+      id = result ? result.id : null;
     }
 
     // Handle sorting and animation for accordion view
@@ -1980,9 +2003,6 @@ class EventAccordionManager {
       if (typeInput && typeInput.value !== value) {
         typeInput.value = value;
 
-        // Update the stored original event type
-        tableRow.dataset.originalEventType = value;
-
         // Update the visible dropdown toggle and dropdown object
         const toggleEl = tableRow.querySelector('.dd-toggle');
         const dropdown = tableRow._eventTypeDropdown;
@@ -2018,6 +2038,8 @@ class EventAccordionManager {
           this.webUI.eventsTableManager.updateFieldVisibility(typeInput);
           this.webUI.eventsTableManager.applyTypeColouring(tableRow);
         }
+
+        typeInput.dispatchEvent(new Event('change', { bubbles: true }));
 
         // DO NOT set default values - preserve existing values
       }
@@ -2065,6 +2087,8 @@ class EventAccordionManager {
             tableRow._eventCountryDropdown.setOptions(opts);
           }
         }
+        const nameInput = tableRow.querySelector('.event-name');
+        if (nameInput) nameInput.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }
   }

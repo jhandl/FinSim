@@ -149,9 +149,17 @@ var RelocationImpactDetector = {
    */
   buildRelocationTimeline: function (events) {
     var mvEvents = [];
+    var available = Config.getInstance().getAvailableCountries() || [];
+    var validCodes = {};
+    for (var c = 0; c < available.length; c++) {
+      var code = String((available[c] || {}).code || '').trim().toLowerCase();
+      if (code) validCodes[code] = true;
+    }
     for (var i = 0; i < events.length; i++) {
       var event = events[i];
       if (isRelocationEvent(event)) {
+        var destinationCountry = getRelocationCountryCode(event);
+        if (!destinationCountry || !validCodes[destinationCountry]) continue;
         var fa = Number(event.fromAge);
         if (!isNaN(fa)) {
           // normalize numeric for sorting comparisons
@@ -476,6 +484,7 @@ var RelocationImpactDetector = {
    * @param {*} details - Optional payload to persist with the impact
    */
   addImpact: function (event, category, message, mvEventId, autoResolvable, details) {
+    if (event && isRelocationEvent(event)) return;
     // Do not overwrite higher-priority impacts (boundary, missing_ruleset)
     if (event.relocationImpact && (event.relocationImpact.category === 'boundary' || event.relocationImpact.category === 'missing_ruleset')) return;
     var impact = {

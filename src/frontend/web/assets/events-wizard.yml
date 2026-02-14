@@ -387,23 +387,16 @@ EventWizards:
     name: "Relocation"
     category: "relocation"
     steps:
-      - stepId: "intro"
-        title: "Relocation"
-        contentType: "intro"
-        content:
-          text: "You are planning to relocate to {destCountryName}. This will affect your tax residency, currency ({destCurrency}), and cost of living ({destCoL}). Default inflation is {destInflation}."
-        showButtons: ["next"]
-
-      - stepId: "timing"
-        title: "When will you relocate?"
+      - stepId: "destination"
+        title: "Destination Country"
         contentType: "input"
-        field: "fromAge"
+        field: "destCountryCode"
         labelPosition: "left"
         content:
-          text: "At what age will you relocate?"
-          inputType: "age"
-          validation: "required|positive"
-          help: "This is when your tax residency will change to the new country."
+          text: "Which country are you relocating to?"
+          inputType: "country"
+          validation: "required"
+          placeholder: "Select country"
         showButtons: ["back", "next"]
 
       - stepId: "cost"
@@ -412,23 +405,22 @@ EventWizards:
         field: "amount"
         labelPosition: "left"
         content:
-          text: "What is the one-time cost of relocating?"
+          text: "What is the one-time cost of relocating in {relocationCostCurrencyLabel}?"
           inputType: "currency"
-          validation: "optional"
-          help: "Include moving expenses, visa fees, travel costs, etc. Leave blank if no cost."
+          validation: "required"
+          help: "Include moving expenses, visa fees, travel costs, etc. Enter 0 if there is no relocation cost."
         showButtons: ["back", "next"]
 
-      - stepId: "inflation"
-        title: "Inflation Rate Override"
+      - stepId: "timing"
+        title: "Relocation Timing"
         contentType: "input"
-        field: "rate"
+        field: "fromAge"
         labelPosition: "left"
         content:
-          text: "Override the destination country's default inflation rate?"
-          inputType: "percentage"
-          validation: "optional"
-          help: "Leave blank to use the destination country's default inflation rate from tax rules."
-          defaultValue: "default"
+          text: "At what age will you relocate?"
+          inputType: "age"
+          validation: "required|positive"
+          help: "This is the age at which you plan to move to the new country."
         showButtons: ["back", "next"]
 
       - stepId: "summary"
@@ -436,13 +428,9 @@ EventWizards:
         contentType: "summary"
         content:
           templates:
-            - condition: "amount && rate"
-              template: "Relocate to {destCountryName} at age {fromAge} with moving cost of {amount} (inflation override: {rate})."
-            - condition: "amount"
-              template: "Relocate to {destCountryName} at age {fromAge} with moving cost of {amount}."
-            - condition: "rate"
-              template: "Relocate to {destCountryName} at age {fromAge} (inflation override: {rate})."
-            - template: "Relocate to {destCountryName} at age {fromAge}."
+            - condition: "amount == '0' || amount == 0 || amount == '0.0' || amount == '0.00'"
+              template: "Relocation to {destCountryName} at age {fromAge} with no relocation cost."
+            - template: "Relocation to {destCountryName} at age {fromAge} with a one-time relocation cost of {amount}."
         showButtons: ["back", "create"]
 
 # Wizard UI Configuration

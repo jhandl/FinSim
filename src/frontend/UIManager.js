@@ -897,6 +897,7 @@ class UIManager {
       }
 
       const type = name.substr(0, pos);
+      const id = name.substr(pos + 1);
       if (validate) {
         const simulationMode = this.ui.getValue('simulation_mode');
         let sInpDescriptionSingle = "Salary Income (no pension)";
@@ -942,7 +943,7 @@ class UIManager {
         }
 
         if (type === 'MV') {
-          const destCode = String(name || '').trim();
+          const destCode = this.getValidRelocationDestinationCode(id);
           if (!destCode) {
             this.ui.setWarning(`Events[${i + 1},2]`, 'Relocation destination country is required.');
             errors = true;
@@ -950,8 +951,6 @@ class UIManager {
           }
         }
       }
-
-      const id = name.substr(pos + 1);
 
       // Convert years to ages if we're in year mode
       let processedFromAge = fromAge;
@@ -1145,12 +1144,15 @@ class UIManager {
       const event = events[i];
       const required = UIManager.getRequiredFields(event.type);
       if (!required) continue;
+      const validRelocationCode = (event.type === 'MV')
+        ? this.getValidRelocationDestinationCode(event.id)
+        : '';
 
       UIManager.getFields().forEach(field => {
         let value = undefined;
         switch (field) {
           case 'name':
-            value = event.id;
+            value = (event.type === 'MV') ? validRelocationCode : event.id;
             break;
           case 'amount':
             value = event.amount;
@@ -1170,7 +1172,10 @@ class UIManager {
         }
 
         if (required[field] === 'required' && (value === undefined || value === '')) {
-          this.ui.setWarning(`Events[${i + 1},${UIManager.getIndexForField(field)}]`, "Required field");
+          const message = (event.type === 'MV' && field === 'name')
+            ? 'Relocation destination country is required.'
+            : 'Required field';
+          this.ui.setWarning(`Events[${i + 1},${UIManager.getIndexForField(field)}]`, message);
           errors = true;
         }
       });
@@ -1294,6 +1299,18 @@ class UIManager {
     return value !== undefined && value !== '' && value !== 0;
   }
 
+  getValidRelocationDestinationCode(rawCode) {
+    var code = getRelocationCountryCode({ type: 'MV', name: rawCode });
+    if (!code) return '';
+    var countries = Config.getInstance().getAvailableCountries() || [];
+    for (var i = 0; i < countries.length; i++) {
+      var item = countries[i] || {};
+      var itemCode = String(item.code || '').trim().toLowerCase();
+      if (itemCode === code) return code;
+    }
+    return '';
+  }
+
   saveToFile() {
     this.ui.saveToFile();
   }
@@ -1319,7 +1336,7 @@ class UIManager {
 
   static getRequiredFields(eventType) {
     if (eventType === 'MV') {
-      const pattern = 'rrr-o-'.split('');
+      const pattern = 'ror---'.split('');
       return Object.fromEntries(UIManager.getFields().map((field, i) => [
         field,
         pattern[i] === 'r' ? 'required' : pattern[i] === 'o' ? 'optional' : 'hidden'

@@ -62,24 +62,42 @@ class WizardRenderer {
     label.htmlFor = `wizard-${idSuffix}`;
     label.textContent = this.processTextVariables(step.content.text, wizardState);
 
-    const input = document.createElement('input');
-    input.type = (step.content.inputType === 'currency' || step.content.inputType === 'percentage' || step.content.inputType === 'age') ? 'text' : 'text';
+    const inputType = step.content.inputType;
+    const isCountryInput = inputType === 'country';
+    const input = document.createElement(isCountryInput ? 'select' : 'input');
     input.id = `wizard-${idSuffix}`;
     input.name = idSuffix;
-    input.placeholder = step.content.placeholder || '';
+    if (isCountryInput) {
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = step.content.placeholder || 'Select country';
+      input.appendChild(placeholder);
 
-    const numericInputTypes = ['currency','percentage','age','number'];
-    if (numericInputTypes.includes(step.content.inputType)) {
-      input.inputMode = 'numeric';
-      input.pattern = '[0-9]*';
+      const countries = Config.getInstance().getAvailableCountries();
+      countries.forEach((country) => {
+        const option = document.createElement('option');
+        option.value = country.code || '';
+        option.textContent = country.name || country.code || '';
+        input.appendChild(option);
+      });
+    } else {
+      input.type = 'text';
+      input.placeholder = step.content.placeholder || '';
+      const numericInputTypes = ['currency', 'percentage', 'age', 'number'];
+      if (numericInputTypes.includes(inputType)) {
+        input.inputMode = 'numeric';
+        input.pattern = '[0-9]*';
+      }
+
+      if (inputType === 'currency') input.className = 'currency-input';
+      else if (inputType === 'percentage') input.className = 'percentage-input';
+      else if (inputType === 'age') input.className = 'age-input';
     }
 
-    const currentValue = wizardState.data[step.field];
+    const currentValue = (wizardState.data[step.field] !== undefined)
+      ? wizardState.data[step.field]
+      : (step.field === 'destCountryCode' ? wizardState.data.name : undefined);
     if (currentValue !== undefined) input.value = currentValue;
-
-    if (step.content.inputType === 'currency') input.className = 'currency-input';
-    else if (step.content.inputType === 'percentage') input.className = 'percentage-input';
-    else if (step.content.inputType === 'age') input.className = 'age-input';
 
     inputGroup.appendChild(label);
     inputGroup.appendChild(input);
@@ -92,11 +110,13 @@ class WizardRenderer {
       container.appendChild(help);
     }
 
-    input.addEventListener('input', () => {
+    const syncInputValue = () => {
       wizardState.data[step.field] = input.value;
       const mgr = this.manager || this.context?.eventsWizard?.manager;
       if (mgr && typeof mgr.clearWizardFieldValidation === 'function') mgr.clearWizardFieldValidation(input);
-    });
+    };
+    input.addEventListener('input', syncInputValue);
+    if (isCountryInput) input.addEventListener('change', syncInputValue);
 
     input.addEventListener('blur', () => {
       const mgr = this.manager || this.context?.eventsWizard?.manager;
@@ -224,14 +244,70 @@ class WizardRenderer {
   }
 
   // Utilities
+  getRelocationResidenceCountryForAge(wizardState) {
+    const cfg = Config.getInstance();
+    const startRaw = (this.context && typeof this.context.getValue === 'function')
+      ? this.context.getValue('StartCountry')
+      : '';
+    let residenceCountry = String(startRaw || cfg.getDefaultCountry()).trim().toLowerCase();
+    const rawAge = wizardState && wizardState.data ? wizardState.data.fromAge : null;
+    const relocationAge = parseFloat(rawAge);
+    if (isNaN(relocationAge)) return residenceCountry;
+    if (!(this.context && typeof this.context.readEvents === 'function')) return residenceCountry;
+
+    const events = this.context.readEvents(false) || [];
+    const relocations = [];
+    for (let i = 0; i < events.length; i++) {
+      const evt = events[i];
+      if (!evt || evt.type !== 'MV') continue;
+      const age = parseFloat(evt.fromAge);
+      if (isNaN(age) || age >= relocationAge) continue;
+      const countryCode = String(getRelocationCountryCode(evt) || '').trim().toLowerCase();
+      if (!countryCode) continue;
+      relocations.push({ age, countryCode, index: i });
+    }
+    relocations.sort((a, b) => (a.age === b.age ? a.index - b.index : a.age - b.age));
+    for (let i = 0; i < relocations.length; i++) {
+      residenceCountry = relocations[i].countryCode;
+    }
+    return residenceCountry;
+  }
+
+  getCurrencyLabelForCountry(countryCode) {
+    const code = String(countryCode || '').trim().toLowerCase();
+    if (!code) return '';
+    const ruleset = Config.getInstance().getCachedTaxRuleSet(code);
+    const currencyCode = (ruleset && typeof ruleset.getCurrencyCode === 'function')
+      ? (ruleset.getCurrencyCode() || code.toUpperCase())
+      : code.toUpperCase();
+    const currencySymbol = (ruleset && typeof ruleset.getCurrencySymbol === 'function')
+      ? (ruleset.getCurrencySymbol() || '')
+      : '';
+    return currencySymbol ? `${currencyCode} (${currencySymbol})` : currencyCode;
+  }
+
   processTextVariables(text, wizardState) {
     if (!text) return text;
     const data = (wizardState && wizardState.data) ? wizardState.data : {};
+    const derived = {};
+    const destinationCode = String(data.destCountryCode || data.name || '').trim().toLowerCase();
+    if (destinationCode) {
+      const currencyLabel = this.getCurrencyLabelForCountry(destinationCode);
+      const currencyCodeMatch = currencyLabel.match(/^[A-Z]+/);
+      derived.destCurrencyLabel = currencyLabel;
+      derived.destCurrency = currencyCodeMatch ? currencyCodeMatch[0] : destinationCode.toUpperCase();
+    }
+    if (wizardState && wizardState.eventType === 'MV') {
+      const preMoveCountry = this.getRelocationResidenceCountryForAge(wizardState);
+      const preMoveCurrency = this.getCurrencyLabelForCountry(preMoveCountry);
+      if (preMoveCurrency) {
+        derived.relocationCostCurrencyLabel = preMoveCurrency;
+      }
+    }
+    const variables = Object.assign({}, data, derived);
     return text.replace(/\{([^}]+)\}/g, (m, key) => {
-      const val = data[key];
+      const val = variables[key];
       return (val !== undefined && val !== null && val !== '') ? val : '';
     });
   }
 }
-
-

@@ -103,7 +103,7 @@ Relocation events use a single type code (`MV`) and store the destination countr
 
 - **`type`**: `MV` (relocation event).
 - **`name`**: Destination country code (ISO2, e.g., `AR`, `IE`). The UI shows the full country name via a dropdown.
-- **`amount`**: One-off relocation cost in destination currency.
+- **`amount`**: Optional one-off relocation cost in destination currency.
 - **`fromAge`**: Point-in-time event specifying when the move occurs.
 - **`rate`**: Optional per-country inflation override for the destination.
 
@@ -217,7 +217,7 @@ Common relocation tax keys used in attribution and tooltips:
 
 ### Relocation Event Creation
 
-Wizard flow: Select "Relocation" → Choose country from modal → 4-step wizard (intro, timing, cost, inflation override, summary). Configured in `events-wizard.yml`.
+Select "Relocation" in the event-type chooser to insert an MV row, then choose destination from the relocation country dropdown on that row. The relocation wizard flow (intro, timing, cost, inflation override, summary) remains available for direct MV wizard starts in `events-wizard.yml`.
 
 ### Visual Indicators
 

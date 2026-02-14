@@ -129,8 +129,9 @@ class DropdownUtils {
     // ---------------------------------------------------------------------
     const rebuildOptions = (opts) => {
       if (!Array.isArray(opts)) return;
-      const hasExplicitSelected = opts.some(opt => opt && opt.selected);
+      const hasExplicitSelected = opts.some(opt => opt && Object.prototype.hasOwnProperty.call(opt, 'selected'));
       if (hasExplicitSelected) {
+        selected = undefined;
         for (let i = 0; i < opts.length; i++) {
           const opt = opts[i];
           if (opt && opt.selected) {

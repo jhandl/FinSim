@@ -10,7 +10,7 @@ class EventsWizard {
     this.manager.onCompleteAction = (eventData) => this.createEvent(eventData);
 
     // Load YAML config
-    this.manager.loadConfig('/src/frontend/web/assets/events-wizard.yml');
+    this.manager.loadConfig('/src/frontend/web/assets/events-wizard.yml?v=20260214-6');
   }
 
   // Delegated API
@@ -23,7 +23,7 @@ class EventsWizard {
   clearWizardFieldValidation(input) { return this.manager.clearWizardFieldValidation(input); }
 
   // Event-specific methods (ported from EventWizardManager)
-  createEvent(eventData) {
+  async createEvent(eventData) {
     if (!this.validateWizardData()) return;
     this.handleSpecialCases();
     const data = Object.assign({ eventType: this.manager.wizardState.eventType }, this.manager.wizardState.data);
@@ -31,13 +31,18 @@ class EventsWizard {
       data.name = data.destCountryCode || data.name || '';
     }
     const onComplete = this.manager.wizardState.onComplete;
-    if (onComplete) {
-      onComplete(data);
-      if (this.manager.wizardState.eventType === 'R' && this.manager.wizardState.data.financing === 'mortgage') {
-        this.createMortgageEvent(data);
+    try {
+      if (onComplete) {
+        await Promise.resolve(onComplete(data));
+        if (this.manager.wizardState.eventType === 'R' && this.manager.wizardState.data.financing === 'mortgage') {
+          await Promise.resolve(this.createMortgageEvent(data));
+        }
       }
+    } catch (err) {
+      console.error('Error creating event from wizard:', err);
+    } finally {
+      this.manager.closeWizard();
     }
-    this.manager.closeWizard();
   }
 
   createMortgageEvent(propertyEventData) {
@@ -63,7 +68,8 @@ class EventsWizard {
       match: 0
     };
     const onComplete = this.manager.wizardState.onComplete;
-    if (onComplete) onComplete(mortgageEventData);
+    if (onComplete) return onComplete(mortgageEventData);
+    return null;
   }
 
   handleChoiceSpecialCases(stepId, choiceValue) {
@@ -107,6 +113,7 @@ class EventsWizard {
 
   validateWizardData() {
     const data = this.manager.wizardState.data || {};
+    const eventType = this.manager.wizardState.eventType;
     if (this.manager.wizardState.eventType === 'MV') {
       const destCode = data.destCountryCode || data.name;
       const nameValidation = ValidationUtils.validateRequired(destCode, 'Destination country');
@@ -115,14 +122,20 @@ class EventsWizard {
       const nameValidation = ValidationUtils.validateRequired(data.name, 'Event name');
       if (!nameValidation.isValid) { alert(nameValidation.message); return false; }
     }
-    if (this.manager.wizardState.eventType !== 'SM' && this.manager.wizardState.eventType !== 'MV') {
+    if (eventType === 'MV') {
+      const amountValidation = ValidationUtils.validateRequired(data.amount, 'Relocation cost (enter 0 if none)');
+      if (!amountValidation.isValid) { alert(amountValidation.message); return false; }
+    } else if (eventType !== 'SM') {
       const amountValidation = ValidationUtils.validateRequired(data.amount, 'Amount');
       if (!amountValidation.isValid) { alert(amountValidation.message); return false; }
     }
     const fromAgeValidation = ValidationUtils.validateRequired(data.fromAge, 'Starting age/year');
     if (!fromAgeValidation.isValid) { alert(fromAgeValidation.message); return false; }
-    if (this.manager.wizardState.eventType !== 'SM') {
-      if (ValidationUtils.validateValue('money', data.amount) === null) { alert('Please enter a valid amount'); return false; }
+    if (eventType !== 'SM') {
+      if (ValidationUtils.validateValue('money', data.amount) === null) {
+        alert(eventType === 'MV' ? 'Please enter a valid relocation cost (enter 0 if none).' : 'Please enter a valid amount');
+        return false;
+      }
     }
     if (ValidationUtils.validateValue('age', data.fromAge) === null) { alert('Please enter a valid starting age/year'); return false; }
     if (data.toAge && data.toAge.trim() !== '') {
@@ -413,7 +426,7 @@ class EventsRenderer extends WizardRenderer {
   processTextVariables(text, wizardState) {
     if (!text) return text;
     const data = wizardState.data || {};
-    const variables = { ...data, ...this.computeDerivedVariables(data) };
+    const variables = { ...data, ...this.computeDerivedVariables(data, false, false, wizardState) };
     return text.replace(/\{([^}]+)\}/g, (match, key) => {
       const val = variables[key];
       return (val !== undefined && val !== null && val !== '') ? val : '';
@@ -449,7 +462,7 @@ class EventsRenderer extends WizardRenderer {
     if (!text) return text;
     const data = wizardState.data || {};
     const isProperty = (wizardState && wizardState.eventType) ? ['R', 'M'].includes(wizardState.eventType) : false;
-    const derived = this.computeDerivedVariables(data, growthRequested, isProperty);
+    const derived = this.computeDerivedVariables(data, growthRequested, isProperty, wizardState);
     const variables = { ...data, ...derived };
     return text.replace(/\{([^}]+)\}/g, (match, key) => {
       const val = variables[key];
@@ -492,7 +505,7 @@ class EventsRenderer extends WizardRenderer {
     }
   }
 
-  computeDerivedVariables(data, growthRequested = false, isProperty = false) {
+  computeDerivedVariables(data, growthRequested = false, isProperty = false, wizardState = null) {
     const derived = {};
     derived.name = `<strong>${data.name || 'Unnamed Event'}</strong>`;
     const toNumber = (v) => { const num = parseFloat(v); return isNaN(num) ? 0 : num; };
@@ -528,6 +541,17 @@ class EventsRenderer extends WizardRenderer {
       const hasDest = (data && (data.destCountryCode || (data.eventType === 'MV' && data.name)));
       if (hasDest) {
         const code = String(data.destCountryCode || data.name || '').toLowerCase();
+        derived.destCountryCode = code.toUpperCase();
+        try {
+          const cfgName = (typeof Config !== 'undefined' && typeof Config.getInstance === 'function') ? Config.getInstance() : null;
+          if (cfgName && typeof cfgName.getCountryNameByCode === 'function') {
+            derived.destCountryName = cfgName.getCountryNameByCode(code) || derived.destCountryCode;
+          } else {
+            derived.destCountryName = derived.destCountryCode;
+          }
+        } catch (_) {
+          derived.destCountryName = derived.destCountryCode;
+        }
         try {
           const cfg = (typeof Config !== 'undefined' && typeof Config.getInstance === 'function') ? Config.getInstance() : null;
           const rs = cfg && typeof cfg.getCachedTaxRuleSet === 'function' ? cfg.getCachedTaxRuleSet(code) : null;
@@ -589,6 +613,39 @@ class EventsRenderer extends WizardRenderer {
         else derived.periodPhrase = `from ${unit} ${from} to ${unit} ${to}`;
       } else { derived.periodPhrase = ''; }
     } else { derived.periodPhrase = ''; }
+    try {
+      if (wizardState && wizardState.eventType === 'MV') {
+        const cfg = (typeof Config !== 'undefined' && typeof Config.getInstance === 'function') ? Config.getInstance() : null;
+        if (cfg) {
+          const startRaw = (this.context && typeof this.context.getValue === 'function') ? this.context.getValue('StartCountry') : '';
+          let residenceCountry = String(startRaw || cfg.getDefaultCountry()).trim().toLowerCase();
+          const relocationAge = parseFloat(data.fromAge);
+          if (!isNaN(relocationAge) && this.context && typeof this.context.readEvents === 'function') {
+            const events = this.context.readEvents(false) || [];
+            const relocations = [];
+            for (let i = 0; i < events.length; i++) {
+              const evt = events[i];
+              if (!evt || evt.type !== 'MV') continue;
+              const age = parseFloat(evt.fromAge);
+              if (isNaN(age) || age >= relocationAge) continue;
+              const code = String(getRelocationCountryCode(evt) || '').trim().toLowerCase();
+              if (!code) continue;
+              relocations.push({ age: age, code: code, index: i });
+            }
+            relocations.sort((a, b) => (a.age === b.age ? a.index - b.index : a.age - b.age));
+            for (let i = 0; i < relocations.length; i++) residenceCountry = relocations[i].code;
+          }
+          const residenceRuleset = (typeof cfg.getCachedTaxRuleSet === 'function') ? cfg.getCachedTaxRuleSet(residenceCountry) : null;
+          const currencyCode = (residenceRuleset && typeof residenceRuleset.getCurrencyCode === 'function')
+            ? (residenceRuleset.getCurrencyCode() || residenceCountry.toUpperCase())
+            : residenceCountry.toUpperCase();
+          const currencySymbol = (residenceRuleset && typeof residenceRuleset.getCurrencySymbol === 'function')
+            ? (residenceRuleset.getCurrencySymbol() || '')
+            : '';
+          derived.relocationCostCurrencyLabel = currencySymbol ? `${currencyCode} (${currencySymbol})` : currencyCode;
+        }
+      }
+    } catch (_) { }
     return derived;
   }
 

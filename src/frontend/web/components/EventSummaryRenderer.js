@@ -33,6 +33,7 @@ class EventSummaryRenderer {
     const hasImpact = event.relocationImpact;
     const impactIcon = hasImpact ? '<i class="fa-solid fa-triangle-exclamation"></i>' : '';
     const impactCategory = hasImpact ? event.relocationImpact.category : '';
+    const badgeText = this.getSummaryBadgeText(event);
 
     return `
       <div class="event-summary">
@@ -42,7 +43,7 @@ class EventSummaryRenderer {
               ${hasImpact ? `<span class="relocation-impact-badge accordion-impact-badge" data-impact-category="${impactCategory}">${impactIcon}</span>` : ''}<span class="event-name">${eventTypeInfo.label}</span>
             </div>
             <div class="event-summary-badge">
-              <span class="event-type-badge">${this.escapeHtml(event.name || '—')}</span>
+              <span class="event-type-badge">${this.escapeHtml(badgeText)}</span>
             </div>
             <div class="event-summary-amount">
               ${displayValue ? `<span class="detail-amount">${displayValue}</span>` : '<span class="detail-empty">—</span>'}
@@ -154,6 +155,24 @@ class EventSummaryRenderer {
     const decimalValue = Math.abs(num) > 1 ? num / 100 : num;
 
     return FormatUtils.formatPercentage(decimalValue);
+  }
+
+  getSummaryBadgeText(event) {
+    if (!event) return '—';
+    if (event.type === 'MV') {
+      return this.getRelocationDisplayName(event.name);
+    }
+    const name = String(event.name || '').trim();
+    return name || '—';
+  }
+
+  getRelocationDisplayName(rawCode) {
+    const code = String(rawCode || '').trim().toLowerCase();
+    const countries = Config.getInstance().getAvailableCountries();
+    const match = Array.isArray(countries)
+      ? countries.find(c => String(c.code || '').trim().toLowerCase() === code)
+      : null;
+    return match ? match.name : 'Select country';
   }
 
   /**
@@ -272,8 +291,7 @@ class EventSummaryRenderer {
    * Only salary events WITH pension contributions show this field
    */
   showsEmployerMatchField(eventType) {
-    // Only salary events WITH pension show this field. Explicitly hide for relocation and NOP during debugging.
-    if (eventType === 'MV') return false;
+    // Only salary events with pension contributions show this field.
     return ['SI', 'SI2'].includes(eventType);
   }
 
@@ -307,6 +325,11 @@ class EventSummaryRenderer {
    * Based on what the rate field means for each event type
    */
   showsGrowthRateField(eventType, event = null) {
+    // Relocation inflation override is now configured from the economy panel.
+    if (eventType === 'MV') {
+      return false;
+    }
+
     // One-off expenses: Never show Growth Rate field since it occurs only once
     if (event && this.isOneOffExpense(event)) {
       return false;
@@ -391,10 +414,7 @@ class EventSummaryRenderer {
     const nameLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'name');
     const nameValue = this.escapeHtml(event.name || '');
     const isRelocation = event.type === 'MV';
-    const code = String(event.name || '').trim().toLowerCase();
-    const countries = Config.getInstance().getAvailableCountries();
-    const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-    const displayName = match ? match.name : 'Select country';
+    const displayName = this.getRelocationDisplayName(event.name);
     details.push(`
       <div class="detail-row">
         <label>${nameLabel}:</label>

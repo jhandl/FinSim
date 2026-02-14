@@ -3,6 +3,12 @@ class RelocationUtils {
   static extractRelocationTransitions(webUI, instance) {
     const cfg = Config.getInstance();
     if (!cfg.isRelocationEnabled()) return;
+    const available = cfg.getAvailableCountries() || [];
+    const validCodes = {};
+    for (let i = 0; i < available.length; i++) {
+      const code = String((available[i] || {}).code || '').trim().toLowerCase();
+      if (code) validCodes[code] = true;
+    }
 
     const uiManager = new UIManager(webUI);
     const events = uiManager.readEvents(false);
@@ -16,6 +22,7 @@ class RelocationUtils {
     let prevCountry = startCountry.toLowerCase();
     mvEvents.forEach(ev => {
       const destCountry = getRelocationCountryCode(ev);
+      if (!destCountry || !validCodes[destCountry]) return;
       instance.relocationTransitions.push({ age: ev.fromAge, fromCountry: prevCountry, toCountry: destCountry });
       prevCountry = destCountry;
 

@@ -435,6 +435,9 @@ class EventsTableManager {
             // If event type changed to/from relocation, update currency selector
             const isOldRelocation = oldType === 'MV';
             const isNewRelocation = newType === 'MV';
+            if (!isOldRelocation && isNewRelocation) {
+              this._clearRelocationDestinationSelection(row);
+            }
             const rowKey = row && row.dataset ? (row.dataset.rowId || row.dataset.eventId || '') : '';
             if (isNewRelocation) {
               this._getOrCreateRelocationLinkId(row);
@@ -521,6 +524,24 @@ class EventsTableManager {
         console.error('Error analyzing relocation impacts:', err);
       }
     }, 400);
+  }
+
+  _clearRelocationDestinationSelection(row) {
+    if (!row) return;
+    const nameInput = row.querySelector('.event-name');
+    if (nameInput) nameInput.value = '';
+    const rowId = row.dataset ? row.dataset.rowId : '';
+    const toggleEl = rowId
+      ? row.querySelector(`#EventCountryToggle_${rowId}`)
+      : row.querySelector('.event-country-dd .dd-toggle');
+    if (toggleEl) toggleEl.textContent = 'Select country';
+    if (row._eventCountryDropdown && typeof row._eventCountryDropdown.setOptions === 'function') {
+      const countries = Config.getInstance().getAvailableCountries();
+      const opts = Array.isArray(countries)
+        ? countries.map(c => ({ value: String(c.code).toUpperCase(), label: c.name, selected: false }))
+        : [];
+      row._eventCountryDropdown.setOptions(opts);
+    }
   }
 
   _removeHiddenInput(row, className) {
@@ -1078,6 +1099,9 @@ class EventsTableManager {
       }
     });
     const rateInput = row.querySelector('.event-rate');
+    if (eventType === 'MV' && rateInput) {
+      rateInput.value = '';
+    }
     if (rateInput) {
       rateInput.placeholder = (!required || !required.rate || required.rate === 'optional') ? 'inflation' : '';
     }
@@ -2370,61 +2394,146 @@ class EventsTableManager {
     }
   }
 
+  async syncTaxRuleSetsForCurrentEvents() {
+    const config = Config.getInstance();
+    const startCountry = config.getStartCountry();
+    let currentEvents = null;
+    if (this.webUI && typeof this.webUI.readEvents === 'function') {
+      currentEvents = this.webUI.readEvents(false);
+    } else if (typeof uiManager !== 'undefined' && uiManager && typeof uiManager.readEvents === 'function') {
+      currentEvents = uiManager.readEvents(false);
+    }
+    if (currentEvents) {
+      await config.syncTaxRuleSetsWithEvents(currentEvents, startCountry);
+    }
+  }
+
+  async applyEventTypeSelection(row, eventType, label) {
+    if (!row) return;
+    const typeInput = row.querySelector('.event-type');
+    if (!typeInput) return;
+
+    typeInput.value = eventType || '';
+    const rowId = row.dataset ? row.dataset.rowId : '';
+    const toggleEl = rowId
+      ? row.querySelector(`#EventTypeToggle_${rowId}`)
+      : row.querySelector('.event-type-dd .dd-toggle');
+    if (toggleEl && label) toggleEl.textContent = label;
+
+    this.updateFieldVisibility(typeInput);
+    this.applyTypeColouring(row);
+    typeInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+    if (typeInput.value === 'MV') {
+      await this.syncTaxRuleSetsForCurrentEvents();
+      this._scheduleRelocationReanalysis();
+    }
+  }
+
+  async applyCountrySelection(row, countryCode, label) {
+    if (!row) return;
+    const nameInput = row.querySelector('.event-name');
+    if (!nameInput) return;
+
+    const upperCode = String(countryCode || '').trim().toUpperCase();
+    nameInput.value = upperCode;
+
+    const rowId = row.dataset ? row.dataset.rowId : '';
+    const countryToggleEl = rowId
+      ? row.querySelector(`#EventCountryToggle_${rowId}`)
+      : row.querySelector('.event-country-dd .dd-toggle');
+    if (countryToggleEl) {
+      countryToggleEl.textContent = label || 'Select country';
+    }
+
+    if (row._eventCountryDropdown && typeof row._eventCountryDropdown.setOptions === 'function') {
+      const countries = Config.getInstance().getAvailableCountries();
+      const countryOptions = Array.isArray(countries)
+        ? countries.map(c => ({
+          value: String(c.code).toUpperCase(),
+          label: c.name,
+          selected: String(c.code).toUpperCase() === upperCode
+        }))
+        : [];
+      row._eventCountryDropdown.setOptions(countryOptions);
+    }
+
+    nameInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await this.syncTaxRuleSetsForCurrentEvents();
+    this._scheduleRelocationReanalysis();
+  }
+
+  setRowFieldValue(row, selector, value) {
+    if (!row) return;
+    const input = row.querySelector(selector);
+    if (!input) return;
+    input.value = (value === undefined || value === null) ? '' : String(value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  async populateRowFromWizardData(row, eventData) {
+    if (!row) return;
+
+    const typeOptions = this.getEventTypeOptionObjects();
+    const desiredType = String((eventData && eventData.eventType) || '');
+    const typeOption = typeOptions.find(opt => opt.value === desiredType)
+      || typeOptions.find(opt => opt.value === 'NOP')
+      || typeOptions[0];
+
+    if (row._eventTypeDropdown && typeof row._eventTypeDropdown.setOptions === 'function') {
+      row._eventTypeDropdown.setOptions(typeOptions);
+    }
+    await this.applyEventTypeSelection(row, typeOption ? typeOption.value : '', typeOption ? typeOption.label : '');
+
+    const resolvedType = typeOption ? typeOption.value : '';
+    if (resolvedType === 'MV') {
+      const countries = Config.getInstance().getAvailableCountries();
+      const code = String((eventData && (eventData.destCountryCode || eventData.name)) || '').trim().toUpperCase();
+      const matchedCountry = Array.isArray(countries)
+        ? countries.find(c => String(c.code).toUpperCase() === code)
+        : null;
+      await this.applyCountrySelection(row, code, matchedCountry ? matchedCountry.name : code);
+    } else {
+      const nameValue = eventData && eventData.name != null ? eventData.name : '';
+      this.setRowFieldValue(row, '.event-name', nameValue);
+    }
+
+    const amountValue = eventData && eventData.amount != null ? eventData.amount : '';
+    const fromAgeValue = eventData && eventData.fromAge != null ? eventData.fromAge : '';
+    const toAgeValue = eventData && eventData.toAge != null ? eventData.toAge : '';
+    const rateValue = eventData && eventData.rate != null ? eventData.rate : '';
+    const matchValue = eventData && eventData.match != null ? eventData.match : '';
+    this.setRowFieldValue(row, '.event-amount', amountValue);
+    this.setRowFieldValue(row, '.event-from-age', fromAgeValue);
+    this.setRowFieldValue(row, '.event-to-age', toAgeValue);
+    this.setRowFieldValue(row, '.event-rate', rateValue);
+    this.setRowFieldValue(row, '.event-match', matchValue);
+
+    row.dataset.originalEventType = resolvedType;
+  }
+
   /**
    * Replace an empty row with event data from wizard
    * @param {HTMLElement} emptyRow - The empty row to replace
    * @param {Object} eventData - Data from the wizard
    */
-  replaceEmptyRowWithEvent(emptyRow, eventData) {
-    // Create a new properly structured row with the wizard data
-    const newRow = this.createEventRow(
-      eventData.eventType || '',
-      eventData.name || '',
-      eventData.amount || '',
-      eventData.fromAge || '',
-      eventData.toAge || '',
-      eventData.rate || '',
-      eventData.match || ''
-    );
-    const newEventId = newRow.dataset.eventId; // capture ID for accordion highlight
+  async replaceEmptyRowWithEvent(emptyRow, eventData) {
+    if (!emptyRow) return null;
 
-    // Preserve the position by inserting the new row before the empty row
-    const tbody = emptyRow.parentNode;
-    if (tbody) {
-      tbody.insertBefore(newRow, emptyRow);
-      // Remove the empty row
-      emptyRow.remove();
-    }
+    await this.populateRowFromWizardData(emptyRow, eventData);
+    const eventId = emptyRow.dataset.eventId || null;
 
-    // Setup formatting for new inputs
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
+    this.applyHighlightAnimation(emptyRow);
 
-    // Apply highlight animation to the new row
-    this.applyHighlightAnimation(newRow);
-
-    // Trigger sorting if needed
     if (this.sortKeys && this.sortKeys.length > 0) {
       this.applySortingWithAnimation();
-    } else {
-      // No sorting active – let highlight animation handle any needed scrolling
     }
 
-    // Call detector after replacing row
-    if (Config.getInstance().isRelocationEnabled()) {
-      try {
-        var events = this.webUI.readEvents(false);
-        var startCountry = Config.getInstance().getStartCountry();
-        RelocationImpactDetector.analyzeEvents(events, startCountry);
-        this.updateRelocationImpactIndicators(events);
-        this.webUI.updateStatusForRelocationImpacts(events);
-      } catch (err) {
-        console.error('Error analyzing relocation impacts:', err);
-      }
-    }
-    // Refresh accordion with highlight if it's active
     if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
-      this.webUI.eventAccordionManager.refreshWithNewEventAnimation(eventData, newEventId);
+      this.webUI.eventAccordionManager.refreshWithNewEventAnimation(eventData, eventId);
     }
     // Refresh chart relocation transitions
     if (this.webUI.chartManager) {
@@ -2437,6 +2546,7 @@ class EventsTableManager {
       RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
       this.webUI.tableManager.setupTableCurrencyControls();
     }
+    return { row: emptyRow, id: eventId };
   }
 
   /**
@@ -2562,31 +2672,10 @@ class EventsTableManager {
       options: optionObjects,
       selectedValue: selectedObj.value,
       onSelect: async (val, label) => {
-        // Normal behaviour for genuine event type selections
-        typeInput.value = val;
-        toggleEl.textContent = label;
-        row.dataset.originalEventType = val;
-        this.updateFieldVisibility(typeInput);
-        this.applyTypeColouring(row);
-        typeInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-        // If this is a relocation event, sync tax rulesets
-        if (val === 'MV') {
-          try {
-            const config = Config.getInstance();
-            const startCountry = config.getStartCountry();
-            let currentEvents = null;
-            if (this.webUI && typeof this.webUI.readEvents === 'function') {
-              currentEvents = this.webUI.readEvents(false);
-            } else if (typeof uiManager !== 'undefined' && uiManager && typeof uiManager.readEvents === 'function') {
-              currentEvents = uiManager.readEvents(false);
-            }
-            if (currentEvents) {
-              await config.syncTaxRuleSetsWithEvents(currentEvents, startCountry);
-            }
-          } catch (err) {
-            console.error('Error loading tax ruleset:', err);
-          }
+        try {
+          await this.applyEventTypeSelection(row, val, label);
+        } catch (err) {
+          console.error('Error selecting event type:', err);
         }
       },
     });
@@ -2617,19 +2706,10 @@ class EventsTableManager {
         options: countryOptions,
         selectedValue: currentOption ? currentOption.value : undefined,
         onSelect: async (val, label) => {
-          nameInput.value = val;
-          countryToggleEl.textContent = label;
-          nameInput.dispatchEvent(new Event('change', { bubbles: true }));
-          const config = Config.getInstance();
-          const startCountry = config.getStartCountry();
-          let currentEvents = null;
-          if (this.webUI && typeof this.webUI.readEvents === 'function') {
-            currentEvents = this.webUI.readEvents(false);
-          } else if (typeof uiManager !== 'undefined' && uiManager && typeof uiManager.readEvents === 'function') {
-            currentEvents = uiManager.readEvents(false);
-          }
-          if (currentEvents) {
-            await config.syncTaxRuleSetsWithEvents(currentEvents, startCountry);
+          try {
+            await this.applyCountrySelection(row, val, label);
+          } catch (err) {
+            console.error('Error selecting relocation country:', err);
           }
         },
       });
@@ -3271,19 +3351,6 @@ class EventsTableManager {
 
       // Add click handler
       option.addEventListener('click', () => {
-        if (wizard.eventType === 'MV') {
-          const eventData = { eventType: 'MV' };
-          if (this.pendingEmptyRowForReplacement) {
-            this.replaceEmptyRowWithEvent(this.pendingEmptyRowForReplacement, eventData);
-            this.pendingEmptyRowForReplacement = null;
-          } else if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
-            this.webUI.eventAccordionManager.addEventFromWizard(eventData);
-          } else {
-            this.addEventFromWizardWithSorting(eventData);
-          }
-          overlay.remove();
-          return;
-        }
         this.startWizardForEventType(wizard.eventType, initialData);
         overlay.remove();
       });
@@ -3379,20 +3446,14 @@ class EventsTableManager {
       // Pass pre-populated data along with completion and cancellation callbacks
       wizardManager.startWizard(eventType, initialData,
         // onComplete callback
-        (eventData) => {
+        async (eventData) => {
           // Check if we need to replace an empty row
           if (this.pendingEmptyRowForReplacement) {
-            this.replaceEmptyRowWithEvent(this.pendingEmptyRowForReplacement, eventData);
+            await this.replaceEmptyRowWithEvent(this.pendingEmptyRowForReplacement, eventData);
             this.pendingEmptyRowForReplacement = null; // Clear the reference
           } else {
             // Normal flow - create new event
-            if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
-              // In accordion mode, let accordion manager handle creation and animation
-              this.webUI.eventAccordionManager.addEventFromWizard(eventData);
-            } else {
-              // In table mode, handle creation and sorting here
-              this.addEventFromWizardWithSorting(eventData);
-            }
+            await this.addEventFromWizardWithSorting(eventData);
           }
         },
         // onCancel callback
@@ -3409,73 +3470,23 @@ class EventsTableManager {
    * @param {Object} eventData - Data collected from wizard
    * @returns {HTMLElement} The created table row
    */
-  createEventFromWizard(eventData) {
-    // Generate unique ID for this event
-    const id = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Create a new event row with the wizard data
-    const row = this.createEventRow(
-      eventData.eventType || '',
-      eventData.name || '',
-      eventData.amount || '',
-      eventData.fromAge || '',
-      eventData.toAge || '',
-      eventData.rate || '',
-      eventData.match || ''
-    );
-
-    // Store the unique ID on the row
-    row.dataset.eventId = id;
-
-    const typeVal = eventData && eventData.eventType;
-    if (typeVal) row.dataset.originalEventType = typeVal;
-
-    // Add to table
-    const tbody = document.querySelector('#Events tbody');
-    if (tbody) {
-      tbody.appendChild(row);
-
-      // Update empty state after adding a row
-      this.updateEmptyStateMessage(true);
-
-      // Setup formatting for new inputs
-      this.webUI.formatUtils.setupCurrencyInputs();
-      this.webUI.formatUtils.setupPercentageInputs();
-    }
-
-    return { row, id };
+  async createEventFromWizard(eventData) {
+    const result = this.addEventRow();
+    if (!result || !result.row) return { row: null, id: null };
+    await this.populateRowFromWizardData(result.row, eventData);
+    return result;
   }
 
   /**
    * Add event from wizard data with sorting and animation for table view
    * @param {Object} eventData - Data collected from wizard
    */
-  addEventFromWizardWithSorting(eventData) {
-    const tbody = document.querySelector('#Events tbody');
-    if (!tbody) return;
+  async addEventFromWizardWithSorting(eventData) {
+    const result = await this.createEventFromWizard(eventData);
+    if (!result || !result.row) return null;
 
-    // Create a new event row at the end
-    const newRow = this.createEventRow(
-      eventData.eventType || '',
-      eventData.name || '',
-      eventData.amount || '',
-      eventData.fromAge || '',
-      eventData.toAge || '',
-      eventData.rate || '',
-      eventData.match || ''
-    );
-    const newEventId = newRow.dataset.eventId;
-
-    // Append to table
-    tbody.appendChild(newRow);
-
-    // Assign stable data-row-id for the new row
-    const index = Array.from(tbody.querySelectorAll('tr')).indexOf(newRow) + 1;
-    if (index > 0) newRow.setAttribute('data-row-id', 'row_' + index);
-
-    // Setup formatting for new inputs
-    this.webUI.formatUtils.setupCurrencyInputs();
-    this.webUI.formatUtils.setupPercentageInputs();
+    const newRow = result.row;
+    const newEventId = result.id;
 
     // Mark as just-created so animateNewTableRow can target it reliably
     newRow.classList.add('just-created');
@@ -3486,11 +3497,6 @@ class EventsTableManager {
     // After sorting completes, animate the new table row highlight smoothly
     if (typeof this.animateNewTableRow === 'function') {
       setTimeout(() => { this.animateNewTableRow(eventData); }, 400);
-    }
-
-    // Recompute relocation impacts before accordion refresh so badges show in cards view
-    if (typeof this.recomputeRelocationImpacts === 'function') {
-      this.recomputeRelocationImpacts();
     }
 
     // Refresh accordion if active
@@ -3508,6 +3514,7 @@ class EventsTableManager {
       RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
       this.webUI.tableManager.setupTableCurrencyControls();
     }
+    return result;
   }
 
 

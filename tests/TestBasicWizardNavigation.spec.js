@@ -9,6 +9,9 @@ import {
 // Base URL for the simulator (served by the dev/preview server)
 const BASE_URL = 'http://localhost:8080/#ifs';
 
+// Relax action timeout for slower mobile devices (Pixel/iPhone).
+test.use({ actionTimeout: 20000 });
+
 // Extracted test logic so it runs across all configured Playwright projects
 async function runBasicWizardNavigationTest(page) {
   // 1. Navigate directly to the simulator route
@@ -25,15 +28,21 @@ async function runBasicWizardNavigationTest(page) {
 
   // 3. Choose "Income" from the wizard selection overlay
   const incomeOption = frame.locator('#wizardSelectionOverlay .wizard-selection-option:has-text("Income")');
-  await incomeOption.waitFor({ state: 'visible' });
+  await incomeOption.waitFor({ state: 'visible', timeout: 30000 });
   const wizardOverlay = frame.locator('#eventWizardOverlay');
+  const selectionOverlay = frame.locator('#wizardSelectionOverlay');
   for (let attempt = 0; attempt < 3; attempt++) {
-    await smartClick(incomeOption);
+    await smartClick(incomeOption, { preferProgrammatic: attempt > 0 });
     try {
-      await wizardOverlay.waitFor({ state: 'visible', timeout: 4000 });
+      // On slower/mobile runs the selection overlay may animate out before
+      // the event wizard overlay becomes visible.
+      await selectionOverlay.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => { });
+      await wizardOverlay.waitFor({ state: 'visible', timeout: 15000 });
       break;
     } catch (error) {
       if (attempt === 2) throw error;
+      await page.waitForTimeout(350);
+      await incomeOption.waitFor({ state: 'visible', timeout: 5000 });
     }
   }
 
