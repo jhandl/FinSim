@@ -91,7 +91,7 @@ function createScenario() {
         }
       },
       events: [
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 60, toAge: 60, currency: 'EUR', rate: 0 }
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 60, toAge: 60, currency: 'EUR', rate: 0 }
       ]
     },
     assertions: []

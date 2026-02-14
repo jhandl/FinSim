@@ -165,7 +165,7 @@ module.exports = {
           { type: 'R', id: 'IE_Home', amount: 60000, fromAge: 32, toAge: 60, currency: 'EUR', linkedCountry: 'ie' },
           { type: 'M', id: 'IE_Mortgage', amount: 18000, fromAge: 32, toAge: 55, rate: 0.03, currency: 'EUR', linkedCountry: 'ie' },
           { type: 'RI', id: 'IE_Rent', amount: 15000, fromAge: 32, toAge: 60, currency: 'EUR', linkedCountry: 'ie' },
-          { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35, currency: 'EUR' },
+          { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35, currency: 'EUR' },
           // Buffer against high FX-evolved EUR mortgage costs after relocation while
           // keeping baseline checks (ages 34–36) intact.
           { type: 'FI', id: 'EUR_Windfall', amount: 400000, fromAge: 37, toAge: 37, currency: 'EUR', linkedCountry: 'ie' },

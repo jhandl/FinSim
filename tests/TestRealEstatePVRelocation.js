@@ -109,7 +109,7 @@ function createMainScenario() {
       },
       events: [
         { type: 'R', id: 'IE_Property', amount: 400000, fromAge: 30, toAge: 80, currency: 'EUR', linkedCountry: 'ie' },
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35, currency: 'EUR', rate: 0.50 }
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35, currency: 'EUR', rate: 0.50 }
       ]
     },
     assertions: []
@@ -186,7 +186,7 @@ function createMultiPropertyScenario() {
       events: [
         { type: 'R', id: 'IE_Property', amount: 400000, fromAge: 30, toAge: 80, currency: 'EUR', linkedCountry: 'ie' },
         { type: 'R', id: 'AR_Property', amount: 200000, fromAge: 30, toAge: 80, currency: 'EUR', linkedCountry: 'ar' },
-        { type: 'MV-ar', id: 'Relocate_AR', amount: 0, fromAge: 31, toAge: 31, currency: 'EUR', rate: 0.50 }
+        { type: 'MV', name: 'AR', id: 'Relocate_AR', amount: 0, fromAge: 31, toAge: 31, currency: 'EUR', rate: 0.50 }
       ]
     },
     assertions: []

@@ -59,7 +59,7 @@ sequenceDiagram
     participant Badge
     participant Panel as Inline Resolution Panel
 
-    User->>Table: Adds MV-* event
+    User->>Table: Adds MV event
     Table->>Detector: analyzeEvents(events, startCountry)
     Detector->>Detector: Classify impacts (boundary, simple, etc.)
     Detector->>Table: Mark events with relocationImpact
@@ -99,9 +99,10 @@ The `SimEvent` class includes three optional fields for multi-country support:
 
 ### Relocation Event Structure
 
-Relocation events use type codes like `MV-IE` (move to Ireland) or `MV-AR` (move to Argentina):
+Relocation events use a single type code (`MV`) and store the destination country code in `name`:
 
-- **`name`**: Destination country display name (e.g., "→ Argentina").
+- **`type`**: `MV` (relocation event).
+- **`name`**: Destination country code (ISO2, e.g., `AR`, `IE`). The UI shows the full country name via a dropdown.
 - **`amount`**: One-off relocation cost in destination currency.
 - **`fromAge`**: Point-in-time event specifying when the move occurs.
 - **`rate`**: Optional per-country inflation override for the destination.
@@ -116,11 +117,11 @@ When relocation events are added, the detector classifies affected events into f
 - **Simple Events**: Events entirely within the new country period need currency review and cost-of-living adjustment.
 - **Property Auto-Peg**: Property events (rentals, mortgages) need linking to their origin country for correct inflation and currency.
 - **Pension Conflicts**: Pensionable salary events after moving to state-only pension countries need conversion to non-pensionable type.
-- **Local Holdings**: Investment holdings with `residenceScope = "local"` and `assetCountry` matching the origin country when an MV-* event occurs. This surfaces guidance for the user (keep, sell, reinvest) rather than performing automatic liquidation.
+- **Local Holdings**: Investment holdings with `residenceScope = "local"` and `assetCountry` matching the origin country when an MV event occurs. This surfaces guidance for the user (keep, sell, reinvest) rather than performing automatic liquidation.
 
 ### Detection Logic
 
-The detector scans events when MV-* events are added or modified, modifying events in-place by adding a `relocationImpact` property containing `{category, message, mvEventId, autoResolvable}`. Impacts are cleared automatically when resolved (e.g., via `clearResolvedImpacts()`).
+The detector scans events when MV events are added or modified, modifying events in-place by adding a `relocationImpact` property containing `{category, message, mvEventId, autoResolvable}`. Impacts are cleared automatically when resolved (e.g., via `clearResolvedImpacts()`).
 
 ## Resolution Workflow
 
@@ -198,7 +199,7 @@ Credit behavior:
 
 ### Residency Timeline
 
-`getResidencyTimeline()` derives a cached residency timeline from `StartCountry` and MV-* events during `Simulator.run()`. The timeline is computed once per run and reused across Monte Carlo iterations for efficiency.
+`getResidencyTimeline()` derives a cached residency timeline from `StartCountry` and MV events during `Simulator.run()`. The timeline is computed once per run and reused across Monte Carlo iterations for efficiency.
 
 ## Attribution Keys
 
@@ -240,11 +241,11 @@ Meta column stores URL-encoded key=value pairs: `currency=EUR;linkedCountry=ie;l
 
 ### Config Initialization
 
-`Config.syncTaxRuleSetsWithEvents()` preloads tax rulesets on scenario load, MV-* selection, or simulation start. Caches and discards unused rulesets.
+`Config.syncTaxRuleSetsWithEvents()` preloads tax rulesets on scenario load, MV selection, or simulation start. Caches and discards unused rulesets.
 
 ### Simulator Loop
 
-`currentCountry` initializes from StartCountry + MV-* events. Per-event currency via `getEventCurrency()`. Multi-currency accumulation in maps, consolidated before taxes.
+`currentCountry` initializes from StartCountry + MV events. Per-event currency via `getEventCurrency()`. Multi-currency accumulation in maps, consolidated before taxes.
 
 ### RealEstate Integration
 

@@ -26,11 +26,16 @@ async function runBasicWizardNavigationTest(page) {
   // 3. Choose "Income" from the wizard selection overlay
   const incomeOption = frame.locator('#wizardSelectionOverlay .wizard-selection-option:has-text("Income")');
   await incomeOption.waitFor({ state: 'visible' });
-  await smartClick(incomeOption);
-
-  // Wait for the first step of the Income wizard to appear
   const wizardOverlay = frame.locator('#eventWizardOverlay');
-  await wizardOverlay.waitFor({ state: 'visible' });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await smartClick(incomeOption);
+    try {
+      await wizardOverlay.waitFor({ state: 'visible', timeout: 4000 });
+      break;
+    } catch (error) {
+      if (attempt === 2) throw error;
+    }
+  }
 
   // 4. Click Back to return to the wizard selection overlay
   const backBtn = wizardOverlay.locator('.event-wizard-button-back');

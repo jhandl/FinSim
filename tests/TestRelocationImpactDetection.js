@@ -1,4 +1,5 @@
 var assert = require('assert');
+require('../src/core/Utils.js');
 
 var currentTestId = '';
 function setTestId(id) {
@@ -108,7 +109,7 @@ module.exports = {
     try {
       // Test 1: Boundary crossing detection.
       runTest('1', function () {
-        const mv = makeEvent({ id: 'mv1', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv1', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_pre', type: 'SI', fromAge: 30, toAge: 40 });
         const expense = makeEvent({ id: 'expense_pre', type: 'E', fromAge: 32, toAge: 37 });
         const postSalary = makeEvent({ id: 'salary_post', type: 'SI', fromAge: 36, toAge: 45 });
@@ -130,7 +131,7 @@ module.exports = {
 
       // Test 2: Simple event classification for same-country range.
       runTest('2', function () {
-        const mv = makeEvent({ id: 'mv_simple', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_simple', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const expense = makeEvent({ id: 'expense_post', type: 'E', fromAge: 36, toAge: 37 });
         const salary = makeEvent({ id: 'salary_post', type: 'SI', fromAge: 37, toAge: 38 });
         const result = runDetector([expense, salary, mv], 'aa');
@@ -144,7 +145,7 @@ module.exports = {
 
       // Test 3: Property boundary detection retains message specificity.
       runTest('3', function () {
-        const mv = makeEvent({ id: 'mv_property', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_property', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const rental = makeEvent({ id: 'rent', type: 'RI', fromAge: 30, toAge: 50 });
         const mortgage = makeEvent({ id: 'mortgage', type: 'M', fromAge: 32, toAge: 60 });
         const result = runDetector([rental, mortgage, mv], 'aa');
@@ -159,7 +160,7 @@ module.exports = {
       // Test 4: Pension conflict detection when destination is state-only.
       runTest('4', function () {
         pensionSystems.bb = 'state_only';
-        const mv = makeEvent({ id: 'mv_state', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_state', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const pensionableSalary = makeEvent({ id: 'si_event', type: 'SI', fromAge: 36, toAge: 45 });
         const result = runDetector([pensionableSalary, mv], 'aa');
         const impact = result.find(e => e.id === 'si_event').relocationImpact;
@@ -170,8 +171,8 @@ module.exports = {
 
       // Test 5: Multiple relocations respect nearest boundary.
       runTest('5', function () {
-        const mv1 = makeEvent({ id: 'mv_bb', type: 'MV-bb', fromAge: 35, toAge: 35 });
-        const mv2 = makeEvent({ id: 'mv_cc', type: 'MV-cc', fromAge: 45, toAge: 45 });
+        const mv1 = makeEvent({ id: 'mv_bb', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
+        const mv2 = makeEvent({ id: 'mv_cc', type: 'MV', name: 'CC', fromAge: 45, toAge: 45 });
         const salary = makeEvent({ id: 'salary_multi', type: 'SI', fromAge: 30, toAge: 50 });
         const result = runDetector([salary, mv1, mv2], 'aa');
         const impact = result.find(e => e.id === 'salary_multi').relocationImpact;
@@ -181,7 +182,7 @@ module.exports = {
 
       // Test 6: Stock market events ignored.
       runTest('6', function () {
-        const mv = makeEvent({ id: 'mv_ignore', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_ignore', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const stock = makeEvent({ id: 'stock_evt', type: 'SM', fromAge: 36, toAge: 36 });
         const result = runDetector([stock, mv], 'aa');
         assert(!result.find(e => e.id === 'stock_evt').relocationImpact, 'Stock market events should be ignored');
@@ -189,7 +190,7 @@ module.exports = {
 
       // Test 7: Resolution detection via currency peg clears impact.
       runTest('7', function () {
-        const mv = makeEvent({ id: 'mv_currency', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_currency', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_currency', type: 'SI', fromAge: 30, toAge: 40 });
         const flagged = runDetector([salary, mv], 'aa');
         const salaryEvt = flagged.find(e => e.id === 'salary_currency');
@@ -201,7 +202,7 @@ module.exports = {
 
       // Test 8: Resolution detection via split linkage clears boundary impact.
       runTest('8', function () {
-        const mv = makeEvent({ id: 'mv_split', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_split', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_split', type: 'SI', fromAge: 30, toAge: 40 });
         const flagged = runDetector([salary, mv], 'aa');
         const salaryEvt = flagged.find(e => e.id === 'salary_split');
@@ -214,7 +215,7 @@ module.exports = {
 
       // Test 8b: Split chain should keep both halves resolved (no new simple impact on part 2).
       runTest('8b', function () {
-        const mv = makeEvent({ id: 'mv_split_pair', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_split_pair', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const part1 = makeEvent({ id: 'salary_split_p1', type: 'SI', fromAge: 30, toAge: 35, linkedEventId: 'split_pair_1' });
         const part2 = makeEvent({ id: 'salary_split_p2', type: 'SI', fromAge: 35, toAge: 40, linkedEventId: 'split_pair_1' });
         const result = runDetector([part1, part2, mv], 'aa');
@@ -224,7 +225,7 @@ module.exports = {
 
       // Test 8b2: Non-overlapping split chain (toAge + 1 = fromAge) should remain resolved.
       runTest('8b2', function () {
-        const mv = makeEvent({ id: 'mv_split_pair_non_overlap', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_split_pair_non_overlap', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const part1 = makeEvent({ id: 'salary_split_non_overlap_p1', type: 'SI', fromAge: 30, toAge: 34, linkedEventId: 'split_pair_2' });
         const part2 = makeEvent({ id: 'salary_split_non_overlap_p2', type: 'SI', fromAge: 35, toAge: 40, linkedEventId: 'split_pair_2' });
         const result = runDetector([part1, part2, mv], 'aa');
@@ -245,7 +246,7 @@ module.exports = {
 
       // Test 8d: Split halves should be re-flagged when relocation no longer matches split boundary.
       runTest('8d', function () {
-        const mv = makeEvent({ id: 'mv_split_shifted', type: 'MV-bb', fromAge: 50, toAge: 50 });
+        const mv = makeEvent({ id: 'mv_split_shifted', type: 'MV', name: 'BB', fromAge: 50, toAge: 50 });
         const part1 = makeEvent({ id: 'salary_split_shifted_p1', type: 'SI', fromAge: 30, toAge: 35, linkedEventId: 'split_shifted_1', currency: 'AAA' });
         const part2 = makeEvent({ id: 'salary_split_shifted_p2', type: 'SI', fromAge: 35, toAge: 40, linkedEventId: 'split_shifted_1', currency: 'BBB' });
         const result = runDetector([part1, part2, mv], 'aa');
@@ -257,7 +258,7 @@ module.exports = {
 
       // Test 8e: Relocation-linked split should be flagged for age-shift adaptation.
       runTest('8e', function () {
-        const mv = makeEvent({ id: 'mv_split_linked', type: 'MV-bb', fromAge: 50, toAge: 50, relocationLinkId: 'mvlink_split_1' });
+        const mv = makeEvent({ id: 'mv_split_linked', type: 'MV', name: 'BB', fromAge: 50, toAge: 50, relocationLinkId: 'mvlink_split_1' });
         const part1 = makeEvent({
           id: 'salary_split_linked_p1',
           type: 'SI',
@@ -288,7 +289,7 @@ module.exports = {
 
       // Test 8f: Relocation-linked sold property should be flagged for age-shift adaptation.
       runTest('8f', function () {
-        const mv = makeEvent({ id: 'mv_sale_linked', type: 'MV-bb', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_sale_1' });
+        const mv = makeEvent({ id: 'mv_sale_linked', type: 'MV', name: 'BB', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_sale_1' });
         const property = makeEvent({
           id: 'sale_home',
           type: 'R',
@@ -314,7 +315,7 @@ module.exports = {
 
       // Test 8g: Relocation-linked sold property aligned to relocation age remains resolved.
       runTest('8g', function () {
-        const mv = makeEvent({ id: 'mv_sale_aligned', type: 'MV-bb', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_sale_2' });
+        const mv = makeEvent({ id: 'mv_sale_aligned', type: 'MV', name: 'BB', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_sale_2' });
         const property = makeEvent({
           id: 'sale_home_aligned',
           type: 'R',
@@ -329,7 +330,7 @@ module.exports = {
 
       // Test 8h: Manual split-half age edits should not trigger relocation-age-shift impact.
       runTest('8h', function () {
-        const mv = makeEvent({ id: 'mv_split_manual', type: 'MV-bb', fromAge: 40, toAge: 40, relocationLinkId: 'mvlink_split_manual_1' });
+        const mv = makeEvent({ id: 'mv_split_manual', type: 'MV', name: 'BB', fromAge: 40, toAge: 40, relocationLinkId: 'mvlink_split_manual_1' });
         const part1 = makeEvent({
           id: 'salary_split_manual_p1',
           type: 'SI',
@@ -355,7 +356,7 @@ module.exports = {
 
       // Test 9: Resolution detection via property linking.
       runTest('9', function () {
-        const mv = makeEvent({ id: 'mv_prop_res', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_prop_res', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const property = makeEvent({ id: 'property_link', type: 'R', fromAge: 30, toAge: 50 });
         const flagged = runDetector([property, mv], 'aa');
         const propertyEvt = flagged.find(e => e.id === 'property_link');
@@ -368,7 +369,7 @@ module.exports = {
       // Test 10: Resolution detection via pension conversion.
       runTest('10', function () {
         pensionSystems.bb = 'state_only';
-        const mv = makeEvent({ id: 'mv_pension', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_pension', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_convert', type: 'SI', fromAge: 36, toAge: 45 });
         const flagged = runDetector([salary, mv], 'aa');
         const salaryEvt = flagged.find(e => e.id === 'salary_convert');
@@ -379,7 +380,7 @@ module.exports = {
 
       // Test 11: Manual override skips analysis.
       runTest('11', function () {
-        const mv = makeEvent({ id: 'mv_override', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_override', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const expense = makeEvent({ id: 'expense_override', type: 'E', fromAge: 36, toAge: 38, resolutionOverride: '1' });
         const result = runDetector([expense, mv], 'aa');
         assert(!result.find(e => e.id === 'expense_override').relocationImpact, 'Override should prevent flagging');
@@ -395,7 +396,7 @@ module.exports = {
       // Negative case: Relocation disabled clears impacts.
       runTest('Neg-RelocationDisabled', function () {
         configStub.relocationEnabled = false;
-        const mv = makeEvent({ id: 'mv_disabled', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_disabled', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_disabled', type: 'SI', fromAge: 30, toAge: 40 });
         const result = runDetector([salary, mv], 'aa');
         assert(!result.find(e => e.id === 'salary_disabled').relocationImpact, 'When relocation disabled nothing is flagged');
@@ -404,7 +405,7 @@ module.exports = {
 
       // Edge case: MV event at age 0.
       runTest('Edge-Age0', function () {
-        const mv = makeEvent({ id: 'mv_zero', type: 'MV-bb', fromAge: 0, toAge: 0 });
+        const mv = makeEvent({ id: 'mv_zero', type: 'MV', name: 'BB', fromAge: 0, toAge: 0 });
         const salary = makeEvent({ id: 'salary_zero', type: 'SI', fromAge: -1, toAge: 1 });
         const result = runDetector([salary, mv], 'aa');
         assert(result.find(e => e.id === 'salary_zero').relocationImpact, 'Boundary at age 0 should be detected');
@@ -412,7 +413,7 @@ module.exports = {
 
       // Edge case: Event ending exactly at relocation age - should be flagged as boundary.
       runTest('Edge-EndAtRelocation', function () {
-        const mv = makeEvent({ id: 'mv_edge', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_edge', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_edge', type: 'SI', fromAge: 30, toAge: 35 });
         const result = runDetector([salary, mv], 'aa');
         assert(result.find(e => e.id === 'salary_edge').relocationImpact, 'Event ending at relocation age should cross boundary');
@@ -420,7 +421,7 @@ module.exports = {
 
       // Edge case: Event starting exactly at relocation age - treated as simple.
       runTest('Edge-StartAtRelocation', function () {
-        const mv = makeEvent({ id: 'mv_start', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_start', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const salary = makeEvent({ id: 'salary_start', type: 'SI', fromAge: 35, toAge: 40 });
         const result = runDetector([salary, mv], 'aa');
         const impact = result.find(e => e.id === 'salary_start').relocationImpact;
@@ -459,7 +460,7 @@ module.exports = {
 
       // Test 13: PPP vs FX divergence appears in panel data attributes (boundary split).
       runTest('13', function () {
-        const mv = makeEvent({ id: 'mv1', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv1', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const evt = makeEvent({
           id: 'salary_ppp_fx', type: 'SI', amount: 10000, fromAge: 30, toAge: 40,
           relocationImpact: { category: 'boundary', message: 'x', mvEventId: 'mv1', autoResolvable: false }
@@ -554,7 +555,7 @@ module.exports = {
 
       // Test 17: Mismatched linkedCountry should remain flagged after event age shift.
       runTest('17', function () {
-        const mv = makeEvent({ id: 'mv_mismatch', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_mismatch', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const property = makeEvent({
           id: 'property_mismatch',
           type: 'R',
@@ -587,14 +588,14 @@ module.exports = {
           linkedCountry: 'aa',
           currency: 'AAA'
         });
-        const mvInitial = makeEvent({ id: 'mv_shifted', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mvInitial = makeEvent({ id: 'mv_shifted', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const initial = runDetector([property, mvInitial], 'aa');
         const initialProperty = initial.find(e => e.id === 'property_shifted' && e.type === 'R');
         assert(initialProperty, 'Expected initial property');
         assert(!initialProperty.relocationImpact, 'Boundary impact should be resolved when linkedCountry is set');
 
         // Simulate user edit: relocation moved earlier, property now starts after move.
-        const mvShifted = makeEvent({ id: 'mv_shifted', type: 'MV-bb', fromAge: 28, toAge: 28 });
+        const mvShifted = makeEvent({ id: 'mv_shifted', type: 'MV', name: 'BB', fromAge: 28, toAge: 28 });
         const updated = runDetector([property, mvShifted], 'aa');
         const propertyResult = updated.find(e => e.id === 'property_shifted' && e.type === 'R');
         assert(propertyResult.relocationImpact, 'Stale linkedCountry should be flagged after relocation age change');
@@ -605,7 +606,7 @@ module.exports = {
 
       // Test 19: Property/mortgage age mismatch should flag the mortgage when linkedCountry is stale.
       runTest('19', function () {
-        const mv = makeEvent({ id: 'mv_mortgage', type: 'MV-bb', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv_mortgage', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const property = makeEvent({
           id: 'home1',
           type: 'R',

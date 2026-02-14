@@ -356,9 +356,9 @@ function serializeSimulation(ui) {
     var rawType = evt && evt[0] ? String(evt[0]) : '';
     var type = rawType;
     if (rawType.indexOf(':') >= 0) type = rawType.split(':')[0];
-    if (type && /^MV-[A-Z]{2,}$/.test(type)) {
-      var cc = type.substring(3).toLowerCase();
-      if (!scenarioCountrySet[cc]) {
+    if (type === 'MV') {
+      var cc = String(evt[1] || '').trim().toLowerCase();
+      if (cc && !scenarioCountrySet[cc]) {
         scenarioCountrySet[cc] = true;
         scenarioCountries.push(cc);
       }
@@ -612,7 +612,7 @@ function serializeSimulation(ui) {
   }
 
   // When relocation is enabled, also persist ANY country-dependent fields that exist in the DOM (including hidden stash),
-  // regardless of current MV-* events, so values don't vanish when the user removes a relocation temporarily.
+  // regardless of current MV events, so values don't vanish when the user removes a relocation temporarily.
   if (isRelocationEnabled && typeof document !== 'undefined') {
     // Allocations: per-country ids -> generic ids
     try {
@@ -1395,9 +1395,9 @@ function deserializeSimulation(content, ui) {
     for (var ei2 = 0; ei2 < eventData.length; ei2++) {
       var row = eventData[ei2];
       var t = row && row[0] ? String(row[0]) : '';
-      if (t && /^MV-[A-Z]{2,}$/.test(t)) {
-        var cc2 = t.substring(3).toLowerCase();
-        if (!scenarioSet[cc2]) {
+      if (t === 'MV') {
+        var cc2 = String(row[1] || '').trim().toLowerCase();
+        if (cc2 && !scenarioSet[cc2]) {
           scenarioSet[cc2] = true;
           scenarioCountries.push(cc2);
         }
@@ -1482,8 +1482,29 @@ function getRateForKey(key, rateBands) {
 // Relocation Lookup Functions
 // ============================================================
 
+function isRelocationEvent(event) {
+  return event && event.type === 'MV';
+}
+
+function getRelocationCountryCode(event) {
+  var raw = event ? event.name : '';
+  if (raw === null || raw === undefined) return '';
+  var trimmed = String(raw).trim();
+  if (!/^[A-Za-z]{2}$/.test(trimmed)) return '';
+  return trimmed.toLowerCase();
+}
+
+var relocationHelpersTarget = (typeof self !== 'undefined') ? self :
+  (typeof globalThis !== 'undefined') ? globalThis :
+  (typeof global !== 'undefined') ? global :
+  this;
+if (relocationHelpersTarget) {
+  relocationHelpersTarget.isRelocationEvent = isRelocationEvent;
+  relocationHelpersTarget.getRelocationCountryCode = getRelocationCountryCode;
+}
+
 /**
- * Get country for a given age by scanning MV-* events.
+ * Get country for a given age by scanning MV events.
  * @param {number} age - The age to look up
  * @param {Array} events - Full events array
  * @param {string} startCountry - Starting country code
@@ -1493,15 +1514,16 @@ function getCountryForAge(age, events, startCountry) {
   var country = startCountry.toLowerCase();
   for (var i = 0; i < events.length; i++) {
     var e = events[i];
-    if (e && e.type && e.type.indexOf('MV-') === 0 && age >= e.fromAge) {
-      country = e.type.substring(3).toLowerCase();
+    if (isRelocationEvent(e) && age >= e.fromAge) {
+      var relocationCountry = getRelocationCountryCode(e);
+      if (relocationCountry) country = relocationCountry;
     }
   }
   return country;
 }
 
 /**
- * Get unique countries from MV-* events.
+ * Get unique countries from MV events.
  * @param {Array} events - Full events array
  * @param {string} startCountry - Starting country code
  * @returns {Set} Set of country codes (lowercase)
@@ -1512,8 +1534,9 @@ function getUniqueCountries(events, startCountry) {
   countries.add(country);
   for (var i = 0; i < events.length; i++) {
     var e = events[i];
-    if (e && e.type && e.type.indexOf('MV-') === 0) {
-      countries.add(e.type.substring(3).toLowerCase());
+    if (isRelocationEvent(e)) {
+      var relocationCountry = getRelocationCountryCode(e);
+      if (relocationCountry) countries.add(relocationCountry);
     }
   }
   return countries;

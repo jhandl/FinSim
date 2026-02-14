@@ -38,8 +38,8 @@ describe('Relocation age-change behavior toggle', () => {
         <thead><tr><th>Type</th><th>Details</th></tr></thead>
         <tbody>
           <tr data-row-id="row-mv" data-event-id="event-mv">
-            <td><div class="event-type-container"><input class="event-type" value="MV-ar"></div></td>
-            <td><input class="event-name" value="Move" /><input class="event-from-age" value="35" /></td>
+            <td><div class="event-type-container"><input class="event-type" value="MV"></div></td>
+            <td><input class="event-name" value="AR" /><input class="event-from-age" value="35" /></td>
           </tr>
           <tr data-row-id="row-p1" data-event-id="event-p1">
             <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>

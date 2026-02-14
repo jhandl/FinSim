@@ -22,9 +22,9 @@ const TestPerCountryPensionContribs = {
     },
     events: [
       { type: 'SI', id: 'salary_ie', name: 'IE Salary', amount: 50000, fromAge: 30, toAge: 39, currency: 'EUR', linkedCountry: 'ie', match: 0.06 },
-      { type: 'MV-AR', id: 'move_ar', name: 'Move to AR', amount: 0, fromAge: 40, currency: 'ARS', linkedCountry: 'ar' },
+      { type: 'MV', id: 'move_ar', name: 'AR', amount: 0, fromAge: 40, currency: 'ARS', linkedCountry: 'ar' },
       { type: 'SI', id: 'salary_ar', name: 'AR Salary', amount: 1000000, fromAge: 40, toAge: 49, currency: 'ARS', linkedCountry: 'ar', match: 0 },
-      { type: 'MV-IE', id: 'move_ie', name: 'Return to IE', amount: 0, fromAge: 50, currency: 'EUR', linkedCountry: 'ie' },
+      { type: 'MV', id: 'move_ie', name: 'IE', amount: 0, fromAge: 50, currency: 'EUR', linkedCountry: 'ie' },
       { type: 'SI', id: 'salary_ie2', name: 'IE Salary 2', amount: 60000, fromAge: 50, toAge: 64, currency: 'EUR', linkedCountry: 'ie', match: 0.06 }
     ]
   },

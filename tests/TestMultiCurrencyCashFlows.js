@@ -218,7 +218,7 @@ module.exports = {
           events: [
             { type: 'RI', id: 'rent-pp', amount: 10000, fromAge: 30, toAge: 31, currency: 'PPP', linkedCountry: 'pp' },
             { type: 'E', id: 'mort-pp', amount: 7000, fromAge: 30, toAge: 31, currency: 'PPP', linkedCountry: 'pp' },
-            { type: 'MV-rr', id: 'move-rr', amount: 0, fromAge: 32, toAge: 32 },
+            { type: 'MV', name: 'RR', id: 'move-rr', amount: 0, fromAge: 32, toAge: 32 },
             { type: 'SI', id: 'salary-rr', amount: 40000, fromAge: 33, toAge: 33, currency: 'RRR' }
           ]
         },

@@ -701,7 +701,12 @@ class TestFramework {
         testParams = __seededParams;
       }
       if (__seededEvents) {
-        testEvents = __seededEvents.map(function(e) { return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match, e.currency, e.linkedEventId, e.linkedCountry); });
+        testEvents = __seededEvents.map(function(e) {
+          var ev = new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match, e.currency, e.linkedEventId, e.linkedCountry);
+          if (e && e.name !== undefined) ev.name = e.name;
+          if (e && e.country !== undefined) ev.country = e.country;
+          return ev;
+        });
       }
 
       // Create a proper UIManager mock that matches the real UIManager interface
@@ -765,7 +770,12 @@ class TestFramework {
           var params = (parsed && parsed.scenario && parsed.scenario.parameters) ? parsed.scenario.parameters : (parsed.params || parsed.testParams || {});
           var eventsArr = (parsed && parsed.scenario && parsed.scenario.events) ? parsed.scenario.events : (parsed.events || parsed.testEvents || []);
           testParams = params;
-          testEvents = eventsArr.map(function(e) { return new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match, e.currency, e.linkedEventId, e.linkedCountry); });
+          testEvents = eventsArr.map(function(e) {
+            var ev = new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match, e.currency, e.linkedEventId, e.linkedCountry);
+            if (e && e.name !== undefined) ev.name = e.name;
+            if (e && e.country !== undefined) ev.country = e.country;
+            return ev;
+          });
         } catch (e) { throw new Error('Failed to load scenario file: ' + (e && e.message ? e.message : e)); }
       };
       MockUIManager.prototype.updateDataRow = function(row, progress) {};
@@ -779,9 +789,9 @@ class TestFramework {
           var evs = Array.isArray(testEvents) ? testEvents : [];
           for (var ei = 0; ei < evs.length; ei++) {
             var evt = evs[ei];
-            var t = evt && evt.type ? String(evt.type) : '';
-            if (t && t.indexOf('MV-') === 0) {
-              scenarioCountries[t.substring(3).toLowerCase()] = true;
+            if (evt && evt.type === 'MV') {
+              var cc = getRelocationCountryCode(evt);
+              if (cc) scenarioCountries[cc] = true;
             }
           }
         } catch (_) { }
@@ -1035,7 +1045,7 @@ class TestFramework {
               var ccAlloc = null;
               if (m2) {
                 var cc2 = String(m2[1]).toLowerCase();
-                // Only treat as cc_base when cc is already known (StartCountry/MV-*) or is 2-letter.
+                // Only treat as cc_base when cc is already known (StartCountry/MV) or is 2-letter.
                 if (scenarioCountries[cc2] || cc2.length === 2) {
                   base = m2[2]; ccAlloc = cc2;
                 }
@@ -1110,14 +1120,14 @@ class TestFramework {
 
         // Canonical drawdown priorities by investment key
         if (!testParams.drawdownPrioritiesByKey) testParams.drawdownPrioritiesByKey = {};
-        // Apply base priorities across all scenario countries (StartCountry + any MV-*).
+        // Apply base priorities across all scenario countries (StartCountry + any MV).
         try {
           var evs = Array.isArray(testEvents) ? testEvents : [];
           for (var ei = 0; ei < evs.length; ei++) {
             var evt = evs[ei];
-            var t = evt && evt.type ? String(evt.type) : '';
-            if (t && t.indexOf('MV-') === 0) {
-              scenarioCountries[t.substring(3).toLowerCase()] = true;
+            if (evt && evt.type === 'MV') {
+              var cc = getRelocationCountryCode(evt);
+              if (cc) scenarioCountries[cc] = true;
             }
           }
         } catch (_) { }

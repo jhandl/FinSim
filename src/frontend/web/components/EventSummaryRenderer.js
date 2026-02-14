@@ -203,21 +203,6 @@ class EventSummaryRenderer {
         };
       }
     }
-    // Special-case relocation MV-* to show arrow + country name
-    try {
-      if (typeof eventType === 'string' && eventType.indexOf('MV-') === 0) {
-        const code = eventType.substring(3).toLowerCase();
-        const countries = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance().getAvailableCountries() : [];
-        const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-        if (match) {
-          return {
-            label: `→ ${match.name}`,
-            description: `Relocation to ${match.name}`
-          };
-        }
-      }
-    } catch (_) {}
-    
     // Fallback mapping
     const typeMap = {
       'SI': 'Salary Income',
@@ -287,8 +272,8 @@ class EventSummaryRenderer {
    * Only salary events WITH pension contributions show this field
    */
   showsEmployerMatchField(eventType) {
-    // Only salary events WITH pension show this field. Explicitly hide for MV-* and NOP during debugging.
-    if (typeof eventType === 'string' && eventType.indexOf('MV-') === 0) return false;
+    // Only salary events WITH pension show this field. Explicitly hide for relocation and NOP during debugging.
+    if (eventType === 'MV') return false;
     return ['SI', 'SI2'].includes(eventType);
   }
 
@@ -312,8 +297,8 @@ class EventSummaryRenderer {
    * Based on actual simulation behavior and event type meanings
    */
   showsToAgeField(eventType, event = null) {
-    // Hide To Age for relocation MV-*; otherwise show (one-off expenses may equal fromAge)
-    if (typeof eventType === 'string' && eventType.indexOf('MV-') === 0) return false;
+    // Hide To Age for relocation; otherwise show (one-off expenses may equal fromAge)
+    if (eventType === 'MV') return false;
     return true;
   }
 
@@ -402,13 +387,23 @@ class EventSummaryRenderer {
       </div>
     `);
 
-    // Event name (editable text input)
+    // Event name / destination country
     const nameLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'name');
+    const nameValue = this.escapeHtml(event.name || '');
+    const isRelocation = event.type === 'MV';
+    const code = String(event.name || '').trim().toLowerCase();
+    const countries = Config.getInstance().getAvailableCountries();
+    const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
+    const displayName = match ? match.name : 'Select country';
     details.push(`
       <div class="detail-row">
         <label>${nameLabel}:</label>
         <div class="editable-field">
-          <input type="text" class="accordion-edit-name" value="${this.escapeHtml(event.name || '')}" data-accordion-id="${event.accordionId}" data-sort-key="event-name">
+          <input type="text" class="accordion-edit-name" value="${nameValue}" data-accordion-id="${event.accordionId}" data-sort-key="event-name" style="display:${isRelocation ? 'none' : ''};">
+          <div class="event-country-dd visualization-control" id="AccordionEventCountry_${event.rowId}" style="display:${isRelocation ? '' : 'none'};">
+            <span id="AccordionEventCountryToggle_${event.rowId}" class="dd-toggle pseudo-select">${displayName}</span>
+            <div id="AccordionEventCountryOptions_${event.rowId}" class="visualization-dropdown" style="display:none;"></div>
+          </div>
         </div>
       </div>
     `);

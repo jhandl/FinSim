@@ -9,7 +9,7 @@ test.use({ actionTimeout: 20000 });
 test('chart currency selector converts datasets and shows original tooltip details', async ({ page }) => {
   const frame = await loadSimulator(page);
   await seedEvents(frame, [
-    { type: 'MV-AR', alias: 'MoveAR', fromAge: 40, toAge: 40 },
+    { type: 'MV', alias: 'AR', fromAge: 40, toAge: 40 },
     { type: 'SI', alias: 'IE Salary', amount: '50000', fromAge: 25, toAge: 39 },
     { type: 'SI', alias: 'US Salary', amount: '75000', fromAge: 40, toAge: 65 }
   ]);

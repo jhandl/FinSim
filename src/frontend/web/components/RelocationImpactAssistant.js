@@ -93,25 +93,24 @@ var RelocationImpactAssistant = {
       return e && (e.id === mvEventId || e._mvRuntimeId === mvEventId);
     });
     if (!mvEvent && mvEventId) {
-      // Fallback: find mvEvent from DOM by looking for the row with matching event name/id
+      // Fallback: find mvEvent from DOM by matching row id
       try {
-        const nameInputs = document.querySelectorAll('#Events tbody tr .event-name');
-        for (let i = 0; i < nameInputs.length; i++) {
-          const nameInput = nameInputs[i];
-          if (nameInput.value === mvEventId) {
-            const mvRow = nameInput.closest('tr');
-            if (mvRow) {
-              const typeInput = mvRow.querySelector('.event-type');
-              const fromAgeInput = mvRow.querySelector('.event-from-age');
-              if (typeInput && typeInput.value && typeInput.value.startsWith('MV-')) {
-                mvEvent = {
-                  id: mvEventId,
-                  type: typeInput.value,
-                  fromAge: fromAgeInput ? fromAgeInput.value : null
-                };
-                break;
-              }
-            }
+        const rows = document.querySelectorAll('#Events tbody tr');
+        for (let i = 0; i < rows.length; i++) {
+          const mvRow = rows[i];
+          const rowId = mvRow && mvRow.dataset ? mvRow.dataset.eventId : '';
+          if (rowId !== mvEventId) continue;
+          const typeInput = mvRow.querySelector('.event-type');
+          const fromAgeInput = mvRow.querySelector('.event-from-age');
+          const nameInput = mvRow.querySelector('.event-name');
+          if (typeInput && typeInput.value === 'MV') {
+            mvEvent = {
+              id: mvEventId,
+              type: typeInput.value,
+              name: nameInput ? nameInput.value : '',
+              fromAge: fromAgeInput ? fromAgeInput.value : null
+            };
+            break;
           }
         }
       } catch (e) {
@@ -120,7 +119,7 @@ var RelocationImpactAssistant = {
     }
     const startCountry = Config.getInstance().getStartCountry();
     if (!mvEvent && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift') return '';
-    const destCountry = mvEvent ? mvEvent.type.substring(3).toLowerCase() : startCountry;
+    const destCountry = mvEvent ? String(mvEvent.name || '').trim().toLowerCase() : startCountry;
     const originCountry = mvEvent && (env && env.eventsTableManager && typeof env.eventsTableManager.getOriginCountry === 'function') ? env.eventsTableManager.getOriginCountry(mvEvent, startCountry) : startCountry;
     const relocationAge = mvEvent ? mvEvent.fromAge : null;
 

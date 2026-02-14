@@ -128,6 +128,7 @@ function parseDemoCsvScenario(filePath) {
       events.push({
         type,
         id: name || type,
+        name: name || '',
         amount,
         fromAge,
         toAge,

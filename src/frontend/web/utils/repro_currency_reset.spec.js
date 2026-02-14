@@ -58,8 +58,8 @@ function getCurrencyOptions(webUI) {
   const events = uiManager.readEvents(false) || [];
   for (let i = 0; i < events.length; i++) {
     const e = events[i]; if (!e) continue;
-    if (e.type && e.type.indexOf('MV-') === 0) {
-      const dest = e.type.substring(3).toLowerCase();
+    if (e.type === 'MV') {
+      const dest = String(e.name || '').toLowerCase();
       const rs = cfg.getCachedTaxRuleSet(dest);
       const cur = rs && rs.getCurrencyCode ? rs.getCurrencyCode() : null;
       if (cur) currencySet.add(cur);
@@ -86,7 +86,7 @@ function getCurrencyOptions(webUI) {
 const webUI = new MockWebUI();
 
 // Scenario 1: Relocation to AR
-webUI.events = [{ type: 'MV-AR', fromAge: 30 }];
+webUI.events = [{ type: 'MV', name: 'AR', fromAge: 30 }];
 let options = getCurrencyOptions(webUI);
 console.log('Scenario 1 Options:', options.map(o => o.value));
 assert(options.find(o => o.value === 'ARS'), 'Should have ARS');

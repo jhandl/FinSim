@@ -893,75 +893,6 @@ class EventAccordionManager {
         options: optionObjects,
         selectedValue: event.type,
         onSelect: async (val, label) => {
-          // Handle Relocation (MV) specially to open country selection modal in card mode
-          if (val === 'MV' && this.webUI && this.webUI.eventsTableManager) {
-            const etm = this.webUI.eventsTableManager;
-            const currentValues = this.preserveCurrentFieldValues(container);
-            // If underlying table row for this accordion event is empty NOP, mark for replacement
-            const rowRef = this.findTableRowForEvent(event);
-            const wasEmpty = rowRef && typeof etm.isEventEmpty === 'function' ? etm.isEventEmpty(rowRef) : false;
-            if (wasEmpty) {
-              etm.pendingEmptyRowForReplacement = rowRef;
-            }
-
-            // Open country selection using centralized modal
-            etm.showCountrySelectionModal((code, name) => {
-              const full = `MV-${code.toUpperCase()}`;
-              // Sync to table without defaults and update local state/label
-              this.syncFieldToTableWithoutDefaults(event, '.event-type', full);
-              event.type = full;
-              if (toggleEl) toggleEl.textContent = `→ ${name}`;
-              this.updateAccordionFieldVisibility(container, event, currentValues);
-              this.refreshEventSummary(event);
-              const accordionItem = container.closest('.events-accordion-item');
-              if (accordionItem) {
-                accordionItem.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market');
-                const newColorClass = this.getEventColorClass(full);
-                if (newColorClass) accordionItem.classList.add(newColorClass);
-              }
-              this.applySortingWithAnimation();
-
-              // Recompute impacts so badges show in cards view immediately
-              if (typeof etm.recomputeRelocationImpacts === 'function') {
-                etm.recomputeRelocationImpacts({ skipAccordionRefresh: true });
-                const updatedTableRow = this.findTableRowForEvent(event);
-                if (updatedTableRow) {
-                  const updatedEvent = this.extractEventFromRow(updatedTableRow);
-                  if (updatedEvent) event.relocationImpact = updatedEvent.relocationImpact;
-                }
-                this.refreshEventSummary(event);
-              }
-
-              // Honor wizard toggle: if off, stop here; fields stay blank
-              if (!etm.isEventsWizardEnabled()) {
-                return;
-              }
-
-              // Preload destination ruleset so currency/inflation are available immediately
-              const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
-              if (cfg && typeof cfg.getTaxRuleSet === 'function') {
-                Promise.resolve(cfg.getTaxRuleSet(code.toLowerCase()))
-                  .catch(() => { })
-                  .finally(() => {
-                    // Launch MV wizard with destination context; name remains optional
-                    etm.startWizardForEventType('MV', {
-                      eventType: full,
-                      destCountryCode: code,
-                      destCountryName: name
-                    });
-                  });
-                return;
-              }
-              // Fallback: start wizard without preloading if cfg not ready
-              etm.startWizardForEventType('MV', {
-                eventType: full,
-                destCountryCode: code,
-                destCountryName: name
-              });
-            });
-            return;
-          }
-
           if (val !== event.type) {
             // Update the hidden input
             typeInput.value = val;
@@ -1007,6 +938,38 @@ class EventAccordionManager {
       if (dropdown && dropdown.wrapper) {
         typeInput._dropdownWrapper = dropdown.wrapper;
         //
+      }
+    }
+
+    // Country dropdown for relocation (stores country code in name input)
+    const nameInput = container.querySelector('.accordion-edit-name');
+    const countryToggleEl = container.querySelector(`#AccordionEventCountryToggle_${event.rowId}`);
+    const countryDropdownEl = container.querySelector(`#AccordionEventCountryOptions_${event.rowId}`);
+    if (nameInput && countryToggleEl && countryDropdownEl) {
+      const countries = Config.getInstance().getAvailableCountries();
+      const countryOptions = Array.isArray(countries)
+        ? countries.map(c => ({ value: String(c.code).toUpperCase(), label: c.name }))
+        : [];
+      const currentCode = String(nameInput.value || '').trim().toUpperCase();
+      const currentOption = countryOptions.find(opt => opt.value === currentCode) || null;
+      countryToggleEl.textContent = currentOption ? currentOption.label : 'Select country';
+      const countryDropdown = DropdownUtils.create({
+        toggleEl: countryToggleEl,
+        dropdownEl: countryDropdownEl,
+        options: countryOptions,
+        selectedValue: currentOption ? currentOption.value : undefined,
+        onSelect: (val, label) => {
+          nameInput.value = val;
+          countryToggleEl.textContent = label;
+          this.clearFieldValidation(nameInput);
+          this.syncFieldToTableWithoutDefaults(event, '.event-name', val);
+          event.name = val;
+          this.refreshEventSummary(event);
+        },
+      });
+      container._eventCountryDropdown = countryDropdown;
+      if (countryDropdown && countryDropdown.wrapper) {
+        nameInput._dropdownWrapper = countryDropdown.wrapper;
       }
     }
 
@@ -1376,21 +1339,33 @@ class EventAccordionManager {
     // Update the stored original event type
     tableRow.dataset.originalEventType = wizardData.eventType || '';
 
-    // For MV-* ensure visible label shows as arrow + country in table dropdown
     const tVal = wizardData && wizardData.eventType;
-    if (tVal && typeof tVal === 'string' && tVal.indexOf('MV-') === 0) {
-      const code = tVal.substring(3).toLowerCase();
+    const toggleEl = tableRow.querySelector(`#EventTypeToggle_${tableRow.dataset.rowId}`);
+    const dropdown = tableRow._eventTypeDropdown;
+    if (dropdown && this.webUI && this.webUI.eventsTableManager) {
+      const opts = this.webUI.eventsTableManager.getEventTypeOptionObjects();
+      dropdown.setOptions(opts);
+      const curOpt = opts.find(o => o.value === tVal) || opts.find(o => o.value === 'NOP') || opts[0];
+      if (toggleEl && curOpt) toggleEl.textContent = curOpt.label;
+    }
+    if (this.webUI && this.webUI.eventsTableManager && typeInput) {
+      this.webUI.eventsTableManager.updateFieldVisibility(typeInput);
+    }
+    if (tVal === 'MV') {
+      const code = nameInput ? String(nameInput.value || '').trim().toLowerCase() : '';
       const countries = Config.getInstance().getAvailableCountries();
       const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-      const label = match ? `→ ${match.name}` : tVal;
-      const toggleEl = tableRow.querySelector(`#EventTypeToggle_${tableRow.dataset.rowId}`);
-      if (toggleEl) toggleEl.textContent = label;
-      const dropdown = tableRow._eventTypeDropdown;
-      if (dropdown) {
-        const baseOpts = this.webUI.eventsTableManager.getEventTypeOptionObjects();
-        const synthetic = match ? { value: tVal, label, description: `Relocation to ${match.name}` } : { value: tVal, label: tVal };
-        const opts = baseOpts.find(o => o.value === tVal) ? baseOpts : baseOpts.concat([synthetic]);
-        dropdown.setOptions(opts);
+      const countryToggle = tableRow.querySelector(`#EventCountryToggle_${tableRow.dataset.rowId}`);
+      if (countryToggle && match) countryToggle.textContent = match.name;
+      if (tableRow._eventCountryDropdown && typeof tableRow._eventCountryDropdown.setOptions === 'function') {
+        const opts = Array.isArray(countries)
+          ? countries.map(c => ({
+            value: String(c.code).toUpperCase(),
+            label: c.name,
+            selected: String(c.code).toLowerCase() === code
+          }))
+          : [];
+        tableRow._eventCountryDropdown.setOptions(opts);
       }
     }
 
@@ -2015,16 +1990,7 @@ class EventAccordionManager {
         if (toggleEl && dropdown && this.webUI.eventsTableManager) {
           // Get the label for the new event type
           const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects();
-          let selectedOption = optionObjects.find(opt => opt.value === value);
-          // If MV-* and not present in options, synthesize arrow label for display
-          if (!selectedOption && value && typeof value === 'string' && value.indexOf('MV-') === 0) {
-            const code = value.substring(3).toLowerCase();
-            const countries = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance().getAvailableCountries() : [];
-            const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-            if (match) {
-              selectedOption = { value: value, label: `→ ${match.name}`, description: `Relocation to ${match.name}` };
-            }
-          }
+          const selectedOption = optionObjects.find(opt => opt.value === value);
 
           if (selectedOption) {
             // Update the visible toggle text
@@ -2077,6 +2043,28 @@ class EventAccordionManager {
         }
 
         input.value = formattedValue;
+      }
+
+      if (tableFieldClass === '.event-name') {
+        const typeInput = tableRow.querySelector('.event-type');
+        const typeValue = typeInput ? String(typeInput.value || '') : '';
+        if (typeValue === 'MV') {
+          const code = String(value || '').trim().toLowerCase();
+          const countries = Config.getInstance().getAvailableCountries();
+          const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
+          const toggleEl = tableRow.querySelector(`#EventCountryToggle_${tableRow.dataset.rowId}`);
+          if (toggleEl) toggleEl.textContent = match ? match.name : 'Select country';
+          if (tableRow._eventCountryDropdown && typeof tableRow._eventCountryDropdown.setOptions === 'function') {
+            const opts = Array.isArray(countries)
+              ? countries.map(c => ({
+                value: String(c.code).toUpperCase(),
+                label: c.name,
+                selected: String(c.code).toLowerCase() === code
+              }))
+              : [];
+            tableRow._eventCountryDropdown.setOptions(opts);
+          }
+        }
       }
     }
   }
@@ -2147,6 +2135,14 @@ class EventAccordionManager {
       }
     });
 
+    const nameInput = container.querySelector('.accordion-edit-name');
+    const countryDropdown = container.querySelector(`#AccordionEventCountry_${event.rowId}`);
+    if (nameInput && countryDropdown) {
+      const isRelocation = event.type === 'MV';
+      nameInput.style.display = isRelocation ? 'none' : '';
+      countryDropdown.style.display = isRelocation ? '' : 'none';
+    }
+
     // Update the event object with preserved values
     Object.assign(event, preservedValues);
 
@@ -2175,16 +2171,7 @@ class EventAccordionManager {
     if (toggleEl && dropdown && this.webUI.eventsTableManager) {
       // Get the label for the new event type
       const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects();
-      let selectedOption = optionObjects.find(opt => opt.value === event.type);
-      // If MV-* and not present in options, synthesize arrow label for display
-      if (!selectedOption && event.type && typeof event.type === 'string' && event.type.indexOf('MV-') === 0) {
-        const code = event.type.substring(3).toLowerCase();
-        const countries = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance().getAvailableCountries() : [];
-        const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-        if (match) {
-          selectedOption = { value: event.type, label: `→ ${match.name}`, description: `Relocation to ${match.name}` };
-        }
-      }
+      const selectedOption = optionObjects.find(opt => opt.value === event.type);
 
       if (selectedOption) {
         // Update the visible toggle text

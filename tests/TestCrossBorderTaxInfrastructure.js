@@ -35,8 +35,8 @@ module.exports = {
     // Test 1: Residency timeline derivation + caching
     const timelineParams = { StartCountry: 'ie', startingAge: 30, targetAge: 60 };
     const timelineEvents = [
-      { type: 'MV-US', id: 'move-us', fromAge: 35, toAge: 35 },
-      { type: 'MV-AR', id: 'move-ar', fromAge: 45, toAge: 45 }
+      { type: 'MV', name: 'US', id: 'move-us', fromAge: 35, toAge: 35 },
+      { type: 'MV', name: 'AR', id: 'move-ar', fromAge: 45, toAge: 45 }
     ];
     const timeline = vm.runInContext(
       'residencyTimeline = null; getResidencyTimeline('

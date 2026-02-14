@@ -1,3 +1,4 @@
+require('../src/core/Utils.js');
 const { RelocationImpactDetector } = require('../src/frontend/web/components/RelocationImpactDetector.js');
 const { RelocationImpactAssistant } = require('../src/frontend/web/components/RelocationImpactAssistant.js');
 const { EventsTableManager } = require('../src/frontend/web/components/EventsTableManager.js');
@@ -52,12 +53,12 @@ describe('Relocation local holdings panels', () => {
             <td>
               <div class="event-type-container">
                 <select class="event-type event-type-dd">
-                  <option value="MV-us" selected>MV-us</option>
+                  <option value="MV" selected>Relocation</option>
                 </select>
               </div>
             </td>
             <td>
-              <input class="event-name" value="mv-local" />
+              <input class="event-name" value="US" />
               <input class="event-from-age" value="35" />
               <input class="event-to-age" value="35" />
               <input class="event-amount" value="0" />
@@ -97,7 +98,7 @@ describe('Relocation local holdings panels', () => {
     expect(eventRow).toBeTruthy();
     expect(eventRow.dataset.rowId).toBe('row-1');
     const events = [
-      { id: 'mv-local', type: 'MV-us', fromAge: 35, toAge: 35, amount: 0 }
+      { id: 'mv-local', type: 'MV', name: 'US', fromAge: 35, toAge: 35, amount: 0 }
     ];
     const investmentContext = {
       investmentAssets: [

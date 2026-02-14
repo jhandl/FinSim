@@ -135,7 +135,7 @@ function createPensionContributionScenario() {
       },
       events: [
         { type: 'SI', id: 'Salary_IE', amount: 50000, fromAge: 30, toAge: 64, currency: 'EUR', rate: 0.02 },
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
       ]
     },
     assertions: []
@@ -181,7 +181,7 @@ function createPrivatePensionIncomeScenario() {
       },
       events: [
         { type: 'SI', id: 'Salary_IE', amount: 50000, fromAge: 30, toAge: 64, currency: 'EUR', rate: 0.02 },
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
       ]
     },
     assertions: []
@@ -228,7 +228,7 @@ function createSalariesMultiCountryScenario() {
       events: [
         { type: 'SI', id: 'Salary_IE', amount: 40000, fromAge: 30, toAge: 40, currency: 'EUR', rate: 0.02 },
         { type: 'SI', id: 'Salary_AR', amount: 30000, fromAge: 40, toAge: 64, currency: 'EUR', linkedCountry: 'ar', rate: 0.50 },
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
       ]
     },
     assertions: []
@@ -276,7 +276,7 @@ function createRentalIncomeScenario() {
       events: [
         // Irish rental income of €24,000/year (€2,000/month) linked to IE property
         { type: 'RI', id: 'IE_Rental', amount: 24000, fromAge: 30, toAge: 70, currency: 'EUR', linkedCountry: 'ie', rate: 0.02 },
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35, currency: 'EUR', rate: 0.50 }
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35, currency: 'EUR', rate: 0.50 }
       ]
     },
     assertions: []

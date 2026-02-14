@@ -227,6 +227,7 @@ function parseDemoCsvScenario(filePath) {
       events.push({
         type,
         id: name || type,
+        name: name || '',
         amount,
         fromAge,
         toAge,
@@ -237,8 +238,9 @@ function parseDemoCsvScenario(filePath) {
         linkedEventId: meta.linkedEventId || null,
         resolutionOverride: meta.resolutionOverride || null
       });
-      if (type && type.toUpperCase().startsWith('MV-')) {
-        relocations.push({ age: fromAge, code: type.substring(3).toLowerCase() });
+      if (type === 'MV') {
+        const code = String(name || '').trim().toLowerCase();
+        if (code) relocations.push({ age: fromAge, code: code });
       }
     }
   }

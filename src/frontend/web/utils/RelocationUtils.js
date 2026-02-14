@@ -12,10 +12,10 @@ class RelocationUtils {
     // Store MV event rate overrides: country -> inflation rate (decimal)
     instance.countryInflationOverrides = {};
 
-    const mvEvents = events.filter(e => e.type && e.type.indexOf('MV-') === 0).sort((a, b) => a.fromAge - b.fromAge);
+    const mvEvents = events.filter(e => isRelocationEvent(e)).sort((a, b) => a.fromAge - b.fromAge);
     let prevCountry = startCountry.toLowerCase();
     mvEvents.forEach(ev => {
-      const destCountry = ev.type.substring(3).toLowerCase();
+      const destCountry = getRelocationCountryCode(ev);
       instance.relocationTransitions.push({ age: ev.fromAge, fromCountry: prevCountry, toCountry: destCountry });
       prevCountry = destCountry;
 

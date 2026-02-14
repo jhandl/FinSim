@@ -67,7 +67,7 @@ function createOverlapScenario() {
         // Runs through age 40 (inclusive in the simulator year loop), producing overlap at 40.
         { type: 'SI', id: 'Salary_IE', amount: 40000, fromAge: 30, toAge: 40, currency: 'EUR', rate: 0 },
         // Move at age 40 to AR; residence currency becomes ARS for that year.
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40 },
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40 },
         // Starts at age 40 in ARS; combined with Salary_IE in the same year triggers the bug.
         { type: 'SI', id: 'Salary_AR', amount: 30000000, fromAge: 40, toAge: 41, currency: 'ARS', linkedCountry: 'ar', rate: 0 }
       ]

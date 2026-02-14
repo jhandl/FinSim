@@ -377,7 +377,7 @@ class Config {
 
   /**
    * Synchronize cached tax rulesets with the events in the scenario.
-   * Loads rulesets for countries referenced by MV-* events and startCountry.
+   * Loads rulesets for countries referenced by MV events and startCountry.
    * Discards cached rulesets for countries not referenced.
    * Always keeps the default country ruleset loaded.
    * @param {Array} events - Array of SimEvent objects
@@ -395,8 +395,8 @@ class Config {
     if (Array.isArray(events)) {
       for (var i = 0; i < events.length; i++) {
         var evt = events[i];
-        if (evt && typeof evt.type === 'string' && evt.type.indexOf('MV-') === 0) {
-          var code = evt.type.substring(3).toLowerCase();
+        if (isRelocationEvent(evt)) {
+          var code = getRelocationCountryCode(evt);
           if (code) {
             required.add(code);
           }

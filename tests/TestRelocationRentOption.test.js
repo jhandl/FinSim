@@ -64,11 +64,11 @@ describe('Relocation Rent Option', () => {
           <tr data-row-id="row-2">
             <td>
               <div class="event-type-container">
-                <input class="event-type" value="MV-us" />
+                <input class="event-type" value="MV" />
               </div>
             </td>
             <td>
-              <input class="event-name" value="Relocation" />
+              <input class="event-name" value="US" />
               <input class="event-from-age" value="40" />
               <input class="event-to-age" value="40" />
               <input class="event-amount" value="0" />
@@ -121,7 +121,8 @@ describe('Relocation Rent Option', () => {
 
     const relocationEvent = {
         id: 'Relocation',
-        type: 'MV-us',
+        type: 'MV',
+        name: 'US',
         fromAge: 40
     };
 
@@ -217,7 +218,7 @@ describe('Relocation Rent Option', () => {
         mvEventId: 'Relocation'
       }
     };
-    const relocationEvent = { id: 'Relocation', type: 'MV-us', fromAge: 40, toAge: 40 };
+    const relocationEvent = { id: 'Relocation', type: 'MV', name: 'US', fromAge: 40, toAge: 40 };
     const webUIStub = {
       readEvents: jest.fn(() => [event, relocationEvent]),
       updateStatusForRelocationImpacts: jest.fn(),
@@ -287,8 +288,8 @@ describe('Relocation Rent Option', () => {
       <table id="Events">
         <tbody>
           <tr data-row-id="row-mv" data-event-id="mv-runtime-1">
-            <td><div class="event-type-container"><input class="event-type" value="MV-us" /></div></td>
-            <td><input class="event-name" value="Relocation" /></td>
+            <td><div class="event-type-container"><input class="event-type" value="MV" /></div></td>
+            <td><input class="event-name" value="US" /></td>
             <td><input class="event-from-age" value="40" /></td>
             <td><input class="event-to-age" value="40" /></td>
             <td><input class="event-relocation-link-id" value="mvlink_test_1" /></td>
@@ -393,8 +394,8 @@ describe('Relocation Rent Option', () => {
       <table id="Events">
         <tbody>
           <tr data-row-id="row-mv" data-event-id="mv-runtime-3">
-            <td><div class="event-type-container"><input class="event-type" value="MV-us" /></div></td>
-            <td><input class="event-name" value="Relocation" /></td>
+            <td><div class="event-type-container"><input class="event-type" value="MV" /></div></td>
+            <td><input class="event-name" value="US" /></td>
             <td><input class="event-from-age" value="40" /></td>
             <td><input class="event-to-age" value="40" /></td>
             <td><input class="event-relocation-link-id" value="mvlink_test_3" /></td>
@@ -468,8 +469,8 @@ describe('Relocation Rent Option', () => {
       <table id="Events">
         <tbody>
           <tr data-row-id="row-mv" data-event-id="mv-runtime-delta">
-            <td><div class="event-type-container"><input class="event-type" value="MV-us" /></div></td>
-            <td><input class="event-name" value="Relocation" /></td>
+            <td><div class="event-type-container"><input class="event-type" value="MV" /></div></td>
+            <td><input class="event-name" value="US" /></td>
             <td><input class="event-from-age" value="40" /></td>
             <td><input class="event-to-age" value="40" /></td>
             <td><input class="event-relocation-link-id" value="mvlink_sale_delta_1" /></td>
@@ -498,7 +499,7 @@ describe('Relocation Rent Option', () => {
     jest.spyOn(EventsTableManager.prototype, '_scheduleRelocationReanalysis').mockImplementation(() => {});
 
     const events = [
-      { id: 'Relocation', type: 'MV-us', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_sale_delta_1', _mvRuntimeId: 'mv-runtime-delta' },
+      { id: 'Relocation', type: 'MV', name: 'US', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_sale_delta_1', _mvRuntimeId: 'mv-runtime-delta' },
       {
         id: 'HomeA',
         type: 'R',
@@ -537,8 +538,8 @@ describe('Relocation Rent Option', () => {
       <table id="Events">
         <tbody>
           <tr data-row-id="row-mv" data-event-id="mv-runtime-99">
-            <td><div class="event-type-container"><input class="event-type" value="MV-us" /></div></td>
-            <td><input class="event-name" value="Relocation" /></td>
+            <td><div class="event-type-container"><input class="event-type" value="MV" /></div></td>
+            <td><input class="event-name" value="US" /></td>
             <td><input class="event-from-age" value="40" /></td>
             <td><input class="event-to-age" value="40" /></td>
           </tr>
@@ -560,7 +561,7 @@ describe('Relocation Rent Option', () => {
     };
     const manager = new EventsTableManager(webUIStub);
 
-    const id1 = manager._getRelocationLinkIdByImpactId('Relocation');
+    const id1 = manager._getRelocationLinkIdByImpactId('mv-runtime-99');
     const id2 = manager._getRelocationLinkIdByImpactId('mv-runtime-99');
     expect(id1).toMatch(/^mvlink_/);
     expect(id2).toBe(id1);
@@ -572,14 +573,14 @@ describe('Relocation Rent Option', () => {
       <table id="Events">
         <tbody>
           <tr data-row-id="row-mv-1" data-event-id="mv-runtime-1">
-            <td><div class="event-type-container"><input class="event-type" value="MV-us" /></div></td>
-            <td><input class="event-name" value="Relocation" /></td>
+            <td><div class="event-type-container"><input class="event-type" value="MV" /></div></td>
+            <td><input class="event-name" value="US" /></td>
             <td><input class="event-from-age" value="40" /></td>
             <td><input class="event-to-age" value="40" /></td>
           </tr>
           <tr data-row-id="row-mv-2" data-event-id="mv-runtime-2">
-            <td><div class="event-type-container"><input class="event-type" value="MV-ca" /></div></td>
-            <td><input class="event-name" value="Relocation" /></td>
+            <td><div class="event-type-container"><input class="event-type" value="MV" /></div></td>
+            <td><input class="event-name" value="CA" /></td>
             <td><input class="event-from-age" value="50" /></td>
             <td><input class="event-to-age" value="50" /></td>
           </tr>

@@ -4354,6 +4354,26 @@ footer {
   text-overflow: ellipsis;
 }
 
+/* Keep relocation country field width aligned with the Name input column. */
+#Events .event-country-dd {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+#Events .event-country-dd .dropdown-wrapper {
+  display: block;
+  width: 100%;
+}
+
+#Events .event-country-dd .pseudo-select {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
 /* Relocation impact badge styling - matches wizard icon pattern */
 .relocation-impact-badge {
   font-size: 0.9rem;

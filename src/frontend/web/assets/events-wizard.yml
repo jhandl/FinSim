@@ -394,16 +394,6 @@ EventWizards:
           text: "You are planning to relocate to {destCountryName}. This will affect your tax residency, currency ({destCurrency}), and cost of living ({destCoL}). Default inflation is {destInflation}."
         showButtons: ["next"]
 
-      - stepId: "name"
-        title: "Event Name (optional)"
-        contentType: "input"
-        field: "name"
-        labelPosition: "left"
-        content:
-          text: "Event name (optional)"
-          validation: "optional"
-        showButtons: ["back", "next"]
-
       - stepId: "timing"
         title: "When will you relocate?"
         contentType: "input"

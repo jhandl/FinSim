@@ -188,9 +188,8 @@ export async function seedEvents(frameOrPage, frameOrEvents, eventsOrOptions, op
 
     // Analyze relocation impacts if relocation is enabled
     if (relocationEnabled && window.RelocationImpactDetector && typeof window.RelocationImpactDetector.analyzeEvents === 'function') {
-      const currentStart = (window.Config && window.Config.getInstance) ? window.Config.getInstance().getStartCountry() : startCountry;
-      if (currentStart) {
-        window.RelocationImpactDetector.analyzeEvents(eventsData, currentStart);
+      if (startCountry) {
+        window.RelocationImpactDetector.analyzeEvents(eventsData, startCountry);
         // Force update indicators immediately after analysis
         if (typeof etm.updateRelocationImpactIndicators === 'function') {
           etm.updateRelocationImpactIndicators(eventsData);

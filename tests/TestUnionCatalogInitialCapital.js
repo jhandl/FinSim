@@ -50,7 +50,7 @@ module.exports = {
           }
         },
         events: [
-          { type: 'MV-ar', id: 'move-ar', amount: 0, fromAge: 40, toAge: 40 }
+          { type: 'MV', name: 'AR', id: 'move-ar', amount: 0, fromAge: 40, toAge: 40 }
         ]
       },
       assertions: []

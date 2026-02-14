@@ -325,7 +325,8 @@ module.exports = {
             currency: 'EUR'
           },
           {
-            type: 'MV-us',
+            type: 'MV',
+            name: 'US',
             id: 'MoveToUS',
             amount: 0,
             fromAge: 35,

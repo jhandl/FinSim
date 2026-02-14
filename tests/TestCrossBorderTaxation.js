@@ -141,9 +141,9 @@ module.exports = {
         events: [
           { type: 'SI', id: 'salary-xx', amount: 60000, fromAge: 30, toAge: 34, currency: 'XXX' },
           { type: 'UI', id: 'bonus-xx', amount: 10000, fromAge: 32, toAge: 32, currency: 'XXX' },
-          { type: 'MV-yy', id: 'move-to-yy', amount: 0, fromAge: 35, toAge: 35 },
+          { type: 'MV', name: 'YY', id: 'move-to-yy', amount: 0, fromAge: 35, toAge: 35 },
           { type: 'SI', id: 'salary-yy', amount: 80000, fromAge: 35, toAge: 38, currency: 'YYY' },
-          { type: 'MV-zz', id: 'move-to-zz', amount: 0, fromAge: 39, toAge: 39 },
+          { type: 'MV', name: 'ZZ', id: 'move-to-zz', amount: 0, fromAge: 39, toAge: 39 },
           { type: 'SI', id: 'salary-zz', amount: 70000, fromAge: 39, toAge: 40, currency: 'ZZZ' }
         ]
       },

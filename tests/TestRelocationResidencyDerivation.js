@@ -157,9 +157,9 @@ module.exports = {
         },
         events: [
           { type: 'SI', id: 'salary-aa', amount: 50000, fromAge: 25, toAge: 34, currency: 'AAA' },
-          { type: 'MV-bb', id: 'move-bb', amount: 0, fromAge: 35, toAge: 35 },
+          { type: 'MV', name: 'BB', id: 'move-bb', amount: 0, fromAge: 35, toAge: 35 },
           { type: 'SI', id: 'salary-bb', amount: 100000, fromAge: 35, toAge: 44, currency: 'BBB' },
-          { type: 'MV-cc', id: 'move-cc', amount: 0, fromAge: 45, toAge: 45 },
+          { type: 'MV', name: 'CC', id: 'move-cc', amount: 0, fromAge: 45, toAge: 45 },
           { type: 'SI', id: 'salary-cc', amount: 75000, fromAge: 45, toAge: 49, currency: 'CCC' }
         ]
       },
@@ -300,7 +300,7 @@ module.exports = {
           },
           events: [
             { type: 'SI', id: 'salary-aa', amount: 40000, fromAge: 30, toAge: 31, currency: 'AAA' },
-            { type: 'MV-zz', id: 'move-unknown', amount: 0, fromAge: 32, toAge: 32 }
+            { type: 'MV', name: 'ZZ', id: 'move-unknown', amount: 0, fromAge: 32, toAge: 32 }
           ]
         },
         assertions: []
@@ -311,7 +311,7 @@ module.exports = {
         installTestTaxRules(invalidMoveFramework, customRules);
         const invalidMoveResults = await invalidMoveFramework.runSimulation();
         if (!invalidMoveResults || invalidMoveResults.success !== false) {
-          errors.push('Simulator should refuse to run with unknown relocation country code (MV-zz)');
+          errors.push('Simulator should refuse to run with unknown relocation country code (ZZ)');
         }
       } else {
         errors.push('Failed to load invalid relocation scenario');

@@ -138,7 +138,8 @@ describe('Relocation cut-short resolution', () => {
     };
     const relocationEvent = {
       id: 'Move_US',
-      type: 'MV-us',
+      type: 'MV',
+      name: 'US',
       fromAge: 40,
       toAge: 40
     };
@@ -189,7 +190,8 @@ describe('Relocation cut-short resolution', () => {
     };
     const relocationEvent = {
       id: 'Move_US',
-      type: 'MV-us',
+      type: 'MV',
+      name: 'US',
       fromAge: 40,
       toAge: 40
     };
@@ -236,7 +238,8 @@ describe('Relocation cut-short resolution', () => {
     };
     const relocationEvent = {
       id: 'Move_US',
-      type: 'MV-us',
+      type: 'MV',
+      name: 'US',
       fromAge: 40,
       toAge: 40
     };
@@ -285,7 +288,8 @@ describe('Relocation cut-short resolution', () => {
     };
     const relocationEvent = {
       id: 'Move_US',
-      type: 'MV-us',
+      type: 'MV',
+      name: 'US',
       fromAge: 45,
       toAge: 45
     };
@@ -335,7 +339,8 @@ describe('Relocation cut-short resolution', () => {
     };
     const relocationEvent = {
       id: 'Move_US',
-      type: 'MV-us',
+      type: 'MV',
+      name: 'US',
       fromAge: 45,
       toAge: 45
     };

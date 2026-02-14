@@ -80,9 +80,9 @@ module.exports = {
         },
         events: [
           { type: 'SI', id: 'salary-uu', amount: 60000, fromAge: 30, toAge: 34, currency: 'UUU', match: 0.05 },
-          { type: 'MV-vv', id: 'move-vv', amount: 0, fromAge: 35, toAge: 35 },
+          { type: 'MV', name: 'VV', id: 'move-vv', amount: 0, fromAge: 35, toAge: 35 },
           { type: 'SInp', id: 'salary-vv', amount: 70000, fromAge: 35, toAge: 38, currency: 'VVV' },
-          { type: 'MV-uu', id: 'return-uu', amount: 0, fromAge: 39, toAge: 39 },
+          { type: 'MV', name: 'UU', id: 'return-uu', amount: 0, fromAge: 39, toAge: 39 },
           { type: 'SI', id: 'salary-uu-return', amount: 65000, fromAge: 40, toAge: 42, currency: 'UUU', match: 0.05 }
         ]
       },

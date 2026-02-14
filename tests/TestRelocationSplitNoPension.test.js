@@ -102,7 +102,8 @@ describe('Relocation Split No Pension', () => {
     
     const relocationEvent = {
         id: 'Relocation',
-        type: 'MV-np', // Moving to No Pension country
+        type: 'MV', // Moving to No Pension country
+        name: 'NP',
         fromAge: 40
     };
 
@@ -184,7 +185,8 @@ describe('Relocation Split No Pension', () => {
     
     const relocationEvent = {
         id: 'Relocation',
-        type: 'MV-np', 
+        type: 'MV',
+        name: 'NP',
         fromAge: 40
     };
 
@@ -241,7 +243,8 @@ describe('Relocation Split No Pension', () => {
     
     const relocationEvent = {
         id: 'Relocation',
-        type: 'MV-uk', 
+        type: 'MV',
+        name: 'UK',
         fromAge: 40
     };
 
@@ -605,8 +608,8 @@ describe('Relocation Split No Pension', () => {
       <table id="Events">
         <tbody>
           <tr data-row-id="row-mv" data-event-id="mv-runtime-1">
-            <td><div class="event-type-container"><input class="event-type" value="MV-us"></div></td>
-            <td><input class="event-name" value="Relocation"></td>
+            <td><div class="event-type-container"><input class="event-type" value="MV"></div></td>
+            <td><input class="event-name" value="US"></td>
             <td><input class="event-from-age" value="35"></td>
             <td><input class="event-to-age" value="35"></td>
           </tr>
@@ -660,8 +663,8 @@ describe('Relocation Split No Pension', () => {
       <table id="Events">
         <tbody>
           <tr data-row-id="row-mv" data-event-id="mv-runtime-delta">
-            <td><div class="event-type-container"><input class="event-type" value="MV-us"></div></td>
-            <td><input class="event-name" value="Relocation"></td>
+            <td><div class="event-type-container"><input class="event-type" value="MV"></div></td>
+            <td><input class="event-name" value="US"></td>
             <td><input class="event-from-age" value="40"></td>
             <td><input class="event-to-age" value="40"></td>
             <td><input class="event-relocation-link-id" value="mvlink_delta_1"></td>
@@ -692,7 +695,7 @@ describe('Relocation Split No Pension', () => {
     jest.spyOn(EventsTableManager.prototype, '_scheduleRelocationReanalysis').mockImplementation(() => {});
 
     const events = [
-      { id: 'Relocation', type: 'MV-us', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_delta_1', _mvRuntimeId: 'mv-runtime-delta' },
+      { id: 'Relocation', type: 'MV', name: 'US', fromAge: 45, toAge: 45, relocationLinkId: 'mvlink_delta_1', _mvRuntimeId: 'mv-runtime-delta' },
       { id: 'Job', type: 'SI', fromAge: 30, toAge: 39, linkedEventId: 'split_delta_1', relocationSplitMvId: 'mvlink_delta_1' },
       {
         id: 'Job',

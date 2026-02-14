@@ -27,6 +27,9 @@ class EventsWizard {
     if (!this.validateWizardData()) return;
     this.handleSpecialCases();
     const data = Object.assign({ eventType: this.manager.wizardState.eventType }, this.manager.wizardState.data);
+    if (data.eventType === 'MV') {
+      data.name = data.destCountryCode || data.name || '';
+    }
     const onComplete = this.manager.wizardState.onComplete;
     if (onComplete) {
       onComplete(data);
@@ -104,8 +107,14 @@ class EventsWizard {
 
   validateWizardData() {
     const data = this.manager.wizardState.data || {};
-    const nameValidation = ValidationUtils.validateRequired(data.name, 'Event name');
-    if (!nameValidation.isValid) { alert(nameValidation.message); return false; }
+    if (this.manager.wizardState.eventType === 'MV') {
+      const destCode = data.destCountryCode || data.name;
+      const nameValidation = ValidationUtils.validateRequired(destCode, 'Destination country');
+      if (!nameValidation.isValid) { alert(nameValidation.message); return false; }
+    } else {
+      const nameValidation = ValidationUtils.validateRequired(data.name, 'Event name');
+      if (!nameValidation.isValid) { alert(nameValidation.message); return false; }
+    }
     if (this.manager.wizardState.eventType !== 'SM' && this.manager.wizardState.eventType !== 'MV') {
       const amountValidation = ValidationUtils.validateRequired(data.amount, 'Amount');
       if (!amountValidation.isValid) { alert(amountValidation.message); return false; }
@@ -516,9 +525,9 @@ class EventsRenderer extends WizardRenderer {
       derived.growthPart = '';
     }
     try {
-      const hasDest = (data && (data.destCountryCode || (typeof data.eventType === 'string' && data.eventType.indexOf('MV-') === 0)));
+      const hasDest = (data && (data.destCountryCode || (data.eventType === 'MV' && data.name)));
       if (hasDest) {
-        const code = (data.destCountryCode || data.eventType.substring(3) || '').toLowerCase();
+        const code = String(data.destCountryCode || data.name || '').toLowerCase();
         try {
           const cfg = (typeof Config !== 'undefined' && typeof Config.getInstance === 'function') ? Config.getInstance() : null;
           const rs = cfg && typeof cfg.getCachedTaxRuleSet === 'function' ? cfg.getCachedTaxRuleSet(code) : null;

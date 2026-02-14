@@ -199,7 +199,7 @@ module.exports = {
         MixConfig_ar_merval_startAsset1Pct: 100
       };
       const events = [
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 31, toAge: 31 },
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 31, toAge: 31 },
         { type: 'SI', id: 'AR_Salary', amount: 1000, fromAge: 31, toAge: 31, rate: 0, currency: 'ARS' },
         { type: 'E', id: 'AR_Life', amount: 0, fromAge: 31, toAge: 31, rate: 0, currency: 'ARS' }
       ];

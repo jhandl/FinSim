@@ -12,7 +12,7 @@ test('data table toggles natural/unified currency modes and shows converted valu
   const frame = await loadSimulator(page);
   
   await seedEvents(page, frame, [
-    { type: 'MV-AR', alias: 'MoveAR', fromAge: 40, toAge: 40 }
+    { type: 'MV', alias: 'AR', fromAge: 40, toAge: 40 }
   ], { startCountry: 'ie' });
 
   // Wait for relocation transitions to be extracted

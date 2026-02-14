@@ -24,7 +24,7 @@ These are the known spots where event country context is available but currency-
 
 If event.currency is provided, the cached currency country can override linkedCountry.
 
-3) Relocation (event types MV-*)
+3) Relocation (event type MV)
 - File: src/core/Simulator.js
 - Behavior: uses findCountryForCurrency(event.currency, prevCountry) first. linkedCountry is only used as a fallback if currency inference fails.
 

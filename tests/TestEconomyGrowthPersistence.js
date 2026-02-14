@@ -280,7 +280,7 @@ module.exports = {
       };
 
       const doc5 = createParameterDocument();
-      const ui5 = createUiStub(doc5, [['MV-US:Move', '', '', '', '', '', '']]);
+      const ui5 = createUiStub(doc5, [['MV', 'US', '', '', '', '', '']]);
       global.document = doc5;
       doc5.ensureEl('StartCountry', 'string').value = 'ie';
       doc5.ensureEl('LocalAssetGrowth_us_localIndex', 'percentage').value = '6';

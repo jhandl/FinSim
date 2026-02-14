@@ -56,7 +56,7 @@ module.exports = {
           }
         },
         events: [
-          { type: 'MV-ar', id: 'move-ar', amount: 0, fromAge: 35, toAge: 35 }
+          { type: 'MV', name: 'AR', id: 'move-ar', amount: 0, fromAge: 35, toAge: 35 }
         ]
       },
       assertions: []
@@ -124,7 +124,7 @@ module.exports = {
         events: [
           { type: 'SI', id: 'IE_Salary', amount: 60000, fromAge: 30, toAge: 32, rate: 0 },
           { type: 'E', id: 'IE_Expenses', amount: 20000, fromAge: 30, toAge: 32, rate: 0 },
-          { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 33, toAge: 33 },
+          { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 33, toAge: 33 },
           { type: 'SI', id: 'AR_Salary', amount: 80000000, fromAge: 33, toAge: 35, rate: 0 },
           { type: 'E', id: 'AR_Expenses', amount: 20000000, fromAge: 33, toAge: 35, rate: 0 }
         ]

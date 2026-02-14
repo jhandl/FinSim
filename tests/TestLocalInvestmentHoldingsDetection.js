@@ -1,4 +1,5 @@
 const assert = require('assert');
+require('../src/core/Utils.js');
 
 /**
  * Tests for local investment holdings detection during relocation.
@@ -76,7 +77,7 @@ module.exports = {
     try {
       // Test 1: Positive case - AR→IE relocation with local AR fund
       (function () {
-        const mv = makeEvent({ id: 'mv1', type: 'MV-ie', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv1', type: 'MV', name: 'IE', fromAge: 35, toAge: 35 });
         const investmentContext = makeInvestmentContext(
           [
             { key: 'localArFund', label: 'Argentina Equity Fund', baseCurrency: 'ARS', assetCountry: 'ar', residenceScope: 'local' }
@@ -93,7 +94,7 @@ module.exports = {
 
       // Test 2: Negative case - global fund should NOT trigger impact
       (function () {
-        const mv = makeEvent({ id: 'mv2', type: 'MV-ie', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv2', type: 'MV', name: 'IE', fromAge: 35, toAge: 35 });
         const investmentContext = makeInvestmentContext(
           [
             { key: 'globalEtf', label: 'MSCI World ETF', baseCurrency: 'USD', assetCountry: 'us', residenceScope: 'global' }
@@ -108,7 +109,7 @@ module.exports = {
 
       // Test 3: Negative case - local fund but zero capital
       (function () {
-        const mv = makeEvent({ id: 'mv3', type: 'MV-ie', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv3', type: 'MV', name: 'IE', fromAge: 35, toAge: 35 });
         const investmentContext = makeInvestmentContext(
           [
             { key: 'localArFund', label: 'Argentina Equity Fund', baseCurrency: 'ARS', assetCountry: 'ar', residenceScope: 'local' }
@@ -122,7 +123,7 @@ module.exports = {
 
       // Test 4: Multiple local holdings - single impact listing all
       (function () {
-        const mv = makeEvent({ id: 'mv4', type: 'MV-ie', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv4', type: 'MV', name: 'IE', fromAge: 35, toAge: 35 });
         const investmentContext = makeInvestmentContext(
           [
             { key: 'localArFund', label: 'Argentina Equity Fund', baseCurrency: 'ARS', assetCountry: 'ar', residenceScope: 'local' },
@@ -140,7 +141,7 @@ module.exports = {
 
       // Test 5: Resolution detection - resolutionOverride clears impact
       (function () {
-        const mv = makeEvent({ id: 'mv5', type: 'MV-ie', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv5', type: 'MV', name: 'IE', fromAge: 35, toAge: 35 });
         const investmentContext = makeInvestmentContext(
           [{ key: 'localArFund', label: 'Argentina Equity Fund', baseCurrency: 'ARS', assetCountry: 'ar', residenceScope: 'local' }],
           { localArFund: 50000 }
@@ -157,7 +158,7 @@ module.exports = {
 
       // Test 6: No investment context - no crash, no investment impacts
       (function () {
-        const mv = makeEvent({ id: 'mv6', type: 'MV-ie', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv6', type: 'MV', name: 'IE', fromAge: 35, toAge: 35 });
         const result = runDetector([mv], 'ar', null);
         const mvResult = result.find(e => e.id === 'mv6');
         // Should not crash and should not have local_holdings impact
@@ -166,7 +167,7 @@ module.exports = {
 
       // Test 7: Mixed portfolio - only local holdings flagged
       (function () {
-        const mv = makeEvent({ id: 'mv7', type: 'MV-ie', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv7', type: 'MV', name: 'IE', fromAge: 35, toAge: 35 });
         const investmentContext = makeInvestmentContext(
           [
             { key: 'globalEtf', label: 'MSCI World ETF', baseCurrency: 'USD', assetCountry: 'us', residenceScope: 'global' },
@@ -185,8 +186,8 @@ module.exports = {
 
       // Test 8: Multi-hop relocation - local holdings at each stage
       (function () {
-        const mv1 = makeEvent({ id: 'mv8a', type: 'MV-ie', fromAge: 35, toAge: 35 });
-        const mv2 = makeEvent({ id: 'mv8b', type: 'MV-us', fromAge: 45, toAge: 45 });
+        const mv1 = makeEvent({ id: 'mv8a', type: 'MV', name: 'IE', fromAge: 35, toAge: 35 });
+        const mv2 = makeEvent({ id: 'mv8b', type: 'MV', name: 'US', fromAge: 45, toAge: 45 });
         const investmentContext = makeInvestmentContext(
           [
             { key: 'localArFund', label: 'Argentina Equity Fund', baseCurrency: 'ARS', assetCountry: 'ar', residenceScope: 'local' },
@@ -210,7 +211,7 @@ module.exports = {
 
       // Test 9: Local fund from different country (not origin) - not flagged
       (function () {
-        const mv = makeEvent({ id: 'mv9', type: 'MV-ie', fromAge: 35, toAge: 35 });
+        const mv = makeEvent({ id: 'mv9', type: 'MV', name: 'IE', fromAge: 35, toAge: 35 });
         const investmentContext = makeInvestmentContext(
           [
             // Local US fund while starting in AR - should not be flagged

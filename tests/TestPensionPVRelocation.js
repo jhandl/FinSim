@@ -110,7 +110,7 @@ function createMainScenario() {
       },
       events: [
         { type: 'SI', id: 'Salary_IE', amount: 50000, fromAge: 30, toAge: 64, currency: 'EUR' },
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
       ]
     },
     assertions: []
@@ -149,7 +149,7 @@ function createContinuityScenario() {
       },
       events: [
         { type: 'SI', id: 'Salary_IE', amount: 50000, fromAge: 30, toAge: 64, currency: 'EUR' },
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
       ]
     },
     assertions: []
@@ -188,7 +188,7 @@ function createNoPensionScenario() {
       },
       events: [
         { type: 'SI', id: 'Salary_IE', amount: 50000, fromAge: 30, toAge: 64, currency: 'EUR' },
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
       ]
     },
     assertions: []
@@ -227,7 +227,7 @@ function createCoupleScenario() {
       },
       events: [
         { type: 'SI', id: 'Salary_IE', amount: 50000, fromAge: 30, toAge: 64, currency: 'EUR' },
-        { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
+        { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0.50 }
       ]
     },
     assertions: []

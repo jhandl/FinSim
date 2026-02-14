@@ -50,8 +50,8 @@
           const tieBreaker = function(a, b) {
             const aType = getCellValue(a, 'event-type') || '';
             const bType = getCellValue(b, 'event-type') || '';
-            const aIsReloc = typeof aType === 'string' && aType.indexOf('MV-') === 0;
-            const bIsReloc = typeof bType === 'string' && bType.indexOf('MV-') === 0;
+            const aIsReloc = aType === 'MV';
+            const bIsReloc = bType === 'MV';
             if (aIsReloc && !bIsReloc) return -1;
             if (!aIsReloc && bIsReloc) return 1;
             return 0;

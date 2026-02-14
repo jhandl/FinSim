@@ -450,7 +450,7 @@ class UIManager {
     // Convention: InvestmentAllocation_{countryCode}_{typeKey} (typeKey without country suffix)
     try {
       if (cfg.isRelocationEnabled && cfg.isRelocationEnabled()) {
-        // Derive scenario countries from MV-* events + StartCountry
+        // Derive scenario countries from MV events + StartCountry
         let scenarioCountries = null;
         if (this.ui && typeof this.ui.getScenarioCountries === 'function') {
           scenarioCountries = this.ui.getScenarioCountries();
@@ -460,8 +460,11 @@ class UIManager {
           const set = {};
           set[startCountry] = true;
           for (let i = 0; i < evs.length; i++) {
-            const t = evs[i] && evs[i].type ? String(evs[i].type) : '';
-            if (t && /^MV-[A-Z]{2,}$/.test(t)) set[t.substring(3).toLowerCase()] = true;
+            const ev = evs[i];
+            if (ev && ev.type === 'MV') {
+              const cc = getRelocationCountryCode(ev);
+              if (cc) set[cc] = true;
+            }
           }
           scenarioCountries = Object.keys(set);
         }
@@ -925,13 +928,26 @@ class UIManager {
           "SM": "Stock Market"
         });
 
-        if (!(valid.hasOwnProperty(type) || /^MV-[A-Z]{2,}$/.test(type))) {
+        if (Config.getInstance().isRelocationEnabled()) {
+          valid["MV"] = "Relocation";
+        }
+
+        if (!valid.hasOwnProperty(type)) {
           const validTypesMsg = Object.keys(valid)
             .map(key => `${key} (${valid[key]})`)
             .join(", ");
           this.ui.setWarning(`Events[${i + 1},1]`, `Invalid event type. Valid types are: ${validTypesMsg}`);
           errors = true;
           break;
+        }
+
+        if (type === 'MV') {
+          const destCode = String(name || '').trim();
+          if (!destCode) {
+            this.ui.setWarning(`Events[${i + 1},2]`, 'Relocation destination country is required.');
+            errors = true;
+            break;
+          }
         }
       }
 
@@ -967,11 +983,14 @@ class UIManager {
         (rate === "") ? undefined : rate,
         (match === "") ? undefined : match
       );
+      if (type === 'MV') {
+        eventObj.name = id;
+      }
       events.push(eventObj);
 
       // Always mirror the runtime row id for MV events so relocation references stay stable
       // even when names are duplicated or later edited.
-      if (/^MV-[A-Z]{2,}$/.test(type) && __visibleEventRows) {
+      if (type === 'MV' && __visibleEventRows) {
         const domRow = __visibleEventRows[events.length - 1];
         if (domRow && domRow.dataset && domRow.dataset.eventId) {
           eventObj._mvRuntimeId = domRow.dataset.eventId;
@@ -1299,7 +1318,7 @@ class UIManager {
   }
 
   static getRequiredFields(eventType) {
-    if (eventType && eventType.indexOf('MV-') === 0 && eventType.length > 3) {
+    if (eventType === 'MV') {
       const pattern = 'rrr-o-'.split('');
       return Object.fromEntries(UIManager.getFields().map((field, i) => [
         field,

@@ -155,7 +155,7 @@ module.exports = {
       doc.ensureEl('simulation_mode', 'string').value = 'single';
       doc.ensureEl('economy_mode', 'string').value = 'deterministic';
 
-      const ui = createUi(doc, [['MV-US', 'Move to US', '', '', '', '']]);
+      const ui = createUi(doc, [['MV', 'US', '', '', '', '']]);
       const csv = serializeSimulation(ui);
 
       if (csv.indexOf('InvestmentAllocation_indexFunds_ie,0') === -1) {

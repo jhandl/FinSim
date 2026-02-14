@@ -243,8 +243,9 @@ class FileManager {
       const row = eventData[i] || [];
       const rawType = row[0] ? String(row[0]) : '';
       const type = rawType.indexOf(':') >= 0 ? rawType.split(':')[0] : rawType;
-      if (type && /^MV-[A-Z]{2,}$/.test(type)) {
-        scenarioCountrySetForPriorities[type.substring(3).toLowerCase()] = true;
+      if (type === 'MV') {
+        const code = String(row[1] || '').trim().toLowerCase();
+        if (code) scenarioCountrySetForPriorities[code] = true;
       }
     }
     const scenarioCountriesForPriorities = Object.keys(scenarioCountrySetForPriorities);
@@ -593,7 +594,7 @@ class FileManager {
       if (line.indexOf('Type,') === 0) continue;
       const parts = line.split(',');
       const type = parts[0] ? parts[0].trim() : '';
-      if (type.indexOf('MV-') === 0) return true;
+      if (type === 'MV') return true;
     }
     return false;
   }

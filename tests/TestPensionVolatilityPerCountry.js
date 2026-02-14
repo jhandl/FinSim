@@ -162,7 +162,7 @@ module.exports = {
         '',
         '# Events',
         'Type,Name,Amount,FromAge,ToAge,Rate,Extra',
-        'MV-AR,Move,0,40,,,'
+        'MV,AR,0,40,,,'
       ].join('\n');
       ctx.deserializeSimulation(legacyCsv, ui);
 
@@ -179,7 +179,7 @@ module.exports = {
       const doc2 = createParameterDocument();
       const ctx2 = makeContext(doc2);
       const ui2 = createUiSimulatingDomUtils(doc2, {
-        events: [['MV-AR', '', '', '', '', '']]
+        events: [['MV', 'AR', '', '', '', '']]
       });
       seedParameterIds(ui2);
 

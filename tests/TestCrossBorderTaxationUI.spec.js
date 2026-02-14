@@ -114,7 +114,7 @@ test('attribution tooltip shows source tax, residence tax, and foreign tax credi
 test('drawdown priority list shows country suffixes for foreign investments', async ({ page }) => {
   const frame = await loadSimulator(page);
   await seedEvents(page, frame, [
-    { type: 'MV-US', alias: 'MoveUS', fromAge: 35, toAge: 35 }
+    { type: 'MV', alias: 'US', fromAge: 35, toAge: 35 }
   ]);
   await configureDeterministic(frame, 'ie');
 

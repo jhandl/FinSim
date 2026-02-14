@@ -469,11 +469,19 @@ class WebUI extends AbstractUI {
         });
       });
 
-      // Keep country chip visibility in sync with scenario MV-* events.
+      // Keep country chip visibility in sync with scenario MV events.
       // This is intentionally lightweight (no heavy parsing): just refresh UI affordances.
       try {
         if (element && element.closest && element.closest('#Events')) {
           this.refreshCountryChipsFromScenario();
+          // Economy chips depend on the exact scenario-country set (Start + MV names).
+          // Re-render growth/economy dynamic fields when MV type/name changes so new countries appear.
+          if (
+            this._lastInvestmentTypesForGrowthRates &&
+            (element.classList && (element.classList.contains('event-type') || element.classList.contains('event-name')))
+          ) {
+            this.renderInvestmentParameterFields(this._lastInvestmentTypesForGrowthRates);
+          }
         }
       } catch (_) { }
 
@@ -487,7 +495,7 @@ class WebUI extends AbstractUI {
   }
 
   setupScenarioCountryAutoRefresh() {
-    // When rows are added/removed in the Events table (e.g. deleting the only MV-* row),
+    // When rows are added/removed in the Events table (e.g. deleting the only MV row),
     // there may be no 'change' event to hook. Observe row mutations and refresh chips.
     const tbody = document.querySelector('#Events tbody');
     if (!tbody) return;
@@ -767,7 +775,7 @@ class WebUI extends AbstractUI {
       }
     }
 
-    // Allocations: if relocation is enabled AND MV-* events exist, render per-country allocation inputs
+    // Allocations: if relocation is enabled AND MV events exist, render per-country allocation inputs
     // and use the chips as a context switcher (show/hide per-country containers).
     this.refreshCountryChipsFromScenario(allocationTypes);
 
@@ -1102,7 +1110,7 @@ class WebUI extends AbstractUI {
 
   /**
    * Returns an array of unique country codes present in the scenario:
-   * StartCountry + all MV-* event countries.
+   * StartCountry + all MV event countries.
    */
   getScenarioCountries() {
     const cfg = Config.getInstance();
@@ -1112,9 +1120,10 @@ class WebUI extends AbstractUI {
     if (startCountry) set[startCountry] = true;
     const events = this.readEvents(false) || [];
     for (let i = 0; i < events.length; i++) {
-      const t = events[i] && events[i].type ? String(events[i].type) : '';
-      if (t && /^MV-[A-Z]{2,}$/.test(t)) {
-        set[t.substring(3).toLowerCase()] = true;
+      const ev = events[i];
+      if (ev && ev.type === 'MV') {
+        const code = getRelocationCountryCode(ev);
+        if (code) set[code] = true;
       }
     }
     return Object.keys(set);
@@ -1123,22 +1132,22 @@ class WebUI extends AbstractUI {
   hasRelocationEvents() {
     const events = this.readEvents(false) || [];
     for (let i = 0; i < events.length; i++) {
-      const t = events[i] && events[i].type ? String(events[i].type) : '';
-      if (t && /^MV-[A-Z]{2,}$/.test(t)) return true;
+      const ev = events[i];
+      if (ev && ev.type === 'MV') return true;
     }
     return false;
   }
 
-  // "Effective" relocation means there is at least one MV-* event whose country differs from StartCountry.
-  // If all MV-* events are MV-<StartCountry>, the scenario is effectively single-country for UI editing.
+  // "Effective" relocation means there is at least one MV event whose country differs from StartCountry.
+  // If all MV events are StartCountry, the scenario is effectively single-country for UI editing.
   hasEffectiveRelocationEvents() {
     const cfg = Config.getInstance();
     const startCountry = (cfg.getStartCountry && cfg.getStartCountry()) ? String(cfg.getStartCountry()).toLowerCase() : '';
     const events = this.readEvents(false) || [];
     for (let i = 0; i < events.length; i++) {
-      const t = events[i] && events[i].type ? String(events[i].type) : '';
-      if (t && /^MV-[A-Z]{2,}$/.test(t)) {
-        const c = t.substring(3).toLowerCase();
+      const ev = events[i];
+      if (ev && ev.type === 'MV') {
+        const c = getRelocationCountryCode(ev);
         if (c && c !== startCountry) return true;
       }
     }
@@ -1213,7 +1222,7 @@ class WebUI extends AbstractUI {
 
     // If we were called from a generic events-table change (no types provided),
     // fall back to StartCountry-resolved investment types so we can correctly
-    // revert to single-country mode when MV-* events are removed.
+    // revert to single-country mode when MV events are removed.
     let types = Array.isArray(fallbackStartTypes) ? fallbackStartTypes : [];
     if (!types.length) {
       const startCountry = cfg.getStartCountry();
@@ -1223,7 +1232,7 @@ class WebUI extends AbstractUI {
 
     // Allocations chips + per-country allocation inputs
     // Per-country OFF: hide chips and render global-only fields (independent keys).
-    // Per-country ON: existing relocation/MV-driven chip behavior.
+    // Per-country ON: existing relocation-driven chip behavior.
     this._setupAllocationsCountryChips(perCountryEnabled && hasMV, types);
 
     // Personal circumstances chips + per-country state pension inputs
@@ -1267,7 +1276,7 @@ class WebUI extends AbstractUI {
     }
 
     // Clear any previously generated allocation inputs (both legacy dynamic and per-country containers)
-    // so we don't end up with duplicates when MV-* events are added/removed.
+    // so we don't end up with duplicates when MV events are added/removed.
     this._clearDynamicAllocationInputs(allocGroup);
 
     // Remove any previously generated per-country allocation containers (not the chip container)
@@ -1498,7 +1507,7 @@ class WebUI extends AbstractUI {
       return;
     }
 
-    // MV-* present: show chips and render per-country allocation inputs for ALL scenario countries.
+    // MV present: show chips and render per-country allocation inputs for ALL scenario countries.
     chipContainer.style.display = '';
     const scenarioCountries = this.getScenarioCountries();
     const countries = scenarioCountries.map(code => ({ code: code, name: cfg.getCountryNameByCode(code) }));
@@ -1542,7 +1551,7 @@ class WebUI extends AbstractUI {
         const inputId = 'InvestmentAllocation_' + code + '_' + baseKey;
         const legacyId = 'InvestmentAllocation_' + key;
 
-        // If user previously entered StartCountry allocations in legacy fields and is now enabling MV-*,
+        // If user previously entered StartCountry allocations in legacy fields and is now enabling MV,
         // seed the StartCountry per-country values (only when per-country is empty).
         if (String(code).toLowerCase() === String(startCountry).toLowerCase()) {
           if (!this._allocationValueCache[inputId] && this._allocationValueCache[legacyId]) {
@@ -1608,7 +1617,7 @@ class WebUI extends AbstractUI {
   _clearDynamicAllocationInputs(allocGroup) {
     if (!allocGroup) return;
     // Remove dynamic allocation input wrappers created by renderInvestmentParameterFields()
-    // and/or previous MV-* container rebuilds.
+    // and/or previous MV container rebuilds.
     const wrappers = Array.from(allocGroup.querySelectorAll('.input-wrapper[data-dynamic-investment-param="true"]'));
     for (let i = 0; i < wrappers.length; i++) {
       const w = wrappers[i];

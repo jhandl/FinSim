@@ -119,12 +119,14 @@ function getResidencyTimeline(params, events) {
   for (var i = 0; i < events.length; i++) {
     var e = events[i];
     if (!e || !e.type) continue;
-    if (String(e.type).indexOf('MV-') !== 0) continue;
+    if (!isRelocationEvent(e)) continue;
     var age = (typeof e.fromAge === 'number') ? e.fromAge : parseFloat(e.fromAge);
     if (!isFinite(age)) continue;
+    var moveCountry = getRelocationCountryCode(e);
+    if (!moveCountry) continue;
     moves.push({
       age: age,
-      country: normalizeCountry(e.type.substring(3)),
+      country: normalizeCountry(moveCountry),
       index: i
     });
   }
@@ -470,10 +472,10 @@ function validatePerCountryInputs(startCountry, events, params) {
   if (Array.isArray(events)) {
     for (var i = 0; i < events.length; i++) {
       var evt = events[i];
-      var type = evt && evt.type ? String(evt.type) : '';
-      if (type.indexOf('MV-') === 0) {
+      if (!evt || !evt.type) continue;
+      if (isRelocationEvent(evt)) {
         hasRelocation = true;
-        var code = type.substring(3).toLowerCase();
+        var code = getRelocationCountryCode(evt);
         if (code && !seen[code]) {
           countries.push(code);
           seen[code] = true;
@@ -536,7 +538,7 @@ function completeMissingCurrencyAndLinkedCountry(events, startCountry) {
   for (var i = 0; i < events.length; i++) {
     var evt = events[i];
     if (!evt || !evt.type) continue;
-    if (evt.type.indexOf('MV-') === 0) continue;
+    if (isRelocationEvent(evt)) continue;
     var eventCountry = getCountryForAgeCached(Number(evt.fromAge), events, startCountry);
     if (!evt.linkedCountry) {
       evt.linkedCountry = eventCountry;
@@ -597,8 +599,8 @@ function initializeSimulationVariables() {
     if (startCode) { countryOrder.push(startCode); seenCountries[startCode] = true; }
     for (var ei = 0; ei < events.length; ei++) {
       var evt = events[ei];
-      if (evt && evt.type && evt.type.indexOf('MV-') === 0) {
-        var mvCode = evt.type.substring(3).toLowerCase();
+      if (isRelocationEvent(evt)) {
+        var mvCode = getRelocationCountryCode(evt);
         if (mvCode && !seenCountries[mvCode]) { countryOrder.push(mvCode); seenCountries[mvCode] = true; }
       }
       if (evt && evt.linkedCountry) {
@@ -1588,10 +1590,10 @@ function processEvents() {
   // before any income/expense processing (including pension contributions)
   for (let i = 0; i < events.length; i++) {
     let event = events[i];
-    if (typeof event.type === 'string' && event.type.indexOf('MV-') === 0) {
+    if (isRelocationEvent(event)) {
       if (person1.age === event.fromAge) {
         var prevCountry = currentCountry;
-        var destCountry = event.type.substring(3).toLowerCase();
+        var destCountry = getRelocationCountryCode(event);
         var startCountry = (params.StartCountry || config.getDefaultCountry() || '').toLowerCase();
         var infCountry = null;
         if (event.currency) {
@@ -1907,7 +1909,7 @@ function processEvents() {
         break;
 
       default:
-        // MV-* relocation events are handled in zero pass above
+        // Relocation events are handled in zero pass above
         break;
     }
   }
@@ -2562,7 +2564,7 @@ function liquidateAll() {
 
 /**
  * Returns allocation map for the current simulation year based on residence country.
- * Allocations are scoped per country and switch when residence changes via MV-* events.
+ * Allocations are scoped per country and switch when residence changes via MV events.
  * Falls back to StartCountry allocations if current country not configured.
  *
  * @param {number} year - Current simulation year (for future time-varying allocations)
@@ -2589,7 +2591,7 @@ function getPensionContributionsByCountry(year) {
 }
 
 /**
- * Derive residence country for a given year from MV-* events.
+ * Derive residence country for a given year from MV events.
  * @param {number} year - Simulation year
  * @returns {string} - Country code (lowercase)
  */

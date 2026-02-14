@@ -258,6 +258,7 @@ function parseDemoCsvScenario(filePath) {
       events.push({
         type,
         id: name,
+        name: name,
         amount,
         fromAge,
         toAge,
@@ -268,8 +269,9 @@ function parseDemoCsvScenario(filePath) {
         linkedEventId: meta.linkedEventId || null,
         resolutionOverride: meta.resolutionOverride || null
       });
-      if (type && type.toUpperCase().startsWith('MV-')) {
-        relocations.push({ age: fromAge, code: type.substring(3).toLowerCase() });
+      if (type === 'MV') {
+        const code = String(name || '').trim().toLowerCase();
+        if (code) relocations.push({ age: fromAge, code: code });
       }
     }
   }
@@ -428,7 +430,7 @@ function validateActualPVFields(rows, inflationRate, startAge, errors, scenarioL
   const relocationAges = new Set();
   if (events) {
     events.forEach(evt => {
-      if (evt.type && evt.type.toUpperCase().startsWith('MV-')) {
+      if (evt.type === 'MV') {
         relocationAges.add(evt.fromAge);
       }
     });
@@ -580,7 +582,7 @@ function extractMaxAbsolute(rows, field) {
 function detectRelocationAges(events) {
   const ages = new Set();
   events.forEach(evt => {
-    if (evt.type && evt.type.toUpperCase().startsWith('MV-')) {
+    if (evt.type === 'MV') {
       ages.add(evt.fromAge);
     }
   });
@@ -595,7 +597,7 @@ function buildResidenceCountryMap(rows, events, startCountry) {
   const map = {};
   let currentCountry = (startCountry || 'ie').toLowerCase();
   const relocationEvents = events
-    .filter(evt => evt.type && evt.type.toUpperCase().startsWith('MV-'))
+    .filter(evt => evt.type === 'MV')
     .sort((a, b) => a.fromAge - b.fromAge);
 
   if (rows.length === 0) return map;
@@ -607,8 +609,8 @@ function buildResidenceCountryMap(rows, events, startCountry) {
     // Check if there's a relocation at this age
     const relocation = relocationEvents.find(evt => evt.fromAge === age);
     if (relocation) {
-      const destCountry = relocation.type.substring(3).toLowerCase();
-      currentCountry = destCountry;
+      const destCountry = (relocation.name || '').toLowerCase();
+      currentCountry = destCountry || currentCountry;
     }
     map[age] = currentCountry;
   }
@@ -914,7 +916,7 @@ module.exports = {
           { type: 'E', id: 'IE_Life', amount: 35000, fromAge: 30, toAge: 39, currency: 'EUR' },
           { type: 'R', id: 'IE_Property', amount: 40000, fromAge: 32, toAge: 60, currency: 'EUR', linkedCountry: 'ie' },
           { type: 'M', id: 'IE_Property', amount: 8000, fromAge: 32, toAge: 39, rate: 0.03, currency: 'EUR', linkedCountry: 'ie' },
-          { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR' },
+          { type: 'MV', name: 'AR', id: 'AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR' },
           { type: 'SI', id: 'AR_Salary', amount: 120000000, fromAge: 40, toAge: 60, rate: 0.02, match: 0, currency: 'ARS' },
           { type: 'E', id: 'AR_Expenses', amount: 18000000, fromAge: 40, toAge: 60, rate: 0.02, currency: 'ARS' },
           { type: 'RI', id: 'AR_Rent', amount: 4000000, fromAge: 40, toAge: 60, currency: 'ARS', linkedCountry: 'ar' }
@@ -1213,7 +1215,7 @@ module.exports = {
       },
       events: [
         { type: 'SI', id: 'Salary', amount: 100000, fromAge: 30, toAge: 50, rate: 0.05 }, // High salary growing at 5%
-        { type: 'MV-AR', id: 'Move to Argentina', amount: 0, fromAge: 40, toAge: 40 } // Relocate at 40
+        { type: 'MV', name: 'AR', id: 'AR', amount: 0, fromAge: 40, toAge: 40 } // Relocate at 40
       ]
     };
 

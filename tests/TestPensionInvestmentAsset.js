@@ -293,7 +293,25 @@ module.exports = {
                 minDrawdownRates: { '0': 0 }
              },
              residencyRules: { postEmigrationTaxYears: 0, taxesForeignIncome: false },
-             investmentTypes: [],
+             investmentTypes: [
+                {
+                   key: 'indexFunds_us',
+                   label: 'Index Funds',
+                   baseRef: 'globalEquity',
+                   baseCurrency: 'USD',
+                   assetCountry: 'us',
+                   residenceScope: 'local',
+                   taxation: { exitTax: { rate: 0.15, deemedDisposalYears: 8, allowLossOffset: false, eligibleForAnnualExemption: false } }
+                },
+                {
+                   key: 'shares_us',
+                   label: 'Shares',
+                   baseCurrency: 'USD',
+                   assetCountry: 'us',
+                   residenceScope: 'local',
+                   taxation: { capitalGains: { rateRef: 'capitalGainsTax.rate', annualExemptionRef: 'capitalGainsTax.annualExemption', allowLossOffset: true } }
+                }
+             ],
              pinnedIncomeTypes: [],
              economicData: {
                 inflation: { cpi: 1.02, year: 2025 },
@@ -312,7 +330,7 @@ module.exports = {
        
        const events = [
           { type: 'SI', id: 'SalIE', amount: 50000, fromAge: 30, toAge: 30, country: 'ie' },
-          { type: 'MV', id: 'MoveUS', fromAge: 31, country: 'us' },
+         { type: 'MV', name: 'US', id: 'MoveUS', fromAge: 31, country: 'us' },
           { type: 'SI', id: 'SalUS', amount: 50000, fromAge: 32, toAge: 32, country: 'us', linkedCountry: 'us', currency: 'USD' }
        ];
        

@@ -61,8 +61,8 @@
             // Determine event types via manager mapping
             const aVal = getAccordionValue(a, 'event-type', accordionManager) || '';
             const bVal = getAccordionValue(b, 'event-type', accordionManager) || '';
-            const aIsReloc = typeof aVal === 'string' && aVal.indexOf('MV-') === 0;
-            const bIsReloc = typeof bVal === 'string' && bVal.indexOf('MV-') === 0;
+            const aIsReloc = aVal === 'MV';
+            const bIsReloc = bVal === 'MV';
             if (aIsReloc && !bIsReloc) return -1;
             if (!aIsReloc && bIsReloc) return 1;
             return 0;

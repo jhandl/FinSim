@@ -63,9 +63,9 @@ module.exports = {
     // Each Monte Carlo run will call convert() many times with same parameters,
     // allowing the cache to demonstrate its effectiveness
     events: [
-      { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35 },
-      { type: 'MV-ie', id: 'Move_IE', amount: 0, fromAge: 40, toAge: 40 },
-      { type: 'MV-ar', id: 'Move_AR2', amount: 0, fromAge: 45, toAge: 45 }
+      { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 35, toAge: 35 },
+      { type: 'MV', name: 'IE', id: 'Move_IE', amount: 0, fromAge: 40, toAge: 40 },
+      { type: 'MV', name: 'AR', id: 'Move_AR2', amount: 0, fromAge: 45, toAge: 45 }
     ]
   },
 

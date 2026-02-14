@@ -388,7 +388,7 @@ class EventsTableManager {
           const row = e.target.closest('tr');
           const typeInput = row ? row.querySelector('.event-type') : null;
           const typeValue = typeInput ? typeInput.value : '';
-          if (typeValue && typeValue.indexOf('MV-') === 0) {
+          if (typeValue === 'MV') {
             const rowKey = row && row.dataset ? (row.dataset.rowId || row.dataset.eventId || '') : '';
             const cachedOldAge = Number(rowKey ? this._mvAgesByRowId[rowKey] : NaN);
             const focusedOldAge = Number(e.target.dataset ? e.target.dataset.mvPrevAge : NaN);
@@ -432,9 +432,9 @@ class EventsTableManager {
             const oldType = row.dataset.originalEventType || '';
             const newType = e.target.value || '';
             row.dataset.originalEventType = newType;
-            // If event type changed to/from MV- relocation, update currency selector
-            const isOldRelocation = oldType && oldType.indexOf('MV-') === 0;
-            const isNewRelocation = newType && newType.indexOf('MV-') === 0;
+            // If event type changed to/from relocation, update currency selector
+            const isOldRelocation = oldType === 'MV';
+            const isNewRelocation = newType === 'MV';
             const rowKey = row && row.dataset ? (row.dataset.rowId || row.dataset.eventId || '') : '';
             if (isNewRelocation) {
               this._getOrCreateRelocationLinkId(row);
@@ -468,7 +468,7 @@ class EventsTableManager {
         const row = e.target.closest('tr');
         const typeInput = row ? row.querySelector('.event-type') : null;
         const typeValue = typeInput ? typeInput.value : '';
-        if (typeValue && typeValue.indexOf('MV-') === 0) {
+        if (typeValue === 'MV') {
           e.target.dataset.mvPrevAge = e.target.value;
         }
       });
@@ -535,7 +535,7 @@ class EventsTableManager {
       const row = rows[i];
       const typeInput = row.querySelector('.event-type');
       const typeValue = typeInput ? String(typeInput.value || '') : '';
-      if (!typeValue || typeValue.indexOf('MV-') !== 0) continue;
+      if (typeValue !== 'MV') continue;
       const fromAgeInput = row.querySelector('.event-from-age');
       const fromAge = Number(fromAgeInput ? fromAgeInput.value : '');
       if (isNaN(fromAge)) continue;
@@ -603,9 +603,6 @@ class EventsTableManager {
     const ids = [];
     const linkId = this._getOrCreateRelocationLinkId(row);
     if (linkId) ids.push(String(linkId));
-    const nameInput = row.querySelector('.event-name');
-    const rowName = nameInput ? String(nameInput.value || '') : '';
-    if (rowName) ids.push(rowName);
     const runtimeId = row && row.dataset ? String(row.dataset.eventId || '') : '';
     if (runtimeId) ids.push(runtimeId);
     return Array.from(new Set(ids));
@@ -630,27 +627,12 @@ class EventsTableManager {
       const row = rows[i];
       const typeInput = row.querySelector('.event-type');
       const typeValue = typeInput ? String(typeInput.value || '') : '';
-      if (!typeValue || typeValue.indexOf('MV-') !== 0) continue;
+      if (typeValue !== 'MV') continue;
       const rowRuntimeId = row && row.dataset ? String(row.dataset.eventId || '') : '';
       if (rowRuntimeId === needle) return this._getOrCreateRelocationLinkId(row);
     }
 
-    // Name fallback is only safe when exactly one MV row has that name.
-    let nameMatch = null;
-    let nameMatches = 0;
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const typeInput = row.querySelector('.event-type');
-      const typeValue = typeInput ? String(typeInput.value || '') : '';
-      if (!typeValue || typeValue.indexOf('MV-') !== 0) continue;
-      const nameInput = row.querySelector('.event-name');
-      const rowName = nameInput ? String(nameInput.value || '') : '';
-      if (rowName === needle) {
-        nameMatches++;
-        nameMatch = row;
-      }
-    }
-    return (nameMatches === 1 && nameMatch) ? this._getOrCreateRelocationLinkId(nameMatch) : '';
+    return '';
   }
 
   _removeRowAndResolutionPanel(row) {
@@ -1099,6 +1081,14 @@ class EventsTableManager {
     if (rateInput) {
       rateInput.placeholder = (!required || !required.rate || required.rate === 'optional') ? 'inflation' : '';
     }
+
+    const nameInput = row.querySelector('.event-name');
+    const countryDropdown = row.querySelector('.event-country-dd');
+    if (nameInput && countryDropdown) {
+      const isRelocation = eventType === 'MV';
+      nameInput.style.display = isRelocation ? 'none' : '';
+      countryDropdown.style.display = isRelocation ? '' : 'none';
+    }
   }
 
   updateEventRowsVisibilityAndTypes() {
@@ -1119,20 +1109,7 @@ class EventsTableManager {
       if (dropdown) {
         const baseOpts = this.getEventTypeOptionObjects();
         const curVal = typeInput.value;
-        let opts = baseOpts;
-        // Special-case relocation events so existing MV-* rows show correct label
-        if (curVal && typeof curVal === 'string' && curVal.indexOf('MV-') === 0) {
-          const code = curVal.substring(3).toLowerCase();
-          const countries = Config.getInstance().getAvailableCountries();
-          const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-          if (match) {
-            const label = match ? `→ ${match.name}` : curVal;
-            const synthetic = match ? { value: curVal, label, description: `Relocation to ${match.name}` } : { value: curVal, label: curVal };
-            if (!baseOpts.find(o => o.value === curVal)) {
-              opts = baseOpts.concat([synthetic]);
-            }
-          }
-        }
+        const opts = baseOpts;
         dropdown.setOptions(opts);
         const curOpt = opts.find((o) => o.value === curVal)
           || opts.find((o) => o.value === 'NOP')
@@ -1385,7 +1362,7 @@ class EventsTableManager {
     const relocationAge = mvEvent.fromAge;
     const relocationAgeNum = Number(relocationAge);
     const part1ToAge = isNaN(relocationAgeNum) ? relocationAge : (relocationAgeNum - 1);
-    const destCountry = mvEvent.type.substring(3).toLowerCase();
+    const destCountry = String(mvEvent && mvEvent.name ? mvEvent.name : '').trim().toLowerCase();
 
     // Determine locale hints from the inline resolution panel
     const panelContainer = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.resolution-panel-container');
@@ -1857,7 +1834,7 @@ class EventsTableManager {
         if (rowMvId) mvEvent = events.find(e => e && (e.id === rowMvId || e._mvRuntimeId === rowMvId));
         if (!mvEvent && rowEvent) {
           const mvEvents = events
-            .filter(e => e && e.type && e.type.indexOf('MV-') === 0)
+            .filter(e => isRelocationEvent(e))
             .sort((a, b) => Number(a.fromAge) - Number(b.fromAge));
           const fromAge = Number(rowEvent.fromAge);
           const toAge = Number(rowEvent.toAge);
@@ -1925,7 +1902,7 @@ class EventsTableManager {
         const ev = idx >= 0 ? events[idx] : null;
         const mvImpactId = ev && ev.relocationImpact ? ev.relocationImpact.mvEventId : null;
         const mv = mvImpactId ? events.find(e => e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId)) : null;
-        dest = mv ? mv.type.substring(3).toLowerCase() : null;
+        dest = mv ? String(mv.name || '').trim().toLowerCase() : null;
       }
       if (dest) {
         const rs = Config.getInstance().getCachedTaxRuleSet(dest);
@@ -2176,11 +2153,11 @@ class EventsTableManager {
 
   detectPropertyCountry(eventFromAge, startCountry) {
     const events = this.webUI.readEvents(false);
-    const mvEvents = events.filter(e => e.type && e.type.indexOf('MV-') === 0).sort((a, b) => a.fromAge - b.fromAge);
+    const mvEvents = events.filter(e => e && e.type === 'MV').sort((a, b) => a.fromAge - b.fromAge);
     if (eventFromAge < mvEvents[0]?.fromAge) return startCountry;
     for (let i = mvEvents.length - 1; i >= 0; i--) {
       if (eventFromAge >= mvEvents[i].fromAge) {
-        return mvEvents[i].type.substring(3).toLowerCase();
+        return String(mvEvents[i] && mvEvents[i].name ? mvEvents[i].name : '').trim().toLowerCase();
       }
     }
     return startCountry;
@@ -2188,11 +2165,11 @@ class EventsTableManager {
 
   getOriginCountry(mvEvent, startCountry) {
     const events = this.webUI.readEvents(false);
-    const mvEvents = events.filter(e => e.type && e.type.indexOf('MV-') === 0).sort((a, b) => a.fromAge - b.fromAge);
+    const mvEvents = events.filter(e => e && e.type === 'MV').sort((a, b) => a.fromAge - b.fromAge);
     const mvImpactId = mvEvent ? (mvEvent.id || mvEvent._mvRuntimeId || '') : '';
     const index = mvEvents.findIndex(e => e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId));
     if (index > 0) {
-      return mvEvents[index - 1].type.substring(3).toLowerCase();
+      return String(mvEvents[index - 1] && mvEvents[index - 1].name ? mvEvents[index - 1].name : '').trim().toLowerCase();
     }
     return startCountry;
   }
@@ -2534,20 +2511,6 @@ class EventsTableManager {
     // Build dropdown options & find label for current selection
     let optionObjects = this.getEventTypeOptionObjects();
     let direct = optionObjects.find((o) => o.value === type);
-    // If incoming type is MV-* and not present, synthesize an option so we don't downgrade to NOP
-    if (!direct && type && typeof type === 'string' && type.indexOf('MV-') === 0) {
-      const code = type.substring(3).toLowerCase();
-      const countries = Config.getInstance().getAvailableCountries();
-      const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-      if (match) {
-        const label = match ? `→ ${match.name}` : type;
-        const synthetic = match ? { value: type, label, description: `Relocation to ${match.name}` } : { value: type, label: type };
-        if (!optionObjects.find(o => o.value === type)) {
-          optionObjects = optionObjects.concat([synthetic]);
-        }
-        direct = synthetic;
-      }
-    }
     const selectedObj = direct || optionObjects.find((o) => o.value === 'NOP') || optionObjects[0];
     if (!direct) {
       // Check relocation enabled status (variable unused but kept for potential future use)
@@ -2567,7 +2530,13 @@ class EventsTableManager {
               </div>
           </div>
       </td>
-      <td><input type="text" id="EventAlias_${rowId}" class="event-name" value="${name}"></td>
+      <td>
+          <input type="text" id="EventAlias_${rowId}" class="event-name" value="${name}">
+          <div class="event-country-dd visualization-control" id="EventCountry_${rowId}" style="display:none;">
+              <span id="EventCountryToggle_${rowId}" class="dd-toggle pseudo-select">Select country</span>
+              <div id="EventCountryOptions_${rowId}" class="visualization-dropdown" style="display:none;"></div>
+          </div>
+      </td>
       <td><input type="text" id="EventAmount_${rowId}" class="event-amount currency" inputmode="numeric" pattern="[0-9]*" step="1000" value="${amount}"></td>
       <td><input type="text" id="EventFromAge_${rowId}" class="event-from-age" inputmode="numeric" pattern="[0-9]*" value="${fromAge}"></td>
       <td><input type="text" id="EventToAge_${rowId}" class="event-to-age" inputmode="numeric" pattern="[0-9]*" value="${toAge}"></td>
@@ -2593,70 +2562,6 @@ class EventsTableManager {
       options: optionObjects,
       selectedValue: selectedObj.value,
       onSelect: async (val, label) => {
-        if (val === 'MV') {
-          // Guard relocation flow if disabled
-          const relocationEnabled = (typeof Config !== 'undefined' && Config.getInstance && Config.getInstance().isRelocationEnabled && Config.getInstance().isRelocationEnabled());
-          if (!relocationEnabled) {
-            if (this.webUI && typeof this.webUI.showToast === 'function') {
-              this.webUI.showToast('Relocation is not available in this build.', 'Feature Disabled', 6);
-            }
-            return;
-          }
-          // Show country selection modal
-          this.showCountrySelectionModal(async (selectedCountryCode, selectedCountryName) => {
-            // User selected a country - update event type to MV-XX
-            const fullEventType = `MV-${selectedCountryCode.toUpperCase()}`;
-            typeInput.value = fullEventType;
-            toggleEl.textContent = `→ ${selectedCountryName}`;
-            row.dataset.originalEventType = fullEventType;
-            this.updateFieldVisibility(typeInput);
-            this.applyTypeColouring(row);
-            typeInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-            // Sync tax rulesets
-            var currentEvents = null;
-            var startCountry = null;
-            try {
-              const config = Config.getInstance();
-              startCountry = config.getStartCountry();
-              if (this.webUI && typeof this.webUI.readEvents === 'function') {
-                currentEvents = this.webUI.readEvents(false);
-              } else if (typeof uiManager !== 'undefined' && uiManager && typeof uiManager.readEvents === 'function') {
-                currentEvents = uiManager.readEvents(false);
-              }
-              if (currentEvents) {
-                await config.syncTaxRuleSetsWithEvents(currentEvents, startCountry);
-              }
-            } catch (err) {
-              console.error('Error syncing tax rulesets:', err);
-            }
-
-            // Call detector after MV-* event selection
-            if (Config.getInstance().isRelocationEnabled()) {
-              try {
-                var summary = RelocationImpactDetector.analyzeEvents(currentEvents, startCountry);
-                if (summary.totalImpacted > 0) {
-                  console.log('Relocation impact analysis:', summary);
-                  // Optional: Show subtle notification
-                  // this.webUI.showToast(summary.totalImpacted + ' events need review', 'Relocation Impact', 3);
-                }
-                this.updateRelocationImpactIndicators();
-                this.webUI.updateStatusForRelocationImpacts(currentEvents);
-              } catch (err) {
-                console.error('Error analyzing relocation impacts:', err);
-              }
-            }
-
-            // If wizard mode is OFF, finish here (type set, other fields remain blank)
-            if (!this.isEventsWizardEnabled()) {
-              return;
-            }
-
-            // Launch relocation wizard (do not set name; pass destination for defaults)
-            this.startWizardForEventType('MV', { eventType: fullEventType, destCountryCode: selectedCountryCode, destCountryName: selectedCountryName });
-          });
-          return; // Don't continue with normal selection flow
-        }
         // Normal behaviour for genuine event type selections
         typeInput.value = val;
         toggleEl.textContent = label;
@@ -2665,8 +2570,8 @@ class EventsTableManager {
         this.applyTypeColouring(row);
         typeInput.dispatchEvent(new Event('change', { bubbles: true }));
 
-        // If this is a relocation event (MV-*), sync tax rulesets
-        if (val && typeof val === 'string' && val.indexOf('MV-') === 0) {
+        // If this is a relocation event, sync tax rulesets
+        if (val === 'MV') {
           try {
             const config = Config.getInstance();
             const startCountry = config.getStartCountry();
@@ -2692,6 +2597,46 @@ class EventsTableManager {
     // This allows the validation system to find the visible element to style
     if (dropdown.wrapper) {
       typeInput._dropdownWrapper = dropdown.wrapper;
+    }
+
+    // Country dropdown for relocation (stores country code in name input)
+    const nameInput = row.querySelector(`#EventAlias_${rowId}`);
+    const countryToggleEl = row.querySelector(`#EventCountryToggle_${rowId}`);
+    const countryDropdownEl = row.querySelector(`#EventCountryOptions_${rowId}`);
+    if (nameInput && countryToggleEl && countryDropdownEl) {
+      const countries = Config.getInstance().getAvailableCountries();
+      const countryOptions = Array.isArray(countries)
+        ? countries.map(c => ({ value: String(c.code).toUpperCase(), label: c.name }))
+        : [];
+      const currentCode = String(nameInput.value || '').trim().toUpperCase();
+      const currentOption = countryOptions.find(opt => opt.value === currentCode) || null;
+      countryToggleEl.textContent = currentOption ? currentOption.label : 'Select country';
+      const countryDropdown = DropdownUtils.create({
+        toggleEl: countryToggleEl,
+        dropdownEl: countryDropdownEl,
+        options: countryOptions,
+        selectedValue: currentOption ? currentOption.value : undefined,
+        onSelect: async (val, label) => {
+          nameInput.value = val;
+          countryToggleEl.textContent = label;
+          nameInput.dispatchEvent(new Event('change', { bubbles: true }));
+          const config = Config.getInstance();
+          const startCountry = config.getStartCountry();
+          let currentEvents = null;
+          if (this.webUI && typeof this.webUI.readEvents === 'function') {
+            currentEvents = this.webUI.readEvents(false);
+          } else if (typeof uiManager !== 'undefined' && uiManager && typeof uiManager.readEvents === 'function') {
+            currentEvents = uiManager.readEvents(false);
+          }
+          if (currentEvents) {
+            await config.syncTaxRuleSetsWithEvents(currentEvents, startCountry);
+          }
+        },
+      });
+      row._eventCountryDropdown = countryDropdown;
+      if (countryDropdown && countryDropdown.wrapper) {
+        nameInput._dropdownWrapper = countryDropdown.wrapper;
+      }
     }
 
     // Initial visibility update
@@ -2773,7 +2718,7 @@ class EventsTableManager {
       }
     }, 0);
 
-    // Call detector if event type is MV-*
+    // Call detector if relocation is enabled
     if (Config.getInstance().isRelocationEnabled()) {
       try {
         var events = this.webUI.readEvents(false);
@@ -3326,42 +3271,17 @@ class EventsTableManager {
 
       // Add click handler
       option.addEventListener('click', () => {
-        // Special handling for Relocation: show country selection first
         if (wizard.eventType === 'MV') {
-          // Guard relocation flow if disabled
-          const relocationEnabled = (typeof Config !== 'undefined' && Config.getInstance && Config.getInstance().isRelocationEnabled && Config.getInstance().isRelocationEnabled());
-          if (!relocationEnabled) {
-            if (this.webUI && typeof this.webUI.showToast === 'function') {
-              this.webUI.showToast('Relocation is not available in this build.', 'Feature Disabled', 6);
-            }
-            return;
+          const eventData = { eventType: 'MV' };
+          if (this.pendingEmptyRowForReplacement) {
+            this.replaceEmptyRowWithEvent(this.pendingEmptyRowForReplacement, eventData);
+            this.pendingEmptyRowForReplacement = null;
+          } else if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+            this.webUI.eventAccordionManager.addEventFromWizard(eventData);
+          } else {
+            this.addEventFromWizardWithSorting(eventData);
           }
-          // Ensure pending empty row reference is set if there is an empty NOP row
-          if (!this.pendingEmptyRowForReplacement) {
-            const existingEmptyRow = this.findEmptyEventRow();
-            if (existingEmptyRow) {
-              this.pendingEmptyRowForReplacement = existingEmptyRow;
-            }
-          }
-          // Close wizard selection before opening the country modal
           overlay.remove();
-          // Open country selection modal; after selection launch MV wizard with destination context
-          this.showCountrySelectionModal(async (code, name) => {
-            const full = `MV-${code.toUpperCase()}`;
-            const cfg = (typeof Config !== 'undefined' && Config.getInstance) ? Config.getInstance() : null;
-            if (cfg && typeof cfg.getTaxRuleSet === 'function') {
-              try {
-                await cfg.getTaxRuleSet(code.toLowerCase());
-              } catch (_) {
-                // Ruleset loading failed; wizard will still launch but may show warnings
-              }
-            }
-            this.startWizardForEventType('MV', {
-              eventType: full,
-              destCountryCode: code,
-              destCountryName: name
-            });
-          });
           return;
         }
         this.startWizardForEventType(wizard.eventType, initialData);
@@ -3507,25 +3427,8 @@ class EventsTableManager {
     // Store the unique ID on the row
     row.dataset.eventId = id;
 
-    // Ensure MV-* rows display as "→ Country" in the visible toggle immediately
     const typeVal = eventData && eventData.eventType;
-    if (typeVal && typeof typeVal === 'string' && typeVal.indexOf('MV-') === 0) {
-      const code = typeVal.substring(3).toLowerCase();
-      const countries = Config.getInstance().getAvailableCountries();
-      const match = Array.isArray(countries) ? countries.find(c => String(c.code).toLowerCase() === code) : null;
-      const label = match ? `→ ${match.name}` : typeVal;
-      const toggleEl = row.querySelector(`#EventTypeToggle_${row.dataset.rowId}`);
-      if (toggleEl) toggleEl.textContent = label;
-      // Also enrich dropdown options with synthetic MV-* so later refreshes keep the label
-      if (row._eventTypeDropdown) {
-        const baseOpts = this.getEventTypeOptionObjects();
-        const synthetic = match ? { value: typeVal, label, description: `Relocation to ${match.name}` } : { value: typeVal, label: typeVal };
-        const opts = baseOpts.find(o => o.value === typeVal) ? baseOpts : baseOpts.concat([synthetic]);
-        if (row._eventTypeDropdown) row._eventTypeDropdown.setOptions(opts);
-      }
-      // Keep original type for logic but show arrow label
-      row.dataset.originalEventType = typeVal;
-    }
+    if (typeVal) row.dataset.originalEventType = typeVal;
 
     // Add to table
     const tbody = document.querySelector('#Events tbody');
@@ -3752,132 +3655,6 @@ class EventsTableManager {
       // Has events - hide empty state message
       emptyStateEl.style.display = 'none';
     }
-  }
-
-  /**
-   * Show country selection modal
-   * @param {Function} onCountrySelected - Callback function that receives (countryCode, countryName) when user selects a country
-   */
-  showCountrySelectionModal(onCountrySelected) {
-    // Remove any existing overlay with same id
-    const prev = document.getElementById('countrySelectionOverlay');
-    if (prev) prev.remove();
-
-    // Overlay using existing class naming
-    const overlay = document.createElement('div');
-    overlay.className = 'wizard-overlay';
-    overlay.id = 'countrySelectionOverlay';
-
-    // Modal container reusing wizard classes
-    const modal = document.createElement('div');
-    modal.className = 'event-wizard-modal country-selection-modal';
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'event-wizard-step-header';
-    const title = document.createElement('h3');
-    title.textContent = 'Select Destination Country';
-    header.appendChild(title);
-    modal.appendChild(header);
-
-    // Body
-    const body = document.createElement('div');
-    body.className = 'event-wizard-step-body';
-
-    // Search
-    const searchDiv = document.createElement('div');
-    searchDiv.className = 'country-search';
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.placeholder = 'Search countries...';
-    searchDiv.appendChild(searchInput);
-    body.appendChild(searchDiv);
-
-    // List
-    const listDiv = document.createElement('div');
-    listDiv.className = 'country-list';
-
-    let countries = [];
-    try {
-      countries = Config.getInstance().getAvailableCountries();
-    } catch (e) {
-      console.error('Error getting available countries:', e);
-      const errorDiv = document.createElement('div');
-      errorDiv.textContent = 'No countries available';
-      listDiv.appendChild(errorDiv);
-    }
-
-    const renderCountries = (filter = '') => {
-      listDiv.innerHTML = '';
-      const filtered = countries.filter(c => c.name.toLowerCase().includes(filter.toLowerCase()));
-      if (filtered.length === 0) {
-        const noResults = document.createElement('div');
-        noResults.textContent = 'No countries found';
-        listDiv.appendChild(noResults);
-        return;
-      }
-      filtered.forEach(country => {
-        const option = document.createElement('div');
-        option.className = 'country-option';
-        option.dataset.countryCode = country.code;
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'country-name';
-        nameDiv.textContent = country.name;
-        option.appendChild(nameDiv);
-        const detailsDiv = document.createElement('div');
-        detailsDiv.className = 'country-details';
-        detailsDiv.textContent = `Currency: ${country.currency || 'N/A'}`;
-        option.appendChild(detailsDiv);
-        // Hover highlight
-        option.addEventListener('mouseenter', () => option.classList.add('hover'));
-        option.addEventListener('mouseleave', () => option.classList.remove('hover'));
-        // Click selection
-        option.addEventListener('click', () => {
-          option.classList.add('selected');
-          onCountrySelected(country.code, country.name);
-          overlay.remove();
-        });
-        listDiv.appendChild(option);
-      });
-    };
-
-    renderCountries();
-    searchInput.addEventListener('input', () => renderCountries(searchInput.value));
-
-    body.appendChild(listDiv);
-    modal.appendChild(body);
-
-    // Footer with Cancel
-    const footer = document.createElement('div');
-    footer.className = 'event-wizard-step-footer';
-    const buttons = document.createElement('div');
-    buttons.className = 'event-wizard-buttons';
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'event-wizard-button';
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.addEventListener('click', () => overlay.remove());
-    buttons.appendChild(cancelBtn);
-    footer.appendChild(buttons);
-    modal.appendChild(footer);
-
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-
-    // Close on overlay click
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) {
-        overlay.remove();
-      }
-    });
-
-    // ESC handling
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        overlay.remove();
-        document.removeEventListener('keydown', handleKeyDown);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
   }
 
 }

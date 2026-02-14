@@ -103,7 +103,8 @@ module.exports = {
             linkedCountry: 'ie'
           },
           {
-            type: 'MV-ar',
+            type: 'MV',
+            name: 'AR',
             id: 'MoveToAR',
             amount: 10000,
             fromAge: 35,

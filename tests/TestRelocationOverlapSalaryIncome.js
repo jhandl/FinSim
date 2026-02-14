@@ -56,7 +56,7 @@ const TestRelocationOverlapSalaryIncome = {
           StartCountry: 'ie'
         },
         events: [
-          { type: 'MV-AR', id: 'move', amount: 0, fromAge: 40, toAge: 40, rate: 0, match: 0 },
+          { type: 'MV', name: 'AR', id: 'move', amount: 0, fromAge: 40, toAge: 40, rate: 0, match: 0 },
           { type: 'SI', id: 'eurSalary', amount: eurSalary, fromAge: 39, toAge: 40, rate: 0, match: 0 },
           { type: 'SI', id: 'arsSalary', amount: arsSalary, fromAge: 40, toAge: 40, rate: 0, match: 0, currency: 'ARS' }
         ]

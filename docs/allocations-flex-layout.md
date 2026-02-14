@@ -129,7 +129,7 @@ The Allocations panel renders different parameter IDs depending on the Per-Count
   - Chips are hidden
 - **Per-country ON**:
   - Allocation percentages use `InvestmentAllocation_<country>_<baseKey>`
-  - Chips appear only when relocation is enabled and MV-* events are present
+  - Chips appear only when relocation is enabled and MV events are present
 
 The layout rules described in this document apply to the investment allocation rows in both modes.
 

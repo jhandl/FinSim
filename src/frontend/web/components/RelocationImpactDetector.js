@@ -1,7 +1,7 @@
 /* This file has to work on both the website and Google Apps Script */
 
 /**
- * RelocationImpactDetector analyzes events for impacts when MV-* relocations are added or edited.
+ * RelocationImpactDetector analyzes events for impacts when MV relocations are added or edited.
  * It modifies events in-place by adding/removing a relocationImpact property.
  * This module is standalone and integrates with EventsTableManager.
  */
@@ -32,14 +32,14 @@ var RelocationImpactDetector = {
           var mvEvent = mvEvents[idx];
           var mvImpactId = this.getMvImpactId(mvEvent);
           var nextMvEvent = (idx + 1 < mvEvents.length) ? mvEvents[idx + 1] : null;
-          var destinationCountry = mvEvent.type.substring(3).toLowerCase();
+          var destinationCountry = getRelocationCountryCode(mvEvent);
           var mvFromAge = Number(mvEvent.fromAge);
           var nextMvFromAge = nextMvEvent ? Number(nextMvEvent.fromAge) : NaN;
 
           // Determine origin country (the country being left)
           var originCountry = startCountry;
           if (idx > 0) {
-            originCountry = mvEvents[idx - 1].type.substring(3).toLowerCase();
+            originCountry = getRelocationCountryCode(mvEvents[idx - 1]);
           }
 
           // Check if destination country ruleset is missing
@@ -53,7 +53,7 @@ var RelocationImpactDetector = {
           for (var j = 0; j < events.length; j++) {
             var event = events[j];
             // Skip MV events and Stock Market events
-            if (event.type && (event.type.indexOf('MV-') === 0 || event.type === 'SM')) continue;
+            if (event.type && (isRelocationEvent(event) || event.type === 'SM')) continue;
             // Skip events explicitly overridden or parts of a split chain
             if (event.resolutionOverride) continue;
             if (event.linkedEventId) continue;
@@ -75,7 +75,7 @@ var RelocationImpactDetector = {
           for (var j = 0; j < events.length; j++) {
             var event = events[j];
             // Skip MV events and Stock Market events
-            if (event.type && (event.type.indexOf('MV-') === 0 || event.type === 'SM')) continue;
+            if (event.type && (isRelocationEvent(event) || event.type === 'SM')) continue;
             if (event.resolutionOverride) continue;
             if ((event.type === 'R' || event.type === 'M') && event.relocationSellMvId) continue;
 
@@ -143,15 +143,15 @@ var RelocationImpactDetector = {
   },
 
   /**
-   * Builds and returns a sorted array of MV-* events by fromAge.
+   * Builds and returns a sorted array of MV events by fromAge.
    * @param {Array} events - Array of SimEvent objects
-   * @returns {Array} Sorted array of MV-* events
+   * @returns {Array} Sorted array of MV events
    */
   buildRelocationTimeline: function (events) {
     var mvEvents = [];
     for (var i = 0; i < events.length; i++) {
       var event = events[i];
-      if (event && event.type && event.type.indexOf('MV-') === 0) {
+      if (isRelocationEvent(event)) {
         var fa = Number(event.fromAge);
         if (!isNaN(fa)) {
           // normalize numeric for sorting comparisons
@@ -168,7 +168,7 @@ var RelocationImpactDetector = {
     var current = startCountry;
     for (var i = 0; i < mvEvents.length; i++) {
       var mvAge = Number(mvEvents[i].fromAge);
-      if (age >= mvAge) current = mvEvents[i].type.substring(3).toLowerCase();
+      if (age >= mvAge) current = getRelocationCountryCode(mvEvents[i]);
       else break;
     }
     return current;
@@ -191,7 +191,7 @@ var RelocationImpactDetector = {
     if (event.relocationImpact && event.relocationImpact.category === 'simple') return;
     if (event.relocationImpact) delete event.relocationImpact;
     var mvEvent = this.getMvEventForAge(mvEvents, Number(event.fromAge));
-    var destinationCountry = mvEvent ? mvEvent.type.substring(3).toLowerCase() : startCountry;
+    var destinationCountry = mvEvent ? getRelocationCountryCode(mvEvent) : startCountry;
     var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry);
     this.addImpact(event, 'simple', message, this.getMvImpactId(mvEvent), true);
   },

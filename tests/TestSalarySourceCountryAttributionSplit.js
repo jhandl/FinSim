@@ -55,7 +55,7 @@ module.exports = {
         events: [
           { type: 'SI', id: 'You', amount: 50000, fromAge: 30, toAge: 40, currency: 'EUR', rate: 0, match: 0 },
           { type: 'SI2np', id: 'Your Partner', amount: 25000, fromAge: 30, toAge: 40, currency: 'EUR', rate: 0, match: 0 },
-          { type: 'MV-ar', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0, match: 0 },
+          { type: 'MV', name: 'AR', id: 'Move_AR', amount: 0, fromAge: 40, toAge: 40, currency: 'EUR', rate: 0, match: 0 },
           { type: 'SI', id: 'Salary_AR', amount: 30000, fromAge: 40, toAge: 41, currency: 'EUR', linkedCountry: 'ar', rate: 0, match: 0 },
           { type: 'SI2np', id: 'Salary_AR_P2', amount: 15000, fromAge: 40, toAge: 41, currency: 'EUR', linkedCountry: 'ar', rate: 0, match: 0 }
         ]

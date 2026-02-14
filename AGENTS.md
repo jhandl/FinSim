@@ -222,7 +222,7 @@ Core logic extends `SimEvent` with optional `currency`, `linkedCountry`, and `li
 
 Key traits:
 
-*   **Country timeline:** Derived from `MV-*` events.
+*   **Country timeline:** Derived from `MV` events (destination code stored in `event.name`).
 *   **Economic context:** `linkedCountry` can drive the inflation/currency basis for an event.
 *   **Split chains:** `linkedEventId` supports traceable event splits and guided resolution flows.
 *   **Cross-border taxation:** `Taxman` derives the active country from relocation events and handles complex multi-jurisdiction logic:

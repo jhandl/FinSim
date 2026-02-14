@@ -87,7 +87,7 @@ module.exports = {
 	          { type: 'R', id: 'prop-ss', amount: 300000, rate: 0, fromAge: 31, toAge: 60, currency: 'SSS', linkedCountry: 'ss' },
 	          { type: 'M', id: 'mort-ss', amount: 20000, rate: 0.03, fromAge: 31, toAge: 60, currency: 'SSS', linkedCountry: 'ss' },
 	          { type: 'RI', id: 'rent-ss', amount: 25000, fromAge: 32, toAge: 60, currency: 'SSS', linkedCountry: 'ss' },
-	          { type: 'MV-tt', id: 'move-tt', amount: 0, fromAge: 35, toAge: 35 },
+	          { type: 'MV', name: 'TT', id: 'move-tt', amount: 0, fromAge: 35, toAge: 35 },
 	          { type: 'SI', id: 'salary-tt', amount: 1000000, fromAge: 35, toAge: 36, currency: 'TTT' },
 	          { type: 'SA', id: 'sale-ss', amount: 0, fromAge: 36, toAge: 36, currency: 'SSS', linkedCountry: 'ss' }
 	        ]
