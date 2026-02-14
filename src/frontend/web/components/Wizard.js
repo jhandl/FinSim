@@ -1698,10 +1698,38 @@ class Wizard {
 
         if (targetRow) {
           const targetRowId = targetRow.dataset.rowId;
+          const currentStepIndex = this.tour && typeof this.tour.getActiveIndex === 'function'
+            ? this.tour.getActiveIndex()
+            : -1;
+          const activeStep = currentStepIndex >= 0 ? this.validSteps[currentStepIndex] : null;
+          const activeStepMatch = activeStep && activeStep.element
+            ? activeStep.element.match(/^#(Event[A-Za-z]+)_/)
+            : null;
           const currentField = this.lastFocusedField;
-          const currentFieldId = currentField.id;
-          const fieldType = currentFieldId.split('_')[0];
-          const targetField = targetRow.querySelector(`#${fieldType}_${targetRowId}`);
+          const currentFieldId = currentField && currentField.id ? currentField.id : '';
+          const fallbackFieldType = currentFieldId ? currentFieldId.split('_')[0] : '';
+          const fieldType = activeStepMatch && activeStepMatch[1] ? activeStepMatch[1] : fallbackFieldType;
+          const targetEventTypeInput = targetRow.querySelector('.event-type');
+          const targetEventType = targetEventTypeInput ? targetEventTypeInput.value : '';
+
+          // Crossing MV boundaries needs a field remap:
+          // relocation rows use the country picker where non-relocation rows use alias.
+          let desiredStepFieldType = fieldType;
+          if (fieldType === 'EventCountry' || fieldType === 'EventCountryToggle') {
+            desiredStepFieldType = targetEventType === 'MV' ? 'EventCountryToggle' : 'EventAlias';
+          } else if (fieldType === 'EventAlias' && targetEventType === 'MV') {
+            desiredStepFieldType = 'EventCountryToggle';
+          }
+
+          let targetField = null;
+          if (desiredStepFieldType === 'EventCountryToggle') {
+            targetField = targetRow.querySelector(`#EventCountry_${targetRowId}`) ||
+                         targetRow.querySelector(`#EventCountryToggle_${targetRowId}`);
+          } else if (desiredStepFieldType === 'EventAlias') {
+            targetField = targetRow.querySelector(`#EventAlias_${targetRowId}`);
+          } else if (desiredStepFieldType) {
+            targetField = targetRow.querySelector(`#${desiredStepFieldType}_${targetRowId}`);
+          }
 
           if (targetField) {
             // Update lastFocusedField to the new target
@@ -1734,12 +1762,36 @@ class Wizard {
               }
             });
 
-            // Find the current step that matches our field type
-            const currentStepIndex = this.tour.getActiveIndex();
+            // Keep index stable to preserve deterministic field order.
+            // Only remap the highlighted step index if we had to switch field types
+            // (e.g. EventAlias <-> EventCountryToggle when crossing MV boundaries).
+            let driveIndex = currentStepIndex;
+            if (desiredStepFieldType && desiredStepFieldType !== fieldType) {
+              const desiredSelector = `#${desiredStepFieldType}_${targetRowId}`;
+              let bestIndex = -1;
+              let bestDistance = Number.MAX_SAFE_INTEGER;
+              for (let i = 0; i < this.validSteps.length; i++) {
+                if (this.validSteps[i] && this.validSteps[i].element === desiredSelector) {
+                  const distance = Math.abs(i - currentStepIndex);
+                  if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestIndex = i;
+                  }
+                }
+              }
+              if (bestIndex >= 0) {
+                driveIndex = bestIndex;
+              } else if (currentStepIndex >= 0 && this.validSteps[currentStepIndex]) {
+                // If the target event type does not expose a dedicated step in validSteps,
+                // repurpose the current slot so the country selector is still reachable.
+                this.validSteps[currentStepIndex].element = desiredSelector;
+                this.updateStepContentForEventType(this.validSteps[currentStepIndex], desiredStepFieldType);
+              }
+            }
 
-            // Re-drive the current step to update the highlight
-            if (this.tour && currentStepIndex >= 0) {
-              this.tour.drive(currentStepIndex);
+            // Re-drive the selected step to update the highlight
+            if (this.tour && driveIndex >= 0) {
+              this.tour.drive(driveIndex);
             }
             return null;
           }
@@ -1794,7 +1846,7 @@ class Wizard {
     if (bestMatch && bestMatch.popover && step.popover) {
       // Copy the popover content from the best match
       if (bestMatch.popover.description) {
-        step.popover.description = bestMatch.popover.description;
+        step.popover.description = this.processAgeYearInContent(bestMatch.popover.description);
       }
       if (bestMatch.popover.title) {
         step.popover.title = bestMatch.popover.title;

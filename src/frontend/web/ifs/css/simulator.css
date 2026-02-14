@@ -33,6 +33,13 @@
 
   /* Shared min-width for amount inputs (events table + resolution panel) */
   --event-amount-input-min-width: 90px;
+
+  /* Event Type Colors (RGB values) */
+  --event-inflow-color: 76, 175, 80;
+  --event-outflow-color: 239, 83, 80;
+  --event-real-estate-color: 66, 165, 245;
+  --event-stock-market-color: 255, 193, 7;
+  --event-relocation-color: 158, 158, 158;
 }
 
 * {
@@ -3207,23 +3214,28 @@ footer {
 
 /* Subtle colored border for Event Type indicating inflow / outflow */
 #Events .pseudo-select.inflow {
-  box-shadow: inset 0 0 6px 1px rgba(76, 175, 80, 0.4);
+  box-shadow: inset 0 0 6px 1px rgba(var(--event-inflow-color), 0.4);
   /* soft green */
 }
 
 #Events .pseudo-select.outflow {
-  box-shadow: inset 0 0 6px 1px rgba(239, 83, 80, 0.4);
+  box-shadow: inset 0 0 6px 1px rgba(var(--event-outflow-color), 0.4);
   /* soft red */
 }
 
 #Events .pseudo-select.real-estate {
-  box-shadow: inset 0 0 6px 1px rgba(66, 165, 245, 0.4);
+  box-shadow: inset 0 0 6px 1px rgba(var(--event-real-estate-color), 0.4);
   /* soft blue */
 }
 
 #Events .pseudo-select.stock-market {
-  box-shadow: inset 0 0 6px 1px rgba(251, 192, 45, 0.4);
+  box-shadow: inset 0 0 6px 1px rgba(var(--event-stock-market-color), 0.4);
   /* soft yellow */
+}
+
+#Events .pseudo-select.relocation {
+  box-shadow: inset 0 0 6px 1px rgba(var(--event-relocation-color), 0.4);
+  /* soft gray */
 }
 
 /* Thin dark grey border for Event Type selectors in table view (exclude NOP) */
@@ -3468,23 +3480,28 @@ footer {
 
 /* Color coding for accordion items */
 .events-accordion-item.inflow {
-  box-shadow: inset 0 0 8px 2px rgba(76, 175, 80, 0.4);
+  box-shadow: inset 0 0 8px 2px rgba(var(--event-inflow-color), 0.4);
   /* rich green */
 }
 
 .events-accordion-item.outflow {
-  box-shadow: inset 0 0 8px 2px rgba(239, 83, 80, 0.45);
+  box-shadow: inset 0 0 8px 2px rgba(var(--event-outflow-color), 0.45);
   /* vivid red */
 }
 
 .events-accordion-item.real-estate {
-  box-shadow: inset 0 0 8px 2px rgba(66, 165, 245, 0.45);
+  box-shadow: inset 0 0 8px 2px rgba(var(--event-real-estate-color), 0.45);
   /* bright blue */
 }
 
 .events-accordion-item.stock-market {
-  box-shadow: inset 0 0 8px 2px rgba(255, 193, 7, 0.45);
+  box-shadow: inset 0 0 8px 2px rgba(var(--event-stock-market-color), 0.45);
   /* bold yellow */
+}
+
+.events-accordion-item.relocation {
+  box-shadow: inset 0 0 8px 2px rgba(var(--event-relocation-color), 0.4);
+  /* soft gray */
 }
 
 .accordion-item-header {

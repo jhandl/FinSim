@@ -338,6 +338,8 @@ class EventAccordionManager {
       return 'inflow';
     } else if (this.isOutflow(eventType)) {
       return 'outflow';
+    } else if (this.isRelocation(eventType)) {
+      return 'relocation';
     }
     return '';
   }
@@ -357,6 +359,10 @@ class EventAccordionManager {
 
   isRealEstate(eventType) {
     return ['R', 'M'].includes(eventType);
+  }
+
+  isRelocation(eventType) {
+    return eventType === 'MV';
   }
 
   /**
@@ -944,7 +950,7 @@ class EventAccordionManager {
             // Update color-coding/shadow of the accordion item
             const accordionItem = container.closest('.events-accordion-item');
             if (accordionItem) {
-              accordionItem.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market');
+              accordionItem.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market', 'relocation');
               const newColorClass = this.getEventColorClass(val);
               if (newColorClass) {
                 accordionItem.classList.add(newColorClass);

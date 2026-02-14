@@ -2221,12 +2221,16 @@ class EventsTableManager {
     return ['R', 'M'].includes(eventType);
   }
 
+  isRelocation(eventType) {
+    return eventType === 'MV';
+  }
+
   applyTypeColouring(row) {
     const typeVal = row.querySelector('.event-type')?.value;
     const toggle = row.querySelector('.dd-toggle');
     if (!toggle) return;
     /* Reset all possible styling classes, including the new 'nop' marker */
-    toggle.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market', 'nop');
+    toggle.classList.remove('inflow', 'outflow', 'real-estate', 'stock-market', 'relocation', 'nop');
 
     /* Apply appropriate class based on the event type */
     if (typeVal === 'NOP') {
@@ -2239,6 +2243,8 @@ class EventsTableManager {
       toggle.classList.add('inflow');
     } else if (this.isOutflow(typeVal)) {
       toggle.classList.add('outflow');
+    } else if (this.isRelocation(typeVal)) {
+      toggle.classList.add('relocation');
     }
   }
 

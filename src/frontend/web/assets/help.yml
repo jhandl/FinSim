@@ -616,6 +616,16 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
+  - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MV"]
+    popover:
+      description: "<p>A relocation event. It changes your country of residence at a specific age.</p>"
+      side: "bottom"
+      align: "center"
+
 ###########################################################
 # Event Name
 
@@ -745,6 +755,16 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
+  - element: "#EventCountryToggle"
+    accordion-element: "#AccordionEventCountryToggle"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MV"]
+    popover:
+      description: "<p>Select the country you are moving to.</p><p>This sets the new residence and tax rules starting at the relocation age.</p>"
+      side: "bottom"
+      align: "center"
+
 
 ###########################################################
 # Event Amount
@@ -755,6 +775,15 @@ WizardSteps:
     card: events
     popover:
       description: "<p>The yearly amount for the event</p><p>For 'Real Estate' events, enter the down payment. For 'Mortgage' events, enter the amount you will repay each year.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MV"]
+    popover:
+      description: "<p>The one-time cost of relocating.</p><p>Enter 0 if you do not expect any relocation costs.</p>"
       side: "bottom"
       align: "center"
 
@@ -885,6 +914,15 @@ WizardSteps:
     card: events
     popover:
       description: "<p>The {{age_or_year}} at which the event starts.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MV"]
+    popover:
+      description: "<p>The {{age_or_year}} when you move to the new country.</p>"
       side: "bottom"
       align: "center"
 
