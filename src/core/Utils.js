@@ -1375,6 +1375,13 @@ function deserializeSimulation(content, ui) {
 
   // Load events
   let eventData = [];
+  const availableCountries = Config.getInstance().getAvailableCountries();
+  const validRelocationCountries = {};
+  for (let i = 0; i < availableCountries.length; i++) {
+    const country = availableCountries[i] || {};
+    const code = String(country.code || '').trim().toLowerCase();
+    if (code) validRelocationCountries[code] = true;
+  }
   let inEvents = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -1386,6 +1393,13 @@ function deserializeSimulation(content, ui) {
       const parts = line.split(',');
       if (parts.length > 1) {
         parts[1] = parts[1].replace(/%2C/g, ",");
+      }
+      const eventType = String(parts[0] || '').trim();
+      if (eventType === 'MV') {
+        const destinationCode = getRelocationCountryCode({ type: 'MV', name: parts[1] });
+        if (!destinationCode || !validRelocationCountries[destinationCode]) {
+          throw new Error('Invalid scenario file: relocation event references unsupported destination "' + String(parts[1] || '') + '" on line ' + (i + 1) + '.');
+        }
       }
       eventData.push(parts);
     }

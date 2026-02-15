@@ -269,7 +269,6 @@ var RelocationImpactAssistant = {
         containerAttributes = ' data-from-country="' + originCountry + '" data-to-country="' + destCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
         addAction(actions, { action: 'accept', tabLabel: 'Apply Suggested Amount', instantApply: true, tooltip: 'Updates the amount to ' + suggestedFormatted + ' (' + (destCurrencyCode || destCurrency) + ') so it reflects purchasing power in ' + destCountryLabel + '.', buttonAttrs: ' data-row-id="' + rowId + '" data-suggested-amount="' + (isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum)) + '" data-suggested-currency="' + destCurrency + '"' });
         addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion to ' + (destCurrencyCode || destCurrency || 'the destination currency') + ' will occur.', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
-        addAction(actions, { action: 'review', tabLabel: 'Mark As Reviewed', instantApply: true, tooltip: 'Records this relocation impact as reviewed without changing the amount or currency.', buttonAttrs: ' data-row-id="' + rowId + '"' });
       }
     } else if (event.relocationImpact.category === 'split_amount_shift') {
       let splitAmountDetails = event.relocationImpact.details;
@@ -371,50 +370,6 @@ var RelocationImpactAssistant = {
         tooltip: 'Restores a single event from age ' + mergedFromAge + ' to ' + mergedToAge + ' using ' + amountLabel + '.',
         buttonAttrs: ' data-row-id="' + rowId + '"'
       });
-    } else if (event.relocationImpact.category === 'local_holdings') {
-      // Local investment holdings resolution panel
-      const localHoldingsDetails = (function parseLocalHoldings(detailsPayload) {
-        if (!detailsPayload) return [];
-        let parsed = detailsPayload;
-        if (typeof parsed === 'string') {
-          try {
-            parsed = JSON.parse(parsed);
-          } catch (_) {
-            return [];
-          }
-        }
-        if (Array.isArray(parsed)) return parsed;
-        if (parsed && Array.isArray(parsed.holdings)) return parsed.holdings;
-        if (parsed && Array.isArray(parsed.localHoldings)) return parsed.localHoldings;
-        return [];
-      })(event.relocationImpact.details);
-      const holdingsPrefix = (localHoldingsDetails && localHoldingsDetails.length)
-        ? localHoldingsDetails.map(function (item) { const label = item && item.label ? String(item.label) : 'Holding'; const cur = item && item.currency ? String(item.currency).toUpperCase() : ''; return label + (cur ? ' (' + cur + ')' : ''); }).join(', ') + '. '
-        : '';
-
-      addAction(actions, {
-        action: 'keep_holdings',
-        tabLabel: 'Keep Holdings',
-        instantApply: true,
-        tooltip: holdingsPrefix + 'Keep your local investment holdings as-is. You can continue to hold these investments after relocation, though they remain tied to the origin country\'s market and currency. Tax treatment will follow your new country of residence.',
-        buttonAttrs: ' data-row-id="' + rowId + '"'
-      });
-
-      addAction(actions, {
-        action: 'plan_sale',
-        tabLabel: 'Plan to Sell',
-        instantApply: true,
-        tooltip: holdingsPrefix + 'Plan to sell these holdings around the time of relocation. You can model the sale by adding a stock market event (SM) at the relocation age with negative growth to simulate liquidation. Proceeds will be converted to your new residence currency.',
-        buttonAttrs: ' data-row-id="' + rowId + '"'
-      });
-
-      addAction(actions, {
-        action: 'plan_reinvest',
-        tabLabel: 'Plan to Reinvest',
-        instantApply: true,
-        tooltip: holdingsPrefix + 'Plan to sell local holdings and reinvest in global or destination-country investments. Add a stock market event (SM) at relocation age to simulate sale, then adjust your investment mix parameters. The simulator will automatically invest surplus in your configured mix.',
-        buttonAttrs: ' data-row-id="' + rowId + '"'
-      });
     }
 
     if (!actions.length) return content;
@@ -476,10 +431,6 @@ var RelocationImpactAssistant = {
         if (typeof etm.convertToPensionless === 'function') etm.convertToPensionless(rowId, eventId);
         break;
       }
-      case 'review': {
-        if (typeof etm.markAsReviewed === 'function') etm.markAsReviewed(rowId, eventId);
-        break;
-      }
       case 'join_split': {
         if (typeof etm.joinSplitEvents === 'function') etm.joinSplitEvents(rowId, eventId);
         break;
@@ -519,13 +470,6 @@ var RelocationImpactAssistant = {
       }
       case 'sell_property': {
         try { this._sellProperty(event, payload, env); } catch (_) { }
-        break;
-      }
-      case 'keep_holdings':
-      case 'plan_sale':
-      case 'plan_reinvest': {
-        // All three actions simply mark the impact as reviewed
-        if (typeof etm.markAsReviewed === 'function') etm.markAsReviewed(rowId, eventId);
         break;
       }
       default:

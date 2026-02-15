@@ -62,6 +62,8 @@ module.exports = {
       global.Config = {
         getInstance: () => ({
           getStartCountry: () => 'ie',
+          getDefaultCountry: () => 'ie',
+          getAvailableCountries: () => ([{ code: 'ie', name: 'Ireland' }]),
           getInvestmentBaseTypes: () => ([]),
           getCachedTaxRuleSet: () => ({ getResolvedInvestmentTypes: () => [] }),
           isRelocationEnabled: () => false

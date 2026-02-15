@@ -508,9 +508,7 @@ graph TD
 ```
 
 **Relocation Impact Detection** (`src/frontend/web/components/RelocationImpactDetector.js`):
-- Local holdings with `assetCountry === originCountry` trigger "local_holdings" impact
-- User prompted to keep/sell/reinvest when relocating
-- Global holdings ignored (assumed portable)
+- Relocation impacts are event-driven (timing/boundary/currency context), not investment-wrapper-driven.
 
 **`residenceScope` Decision Tree**:
 ```mermaid
@@ -523,10 +521,8 @@ graph TD
     E -->|local| F[Local Investment]
     E -->|global| G[Global Investment]
     F --> H[PV: residency CPI]
-    F --> I[Relocation: flagged if assetCountry matches origin]
     F --> J[UI: per-country params]
     G --> K[PV: assetCountry CPI]
-    G --> L[Relocation: ignored]
     G --> M[UI: global params]
 ```
 

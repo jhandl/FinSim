@@ -2805,26 +2805,3 @@ function updateYearlyData() {
     uiManager.updateDataRow(row, (person1.age - params.startingAge) / (100 - params.startingAge));
   }
 }
-
-/**
- * Returns investment context for UI components like RelocationImpactDetector.
- * Provides investmentAssets array and current capital by investment key.
- * Per §9 strictness: assumes investmentAssets is initialized and each entry has
- * a valid asset with capital() method.
- * @returns {Object} { investmentAssets, capsByKey }
- */
-function getInvestmentContext() {
-  // Build capsByKey map from current asset capitals
-  var capsByKey = {};
-  for (var i = 0; i < investmentAssets.length; i++) {
-    capsByKey[investmentAssets[i].key] = investmentAssets[i].asset.capital();
-  }
-
-  return {
-    investmentAssets: investmentAssets,
-    capsByKey: capsByKey
-  };
-}
-
-// Expose getInvestmentContext globally for UI access
-this.getInvestmentContext = getInvestmentContext;

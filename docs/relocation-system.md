@@ -111,13 +111,12 @@ Relocation events use a single type code (`MV`) and store the destination countr
 
 ### Event Classification
 
-When relocation events are added, the detector classifies affected events into five categories:
+When relocation events are added, the detector classifies affected events into four categories:
 
 - **Boundary Crossers**: Events spanning relocation boundaries (e.g., salary from age 30-40 when relocating at 35) need splitting or currency pegging.
 - **Simple Events**: Events entirely within the new country period need currency review and cost-of-living adjustment.
 - **Property Auto-Peg**: Property events (rentals, mortgages) need linking to their origin country for correct inflation and currency.
 - **Pension Conflicts**: Pensionable salary events after moving to state-only pension countries need conversion to non-pensionable type.
-- **Local Holdings**: Investment holdings with `residenceScope = "local"` and `assetCountry` matching the origin country when an MV event occurs. This surfaces guidance for the user (keep, sell, reinvest) rather than performing automatic liquidation.
 
 ### Detection Logic
 
@@ -138,7 +137,6 @@ Resolution panels expand below event rows, structured as:
 - **Peg Currency**: Sets `event.currency` to maintain origin currency. Method: `pegCurrencyToOriginal()`.
 - **Link to Country**: Sets `event.linkedCountry` for location-tied inflation. Method: `linkPropertyToCountry()`.
 - **Convert to Pensionless**: Changes type from SI/SI2 to SInp/SI2np. Method: `convertToPensionless()`.
-- **Mark as Reviewed**: Sets `resolutionOverride` flag. Method: `markAsReviewed()`.
 
 For salary/pension link actions, `EventsTableManager.linkIncomeToCountry(rowId, country)` sets `event.linkedCountry` and re-runs impact detection.
 

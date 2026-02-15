@@ -365,14 +365,8 @@ class EventsTableManager {
     const events = this.webUI.readEvents(false);
     const startCountry = Config.getInstance().getStartCountry();
 
-    // Gather investment context from simulator if available
-    var investmentContext = null;
-    if (typeof Simulator !== 'undefined' && Simulator.getInvestmentContext) {
-      investmentContext = Simulator.getInvestmentContext();
-    }
-
     if (typeof RelocationImpactDetector !== 'undefined') {
-      RelocationImpactDetector.analyzeEvents(events, startCountry, investmentContext);
+      RelocationImpactDetector.analyzeEvents(events, startCountry);
     }
     this.updateRelocationImpactIndicators(events);
     this.webUI.updateStatusForRelocationImpacts(events);
@@ -497,14 +491,8 @@ class EventsTableManager {
         var events = this.webUI.readEvents(false);
         var startCountry = Config.getInstance().getStartCountry();
 
-        // Gather investment context from simulator if available
-        var investmentContext = null;
-        if (typeof Simulator !== 'undefined' && Simulator.getInvestmentContext) {
-          investmentContext = Simulator.getInvestmentContext();
-        }
-
         if (typeof RelocationImpactDetector !== 'undefined') {
-          RelocationImpactDetector.analyzeEvents(events, startCountry, investmentContext);
+          RelocationImpactDetector.analyzeEvents(events, startCountry);
         }
         this.updateRelocationImpactIndicators(events);
         this.webUI.updateStatusForRelocationImpacts(events);

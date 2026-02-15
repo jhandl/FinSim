@@ -111,6 +111,10 @@ module.exports = {
         getInstance: () => ({
           getStartCountry: () => 'ie',
           getDefaultCountry: () => 'ie',
+          getAvailableCountries: () => ([
+            { code: 'ie', name: 'Ireland' },
+            { code: 'ar', name: 'Argentina' }
+          ]),
           getCachedTaxRuleSet: () => ({ getResolvedInvestmentTypes: () => [] }),
           getInvestmentBaseTypes: () => [],
           isRelocationEnabled: () => false

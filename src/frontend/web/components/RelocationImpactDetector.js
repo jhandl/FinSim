@@ -14,7 +14,7 @@ var RelocationImpactDetector = {
    * @param {string} startCountry - Starting country code (optional, uses default if missing)
    * @returns {Object} Summary: { totalImpacted }
    */
-  analyzeEvents: function (events, startCountry, investmentContext) {
+  analyzeEvents: function (events, startCountry) {
     try {
       if (!Config.getInstance().isRelocationEnabled()) {
         this.clearAllImpacts(events);
@@ -40,13 +40,6 @@ var RelocationImpactDetector = {
           var originCountry = startCountry;
           if (idx > 0) {
             originCountry = getRelocationCountryCode(mvEvents[idx - 1]);
-          }
-
-          // Check if destination country ruleset is missing
-          var destinationRuleset = Config.getInstance().getCachedTaxRuleSet(destinationCountry);
-          if (!destinationRuleset) {
-            var message = 'Tax rules for ' + Config.getInstance().getCountryNameByCode(destinationCountry) + ' are not available. Please remove or change this relocation event.';
-            this.addImpact(mvEvent, 'missing_ruleset', message, mvImpactId, false);
           }
 
           // Boundary crossers: events that span THIS MV's boundary only
@@ -86,35 +79,6 @@ var RelocationImpactDetector = {
             }
           }
 
-          // Detect local investment holdings for each MV event
-          if (investmentContext) {
-            var localHoldings = [];
-            for (var i = 0; i < investmentContext.investmentAssets.length; i++) {
-              var invAsset = investmentContext.investmentAssets[i];
-              var capital = investmentContext.capsByKey[invAsset.key];
-              if (invAsset.residenceScope === 'local' &&
-                invAsset.assetCountry === originCountry &&
-                capital > 0) {
-                localHoldings.push({
-                  key: invAsset.key,
-                  label: invAsset.label,
-                  currency: invAsset.baseCurrency,
-                  capital: capital
-                });
-              }
-            }
-
-            if (localHoldings.length > 0) {
-              var localHoldingsMessage = this.generateLocalHoldingsMessage(localHoldings, mvEvent, destinationCountry);
-              var serializedLocalHoldings = '';
-              try {
-                serializedLocalHoldings = JSON.stringify(localHoldings);
-              } catch (_) {
-                serializedLocalHoldings = '';
-              }
-              this.addImpact(mvEvent, 'local_holdings', localHoldingsMessage, mvImpactId, false, serializedLocalHoldings || undefined);
-            }
-          }
         }
         this.addSoldRealEstateShiftImpacts(events, mvEvents);
       }
@@ -581,26 +545,6 @@ var RelocationImpactDetector = {
   },
 
   /**
-   * Generates a user-friendly message for local investment holdings impact.
-   * @param {Array} localHoldings - Array of affected local holdings
-   * @param {Object} mvEvent - The MV event
-   * @param {string} destinationCountry - Destination country code
-   * @returns {string}
-   */
-  generateLocalHoldingsMessage: function (localHoldings, mvEvent, destinationCountry) {
-    var destinationCountryName = Config.getInstance().getCountryNameByCode(destinationCountry);
-    var holdingsList = localHoldings.map(function (h) {
-      return h.label + ' (' + h.currency + ')';
-    }).join(', ');
-
-    if (localHoldings.length === 1) {
-      return 'You hold ' + localHoldings[0].label + ' tied to your current country. What would you like to do after moving to ' + destinationCountryName + '?';
-    } else {
-      return 'You hold local investments (' + holdingsList + ') tied to your current country. What would you like to do after moving to ' + destinationCountryName + '?';
-    }
-  },
-
-  /**
    * Removes relocationImpact if the event is resolved.
    * @param {Object} event - SimEvent object
    * @param {Array} mvEvents - Relocation timeline for scoped resolution matching
@@ -617,7 +561,7 @@ var RelocationImpactDetector = {
       // or for real-estate events if a linked country has been set (indicating jurisdiction is tied).
       resolved = !!(event.linkedEventId || (event.currency && event.linkedCountry) || ((event.type === 'R' || event.type === 'M') && event.linkedCountry));
     } else if (event.relocationImpact.category === 'simple') {
-      // Consider simple resolved if the event belongs to a split chain, has explicit jurisdiction, or salary conversion is acknowledged
+      // Consider simple resolved if the event belongs to a split chain, has explicit jurisdiction, or salary conversion was applied
       resolved = !!(event.linkedEventId || event.linkedCountry || event.type === 'SInp' || event.type === 'SI2np');
     }
     if (resolved) delete event.relocationImpact;
@@ -634,8 +578,8 @@ var RelocationImpactDetector = {
    */
   addImpact: function (event, category, message, mvEventId, autoResolvable, details) {
     if (event && isRelocationEvent(event)) return;
-    // Do not overwrite higher-priority impacts (boundary, missing_ruleset)
-    if (event.relocationImpact && (event.relocationImpact.category === 'boundary' || event.relocationImpact.category === 'missing_ruleset')) return;
+    // Do not overwrite higher-priority impacts (boundary)
+    if (event.relocationImpact && event.relocationImpact.category === 'boundary') return;
     var impact = {
       category: category,
       message: message,

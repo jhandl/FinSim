@@ -95,6 +95,10 @@ module.exports = {
         isRelocationEnabled: () => true,
         getCountryNameByCode: code => (code || '').toUpperCase(),
         getInvestmentBaseTypes: () => ([]),
+        getAvailableCountries: () => ([
+          { code: 'aa', name: 'Country AA' },
+          { code: 'bb', name: 'Country BB' }
+        ]),
         listCachedRuleSets: () => ({ aa: fakeRuleSet, bb: fakeRuleSet }),
         getCachedTaxRuleSet: () => fakeRuleSet,
         getDefaultCountry: () => 'aa',

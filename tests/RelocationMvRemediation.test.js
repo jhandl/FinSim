@@ -357,7 +357,7 @@ describe('MV relocation remediation', () => {
 
   test('RelocationImpactDetector never assigns impact badges to relocation events', () => {
     const mvEvent = { type: 'MV', name: 'AR', fromAge: 40 };
-    RelocationImpactDetector.addImpact(mvEvent, 'missing_ruleset', 'Missing tax rules', 'mv-id', false);
+    RelocationImpactDetector.addImpact(mvEvent, 'simple', 'Relocation impact', 'mv-id', false);
     expect(mvEvent.relocationImpact).toBeUndefined();
   });
 
