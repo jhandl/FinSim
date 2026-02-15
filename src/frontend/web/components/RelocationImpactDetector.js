@@ -59,7 +59,7 @@ var RelocationImpactDetector = {
             var eFrom = Number(event.fromAge);
             var eTo = Number(event.toAge);
             if (!isNaN(eTo) && !isNaN(eFrom) && eFrom < mvFromAge && eTo >= mvFromAge) {
-              var message = this.generateImpactMessage('boundary', event, mvEvent, destinationCountry);
+              var message = this.generateImpactMessage('boundary', event, mvEvent, destinationCountry, originCountry);
               this.addImpact(event, 'boundary', message, mvImpactId, false);
             }
           }
@@ -74,7 +74,7 @@ var RelocationImpactDetector = {
 
             var eFrom2 = Number(event.fromAge);
             if (!isNaN(eFrom2) && eFrom2 >= mvFromAge && (!nextMvEvent || eFrom2 < nextMvFromAge)) {
-              var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry);
+              var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry, originCountry);
               this.addImpact(event, 'simple', message, mvImpactId, true);
             }
           }
@@ -193,11 +193,13 @@ var RelocationImpactDetector = {
   },
 
   ensureSimpleImpact: function (event, mvEvents, startCountry, details) {
-    if (event.relocationImpact && event.relocationImpact.category === 'simple') return;
+    // Overwrite existing simple impacts if jurisdiction details are provided
+    if (event.relocationImpact && event.relocationImpact.category === 'simple' && !details) return;
     if (event.relocationImpact) delete event.relocationImpact;
     var mvEvent = this.getMvEventForAge(mvEvents, Number(event.fromAge));
     var destinationCountry = mvEvent ? getRelocationCountryCode(mvEvent) : startCountry;
-    var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry);
+    var originCountry = (details && details.previousLinkedCountry) ? details.previousLinkedCountry : null;
+    var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry, originCountry);
     this.addImpact(event, 'simple', message, this.getMvImpactId(mvEvent), true, details);
   },
 
@@ -515,10 +517,12 @@ var RelocationImpactDetector = {
    * @param {Object} event - SimEvent object
    * @param {Object} mvEvent - The MV event
    * @param {string} destinationCountry - Destination country code
+   * @param {string} originCountry - Origin country code (optional)
    * @returns {string}
    */
-  generateImpactMessage: function (category, event, mvEvent, destinationCountry) {
+  generateImpactMessage: function (category, event, mvEvent, destinationCountry, originCountry) {
     var destinationCountryName = Config.getInstance().getCountryNameByCode(destinationCountry);
+    var originCountryName = originCountry ? Config.getInstance().getCountryNameByCode(originCountry) : null;
     var noun;
     switch (event.type) {
       case 'E': noun = 'expense'; break;
@@ -526,13 +530,15 @@ var RelocationImpactDetector = {
       case 'M': noun = 'mortgage'; break;
       default: noun = 'income'; break;
     }
+
+    if (noun === 'property' || noun === 'mortgage') {
+      var countryForQuestion = originCountryName || destinationCountryName;
+      return 'Is this ' + noun + ' still relevant in ' + countryForQuestion + '?';
+    }
+
     switch (category) {
       case 'boundary':
-        if (noun === 'property' || noun === 'mortgage') {
-          return 'Are you keeping this property after your move to ' + destinationCountryName + '?';
-        } else {
-          return 'Does this ' + noun + ' continue after your move to ' + destinationCountryName + '?';
-        }
+        return 'Does this ' + noun + ' continue after your move to ' + destinationCountryName + '?';
       case 'simple':
         if (mvEvent && this.checkPensionConflict(event, destinationCountry, mvEvent.fromAge)) {
           return 'Are you converting this salary to a non-pensionable salary after your move to ' + destinationCountryName + '?';

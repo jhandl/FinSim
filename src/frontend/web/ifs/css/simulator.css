@@ -5218,23 +5218,27 @@ footer {
 
 /* Inline country selector in property resolution panel */
 .country-selector-inline {
-  margin: 0.5rem 0;
-  /* reduced */
+  margin: 0.25rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .country-selector-inline label {
-  display: block;
-  margin-bottom: 0.25rem;
-  /* reduced */
+  display: inline-block;
+  margin-bottom: 0;
   font-weight: 600;
   color: #333;
   font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .country-selector-inline select {
-  width: 100%;
+  width: var(--event-amount-input-min-width);
+  min-width: var(--event-amount-input-min-width);
+  max-width: var(--event-amount-input-min-width);
   padding: 0.35rem;
-  /* reduced */
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 0.9rem;

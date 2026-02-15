@@ -213,6 +213,9 @@ var RelocationImpactAssistant = {
         // Fallback: if no currency or country found, use startCountry
         if (!originalCountry) originalCountry = startCountry;
 
+        const originalCountryObj = countries.find(function (c) { return c.code.toLowerCase() === originalCountry; });
+        const originalCountryName = originalCountryObj ? originalCountryObj.name : (originalCountry ? originalCountry.toUpperCase() : '');
+
         const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originalCountry);
         const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
         const fromMeta = getSymbolAndLocaleByCountry(originalCountry);
@@ -226,10 +229,13 @@ var RelocationImpactAssistant = {
         const toMeta = getSymbolAndLocaleByCountry(detectedCountry);
         const suggestedFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : '';
 
-        let optionsHTML = '';
-        countries.forEach(function (country) { const selected = country.code.toLowerCase() === detectedCountry ? 'selected' : ''; optionsHTML += '<option value="' + country.code.toLowerCase() + '" ' + selected + '>' + country.name + '</option>'; });
+        const label1 = hasStaleRealEstateLink ? ('In ' + originalCountryName) : 'Before move';
+        const label2 = hasStaleRealEstateLink ? ('In ' + detectedCountryName) : 'After move';
+
         containerAttributes = ' data-from-country="' + originalCountry + '" data-to-country="' + detectedCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + toCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
-        addAction(actions, { action: 'link', tabLabel: 'Link To Country', buttonLabel: 'Confirm', buttonClass: 'event-wizard-button resolution-apply resolution-confirm-btn', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<p class="micro-note">Detected country: ' + detectedCountryName + '. Change if the property belongs to a different jurisdiction.</p><div class="country-selector-inline"><label for="country-select-' + rowId + '">Country</label><select class="country-selector link-country-selector" id="country-select-' + rowId + '" data-row-id="' + rowId + '" data-from-country="' + originalCountry + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '">' + optionsHTML + '</select></div><div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-line">Before move (' + (originCurrency || '') + '): ' + currentFormatted + '</div></div><div class="split-part-info"><div class="part-line">After move (' + (toCurrency || '') + '): <input type="text" class="link-amount-input" value="' + suggestedFormatted + '" placeholder="Amount"></div></div></div></div>' });
+        addAction(actions, { action: 'delete', tabLabel: 'Remove', instantApply: true, tooltip: 'Delete this event.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+        addAction(actions, { action: 'mark_reviewed', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Ignore this impact and keep the event as it is.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+        addAction(actions, { action: 'link', tabLabel: 'Change to ' + detectedCountryName, buttonLabel: 'Confirm', buttonClass: 'event-wizard-button resolution-apply resolution-confirm-btn', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-line">' + label1 + ' (' + (originCurrency || '') + '): ' + currentFormatted + '</div></div><div class="split-part-info"><div class="part-line">' + label2 + ' <span class="link-to-currency-label">(' + (toCurrency || '') + ')</span>: <input type="text" class="link-amount-input" value="' + suggestedFormatted + '" placeholder="Amount"></div></div></div></div>' });
       } else if (event.type === 'S' || event.type === 'PP' || event.type === 'SI' || event.type === 'SI2' || event.type === 'SInp' || event.type === 'SI2np') {
         const countries = Config.getInstance().getAvailableCountries();
         const selectedCountry = (event.linkedCountry ? String(event.linkedCountry).toLowerCase() : '') || destCountry || originCountry || startCountry;
@@ -396,6 +402,17 @@ var RelocationImpactAssistant = {
     const rowId = payload && payload.rowId;
     const eventId = payload && payload.eventId;
     switch (action) {
+      case 'delete': {
+        const row = document.querySelector('tr[data-row-id="' + rowId + '"]');
+        if (row && typeof etm.deleteTableRowWithAnimation === 'function') {
+          etm.deleteTableRowWithAnimation(row);
+        }
+        break;
+      }
+      case 'mark_reviewed': {
+        if (typeof etm.markAsReviewed === 'function') etm.markAsReviewed(rowId, eventId);
+        break;
+      }
       case 'split': {
         const override = payload && payload.part2Amount;
         if (typeof etm.splitEventAtRelocation === 'function') etm.splitEventAtRelocation(rowId, override, eventId);
@@ -614,6 +631,13 @@ var RelocationImpactAssistant = {
         const suggestedFormatted = !isNaN(pppSuggestion) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestion) : '';
         const amountInput = interactionRoot.querySelector('.link-amount-input');
         if (amountInput) amountInput.value = suggestedFormatted;
+
+        const currencyLabel = interactionRoot.querySelector('.link-to-currency-label');
+        if (currencyLabel) {
+          const rs = Config.getInstance().getCachedTaxRuleSet(toCountry);
+          const toCurrency = rs && rs.getCurrencyCode ? rs.getCurrencyCode() : 'EUR';
+          currencyLabel.textContent = '(' + (toCurrency || '') + ')';
+        }
       });
     }
 
@@ -656,7 +680,7 @@ var RelocationImpactAssistant = {
       };
       if (action === 'split') { const detail = btn.closest('.resolution-detail'); const input = detail ? detail.querySelector('.part2-amount-input') : null; payload.part2Amount = input ? input.value : undefined; }
       else if (action === 'update_split_value') { const detail = btn.closest('.resolution-detail'); const input = detail ? detail.querySelector('.split-value-amount-input') : null; payload.suggestedAmount = input ? input.value : payload.suggestedAmount; }
-      else if (action === 'link') { const detail = btn.closest('.resolution-detail'); const sel = detail ? detail.querySelector('.country-selector') : null; const amountInput = detail ? detail.querySelector('.link-amount-input') : null; payload.country = sel ? sel.value : undefined; payload.convertedAmount = amountInput ? amountInput.value : undefined; }
+      else if (action === 'link') { const detail = btn.closest('.resolution-detail'); const sel = detail ? detail.querySelector('.country-selector') : null; const amountInput = detail ? detail.querySelector('.link-amount-input') : null; payload.country = sel ? sel.value : payload.toCountry; payload.convertedAmount = amountInput ? amountInput.value : undefined; }
       self.handlePanelAction(ctx.event, action, payload, ctx.env);
     });
     this._bindTabKeyboard(interactionRoot);
