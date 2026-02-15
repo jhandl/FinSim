@@ -281,6 +281,9 @@ class EventAccordionManager {
     item.className = 'events-accordion-item';
     item.dataset.eventIndex = index;
     item.dataset.accordionId = event.accordionId;
+    if (event.rowId) {
+      item.dataset.rowId = event.rowId;
+    }
 
     // Apply color coding based on event type
     const colorClass = this.getEventColorClass(event.type);
@@ -693,7 +696,7 @@ class EventAccordionManager {
   /**
    * Refresh the accordion view with current table data
    */
-  refresh() {
+  refresh(options = {}) {
     // Capture which events are expanded using stable event ids to preserve state across re-render
     let previouslyExpandedEventIds = new Set();
     try {
@@ -727,7 +730,13 @@ class EventAccordionManager {
 
     // Re-render the accordion
     this.renderAccordion();
-    this.applySortingWithAnimation();
+    
+    if (options.skipSortAnimation) {
+      // Direct sort without FLIP animation
+      this.applySortingDirectly();
+    } else {
+      this.applySortingWithAnimation();
+    }
 
     // Rebuild expandedItems based on stable event ids captured earlier
     try {
@@ -771,6 +780,72 @@ class EventAccordionManager {
     setTimeout(() => {
       this.applySortingWithAnimation(true); // true = highlight new item
     }, 50);
+  }
+
+  /**
+   * Apply sorting directly without animation
+   */
+  applySortingDirectly() {
+    const tableManager = this.webUI.eventsTableManager;
+    if (!tableManager || !tableManager.sortKeys || tableManager.sortKeys.length === 0) return;
+
+    const container = this.accordionContainer.querySelector('.events-accordion-items');
+    if (!container) return;
+
+    const items = Array.from(container.querySelectorAll('.events-accordion-item'));
+    const getValueFn = (el, col) => {
+      const accId = el.dataset.accordionId;
+      const ev = this.events.find(e => e.accordionId === accId);
+      if (!ev) return '';
+      if (col === 'creation-index') return ev.tableRowIndex !== undefined ? String(ev.tableRowIndex) : '0';
+      
+      const val = ev[col === 'from-age' ? 'fromAge' : (col === 'to-age' ? 'toAge' : col.replace('event-', ''))];
+      return val !== undefined ? String(val) : '';
+    };
+
+    const sorted = items.sort((a, b) => {
+      for (const key of tableManager.sortKeys) {
+        const cmp = SortingUtils.compareValues(getValueFn(a, key.col), getValueFn(b, key.col), key.dir);
+        if (cmp !== 0) return key.dir === 'desc' ? -cmp : cmp;
+      }
+      return 0;
+    });
+
+    sorted.forEach(el => container.appendChild(el));
+
+    // Also sort the table directly
+    const tbody = document.querySelector('#Events tbody');
+    if (tbody) {
+      const colSelectors = {
+        'event-type': '.event-type',
+        'event-name': '.event-name',
+        'event-amount': '.event-amount',
+        'from-age': '.event-from-age',
+        'to-age': '.event-to-age',
+        'event-rate': '.event-rate',
+        'event-match': '.event-match'
+      };
+      const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+      const getRowValue = (row, col) => {
+        if (col === 'creation-index') return row.dataset.creationIndex || '0';
+        const selector = colSelectors[col];
+        const el = selector ? row.querySelector(selector) : null;
+        if (!el) return '';
+        return el.value || el.textContent || '';
+      };
+      const sortedRows = rows.sort((a, b) => {
+        for (const key of tableManager.sortKeys) {
+          const cmp = SortingUtils.compareValues(getRowValue(a, key.col), getRowValue(b, key.col), key.dir);
+          if (cmp !== 0) return key.dir === 'desc' ? -cmp : cmp;
+        }
+        return 0;
+      });
+      sortedRows.forEach(r => {
+        const panel = r.nextElementSibling;
+        tbody.appendChild(r);
+        if (panel && panel.classList.contains('resolution-panel-row')) tbody.appendChild(panel);
+      });
+    }
   }
 
   /**
@@ -1815,6 +1890,43 @@ class EventAccordionManager {
 
     // Update CSS custom property for the event type column width
     this.accordionContainer.style.setProperty('--event-type-width', `${optimalWidth}px`);
+  }
+
+  /**
+   * Highlight an accordion item by its associated table row ID
+   */
+  highlightEventByRowId(rowId) {
+    if (!rowId) return;
+
+    // Search for an item that contains an element with the given data-row-id
+    const accordionItems = document.querySelectorAll('.events-accordion-item');
+    let foundItem = null;
+
+    for (const item of accordionItems) {
+      // Check if this item has the rowId in its dataset or in any of its inputs
+      const rowIdInput = item.querySelector(`[data-row-id="${rowId}"]`);
+      if (rowIdInput || item.dataset.rowId === rowId) {
+        foundItem = item;
+        break;
+      }
+    }
+
+    if (foundItem) {
+      // Add pulse animation class
+      foundItem.classList.add('new-event-highlight');
+
+      // Scroll into view if needed
+      const rect = foundItem.getBoundingClientRect();
+      const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+      if (rect.top < 0 || rect.bottom > viewportHeight) {
+        foundItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      // Remove highlight after animation completes
+      setTimeout(() => {
+        foundItem.classList.remove('new-event-highlight');
+      }, 800);
+    }
   }
 
   /**

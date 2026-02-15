@@ -3974,10 +3974,13 @@ footer {
   }
 }
 
-/* Flash for age inputs auto-updated when relocation age changes */
+/* Flash for inputs auto-updated when relocation age or amount changes */
 #Events .event-from-age.age-auto-changed,
-#Events .event-to-age.age-auto-changed {
-  animation: ageAutoChangedFlash 0.7s ease-out forwards;
+#Events .event-to-age.age-auto-changed,
+#Events .event-amount.age-auto-changed,
+#Events .event-rate.age-auto-changed,
+#Events .event-match.age-auto-changed {
+  animation: ageAutoChangedFlash 3s ease-out forwards;
 }
 
 @keyframes ageAutoChangedFlash {

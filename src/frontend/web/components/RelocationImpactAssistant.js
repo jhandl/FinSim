@@ -635,9 +635,6 @@ var RelocationImpactAssistant = {
           toCountry: panelContainer ? panelContainer.getAttribute('data-to-country') : null
         };
         self.handlePanelAction(ctx.event, action, payload, ctx.env);
-        self._refreshImpacts(ctx.env);
-        if (ctx.context === 'table') self.collapsePanelForTableRow(document.querySelector('tr[data-row-id="' + payload.rowId + '"]'));
-        else if (ctx.context === 'accordion') self._collapseAccordionPanel(ctx.accordionItem);
         return;
       }
       const tab = e.target && e.target.closest && e.target.closest('.resolution-tab');
@@ -781,7 +778,9 @@ var RelocationImpactAssistant = {
       etm.getOrCreateHiddenInput(row, 'event-linked-country', origin);
       if (originCurrency) etm.getOrCreateHiddenInput(row, 'event-currency', originCurrency);
     });
-    this._refreshImpacts(env);
+    if (etm && typeof etm._afterResolutionAction === 'function') {
+      etm._afterResolutionAction(rowId);
+    }
   },
 
   _sellProperty: function (event, payload, env) {
@@ -827,15 +826,17 @@ var RelocationImpactAssistant = {
       etm.getOrCreateHiddenInput(row, 'event-relocation-sell-anchor-age', String(relocationAge));
     });
     etm._suppressSellMarkerClear = previousSuppress;
-    this._refreshImpacts(env);
+    if (etm && typeof etm._afterResolutionAction === 'function') {
+      etm._afterResolutionAction(rowId, { flashFields: ['.event-to-age'] });
+    }
   },
 
   _rentOutProperty: function (event, payload, env) {
-    this._keepProperty(event, payload, env);
-
     var webUI = env && env.webUI ? env.webUI : null;
     var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
     if (!webUI || !etm) return;
+
+    this._keepProperty(event, payload, env);
 
     var events = webUI.readEvents(false) || [];
     var mvImpactId = event.relocationImpact && event.relocationImpact.mvEventId;
@@ -852,23 +853,7 @@ var RelocationImpactAssistant = {
       });
     }
 
-    this._refreshImpacts(env);
-  },
-
-  _refreshImpacts: function (env) {
-    var webUI = env && env.webUI ? env.webUI : null;
-    var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
-    if (!webUI || !etm) return;
-    if (typeof etm.recomputeRelocationImpacts === 'function') {
-      etm.recomputeRelocationImpacts();
-      return;
-    }
-    var events = webUI.readEvents(false);
-    var startCountry = Config.getInstance().getStartCountry();
-    if (typeof RelocationImpactDetector !== 'undefined') RelocationImpactDetector.analyzeEvents(events, startCountry);
-    etm.updateRelocationImpactIndicators(events);
-    if (typeof webUI.updateStatusForRelocationImpacts === 'function') webUI.updateStatusForRelocationImpacts(events);
-    if (webUI.eventAccordionManager && typeof webUI.eventAccordionManager.refresh === 'function') webUI.eventAccordionManager.refresh();
+    // No need for separate refresh here as _keepProperty (now using _afterResolutionAction) or addEventFromWizardWithSorting will handle it
   }
 };
 

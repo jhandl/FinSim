@@ -365,6 +365,8 @@ class EventsTableManager {
     const events = this.webUI.readEvents(false);
     const startCountry = Config.getInstance().getStartCountry();
 
+    const hadImpacts = events.some(e => e.relocationImpact);
+
     if (typeof RelocationImpactDetector !== 'undefined') {
       RelocationImpactDetector.analyzeEvents(events, startCountry);
     }
@@ -372,6 +374,14 @@ class EventsTableManager {
     this.webUI.updateStatusForRelocationImpacts(events);
     // Ensure accordion view reflects latest table state
     if (!options.skipAccordionRefresh && this.webUI.eventAccordionManager) this.webUI.eventAccordionManager.refresh();
+
+    const hasImpactsNow = events.some(e => e.relocationImpact);
+    if (hadImpacts && !hasImpactsNow) {
+      const nu = this.webUI && this.webUI.notificationUtils;
+      if (nu && typeof nu.showToast === 'function') {
+        nu.showToast('All relocation impacts resolved!', 'Success', 3);
+      }
+    }
   }
 
   setupEventTypeChangeHandler() {
@@ -683,12 +693,12 @@ class EventsTableManager {
     row.remove();
   }
 
-  _flashAgeInput(input) {
+  _flashInput(input) {
     if (!input || !input.classList) return;
     input.classList.remove('age-auto-changed');
     input.offsetHeight;
     input.classList.add('age-auto-changed');
-    setTimeout(() => { input.classList.remove('age-auto-changed'); }, 750);
+    setTimeout(() => { input.classList.remove('age-auto-changed'); }, 3000);
   }
 
   _syncSplitChainsForRelocationAgeShift(delta, markerIds, newRelocationAge) {
@@ -744,7 +754,7 @@ class EventsTableManager {
       // Relocation moved before the split range: keep destination-side row only.
       if (nextPart1To < firstFrom) {
         secondFromInput.value = String(firstFrom);
-        this._flashAgeInput(secondFromInput);
+        this._flashInput(secondFromInput);
         this._removeHiddenInput(secondRow, 'event-linked-event-id');
         this._removeHiddenInput(secondRow, 'event-relocation-split-mv-id');
         this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-age');
@@ -756,7 +766,7 @@ class EventsTableManager {
       // Relocation moved after the split range: keep origin-side row only.
       if (nextPart2From > secondTo) {
         firstToInput.value = String(secondTo);
-        this._flashAgeInput(firstToInput);
+        this._flashInput(firstToInput);
         this._removeHiddenInput(firstRow, 'event-linked-event-id');
         this._removeHiddenInput(firstRow, 'event-relocation-split-mv-id');
         this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-age');
@@ -767,8 +777,8 @@ class EventsTableManager {
 
       firstToInput.value = String(nextPart1To);
       secondFromInput.value = String(nextPart2From);
-      this._flashAgeInput(firstToInput);
-      this._flashAgeInput(secondFromInput);
+      this._flashInput(firstToInput);
+      this._flashInput(secondFromInput);
       this.getOrCreateHiddenInput(firstRow, 'event-relocation-split-anchor-age', String(newRelocationAge));
       this.getOrCreateHiddenInput(secondRow, 'event-relocation-split-anchor-age', String(newRelocationAge));
       this._removeHiddenInput(firstRow, 'event-resolution-override');
@@ -809,7 +819,7 @@ class EventsTableManager {
 
       this._suppressSellMarkerClear = true;
       toAgeInput.value = String(targetToAge);
-      this._flashAgeInput(toAgeInput);
+      this._flashInput(toAgeInput);
       toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
       this._suppressSellMarkerClear = false;
       this.getOrCreateHiddenInput(row, 'event-relocation-sell-anchor-age', String(newRelocationAge));
@@ -1530,8 +1540,14 @@ class EventsTableManager {
     setTimeout(() => {
       row.remove();
       // Recompute after original row removal so counts and badges align
-      this._afterResolutionAction(resolvedRowId);
-      // After table and accordion refresh/sort, animate the new table row
+      this._afterResolutionAction(resolvedRowId); // No animation on the "deleting" ID
+      
+      // Animate the new rows
+      if (part1Row) {
+        this._flashInput(part1Row.querySelector('.event-to-age'));
+      }
+
+      // After table and accordion refresh/sort, animate the new table row (pulse)
       if (typeof this.animateNewTableRow === 'function') {
         setTimeout(() => { this.animateNewTableRow(newEventData); }, 400);
       }
@@ -1596,7 +1612,7 @@ class EventsTableManager {
         toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }
-    this._afterResolutionAction(resolvedRowId);
+    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-to-age'] });
   }
 
   joinSplitEvents(rowId, eventId) {
@@ -1672,7 +1688,7 @@ class EventsTableManager {
     }
 
     const mergedRowId = mergedRow && mergedRow.dataset ? mergedRow.dataset.rowId : resolvedRowId;
-    this._afterResolutionAction(mergedRowId);
+    this._afterResolutionAction(mergedRowId, { flashFields: ['.event-to-age'] });
   }
 
   _findRelocationEventForImpactedRow(row) {
@@ -1760,7 +1776,7 @@ class EventsTableManager {
       this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-age');
       this._removeHiddenInput(secondRow, 'event-resolution-override');
       this._removeRowAndResolutionPanel(firstRow);
-      this._afterResolutionAction(resolvedRowId);
+      this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-from-age'] });
       return;
     }
 
@@ -1772,7 +1788,7 @@ class EventsTableManager {
       this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-age');
       this._removeHiddenInput(firstRow, 'event-resolution-override');
       this._removeRowAndResolutionPanel(secondRow);
-      this._afterResolutionAction(resolvedRowId);
+      this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-to-age'] });
       return;
     }
 
@@ -1782,7 +1798,7 @@ class EventsTableManager {
     this.getOrCreateHiddenInput(secondRow, 'event-relocation-split-anchor-age', String(relocationAge));
     this._removeHiddenInput(firstRow, 'event-resolution-override');
     this._removeHiddenInput(secondRow, 'event-resolution-override');
-    this._afterResolutionAction(resolvedRowId);
+    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-to-age', '.event-from-age'] });
   }
 
   keepSplitAsIs(rowId, eventId) {
@@ -1888,6 +1904,7 @@ class EventsTableManager {
       amountInput.dispatchEvent(new Event('change', { bubbles: true }));
     }
     this.keepSplitValueAsIs(resolvedRowId, eventId);
+    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-amount'] });
   }
 
   adaptSaleToRelocationAge(rowId, eventId) {
@@ -1932,8 +1949,8 @@ class EventsTableManager {
       this.getOrCreateHiddenInput(pairRow, 'event-relocation-sell-anchor-age', String(relocationAge));
       this._removeHiddenInput(pairRow, 'event-resolution-override');
     });
-    this._suppressSellMarkerClear = previousSuppress;
-    this._afterResolutionAction(resolvedRowId);
+    this._suppressSellMarkerClear = false;
+    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-to-age'] });
   }
 
   keepSaleAsIs(rowId, eventId) {
@@ -2003,7 +2020,7 @@ class EventsTableManager {
       if (resolvedLinkedCountry) this.getOrCreateHiddenInput(r, 'event-linked-country', resolvedLinkedCountry);
       this._setResolutionOverride(r, resolutionScope);
     });
-    this._afterResolutionAction(resolvedRowId);
+    this._afterResolutionAction(resolvedRowId); // No animation for "Keep as is"
   }
 
   acceptSuggestion(rowId, suggestedAmount, suggestedCurrency, eventId) {
@@ -2055,7 +2072,7 @@ class EventsTableManager {
         }
       }
     }
-    this._afterResolutionAction(resolvedRowId);
+    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-amount'] });
   }
 
   linkPropertyToCountry(rowId, selectedCountryOverride, convertedAmountOverride, eventId) {
@@ -2139,7 +2156,7 @@ class EventsTableManager {
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();
     }
-    this._afterResolutionAction(resolvedRowId);
+    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-amount'] });
   }
 
   linkIncomeToCountry(rowId, country, eventId) {
@@ -2172,7 +2189,7 @@ class EventsTableManager {
     if (row._eventTypeDropdown) row._eventTypeDropdown.setValue(newType);
     this.updateFieldVisibility(typeInput);
     typeInput.dispatchEvent(new Event('change', { bubbles: true }));
-    this._afterResolutionAction(resolvedRowId);
+    this._afterResolutionAction(resolvedRowId, { pulse: true });
   }
 
   // Helper: apply function to all rows with same id for both R and M
@@ -2197,20 +2214,50 @@ class EventsTableManager {
     this._setResolutionOverride(row, resolutionScope);
     // Also apply to paired real-estate rows if applicable (R/M with same id)
     this._applyToRealEstatePair(row, (r) => this._setResolutionOverride(r, resolutionScope));
-    this._afterResolutionAction(resolvedRowId);
+    this._afterResolutionAction(resolvedRowId); // No animation
   }
 
-  _afterResolutionAction(rowId) {
+  _afterResolutionAction(rowId, options = {}) {
     this.collapseResolutionPanel(rowId);
     const events = this.webUI.readEvents(false);
     const startCountry = Config.getInstance().getStartCountry();
+    
+    // Check if there were impacts before analysis
+    const hadImpacts = events.some(e => e.relocationImpact);
+    
     RelocationImpactDetector.analyzeEvents(events, startCountry);
     this.updateRelocationImpactIndicators(events);
     this.webUI.updateStatusForRelocationImpacts(events);
-    if (this.webUI.eventAccordionManager) this.webUI.eventAccordionManager.refresh();
-    // Do not auto-expand resolution panels; only show toast if none remain
-    const anyImpacts = Array.from(document.querySelectorAll('tr[data-relocation-impact="1"]')).length > 0;
-    if (!anyImpacts) {
+    if (this.webUI.eventAccordionManager) {
+      this.webUI.eventAccordionManager.refresh({ skipSortAnimation: !options.pulse });
+      // In accordion mode, the refresh re-renders everything.
+      if (rowId && options.pulse) {
+        setTimeout(() => {
+          if (typeof this.webUI.eventAccordionManager.highlightEventByRowId === 'function') {
+            this.webUI.eventAccordionManager.highlightEventByRowId(rowId);
+          }
+        }, 100);
+      }
+    }
+
+    // Handle animations for table view
+    const row = this._findEventRow(rowId);
+    if (row) {
+      if (options.pulse) {
+        // Small delay to let the resolution panel collapse animation start
+        setTimeout(() => this.animateRowHighlight(row), 100);
+      }
+      if (options.flashFields && options.flashFields.length) {
+        options.flashFields.forEach(selector => {
+          const input = row.querySelector(selector);
+          if (input) this._flashInput(input);
+        });
+      }
+    }
+
+    // Show toast if impacts were present and now they are all gone
+    const hasImpactsNow = events.some(e => e.relocationImpact);
+    if (hadImpacts && !hasImpactsNow) {
       const nu = this.webUI && this.webUI.notificationUtils;
       if (nu && typeof nu.showToast === 'function') {
         nu.showToast('All relocation impacts resolved!', 'Success', 3);
@@ -2647,7 +2694,7 @@ class EventsTableManager {
 
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
-    this.applyHighlightAnimation(emptyRow);
+    this.animateRowHighlight(emptyRow);
 
     if (this.sortKeys && this.sortKeys.length > 0) {
       this.applySortingWithAnimation();
@@ -2668,42 +2715,6 @@ class EventsTableManager {
       this.webUI.tableManager.setupTableCurrencyControls();
     }
     return { row: emptyRow, id: eventId };
-  }
-
-  /**
-   * Apply highlight animation to a table row
-   * @param {HTMLElement} row - The row to animate
-   */
-  applyHighlightAnimation(row) {
-    if (!row) return;
-
-    // Find the table container to temporarily allow overflow
-    const tableContainer = row.closest('.table-container');
-    const eventsTable = document.getElementById('Events');
-
-    // Temporarily allow overflow to prevent clipping
-    if (tableContainer) {
-      tableContainer.style.overflow = 'visible';
-    }
-    if (eventsTable) {
-      eventsTable.style.overflow = 'visible';
-    }
-
-    // Add pulse animation class
-    row.classList.add('new-event-highlight');
-
-    // Remove highlight and restore overflow after animation completes
-    setTimeout(() => {
-      row.classList.remove('new-event-highlight');
-
-      // Restore original overflow settings
-      if (tableContainer) {
-        tableContainer.style.overflow = '';
-      }
-      if (eventsTable) {
-        eventsTable.style.overflow = '';
-      }
-    }, 800); // Match animation duration
   }
 
   /**
@@ -3677,42 +3688,51 @@ class EventsTableManager {
     }
 
     if (targetRow) {
-      // Find the table container to temporarily allow overflow
-      const tableContainer = targetRow.closest('.table-container');
-      const eventsTable = document.getElementById('Events');
+      this.animateRowHighlight(targetRow);
+    }
+  }
 
-      // Temporarily allow overflow to prevent clipping
+  /**
+   * Apply a pulse/zoom animation to a table row to highlight it
+   */
+  animateRowHighlight(row) {
+    if (!row) return;
+
+    // Find the table container to temporarily allow overflow
+    const tableContainer = row.closest('.table-container');
+    const eventsTable = document.getElementById('Events');
+
+    // Temporarily allow overflow to prevent clipping
+    if (tableContainer) {
+      tableContainer.style.overflow = 'visible';
+    }
+    if (eventsTable) {
+      eventsTable.style.overflow = 'visible';
+    }
+
+    // Add pulse animation class
+    row.classList.add('new-event-highlight');
+
+    // Make sure the row is visible before highlighting; scroll only if off-screen
+    const rect = row.getBoundingClientRect();
+    const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    if (rect.top < 0 || rect.bottom > viewportHeight) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Remove highlight and restore overflow after animation completes
+    setTimeout(() => {
+      row.classList.remove('new-event-highlight');
+      row.classList.remove('just-created'); // Remove the marker if it exists
+
+      // Restore original overflow settings
       if (tableContainer) {
-        tableContainer.style.overflow = 'visible';
+        tableContainer.style.overflow = '';
       }
       if (eventsTable) {
-        eventsTable.style.overflow = 'visible';
+        eventsTable.style.overflow = '';
       }
-
-      // Add pulse animation class
-      targetRow.classList.add('new-event-highlight');
-
-      // Make sure the row is visible before highlighting; scroll only if off-screen
-      const rect = targetRow.getBoundingClientRect();
-      const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-      if (rect.top < 0 || rect.bottom > viewportHeight) {
-        targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-
-      // Remove highlight and restore overflow after animation completes
-      setTimeout(() => {
-        targetRow.classList.remove('new-event-highlight');
-        targetRow.classList.remove('just-created'); // Remove the marker
-
-        // Restore original overflow settings
-        if (tableContainer) {
-          tableContainer.style.overflow = '';
-        }
-        if (eventsTable) {
-          eventsTable.style.overflow = '';
-        }
-      }, 800);
-    }
+    }, 800);
   }
 
   /**
