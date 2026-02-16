@@ -9,7 +9,8 @@ class FormatUtils {
     
     try {
       const config = Config.getInstance();
-      const ruleset = config.getCachedTaxRuleSet();
+      const startCountry = config.getStartCountry();
+      const ruleset = config.getCachedTaxRuleSet(startCountry);
       if (ruleset) {
         numberLocale = ruleset.getNumberLocale();
         currencyCode = ruleset.getCurrencyCode();
@@ -59,8 +60,8 @@ class FormatUtils {
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return value;
     
-    // If value is decimal (< 1), multiply by 100
-    const displayValue = numValue <= 1 ? (numValue * 100) : numValue;
+    // If value is decimal (-1..1), multiply by 100
+    const displayValue = Math.abs(numValue) <= 1 ? (numValue * 100) : numValue;
     // Format with at most 1 decimal place, and remove .0 if present
     return `${parseFloat(displayValue.toFixed(1)).toString()}%`;
   }
@@ -111,9 +112,23 @@ class FormatUtils {
   }
 
 
-  setupPercentageInputs() {
+  setupPercentageInputs(force = false) {
     const percentageInputs = document.querySelectorAll('input.percentage');
     percentageInputs.forEach(input => {
+      const updatePercentageVisibility = () => {
+        const container = input.parentElement;
+        if (container && container.classList.contains('percentage-container')) {
+          container.style.setProperty('--show-percentage', input.value.trim() !== '' ? '1' : '0');
+        }
+      };
+
+      if (!force && input.getAttribute('data-percentage-initialized')) {
+        // Input can be moved to a new container (e.g. allocation panel rebuilds).
+        // Re-apply visibility state without re-binding listeners.
+        updatePercentageVisibility();
+        return;
+      }
+
       // Only wrap if not already wrapped
       if (!input.parentElement.classList.contains('percentage-container')) {
         const container = document.createElement('div');
@@ -135,14 +150,6 @@ class FormatUtils {
           }
         }
       }
-
-      // Function to update % symbol visibility
-      const updatePercentageVisibility = () => {
-        const container = input.parentElement;
-        if (container && container.classList.contains('percentage-container')) {
-          container.style.setProperty('--show-percentage', input.value.trim() !== '' ? '1' : '0');
-        }
-      };
 
       // Add event listeners
       input.addEventListener('input', updatePercentageVisibility);
@@ -169,10 +176,21 @@ class FormatUtils {
         }
         updatePercentageVisibility();
       });
+
+      // Format existing value if present (similar to setupCurrencyInputs)
+      const val = input.value;
+      if (val && val.trim() !== '') {
+        const num = parseFloat(val);
+        if (!isNaN(num)) {
+          input.value = FormatUtils.formatPercentage(num).replace('%', '');
+        }
+      }
+
+      input.setAttribute('data-percentage-initialized', 'true');
     });
   }
 
-  setupCurrencyInputs() {
+  setupCurrencyInputs(force = false) {
     const currencyInputs = document.querySelectorAll('input.currency');
     
     // Helpers to derive per-input locale settings using hidden row hints
@@ -180,7 +198,12 @@ class FormatUtils {
       try {
         const row = input.closest('tr');
         // Prefer explicit country hint when present (unambiguous for shared currencies)
-        const countryHint = row && row.querySelector ? (row.querySelector('.event-country')?.value || '') : '';
+        let countryHint = row && row.querySelector ? (row.querySelector('.event-country')?.value || '') : '';
+        if (!countryHint) {
+          const countryEl = input.closest('[data-country-code]');
+          if (countryEl) countryHint = countryEl.getAttribute('data-country-code');
+        }
+
         const code = row && row.querySelector ? (row.querySelector('.event-currency')?.value || '') : '';
         const cfg = Config.getInstance();
         if (countryHint) {
@@ -241,6 +264,8 @@ class FormatUtils {
 
     // Create container elements and apply per-input patterns
     currencyInputs.forEach(input => {
+      if (!force && input.getAttribute('data-currency-initialized')) return;
+
       if (!input.parentElement.classList.contains('currency-container')) {
         const container = document.createElement('div');
         container.className = 'currency-container';
@@ -265,31 +290,43 @@ class FormatUtils {
 
     // Use direct event listeners instead of delegation for better reliability
     currencyInputs.forEach(input => {
-      input.addEventListener('focus', function() {
-        const ls = getInputLocaleSettings(this);
-        const value = parseWithLocale(this.value, ls);
-        if (!isNaN(value)) {
-          this.value = value;
-        }
-      });
+      const isInitialized = input.getAttribute('data-currency-initialized');
+      if (!force && isInitialized) return;
 
-      input.addEventListener('blur', function() {
-        const ls = getInputLocaleSettings(this);
-        const value = parseWithLocale(this.value, ls);
-        if (!isNaN(value)) {
-          this.value = formatWithLocale(value, ls);
-        }
-      });
+      if (!isInitialized) {
+        input.addEventListener('focus', function() {
+          const ls = getInputLocaleSettings(this);
+          const value = parseWithLocale(this.value, ls);
+          if (!isNaN(value)) {
+            this.value = value;
+          }
+        });
 
-      // Format initial value if it exists and isn't already formatted according to its locale
+        input.addEventListener('blur', function() {
+          const ls = getInputLocaleSettings(this);
+          const value = parseWithLocale(this.value, ls);
+          if (!isNaN(value)) {
+            this.value = formatWithLocale(value, ls);
+          }
+        });
+      }
+
       const ls = getInputLocaleSettings(input);
       const value = input.value;
-      if (value && (ls.currencySymbol && value.indexOf(ls.currencySymbol) === -1)) {
-        const number = parseWithLocale(value, ls);
+      if (value) {
+        let number = parseWithLocale(value, ls);
+        
+        if (isNaN(number) && force) {
+          const cleanValue = value.replace(/[€$£¥₹]/g, '').trim();
+          number = parseWithLocale(cleanValue, ls);
+        }
+
         if (!isNaN(number)) {
           input.value = formatWithLocale(number, ls);
         }
       }
+
+      input.setAttribute('data-currency-initialized', 'true');
     });
   }
 

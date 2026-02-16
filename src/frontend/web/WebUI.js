@@ -637,6 +637,12 @@ class WebUI extends AbstractUI {
     }
     const investmentTypes = ruleset.getResolvedInvestmentTypes() || [];
     this.renderInvestmentParameterFields(investmentTypes);
+
+    if (this.formatUtils) {
+      this.formatUtils.setupCurrencyInputs(true);
+      this.formatUtils.setupPercentageInputs(true);
+    }
+
     if (this.dragAndDrop && typeof this.dragAndDrop.renderPriorities === 'function') {
       await this.dragAndDrop.renderPriorities();
     }
@@ -669,6 +675,10 @@ class WebUI extends AbstractUI {
 
     // Remove previously generated dynamic fields
     document.querySelectorAll('[data-dynamic-investment-param="true"]').forEach(el => {
+      try {
+        const inputs = el.querySelectorAll('input, select');
+        for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+      } catch (_) { }
       if (el && el.parentNode) el.parentNode.removeChild(el);
     });
 
@@ -767,7 +777,9 @@ class WebUI extends AbstractUI {
         input.setAttribute('pattern', '[0-9]*');
         const cached = startingCapitalCache[inputId];
         if (cached !== undefined && cached !== null && String(cached).trim() !== '') {
-          input.value = cached;
+          if (!input.value || String(input.value).trim() === '') {
+            input.value = cached;
+          }
         }
         wrapper.appendChild(input);
 
@@ -1023,7 +1035,7 @@ class WebUI extends AbstractUI {
     if (this._growthRateCacheForRestore) {
       for (const [id, value] of Object.entries(this._growthRateCacheForRestore)) {
         const input = document.getElementById(id);
-        if (input && !input.value) {
+        if (input && (!input.value || String(input.value).trim() === '')) {
           input.value = value;
         }
       }
@@ -1061,6 +1073,7 @@ class WebUI extends AbstractUI {
     // Re-apply economy mode visibility to newly created volatility cells
     this.updateUIForEconomyMode();
     this.formatUtils.setupPercentageInputs();
+    this.formatUtils.setupCurrencyInputs();
 
     const refreshGrowthRatesForRelocation = () => {
       const cfg = Config.getInstance();
@@ -1238,6 +1251,9 @@ class WebUI extends AbstractUI {
     // Personal circumstances chips + per-country state pension inputs
     this.setupPersonalCircumstancesCountryChips();
 
+    if (this.formatUtils) {
+      this.formatUtils.setupCurrencyInputs();
+    }
   }
 
   _sortInvestmentTypes(types) {
@@ -2785,6 +2801,10 @@ class WebUI extends AbstractUI {
       } else {
         group.appendChild(creditContainer);
       }
+
+      if (this.formatUtils) {
+        this.formatUtils.setupCurrencyInputs();
+      }
       return;
     }
 
@@ -2903,6 +2923,10 @@ class WebUI extends AbstractUI {
     // Respect single/couple toggle for the P2 per-country state pension wrappers
     this._syncP2CountryStatePensionVisibility();
     this.countryTabSyncManager.setSelectedCountry('personalCircumstances', selected);
+
+    if (this.formatUtils) {
+      this.formatUtils.setupCurrencyInputs();
+    }
   }
 
   _showStatePensionCountry(code) {
@@ -4078,9 +4102,42 @@ class WebUI extends AbstractUI {
         options,
         selectedValue: hiddenInput.value,
         onSelect: (val, label) => {
+          if (hiddenInput.value === val) return;
+          
+          // Capture current values as numbers before changing the country (and thus the locale)
+          const capturedValues = {};
+          const currencyInputs = document.querySelectorAll('input.currency, input.percentage');
+          currencyInputs.forEach(input => {
+            if (input && input.id) {
+              try {
+                const num = this.getValue(input.id);
+                if (num !== undefined && num !== null && !isNaN(num)) {
+                  capturedValues[input.id] = num;
+                }
+              } catch (_) { }
+            }
+          });
+
           hiddenInput.value = val;
           hiddenInput.dataset.auto = '0'; // user-chosen
           toggleSpan.textContent = label;
+          
+          // Apply captured numeric values back to inputs after the country change
+          // but before listeners (like ensureInvestmentParameterFields) run.
+          // This ensures they are re-formatted using the NEW locale from the same numeric base.
+          for (const [id, num] of Object.entries(capturedValues)) {
+            const input = document.getElementById(id);
+            if (input) {
+              if (input.classList.contains('percentage')) {
+                input.value = FormatUtils.formatPercentage(num).replace('%', '');
+              } else {
+                // For currency and other numeric types, we set the raw number; 
+                // FormatUtils.setupCurrencyInputs will format it correctly.
+                input.value = num;
+              }
+            }
+          }
+
           // Fire change so listeners update
           hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
         },
@@ -4562,6 +4619,10 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
 
     // Load field labels configuration
     await webUi.fieldLabelsManager.loadLabels();
+
+    if (webUi.formatUtils) {
+      webUi.formatUtils.setupCurrencyInputs();
+    }
 
     // Show welcome modal based on user preference
     const welcomeModalState = localStorage.getItem('welcomeModalState') || 'on';

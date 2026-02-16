@@ -3,7 +3,10 @@ const path = require('path');
 
 // Mocks
 global.AbstractUI = class {};
-global.FormatUtils = class { setupPercentageInputs() {} };
+global.FormatUtils = class { 
+  setupPercentageInputs() {} 
+  setupCurrencyInputs() {}
+};
 global.NotificationUtils = class { setStatus() {} setErrorModalUtils() {} };
 global.ErrorModalUtils = class {};
 global.FieldLabelsManager = class { static getInstance() { return {}; } };
