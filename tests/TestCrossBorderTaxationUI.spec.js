@@ -102,7 +102,16 @@ test('attribution tooltip shows source tax, residence tax, and foreign tax credi
     await taxCell.dispatchEvent('touchstart');
     await page.waitForTimeout(700);
   } else {
-    await taxCell.hover();
+    // Desktop runs can have sticky table headers temporarily intercepting pointer events.
+    // Trigger tooltip handlers directly first, then fall back to a forced hover.
+    await taxCell.dispatchEvent('pointerover');
+    await taxCell.dispatchEvent('mouseover');
+    await taxCell.dispatchEvent('mouseenter');
+    await page.waitForTimeout(150);
+    const tooltipVisible = await frame.locator('.visualization-tooltip').last().isVisible().catch(() => false);
+    if (!tooltipVisible) {
+      await taxCell.hover({ force: true });
+    }
   }
   await expect(frame.locator('.visualization-tooltip').last()).toBeVisible({ timeout: 5000 });
 

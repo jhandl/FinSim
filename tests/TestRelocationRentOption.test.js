@@ -81,7 +81,7 @@ describe('Relocation Rent Option', () => {
 
   test('Render "Rent Out" option and trigger action', () => {
     const economicData = {
-      ready: false,
+      ready: true,
       getFX: jest.fn(() => 1.0),
       getPPP: jest.fn(() => 1.0)
     };
@@ -89,11 +89,13 @@ describe('Relocation Rent Option', () => {
       isRelocationEnabled: () => true,
       getDefaultCountry: () => 'ar',
       getStartCountry: () => 'ar',
+      getSimulationStartYear: () => 2026,
       getCountryNameByCode: (code) => (code === 'us' ? 'United States' : 'Argentina'),
       getCachedTaxRuleSet: (code) => ({
         getCurrencySymbol: () => (code === 'us' ? '$' : '$'),
         getNumberLocale: () => 'en-US',
-        getCurrencyCode: () => (code || 'usd').toUpperCase()
+        getCurrencyCode: () => (code || 'usd').toUpperCase(),
+        getEconomicData: () => ({ typicalRentalYield: 4.0 })
       }),
       getEconomicData: () => economicData,
       getAvailableCountries: () => [
@@ -142,6 +144,7 @@ describe('Relocation Rent Option', () => {
             recomputeRelocationImpacts: jest.fn(),
             getOrCreateHiddenInput: jest.fn(), // for _keepProperty
             _applyToRealEstatePair: jest.fn(), // for _keepProperty
+            _getRelocationLinkIdByImpactId: jest.fn(() => 'mvlink_rent_1')
         }
     };
     
@@ -153,7 +156,7 @@ describe('Relocation Rent Option', () => {
     
     const buttons = panel.querySelectorAll('button[data-action="rent_out"]');
     expect(buttons.length).toBeGreaterThan(0);
-    expect(buttons[0].textContent).toBe('Rent Out');
+    expect(buttons[0].textContent).toBe('Rent out');
 
     const applyButton = panel.querySelector('.resolution-instant-btn[data-action="rent_out"]');
     expect(applyButton).toBeTruthy();
@@ -162,14 +165,101 @@ describe('Relocation Rent Option', () => {
     
     expect(rentOutSpy).toHaveBeenCalled();
     
-    // Check if addEventFromWizardWithSorting was called
+    // Check if addEventFromWizardWithSorting was called with estimated amount
+    // property value 500,000 * 4% yield = 20,000. Origin currency '$' (ARS in mock). PPP is NOT applied.
     expect(env.eventsTableManager.addEventFromWizardWithSorting).toHaveBeenCalledWith({
         eventType: 'RI',
         name: 'MyHouse',
-        amount: '',
+        amount: '$20000',
         fromAge: 40,
-        toAge: 80
+        toAge: 80,
+        relocationReviewed: true,
+        relocationImpact: event.relocationImpact,
+        relocationRentMvId: 'mvlink_rent_1',
+        linkedCountry: 'ar',
+        currency: 'AR'
     });
+  });
+
+  test('orphan rent-out panel shows Keep Renting and Remove actions', () => {
+    const configStub = {
+      isRelocationEnabled: () => true,
+      getDefaultCountry: () => 'ar',
+      getStartCountry: () => 'ar',
+      getSimulationStartYear: () => 2026,
+      getCountryNameByCode: (code) => (code === 'us' ? 'United States' : 'Argentina'),
+      getCachedTaxRuleSet: () => ({
+        getCurrencySymbol: () => '$',
+        getNumberLocale: () => 'en-US',
+        getCurrencyCode: () => 'AR'
+      }),
+      getEconomicData: () => ({ ready: false, getFX: jest.fn(() => null), getPPP: jest.fn(() => null) }),
+      getAvailableCountries: () => [
+        { code: 'ar', name: 'Argentina' },
+        { code: 'us', name: 'United States' }
+      ]
+    };
+    global.Config = { getInstance: () => configStub };
+
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-ri" data-event-id="event-ri">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="RI" />
+                <input class="event-relocation-rent-mv-id" value="mvlink_rent_removed" />
+              </div>
+            </td>
+            <td>
+              <input class="event-name" value="MyHouse" />
+              <input class="event-from-age" value="40" />
+              <input class="event-to-age" value="80" />
+              <input class="event-amount" value="20000" />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const row = document.querySelector('tr[data-row-id="row-ri"]');
+    const event = {
+      id: 'rent_orphan',
+      type: 'RI',
+      fromAge: 40,
+      toAge: 80,
+      amount: 20000,
+      relocationRentMvId: 'mvlink_rent_removed',
+      relocationImpact: {
+        category: 'simple',
+        mvEventId: '',
+        details: { relocationRentalOrphan: true }
+      }
+    };
+    const env = {
+      webUI: {
+        readEvents: jest.fn(() => [event]),
+        updateStatusForRelocationImpacts: jest.fn(),
+        eventAccordionManager: { refresh: jest.fn() }
+      },
+      eventsTableManager: {
+        _findEventRow: jest.fn(() => row),
+        _removeHiddenInput: jest.fn(),
+        _afterResolutionAction: jest.fn()
+      }
+    };
+
+    RelocationImpactAssistant.renderPanelForTableRow(row, event, env);
+    const panel = document.querySelector('.resolution-panel-row');
+    expect(panel).toBeTruthy();
+    expect(panel.querySelector('.resolution-instant-btn[data-action="keep_renting"]')).toBeTruthy();
+    expect(panel.querySelector('.resolution-instant-btn[data-action="delete"]')).toBeTruthy();
+    expect(panel.querySelector('.resolution-instant-btn[data-action="keep_renting"]').textContent).toBe('Keep renting');
+    expect(panel.querySelector('.resolution-instant-btn[data-action="delete"]').textContent).toBe('Remove');
+
+    panel.querySelector('.resolution-instant-btn[data-action="keep_renting"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(env.eventsTableManager._removeHiddenInput).toHaveBeenCalledWith(row, 'event-relocation-rent-mv-id');
+    expect(env.eventsTableManager._afterResolutionAction).toHaveBeenCalledWith('row-ri', { pulse: true });
   });
 
   test('sell property cuts property and mortgage to the last age before relocation', () => {
@@ -248,7 +338,6 @@ describe('Relocation Rent Option', () => {
       }),
       _getRelocationLinkIdByImpactId: jest.fn(() => 'mvlink_1700000000_test')
     };
-    jest.spyOn(RelocationImpactAssistant, '_refreshImpacts').mockImplementation(() => {});
 
     RelocationImpactAssistant._sellProperty(event, { rowId: 'row-1' }, {
       webUI: webUIStub,
@@ -609,5 +698,83 @@ describe('Relocation Rent Option', () => {
     expect(document.querySelector('tr[data-row-id="row-mv-2"] .event-relocation-link-id').value).toBe(runtimeLink);
     expect(document.querySelector('tr[data-row-id="row-mv-1"] .event-relocation-link-id')).toBeNull();
     expect(ambiguousNameLink).toBe('');
+  });
+
+  test('mortgage pay-off action is decoupled from property row', () => {
+    const configStub = {
+      isRelocationEnabled: () => true,
+      getDefaultCountry: () => 'ar',
+      getStartCountry: () => 'ar',
+      getCountryNameByCode: () => 'Argentina',
+      getCachedTaxRuleSet: () => ({
+        getCurrencySymbol: () => '$',
+        getNumberLocale: () => 'en-US',
+        getCurrencyCode: () => 'USD'
+      }),
+      getEconomicData: () => ({ ready: false, getFX: jest.fn(() => 1.0), getPPP: jest.fn(() => 1.0) }),
+      getAvailableCountries: () => []
+    };
+    global.Config = { getInstance: () => configStub };
+
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-r1">
+            <td><input class="event-type" value="R" /></td>
+            <td><input class="event-name" value="HomeA" /></td>
+            <td><input class="event-to-age" value="80" /></td>
+          </tr>
+          <tr data-row-id="row-m1">
+            <td><input class="event-type" value="M" /></td>
+            <td><input class="event-name" value="HomeA" /></td>
+            <td><input class="event-to-age" value="80" /></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const event = {
+      id: 'HomeA',
+      type: 'M',
+      fromAge: 30,
+      toAge: 80,
+      relocationImpact: { category: 'boundary', mvEventId: 'Relocation' }
+    };
+    const relocationEvent = { id: 'Relocation', type: 'MV', name: 'US', fromAge: 40, toAge: 40 };
+    const webUIStub = {
+      readEvents: jest.fn(() => [event, relocationEvent]),
+      updateStatusForRelocationImpacts: jest.fn(),
+      eventAccordionManager: { refresh: jest.fn() }
+    };
+    const eventsTableManagerStub = {
+      _findEventRow: jest.fn((rowId) => document.querySelector(`tr[data-row-id="${rowId}"]`)),
+      _applyToRealEstatePair: jest.fn(),
+      getOrCreateHiddenInput: jest.fn((row, className, value) => {
+        let input = row.querySelector('.' + className);
+        if (!input) {
+          input = document.createElement('input');
+          input.type = 'hidden';
+          input.className = className;
+          row.appendChild(input);
+        }
+        input.value = value;
+        return input;
+      }),
+      _getRelocationLinkIdByImpactId: jest.fn(() => 'mvlink_payoff')
+    };
+
+    RelocationImpactAssistant._sellProperty(event, { rowId: 'row-m1' }, {
+      webUI: webUIStub,
+      eventsTableManager: eventsTableManagerStub
+    });
+
+    const propertyToAge = document.querySelector('tr[data-row-id="row-r1"] .event-to-age').value;
+    const mortgageToAge = document.querySelector('tr[data-row-id="row-m1"] .event-to-age').value;
+    const mortgageSellMv = document.querySelector('tr[data-row-id="row-m1"] .event-relocation-sell-mv-id').value;
+    
+    expect(mortgageToAge).toBe('39');
+    expect(mortgageSellMv).toBe('mvlink_payoff');
+    // Property row should NOT be affected
+    expect(propertyToAge).toBe('80');
   });
 });

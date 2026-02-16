@@ -21,9 +21,11 @@ Run: python3 getFinData.py IE AR
 This script now writes the fetched economic data directly into each
 `src/core/config/tax-rules-<country>.json` file under the `economicData`
 section (creating or updating it as needed).
+It also fetches rental yields (migrated from `get2.py`) and writes
+`economicData.typicalRentalYield` for each selected country.
 """
 
-import sys, json, time, urllib.request, urllib.parse, xml.etree.ElementTree as ET
+import sys, json, time, re, urllib.request, urllib.parse, xml.etree.ElementTree as ET
 from typing import Dict, Any, List, Optional, Tuple
 from collections import OrderedDict
 from pathlib import Path
@@ -33,6 +35,7 @@ IMF_BASE = "https://www.imf.org/external/datamapper/api/v1"
 ECB_XML_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
 EXCHANGERATE_API_BASE = "https://api.exchangerate-api.com/v4/latest/EUR"
 EXCHANGERATE_HOST_BASE = "https://api.exchangerate.host/latest"
+RENTAL_YIELDS_URL = "https://www.globalpropertyguide.com/rental-yields"
 
 def http_get_json(url: str):
     for _ in range(3):
@@ -257,7 +260,7 @@ def fetch(codes: List[str]) -> Tuple[List[Dict[str, Any]], Dict[str, float], Opt
     usd_per_eur = fx_map.get("USD") if fx_map else None
     out = []
     for c in [x.upper() for x in codes]:
-        curr, iso3, _ = wb_country_info(c)
+        curr, iso3, wb_name = wb_country_info(c)
         if iso3 is None:
             iso3 = c
         infl, infl_y = wb_latest(c, "FP.CPI.TOTL.ZG")
@@ -297,6 +300,7 @@ def fetch(codes: List[str]) -> Tuple[List[Dict[str, Any]], Dict[str, float], Opt
         ppp_series = imf_fetch_ppp_series(iso3)
         out.append({
             "country": c,
+            "countryName": wb_name,
             "curr": curr,
             "infl": round(infl, 4) if infl is not None else None,
             "infl_year": infl_y,
@@ -461,8 +465,36 @@ def calculate_median_log_cpi(cpi_series: Dict[Any, float], window_years: int = 2
     
     return cpi_val, most_recent_historical_year
 
-def update_economic_block(entry: Dict[str, Any], currency_code_from_locale: Optional[str] = None) -> OrderedDict:
+def _promote_key_first(d: OrderedDict, key: str) -> OrderedDict:
+    if not isinstance(d, dict) or key not in d:
+        return d
+    out = OrderedDict()
+    out[key] = d[key]
+    for k, v in d.items():
+        if k == key:
+            continue
+        out[k] = v
+    return out
+
+def _normalize_country_name(name: str) -> str:
+    # Permissive normalizer for matching across data sources.
+    return re.sub(r"[^a-z0-9]+", "", (name or "").lower())
+
+def lookup_rental_yield_pct(yields_by_norm_name: Dict[str, float], country_name: Optional[str]) -> Optional[float]:
+    if not yields_by_norm_name or not country_name:
+        return None
+    key = _normalize_country_name(country_name)
+    return yields_by_norm_name.get(key)
+
+def update_economic_block(
+    entry: Dict[str, Any],
+    currency_code_from_locale: Optional[str] = None,
+    typical_rental_yield_pct: Optional[float] = None,
+) -> OrderedDict:
     econ = OrderedDict()
+    
+    if typical_rental_yield_pct is not None:
+        econ["typicalRentalYield"] = round(float(typical_rental_yield_pct), 2)
     
     # Calculate CPI using median of log-changes over historical data
     cpi_series = entry.get("series", {}).get("inflation", {})
@@ -535,7 +567,7 @@ def insert_economic_block(data: OrderedDict, econ: OrderedDict):
         merged.pop("timeSeries", None)
         # Remove projectionWindowYears as it is now baked into the Python script (30y)
         merged.pop("projectionWindowYears", None)
-        econ = merged
+        econ = _promote_key_first(merged, "typicalRentalYield")
     # Rebuild ordered dict placing economicData after locale when possible
     new_items = []
     inserted = False
@@ -562,13 +594,76 @@ def get_fx_rate_from_apis(currency_code: str, fx_map: Dict[str, float]) -> Optio
         return 1.0
     return fx_map.get(curr_upper) if fx_map else None
 
+def _parse_yield_table_rows(rows: List[Dict[str, Any]]) -> Dict[str, float]:
+    yields: Dict[str, float] = {}
+    for r in rows:
+        c = (r.get("country") or "").strip()
+        ytxt = (r.get("yieldText") or "").strip()
+        if not c or not ytxt:
+            continue
+        m = re.search(r"(\d+(?:\.\d+)?)\s*%", ytxt)
+        if not m:
+            continue
+        yields[c] = round(float(m.group(1)), 2)
+    return yields
+
+async def fetch_rental_yields_via_playwright(headless: bool) -> Dict[str, float]:
+    # Migrated from get2.py (Playwright scrape of globalpropertyguide.com).
+    from playwright.async_api import async_playwright, TimeoutError as PWTimeout
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=headless)
+        context = await browser.new_context()
+        page = await context.new_page()
+
+        await page.goto(RENTAL_YIELDS_URL, wait_until="domcontentloaded", timeout=120_000)
+
+        try:
+            await page.wait_for_selector("#simpletable tbody tr", timeout=60_000)
+        except PWTimeout:
+            raise RuntimeError("Timed out waiting for #simpletable rows (paywall/challenge/selector changed).") from None
+
+        rows = await page.eval_on_selector_all(
+            "#simpletable tbody tr",
+            """trs => trs.map(tr => {
+                const tds = Array.from(tr.querySelectorAll("td"));
+                const country = (tds[0]?.innerText || "").trim();
+                const yieldText = (tds[1]?.innerText || "").trim();
+                return { country, yieldText };
+            })""",
+        )
+
+        yields = _parse_yield_table_rows(rows)
+        await context.close()
+        await browser.close()
+        return yields
+
+def write_rental_yields_tsv(path: Path, yields_by_country_name: Dict[str, float]):
+    lines = []
+    for country in sorted(yields_by_country_name.keys()):
+        lines.append(f"{country}\t{yields_by_country_name[country]:.2f}")
+    path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
+def build_normalized_rental_yield_map(yields_by_country_name: Dict[str, float]) -> Dict[str, float]:
+    out: Dict[str, float] = {}
+    for country_name, pct in yields_by_country_name.items():
+        out[_normalize_country_name(country_name)] = round(float(pct), 2)
+    return out
+
 def main():
+    base_path = Path(__file__).parent / "src" / "core" / "config"
+    yields_path = Path(__file__).parent / "yields"
+
     if len(sys.argv) < 2:
         print("Usage: python getFinData.py <ISO2> [<ISO2> ...]")
         sys.exit(1)
+
     codes = sys.argv[1:]
     data, fx_map_free, fx_date_free = fetch(codes)
-    base_path = Path(__file__).parent / "src" / "core" / "config"
+    import asyncio
+    yields_by_country = asyncio.run(fetch_rental_yields_via_playwright(headless=False))
+    write_rental_yields_tsv(yields_path, yields_by_country)
+    yields_by_norm_name = build_normalized_rental_yield_map(yields_by_country)
     
     for entry in data:
         country = entry["country"].lower()
@@ -580,6 +675,10 @@ def main():
         # Extract currency code from locale for accurate EUR detection and FX lookup
         locale = rules.get("locale", {})
         currency_code = locale.get("currencyCode", "") if isinstance(locale, dict) else ""
+        yield_pct = lookup_rental_yield_pct(
+            yields_by_norm_name,
+            (rules.get("countryName") or entry.get("countryName")),
+        )
         
         # If entry's FX is missing or we have better free API data, use the locale currency code to look it up
         if currency_code and fx_map_free:
@@ -589,7 +688,11 @@ def main():
                 if fx_date_free:
                     entry["fx_date"] = fx_date_free
         
-        econ_block = update_economic_block(entry, currency_code_from_locale=currency_code)
+        econ_block = update_economic_block(
+            entry,
+            currency_code_from_locale=currency_code,
+            typical_rental_yield_pct=yield_pct,
+        )
         updated = insert_economic_block(rules, econ_block)
         write_tax_rules(tax_file, updated)
         print(f"[OK] Updated economic data for {entry['country']} -> {tax_file}")

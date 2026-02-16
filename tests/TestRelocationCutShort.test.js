@@ -24,6 +24,7 @@ describe('Relocation cut-short resolution', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     global.requestAnimationFrame = (cb) => { if (typeof cb === 'function') cb(); };
+    global.RelocationImpactDetector = { analyzeEvents: jest.fn() };
     global.TooltipUtils = { attachTooltip: jest.fn() };
     global.FormatUtils = {
       getLocaleSettings: () => ({ numberLocale: 'en-US', currencySymbol: '$' }),
@@ -206,7 +207,10 @@ describe('Relocation cut-short resolution', () => {
 
     const row = document.querySelector('tr[data-row-id="row-1"]');
     expect(row.querySelector('.event-to-age').value).toBe('39');
-    expect(afterSpy).toHaveBeenCalledWith('row-1');
+    expect(afterSpy).toHaveBeenCalledWith('row-1', expect.objectContaining({
+      pulse: true,
+      flashFields: ['.event-to-age']
+    }));
   });
 
   test('sell_property keeps both real-estate rows linked so relocation age shifts update both', () => {
@@ -365,18 +369,10 @@ describe('Relocation cut-short resolution', () => {
     expect(panel.querySelector('.resolution-tab[data-action="keep_split_value_as_is"]')).toBeTruthy();
     expect(panel.querySelector('.resolution-tab[data-action="update_split_value"]')).toBeTruthy();
 
-    const updateTab = panel.querySelector('.resolution-tab[data-action="update_split_value"]');
-    expect(updateTab).toBeTruthy();
-    updateTab.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
-    const amountInput = panel.querySelector('.split-value-amount-input');
-    expect(amountInput).toBeTruthy();
-    amountInput.value = '241500';
-
-    const confirmButton = panel.querySelector('.resolution-apply[data-action="update_split_value"]');
-    expect(confirmButton).toBeTruthy();
-    confirmButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    expect(env.eventsTableManager.updateSplitValue).toHaveBeenCalledWith('row-1', '241500', 'event-1');
+    const updateButton = panel.querySelector('.resolution-instant-btn[data-action="update_split_value"]');
+    expect(updateButton).toBeTruthy();
+    updateButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(env.eventsTableManager.updateSplitValue).toHaveBeenCalledWith('row-1', '240000', 'event-1');
   });
 
   test('sale relocation age-shift panel exposes adapt/leave actions', () => {
@@ -457,5 +453,92 @@ describe('Relocation cut-short resolution', () => {
 
     expect(row.querySelector('.event-type').value).toBe('MV');
     expect(row.querySelector('.event-type-dd .dd-toggle').textContent).toBe('Relocation');
+  });
+
+  test('deleting relocation clears matching resolution override tags for all impacted events', () => {
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-mv" data-event-id="mv-runtime-1">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="MV" />
+                <input class="event-relocation-link-id" value="mvlink_1" />
+              </div>
+            </td>
+            <td><input class="event-name" value="US" /></td>
+          </tr>
+          <tr data-row-id="row-si">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="SI" />
+                <input class="event-resolution-override" value="1" />
+                <input class="event-resolution-mv-id" value="mv-runtime-1" />
+                <input class="event-resolution-category" value="boundary" />
+              </div>
+            </td>
+            <td><input class="event-name" value="Salary" /></td>
+          </tr>
+          <tr data-row-id="row-ri">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="RI" />
+                <input class="event-resolution-override" value="1" />
+                <input class="event-resolution-mv-id" value="mvlink_1" />
+                <input class="event-resolution-category" value="simple" />
+              </div>
+            </td>
+            <td><input class="event-name" value="Rental" /></td>
+          </tr>
+          <tr data-row-id="row-rm">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="R" />
+                <input class="event-resolution-override" value="1" />
+                <input class="event-resolution-mv-id" value="mvlink_1" />
+                <input class="event-resolution-category" value="boundary" />
+                <input class="event-linked-country" value="ar" />
+                <input class="event-currency" value="ARS" />
+              </div>
+            </td>
+            <td><input class="event-name" value="House" /></td>
+          </tr>
+          <tr data-row-id="row-unrelated">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="E" />
+                <input class="event-resolution-override" value="1" />
+                <input class="event-resolution-mv-id" value="mvlink_other" />
+                <input class="event-resolution-category" value="simple" />
+              </div>
+            </td>
+            <td><input class="event-name" value="Expense" /></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const manager = Object.create(EventsTableManager.prototype);
+    manager.collapseResolutionPanel = jest.fn();
+    manager.deleteRowWithSlideUp = jest.fn();
+    manager._clearRelocationAgeShift = jest.fn();
+
+    const mvRow = document.querySelector('tr[data-row-id="row-mv"]');
+    manager.deleteTableRowWithAnimation(mvRow);
+
+    expect(document.querySelector('tr[data-row-id="row-si"] .event-resolution-override')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-ri"] .event-resolution-override')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-si"] .event-resolution-mv-id')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-ri"] .event-resolution-mv-id')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-rm"] .event-resolution-override')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-rm"] .event-resolution-mv-id')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-rm"] .event-linked-country')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-rm"] .event-currency')).toBeNull();
+
+    expect(document.querySelector('tr[data-row-id="row-unrelated"] .event-resolution-override')).not.toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-unrelated"] .event-resolution-mv-id').value).toBe('mvlink_other');
+
+    expect(manager._clearRelocationAgeShift).toHaveBeenCalledWith(expect.arrayContaining(['mv-runtime-1', 'mvlink_1']));
+    expect(manager.deleteRowWithSlideUp).toHaveBeenCalledWith(mvRow);
   });
 });

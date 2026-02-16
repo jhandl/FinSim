@@ -45,10 +45,10 @@ const expectedBaselines = {
   },
   "IE→US Relocation": {
     cash: 0,
-    indexFunds_ie: 141484.39,
-    shares_ie: 88238.61,
+    indexFunds_ie: 142758.56,
+    shares_ie: 88986.39,
     usIndexFunds: 20191.91,
-    usShares: 15854.88,
+    usShares: 15946.51,
     it: 0,
     prsi: 0,
     usc: 0,

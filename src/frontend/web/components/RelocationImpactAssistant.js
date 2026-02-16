@@ -39,6 +39,8 @@ var RelocationImpactAssistant = {
         if (e.target !== expander) return;
         expander.removeEventListener('transitionend', onClosed);
         if (panelRow.parentNode) panelRow.remove();
+        // Trigger resize after panel removal to update layout
+        window.dispatchEvent(new Event('resize'));
       };
       expander.addEventListener('transitionend', onClosed);
     } else {
@@ -92,6 +94,7 @@ var RelocationImpactAssistant = {
     if (typeof impactDetails === 'string') {
       try { impactDetails = JSON.parse(impactDetails); } catch (_) { impactDetails = null; }
     }
+    const isRelocationRentalOrphan = !!(impactDetails && impactDetails.relocationRentalOrphan === true);
     const mvEventId = event && event.relocationImpact ? event.relocationImpact.mvEventId : null;
     let mvEvent = events.find(function (e) {
       return e && (e.id === mvEventId || e._mvRuntimeId === mvEventId);
@@ -122,7 +125,7 @@ var RelocationImpactAssistant = {
       }
     }
     const startCountry = Config.getInstance().getStartCountry();
-    const canRenderWithoutMv = (impactCategory === 'simple' && (event.type === 'R' || event.type === 'M'));
+    const canRenderWithoutMv = (impactCategory === 'simple' && (event.type === 'R' || event.type === 'M' || (event.type === 'RI' && isRelocationRentalOrphan)));
     if (!mvEvent && !canRenderWithoutMv && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift' && impactCategory !== 'split_amount_shift') return '';
     const destCountry = mvEvent ? String(mvEvent.name || '').trim().toLowerCase() : startCountry;
     const originCountry = mvEvent && (env && env.eventsTableManager && typeof env.eventsTableManager.getOriginCountry === 'function') ? env.eventsTableManager.getOriginCountry(mvEvent, startCountry) : startCountry;
@@ -160,13 +163,29 @@ var RelocationImpactAssistant = {
     let containerAttributes = '';
 
     if (event.relocationImpact.category === 'boundary') {
-      if (event.type === 'R' || event.type === 'M') {
+      if (event.type === 'R') {
+        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
+        const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
+        const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
+        const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
+        const fromMeta = getSymbolAndLocaleByCountry(originCountry);
+
+        var yieldRate = 0.04; // Default 4%
+        var econData = fromRuleSet ? fromRuleSet.getEconomicData() : null;
+        if (econData && typeof econData.typicalRentalYield === 'number') {
+          yieldRate = econData.typicalRentalYield / 100;
+        }
+        var estimatedRentOrigin = Math.round(baseAmountSanitized * yieldRate);
+        var inputFormatted = !isNaN(estimatedRentOrigin) ? fmtWithSymbol(fromMeta.symbol, fromMeta.locale, estimatedRentOrigin) : '';
+
+        addAction(actions, { action: 'keep_property', tabLabel: 'Keep property', instantApply: true, tooltip: 'Keep this property after relocation.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+        addAction(actions, { action: 'rent_out', tabLabel: 'Rent out', instantApply: true, tooltip: 'Keep the property and start renting it out after the relocation. Estimated rental income: ' + inputFormatted + ' ' + (originCurrency || '') + '.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+        addAction(actions, { action: 'sell_property', tabLabel: 'Sell property', instantApply: true, tooltip: 'Sell the property when relocating.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+      } else if (event.type === 'M') {
         const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
         const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
-        const originCountryCode = originCountry ? originCountry.toUpperCase() : '';
-        addAction(actions, { action: 'keep_property', tabLabel: 'Keep Property', instantApply: true, tooltip: 'Keep the property and associated mortgage.', buttonAttrs: ' data-row-id="' + rowId + '"' });
-        addAction(actions, { action: 'rent_out', tabLabel: 'Rent Out', instantApply: true, tooltip: 'Keep the property and start renting it out after the relocation.', buttonAttrs: ' data-row-id="' + rowId + '"' });
-        addAction(actions, { action: 'sell_property', tabLabel: 'Sell Property', instantApply: true, tooltip: 'Sell the property when relocating.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+        addAction(actions, { action: 'keep_property', tabLabel: 'Keep debt', instantApply: true, tooltip: 'Continue paying the mortgage in ' + (originCurrency || 'origin currency') + '. You will be subject to exchange rate fluctuations.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+        addAction(actions, { action: 'sell_property', tabLabel: 'Pay off', instantApply: true, tooltip: 'Fully repay the remaining balance of the mortgage at the time of relocation.', buttonAttrs: ' data-row-id="' + rowId + '"' });
       } else {
         const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originCountry, destCountry));
         const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
@@ -174,21 +193,30 @@ var RelocationImpactAssistant = {
         const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
         const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
         const isIncomeOrExpenseType = ['S', 'PP', 'SI', 'SI2', 'SInp', 'SI2np', 'UI', 'RI', 'DBI', 'FI', 'E'].indexOf(event.type) !== -1;
-        const relocationAgeNum = Number(relocationAge);
-        const cutShortToAge = isNaN(relocationAgeNum) ? relocationAge : (relocationAgeNum - 1);
         const fromMeta = getSymbolAndLocaleByCountry(originCountry);
         const toMeta = getSymbolAndLocaleByCountry(destCountry);
-        const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
-        const part1AmountFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmountSanitized);
         const inputFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : '';
+        const currentFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmountSanitized);
+        
         containerAttributes = ' data-from-country="' + originCountry + '" data-to-country="' + destCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
-        addAction(actions, { action: 'split', tabLabel: 'Split Event', buttonLabel: 'Confirm', buttonClass: 'event-wizard-button resolution-apply resolution-confirm-btn', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-line">Before move (' + (originCurrency || '') + '): ' + part1AmountFormatted + '</div></div><div class="split-part-info"><div class="part-line">After move (' + (destCurrency || '') + '): <input type="text" class="part2-amount-input" value="' + inputFormatted + '" placeholder="Amount"></div></div></div></div>' });
+        
+        addAction(actions, { 
+          action: 'split', 
+          tabLabel: 'Split event', 
+          instantApply: true, 
+          tooltip: 'Splits this event at the move. The second half will start with a PPP-adjusted value of ' + inputFormatted + ' ' + (destCurrency || '') + '.',
+          buttonAttrs: ' data-row-id="' + rowId + '" data-part2-amount="' + (isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum)) + '"' 
+        });
         if (isIncomeOrExpenseType) {
-          addAction(actions, { action: 'cut_short', tabLabel: 'Cut Short', instantApply: true, tooltip: 'End this event before relocation.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+          addAction(actions, { action: 'cut_short', tabLabel: 'Cut short', instantApply: true, tooltip: 'End this event before relocation.', buttonAttrs: ' data-row-id="' + rowId + '"' });
         }
-        addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Let this event continue unchanged after the relocation.', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
+        addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Let this event continue unchanged after the relocation (keeping its current value of ' + currentFormatted + ' ' + (originCurrency || '') + ').', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
       }
     } else if (event.relocationImpact.category === 'simple') {
+      if (event.type === 'RI' && isRelocationRentalOrphan) {
+        addAction(actions, { action: 'keep_renting', tabLabel: 'Keep renting', instantApply: true, tooltip: 'Keep this rental income event unchanged.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+        addAction(actions, { action: 'delete', tabLabel: 'Remove', instantApply: true, tooltip: 'Delete this rental income event.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+      } else {
       const hasStaleRealEstateLink = !!(impactDetails && impactDetails.previousLinkedCountry);
       if ((event.type === 'R' || event.type === 'M') && (!event.linkedCountry || hasStaleRealEstateLink)) {
         const countries = Config.getInstance().getAvailableCountries();
@@ -233,30 +261,28 @@ var RelocationImpactAssistant = {
         const label2 = hasStaleRealEstateLink ? ('In ' + detectedCountryName) : 'After move';
 
         containerAttributes = ' data-from-country="' + originalCountry + '" data-to-country="' + detectedCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + toCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
+        
         addAction(actions, { action: 'delete', tabLabel: 'Remove', instantApply: true, tooltip: 'Delete this event.', buttonAttrs: ' data-row-id="' + rowId + '"' });
         addAction(actions, { action: 'mark_reviewed', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Ignore this impact and keep the event as it is.', buttonAttrs: ' data-row-id="' + rowId + '"' });
-        addAction(actions, { action: 'link', tabLabel: 'Change to ' + detectedCountryName, buttonLabel: 'Confirm', buttonClass: 'event-wizard-button resolution-apply resolution-confirm-btn', buttonAttrs: ' data-row-id="' + rowId + '"', bodyHtml: '<div class="split-preview-inline compact"><div class="split-parts-container"><div class="split-part-info"><div class="part-line">' + label1 + ' (' + (originCurrency || '') + '): ' + currentFormatted + '</div></div><div class="split-part-info"><div class="part-line">' + label2 + ' <span class="link-to-currency-label">(' + (toCurrency || '') + ')</span>: <input type="text" class="link-amount-input" value="' + suggestedFormatted + '" placeholder="Amount"></div></div></div></div>' });
+        addAction(actions, { 
+          action: 'link', 
+          tabLabel: 'Change to ' + detectedCountryName, 
+          instantApply: true, 
+          tooltip: 'Changes the jurisdiction to ' + detectedCountryName + ' and updates the value to ' + suggestedFormatted + ' ' + (toCurrency || '') + ' based on PPP.',
+          buttonAttrs: ' data-row-id="' + rowId + '" data-country="' + detectedCountry + '" data-converted-amount="' + (isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum)) + '"' 
+        });
       } else if (event.type === 'S' || event.type === 'PP' || event.type === 'SI' || event.type === 'SI2' || event.type === 'SInp' || event.type === 'SI2np') {
         const countries = Config.getInstance().getAvailableCountries();
         const selectedCountry = (event.linkedCountry ? String(event.linkedCountry).toLowerCase() : '') || destCountry || originCountry || startCountry;
         const selectedCountryObj = countries.find(function (c) { return c.code.toLowerCase() === selectedCountry; });
         const selectedCountryName = selectedCountryObj ? selectedCountryObj.name : (selectedCountry ? selectedCountry.toUpperCase() : '');
-        const amountCountry = selectedCountry || originCountry;
-        const amountMeta = getSymbolAndLocaleByCountry(amountCountry);
-        const amountFormatted = fmtWithSymbol(amountMeta.symbol, amountMeta.locale, baseAmountSanitized);
-        let optionsHTML = '';
-        countries.forEach(function (country) {
-          const code = String(country.code || '').toLowerCase();
-          const selected = code === selectedCountry ? 'selected' : '';
-          optionsHTML += '<option value="' + code + '" ' + selected + '>' + country.name + '</option>';
-        });
+        
         addAction(actions, {
           action: 'link',
-          tabLabel: 'Link To Country',
-          buttonLabel: 'Confirm',
-          buttonClass: 'event-wizard-button resolution-apply',
-          buttonAttrs: ' data-row-id="' + rowId + '"',
-          bodyHtml: '<p class="micro-note">Select the source country for this income stream. Amount stays unchanged.</p><div class="country-selector-inline"><label for="country-select-' + rowId + '">Country</label><select class="country-selector" id="country-select-' + rowId + '" data-row-id="' + rowId + '">' + optionsHTML + '</select></div><div class="resolution-quick-action"><p class="micro-note">Current amount: ' + (amountFormatted || String(baseAmountSanitized || '')) + '.</p><p class="micro-note">Apply links this salary/pension event to ' + selectedCountryName + ' for source-country taxation.</p></div>'
+          tabLabel: 'Link to ' + selectedCountryName,
+          instantApply: true,
+          tooltip: 'Links this income stream to ' + selectedCountryName + ' for source-country taxation. Amount stays unchanged.',
+          buttonAttrs: ' data-row-id="' + rowId + '" data-country="' + selectedCountry + '"'
         });
       } else {
         const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originCountry, destCountry));
@@ -267,14 +293,14 @@ var RelocationImpactAssistant = {
         const fromMeta = getSymbolAndLocaleByCountry(originCountry);
         const toMeta = getSymbolAndLocaleByCountry(destCountry);
         const currentAmountNum = Number(baseAmountSanitized);
-        const percentage = (!isNaN(pppSuggestionNum) && !isNaN(currentAmountNum) && currentAmountNum !== 0) ? (((pppSuggestionNum / currentAmountNum - 1) * 100).toFixed(1)) : '0.0';
         const currentFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, currentAmountNum);
         const suggestedFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : '';
         const destCurrencyCode = destCurrency ? destCurrency.toUpperCase() : destCurrency;
         const destCountryLabel = (destCountry ? destCountry.toUpperCase() : '') || 'destination country';
         containerAttributes = ' data-from-country="' + originCountry + '" data-to-country="' + destCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
-        addAction(actions, { action: 'accept', tabLabel: 'Apply Suggested Amount', instantApply: true, tooltip: 'Updates the amount to ' + suggestedFormatted + ' (' + (destCurrencyCode || destCurrency) + ') so it reflects purchasing power in ' + destCountryLabel + '.', buttonAttrs: ' data-row-id="' + rowId + '" data-suggested-amount="' + (isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum)) + '" data-suggested-currency="' + destCurrency + '"' });
-        addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion to ' + (destCurrencyCode || destCurrency || 'the destination currency') + ' will occur.', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
+        addAction(actions, { action: 'accept', tabLabel: 'Apply suggested amount', instantApply: true, tooltip: 'Updates the amount to ' + suggestedFormatted + ' (' + (destCurrencyCode || destCurrency) + ') so it reflects purchasing power in ' + destCountryLabel + '.', buttonAttrs: ' data-row-id="' + rowId + '" data-suggested-amount="' + (isNaN(pppSuggestionNum) ? '' : String(pppSuggestionNum)) + '" data-suggested-currency="' + destCurrency + '"' });
+        addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion will occur.', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
+      }
       }
     } else if (event.relocationImpact.category === 'split_amount_shift') {
       let splitAmountDetails = event.relocationImpact.details;
@@ -302,16 +328,15 @@ var RelocationImpactAssistant = {
         action: 'keep_split_value_as_is',
         tabLabel: 'Leave as is',
         instantApply: true,
-        tooltip: 'Keep Part 2 at its current value and mark this split as reviewed until Part 1 changes again.',
+        tooltip: 'Keep Part 2 at its current value.',
         buttonAttrs: ' data-row-id="' + rowId + '"'
       });
       addAction(actions, {
         action: 'update_split_value',
         tabLabel: 'Update value',
-        buttonLabel: 'Confirm',
-        buttonClass: 'event-wizard-button resolution-apply resolution-confirm-btn',
-        buttonAttrs: ' data-row-id="' + rowId + '"',
-        bodyHtml: '<div class="split-value-editor-inline"><div class="split-preview-inline compact split-value-preview"><div class="split-parts-container"><div class="split-part-info"><div class="part-line">Updated Part 2 (' + (destCurrency || '') + '): <input type="text" class="part2-amount-input split-value-amount-input" value="' + suggestedFormatted + '" placeholder="Amount"></div></div></div></div></div>'
+        instantApply: true,
+        tooltip: 'Updates the Part 2 value to ' + suggestedFormatted + ' ' + (destCurrency || '') + ' based on the changed Part 1 amount and current PPP.',
+        buttonAttrs: ' data-row-id="' + rowId + '" data-suggested-amount="' + (isNaN(suggestedAmount) ? '' : String(suggestedAmount)) + '"'
       });
     } else if (event.relocationImpact.category === 'split_relocation_shift') {
       let splitShiftDetails = event.relocationImpact.details;
@@ -324,14 +349,14 @@ var RelocationImpactAssistant = {
       const expectedPart1ToAge = !isNaN(relocationAgeResolved) ? (relocationAgeResolved - 1) : '';
       addAction(actions, {
         action: 'adapt_split_to_move',
-        tabLabel: 'Adapt Split Age',
+        tabLabel: 'Adapt split age',
         instantApply: true,
         tooltip: 'Updates Part 1 to end at age ' + expectedPart1ToAge + ' and Part 2 to start at age ' + relocationAgeLabel + '.',
         buttonAttrs: ' data-row-id="' + rowId + '"'
       });
       addAction(actions, {
         action: 'keep_split_as_is',
-        tabLabel: 'Leave As Is',
+        tabLabel: 'Leave as is',
         instantApply: true,
         tooltip: 'Keep both halves at their current ages. The split remains linked and will be marked as reviewed.',
         buttonAttrs: ' data-row-id="' + rowId + '"'
@@ -347,14 +372,14 @@ var RelocationImpactAssistant = {
       const currentToAge = saleShiftDetails && saleShiftDetails.currentToAge != null ? saleShiftDetails.currentToAge : event.toAge;
       addAction(actions, {
         action: 'adapt_sale_to_move',
-        tabLabel: 'Adapt Sale Age',
+        tabLabel: 'Adapt sale age',
         instantApply: true,
         tooltip: 'Aligns the sale with relocation by setting To Age to ' + expectedToAge + '.',
         buttonAttrs: ' data-row-id="' + rowId + '"'
       });
       addAction(actions, {
         action: 'keep_sale_as_is',
-        tabLabel: 'Leave As Is',
+        tabLabel: 'Leave as is',
         instantApply: true,
         tooltip: 'Keep the current sale timing and mark this impact as reviewed.',
         buttonAttrs: ' data-row-id="' + rowId + '"'
@@ -371,7 +396,7 @@ var RelocationImpactAssistant = {
       const amountLabel = (firstHalfAmount != null && firstHalfAmount !== '') ? String(firstHalfAmount) + (firstHalfCurrency ? ' ' + firstHalfCurrency : '') : 'the first-half amount';
       addAction(actions, {
         action: 'join_split',
-        tabLabel: 'Join Halves',
+        tabLabel: 'Join halves',
         instantApply: true,
         tooltip: 'Restores a single event from age ' + mergedFromAge + ' to ' + mergedToAge + ' using ' + amountLabel + '.',
         buttonAttrs: ' data-row-id="' + rowId + '"'
@@ -380,18 +405,13 @@ var RelocationImpactAssistant = {
 
     if (!actions.length) return content;
     const impactCause = (event.relocationImpact.message || '').trim() || 'Relocation impact detected for this event.';
-    const instantActions = actions.filter(function (ac) { return ac.instantApply; });
-    const inputActions = actions.filter(function (ac) { return !ac.instantApply; });
-    const instantButtonsHtml = instantActions.map(function (ac) {
+    const instantButtonsHtml = actions.map(function (ac) {
       const attrs = (ac.buttonAttrs || '') + (eventId ? ' data-event-id="' + eventId + '"' : '');
       const tooltipAttr = ac.tooltip ? ' data-tooltip="' + String(ac.tooltip).replace(/"/g, '&quot;') + '"' : '';
       return '<button type="button" class="resolution-tab resolution-instant-btn" id="' + ac.tabId + '" data-action="' + ac.action + '"' + attrs + tooltipAttr + '>' + ac.tabLabel + '</button>';
     }).join('');
-    const tabsHtml = inputActions.map(function (ac) { return '<button type="button" class="resolution-tab" id="' + ac.tabId + '" role="tab" aria-selected="false" aria-controls="' + ac.detailId + '" data-action="' + ac.action + '" tabindex="0">' + ac.tabLabel + '</button>'; }).join('');
-    const detailsHtml = inputActions.map(function (ac) { const btnClass = ac.buttonClass || 'event-wizard-button resolution-apply'; const attrs = ac.buttonAttrs || ''; const eventAttrs = eventId ? ' data-event-id="' + eventId + '"' : ''; return '<div class="resolution-detail" id="' + ac.detailId + '" role="tabpanel" aria-labelledby="' + ac.tabId + '" data-action="' + ac.action + '" hidden aria-hidden="true"><div class="resolution-detail-content">' + ac.bodyHtml + '</div><div class="resolution-detail-footer"><button type="button" class="' + btnClass + '" data-action="' + ac.action + '"' + attrs + eventAttrs + '>' + (ac.buttonLabel || 'Confirm') + '</button></div></div>'; }).join('');
-    let bodyContent = '';
-    if (instantButtonsHtml || tabsHtml) bodyContent += '<div class="resolution-tab-strip" role="tablist" aria-label="Resolution actions" aria-orientation="horizontal">' + instantButtonsHtml + tabsHtml + '</div>';
-    if (tabsHtml) bodyContent += '<div class="resolution-details">' + detailsHtml + '</div>';
+    
+    let bodyContent = '<div class="resolution-tab-strip" role="tablist" aria-label="Resolution actions" aria-orientation="horizontal">' + instantButtonsHtml + '</div>';
     content = '<div class="resolution-panel-expander"><div class="resolution-panel-container"' + containerAttributes + '><div class="resolution-panel-header"><h4>' + impactCause + '</h4><button class="panel-close-btn">×</button></div><div class="resolution-panel-body">' + bodyContent + '</div></div></div>';
     return content;
   },
@@ -479,6 +499,10 @@ var RelocationImpactAssistant = {
       }
       case 'keep_property': {
         try { this._keepProperty(event, payload, env); } catch (_) { }
+        break;
+      }
+      case 'keep_renting': {
+        try { this._keepRenting(event, payload, env); } catch (_) { }
         break;
       }
       case 'rent_out': {
@@ -585,7 +609,13 @@ var RelocationImpactAssistant = {
         const fullHeight = expander.scrollHeight;
         if (containerEl) { try { containerEl.classList.add('visible'); } catch (_) { } }
         expander.style.height = fullHeight + 'px';
-        const onOpened = function (e) { if (e.target !== expander) return; expander.style.height = 'auto'; expander.removeEventListener('transitionend', onOpened); };
+        const onOpened = function (e) {
+          if (e.target !== expander) return;
+          expander.style.height = 'auto';
+          // Trigger resize to ensure parent containers adapt to growing height
+          window.dispatchEvent(new Event('resize'));
+          expander.removeEventListener('transitionend', onOpened);
+        };
         expander.addEventListener('transitionend', onOpened);
       });
     } else if (containerEl) {
@@ -655,35 +685,17 @@ var RelocationImpactAssistant = {
           currency: instantBtn.getAttribute('data-currency'),
           suggestedAmount: instantBtn.getAttribute('data-suggested-amount'),
           suggestedCurrency: instantBtn.getAttribute('data-suggested-currency'),
+          part2Amount: instantBtn.getAttribute('data-part2-amount'),
+          country: instantBtn.getAttribute('data-country'),
+          convertedAmount: instantBtn.getAttribute('data-converted-amount'),
           fromCountry: panelContainer ? panelContainer.getAttribute('data-from-country') : null,
           toCountry: panelContainer ? panelContainer.getAttribute('data-to-country') : null
         };
         self.handlePanelAction(ctx.event, action, payload, ctx.env);
         return;
       }
-      const tab = e.target && e.target.closest && e.target.closest('.resolution-tab');
-      if (tab) { e.preventDefault(); self._handleTabSelection(interactionRoot, tab); return; }
-      const btn = e.target && e.target.closest && e.target.closest('.resolution-apply');
-      if (!btn) return; e.preventDefault(); e.stopPropagation();
-      const action = btn.getAttribute('data-action');
-      const panelContainer = (interactionRoot.classList && interactionRoot.classList.contains('resolution-panel-container'))
-        ? interactionRoot
-        : (interactionRoot.querySelector && interactionRoot.querySelector('.resolution-panel-container'));
-      const payload = {
-        rowId: (btn.getAttribute('data-row-id') || (ctx && ctx.rowId)),
-        eventId: (btn.getAttribute('data-event-id') || (ctx && ctx.eventId)),
-        currency: btn.getAttribute('data-currency'),
-        suggestedAmount: btn.getAttribute('data-suggested-amount'),
-        suggestedCurrency: btn.getAttribute('data-suggested-currency'),
-        fromCountry: panelContainer ? panelContainer.getAttribute('data-from-country') : null,
-        toCountry: panelContainer ? panelContainer.getAttribute('data-to-country') : null
-      };
-      if (action === 'split') { const detail = btn.closest('.resolution-detail'); const input = detail ? detail.querySelector('.part2-amount-input') : null; payload.part2Amount = input ? input.value : undefined; }
-      else if (action === 'update_split_value') { const detail = btn.closest('.resolution-detail'); const input = detail ? detail.querySelector('.split-value-amount-input') : null; payload.suggestedAmount = input ? input.value : payload.suggestedAmount; }
-      else if (action === 'link') { const detail = btn.closest('.resolution-detail'); const sel = detail ? detail.querySelector('.country-selector') : null; const amountInput = detail ? detail.querySelector('.link-amount-input') : null; payload.country = sel ? sel.value : payload.toCountry; payload.convertedAmount = amountInput ? amountInput.value : undefined; }
-      self.handlePanelAction(ctx.event, action, payload, ctx.env);
     });
-    this._bindTabKeyboard(interactionRoot);
+    
     if (typeof TooltipUtils !== 'undefined' && TooltipUtils.attachTooltip) {
       const instantBtns = interactionRoot.querySelectorAll('.resolution-instant-btn[data-tooltip]');
       instantBtns.forEach(function (btn) {
@@ -691,42 +703,6 @@ var RelocationImpactAssistant = {
         if (tooltip) TooltipUtils.attachTooltip(btn, tooltip, { hoverDelay: 300, touchDelay: 400 });
       });
     }
-  },
-
-  _handleTabSelection: function (rootEl, tabButton) {
-    if (!rootEl || !tabButton) return;
-    const action = tabButton.getAttribute('data-action'); if (!action) return;
-    const tabs = rootEl.querySelectorAll('.resolution-tab');
-    tabs.forEach(function (tab) { const isActive = (tab === tabButton); tab.classList.toggle('resolution-tab-active', isActive); tab.setAttribute('aria-selected', isActive ? 'true' : 'false'); tab.setAttribute('tabindex', isActive ? '0' : '-1'); });
-    const details = rootEl.querySelectorAll('.resolution-detail');
-    let selectedDetail = null; const self = this;
-    details.forEach(function (detail) { const matches = detail.getAttribute('data-action') === action; if (matches) { selectedDetail = detail; if (!detail.classList.contains('resolution-detail-active') || detail.hasAttribute('hidden')) { self._animateOpenResolutionDetail(detail); } else { detail.setAttribute('aria-hidden', 'false'); detail.style.pointerEvents = ''; } } else if (!detail.hasAttribute('hidden') || detail.classList.contains('resolution-detail-active')) { self._animateCloseResolutionDetail(detail); } });
-  },
-
-  _bindTabKeyboard: function (rootEl) {
-    if (!rootEl || rootEl._resolutionTabKeyboardBound) return;
-    const self = this;
-    const keyHandler = function (event) {
-      const tab = event.target && event.target.closest && event.target.closest('.resolution-tab'); if (!tab) return; const key = event.key; if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return; const tabs = Array.from(rootEl.querySelectorAll('.resolution-tab')); if (!tabs.length) return; const currentIndex = tabs.indexOf(tab); if (currentIndex === -1) return; let nextIndex = currentIndex; if (key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length; else if (key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length; else if (key === 'Home') nextIndex = 0; else if (key === 'End') nextIndex = tabs.length - 1; if (nextIndex === currentIndex) return; event.preventDefault(); const nextTab = tabs[nextIndex]; if (nextTab) { try { if (typeof nextTab.focus === 'function') nextTab.focus(); } catch (_) { } self._handleTabSelection(rootEl, nextTab); }
-    };
-    rootEl.addEventListener('keydown', keyHandler);
-    rootEl._resolutionTabKeyboardBound = true;
-  },
-
-  _animateOpenResolutionDetail: function (detail) {
-    if (!detail) return; this._clearResolutionDetailTransition(detail); detail.classList.add('resolution-detail-active'); detail.removeAttribute('hidden'); detail.setAttribute('aria-hidden', 'false'); detail.style.pointerEvents = 'auto'; const targetHeight = detail.scrollHeight; detail.style.overflow = 'hidden'; detail.style.transition = 'none'; detail.style.height = '0px'; detail.style.opacity = '0'; // eslint-disable-next-line no-unused-expressions
-    detail.offsetHeight; detail.style.transition = 'height 0.24s ease, opacity 0.18s ease'; detail.style.height = targetHeight + 'px'; detail.style.opacity = '1';
-    const onEnd = function (evt) { if (evt && evt.target !== detail) return; if (detail._resolutionDetailTimer) { clearTimeout(detail._resolutionDetailTimer); detail._resolutionDetailTimer = null; } detail.style.transition = ''; detail.style.height = 'auto'; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; detail.removeEventListener('transitionend', onEnd); };
-    detail._resolutionDetailHandler = onEnd; detail.addEventListener('transitionend', onEnd); detail._resolutionDetailTimer = setTimeout(function () { if (detail._resolutionDetailHandler) { onEnd({ target: detail }); } }, 320);
-  },
-
-  _animateCloseResolutionDetail: function (detail) {
-    if (!detail) return; this._clearResolutionDetailTransition(detail); detail.style.pointerEvents = 'none'; detail.setAttribute('aria-hidden', 'true'); const startHeight = detail.scrollHeight; if (!startHeight) { detail.classList.remove('resolution-detail-active'); detail.setAttribute('hidden', 'hidden'); detail.style.transition = ''; detail.style.height = ''; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; return; } const computedStyle = (typeof window !== 'undefined' && window.getComputedStyle) ? window.getComputedStyle(detail) : null; detail.style.overflow = 'hidden'; detail.style.transition = 'none'; detail.style.height = startHeight + 'px'; detail.style.opacity = computedStyle ? computedStyle.opacity || '1' : '1'; // eslint-disable-next-line no-unused-expressions
-    detail.offsetHeight; detail.style.transition = 'height 0.24s ease, opacity 0.18s ease'; detail.style.height = '0px'; detail.style.opacity = '0'; const onEnd = function (evt) { if (evt && evt.target !== detail) return; if (detail._resolutionDetailTimer) { clearTimeout(detail._resolutionDetailTimer); detail._resolutionDetailTimer = null; } detail.classList.remove('resolution-detail-active'); detail.setAttribute('hidden', 'hidden'); detail.style.transition = ''; detail.style.height = ''; detail.style.opacity = ''; detail.style.overflow = ''; detail.style.pointerEvents = ''; detail._resolutionDetailHandler = null; detail.removeEventListener('transitionend', onEnd); }; detail._resolutionDetailHandler = onEnd; detail.addEventListener('transitionend', onEnd); detail._resolutionDetailTimer = setTimeout(function () { if (detail._resolutionDetailHandler) { onEnd({ target: detail }); } }, 320);
-  },
-
-  _clearResolutionDetailTransition: function (detail) {
-    if (!detail) return; if (detail._resolutionDetailTimer) { try { clearTimeout(detail._resolutionDetailTimer); } catch (_) { } detail._resolutionDetailTimer = null; } if (detail._resolutionDetailHandler) { try { detail.removeEventListener('transitionend', detail._resolutionDetailHandler); } catch (_) { } detail._resolutionDetailHandler = null; }
   },
 
   _setupCollapseTriggers: function (opts) {
@@ -770,19 +746,43 @@ var RelocationImpactAssistant = {
       const current = expander.scrollHeight; expander.style.height = current + 'px';
       // eslint-disable-next-line no-unused-expressions
       expander.offsetHeight; requestAnimationFrame(function () { expander.style.height = '0px'; });
-      const onClosed = function (e) { if (e.target !== expander) return; expander.removeEventListener('transitionend', onClosed); const wrapperToRemove = expander; if (wrapperToRemove && wrapperToRemove.parentNode) { wrapperToRemove.remove(); } };
+      const onClosed = function (e) {
+        if (e.target !== expander) return;
+        expander.removeEventListener('transitionend', onClosed);
+        const wrapperToRemove = expander;
+        if (wrapperToRemove && wrapperToRemove.parentNode) { wrapperToRemove.remove(); }
+        // Trigger resize after panel removal
+        window.dispatchEvent(new Event('resize'));
+      };
       expander.addEventListener('transitionend', onClosed);
     } else if (container) {
-      setTimeout(function () { if (container.parentNode) container.parentNode.remove(); }, 300);
+      setTimeout(function () {
+        if (container.parentNode) container.parentNode.remove();
+        // Trigger resize after panel removal
+        window.dispatchEvent(new Event('resize'));
+      }, 300);
     }
     this._teardownCollapseTriggers(item);
   },
 
   // Property helpers (used by keep/sell actions)
+  _keepRenting: function (event, payload, env) {
+    var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
+    if (!etm) return;
+    var rowId = payload && payload.rowId;
+    var eventId = payload && payload.eventId;
+    var row = null;
+    if (typeof etm._findEventRow === 'function') row = etm._findEventRow(rowId, eventId);
+    if (!row && rowId) row = document.querySelector('tr[data-row-id="' + rowId + '"]');
+    if (!row) return;
+    if (typeof etm._removeHiddenInput === 'function') etm._removeHiddenInput(row, 'event-relocation-rent-mv-id');
+    if (typeof etm._afterResolutionAction === 'function') etm._afterResolutionAction(rowId, { pulse: true });
+  },
+
   _keepProperty: function (event, payload, env) {
     var webUI = env && env.webUI ? env.webUI : null;
     var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
-    if (!webUI || !etm || typeof etm._applyToRealEstatePair !== 'function') return;
+    if (!webUI || !etm) return;
 
     var rowId = payload && payload.rowId;
     var eventId = payload && payload.eventId;
@@ -790,18 +790,20 @@ var RelocationImpactAssistant = {
     if (typeof etm._findEventRow === 'function') baseRow = etm._findEventRow(rowId, eventId);
     if (!baseRow && rowId) baseRow = document.querySelector('tr[data-row-id="' + rowId + '"]');
     if (!baseRow) return;
+    var resolutionScope = (typeof etm._getResolutionScopeForRow === 'function') ? etm._getResolutionScopeForRow(baseRow) : null;
 
     var startCountry = Config.getInstance().getStartCountry();
     var origin = typeof etm.detectPropertyCountry === 'function' ? etm.detectPropertyCountry(Number(event.fromAge), startCountry) : startCountry;
     var rs = Config.getInstance().getCachedTaxRuleSet(origin);
     var originCurrency = rs && typeof rs.getCurrencyCode === 'function' ? rs.getCurrencyCode() : null;
 
-    etm._applyToRealEstatePair(baseRow, function (row) {
-      if (typeof etm._removeHiddenInput === 'function') etm._removeHiddenInput(row, 'event-relocation-sell-mv-id');
-      if (typeof etm._removeHiddenInput === 'function') etm._removeHiddenInput(row, 'event-relocation-sell-anchor-age');
-      etm.getOrCreateHiddenInput(row, 'event-linked-country', origin);
-      if (originCurrency) etm.getOrCreateHiddenInput(row, 'event-currency', originCurrency);
-    });
+    // Decoupled: only apply to the target row (keep property OR keep debt)
+    if (typeof etm._removeHiddenInput === 'function') etm._removeHiddenInput(baseRow, 'event-relocation-sell-mv-id');
+    if (typeof etm._removeHiddenInput === 'function') etm._removeHiddenInput(baseRow, 'event-relocation-sell-anchor-age');
+    etm.getOrCreateHiddenInput(baseRow, 'event-linked-country', origin);
+    if (originCurrency) etm.getOrCreateHiddenInput(baseRow, 'event-currency', originCurrency);
+    if (resolutionScope && typeof etm._setResolutionOverride === 'function') etm._setResolutionOverride(baseRow, resolutionScope);
+
     if (etm && typeof etm._afterResolutionAction === 'function') {
       etm._afterResolutionAction(rowId);
     }
@@ -810,7 +812,7 @@ var RelocationImpactAssistant = {
   _sellProperty: function (event, payload, env) {
     var webUI = env && env.webUI ? env.webUI : null;
     var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
-    if (!webUI || !etm || typeof etm._applyToRealEstatePair !== 'function') return;
+    if (!webUI || !etm) return;
 
     var events = webUI.readEvents(false) || [];
     var mvImpactId = event.relocationImpact && event.relocationImpact.mvEventId;
@@ -844,11 +846,23 @@ var RelocationImpactAssistant = {
 
     var previousSuppress = etm._suppressSellMarkerClear;
     etm._suppressSellMarkerClear = true;
-    etm._applyToRealEstatePair(baseRow, function (row) {
-      setToAgeGuarded(row, cutoffAge);
-      if (sellMarkerId) etm.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', sellMarkerId);
-      etm.getOrCreateHiddenInput(row, 'event-relocation-sell-anchor-age', String(relocationAge));
-    });
+
+    // Decoupled logic:
+    // If it's a property sale (R), we usually want to clear the mortgage too.
+    // If it's a mortgage payoff (M), we only want to clear the debt.
+    if (event.type === 'R' && typeof etm._applyToRealEstatePair === 'function') {
+      etm._applyToRealEstatePair(baseRow, function (row) {
+        setToAgeGuarded(row, cutoffAge);
+        if (sellMarkerId) etm.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', sellMarkerId);
+        etm.getOrCreateHiddenInput(row, 'event-relocation-sell-anchor-age', String(relocationAge));
+      });
+    } else {
+      // Single row action (e.g. Mortgage Pay Off only)
+      setToAgeGuarded(baseRow, cutoffAge);
+      if (sellMarkerId) etm.getOrCreateHiddenInput(baseRow, 'event-relocation-sell-mv-id', sellMarkerId);
+      etm.getOrCreateHiddenInput(baseRow, 'event-relocation-sell-anchor-age', String(relocationAge));
+    }
+
     etm._suppressSellMarkerClear = previousSuppress;
     if (etm && typeof etm._afterResolutionAction === 'function') {
       etm._afterResolutionAction(rowId, { flashFields: ['.event-to-age'] });
@@ -864,16 +878,49 @@ var RelocationImpactAssistant = {
 
     var events = webUI.readEvents(false) || [];
     var mvImpactId = event.relocationImpact && event.relocationImpact.mvEventId;
+    var rentMarkerId = '';
+    if (typeof etm._getRelocationLinkIdByImpactId === 'function') {
+      rentMarkerId = String(etm._getRelocationLinkIdByImpactId(mvImpactId) || '');
+    }
+    if (!rentMarkerId && mvImpactId) rentMarkerId = String(mvImpactId);
     var mv = events.find(function (e) { return e && (e.id === mvImpactId || e._mvRuntimeId === mvImpactId); });
     var relocationAge = mv ? mv.fromAge : null;
 
+    var amount = '';
     if (relocationAge && typeof etm.addEventFromWizardWithSorting === 'function') {
+      try {
+        var startCountry = Config.getInstance().getStartCountry();
+        var origin = typeof etm.detectPropertyCountry === 'function' ? etm.detectPropertyCountry(Number(event.fromAge), startCountry) : startCountry;
+        var dest = mv ? String(mv.name || '').trim().toLowerCase() : startCountry;
+        
+        // Estimate rental income based on property value and yield
+        var propertyValue = (function (a) { var s = (a == null) ? '' : String(a); s = s.replace(/[^0-9.\-]/g, ''); var n = Number(s); return isNaN(n) ? Number(a) : n; })(event.amount);
+        if (!isNaN(propertyValue) && propertyValue > 0) {
+          var yieldRate = 0.04; // Default 4%
+          var originRuleSet = Config.getInstance().getCachedTaxRuleSet(origin);
+          var econ = originRuleSet ? originRuleSet.getEconomicData() : null;
+          if (econ && typeof econ.typicalRentalYield === 'number') {
+            yieldRate = econ.typicalRentalYield / 100;
+          }
+          var estimatedRentOrigin = Math.round(propertyValue * yieldRate);
+          var originCurrency = originRuleSet ? originRuleSet.getCurrencyCode() : 'EUR';
+          amount = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.formatCurrency === 'function')
+            ? FormatUtils.formatCurrency(estimatedRentOrigin, originCurrency, origin)
+            : String(estimatedRentOrigin);
+        }
+      } catch (_) { }
+
       etm.addEventFromWizardWithSorting({
         eventType: 'RI',
         name: event.id,
-        amount: '',
+        amount: amount,
         fromAge: relocationAge,
-        toAge: event.toAge
+        toAge: event.toAge,
+        relocationReviewed: true,
+        relocationImpact: event.relocationImpact,
+        relocationRentMvId: rentMarkerId,
+        linkedCountry: origin,
+        currency: originCurrency
       });
     }
 

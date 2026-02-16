@@ -1034,6 +1034,9 @@ class UIManager {
               if (!isNaN(sellAnchorAge)) eventObj.relocationSellAnchorAge = sellAnchorAge;
             }
 
+            const rentMvIdInput = domRow.querySelector('.event-relocation-rent-mv-id');
+            if (rentMvIdInput && rentMvIdInput.value) eventObj.relocationRentMvId = rentMvIdInput.value;
+
             const overrideInput = domRow.querySelector('.event-resolution-override');
             if (overrideInput && overrideInput.value) eventObj.resolutionOverride = overrideInput.value;
             const overrideMvIdInput = domRow.querySelector('.event-resolution-mv-id');

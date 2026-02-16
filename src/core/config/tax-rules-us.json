@@ -3,19 +3,18 @@
   "countryName": "United States",
   "version": "2025.12",
   "taxBasis": "worldwide",
-  "treatyEquivalents": {
-    "incomeTax": "income",
-    "capitalGains": "capitalGains",
-    "dividends": "dividends"
-  },
+
+  "treatyEquivalents": { "incomeTax": "income", "capitalGains": "capitalGains", "dividends": "dividends" },
+
   "updateMessage": "Adds experimental support for US-style federal taxes (income tax + FICA + CGT) within FinSim.",
 
   "locale": { "numberLocale": "en-US", "currencyCode": "USD", "currencySymbol": "$" },
 
   "economicData": {
-    "inflation": { "cpi": 2.2499, "year": 2025 },
+    "typicalRentalYield": 6.56,
+    "inflation": { "cpi": 2.2499, "year": 2026 },
     "purchasingPowerParity": { "value": 1.0, "year": 2024 },
-    "exchangeRate": { "perEur": 1.18, "asOf": "2025-12-16" }
+    "exchangeRate": { "perEur": 1.19, "asOf": "2026-02-16" }
   },
 
   "incomeTax": {
@@ -64,11 +63,7 @@
     "statePensionIncreaseBands": {  },
     "pensionSystem": { "type": "mixed" },
     "taxAdvantaged": true,
-    "wizardHelp": {
-      "label": "Retirement Accounts",
-      "contributionDescriptionP1": "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age as per the tax rules. Do not include employer matching contributions here; there's another place for that.</p>",
-      "contributionDescriptionP2": "<p>How much of your partner's age-dependent maximum they want to pay out of their gross salary into their private pension scheme.</p><p>If you enter 100% here, your partner will contribute the maximum allowed for their age. This field is only used in two-person simulation mode.</p>"
-    },
+    "wizardHelp": { "label": "Retirement Accounts", "contributionDescriptionP1": "<p>How much of your age-dependent maximum you want to pay out of your gross salary into a private pension scheme.</p><p>If you enter 100% here, you will contribute the maximum allowed for your age as per the tax rules. Do not include employer matching contributions here; there's another place for that.</p>", "contributionDescriptionP2": "<p>How much of your partner's age-dependent maximum they want to pay out of their gross salary into their private pension scheme.</p><p>If you enter 100% here, your partner will contribute the maximum allowed for their age. This field is only used in two-person simulation mode.</p>" },
     "definedBenefit": { "treatment": "privatePension" }
   },
 
@@ -107,10 +102,7 @@
       "sellWhenReceived": true,
       "excludeFromAllocations": true,
       "taxation": {
-        "capitalGains": {
-          "rateRef": "capitalGainsTax.rate",
-          "allowLossOffset": true
-        }
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
       },
       "helpText": "RSUs are taxed as ordinary income at vesting. Subsequent gains on the sale of shares are subject to Capital Gains Tax."
     }

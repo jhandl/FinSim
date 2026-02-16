@@ -54,6 +54,7 @@ var RelocationImpactDetector = {
             // addSoldRealEstateShiftImpacts so users can explicitly re-align
             // sale timing when relocation age changes.
             if (this.isProtectedBySellMarkerForMv(event, mvEvents, mvImpactId)) continue;
+            if (this.shouldDeferMortgageBoundaryImpact(event, events, mvFromAge)) continue;
 
             // Check if event crosses THIS MV's boundary (not the next one)
             var eFrom = Number(event.fromAge);
@@ -86,6 +87,7 @@ var RelocationImpactDetector = {
       this.validateRealEstateLinkedCountries(events, mvEvents, startCountry);
       this.addSplitAmountShiftImpacts(events, mvEvents, startCountry);
       this.addOrphanSplitImpacts(events, mvEvents);
+      this.addOrphanRentalImpacts(events, mvEvents);
 
       // Final pass: remove impacts for events that are already resolved
       for (var k = 0; k < events.length; k++) {
@@ -190,6 +192,22 @@ var RelocationImpactDetector = {
     var markerMv = this.getMvEventByImpactRef(mvEvents, String(event.relocationSellMvId));
     if (!markerMv) return false;
     return this.getMvImpactId(markerMv) === String(mvImpactId || '');
+  },
+
+  shouldDeferMortgageBoundaryImpact: function (event, events, mvFromAge) {
+    if (!event || event.type !== 'M') return false;
+    var mortgageId = String(event.id || '');
+    if (!mortgageId) return false;
+    for (var i = 0; i < events.length; i++) {
+      var candidate = events[i];
+      if (!candidate || candidate.type !== 'R') continue;
+      if (String(candidate.id || '') !== mortgageId) continue;
+      var pFrom = Number(candidate.fromAge);
+      var pTo = Number(candidate.toAge);
+      if (isNaN(pFrom) || isNaN(pTo) || !(pFrom < mvFromAge && pTo >= mvFromAge)) continue;
+      if (!candidate.linkedCountry) return true;
+    }
+    return false;
   },
 
   ensureSimpleImpact: function (event, mvEvents, startCountry, details) {
@@ -321,6 +339,25 @@ var RelocationImpactDetector = {
       for (var k = 0; k < chain.length; k++) {
         this.addImpact(chain[k], 'split_orphan', message, '', true, details);
       }
+    }
+  },
+
+  addOrphanRentalImpacts: function (events, mvEvents) {
+    if (!events || !events.length) return;
+    for (var i = 0; i < events.length; i++) {
+      var event = events[i];
+      if (!event || event.type !== 'RI') continue;
+      if (event.relocationImpact) continue;
+      var rentMarkerId = String(event.relocationRentMvId || '');
+      if (!rentMarkerId) continue;
+      var markerMv = this.getMvEventByImpactRef(mvEvents, rentMarkerId);
+      if (markerMv) continue;
+      var details = {
+        relocationRentalOrphan: true,
+        rentMvId: rentMarkerId
+      };
+      var message = 'This rental income was created for a relocation that no longer exists. Keep renting or remove this event.';
+      this.addImpact(event, 'simple', message, '', true, details);
     }
   },
 
@@ -531,17 +568,18 @@ var RelocationImpactDetector = {
       default: noun = 'income'; break;
     }
 
-    if (noun === 'property' || noun === 'mortgage') {
-      var countryForQuestion = originCountryName || destinationCountryName;
-      return 'Is this ' + noun + ' still relevant in ' + countryForQuestion + '?';
+    var countryForQuestion = originCountryName || destinationCountryName;
+
+    if (category === 'boundary') {
+      return 'What should happen with this ' + noun + ' after your move to ' + destinationCountryName + '?';
     }
 
     switch (category) {
-      case 'boundary':
-        return 'Does this ' + noun + ' continue after your move to ' + destinationCountryName + '?';
       case 'simple':
         if (mvEvent && this.checkPensionConflict(event, destinationCountry, mvEvent.fromAge)) {
           return 'Are you converting this salary to a non-pensionable salary after your move to ' + destinationCountryName + '?';
+        } else if (noun === 'property' || noun === 'mortgage') {
+          return 'Is this ' + noun + ' in ' + countryForQuestion + ' still relevant?';
         } else {
           return 'Is this ' + noun + ' still relevant after your move to ' + destinationCountryName + '?';
         }
@@ -567,8 +605,17 @@ var RelocationImpactDetector = {
       // or for real-estate events if a linked country has been set (indicating jurisdiction is tied).
       resolved = !!(event.linkedEventId || (event.currency && event.linkedCountry) || ((event.type === 'R' || event.type === 'M') && event.linkedCountry));
     } else if (event.relocationImpact.category === 'simple') {
+      var simpleDetails = event.relocationImpact ? event.relocationImpact.details : null;
+      if (typeof simpleDetails === 'string') {
+        try { simpleDetails = JSON.parse(simpleDetails); } catch (_) { simpleDetails = null; }
+      }
+      var isRelocationRentalOrphan = !!(event.type === 'RI' && simpleDetails && simpleDetails.relocationRentalOrphan === true);
       // Consider simple resolved if the event belongs to a split chain, has explicit jurisdiction, or salary conversion was applied
-      resolved = !!(event.linkedEventId || event.linkedCountry || event.type === 'SInp' || event.type === 'SI2np');
+      if (isRelocationRentalOrphan) {
+        resolved = !event.relocationRentMvId;
+      } else {
+        resolved = !!(event.linkedEventId || event.linkedCountry || event.type === 'SInp' || event.type === 'SI2np');
+      }
     }
     if (resolved) delete event.relocationImpact;
   },

@@ -157,6 +157,34 @@ module.exports = {
         assert(rentalImpact.message && rentalImpact.message.indexOf('move to') !== -1, 'Rental impact message should reference relocation destination');
       });
 
+      // Test 3b: Mortgage boundary impact is deferred until property keep/rent resolution.
+      runTest('3b', function () {
+        const mv = makeEvent({ id: 'mv_property_keep', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
+        const property = makeEvent({ id: 'home_keep', type: 'R', fromAge: 30, toAge: 50 });
+        const mortgage = makeEvent({ id: 'home_keep', type: 'M', fromAge: 30, toAge: 50 });
+
+        const unresolved = runDetector([property, mortgage, mv], 'aa');
+        const unresolvedPropertyImpact = unresolved.find(e => e.type === 'R').relocationImpact;
+        const unresolvedMortgageImpact = unresolved.find(e => e.type === 'M').relocationImpact;
+        assert(unresolvedPropertyImpact && unresolvedPropertyImpact.category === 'boundary', 'Property should be flagged before keep/rent resolution');
+        assert(!unresolvedMortgageImpact, 'Mortgage should wait until property keep/rent resolution');
+
+        const keptProperty = makeEvent({
+          id: 'home_keep',
+          type: 'R',
+          fromAge: 30,
+          toAge: 50,
+          linkedCountry: 'aa',
+          currency: 'AAA',
+          resolutionOverride: '1',
+          resolutionOverrideMvId: 'mv_property_keep',
+          resolutionOverrideCategory: 'boundary'
+        });
+        const resolved = runDetector([keptProperty, mortgage, mv], 'aa');
+        const resolvedMortgageImpact = resolved.find(e => e.type === 'M').relocationImpact;
+        assert(resolvedMortgageImpact && resolvedMortgageImpact.category === 'boundary', 'Mortgage should be flagged after property keep/rent resolution');
+      });
+
       // Test 4: Pension conflict detection when destination is state-only.
       runTest('4', function () {
         pensionSystems.bb = 'state_only';
@@ -419,8 +447,67 @@ module.exports = {
         const propertyImpact = result.find(e => e.type === 'R').relocationImpact;
         const mortgageImpact = result.find(e => e.type === 'M').relocationImpact;
         assert(propertyImpact && propertyImpact.category === 'boundary', 'Property should be re-flagged when stale sell marker no longer matches a relocation');
-        assert(mortgageImpact && mortgageImpact.category === 'boundary', 'Mortgage should be re-flagged when stale sell marker no longer matches a relocation');
+        assert(!mortgageImpact, 'Mortgage should wait for property keep/rent resolution when stale marker no longer matches');
         assert.strictEqual(propertyImpact.mvEventId, 'mv_new_sale_boundary', 'Property impact should reference the new relocation');
+
+        const keptProperty = makeEvent({
+          id: 'home_sale_stale_marker',
+          type: 'R',
+          fromAge: 35,
+          toAge: 44,
+          linkedCountry: 'aa',
+          currency: 'AAA',
+          resolutionOverride: '1',
+          resolutionOverrideMvId: 'mv_new_sale_boundary',
+          resolutionOverrideCategory: 'boundary'
+        });
+        const afterKeep = runDetector([keptProperty, mortgage, mvNew], 'aa');
+        const mortgageAfterKeep = afterKeep.find(e => e.type === 'M').relocationImpact;
+        assert(mortgageAfterKeep && mortgageAfterKeep.category === 'boundary', 'Mortgage should be flagged after property keep/rent resolution');
+      });
+
+      // Test 8k: Rent-out rental should be re-flagged when its linked relocation is removed.
+      runTest('8k', function () {
+        const mv = makeEvent({ id: 'mv_rent_linked', type: 'MV', name: 'BB', fromAge: 35, toAge: 35, relocationLinkId: 'mvlink_rent_1' });
+        const rental = makeEvent({
+          id: 'rent_linked',
+          type: 'RI',
+          fromAge: 35,
+          toAge: 60,
+          linkedCountry: 'aa',
+          currency: 'AAA',
+          relocationRentMvId: 'mvlink_rent_1'
+        });
+
+        const withMove = runDetector([rental, mv], 'aa');
+        const withMoveImpact = withMove.find(e => e.id === 'rent_linked').relocationImpact;
+        assert(!withMoveImpact, 'Rent-out rental should remain resolved while relocation exists');
+
+        const withoutMove = runDetector([rental], 'aa');
+        const orphanImpact = withoutMove.find(e => e.id === 'rent_linked').relocationImpact;
+        assert(orphanImpact, 'Rent-out rental should be flagged when relocation is removed');
+        assert.strictEqual(orphanImpact.category, 'simple');
+        assert(orphanImpact.details && orphanImpact.details.relocationRentalOrphan === true, 'Impact should carry relocation-rental orphan details');
+      });
+
+      // Test 8l: Keep-renting resolution clears relocation rent marker and resolves impact.
+      runTest('8l', function () {
+        const rental = makeEvent({
+          id: 'rent_keep',
+          type: 'RI',
+          fromAge: 35,
+          toAge: 60,
+          linkedCountry: 'aa',
+          currency: 'AAA',
+          relocationRentMvId: 'mvlink_rent_2'
+        });
+        const flagged = runDetector([rental], 'aa');
+        const rentalEvt = flagged.find(e => e.id === 'rent_keep');
+        assert(rentalEvt.relocationImpact, 'Rent-out rental should be impacted before keep-renting resolution');
+
+        delete rentalEvt.relocationRentMvId;
+        RelocationImpactDetector.clearResolvedImpacts(rentalEvt);
+        assert(!rentalEvt.relocationImpact, 'Removing relocation rent marker should resolve orphan rental impact');
       });
 
       // Test 9: Resolution detection via property linking.
@@ -687,7 +774,7 @@ module.exports = {
         assert(html && html.indexOf('resolution-panel-container') !== -1, 'Split amount-shift panel should be generated');
         assert(html.indexOf('data-action="keep_split_value_as_is"') !== -1, 'Split amount-shift panel should expose Leave as is action');
         assert(html.indexOf('data-action="update_split_value"') !== -1, 'Split amount-shift panel should expose Update value action');
-        assert(html.indexOf('split-value-amount-input') !== -1, 'Update value panel should expose editable amount input');
+        assert(html.indexOf('data-suggested-amount="24000"') !== -1, 'Update value action should carry suggested amount payload');
       });
 
       // Test 14: PPP fallback to FX when PPP unavailable.

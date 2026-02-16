@@ -45,6 +45,13 @@ class RealEstate {
     return 0;
   }
 
+  getRemainingPrincipal(id) {
+    if (id in this.properties) {
+      return this.properties[id].getRemainingPrincipal();
+    }
+    return 0;
+  }
+
   getCurrency(id) {
     if (id in this.properties) {
       return this.properties[id].getCurrency();
@@ -59,13 +66,24 @@ class RealEstate {
     return null;
   }
 
+  settleMortgage(id) {
+    if (id in this.properties) {
+      const remaining = this.properties[id].getRemainingPrincipal();
+      this.properties[id].borrowed = null;
+      this.properties[id].payment = null;
+      this.properties[id].totalPayments = 0;
+      this.properties[id].monthsPaid = 0;
+      this.properties[id].monthlyRate = 0;
+      this.properties[id].monthlyPaymentAmount = 0;
+      this.properties[id].fractionRepaid = this.properties[id].purchaseBasisAmount > 0 ? 1 : 0;
+      return remaining;
+    }
+    return 0;
+  }
+
   getPurchaseBasis(id) {
     if (!(id in this.properties)) return 0;
-    var property = this.properties[id];
-    var basis = 0;
-    if (property.paid) basis += property.paid.amount;
-    if (property.borrowed) basis += property.borrowed.amount;
-    return basis;
+    return this.properties[id].getPurchaseBasis();
   }
 
   calculatePrimaryResidenceProportion(propertyCountry, propertyId, purchaseAge, saleAge, residencyTimeline, rentalEvents) {
@@ -182,9 +200,13 @@ class Property {
   constructor() {
     this.appreciation = 0;
     this.periods = 0;
-    this.terms = 1;
-    this.paymentsMade = 0;
+    this.terms = 0;
+    this.totalPayments = 0;
+    this.monthsPaid = 0;
+    this.monthlyRate = 0;
+    this.monthlyPaymentAmount = 0;
     this.fractionRepaid = 0;
+    this.purchaseBasisAmount = 0;
     this.paid = null;
     this.borrowed = null;
     this.payment = null;
@@ -194,36 +216,106 @@ class Property {
     this.appreciation = appreciation;
     var normalizedCurrency = (currency !== undefined && currency !== null && currency !== '') ? String(currency).toUpperCase() : 'EUR';
     var normalizedCountry = (linkedCountry !== undefined && linkedCountry !== null && linkedCountry !== '') ? String(linkedCountry).toLowerCase() : 'ie';
+    if (this.borrowed) {
+      if (this.borrowed.currency !== normalizedCurrency) {
+        throw new Error('Property currency mismatch: paid=' + normalizedCurrency + ', borrowed=' + this.borrowed.currency);
+      }
+      if (this.borrowed.country !== normalizedCountry) {
+        throw new Error('Property country mismatch: paid=' + normalizedCountry + ', borrowed=' + this.borrowed.country);
+      }
+    }
     this.paid = Money.create(paid, normalizedCurrency, normalizedCountry);
+    this.updatePurchaseBasis();
   }
 
   mortgage(years, rate, payment, currency, linkedCountry) {
     const n = years * 12;
     const r = rate / 12;
-    const c = Math.pow(1 + r, n);
-    var borrowedAmount = payment / 12 * (c - 1) / (r * c);
+    const monthlyPayment = payment / 12;
+    var borrowedAmount;
+    if (r === 0) {
+      borrowedAmount = monthlyPayment * n;
+    } else {
+      const c = Math.pow(1 + r, n);
+      borrowedAmount = monthlyPayment * (c - 1) / (r * c);
+    }
     this.terms = years;
-    this.paymentsMade = 0;
+    this.totalPayments = n;
+    this.monthsPaid = 0;
+    this.monthlyRate = r;
+    this.monthlyPaymentAmount = monthlyPayment;
     this.fractionRepaid = 0;
     var normalizedCurrency = (currency !== undefined && currency !== null && currency !== '') ? String(currency).toUpperCase() : (this.paid ? this.paid.currency : 'EUR');
     var normalizedCountry = (linkedCountry !== undefined && linkedCountry !== null && linkedCountry !== '') ? String(linkedCountry).toLowerCase() : (this.paid ? this.paid.country : 'ie');
+    if (this.paid) {
+      if (this.paid.currency !== normalizedCurrency) {
+        throw new Error('Property currency mismatch: paid=' + this.paid.currency + ', borrowed=' + normalizedCurrency);
+      }
+      if (this.paid.country !== normalizedCountry) {
+        throw new Error('Property country mismatch: paid=' + this.paid.country + ', borrowed=' + normalizedCountry);
+      }
+    }
     if (!this.paid) {
       this.paid = Money.create(0, normalizedCurrency, normalizedCountry);
     }
     this.payment = Money.create(payment, normalizedCurrency, normalizedCountry);
     this.borrowed = Money.create(borrowedAmount, normalizedCurrency, normalizedCountry);
+    this.updatePurchaseBasis();
   }
 
   addYear() {
     this.periods++;
-    if (this.paymentsMade < this.terms) {
-      this.paymentsMade++;
+    if (this.borrowed && this.totalPayments > 0 && this.monthsPaid < this.totalPayments) {
+      this.monthsPaid += 12;
+      if (this.monthsPaid > this.totalPayments) {
+        this.monthsPaid = this.totalPayments;
+      }
     }
-    this.fractionRepaid = this.paymentsMade / this.terms;
+    if (this.borrowed && this.borrowed.amount > 0) {
+      this.fractionRepaid = 1 - (this.getRemainingPrincipal() / this.borrowed.amount);
+      if (this.fractionRepaid < 0) this.fractionRepaid = 0;
+      if (this.fractionRepaid > 1) this.fractionRepaid = 1;
+    } else {
+      if (this.purchaseBasisAmount > 0) {
+        this.fractionRepaid = 1;
+      } else {
+        this.fractionRepaid = 0;
+      }
+    }
   }
 
   getPayment() {
     return this.payment ? this.payment.amount : 0;
+  }
+
+  getRemainingPrincipal() {
+    if (!this.borrowed) return 0;
+    var principal = this.borrowed.amount;
+    if (!(principal > 0)) return 0;
+    if (this.totalPayments <= 0) return principal;
+    var k = this.monthsPaid;
+    if (!(k > 0)) return principal;
+    if (k >= this.totalPayments) return 0;
+
+    if (this.monthlyRate === 0) {
+      var remainingZeroRate = principal - (this.monthlyPaymentAmount * k);
+      return (remainingZeroRate > 0) ? remainingZeroRate : 0;
+    }
+
+    var growth = Math.pow(1 + this.monthlyRate, k);
+    var remaining = principal * growth - this.monthlyPaymentAmount * ((growth - 1) / this.monthlyRate);
+    return (remaining > 0) ? remaining : 0;
+  }
+
+  updatePurchaseBasis() {
+    var basis = 0;
+    if (this.paid) basis += this.paid.amount;
+    if (this.borrowed) basis += this.borrowed.amount;
+    this.purchaseBasisAmount = basis;
+  }
+
+  getPurchaseBasis() {
+    return this.purchaseBasisAmount;
   }
 
   /**
@@ -235,25 +327,41 @@ class Property {
    * @performance Rare call (yearly per property), direct .amount arithmetic for zero overhead.
    */
   getValue() {
-    // Money path: safe currency-aware calculation
-    var baseMoney;
-    if (this.paid) {
-      baseMoney = Money.create(this.paid.amount, this.paid.currency, this.paid.country);
-      if (this.borrowed && this.fractionRepaid > 0) {
-        var borrowedFraction = Money.create(this.borrowed.amount, this.borrowed.currency, this.borrowed.country);
-        Money.multiply(borrowedFraction, this.fractionRepaid);
-        Money.add(baseMoney, borrowedFraction);
-      }
-    } else if (this.borrowed) {
-      baseMoney = Money.create(0, this.borrowed.currency, this.borrowed.country);
-    } else {
-      return 0; // No property data
+    var propertyCurrency = this.getCurrency();
+    var propertyCountry = this.getLinkedCountry();
+    if (!propertyCurrency || !propertyCountry) return 0;
+
+    if (!(this.purchaseBasisAmount > 0)) {
+      if (!this.paid && !this.borrowed) return 0;
     }
+
+    // Money path: safe currency-aware market value basis
+    var baseMoney = Money.create(this.purchaseBasisAmount, propertyCurrency, propertyCountry);
+    var remainingPrincipal = this.getRemainingPrincipal();
 
     // Safety: enforce same-currency invariant per property
     if (this.paid && this.borrowed) {
       if (this.paid.currency !== this.borrowed.currency) {
         throw new Error('Property currency mismatch: paid=' + this.paid.currency + ', borrowed=' + this.borrowed.currency);
+      }
+      if (this.paid.country !== this.borrowed.country) {
+        throw new Error('Property country mismatch: paid=' + this.paid.country + ', borrowed=' + this.borrowed.country);
+      }
+    }
+    if (this.paid && this.payment) {
+      if (this.paid.currency !== this.payment.currency) {
+        throw new Error('Property currency mismatch: paid=' + this.paid.currency + ', payment=' + this.payment.currency);
+      }
+      if (this.paid.country !== this.payment.country) {
+        throw new Error('Property country mismatch: paid=' + this.paid.country + ', payment=' + this.payment.country);
+      }
+    }
+    if (this.borrowed && this.payment) {
+      if (this.borrowed.currency !== this.payment.currency) {
+        throw new Error('Property currency mismatch: borrowed=' + this.borrowed.currency + ', payment=' + this.payment.currency);
+      }
+      if (this.borrowed.country !== this.payment.country) {
+        throw new Error('Property country mismatch: borrowed=' + this.borrowed.country + ', payment=' + this.payment.country);
       }
     }
 
@@ -324,10 +432,10 @@ class Property {
       }
     }
 
-    // Inflate: extract .amount, adjust, return
+    // Inflate: extract .amount, adjust, then net out remaining principal to produce equity.
     var inflatedAmount = adjust(baseMoney.amount, resolvedRate, this.periods);
-
-    return inflatedAmount;
+    var equityAmount = inflatedAmount - remainingPrincipal;
+    return (equityAmount > 0) ? equityAmount : 0;
   }
 
   getCurrency() {

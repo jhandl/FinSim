@@ -844,6 +844,12 @@ function serializeSimulation(ui) {
             metaPairs.push('sellMvId=' + encodeURIComponent(sellMvIdInput.value));
           }
         } catch (_e3b) { }
+        try {
+          var rentMvIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-rent-mv-id') : null;
+          if (rentMvIdInput && rentMvIdInput.value) {
+            metaPairs.push('rentMvId=' + encodeURIComponent(rentMvIdInput.value));
+          }
+        } catch (_e3e) { }
         var resolvedMeta = null;
         try {
           var resolutionOverrideInput = rowEl.querySelector ? rowEl.querySelector('.event-resolution-override') : null;

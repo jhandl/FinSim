@@ -251,6 +251,11 @@ class EventsTableManager {
     if (maybePanel && maybePanel.classList && maybePanel.classList.contains('resolution-panel-row')) {
       this.collapseResolutionPanel(row.dataset.rowId);
     }
+    const relocationMarkerIds = this._getRelocationMarkerIdsForDeletedRow(row);
+    if (relocationMarkerIds.length) {
+      this._clearResolutionOverridesForRelocationMarkers(relocationMarkerIds);
+      this._clearRelocationAgeShift(relocationMarkerIds);
+    }
 
     // Check if this is the only row
     const allRows = document.querySelectorAll('#Events tbody tr');
@@ -631,6 +636,40 @@ class EventsTableManager {
     const runtimeId = row && row.dataset ? String(row.dataset.eventId || '') : '';
     if (runtimeId) ids.push(runtimeId);
     return Array.from(new Set(ids));
+  }
+
+  _getRelocationMarkerIdsForDeletedRow(row) {
+    if (!row) return [];
+    const typeInput = row.querySelector('.event-type');
+    const typeValue = typeInput ? String(typeInput.value || '') : '';
+    if (typeValue !== 'MV') return [];
+    const ids = [];
+    const linkInput = row.querySelector('.event-relocation-link-id');
+    const linkId = linkInput ? String(linkInput.value || '') : '';
+    if (linkId) ids.push(linkId);
+    const runtimeId = row && row.dataset ? String(row.dataset.eventId || '') : '';
+    if (runtimeId) ids.push(runtimeId);
+    return Array.from(new Set(ids));
+  }
+
+  _clearResolutionOverridesForRelocationMarkers(markerIds) {
+    if (!markerIds || !markerIds.length) return;
+    const markerSet = new Set(markerIds.map(id => String(id || '')).filter(Boolean));
+    if (markerSet.size === 0) return;
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const overrideMvIdInput = row.querySelector('.event-resolution-mv-id');
+      const overrideMvId = overrideMvIdInput ? String(overrideMvIdInput.value || '') : '';
+      if (!overrideMvId || !markerSet.has(overrideMvId)) continue;
+      const typeInput = row.querySelector('.event-type');
+      const typeValue = typeInput ? String(typeInput.value || '') : '';
+      this._removeHiddenInput(row, 'event-resolution-override');
+      if (typeValue === 'R' || typeValue === 'M') {
+        this._removeHiddenInput(row, 'event-linked-country');
+        this._removeHiddenInput(row, 'event-currency');
+      }
+    }
   }
 
   _getOrCreateRelocationLinkId(row) {
@@ -1540,7 +1579,7 @@ class EventsTableManager {
     setTimeout(() => {
       row.remove();
       // Recompute after original row removal so counts and badges align
-      this._afterResolutionAction(resolvedRowId); // No animation on the "deleting" ID
+      this._afterResolutionAction(row.dataset.rowId); // No animation on the "deleting" ID
       
       // Animate the new rows
       if (part1Row) {
@@ -1549,7 +1588,7 @@ class EventsTableManager {
 
       // After table and accordion refresh/sort, animate the new table row (pulse)
       if (typeof this.animateNewTableRow === 'function') {
-        setTimeout(() => { this.animateNewTableRow(newEventData); }, 400);
+        setTimeout(() => { this.animateNewTableRow(newEventData, { flashFields: ['.event-amount'] }); }, 400);
       }
       // After base refresh, trigger accordion highlight for the new event
       if (this.viewMode === 'accordion' && this.webUI && this.webUI.eventAccordionManager && newEventId) {
@@ -1612,7 +1651,7 @@ class EventsTableManager {
         toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
       }
     }
-    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-to-age'] });
+    this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-to-age'], pulse: true });
   }
 
   joinSplitEvents(rowId, eventId) {
@@ -1688,7 +1727,7 @@ class EventsTableManager {
     }
 
     const mergedRowId = mergedRow && mergedRow.dataset ? mergedRow.dataset.rowId : resolvedRowId;
-    this._afterResolutionAction(mergedRowId, { flashFields: ['.event-to-age'] });
+    this._afterResolutionAction(mergedRowId, { flashFields: ['.event-to-age'], pulse: true });
   }
 
   _findRelocationEventForImpactedRow(row) {
@@ -1776,7 +1815,7 @@ class EventsTableManager {
       this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-age');
       this._removeHiddenInput(secondRow, 'event-resolution-override');
       this._removeRowAndResolutionPanel(firstRow);
-      this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-from-age'] });
+      this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-from-age'], pulse: true });
       return;
     }
 
@@ -1788,7 +1827,7 @@ class EventsTableManager {
       this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-age');
       this._removeHiddenInput(firstRow, 'event-resolution-override');
       this._removeRowAndResolutionPanel(secondRow);
-      this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-to-age'] });
+      this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-to-age'], pulse: true });
       return;
     }
 
@@ -1798,7 +1837,7 @@ class EventsTableManager {
     this.getOrCreateHiddenInput(secondRow, 'event-relocation-split-anchor-age', String(relocationAge));
     this._removeHiddenInput(firstRow, 'event-resolution-override');
     this._removeHiddenInput(secondRow, 'event-resolution-override');
-    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-to-age', '.event-from-age'] });
+    this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-to-age', '.event-from-age'], pulse: true });
   }
 
   keepSplitAsIs(rowId, eventId) {
@@ -1825,7 +1864,7 @@ class EventsTableManager {
         this._setResolutionOverride(rows[i], resolutionScope);
       }
     }
-    this._afterResolutionAction(resolvedRowId);
+    this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 
   keepSplitValueAsIs(rowId, eventId) {
@@ -1857,7 +1896,7 @@ class EventsTableManager {
     const part1Amount = Number(String(part1AmountInput.value || '').replace(/[^0-9.\-]/g, ''));
     if (isNaN(part1Amount)) return;
     this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-amount', String(part1Amount));
-    this._afterResolutionAction(resolvedRowId);
+    this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 
   updateSplitValue(rowId, suggestedAmount, eventId) {
@@ -1903,8 +1942,8 @@ class EventsTableManager {
       }
       amountInput.dispatchEvent(new Event('change', { bubbles: true }));
     }
-    this.keepSplitValueAsIs(resolvedRowId, eventId);
-    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-amount'] });
+    this.keepSplitValueAsIs(row.dataset.rowId, eventId);
+    this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-amount'], pulse: true });
   }
 
   adaptSaleToRelocationAge(rowId, eventId) {
@@ -1950,7 +1989,7 @@ class EventsTableManager {
       this._removeHiddenInput(pairRow, 'event-resolution-override');
     });
     this._suppressSellMarkerClear = false;
-    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-to-age'] });
+    this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-to-age'], pulse: true });
   }
 
   keepSaleAsIs(rowId, eventId) {
@@ -2020,7 +2059,7 @@ class EventsTableManager {
       if (resolvedLinkedCountry) this.getOrCreateHiddenInput(r, 'event-linked-country', resolvedLinkedCountry);
       this._setResolutionOverride(r, resolutionScope);
     });
-    this._afterResolutionAction(resolvedRowId); // No animation for "Keep as is"
+    this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 
   acceptSuggestion(rowId, suggestedAmount, suggestedCurrency, eventId) {
@@ -2072,7 +2111,7 @@ class EventsTableManager {
         }
       }
     }
-    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-amount'] });
+    this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-amount'], pulse: true });
   }
 
   linkPropertyToCountry(rowId, selectedCountryOverride, convertedAmountOverride, eventId) {
@@ -2156,7 +2195,7 @@ class EventsTableManager {
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();
     }
-    this._afterResolutionAction(resolvedRowId, { flashFields: ['.event-amount'] });
+    this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-amount'], pulse: true });
   }
 
   linkIncomeToCountry(rowId, country, eventId) {
@@ -2170,7 +2209,7 @@ class EventsTableManager {
     }
     if (!selectedCountry) return;
     this.getOrCreateHiddenInput(row, 'event-linked-country', selectedCountry);
-    this._afterResolutionAction(resolvedRowId);
+    this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 
   convertToPensionless(rowId, eventId) {
@@ -2189,7 +2228,7 @@ class EventsTableManager {
     if (row._eventTypeDropdown) row._eventTypeDropdown.setValue(newType);
     this.updateFieldVisibility(typeInput);
     typeInput.dispatchEvent(new Event('change', { bubbles: true }));
-    this._afterResolutionAction(resolvedRowId, { pulse: true });
+    this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 
   // Helper: apply function to all rows with same id for both R and M
@@ -2214,7 +2253,7 @@ class EventsTableManager {
     this._setResolutionOverride(row, resolutionScope);
     // Also apply to paired real-estate rows if applicable (R/M with same id)
     this._applyToRealEstatePair(row, (r) => this._setResolutionOverride(r, resolutionScope));
-    this._afterResolutionAction(resolvedRowId); // No animation
+    this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 
   _afterResolutionAction(rowId, options = {}) {
@@ -2245,7 +2284,7 @@ class EventsTableManager {
     if (row) {
       if (options.pulse) {
         // Small delay to let the resolution panel collapse animation start
-        setTimeout(() => this.animateRowHighlight(row), 100);
+        setTimeout(() => this.animateRowHighlight(row, { skipScrollIfVisible: true }), 100);
       }
       if (options.flashFields && options.flashFields.length) {
         options.flashFields.forEach(selector => {
@@ -2678,6 +2717,24 @@ class EventsTableManager {
     this.setRowFieldValue(row, '.event-rate', rateValue);
     this.setRowFieldValue(row, '.event-match', matchValue);
 
+    if (eventData && eventData.linkedCountry) {
+      this.getOrCreateHiddenInput(row, 'event-linked-country', eventData.linkedCountry);
+    }
+    if (eventData && eventData.currency) {
+      this.getOrCreateHiddenInput(row, 'event-currency', eventData.currency);
+    }
+    if (eventData && eventData.relocationRentMvId) {
+      this.getOrCreateHiddenInput(row, 'event-relocation-rent-mv-id', eventData.relocationRentMvId);
+    }
+
+    if (eventData && eventData.relocationReviewed) {
+      const scope = {
+        mvId: eventData.relocationImpact ? eventData.relocationImpact.mvEventId : '',
+        category: eventData.relocationImpact ? eventData.relocationImpact.category : ''
+      };
+      this._setResolutionOverride(row, scope);
+    }
+
     row.dataset.originalEventType = resolvedType;
   }
 
@@ -2694,7 +2751,7 @@ class EventsTableManager {
 
     this.webUI.formatUtils.setupCurrencyInputs();
     this.webUI.formatUtils.setupPercentageInputs();
-    this.animateRowHighlight(emptyRow);
+    this.animateRowHighlight(emptyRow, { skipScrollIfVisible: true });
 
     if (this.sortKeys && this.sortKeys.length > 0) {
       this.applySortingWithAnimation();
@@ -3628,7 +3685,7 @@ class EventsTableManager {
 
     // After sorting completes, animate the new table row highlight smoothly
     if (typeof this.animateNewTableRow === 'function') {
-      setTimeout(() => { this.animateNewTableRow(eventData); }, 400);
+      setTimeout(() => { this.animateNewTableRow(eventData, { flashFields: ['.event-amount'] }); }, 400);
     }
 
     // Refresh accordion if active
@@ -3663,7 +3720,7 @@ class EventsTableManager {
   /**
    * Animate the newly created table row
    */
-  animateNewTableRow(eventData) {
+  animateNewTableRow(eventData, options = {}) {
     // The new row is always the one that was just added to the DOM
     // After sorting, we need to find it by marking it during creation
     const tableRows = document.querySelectorAll('#Events tbody tr');
@@ -3688,14 +3745,22 @@ class EventsTableManager {
     }
 
     if (targetRow) {
-      this.animateRowHighlight(targetRow);
+      this.animateRowHighlight(targetRow, { skipScrollIfVisible: true });
+
+      // Also flash specific fields if requested
+      if (options.flashFields && options.flashFields.length) {
+        options.flashFields.forEach(selector => {
+          const input = targetRow.querySelector(selector);
+          if (input) this._flashInput(input);
+        });
+      }
     }
   }
 
   /**
    * Apply a pulse/zoom animation to a table row to highlight it
    */
-  animateRowHighlight(row) {
+  animateRowHighlight(row, options = {}) {
     if (!row) return;
 
     // Find the table container to temporarily allow overflow
@@ -3704,6 +3769,7 @@ class EventsTableManager {
 
     // Temporarily allow overflow to prevent clipping
     if (tableContainer) {
+      tableContainer._originalOverflow = tableContainer.style.overflow;
       tableContainer.style.overflow = 'visible';
     }
     if (eventsTable) {
@@ -3716,7 +3782,9 @@ class EventsTableManager {
     // Make sure the row is visible before highlighting; scroll only if off-screen
     const rect = row.getBoundingClientRect();
     const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
-    if (rect.top < 0 || rect.bottom > viewportHeight) {
+    const isVisible = rect.top >= 0 && rect.bottom <= viewportHeight;
+    
+    if (!isVisible || !options.skipScrollIfVisible) {
       row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
@@ -3727,7 +3795,8 @@ class EventsTableManager {
 
       // Restore original overflow settings
       if (tableContainer) {
-        tableContainer.style.overflow = '';
+        tableContainer.style.overflow = tableContainer._originalOverflow || '';
+        delete tableContainer._originalOverflow;
       }
       if (eventsTable) {
         eventsTable.style.overflow = '';

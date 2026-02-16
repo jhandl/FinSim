@@ -3,97 +3,58 @@
   "countryName": "Argentina",
   "version": "2025.12",
   "taxBasis": "domestic",
-  "treatyEquivalents": {
-    "incomeTax": "income",
-    "capitalGains": "capitalGains",
-    "dividends": "dividends"
-  },
+
+  "treatyEquivalents": { "incomeTax": "income", "capitalGains": "capitalGains", "dividends": "dividends" },
+
   "updateMessage": "",
-  "locale": {
-    "numberLocale": "es-AR",
-    "currencyCode": "ARS",
-    "currencySymbol": "$"
-  },
+
+  "locale": { "numberLocale": "es-AR", "currencyCode": "ARS", "currencySymbol": "$" },
+
   "economicData": {
-    "inflation": {
-      "cpi": 25.7,
-      "year": 2025
-    },
-    "purchasingPowerParity": {
-      "value": 420.076325,
-      "year": 2024
-    },
-    "exchangeRate": {
-      "perEur": 1631.72,
-      "asOf": "2025-11-22"
-    }
+    "typicalRentalYield": 5.09,
+    "inflation": { "cpi": 25.7, "year": 2026 },
+    "purchasingPowerParity": { "value": 419.90104, "year": 2024 },
+    "exchangeRate": { "perEur": 1723.09, "asOf": "2026-02-16" }
   },
+
   "incomeTax": {
     "name": "Ganancias",
     "personalAllowance": 0,
-    "taxCredits": {},
+    "taxCredits": {  },
     "bracketsByStatus": {
-      "single": {
-        "0": 0.05,
-        "500000": 0.09,
-        "1000000": 0.12,
-        "1500000": 0.15,
-        "2000000": 0.19,
-        "2500000": 0.23,
-        "3000000": 0.27,
-        "3500000": 0.31,
-        "4000000": 0.35
-      },
-      "married": {
-        "0": 0.05,
-        "750000": 0.09,
-        "1500000": 0.12,
-        "2250000": 0.15,
-        "3000000": 0.19,
-        "3750000": 0.23,
-        "4500000": 0.27,
-        "5250000": 0.31,
-        "6000000": 0.35
-      }
+      "single": { "0": 0.05, "500000": 0.09, "1000000": 0.12, "1500000": 0.15, "2000000": 0.19, "2500000": 0.23, "3000000": 0.27, "3500000": 0.31, "4000000": 0.35 },
+      "married": { "0": 0.05, "750000": 0.09, "1500000": 0.12, "2250000": 0.15, "3000000": 0.19, "3750000": 0.23, "4500000": 0.27, "5250000": 0.31, "6000000": 0.35 }
     }
   },
+
   "socialContributions": [
     {
       "name": "ANSES",
       "rate": 0.11,
-      "applicableIncomeTypes": [
-        "employment"
-      ]
+      "applicableIncomeTypes": [ "employment" ]
     },
     {
       "name": "Obra Social",
       "rate": 0.03,
-      "applicableIncomeTypes": [
-        "employment"
-      ]
+      "applicableIncomeTypes": [ "employment" ]
     }
   ],
-  "capitalGainsTax": {
-    "rate": 0.15,
-    "annualExemption": 0,
-    "allowLossOffset": true
-  },
+
+  "capitalGainsTax": { "rate": 0.15, "annualExemption": 0, "allowLossOffset": true },
+
   "pensionRules": {
     "minRetirementAgeState": 65,
     "statePensionAge": 65,
     "statePensionPeriod": "monthly",
-    "pensionSystem": {
-      "type": "state_only"
-    },
+    "pensionSystem": { "type": "state_only" },
     "taxAdvantaged": true,
-    "contributionLimits": {},
-    "lumpSumTaxBands": {},
-    "minDrawdownRates": {}
+    "contributionLimits": {  },
+    "lumpSumTaxBands": {  },
+    "minDrawdownRates": {  }
   },
-  "residencyRules": {
-    "postEmigrationTaxYears": 0,
-    "taxesForeignIncome": false
-  },
+
+  "residencyRules": { "postEmigrationTaxYears": 0, "taxesForeignIncome": false },
+
   "investmentTypes": [
     {
       "key": "merval_ar",
@@ -102,10 +63,7 @@
       "assetCountry": "ar",
       "residenceScope": "local",
       "taxation": {
-        "capitalGains": {
-          "rateRef": "capitalGainsTax.rate",
-          "allowLossOffset": true
-        }
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
       },
       "helpText": "MERVAL index shares are subject to capital gains tax at ${taxRules.capitalGainsTax.rate,percentage} on gains. Securities traded on the Argentine stock exchange may have exemptions under certain conditions. Losses can be offset against gains.",
       "helpUrl": "https://www.afip.gob.ar/"
@@ -118,10 +76,7 @@
       "assetCountry": "us",
       "residenceScope": "global",
       "taxation": {
-        "capitalGains": {
-          "rateRef": "capitalGainsTax.rate",
-          "allowLossOffset": true
-        }
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
       },
       "helpText": "CEDEARs (Argentine Depositary Receipts) are subject to capital gains tax at ${taxRules.capitalGainsTax.rate,percentage} on gains. These represent shares of foreign companies traded on the Argentine exchange. Losses can be offset against gains.",
       "helpUrl": "https://www.afip.gob.ar/"
@@ -136,18 +91,12 @@
       "sellWhenReceived": true,
       "excludeFromAllocations": true,
       "taxation": {
-        "capitalGains": {
-          "rateRef": "capitalGainsTax.rate",
-          "allowLossOffset": true
-        }
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "allowLossOffset": true }
       },
       "helpText": "Restricted Stock Units are taxed as ordinary income at delivery (up to 35% withholding). Subsequent sale of vested shares is subject to capital gains tax at ${taxRules.capitalGainsTax.rate,percentage}.",
       "helpUrl": "https://www.afip.gob.ar/"
     }
   ],
-  "pinnedIncomeTypes": [
-    "incomeSalaries",
-    "incomeStatePension",
-    "incomeCash"
-  ]
+
+  "pinnedIncomeTypes": [ "incomeSalaries", "incomeStatePension", "incomeCash" ]
 }

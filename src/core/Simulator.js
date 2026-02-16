@@ -1558,6 +1558,15 @@ function processEvents() {
           attributionManager.record('expenses', entry.label || entry.eventId, entryConvertedAmount);
           break;
 
+        case 'mortgage_payoff':
+          var payoffTotal = categoryTotalsByType['mortgage_payoff'] || 0;
+          if (!countedCategories[entryCategory] && payoffTotal > 0) {
+            expenses += payoffTotal;
+            countedCategories[entryCategory] = true;
+          }
+          attributionManager.record('expenses', entry.label || entry.eventId, entryConvertedAmount);
+          break;
+
         case 'purchase': {
           // Purchases are cash-funded (not "expenses" unless shortfall).
           // Do NOT use consolidated totals here: multiple purchase entries in the same year would
@@ -1882,6 +1891,18 @@ function processEvents() {
             eventId: event.id,
             label: 'Mortgage (' + event.id + ')'
           });
+
+          // Check if a lump-sum payoff is triggered (forced by relocation resolution)
+          if (person1.age === event.toAge && event.relocationSellMvId) {
+            var payoff = realEstate.settleMortgage(event.id);
+            if (payoff > 0) {
+              recordExpenseEntry(flowState, { currency: mortgageCurrency, country: mortgageCountry }, payoff, {
+                type: 'mortgage_payoff',
+                eventId: event.id,
+                label: 'Mortgage Payoff (' + event.id + ')'
+              });
+            }
+          }
         }
         break;
       }

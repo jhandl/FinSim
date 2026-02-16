@@ -82,6 +82,6 @@ describe('Relocation panel blur auto-sort guard', () => {
     expect(row.querySelector('.event-currency').value).toBe('EUR');
     expect(row.querySelector('.event-linked-country').value).toBe('ie');
     expect(row.querySelector('.event-resolution-override').value).toBe('1');
-    expect(afterSpy).toHaveBeenCalledWith('row_1');
+    expect(afterSpy).toHaveBeenCalledWith('row_1', expect.objectContaining({ pulse: true }));
   });
 });

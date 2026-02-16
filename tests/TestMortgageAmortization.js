@@ -109,16 +109,16 @@ const TestMortgageAmortization = {
       }
     },
 
-    // Test 4: After 5 years, property value should be significantly higher
-    // More mortgage principal repaid + 5 years of 3% appreciation
+    // Test 4: After 5 years, property value should be significantly higher.
+    // With true amortization, equity builds slightly faster than the old linear approximation.
     {
       type: "range",
       target: "age", 
       age: 40,
       field: "realEstateCapital",
       expected: {
-        min: 120000,                   // Substantial equity built up
-        max: 150000
+        min: 150000,                   // Substantial equity built up
+        max: 170000
       }
     },
 

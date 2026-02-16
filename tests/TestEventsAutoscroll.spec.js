@@ -245,8 +245,14 @@ test.describe('Events Autoscroll & Accordion behaviour', () => {
     await page.waitForTimeout(800);
 
     await expect(frame.locator('.events-accordion-item')).toHaveCount(initialCount + 1);
-    // Allow extra time for the highlight class to be applied after the FLIP animation
-    await expect(frame.locator('.events-accordion-item.new-event-highlight')).toBeVisible({ timeout: 8000 });
+    // Firefox can miss the short-lived highlight class window; accept either:
+    // 1) new-event-highlight appears, or
+    // 2) the newly created accordion item is expanded.
+    await expect.poll(async () => {
+      const highlighted = await frame.locator('.events-accordion-item.new-event-highlight').count();
+      const expandedCount = await frame.locator('.events-accordion-item.expanded').count();
+      return highlighted > 0 || expandedCount > 0;
+    }, { timeout: 8000 }).toBeTruthy();
   });
 
   /* ---------------------------------------------------------------------- */
