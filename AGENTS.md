@@ -233,7 +233,9 @@ Key traits:
 Relocation UI support:
 
 *   Relocation-affected events are annotated with `event.relocationImpact` for display and resolution flows.
-*   **Impact detection:** [`RelocationImpactDetector.js`](src/frontend/web/components/RelocationImpactDetector.js:1) flags relocation-sensitive events.
+*   **Impact detection:** [`RelocationImpactDetector.js`](src/frontend/web/components/RelocationImpactDetector.js:1) flags relocation-sensitive events. It supports bidirectional detection: both when relocations change and when events are created or edited.
+*   **Currency Inference:** `RelocationImpactDetector.inferEventCurrency()` auto-detects jurisdiction context during event creation/edits.
+*   **Debounced Analysis:** `EventsTableManager._scheduleRelocationReanalysis()` provides 300ms debouncing for impact detection triggered by table edits.
 *   **Inline resolution:** [`RelocationImpactAssistant.js`](src/frontend/web/components/RelocationImpactAssistant.js:1) provides guided fixes (split, peg, link, convert) in both table and accordion flows.
 
 ## 4. Test Framework
