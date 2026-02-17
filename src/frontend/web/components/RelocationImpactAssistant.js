@@ -40,7 +40,7 @@ var RelocationImpactAssistant = {
         expander.removeEventListener('transitionend', onClosed);
         if (panelRow.parentNode) panelRow.remove();
         // Trigger resize after panel removal to update layout
-        window.dispatchEvent(new Event('resize'));
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('resize', { detail: { skipScroll: true } }));
       };
       expander.addEventListener('transitionend', onClosed);
     } else {
@@ -613,7 +613,7 @@ var RelocationImpactAssistant = {
           if (e.target !== expander) return;
           expander.style.height = 'auto';
           // Trigger resize to ensure parent containers adapt to growing height
-          window.dispatchEvent(new Event('resize'));
+          if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('resize', { detail: { skipScroll: true } }));
           expander.removeEventListener('transitionend', onOpened);
         };
         expander.addEventListener('transitionend', onOpened);
@@ -752,14 +752,14 @@ var RelocationImpactAssistant = {
         const wrapperToRemove = expander;
         if (wrapperToRemove && wrapperToRemove.parentNode) { wrapperToRemove.remove(); }
         // Trigger resize after panel removal
-        window.dispatchEvent(new Event('resize'));
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('resize', { detail: { skipScroll: true } }));
       };
       expander.addEventListener('transitionend', onClosed);
     } else if (container) {
       setTimeout(function () {
         if (container.parentNode) container.parentNode.remove();
         // Trigger resize after panel removal
-        window.dispatchEvent(new Event('resize'));
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('resize', { detail: { skipScroll: true } }));
       }, 300);
     }
     this._teardownCollapseTriggers(item);

@@ -32,6 +32,7 @@
    * Apply FLIP animation to elements that have moved
    */
   function applyFLIPAnimation(elements, firstPositions, lastPositions, options = {}) {
+    if (options.skipAnimation) return;
     const { duration = 350, easing = 'ease' } = options;
 
     elements.forEach(element => {

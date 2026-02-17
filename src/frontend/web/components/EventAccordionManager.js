@@ -735,7 +735,7 @@ class EventAccordionManager {
       // Direct sort without FLIP animation
       this.applySortingDirectly();
     } else {
-      this.applySortingWithAnimation();
+      this.applySortingWithAnimation(options);
     }
 
     // Rebuild expandedItems based on stable event ids captured earlier
@@ -851,7 +851,8 @@ class EventAccordionManager {
   /**
    * Apply sorting with FLIP animation using AccordionSorter
    */
-  applySortingWithAnimation(highlightNew = false) {
+  applySortingWithAnimation(options = {}) {
+    const highlightNew = (typeof options === 'boolean') ? options : !!options.highlightNew;
     const tableManager = this.webUI.eventsTableManager;
     if (!tableManager || !tableManager.sortKeys || tableManager.sortKeys.length === 0) {
       // No sorting active, just highlight if needed
@@ -872,7 +873,7 @@ class EventAccordionManager {
     if (tbody && window.RowSorter) {
       // Close any open inline resolution panels in the table before DOM reorder
       if (tableManager && tableManager.collapseAllResolutionPanels) tableManager.collapseAllResolutionPanels();
-      window.RowSorter.sortRows(tbody, tableManager.sortKeys);
+      window.RowSorter.sortRows(tbody, tableManager.sortKeys, { skipAnimation: !!options.skipTableAnimation });
     }
 
     // Highlight the new event after sorting animation
@@ -2438,6 +2439,7 @@ class EventAccordionManager {
 
     // Use requestAnimationFrame to ensure DOM is fully updated after expansion
     requestAnimationFrame(() => {
+      if (typeof window === 'undefined') return;
       // Prefer visualViewport if available (adjusts for on-screen keyboard)
       const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight || document.documentElement.clientHeight;
 
@@ -2467,6 +2469,7 @@ class EventAccordionManager {
       // If the top of the accordion item is too close to the top, scroll up
       // slightly so the header is comfortably visible.
       const ensureTopSafety = () => {
+        if (typeof window === 'undefined') return;
         const itemTopNow = item.getBoundingClientRect().top;
         if (itemTopNow < TOP_MARGIN) {
           const adjust = itemTopNow - TOP_MARGIN;
@@ -2475,7 +2478,7 @@ class EventAccordionManager {
       };
 
       // Allow smooth scroll to start before checking top safety; slightly longer on mobile
-      const isMobile = window.innerWidth < 800;
+      const isMobile = (typeof window !== 'undefined') && window.innerWidth < 800;
       setTimeout(ensureTopSafety, isMobile ? 250 : 120);
     });
   }

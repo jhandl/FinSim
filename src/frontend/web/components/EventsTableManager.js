@@ -1718,7 +1718,7 @@ class EventsTableManager {
     }
 
     if (this.sortKeys && this.sortKeys.length > 0 && typeof this.applySort === 'function') {
-      this.applySort();
+      this.applySort({ skipAnimation: true });
     } else {
       const ageInput = document.querySelector('#Events tbody tr .event-from-age');
       if (ageInput) {
@@ -2268,7 +2268,9 @@ class EventsTableManager {
     this.updateRelocationImpactIndicators(events);
     this.webUI.updateStatusForRelocationImpacts(events);
     if (this.webUI.eventAccordionManager) {
-      this.webUI.eventAccordionManager.refresh({ skipSortAnimation: !options.pulse });
+      // Relocation resolution impacts should generally skip the "flying" sort animation
+      // unless they involve creating a second event (which is handled by split/rent actions explicitly calling applySort)
+      this.webUI.eventAccordionManager.refresh({ skipSortAnimation: true });
       // In accordion mode, the refresh re-renders everything.
       if (rowId && options.pulse) {
         setTimeout(() => {
@@ -2492,6 +2494,7 @@ class EventsTableManager {
    */
   focusOnEmptyRow(row) {
     // Ensure the row is visible – scroll only if it's outside the viewport
+    if (typeof window === 'undefined') return;
     const rect = row.getBoundingClientRect();
     const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
     const needsScroll = rect.top < 0 || rect.bottom > viewportHeight;
@@ -2576,11 +2579,15 @@ class EventsTableManager {
     if (accordionEl) {
       if (isExpanded) {
         // Item is already open – ensure it's fully visible (no double-scroll)
-        this.webUI.eventAccordionManager._scrollExpandedItemIntoView?.(accordionEl);
+        const skipScroll = !!(typeof window !== 'undefined' && window.event && window.event.detail && window.event.detail.skipScroll);
+        if (!skipScroll) {
+          this.webUI.eventAccordionManager._scrollExpandedItemIntoView?.(accordionEl);
+        }
       } else {
         // Item collapsed – only scroll if it's off-screen. Use block:"nearest" to
         // avoid forcing the header to the middle which causes the later upward
         // correction.
+        if (typeof window === 'undefined') return;
         const rect = accordionEl.getBoundingClientRect();
         const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
         if (rect.top < 0 || rect.bottom > viewportHeight) {
@@ -2754,7 +2761,7 @@ class EventsTableManager {
     this.animateRowHighlight(emptyRow, { skipScrollIfVisible: true });
 
     if (this.sortKeys && this.sortKeys.length > 0) {
-      this.applySortingWithAnimation();
+      this.applySort();
     }
 
     if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
@@ -3285,7 +3292,8 @@ class EventsTableManager {
     }, true);
   }
 
-  applySort() {
+  applySort(options = {}) {
+    const skipAnimation = !!(options && options.skipAnimation);
     // Collapse any open inline resolution panels before reordering rows
     RelocationImpactAssistant.collapseAllPanels();
     const tbody = document.querySelector('#Events tbody');
@@ -3321,7 +3329,7 @@ class EventsTableManager {
     }
 
     if (window.RowSorter) {
-      RowSorter.sortRows(tbody, this.sortKeys);
+      RowSorter.sortRows(tbody, this.sortKeys, { skipAnimation: skipAnimation });
     }
 
     this.updateHeaderIndicators();
@@ -3780,6 +3788,7 @@ class EventsTableManager {
     row.classList.add('new-event-highlight');
 
     // Make sure the row is visible before highlighting; scroll only if off-screen
+    if (typeof window === 'undefined') return;
     const rect = row.getBoundingClientRect();
     const viewportHeight = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
     const isVisible = rect.top >= 0 && rect.bottom <= viewportHeight;
