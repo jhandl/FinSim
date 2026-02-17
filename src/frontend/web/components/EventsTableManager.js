@@ -2182,11 +2182,11 @@ class EventsTableManager {
     // Also apply to paired real-estate rows if applicable
     this._applyToRealEstatePair(row, (r) => this.getOrCreateHiddenInput(r, 'event-currency', suggestedCurrency));
 
-    // If SI/SI2 and destination pension is state_only, auto-convert to non-pensionable
+    // If SI/SI2 and destination pension is state_only, auto-convert to non-pensionable.
+    // This is specifically correct for the destination-side (second half) of split salary events.
     const typeInput = row.querySelector('.event-type');
     const currentType = typeInput ? typeInput.value : null;
     if (currentType === 'SI' || currentType === 'SI2') {
-      // Derive dest country from context container if present
       const container = row.nextElementSibling && row.nextElementSibling.querySelector && row.nextElementSibling.querySelector('.resolution-panel-container');
       let dest = null;
       if (container) {
@@ -2213,6 +2213,11 @@ class EventsTableManager {
           }
           this.updateFieldVisibility(typeInput);
           typeInput.dispatchEvent(new Event('change', { bubbles: true }));
+          const matchInput = row.querySelector('.event-match');
+          if (matchInput) {
+            matchInput.value = '';
+            matchInput.dispatchEvent(new Event('change', { bubbles: true }));
+          }
         }
       }
     }
@@ -2329,10 +2334,19 @@ class EventsTableManager {
     const newType = currentType === 'SI' ? 'SInp' : 'SI2np';
     typeInput.value = newType;
     const toggleEl = row.querySelector(`#EventTypeToggle_${resolvedRowId}`);
-    if (toggleEl) toggleEl.textContent = newType;
-    if (row._eventTypeDropdown) row._eventTypeDropdown.setValue(newType);
+    if (toggleEl) {
+      const opts = this.getEventTypeOptionObjects();
+      const opt = opts.find(o => o && o.value === newType);
+      toggleEl.textContent = (opt && opt.label) ? opt.label : newType;
+    }
+    if (row._eventTypeDropdown && typeof row._eventTypeDropdown.setValue === 'function') row._eventTypeDropdown.setValue(newType);
     this.updateFieldVisibility(typeInput);
     typeInput.dispatchEvent(new Event('change', { bubbles: true }));
+    const matchInput = row.querySelector('.event-match');
+    if (matchInput) {
+      matchInput.value = '';
+      matchInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 

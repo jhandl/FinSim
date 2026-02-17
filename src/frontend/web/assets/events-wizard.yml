@@ -114,7 +114,7 @@ EventWizards:
               title: "No"
               description: "This salary does not contribute to pension"
         showButtons: ["back", "next"]
-        condition: "incomeType === 'salary'"
+        condition: "incomeType === 'salary' && salaryHasPrivatePension === true"
 
       - stepId: "match"
         title: "Employer Pension Match"
@@ -126,7 +126,7 @@ EventWizards:
           validation: "optional"
           help: "Leave blank if no match."
         showButtons: ["back", "next"]
-        condition: "incomeType === 'salary' && pensionContribution === 'yes'"
+        condition: "incomeType === 'salary' && salaryHasPrivatePension === true && pensionContribution === 'yes'"
 
       - stepId: "summary"
         title: "Review & Create"

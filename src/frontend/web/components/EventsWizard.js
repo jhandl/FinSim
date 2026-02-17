@@ -10,7 +10,7 @@ class EventsWizard {
     this.manager.onCompleteAction = (eventData) => this.createEvent(eventData);
 
     // Load YAML config
-    this.manager.loadConfig('/src/frontend/web/assets/events-wizard.yml?v=20260214-6');
+    this.manager.loadConfig('/src/frontend/web/assets/events-wizard.yml?v=20260217-3');
   }
 
   // Delegated API
@@ -90,7 +90,18 @@ class EventsWizard {
     if (this.manager.wizardState.eventType === 'SI' && data.incomeType === 'salary') {
       const simulationMode = this.webUI.getValue('simulation_mode');
       const person = data.person || 'person1';
-      const pensionContribution = data.pensionContribution || 'yes';
+      let pensionContribution = data.pensionContribution || 'yes';
+
+      // If the salary falls under a state-only pension system, pension contributions are not allowed.
+      // The wizard UI skips the pension steps in this case; this enforces it at event creation time too.
+      const salaryCountry = this.renderer.getRelocationResidenceCountryForAge(this.manager.wizardState);
+      const rs = Config.getInstance().getCachedTaxRuleSet(salaryCountry);
+      if (!rs.hasPrivatePensions()) {
+        pensionContribution = 'no';
+        data.pensionContribution = 'no';
+        data.match = '';
+      }
+
       if (simulationMode === 'single') {
         this.manager.wizardState.eventType = pensionContribution === 'yes' ? 'SI' : 'SInp';
       } else {
@@ -162,6 +173,21 @@ class EventsRenderer extends WizardRenderer {
     super(webUI);
   }
 
+  _syncSalaryPensionAvailability(wizardState) {
+    const data = (wizardState && wizardState.data) ? wizardState.data : {};
+    if (!(wizardState && wizardState.eventType === 'SI' && data.incomeType === 'salary')) return;
+
+    const salaryCountry = this.getRelocationResidenceCountryForAge(wizardState);
+    data.salaryCountry = salaryCountry;
+    data.salaryCountryName = Config.getInstance().getCountryNameByCode(salaryCountry);
+    const rs = Config.getInstance().getCachedTaxRuleSet(salaryCountry);
+    data.salaryHasPrivatePension = !!rs.hasPrivatePensions();
+    if (!data.salaryHasPrivatePension) {
+      data.pensionContribution = 'no';
+      data.match = '';
+    }
+  }
+
   // Period content (fromAge/toAge selection)
   renderPeriodContent(step, wizardState) {
     const container = document.createElement('div');
@@ -223,8 +249,12 @@ class EventsRenderer extends WizardRenderer {
       container.appendChild(help);
     }
 
+    // Ensure derived flags exist before later step conditions run.
+    this._syncSalaryPensionAvailability(wizardState);
+
     fromInput.addEventListener('input', () => {
       wizardState.data.fromAge = fromInput.value;
+      this._syncSalaryPensionAvailability(wizardState);
       const wizardManager = this.manager;
       if (wizardManager) {
         wizardManager.clearWizardFieldValidation(fromInput);
@@ -245,6 +275,7 @@ class EventsRenderer extends WizardRenderer {
 
     toInput.addEventListener('input', () => {
       wizardState.data.toAge = toInput.value;
+      this._syncSalaryPensionAvailability(wizardState);
       const wizardManager = this.manager;
       if (wizardManager) {
         wizardManager.clearWizardFieldValidation(toInput);

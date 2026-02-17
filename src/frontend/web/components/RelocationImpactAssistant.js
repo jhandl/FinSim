@@ -125,9 +125,13 @@ var RelocationImpactAssistant = {
       }
     }
     const startCountry = Config.getInstance().getStartCountry();
-    const canRenderWithoutMv = (impactCategory === 'simple' && (event.type === 'R' || event.type === 'M' || (event.type === 'RI' && isRelocationRentalOrphan)));
+    const canRenderWithoutMv = (impactCategory === 'simple' && (event.type === 'R' || event.type === 'M' || (event.type === 'RI' && isRelocationRentalOrphan))) ||
+      impactCategory === 'pension_conflict';
     if (!mvEvent && !canRenderWithoutMv && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift' && impactCategory !== 'split_amount_shift') return '';
-    const destCountry = mvEvent ? String(mvEvent.name || '').trim().toLowerCase() : startCountry;
+    let destCountry = mvEvent ? String(mvEvent.name || '').trim().toLowerCase() : startCountry;
+    if (impactCategory === 'pension_conflict' && impactDetails && impactDetails.country) {
+      destCountry = String(impactDetails.country || '').trim().toLowerCase() || destCountry;
+    }
     const originCountry = mvEvent && (env && env.eventsTableManager && typeof env.eventsTableManager.getOriginCountry === 'function') ? env.eventsTableManager.getOriginCountry(mvEvent, startCountry) : startCountry;
     const relocationAge = mvEvent ? mvEvent.fromAge : null;
 
@@ -212,6 +216,9 @@ var RelocationImpactAssistant = {
         }
         addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Let this event continue unchanged after the relocation (keeping its current value of ' + currentFormatted + ' ' + (originCurrency || '') + ').', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
       }
+    } else if (event.relocationImpact.category === 'pension_conflict') {
+      addAction(actions, { action: 'convert', tabLabel: 'Convert to "Salary (no pension)"', instantApply: true, tooltip: 'Converts this to a non-pensionable salary event.', buttonAttrs: ' data-row-id="' + rowId + '"' });
+      addAction(actions, { action: 'delete', tabLabel: 'Remove', instantApply: true, tooltip: 'Delete this event.', buttonAttrs: ' data-row-id="' + rowId + '"' });
     } else if (event.relocationImpact.category === 'simple') {
       if (event.type === 'RI' && isRelocationRentalOrphan) {
         addAction(actions, { action: 'keep_renting', tabLabel: 'Keep renting', instantApply: true, tooltip: 'Keep this rental income event unchanged.', buttonAttrs: ' data-row-id="' + rowId + '"' });

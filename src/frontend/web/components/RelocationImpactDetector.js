@@ -119,6 +119,27 @@ var RelocationImpactDetector = {
       this.addOrphanSplitImpacts(events, mvEvents);
       this.addOrphanRentalImpacts(events, mvEvents);
 
+      // Pension conflicts: pensionable salary in a state-only pension system.
+      // This blocks simulation until converted to a non-pensionable salary type.
+      for (var p = 0; p < events.length; p++) {
+        var evP = events[p];
+        if (!evP || (evP.type && isRelocationEvent(evP)) || evP.type === 'SM') continue;
+        if (evP.type !== 'SI' && evP.type !== 'SI2') continue;
+
+        var evFromAgeP = this.parseAgeValue(evP.fromAge);
+        if (isNaN(evFromAgeP)) continue;
+        var countryP = this.getCountryAtAge(mvEvents, startCountry, evFromAgeP);
+        var rsP = Config.getInstance().getCachedTaxRuleSet(countryP);
+        if (rsP && rsP.getPensionSystemType && rsP.getPensionSystemType() === 'state_only') {
+          var mvP = (mvEvents && mvEvents.length) ? this.getMvEventForAge(mvEvents, evFromAgeP) : null;
+          var msgP = this.generateImpactMessage('pension_conflict', evP, mvP, countryP, null);
+          this.addImpact(evP, 'pension_conflict', msgP, mvP ? this.getMvImpactId(mvP) : '', false, {
+            country: countryP,
+            pensionConflict: true
+          });
+        }
+      }
+
       // Final pass: remove impacts for events that are already resolved
       for (var k = 0; k < events.length; k++) {
         this.clearResolvedImpacts(events[k], mvEvents);
@@ -684,6 +705,10 @@ var RelocationImpactDetector = {
       default: noun = 'income'; break;
     }
 
+    if (category === 'pension_conflict') {
+      return 'This salary is in ' + destinationCountryName + ', which has no private pension system.';
+    }
+
     var countryForQuestion = originCountryName || destinationCountryName;
 
     if (category === 'boundary') {
@@ -726,12 +751,15 @@ var RelocationImpactDetector = {
     var impactMvId = event.relocationImpact ? event.relocationImpact.mvEventId : '';
     var impactCategory = event.relocationImpact ? event.relocationImpact.category : '';
     var impactMvEvent = this.getMvEventByImpactRef(mvEvents, impactMvId);
-    if (this.hasMatchingResolutionOverrideFor(event, impactMvId, impactCategory, impactMvEvent)) { delete event.relocationImpact; return; }
+    // Pension conflicts are hard errors and cannot be dismissed via "keep as is".
+    if (impactCategory !== 'pension_conflict' && this.hasMatchingResolutionOverrideFor(event, impactMvId, impactCategory, impactMvEvent)) { delete event.relocationImpact; return; }
     var resolved = false;
     if (event.relocationImpact.category === 'boundary') {
       // Boundary impacts are only cleared by explicit boundary-scoped overrides.
       // Keeping linked/currency values should not auto-resolve a boundary crossing.
       resolved = false;
+    } else if (event.relocationImpact.category === 'pension_conflict') {
+      resolved = (event.type === 'SInp' || event.type === 'SI2np');
     } else if (event.relocationImpact.category === 'simple') {
       var simpleDetails = event.relocationImpact ? event.relocationImpact.details : null;
       if (typeof simpleDetails === 'string') {
