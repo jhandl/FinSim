@@ -302,6 +302,34 @@ var RelocationImpactAssistant = {
         addAction(actions, { action: 'peg', tabLabel: 'Keep as is', instantApply: true, tooltip: 'Keeps the current value (' + (currentFormatted || originCurrency) + ') in ' + originCurrency + '. No conversion will occur.', buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '"' });
       }
       }
+    } else if (event.relocationImpact.category === 'jurisdiction_change') {
+      const fromCountry = impactDetails && impactDetails.fromCountry
+        ? String(impactDetails.fromCountry).toLowerCase()
+        : event.linkedCountry;
+      const toCountry = impactDetails && impactDetails.toCountry
+        ? String(impactDetails.toCountry).toLowerCase()
+        : destCountry;
+      const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(fromCountry);
+      const toRuleSet = Config.getInstance().getCachedTaxRuleSet(toCountry);
+      const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
+      const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
+
+      containerAttributes = ' data-from-country="' + fromCountry + '" data-to-country="' + toCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
+
+      addAction(actions, {
+        action: 'peg',
+        tabLabel: 'Keep as ' + (originCurrency || 'origin currency'),
+        instantApply: true,
+        tooltip: 'Maintains ' + (originCurrency || 'original currency') + ' for this event, linked to ' + (fromCountry || 'original country') + '.',
+        buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '" data-country="' + fromCountry + '" data-from-country="' + fromCountry + '"'
+      });
+      addAction(actions, {
+        action: 'peg',
+        tabLabel: 'Change to ' + (destCurrency || 'new currency'),
+        instantApply: true,
+        tooltip: 'Changes currency to ' + (destCurrency || 'new currency') + ' and links to ' + (toCountry || 'new country') + '.',
+        buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + destCurrency + '" data-country="' + toCountry + '" data-from-country="' + toCountry + '"'
+      });
     } else if (event.relocationImpact.category === 'split_amount_shift') {
       let splitAmountDetails = event.relocationImpact.details;
       if (typeof splitAmountDetails === 'string') {
@@ -444,8 +472,8 @@ var RelocationImpactAssistant = {
       }
       case 'peg': {
         const currency = payload && payload.currency;
-        const fromCountry = payload && payload.fromCountry;
-        if (typeof etm.pegCurrencyToOriginal === 'function') etm.pegCurrencyToOriginal(rowId, currency, fromCountry, eventId);
+        const linkedCountry = payload && (payload.country || payload.fromCountry);
+        if (typeof etm.pegCurrencyToOriginal === 'function') etm.pegCurrencyToOriginal(rowId, currency, linkedCountry, eventId);
         break;
       }
       case 'accept': {

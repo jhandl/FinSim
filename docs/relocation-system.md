@@ -115,12 +115,29 @@ When relocation events are added, the detector classifies affected events into f
 
 - **Boundary Crossers**: Events spanning relocation boundaries (e.g., salary from age 30-40 when relocating at 35) need splitting or currency pegging.
 - **Simple Events**: Events entirely within the new country period need currency review and cost-of-living adjustment.
+- **Jurisdiction Changes**: Events with a `linkedCountry` that no longer matches their location (e.g., after an age edit) need currency and link review.
 - **Property Auto-Peg**: Property events (rentals, mortgages) need linking to their origin country for correct inflation and currency.
 - **Pension Conflicts**: Pensionable salary events after moving to state-only pension countries need conversion to non-pensionable type.
 
 ### Detection Logic
 
-The detector scans events when MV events are added or modified, modifying events in-place by adding a `relocationImpact` property containing `{category, message, mvEventId, autoResolvable}`. Impacts are cleared automatically when resolved (e.g., via `clearResolvedImpacts()`).
+The detector scans events when MV events are added or modified, or when event ages are edited. It modifies events in-place by adding a `relocationImpact` property containing `{category, message, mvEventId, autoResolvable}`. Impacts are cleared automatically when resolved (e.g., via `clearResolvedImpacts()`).
+
+## Event-Triggered Impact Detection
+
+The relocation system also operates proactively when events are created or modified, ensuring that jurisdiction context is maintained.
+
+### Currency and LinkedCountry Inference
+
+When an event is created (via wizard or direct table entry) or its ages are edited, the system automatically infers the appropriate `currency` and `linkedCountry` if the event falls entirely within a relocated jurisdiction. 
+- **Auto-linking**: If the event is entirely within a single relocation period, it is automatically linked to that country.
+- **No Impact Marking**: Events that are automatically linked are NOT marked as impacted, as they are considered "correct by construction" during the creation/edit flow.
+
+### Blur-Triggered Re-analysis
+
+To avoid excessive processing, full impact detection is triggered on field blur (specifically for age fields) with a 300ms debounce. This ensures that:
+1. **Boundary Spanning** is detected if an edit moves an event to cross a move age.
+2. **Jurisdiction Changes** are detected if an event with an existing link is moved to a different country's period.
 
 ## Resolution Workflow
 

@@ -489,6 +489,10 @@ class WebUI extends AbstractUI {
       try {
         if (element && element.id === 'StartCountry') {
           this.refreshCountryChipsFromScenario();
+          // Comment 2: Trigger relocation re-analysis when StartCountry changes.
+          if (this.eventsTableManager) {
+            this.eventsTableManager.recomputeRelocationImpacts();
+          }
         }
       } catch (_) { }
     });

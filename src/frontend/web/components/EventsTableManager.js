@@ -476,6 +476,8 @@ class EventsTableManager {
 
       // Also listen for input changes on all event fields to update wizard icons
       eventsTable.addEventListener('focusin', (e) => {
+        if (!e.target.matches('.event-from-age, .event-to-age')) return;
+        e.target.dataset.prevAgeValue = e.target.value;
         if (!e.target.classList.contains('event-from-age')) return;
         const row = e.target.closest('tr');
         const typeInput = row ? row.querySelector('.event-type') : null;
@@ -526,7 +528,7 @@ class EventsTableManager {
       } catch (err) {
         console.error('Error analyzing relocation impacts:', err);
       }
-    }, 400);
+    }, 300);
   }
 
   _clearRelocationDestinationSelection(row) {
@@ -738,6 +740,74 @@ class EventsTableManager {
     input.offsetHeight;
     input.classList.add('age-auto-changed');
     setTimeout(() => { input.classList.remove('age-auto-changed'); }, 3000);
+  }
+
+  _handleAgeFieldBlur(row, fieldType) {
+    if (!row) return;
+    const cfg = Config.getInstance();
+    if (!cfg.isRelocationEnabled()) return;
+
+    const fromAgeInput = row.querySelector('.event-from-age');
+    const toAgeInput = row.querySelector('.event-to-age');
+    const fromAge = fromAgeInput ? fromAgeInput.value : '';
+    const toAge = toAgeInput ? toAgeInput.value : '';
+
+    // Only infer if we have at least fromAge
+    if (!fromAge) return;
+    const activeAgeInput = fieldType === 'to' ? toAgeInput : fromAgeInput;
+    const previousAgeValue = activeAgeInput && activeAgeInput.dataset ? String(activeAgeInput.dataset.prevAgeValue || '') : '';
+    const currentAgeValue = activeAgeInput ? String(activeAgeInput.value || '') : '';
+    if (activeAgeInput && previousAgeValue !== currentAgeValue) {
+      this._removeHiddenInput(row, 'event-resolution-override');
+      this._applyToRealEstatePair(row, (r) => this._removeHiddenInput(r, 'event-resolution-override'));
+    }
+
+    // Auto-infer for truly new rows: either still empty, or first-time from-age entry.
+    // Existing events edited later should still surface jurisdiction_change impacts.
+    const nameInput = row.querySelector('.event-name');
+    const amountInput = row.querySelector('.event-amount');
+    const fromAgeWasEmpty = !fromAgeInput || !String((fromAgeInput.dataset && fromAgeInput.dataset.prevAgeValue) || '').trim();
+    const isFirstFromAgeEntry = fieldType === 'from' && fromAgeWasEmpty;
+    const isNewEvent = ((!nameInput || !nameInput.value.trim()) && (!amountInput || !amountInput.value.trim())) || isFirstFromAgeEntry;
+
+    if (isNewEvent) {
+      const events = this.webUI.readEvents(false);
+      const startCountry = cfg.getStartCountry();
+      const mvEvents = RelocationImpactDetector.buildRelocationTimeline(events);
+
+      const inferred = RelocationImpactDetector.inferEventCurrency({
+        fromAge: fromAge,
+        toAge: toAge
+      }, mvEvents, startCountry);
+
+      let inferredJurisdiction = false;
+      if (inferred.linkedCountry) {
+        // Only set if not already set or if it's a property/mortgage (which might need auto-linking)
+        const existingLinked = row.querySelector('.event-linked-country');
+        if (!existingLinked || !existingLinked.value) {
+          this.getOrCreateHiddenInput(row, 'event-linked-country', inferred.linkedCountry);
+          this.getOrCreateHiddenInput(row, 'event-country', inferred.linkedCountry);
+          inferredJurisdiction = true;
+        }
+      }
+      if (inferred.currency) {
+        const existingCurrency = row.querySelector('.event-currency');
+        if (!existingCurrency || !existingCurrency.value) {
+          this.getOrCreateHiddenInput(row, 'event-currency', inferred.currency);
+          inferredJurisdiction = true;
+        }
+      }
+      if (inferredJurisdiction && amountInput && amountInput.value) {
+        const normalizedAmount = String(amountInput.value).replace(/[^0-9\-]/g, '');
+        const numericAmount = Number(normalizedAmount);
+        if (!isNaN(numericAmount)) amountInput.value = String(numericAmount);
+        if (this.webUI && this.webUI.formatUtils && typeof this.webUI.formatUtils.setupCurrencyInputs === 'function') {
+          this.webUI.formatUtils.setupCurrencyInputs(true);
+        }
+      }
+    }
+
+    this._scheduleRelocationReanalysis();
   }
 
   _syncSplitChainsForRelocationAgeShift(delta, markerIds, newRelocationAge) {
@@ -1519,9 +1589,22 @@ class EventsTableManager {
 
     const linkedEventId = 'split_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     const splitMvId = this._getRelocationLinkIdByImpactId(mvImpactId) || String(mvImpactId || '');
-    // Prefer parsing the original row's displayed amount using the origin country's locale
+    // Prefer parsing the original row's displayed amount using the row's current locale/country hint.
+    // This avoids blank amount issues when an event was first created post-relocation and later moved
+    // before the relocation boundary (display may still be in destination locale/currency at split time).
     const originalAmountRaw = (row.querySelector && row.querySelector('.event-amount') ? row.querySelector('.event-amount').value : (event && event.amount));
-    const part1AmountNum = parseByCountry(originalAmountRaw, fromCountryHint);
+    const rowCountryHintInput = row.querySelector('.event-country');
+    const rowLinkedCountryInput = row.querySelector('.event-linked-country');
+    const rowCountryHint = rowCountryHintInput && rowCountryHintInput.value
+      ? String(rowCountryHintInput.value).toLowerCase()
+      : (rowLinkedCountryInput && rowLinkedCountryInput.value ? String(rowLinkedCountryInput.value).toLowerCase() : '');
+    let part1AmountNum = parseByCountry(originalAmountRaw, rowCountryHint || fromCountryHint);
+    if ((typeof part1AmountNum !== 'number' || isNaN(part1AmountNum)) && fromCountryHint && rowCountryHint !== fromCountryHint) {
+      part1AmountNum = parseByCountry(originalAmountRaw, fromCountryHint);
+    }
+    if ((typeof part1AmountNum !== 'number' || isNaN(part1AmountNum)) && toCountryHint && toCountryHint !== fromCountryHint) {
+      part1AmountNum = parseByCountry(originalAmountRaw, toCountryHint);
+    }
     const part1Amount = (typeof part1AmountNum === 'number') ? String(part1AmountNum) : '';
 
     // Normalize percentage fields for inputs: inputs expect percentage (e.g., 3.5 for 3.5%)
@@ -1554,7 +1637,11 @@ class EventsTableManager {
       this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-amount', String(part1AmountNum));
     }
     this.getOrCreateHiddenInput(part2Row, 'event-currency', destCurrency);
-    if (toCountryHint) this.getOrCreateHiddenInput(part2Row, 'event-country', String(toCountryHint).toLowerCase());
+    const part2LinkedCountry = toCountryHint ? String(toCountryHint).toLowerCase() : destCountry;
+    if (part2LinkedCountry) {
+      this.getOrCreateHiddenInput(part2Row, 'event-country', part2LinkedCountry);
+      this.getOrCreateHiddenInput(part2Row, 'event-linked-country', part2LinkedCountry);
+    }
 
     row.insertAdjacentElement('afterend', part1Row);
     part1Row.insertAdjacentElement('afterend', part2Row);
@@ -2049,16 +2136,34 @@ class EventsTableManager {
       if (!resolvedLinkedCountry) resolvedLinkedCountry = Config.getInstance().getStartCountry();
     }
     const resolutionScope = this._getResolutionScopeForRow(row);
+    const normalizeAmountForCurrencyFormatting = (targetRow) => {
+      const amountInput = targetRow ? targetRow.querySelector('.event-amount') : null;
+      if (!amountInput || !amountInput.value) return;
+      const normalizedAmount = String(amountInput.value).replace(/[^0-9\-]/g, '');
+      const numericAmount = Number(normalizedAmount);
+      if (!isNaN(numericAmount)) amountInput.value = String(numericAmount);
+    };
     // Set currency on current row
     this.getOrCreateHiddenInput(row, 'event-currency', currencyCode);
-    if (resolvedLinkedCountry) this.getOrCreateHiddenInput(row, 'event-linked-country', resolvedLinkedCountry);
+    if (resolvedLinkedCountry) {
+      this.getOrCreateHiddenInput(row, 'event-linked-country', resolvedLinkedCountry);
+      this.getOrCreateHiddenInput(row, 'event-country', resolvedLinkedCountry);
+    }
+    normalizeAmountForCurrencyFormatting(row);
     this._setResolutionOverride(row, resolutionScope);
     // Also apply to paired real-estate rows if applicable
     this._applyToRealEstatePair(row, (r) => {
       this.getOrCreateHiddenInput(r, 'event-currency', currencyCode);
-      if (resolvedLinkedCountry) this.getOrCreateHiddenInput(r, 'event-linked-country', resolvedLinkedCountry);
+      if (resolvedLinkedCountry) {
+        this.getOrCreateHiddenInput(r, 'event-linked-country', resolvedLinkedCountry);
+        this.getOrCreateHiddenInput(r, 'event-country', resolvedLinkedCountry);
+      }
+      normalizeAmountForCurrencyFormatting(r);
       this._setResolutionOverride(r, resolutionScope);
     });
+    if (this.webUI && this.webUI.formatUtils && typeof this.webUI.formatUtils.setupCurrencyInputs === 'function') {
+      this.webUI.formatUtils.setupCurrencyInputs(true);
+    }
     this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 
@@ -2726,12 +2831,31 @@ class EventsTableManager {
 
     if (eventData && eventData.linkedCountry) {
       this.getOrCreateHiddenInput(row, 'event-linked-country', eventData.linkedCountry);
+      this.getOrCreateHiddenInput(row, 'event-country', eventData.linkedCountry);
     }
     if (eventData && eventData.currency) {
       this.getOrCreateHiddenInput(row, 'event-currency', eventData.currency);
     }
     if (eventData && eventData.relocationRentMvId) {
       this.getOrCreateHiddenInput(row, 'event-relocation-rent-mv-id', eventData.relocationRentMvId);
+    }
+
+    // Infer currency/linkedCountry if not explicitly provided and relocation is enabled
+    if (Config.getInstance().isRelocationEnabled() && resolvedType !== 'MV' && (!eventData || (!eventData.linkedCountry && !eventData.currency))) {
+      const events = this.webUI.readEvents(false);
+      const startCountry = Config.getInstance().getStartCountry();
+      const mvEvents = RelocationImpactDetector.buildRelocationTimeline(events);
+      const inferred = RelocationImpactDetector.inferEventCurrency({
+        fromAge: fromAgeValue,
+        toAge: toAgeValue
+      }, mvEvents, startCountry);
+      if (inferred.linkedCountry) {
+        this.getOrCreateHiddenInput(row, 'event-linked-country', inferred.linkedCountry);
+        this.getOrCreateHiddenInput(row, 'event-country', inferred.linkedCountry);
+      }
+      if (inferred.currency) {
+        this.getOrCreateHiddenInput(row, 'event-currency', inferred.currency);
+      }
     }
 
     if (eventData && eventData.relocationReviewed) {
@@ -2756,7 +2880,7 @@ class EventsTableManager {
     await this.populateRowFromWizardData(emptyRow, eventData);
     const eventId = emptyRow.dataset.eventId || null;
 
-    this.webUI.formatUtils.setupCurrencyInputs();
+    this.webUI.formatUtils.setupCurrencyInputs(true);
     this.webUI.formatUtils.setupPercentageInputs();
     this.animateRowHighlight(emptyRow, { skipScrollIfVisible: true });
 
@@ -3289,6 +3413,14 @@ class EventsTableManager {
       if (e.target.matches('input') && this.sortKeys.length > 0) {
         this.applySort();
       }
+
+      // Handle age field blur for currency inference and relocation re-analysis
+      if (e.target.matches('.event-from-age, .event-to-age')) {
+        const row = e.target.closest('tr');
+        if (row) {
+          this._handleAgeFieldBlur(row, e.target.classList.contains('event-from-age') ? 'from' : 'to');
+        }
+      }
     }, true);
   }
 
@@ -3671,6 +3803,10 @@ class EventsTableManager {
     const result = this.addEventRow();
     if (!result || !result.row) return { row: null, id: null };
     await this.populateRowFromWizardData(result.row, eventData);
+    if (this.webUI && this.webUI.formatUtils) {
+      this.webUI.formatUtils.setupCurrencyInputs(true);
+      this.webUI.formatUtils.setupPercentageInputs();
+    }
     return result;
   }
 
@@ -3690,6 +3826,7 @@ class EventsTableManager {
 
     // Apply sorting animation
     this.applySort(); // Apply FLIP animation for moved rows
+    this._scheduleRelocationReanalysis();
 
     // After sorting completes, animate the new table row highlight smoothly
     if (typeof this.animateNewTableRow === 'function') {

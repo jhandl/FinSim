@@ -509,13 +509,40 @@ class EventsRenderer extends WizardRenderer {
     const derived = {};
     derived.name = `<strong>${data.name || 'Unnamed Event'}</strong>`;
     const toNumber = (v) => { const num = parseFloat(v); return isNaN(num) ? 0 : num; };
-    if (data.amount !== undefined) derived.amount = this.formatCurrency(toNumber(data.amount));
-    if (data.propertyValue !== undefined) derived.propertyValue = this.formatCurrency(toNumber(data.propertyValue));
+    let summaryCountryCode = null;
+    let summaryCurrencyCode = null;
+    try {
+      const cfg = (typeof Config !== 'undefined' && typeof Config.getInstance === 'function') ? Config.getInstance() : null;
+      if (cfg) {
+        const startCountry = String(cfg.getStartCountry() || cfg.getDefaultCountry() || '').trim().toLowerCase();
+        summaryCountryCode = startCountry || null;
+        if (data && data.linkedCountry) summaryCountryCode = String(data.linkedCountry).trim().toLowerCase();
+        if (data && data.currency) summaryCurrencyCode = String(data.currency).trim().toUpperCase();
+        if (wizardState && wizardState.eventType !== 'MV' && data && data.fromAge !== undefined && data.fromAge !== '') {
+          const events = (this.context && typeof this.context.readEvents === 'function') ? (this.context.readEvents(false) || []) : [];
+          const mvEvents = (typeof RelocationImpactDetector !== 'undefined' && typeof RelocationImpactDetector.buildRelocationTimeline === 'function')
+            ? RelocationImpactDetector.buildRelocationTimeline(events)
+            : [];
+          if (typeof RelocationImpactDetector !== 'undefined' && typeof RelocationImpactDetector.inferEventCurrency === 'function') {
+            const inferred = RelocationImpactDetector.inferEventCurrency({ fromAge: data.fromAge, toAge: data.toAge }, mvEvents, startCountry);
+            if (inferred && inferred.linkedCountry) summaryCountryCode = String(inferred.linkedCountry).toLowerCase();
+            if (inferred && inferred.currency) summaryCurrencyCode = String(inferred.currency).toUpperCase();
+          }
+        }
+        if (!summaryCurrencyCode && summaryCountryCode) {
+          const rsSummary = cfg.getCachedTaxRuleSet(summaryCountryCode);
+          if (rsSummary && typeof rsSummary.getCurrencyCode === 'function') summaryCurrencyCode = rsSummary.getCurrencyCode();
+        }
+      }
+    } catch (_) { }
+    const formatSummaryCurrency = (value) => this.formatCurrency(value, summaryCurrencyCode, summaryCountryCode);
+    if (data.amount !== undefined) derived.amount = formatSummaryCurrency(toNumber(data.amount));
+    if (data.propertyValue !== undefined) derived.propertyValue = formatSummaryCurrency(toNumber(data.propertyValue));
     if (data.frequency) {
       const freqMap = { oneoff: 'one-off', weekly: 'weekly', monthly: 'monthly', yearly: 'annual' };
       derived.frequencyText = freqMap[data.frequency] || data.frequency;
       const factor = { weekly: 52, monthly: 12, yearly: 1 }[data.frequency];
-      if (factor && data.amount !== undefined) derived.annualAmount = this.formatCurrency(toNumber(data.amount) * factor);
+      if (factor && data.amount !== undefined) derived.annualAmount = formatSummaryCurrency(toNumber(data.amount) * factor);
     }
     if (growthRequested) {
       if (data.rate === undefined || data.rate === '' || data.rate === 'inflation') {
@@ -594,8 +621,8 @@ class EventsRenderer extends WizardRenderer {
       }
     } catch (_) { }
     if (data.mortgageRate !== undefined) derived.mortgageRate = `${data.mortgageRate}%`;
-    if (data.mortgageAnnualPayment !== undefined) derived.mortgageAnnualPayment = this.formatCurrency(toNumber(data.mortgageAnnualPayment));
-    if (data.mortgageMonthlyPayment !== undefined) derived.mortgageMonthlyPayment = this.formatCurrency(toNumber(data.mortgageMonthlyPayment));
+    if (data.mortgageAnnualPayment !== undefined) derived.mortgageAnnualPayment = formatSummaryCurrency(toNumber(data.mortgageAnnualPayment));
+    if (data.mortgageMonthlyPayment !== undefined) derived.mortgageMonthlyPayment = formatSummaryCurrency(toNumber(data.mortgageMonthlyPayment));
     if (data.match !== undefined && data.match !== '') { derived.match = `${data.match}%`; derived.matchPart = `, employer matches up to ${data.match}%`; } else { derived.matchPart = ''; }
     if (data.mortgageTerm !== undefined) derived.mortgageTerm = data.mortgageTerm;
     if (data.propertyValue !== undefined && data.amount !== undefined) {
@@ -710,7 +737,7 @@ class EventsRenderer extends WizardRenderer {
     return type === 'from' ? currentYear.toString() : (currentYear + 40).toString();
   }
 
-  formatCurrency(value) {
-    try { return FormatUtils.formatCurrency(value); } catch (err) { const num = parseFloat(value) || 0; return num.toString(); }
+  formatCurrency(value, currencyCode, countryCode) {
+    try { return FormatUtils.formatCurrency(value, currencyCode, countryCode); } catch (err) { const num = parseFloat(value) || 0; return num.toString(); }
   }
 }

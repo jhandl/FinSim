@@ -33,8 +33,8 @@ var RelocationImpactDetector = {
           var mvImpactId = this.getMvImpactId(mvEvent);
           var nextMvEvent = (idx + 1 < mvEvents.length) ? mvEvents[idx + 1] : null;
           var destinationCountry = getRelocationCountryCode(mvEvent);
-          var mvFromAge = Number(mvEvent.fromAge);
-          var nextMvFromAge = nextMvEvent ? Number(nextMvEvent.fromAge) : NaN;
+          var mvFromAge = this.parseAgeValue(mvEvent.fromAge);
+          var nextMvFromAge = nextMvEvent ? this.parseAgeValue(nextMvEvent.fromAge) : NaN;
 
           // Determine origin country (the country being left)
           var originCountry = startCountry;
@@ -47,9 +47,10 @@ var RelocationImpactDetector = {
             var event = events[j];
             // Skip MV events and Stock Market events
             if (event.type && (isRelocationEvent(event) || event.type === 'SM')) continue;
+            if (!this.isEventAgeReadyForRelocationAnalysis(event)) continue;
             // Skip events explicitly reviewed for this relocation/category, or parts of a split chain
             if (this.hasMatchingResolutionOverrideFor(event, mvImpactId, 'boundary', mvEvent)) continue;
-            if (event.linkedEventId) continue;
+            if (event.linkedEventId && this.isProtectedSplitChainForMv(event, events, mvEvent)) continue;
             // Sold real-estate rows linked to a relocation are handled by
             // addSoldRealEstateShiftImpacts so users can explicitly re-align
             // sale timing when relocation age changes.
@@ -57,9 +58,9 @@ var RelocationImpactDetector = {
             if (this.shouldDeferMortgageBoundaryImpact(event, events, mvFromAge)) continue;
 
             // Check if event crosses THIS MV's boundary (not the next one)
-            var eFrom = Number(event.fromAge);
-            var eTo = Number(event.toAge);
-            if (!isNaN(eTo) && !isNaN(eFrom) && eFrom < mvFromAge && eTo >= mvFromAge) {
+            var eFrom = this.parseAgeValue(event.fromAge);
+            var eTo = this.parseAgeValue(event.toAge);
+            if (!isNaN(eFrom) && !isNaN(eTo) && eFrom < mvFromAge && eTo >= mvFromAge) {
               var message = this.generateImpactMessage('boundary', event, mvEvent, destinationCountry, originCountry);
               this.addImpact(event, 'boundary', message, mvImpactId, false);
             }
@@ -70,11 +71,18 @@ var RelocationImpactDetector = {
             var event = events[j];
             // Skip MV events and Stock Market events
             if (event.type && (isRelocationEvent(event) || event.type === 'SM')) continue;
+            if (!this.isEventAgeReadyForRelocationAnalysis(event)) continue;
             if (this.hasMatchingResolutionOverrideFor(event, mvImpactId, 'simple', mvEvent)) continue;
             if (this.isProtectedBySellMarkerForMv(event, mvEvents, mvImpactId)) continue;
 
-            var eFrom2 = Number(event.fromAge);
+            var eFrom2 = this.parseAgeValue(event.fromAge);
             if (!isNaN(eFrom2) && eFrom2 >= mvFromAge && (!nextMvEvent || eFrom2 < nextMvFromAge)) {
+              // Skip simple impact if this event has a linkedCountry (or implicit StartCountry link)
+              // that doesn't match this jurisdiction, as it will be caught by the more specific
+              // jurisdiction_change pass.
+              var effectiveLinkForSimple = event.linkedCountry || startCountry;
+              if (effectiveLinkForSimple && String(effectiveLinkForSimple).toLowerCase() !== destinationCountry.toLowerCase()) continue;
+
               var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry, originCountry);
               this.addImpact(event, 'simple', message, mvImpactId, true);
             }
@@ -82,6 +90,28 @@ var RelocationImpactDetector = {
 
         }
         this.addSoldRealEstateShiftImpacts(events, mvEvents);
+
+        // Jurisdiction Change: Detect if an event with linkedCountry now falls in a different jurisdiction
+        for (var l = 0; l < events.length; l++) {
+          var ev = events[l];
+          if (!ev || (ev.type && isRelocationEvent(ev)) || ev.type === 'SM') continue;
+          if (!this.isEventAgeReadyForRelocationAnalysis(ev)) continue;
+          if (ev.relocationImpact) continue; // Boundary takes precedence
+
+          var evFromAge = this.parseAgeValue(ev.fromAge);
+          var currentJurisdiction = this.getCountryAtAge(mvEvents, startCountry, evFromAge);
+          var effectiveLink = ev.linkedCountry || startCountry;
+          if (String(effectiveLink).toLowerCase() !== String(currentJurisdiction).toLowerCase()) {
+            var origin = effectiveLink;
+            var destination = currentJurisdiction;
+            var mvEv = this.getMvEventForAge(mvEvents, evFromAge);
+            var msg = this.generateImpactMessage('jurisdiction_change', ev, mvEv, destination, origin);
+            this.addImpact(ev, 'jurisdiction_change', msg, this.getMvImpactId(mvEv), true, {
+              fromCountry: origin,
+              toCountry: destination
+            });
+          }
+        }
       }
 
       this.validateRealEstateLinkedCountries(events, mvEvents, startCountry);
@@ -127,7 +157,7 @@ var RelocationImpactDetector = {
       if (isRelocationEvent(event)) {
         var destinationCountry = getRelocationCountryCode(event);
         if (!destinationCountry || !validCodes[destinationCountry]) continue;
-        var fa = Number(event.fromAge);
+        var fa = this.parseAgeValue(event.fromAge);
         if (!isNaN(fa)) {
           // normalize numeric for sorting comparisons
           event.fromAge = fa;
@@ -141,18 +171,81 @@ var RelocationImpactDetector = {
 
   getCountryAtAge: function (mvEvents, startCountry, age) {
     var current = startCountry;
+    if (isNaN(age)) return current;
     for (var i = 0; i < mvEvents.length; i++) {
-      var mvAge = Number(mvEvents[i].fromAge);
+      var mvAge = this.parseAgeValue(mvEvents[i].fromAge);
       if (age >= mvAge) current = getRelocationCountryCode(mvEvents[i]);
       else break;
     }
     return current;
   },
 
+  parseAgeValue: function (value) {
+    if (value === undefined || value === null) return NaN;
+    var text = String(value).trim();
+    if (!text) return NaN;
+    var parsed = Number(text);
+    return isNaN(parsed) ? NaN : parsed;
+  },
+
+  eventRequiresToAge: function (event) {
+    if (!event || !event.type) return false;
+    if (typeof UIManager !== 'undefined' && UIManager && typeof UIManager.getRequiredFields === 'function') {
+      var required = UIManager.getRequiredFields(String(event.type));
+      return !!(required && required.toAge === 'required');
+    }
+    var type = String(event.type);
+    return type !== 'R' && type !== 'DBI' && type !== 'MV' && type !== 'NOP';
+  },
+
+  isEventAgeReadyForRelocationAnalysis: function (event) {
+    var fromAge = this.parseAgeValue(event ? event.fromAge : null);
+    if (isNaN(fromAge)) return false;
+    if (!this.eventRequiresToAge(event)) return true;
+    var toAge = this.parseAgeValue(event ? event.toAge : null);
+    return !isNaN(toAge);
+  },
+
+  /**
+   * Infers the natural currency and linkedCountry for an event based on its age.
+   * Returns { currency, linkedCountry } if event falls entirely within a jurisdiction.
+   * @param {Object} event - Event data object
+   * @param {Array} mvEvents - Sorted MV events
+   * @param {string} startCountry - Starting country code
+   * @returns {Object} { currency, linkedCountry } or nulls
+   */
+  inferEventCurrency: function (event, mvEvents, startCountry) {
+    var fromAge = this.parseAgeValue(event.fromAge);
+    var toAge = this.parseAgeValue(event.toAge);
+    if (isNaN(fromAge)) return { currency: null, linkedCountry: null };
+
+    // Check if event spans multiple jurisdictions
+    var countryAtStart = this.getCountryAtAge(mvEvents, startCountry, fromAge);
+    if (!isNaN(toAge)) {
+      var countryAtEnd = this.getCountryAtAge(mvEvents, startCountry, toAge);
+      if (countryAtStart !== countryAtEnd) {
+        return { currency: null, linkedCountry: null };
+      }
+    }
+
+    // If it falls entirely within start country, return nulls (default behavior)
+    if (countryAtStart === startCountry) {
+      return { currency: null, linkedCountry: null };
+    }
+
+    // Entirely within a relocated jurisdiction
+    var rs = Config.getInstance().getCachedTaxRuleSet(countryAtStart);
+    var currency = rs ? rs.getCurrencyCode() : null;
+    return {
+      currency: currency ? String(currency).toUpperCase() : null,
+      linkedCountry: countryAtStart
+    };
+  },
+
   getMvEventForAge: function (mvEvents, age) {
     var chosen = mvEvents[0];
     for (var i = 0; i < mvEvents.length; i++) {
-      if (age >= Number(mvEvents[i].fromAge)) chosen = mvEvents[i];
+      if (age >= this.parseAgeValue(mvEvents[i].fromAge)) chosen = mvEvents[i];
       else break;
     }
     return chosen;
@@ -208,6 +301,29 @@ var RelocationImpactDetector = {
       if (!candidate.linkedCountry) return true;
     }
     return false;
+  },
+
+  isProtectedSplitChainForMv: function (event, events, mvEvent) {
+    if (!event || !event.linkedEventId || !events || !events.length) return false;
+    var linkedId = String(event.linkedEventId || '');
+    if (!linkedId) return false;
+    var chain = [];
+    for (var i = 0; i < events.length; i++) {
+      var candidate = events[i];
+      if (!candidate || !candidate.linkedEventId) continue;
+      if (String(candidate.linkedEventId) !== linkedId) continue;
+      chain.push(candidate);
+    }
+    if (chain.length < 2) return false;
+    chain.sort(function (a, b) {
+      var aFrom = RelocationImpactDetector.parseAgeValue(a.fromAge);
+      var bFrom = RelocationImpactDetector.parseAgeValue(b.fromAge);
+      if (aFrom !== bFrom) return aFrom - bFrom;
+      var aTo = RelocationImpactDetector.parseAgeValue(a.toAge);
+      var bTo = RelocationImpactDetector.parseAgeValue(b.toAge);
+      return aTo - bTo;
+    });
+    return this.hasRelocationBoundaryForSplitChain(chain, mvEvent ? [mvEvent] : []);
   },
 
   ensureSimpleImpact: function (event, mvEvents, startCountry, details) {
@@ -574,6 +690,18 @@ var RelocationImpactDetector = {
       return 'What should happen with this ' + noun + ' after your move to ' + destinationCountryName + '?';
     }
 
+    if (category === 'jurisdiction_change') {
+      var originCurrencyCode = 'original currency';
+      var destinationCurrencyCode = 'new currency';
+      try {
+        var rsOrig = Config.getInstance().getCachedTaxRuleSet(originCountry);
+        if (rsOrig) originCurrencyCode = rsOrig.getCurrencyCode();
+        var rsDest = Config.getInstance().getCachedTaxRuleSet(destinationCountry);
+        if (rsDest) destinationCurrencyCode = rsDest.getCurrencyCode();
+      } catch (_) { }
+      return 'This ' + noun + ' moved from ' + originCountryName + ' to ' + destinationCountryName + '. Keep as ' + originCurrencyCode + ' or change to ' + destinationCurrencyCode + '?';
+    }
+
     switch (category) {
       case 'simple':
         if (mvEvent && this.checkPensionConflict(event, destinationCountry, mvEvent.fromAge)) {
@@ -601,9 +729,9 @@ var RelocationImpactDetector = {
     if (this.hasMatchingResolutionOverrideFor(event, impactMvId, impactCategory, impactMvEvent)) { delete event.relocationImpact; return; }
     var resolved = false;
     if (event.relocationImpact.category === 'boundary') {
-      // Consider boundary resolved if the event was explicitly split/linked, pegged to a currency,
-      // or for real-estate events if a linked country has been set (indicating jurisdiction is tied).
-      resolved = !!(event.linkedEventId || (event.currency && event.linkedCountry) || ((event.type === 'R' || event.type === 'M') && event.linkedCountry));
+      // Boundary impacts are only cleared by explicit boundary-scoped overrides.
+      // Keeping linked/currency values should not auto-resolve a boundary crossing.
+      resolved = false;
     } else if (event.relocationImpact.category === 'simple') {
       var simpleDetails = event.relocationImpact ? event.relocationImpact.details : null;
       if (typeof simpleDetails === 'string') {
