@@ -498,11 +498,11 @@
   <script src="/src/frontend/web/utils/FieldLabelsManager.js?v=20260213-4"></script>
   <script src="/src/frontend/web/utils/ValidationUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/RelocationUtils.js?v=20260214-1"></script>
-  <script src="/src/frontend/web/components/DynamicSectionManager.js?v=20260205-2"></script>
+  <script src="/src/frontend/web/components/DynamicSectionManager.js?v=20260217-3"></script>
   <script src="/src/frontend/web/components/DynamicSectionVisibilityEngine.js?v=20260204-1"></script>
   <script src="/src/frontend/web/components/DynamicSectionsConfig.js?v=20260207-7"></script>
   <script src="/src/frontend/web/components/DynamicSectionsManager.js?v=2026-01-10-1"></script>
-  <script src="/src/frontend/web/components/TableManager.js?v=20260208-2"></script>
+  <script src="/src/frontend/web/components/TableManager.js?v=20260217-2"></script>
   <script src="/src/frontend/web/components/EventsTableManager.js?v=20260217-3"></script>
   <script src="/src/frontend/web/components/RelocationImpactDetector.js?v=20260217-3"></script>
   <script src="/src/frontend/web/components/RelocationImpactAssistant.js?v=20260217-2"></script>
@@ -604,6 +604,10 @@
           e.preventDefault();
           dataSection.style.display = 'block';
           mobileMessage.style.display = 'none';
+          const webUI = (typeof WebUI !== 'undefined' && WebUI.getInstance) ? WebUI.getInstance() : null;
+          if (webUI && webUI.tableManager && typeof webUI.tableManager.finalizeDataTableLayout === 'function') {
+            webUI.tableManager.finalizeDataTableLayout();
+          }
 
           // Recalculate sticky column widths after table is shown
           setTimeout(updateStickyColumnWidths, 100);

@@ -131,6 +131,10 @@ class DynamicSectionManager {
     const sectionName = this.getSectionName();
     const containerSelector = `.dynamic-section-container[data-section="${sectionName}"]`;
     const cellSelector = '.dynamic-section-cell';
+    const tableEl = tbody.closest('#Data');
+    if (tableEl && tableEl.offsetWidth === 0) {
+      return;
+    }
 
     // Ensure re-running this method (e.g. after currency display changes) measures
     // intrinsic content widths rather than previously-fixed pixel widths.
