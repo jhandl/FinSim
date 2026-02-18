@@ -73,35 +73,15 @@ async function runScenario(parameters, events) {
 
 function getMixTotals(context, entry) {
   const asset = entry.asset;
-  const mixConfig = asset.mixConfig;
-  const matchTolerance = 0.0001;
-  let v1 = 0;
-  let v2 = 0;
-
-  for (let i = 0; i < asset.portfolio.length; i++) {
-    const holding = asset.portfolio[i];
-    if (typeof holding.growth !== 'number' || typeof holding.stdev !== 'number') continue;
-    const isAsset1 = Math.abs(holding.growth - mixConfig.asset1Growth) < matchTolerance &&
-      Math.abs(holding.stdev - mixConfig.asset1Vol) < matchTolerance;
-    const isAsset2 = Math.abs(holding.growth - mixConfig.asset2Growth) < matchTolerance &&
-      Math.abs(holding.stdev - mixConfig.asset2Vol) < matchTolerance;
-    if (!isAsset1 && !isAsset2) continue;
-
-    let holdingCapital = holding.principal.amount + holding.interest.amount;
-    if (holding.principal.currency !== context.residenceCurrency || holding.principal.country !== context.currentCountry) {
-      holdingCapital = context.convertCurrencyAmount(
-        holdingCapital,
-        holding.principal.currency,
-        holding.principal.country,
-        context.residenceCurrency,
-        context.currentCountry,
-        context.year,
-        true
-      );
-    }
-    if (isAsset1) v1 += holdingCapital;
-    if (isAsset2) v2 += holdingCapital;
+  const composite = asset._mixedAsset || asset;
+  
+  if (!composite.leg1 || !composite.leg2) {
+    return { v1: 0, v2: 0, total: 0 };
   }
+
+  // Capital is already in residence currency (or handles conversion internally)
+  const v1 = composite.leg1.capital();
+  const v2 = composite.leg2.capital();
 
   return { v1: v1, v2: v2, total: v1 + v2 };
 }

@@ -12,6 +12,7 @@ class WebUI extends AbstractUI {
     this.preservedVolatilityValues = {}; // Store volatility values when switching modes
     this.investmentStrategiesEnabled = false;
     this.perCountryInvestmentsEnabled = false;
+    this.economicRegimesEnabled = 'off';
 
     this.p1Labels = {
       'StartingAge': { neutral: 'Current Age', your: 'Your Current Age' },
@@ -351,6 +352,9 @@ class WebUI extends AbstractUI {
     }
     if (elementId === 'perCountryInvestmentsEnabled') {
       return this.perCountryInvestmentsEnabled;
+    }
+    if (elementId === 'economicRegimesEnabled') {
+      return this.economicRegimesEnabled;
     }
     return DOMUtils.getValue(elementId);
   }
@@ -4516,6 +4520,11 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     const perCountryInvestmentsState = localStorage.getItem('perCountryInvestmentsEnabled') || 'off';
     webUi.perCountryInvestmentsEnabled = (perCountryInvestmentsState === 'on');
 
+    const cfg = Config.getInstance();
+    const isRegimesEnabled = !!(cfg && cfg.isEconomicRegimesFeatureEnabled && cfg.isEconomicRegimesFeatureEnabled());
+    const economicRegimesState = isRegimesEnabled ? (localStorage.getItem('economicRegimesEnabled') || 'off') : 'off';
+    webUi.economicRegimesEnabled = economicRegimesState;
+
     // Listen for Investment Strategies toggle
     window.addEventListener('investmentStrategiesToggle', (e) => {
       webUi.investmentStrategiesEnabled = e.detail.enabled;
@@ -4528,6 +4537,13 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
       // Refresh allocations UI immediately (global ↔ per-country mode)
       try { webUi.refreshCountryChipsFromScenario(webUi._lastInvestmentTypesForGrowthRates); } catch (_) { }
     });
+
+    // Listen for Economic Regimes toggle
+    if (isRegimesEnabled) {
+      window.addEventListener('economicRegimesToggle', (e) => {
+        webUi.economicRegimesEnabled = e.detail.enabled ? 'on' : 'off';
+      });
+    }
 
     // Initialize controls that depend on Config/tax rules being available
     // IMPORTANT: Create StartCountry controls before any code may read it
@@ -4565,7 +4581,6 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     });
 
     // After labels and headers are present, apply pinned-only income visibility
-    const cfg = Config.getInstance();
     const rs = (cfg.getCachedTaxRuleSet ? (cfg.getCachedTaxRuleSet(cfg.getDefaultCountry())) : null) || (cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet() : null);
     if (rs && typeof rs.getInvestmentTypes === 'function') {
       let investmentTypes = rs.getResolvedInvestmentTypes() || [];

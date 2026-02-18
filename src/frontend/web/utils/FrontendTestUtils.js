@@ -46,8 +46,7 @@ export async function waitForOverlayGone(page, timeout = 12000) {
       const gone = await page.evaluate(() => {
         const iframe = document.querySelector('#app-frame');
         const doc = iframe && iframe.contentDocument;
-        const m = doc?.querySelector('.welcome-modal');
-        return !m || m.offsetParent === null;
+        return !doc || !doc.querySelector('.welcome-modal.visible');
       });
       if (gone) return;
     } catch (_) { /* ignore transient frame detach/errors and retry */ }

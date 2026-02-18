@@ -16,22 +16,16 @@ function getRowByAge(results, age) {
 
 function getMixTotals(context, entry) {
   const asset = entry.asset;
-  const mixConfig = asset.mixConfig;
-  const matchTolerance = 0.0001;
-  let v1 = 0;
-  let v2 = 0;
-  for (let i = 0; i < asset.portfolio.length; i++) {
-    const holding = asset.portfolio[i];
-    if (typeof holding.growth !== 'number' || typeof holding.stdev !== 'number') continue;
-    const isAsset1 = Math.abs(holding.growth - mixConfig.asset1Growth) < matchTolerance &&
-      Math.abs(holding.stdev - mixConfig.asset1Vol) < matchTolerance;
-    const isAsset2 = Math.abs(holding.growth - mixConfig.asset2Growth) < matchTolerance &&
-      Math.abs(holding.stdev - mixConfig.asset2Vol) < matchTolerance;
-    if (!isAsset1 && !isAsset2) continue;
-    const holdingCapital = holding.principal.amount + holding.interest.amount;
-    if (isAsset1) v1 += holdingCapital;
-    if (isAsset2) v2 += holdingCapital;
+  // Handle both MixedInvestmentAsset and Pension (via _mixedAsset)
+  const composite = asset._mixedAsset || asset;
+  
+  if (!composite.leg1 || !composite.leg2) {
+    return { v1: 0, v2: 0, total: 0 };
   }
+  
+  const v1 = composite.leg1.capital();
+  const v2 = composite.leg2.capital();
+  
   return { v1: v1, v2: v2, total: v1 + v2 };
 }
 
@@ -211,10 +205,19 @@ module.exports = {
         const assets = framework.simulationContext.investmentAssets || [];
         const ieEntry = assets.find(entry => entry && entry.key === 'indexFunds_ie');
         const arEntry = assets.find(entry => entry && entry.key === 'merval_ar');
-        const ieHoldings = ieEntry && ieEntry.asset ? ieEntry.asset.portfolio || [] : [];
-        const arHoldings = arEntry && arEntry.asset ? arEntry.asset.portfolio || [] : [];
-        const ieGrowth = ieHoldings.length ? ieHoldings[0].growth : null;
-        const arGrowth = arHoldings.length ? arHoldings[0].growth : null;
+        
+        // With MixedInvestmentAsset, portfolio is in legs.
+        // ie mix: 100% asset1. merval mix: 100% asset1.
+        
+        const ieLeg1 = ieEntry && ieEntry.asset && ieEntry.asset.leg1;
+        const arLeg1 = arEntry && arEntry.asset && arEntry.asset.leg1;
+        
+        const ieHoldings = ieLeg1 ? ieLeg1.portfolio || [] : [];
+        const arHoldings = arLeg1 ? arLeg1.portfolio || [] : [];
+        
+        const ieGrowth = ieHoldings.length ? (ieHoldings[0].growth !== undefined ? ieHoldings[0].growth : ieLeg1.growth) : null;
+        const arGrowth = arHoldings.length ? (arHoldings[0].growth !== undefined ? arHoldings[0].growth : arLeg1.growth) : null;
+        
         if (typeof ieGrowth !== 'number' || !approxEqual(ieGrowth, 0.1, 0.0001)) {
           errors.push('Per-country mix: expected IE holding growth ≈ 0.1, got ' + ieGrowth);
         }

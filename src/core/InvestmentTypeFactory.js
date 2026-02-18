@@ -63,6 +63,21 @@ class InvestmentTypeFactory {
     return mix;
   }
 
+  static _resolveAssetClassForBaseKey(baseKey) {
+    if (!baseKey) {
+      throw new Error('Economic regime configuration error: Missing base key in mix configuration');
+    }
+    var cfg = Config.getInstance();
+    var baseType = cfg.getInvestmentBaseTypeByKey(baseKey);
+    if (!baseType) {
+      throw new Error('Economic regime configuration error: Unknown investment base type "' + baseKey + '" in mix configuration');
+    }
+    if (!baseType.assetClass) {
+      throw new Error('Economic regime configuration error: Missing assetClass for investment base type "' + baseKey + '"');
+    }
+    return baseType.assetClass;
+  }
+
   /**
    * Creates InvestmentAsset instances from ruleset investment types.
    * 
@@ -110,6 +125,41 @@ class InvestmentTypeFactory {
         baseKey = String(key).slice(0, String(key).length - suffix.length);
       }
       var mixConfig = InvestmentTypeFactory.resolveMixConfig(params, countryCode, baseKey);
+      
+      // Check if this is a mixed asset
+      if (mixConfig && (mixConfig.type === 'fixed' || mixConfig.type === 'glidePath')) {
+        // Create mixed asset
+        var assetClass1 = InvestmentTypeFactory._resolveAssetClassForBaseKey(mixConfig.asset1);
+        var assetClass2 = InvestmentTypeFactory._resolveAssetClassForBaseKey(mixConfig.asset2);
+
+        // We need typeDefs for the legs. We can construct minimal ones.
+        // Leg typeDefs should ideally inherit properties from the parent type (t),
+        // but overridden by the leg's specific asset class.
+        // However, InvestmentAsset uses typeDef primarily for taxation rules.
+        // The legs should probably inherit the taxation rules of the wrapper (t).
+        // So we clone t and override assetClass.
+        var leg1TypeDef = Object.assign({}, t); leg1TypeDef.assetClass = assetClass1;
+        var leg2TypeDef = Object.assign({}, t); leg2TypeDef.assetClass = assetClass2;
+
+        var assetInstance = new MixedInvestmentAsset(
+          leg1TypeDef, leg2TypeDef, 
+          mixConfig.asset1Growth, mixConfig.asset1Vol,
+          mixConfig.asset2Growth, mixConfig.asset2Vol,
+          ruleset
+        );
+        assetInstance.mixConfig = mixConfig;
+        
+        assets.push({
+          key: key,
+          label: (t.label || key),
+          asset: assetInstance,
+          baseCurrency: t.baseCurrency,
+          assetCountry: t.assetCountry,
+          residenceScope: t.residenceScope
+        });
+        continue;
+      }
+
       var gr, sd;
       if (t.baseRef) {
         // Non-local wrapper: use asset-level parameters (treated as percentages)

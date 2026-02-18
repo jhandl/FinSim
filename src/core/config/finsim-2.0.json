@@ -9,5 +9,6 @@
     ],
     "defaultCountry": "ie",
     "simulationRuns": 1000,
+    "economicRegimesEnabled": true,
     "applicationName": "Ireland Financial Simulator"
 }

@@ -19,6 +19,7 @@ class InvestmentAsset {
     this.baseCurrency = this._typeDef.baseCurrency;
     this.assetCountry = this._typeDef.assetCountry;
     this.residenceScope = this._typeDef.residenceScope;
+    this.assetClass = (investmentTypeDef && investmentTypeDef.assetClass) || null;
     
     // Resolve tax properties using static helpers
     this.taxRate = InvestmentAsset._resolveTaxRate(this._typeDef, this._ruleset);
@@ -26,6 +27,9 @@ class InvestmentAsset {
     this._deemedDisposalYears = InvestmentAsset._resolveDeemedDisposalYears(this._typeDef);
     this.canOffsetLosses = InvestmentAsset._resolveAllowLossOffset(this._typeDef);
     this.eligibleForAnnualExemption = InvestmentAsset._resolveAnnualExemptionEligibility(this._typeDef);
+
+    this._suppressRevenue = false;
+    this._lastGainsConverted = 0;
 
     // Resolve currency/country defaults from ruleset if type definition omits them
     if (this.baseCurrency === undefined && this._ruleset && typeof this._ruleset.getCurrencyCode === 'function') {
@@ -216,7 +220,10 @@ class InvestmentAsset {
     }
 
     this.yearlySold += soldConverted;
-    this.declareRevenue(soldConverted, gainsConverted);
+    this._lastGainsConverted = gainsConverted;
+    if (!this._suppressRevenue) {
+      this.declareRevenue(soldConverted, gainsConverted);
+    }
     return soldConverted;
   }
 
@@ -344,10 +351,19 @@ class InvestmentAsset {
     for (let i = 0; i < this.portfolio.length; i++) {
       const holding = this.portfolio[i];
       // Maintain legacy behavior: always use gaussian(mean, stdev) for growth sampling
-      const growthRate = gaussian(
-        (holding.growth !== undefined ? holding.growth : this.growth),
-        (holding.stdev !== undefined ? holding.stdev : this.stdev)
-      );
+      var mean = (holding.growth !== undefined ? holding.growth : this.growth);
+      var stdev = (holding.stdev !== undefined ? holding.stdev : this.stdev);
+
+      // Apply economic regime modifiers if active and assetClass is defined
+      if (typeof currentEconomicRegime !== 'undefined' && currentEconomicRegime !== null && this.assetClass) {
+        var modifier = currentEconomicRegime[this.assetClass];
+        if (modifier) {
+          mean = mean + (modifier.meanModifier / 100);
+          stdev = stdev * modifier.volatilityMultiplier;
+        }
+      }
+
+      const growthRate = gaussian(mean, stdev);
       const holdingTotal = holding.principal.amount + holding.interest.amount;
       const growthAmount = holdingTotal * growthRate;
       holding.interest.amount += growthAmount;

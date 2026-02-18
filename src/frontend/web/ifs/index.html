@@ -143,6 +143,14 @@
           </div>
         </button>
 
+        <button id="economicRegimesToggleMobile" class="mobile-menu-button secondary-button toggle-button"
+          data-toggle-state="off">
+          <span>Economic regimes</span>
+          <div class="toggle-switch">
+            <div class="toggle-slider"></div>
+          </div>
+        </button>
+
         <div class="mobile-menu-divider"></div>
 
         <a href="https://www.buymeacoffee.com/jhandl" target="_blank" class="coffee-button">
@@ -484,7 +492,7 @@
 
   <!-- SYSTEM UTILITIES SECTION -->
   <script src="/src/frontend/AbstractUI.js?v=20251101"></script>
-  <script src="/src/frontend/UIManager.js?v=20260216-1"></script>
+  <script src="/src/frontend/UIManager.js?v=20260218-1"></script>
   <script src="/src/frontend/web/utils/DOMUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/DeviceUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/FormatUtils.js?v=20260216-3"></script>
@@ -520,18 +528,19 @@
   <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
   <script src="/src/frontend/web/components/CountryTabSyncManager.js?v=20260114-1"></script>
   <script src="/src/frontend/web/components/CountryChipSelector.js?v=20260130-1"></script>
-  <script src="/src/frontend/web/WebUI.js?v=20260213-5"></script>
+  <script src="/src/frontend/web/WebUI.js?v=20260218-1"></script>
   <script src="/src/core/TaxRuleSet.js?v=20260207-1"></script>
-  <script src="/src/core/Config.js?v=20260213-4"></script>
+  <script src="/src/core/Config.js?v=20260218-1"></script>
   <script src="/src/core/Events.js?v=20260213-4"></script>
   <script src="/src/core/EconomicData.js?v=2025-12-18"></script>
   <script src="/src/core/Money.js?v=2025-12-20-14"></script>
   <script src="/src/core/Taxman.js?v=20260208-1"></script>
-  <script src="/src/core/InvestmentAsset.js?v=20260208-1"></script>
-  <script src="/src/core/Pension.js?v=20260131-1"></script>
+  <script src="/src/core/InvestmentAsset.js?v=20260218-1"></script>
+  <script src="/src/core/MixedInvestmentAsset.js?v=20260218-1"></script>
+  <script src="/src/core/Pension.js?v=20260218-2"></script>
   <script src="/src/core/Person.js?v=20260117-legacyclean1"></script>
   <script src="/src/core/GlidePathCalculator.js?v=20260128-1"></script>
-  <script src="/src/core/InvestmentTypeFactory.js?v=20260130-1"></script>
+  <script src="/src/core/InvestmentTypeFactory.js?v=20260218-2"></script>
   <script src="/src/core/RealEstate.js?v=20260216-1"></script>
   <script src="/src/core/InflationService.js?v=2025-11-26-2"></script>
   <script src="/src/core/LegacyScenarioAdapter.js?v=20260205-2"></script>
@@ -541,7 +550,8 @@
   <script src="/src/core/DataAggregatesCalculator.js?v=2026-01-09-2"></script>
   <script src="/src/core/Attribution.js?v=2025-11-05-1"></script>
   <script src="/src/core/AttributionManager.js?v=2025-09-04"></script>
-  <script src="/src/core/Simulator.js?v=20260215-1"></script>
+  <script src="/src/core/EconomicRegimeModel.js?v=20260218-1"></script>
+  <script src="/src/core/Simulator.js?v=20260218-1"></script>
 
   <!-- Init app name after Config is initialized -->
   <script>
@@ -712,6 +722,7 @@
         const countryTabsSyncToggleButton = document.getElementById('countryTabsSyncToggleMobile');
         const investmentStrategiesToggleButton = document.getElementById('investmentStrategiesToggleMobile');
         const perCountryInvestmentsToggleButton = document.getElementById('perCountryInvestmentsToggleMobile');
+        const economicRegimesToggleButton = document.getElementById('economicRegimesToggleMobile');
         const firstDivider = document.querySelector('.mobile-menu-divider');
         const secondDivider = document.querySelectorAll('.mobile-menu-divider')[1];
         const thirdDivider = document.querySelectorAll('.mobile-menu-divider')[2];
@@ -726,6 +737,7 @@
         let SHOW_COUNTRY_TABS_SYNC_TOGGLE = false;
         const SHOW_INVESTMENT_STRATEGIES_TOGGLE = true;
         const SHOW_PER_COUNTRY_INVESTMENTS_TOGGLE = true;
+        let SHOW_ECONOMIC_REGIMES_TOGGLE = false;
         try {
           if (typeof Config !== 'undefined') {
             const cfg = Config.getInstance();
@@ -734,6 +746,7 @@
               const webUI = WebUI.getInstance();
               SHOW_COUNTRY_TABS_SYNC_TOGGLE = !!(webUI && typeof webUI.hasEffectiveRelocationEvents === 'function' && webUI.hasEffectiveRelocationEvents());
             }
+            SHOW_ECONOMIC_REGIMES_TOGGLE = !!(cfg && cfg.isEconomicRegimesFeatureEnabled && cfg.isEconomicRegimesFeatureEnabled());
           }
         } catch (_) { /* no-op */ }
 
@@ -741,7 +754,7 @@
         let hasRunSection = false;
         let hasSaveLoadSection = false;
         let hasDemoHelpSection = false;
-        let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE || SHOW_COUNTRY_TABS_SYNC_TOGGLE || SHOW_INVESTMENT_STRATEGIES_TOGGLE || SHOW_PER_COUNTRY_INVESTMENTS_TOGGLE;
+        let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE || SHOW_COUNTRY_TABS_SYNC_TOGGLE || SHOW_INVESTMENT_STRATEGIES_TOGGLE || SHOW_PER_COUNTRY_INVESTMENTS_TOGGLE || SHOW_ECONOMIC_REGIMES_TOGGLE;
 
         if (currentWidth > breakpoints.tablet) {
           // Desktop mode: Only show Demo/Help/Coffee buttons that are visible in header but burger menu is always available
@@ -811,6 +824,9 @@
         }
         if (perCountryInvestmentsToggleButton) {
           perCountryInvestmentsToggleButton.style.display = SHOW_PER_COUNTRY_INVESTMENTS_TOGGLE ? 'flex' : 'none';
+        }
+        if (economicRegimesToggleButton) {
+          economicRegimesToggleButton.style.display = SHOW_ECONOMIC_REGIMES_TOGGLE ? 'flex' : 'none';
         }
 
         // Third divider: between Demo/Help/Toggle and Coffee (Coffee is always visible)
@@ -915,6 +931,14 @@
         if (perCountryInvestmentsToggleMobile) {
           perCountryInvestmentsToggleMobile.addEventListener('click', () => {
             this.handlePerCountryInvestmentsToggle(perCountryInvestmentsToggleMobile);
+          });
+        }
+
+        // Economic Regimes Toggle
+        const economicRegimesToggleMobile = document.getElementById('economicRegimesToggleMobile');
+        if (economicRegimesToggleMobile) {
+          economicRegimesToggleMobile.addEventListener('click', () => {
+            this.handleEconomicRegimesToggle(economicRegimesToggleMobile);
           });
         }
       }
@@ -1091,6 +1115,31 @@
         }));
       }
 
+      handleEconomicRegimesToggle(toggleButton) {
+        try {
+          const cfg = Config.getInstance();
+          if (!(cfg && cfg.isEconomicRegimesFeatureEnabled && cfg.isEconomicRegimesFeatureEnabled())) {
+            return;
+          }
+        } catch (_) { return; }
+
+        const currentState = toggleButton.getAttribute('data-toggle-state');
+        const newState = currentState === 'off' ? 'on' : 'off';
+        const toggleSwitch = toggleButton.querySelector('.toggle-switch');
+
+        toggleButton.setAttribute('data-toggle-state', newState);
+        if (toggleSwitch) {
+          if (newState === 'on') toggleSwitch.classList.add('active');
+          else toggleSwitch.classList.remove('active');
+        }
+
+        localStorage.setItem('economicRegimesEnabled', newState);
+
+        window.dispatchEvent(new CustomEvent('economicRegimesToggle', {
+          detail: { state: newState, enabled: newState === 'on' }
+        }));
+      }
+
       initializeToggleState() {
         // Initialize experimental toggle
         const toggleButton = document.getElementById('experimentalToggleMobile');
@@ -1228,6 +1277,31 @@
           window.dispatchEvent(new CustomEvent('perCountryInvestmentsToggle', {
             detail: { state: savedState, enabled: savedState === 'on' }
           }));
+        }
+
+        // Initialize Economic Regimes toggle
+        const economicRegimesToggleButton = document.getElementById('economicRegimesToggleMobile');
+        if (economicRegimesToggleButton) {
+          let isRegimesEnabled = false;
+          try {
+            const cfg = Config.getInstance();
+            isRegimesEnabled = !!(cfg && cfg.isEconomicRegimesFeatureEnabled && cfg.isEconomicRegimesFeatureEnabled());
+          } catch (_) { /* Config might not be ready yet */ }
+
+          const savedState = isRegimesEnabled ? (localStorage.getItem('economicRegimesEnabled') || 'off') : 'off';
+          const toggleSwitch = economicRegimesToggleButton.querySelector('.toggle-switch');
+
+          economicRegimesToggleButton.setAttribute('data-toggle-state', savedState);
+          if (toggleSwitch) {
+            if (savedState === 'on') toggleSwitch.classList.add('active');
+            else toggleSwitch.classList.remove('active');
+          }
+
+          if (isRegimesEnabled) {
+            window.dispatchEvent(new CustomEvent('economicRegimesToggle', {
+              detail: { state: savedState, enabled: savedState === 'on' }
+            }));
+          }
         }
       }
     }

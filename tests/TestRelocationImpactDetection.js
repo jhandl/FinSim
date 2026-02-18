@@ -100,6 +100,7 @@ module.exports = {
     function runTest(id, fn) {
       try {
         setTestId(id);
+        Object.keys(pensionSystems).forEach(function (key) { delete pensionSystems[key]; });
         fn();
       } catch (err) {
         errors.push(err && err.message ? err.message : String(err));
@@ -193,8 +194,8 @@ module.exports = {
         const result = runDetector([pensionableSalary, mv], 'aa');
         const impact = result.find(e => e.id === 'si_event').relocationImpact;
         assert(impact, 'Salary should be flagged when moving to state-only pension system');
-        assert.strictEqual(impact.category, 'simple');
-        assert(impact.message.indexOf('non-pensionable') !== -1, 'Impact message should suggest conversion');
+        assert.strictEqual(impact.category, 'pension_conflict');
+        assert(impact.message.indexOf('no private pension system') !== -1, 'Impact message should explain private pension conflict');
       });
 
       // Test 5: Multiple relocations respect nearest boundary.
@@ -224,7 +225,10 @@ module.exports = {
         const salaryEvt = flagged.find(e => e.id === 'salary_currency');
         salaryEvt.currency = 'AAA';
         salaryEvt.linkedCountry = 'aa';
-        RelocationImpactDetector.clearResolvedImpacts(flagged.find(e => e.id === 'salary_currency'));
+        salaryEvt.resolutionOverride = '1';
+        salaryEvt.resolutionOverrideMvId = 'mv_currency';
+        salaryEvt.resolutionOverrideCategory = 'boundary';
+        RelocationImpactDetector.clearResolvedImpacts(salaryEvt, [mv]);
         assert(!flagged.find(e => e.id === 'salary_currency').relocationImpact, 'Currency peg should resolve impact');
       });
 
@@ -237,7 +241,10 @@ module.exports = {
         salaryEvt.linkedEventId = 'split_123';
         salaryEvt.currency = 'AAA';
         salaryEvt.linkedCountry = 'aa';
-        RelocationImpactDetector.clearResolvedImpacts(salaryEvt);
+        salaryEvt.resolutionOverride = '1';
+        salaryEvt.resolutionOverrideMvId = 'mv_split';
+        salaryEvt.resolutionOverrideCategory = 'boundary';
+        RelocationImpactDetector.clearResolvedImpacts(salaryEvt, [mv]);
         assert(!salaryEvt.relocationImpact, 'Linked split should resolve boundary impact');
       });
 
@@ -518,7 +525,10 @@ module.exports = {
         const propertyEvt = flagged.find(e => e.id === 'property_link');
         propertyEvt.linkedCountry = 'aa';
         propertyEvt.currency = 'AAA';
-        RelocationImpactDetector.clearResolvedImpacts(propertyEvt);
+        propertyEvt.resolutionOverride = '1';
+        propertyEvt.resolutionOverrideMvId = 'mv_prop_res';
+        propertyEvt.resolutionOverrideCategory = 'boundary';
+        RelocationImpactDetector.clearResolvedImpacts(propertyEvt, [mv]);
         assert(!propertyEvt.relocationImpact, 'Linking property to country should clear impact');
       });
 
@@ -830,7 +840,10 @@ module.exports = {
           fromAge: 30,
           toAge: 60,
           linkedCountry: 'aa',
-          currency: 'AAA'
+          currency: 'AAA',
+          resolutionOverride: '1',
+          resolutionOverrideMvId: 'mv_mismatch',
+          resolutionOverrideCategory: 'boundary'
         });
         const initial = runDetector([property, mv], 'aa');
         const initialProperty = initial.find(e => e.id === 'property_mismatch' && e.type === 'R');
@@ -854,7 +867,10 @@ module.exports = {
           fromAge: 30,
           toAge: 55,
           linkedCountry: 'aa',
-          currency: 'AAA'
+          currency: 'AAA',
+          resolutionOverride: '1',
+          resolutionOverrideMvId: 'mv_shifted',
+          resolutionOverrideCategory: 'boundary'
         });
         const mvInitial = makeEvent({ id: 'mv_shifted', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
         const initial = runDetector([property, mvInitial], 'aa');
@@ -881,7 +897,10 @@ module.exports = {
           fromAge: 30,
           toAge: 60,
           linkedCountry: 'aa',
-          currency: 'AAA'
+          currency: 'AAA',
+          resolutionOverride: '1',
+          resolutionOverrideMvId: 'mv_mortgage',
+          resolutionOverrideCategory: 'boundary'
         });
         const mortgage = makeEvent({
           id: 'home1',
@@ -889,7 +908,10 @@ module.exports = {
           fromAge: 32,
           toAge: 60,
           linkedCountry: 'aa',
-          currency: 'AAA'
+          currency: 'AAA',
+          resolutionOverride: '1',
+          resolutionOverrideMvId: 'mv_mortgage',
+          resolutionOverrideCategory: 'boundary'
         });
         const initial = runDetector([property, mortgage, mv], 'aa');
         const initialMortgage = initial.find(e => e.id === 'home1' && e.type === 'M');

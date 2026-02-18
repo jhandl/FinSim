@@ -3,6 +3,7 @@
   "investmentBaseTypes": [
     {
       "baseKey": "globalEquity",
+      "assetClass": "equity",
       "label": "Global Equity",
       "shortLabel": "Eq",
       "baseCurrency": "USD",
@@ -12,6 +13,7 @@
     },
     {
       "baseKey": "globalBonds",
+      "assetClass": "bond",
       "label": "Global Bonds",
       "shortLabel": "Bd",
       "baseCurrency": "USD",
@@ -36,6 +38,40 @@
     "capitalGains": {
       "us": 0
     }
+  },
+  "economicRegimes": {
+    "_calibrationDocs": {
+      "zeroSumConstraint": "Σ(π_i × meanModifier_i) = 0 for each assetClass, where π is the stationary distribution computed from transitionMatrix (not manually stated probabilities).",
+      "stationaryDistribution": "Stationary distribution π is computed from transitionMatrix via power iteration (π_{n+1} = π_n × T) until convergence. This is the reference weighting for the zero-sum check.",
+      "transitionRowSum": "Each row in transitionMatrix must sum to 1.0.",
+      "volatilityMultipliers": "Must be positive (> 0). No zero-sum constraint applies.",
+      "addingRegimes": "Add entry to regimes[], add row and column to transitionMatrix, re-verify all constraints.",
+      "configurability": "The engine is fully data-driven: regime keys are arbitrary strings, any number of regimes is supported, and all parameters are tunable via config with no code changes required."
+    },
+    "regimes": [
+      {
+        "key": "growth",
+        "label": "Growth",
+        "equity": { "meanModifier": 3.847826087, "volatilityMultiplier": 0.7 },
+        "bond": { "meanModifier": -1.413043478, "volatilityMultiplier": 0.8 }
+      },
+      {
+        "key": "recession",
+        "label": "Recession",
+        "equity": { "meanModifier": -20, "volatilityMultiplier": 2.0 },
+        "bond": { "meanModifier": 6, "volatilityMultiplier": 1.5 }
+      },
+      {
+        "key": "stagnation",
+        "label": "Stagnation",
+        "equity": { "meanModifier": -1, "volatilityMultiplier": 1.2 },
+        "bond": { "meanModifier": 1, "volatilityMultiplier": 1.0 }
+      }
+    ],
+    "transitionMatrix": {
+      "growth": { "growth": 0.80, "recession": 0.05, "stagnation": 0.15 },
+      "recession": { "growth": 0.30, "recession": 0.50, "stagnation": 0.20 },
+      "stagnation": { "growth": 0.40, "recession": 0.10, "stagnation": 0.50 }
+    }
   }
 }
-

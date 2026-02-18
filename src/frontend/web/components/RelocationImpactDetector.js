@@ -77,11 +77,10 @@ var RelocationImpactDetector = {
 
             var eFrom2 = this.parseAgeValue(event.fromAge);
             if (!isNaN(eFrom2) && eFrom2 >= mvFromAge && (!nextMvEvent || eFrom2 < nextMvFromAge)) {
-              // Skip simple impact if this event has a linkedCountry (or implicit StartCountry link)
-              // that doesn't match this jurisdiction, as it will be caught by the more specific
-              // jurisdiction_change pass.
-              var effectiveLinkForSimple = event.linkedCountry || startCountry;
-              if (effectiveLinkForSimple && String(effectiveLinkForSimple).toLowerCase() !== destinationCountry.toLowerCase()) continue;
+              // Skip simple only for explicit stale links. Unlinked events in a moved
+              // jurisdiction are still simple review candidates.
+              var explicitLinkForSimple = event.linkedCountry ? String(event.linkedCountry).toLowerCase() : '';
+              if (explicitLinkForSimple && explicitLinkForSimple !== destinationCountry.toLowerCase()) continue;
 
               var message = this.generateImpactMessage('simple', event, mvEvent, destinationCountry, originCountry);
               this.addImpact(event, 'simple', message, mvImpactId, true);
@@ -91,20 +90,26 @@ var RelocationImpactDetector = {
         }
         this.addSoldRealEstateShiftImpacts(events, mvEvents);
 
-        // Jurisdiction Change: Detect if an event with linkedCountry now falls in a different jurisdiction
+        // Jurisdiction Change: detect stale explicit links after age edits/relocation shifts.
         for (var l = 0; l < events.length; l++) {
           var ev = events[l];
           if (!ev || (ev.type && isRelocationEvent(ev)) || ev.type === 'SM') continue;
           if (!this.isEventAgeReadyForRelocationAnalysis(ev)) continue;
           if (ev.relocationImpact) continue; // Boundary takes precedence
+          var explicitLink = ev.linkedCountry ? String(ev.linkedCountry).toLowerCase() : '';
+          if (!explicitLink) continue;
+          if (ev.type === 'RI' && ev.relocationRentMvId) {
+            var rentMv = this.getMvEventByImpactRef(mvEvents, String(ev.relocationRentMvId));
+            if (rentMv) continue;
+          }
 
           var evFromAge = this.parseAgeValue(ev.fromAge);
           var currentJurisdiction = this.getCountryAtAge(mvEvents, startCountry, evFromAge);
-          var effectiveLink = ev.linkedCountry || startCountry;
-          if (String(effectiveLink).toLowerCase() !== String(currentJurisdiction).toLowerCase()) {
-            var origin = effectiveLink;
+          var mvEv = this.getMvEventForAge(mvEvents, evFromAge);
+          if (this.hasMatchingResolutionOverrideFor(ev, this.getMvImpactId(mvEv), 'jurisdiction_change', mvEv)) continue;
+          if (explicitLink !== String(currentJurisdiction).toLowerCase()) {
+            var origin = explicitLink;
             var destination = currentJurisdiction;
-            var mvEv = this.getMvEventForAge(mvEvents, evFromAge);
             var msg = this.generateImpactMessage('jurisdiction_change', ev, mvEv, destination, origin);
             this.addImpact(ev, 'jurisdiction_change', msg, this.getMvImpactId(mvEv), true, {
               fromCountry: origin,

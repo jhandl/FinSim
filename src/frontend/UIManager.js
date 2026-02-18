@@ -369,7 +369,8 @@ class UIManager {
       initialPensionP2: this.ui.getValue("InitialPensionP2"),
       pensionPercentageP2: this.ui.getValue("PensionContributionPercentageP2"),
       simulation_mode: this.ui.getValue("simulation_mode"),
-      economyMode: this.ui.getValue("economy_mode")
+      economyMode: this.ui.getValue("economy_mode"),
+      economicRegimesEnabled: this.ui.getValue('economicRegimesEnabled') === 'on'
     };
 
     // StartCountry is always required

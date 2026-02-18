@@ -1,4 +1,11 @@
-
+global.getRelocationCountryCode = function(event) {
+  return String((event && event.name) || '').trim().toLowerCase();
+};
+global.isRelocationEvent = function(event) {
+  return !!(event && event.type === 'MV');
+};
+const { RelocationImpactDetector } = require('../src/frontend/web/components/RelocationImpactDetector.js');
+global.RelocationImpactDetector = RelocationImpactDetector;
 const { EventsTableManager } = require('../src/frontend/web/components/EventsTableManager.js');
 
 describe('Relocation Split No Pension', () => {
@@ -66,6 +73,7 @@ describe('Relocation Split No Pension', () => {
     const configStub = {
       isRelocationEnabled: () => true,
       getStartCountry: () => 'us',
+      getAvailableCountries: () => [{ code: 'US', name: 'United States' }, { code: 'NP', name: 'No Pension' }],
       getCachedTaxRuleSet: (code) => {
         if (code === 'np') { // 'np' = No Pension country
             return {
@@ -150,6 +158,7 @@ describe('Relocation Split No Pension', () => {
      const configStub = {
       isRelocationEnabled: () => true,
       getStartCountry: () => 'us',
+      getAvailableCountries: () => [{ code: 'US', name: 'United States' }, { code: 'NP', name: 'No Pension' }],
       getCachedTaxRuleSet: (code) => {
         if (code === 'np') { // 'np' = No Pension country
             return {
@@ -216,6 +225,7 @@ describe('Relocation Split No Pension', () => {
      const configStub = {
       isRelocationEnabled: () => true,
       getStartCountry: () => 'us',
+      getAvailableCountries: () => [{ code: 'US', name: 'United States' }, { code: 'UK', name: 'United Kingdom' }],
       getCachedTaxRuleSet: (code) => {
         return {
             getCurrencyCode: () => 'GBP',

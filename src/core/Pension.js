@@ -28,6 +28,7 @@ class Pension extends InvestmentAsset {
     this.taxAdvantaged = (this._ruleset && typeof this._ruleset.isPrivatePensionTaxAdvantaged === 'function')
       ? this._ruleset.isPrivatePensionTaxAdvantaged()
       : true;
+    this._mixedAsset = null;
   }
 
   // Override currency methods: pension tracks its own country's currency
@@ -38,6 +39,75 @@ class Pension extends InvestmentAsset {
 
   _getAssetCountry() {
     return this.countryCode || normalizeCountry(params.StartCountry || config.getDefaultCountry());
+  }
+
+  buy(amount, currency, country, legNum) {
+    if (this._mixedAsset) {
+      this._mixedAsset.buy(amount, currency, country, legNum);
+    } else {
+      super.buy(amount, currency, country);
+    }
+  }
+
+  capital() {
+    return this._mixedAsset ? this._mixedAsset.capital() : super.capital();
+  }
+
+  addYear() {
+    if (this._mixedAsset) {
+      this._mixedAsset.addYear();
+    } else {
+      super.addYear();
+    }
+  }
+
+  resetYearlyStats() {
+    if (this._mixedAsset) {
+      this._mixedAsset.resetYearlyStats();
+    } else {
+      super.resetYearlyStats();
+    }
+  }
+
+  getPortfolioStats() {
+    return this._mixedAsset ? this._mixedAsset.getPortfolioStats() : super.getPortfolioStats();
+  }
+
+  sell(amount) {
+    if (this._mixedAsset) {
+      // Pension-specific mixed sell: suppress per-leg revenue, aggregate, then declare as pension income
+      var v1 = this._mixedAsset.leg1.capital();
+      var v2 = this._mixedAsset.leg2.capital();
+      var totalCapital = v1 + v2;
+      
+      if (totalCapital === 0) return 0;
+      
+      var amount1 = amount * (v1 / totalCapital);
+      var amount2 = amount * (v2 / totalCapital);
+
+      this._mixedAsset.leg1._suppressRevenue = true;
+      this._mixedAsset.leg2._suppressRevenue = true;
+
+      var sold1;
+      var sold2;
+      try {
+        sold1 = this._mixedAsset.leg1.sell(amount1);
+        sold2 = this._mixedAsset.leg2.sell(amount2);
+      } finally {
+        this._mixedAsset.leg1._suppressRevenue = false;
+        this._mixedAsset.leg2._suppressRevenue = false;
+      }
+      
+      if (sold1 === null || sold2 === null) return null;
+      
+      var totalSold = sold1 + sold2;
+      var totalGains = this._mixedAsset.leg1._lastGainsConverted + this._mixedAsset.leg2._lastGainsConverted;
+
+      this.declareRevenue(totalSold, totalGains);
+      return totalSold;
+    } else {
+      return super.sell(amount);
+    }
   }
 
   declareRevenue(income, gains) {

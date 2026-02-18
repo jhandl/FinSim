@@ -67,20 +67,14 @@ async function runScenario(parameters, events) {
 }
 
 function getPotHoldingsByMix(pot, mixConfig) {
-  const matchTolerance = 0.0001;
-  let count1 = 0;
-  let count2 = 0;
-  for (let i = 0; i < pot.portfolio.length; i++) {
-    const holding = pot.portfolio[i];
-    if (typeof holding.growth !== 'number' || typeof holding.stdev !== 'number') continue;
-    const isAsset1 = Math.abs(holding.growth - mixConfig.asset1Growth) < matchTolerance &&
-      Math.abs(holding.stdev - mixConfig.asset1Vol) < matchTolerance;
-    const isAsset2 = Math.abs(holding.growth - mixConfig.asset2Growth) < matchTolerance &&
-      Math.abs(holding.stdev - mixConfig.asset2Vol) < matchTolerance;
-    if (isAsset1) count1++;
-    if (isAsset2) count2++;
+  // Check if mixed asset legs exist and have capital
+  if (pot._mixedAsset && pot._mixedAsset.leg1 && pot._mixedAsset.leg2) {
+    return {
+      count1: pot._mixedAsset.leg1.capital() > 0 ? 1 : 0,
+      count2: pot._mixedAsset.leg2.capital() > 0 ? 1 : 0
+    };
   }
-  return { count1: count1, count2: count2 };
+  return { count1: 0, count2: 0 };
 }
 
 module.exports = {
@@ -114,6 +108,14 @@ module.exports = {
           const priv = framework.simulationContext.revenue.privatePensionP1;
           if (!approxEqual(priv, 0, 0.0001)) {
             errors.push('P1 pension mix: expected no pension tax during rebalancing, got ' + priv);
+          }
+          try {
+            const sold = pot.sell(10);
+            if (!(typeof sold === 'number')) {
+              errors.push('P1 pension mix: expected numeric sell result');
+            }
+          } catch (e) {
+            errors.push('P1 pension mix: mixed sell should not throw (' + e.message + ')');
           }
         }
       }

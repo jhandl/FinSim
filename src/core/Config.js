@@ -174,6 +174,22 @@ class Config {
   }
 
   /**
+   * Return the economic regimes configuration from the global tax rules.
+   * @returns {Object} The economic regimes configuration
+   */
+  getEconomicRegimes() {
+    return this.getGlobalTaxRules().economicRegimes;
+  }
+
+  /**
+   * Check if the economic regimes feature is enabled in the configuration.
+   * @returns {boolean} True if economic regimes are enabled
+   */
+  isEconomicRegimesFeatureEnabled() {
+    return this.economicRegimesEnabled === true;
+  }
+
+  /**
    * Return the array of investment base types from global tax rules.
    * @returns {Array} Array of investment base type definitions
    */

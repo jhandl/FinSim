@@ -1,6 +1,8 @@
 var uiManager, params, events, config, dataSheet, row, errors;
 var year, periods, failedAt, success, montecarlo;
 var revenue, realEstate, stockGrowthOverride, attributionManager;
+var currentEconomicRegime = null;
+var economicRegimesModel = null;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var purchaseShortfallThisYear;
 var incomeStatePension, incomePrivatePension, withdrawalRate;
@@ -68,7 +70,7 @@ async function run() {
       if (parseFloat(params[pk]) > 0) { hasVolatility = true; break; }
     }
   }
-  montecarlo = (params.economyMode === 'montecarlo' && hasVolatility);
+  montecarlo = (params.economyMode === 'montecarlo') && (hasVolatility || params.economicRegimesEnabled);
 
 
   // In web UI we retain per-run yearly data for pinch-point visualization.
@@ -454,6 +456,22 @@ async function initializeSimulator() {
   // This happens after the UI relocation-impact gate; it does not persist to disk.
   completeMissingCurrencyAndLinkedCountry(events, startCountry);
 
+  // Initialize economic regimes if enabled and in Monte Carlo mode
+  if (params.economicRegimesEnabled && params.economyMode === 'montecarlo') {
+    try {
+      var regimesConfig = config.getEconomicRegimes();
+      economicRegimesModel = new EconomicRegimeModel(regimesConfig);
+    } catch (e) {
+      errors = true;
+      success = false;
+      uiManager.setStatus(e.message, STATUS_COLORS.ERROR);
+      return false;
+    }
+  } else {
+    economicRegimesModel = null;
+    currentEconomicRegime = null;
+  }
+
   return true;
 }
 
@@ -762,6 +780,13 @@ function initializeSimulationVariables() {
   targetCash = params.emergencyStash; // Initialize target cash (emergency stash) in starting currency
   failedAt = 0;
   row = 0;
+
+  // Pick starting economic regime
+  if (economicRegimesModel) {
+    currentEconomicRegime = economicRegimesModel.sampleStartingRegime();
+  } else {
+    currentEconomicRegime = null;
+  }
 }
 
 function resetYearlyVariables() {
@@ -823,6 +848,12 @@ function resetYearlyVariables() {
       assetObj.resetYearlyStats();
     }
   }
+
+  // Transition economic regime
+  if (economicRegimesModel && currentEconomicRegime) {
+    currentEconomicRegime = economicRegimesModel.getNextRegime(currentEconomicRegime);
+  }
+
   residenceCurrency = getCurrencyForCountry(currentCountry) || residenceCurrency || 'EUR';
 }
 
@@ -1954,8 +1985,50 @@ function resolvePensionMixConfig(person, countryCode) {
   return InvestmentTypeFactory.resolveMixConfig(params, cc, baseKey);
 }
 
+function resolveAssetClassForBaseKey(baseKey) {
+  if (!baseKey) {
+    throw new Error('Economic regime configuration error: Missing base key in pension mix configuration');
+  }
+  var cfg = Config.getInstance();
+  var baseType = cfg.getInvestmentBaseTypeByKey(baseKey);
+  if (!baseType) {
+    throw new Error('Economic regime configuration error: Unknown investment base type "' + baseKey + '" in pension mix configuration');
+  }
+  if (!baseType.assetClass) {
+    throw new Error('Economic regime configuration error: Missing assetClass for investment base type "' + baseKey + '"');
+  }
+  return baseType.assetClass;
+}
+
+function createMixedAssetForPension(pensionPot, mixConfig) {
+  if (!pensionPot || !mixConfig) return;
+  if (pensionPot._mixedAsset) return; // Already created
+
+  var assetClass1 = resolveAssetClassForBaseKey(mixConfig.asset1);
+  var assetClass2 = resolveAssetClassForBaseKey(mixConfig.asset2);
+  
+  var leg1TypeDef = { key: mixConfig.asset1, assetClass: assetClass1 };
+  var leg2TypeDef = { key: mixConfig.asset2, assetClass: assetClass2 };
+  
+  pensionPot._mixedAsset = new MixedInvestmentAsset(
+    leg1TypeDef, leg2TypeDef,
+    mixConfig.asset1Growth, mixConfig.asset1Vol,
+    mixConfig.asset2Growth, mixConfig.asset2Vol,
+    null
+  );
+  pensionPot._mixedAsset.mixConfig = mixConfig;
+
+  // Redirect yearly stats to the mixed asset (which aggregates legs)
+  // This ensures rebalancing sales (which happen on legs) are visible on the pension pot
+  Object.defineProperty(pensionPot, 'yearlyBought', { get: function() { return this._mixedAsset.yearlyBought; }, configurable: true });
+  Object.defineProperty(pensionPot, 'yearlySold', { get: function() { return this._mixedAsset.yearlySold; }, configurable: true });
+  Object.defineProperty(pensionPot, 'yearlyGrowth', { get: function() { return this._mixedAsset.yearlyGrowth; }, configurable: true });
+}
+
 function buyPensionWithMix(pensionPot, amount, currency, country, mixConfig, currentAge) {
   if (mixConfig && (mixConfig.type === 'fixed' || mixConfig.type === 'glidePath')) {
+    createMixedAssetForPension(pensionPot, mixConfig);
+    
     var asset1Pct = mixConfig.startAsset1Pct;
     if (mixConfig.type === 'glidePath' && typeof GlidePathCalculator !== 'undefined') {
       var currentMix = GlidePathCalculator.getCurrentMix(currentAge, mixConfig);
@@ -1965,8 +2038,8 @@ function buyPensionWithMix(pensionPot, amount, currency, country, mixConfig, cur
     var asset2Pct = 100 - asset1Pct;
     var amount1 = amount * (asset1Pct / 100);
     var amount2 = amount - amount1;
-    if (amount1 > 0) pensionPot.buy(amount1, currency, country, mixConfig.asset1Growth, mixConfig.asset1Vol);
-    if (amount2 > 0) pensionPot.buy(amount2, currency, country, mixConfig.asset2Growth, mixConfig.asset2Vol);
+    if (amount1 > 0) pensionPot.buy(amount1, currency, country, 1);
+    if (amount2 > 0) pensionPot.buy(amount2, currency, country, 2);
   } else {
     pensionPot.buy(amount, currency, country);
   }
@@ -2192,8 +2265,8 @@ function handleInvestments() {
               var asset2Pct = 100 - asset1Pct;
               var amount1 = amountInAssetCurrency * (asset1Pct / 100);
               var amount2 = amountInAssetCurrency - amount1;
-              if (amount1 > 0) entry.asset.buy(amount1, buyCurrency, buyCountry, mixConfig.asset1Growth, mixConfig.asset1Vol);
-              if (amount2 > 0) entry.asset.buy(amount2, buyCurrency, buyCountry, mixConfig.asset2Growth, mixConfig.asset2Vol);
+              if (amount1 > 0) entry.asset.buy(amount1, buyCurrency, buyCountry, 1);
+              if (amount2 > 0) entry.asset.buy(amount2, buyCurrency, buyCountry, 2);
             } else {
               // Base currency matches residence currency - no conversion needed
               entry.asset.buy(amountInAssetCurrency, buyCurrency, buyCountry);
@@ -2263,7 +2336,13 @@ function rebalanceMixAsset(assetEntry, surplusCash, currentAge) {
   var asset = assetEntry.asset;
   var mixConfig = asset.mixConfig;
   if (!mixConfig || (mixConfig.type !== 'fixed' && mixConfig.type !== 'glidePath')) return 0;
-  if (!asset.portfolio || asset.portfolio.length === 0) return 0;
+  
+  // Resolve the composite asset (Pension delegates to _mixedAsset; normal assets ARE the composite)
+  var composite = asset._mixedAsset || asset;
+  
+  // Ensure legs exist (pension might not have bought yet)
+  if (!composite.leg1 || !composite.leg2) return 0;
+
   var skipTax = asset && asset._isPension && asset.taxAdvantaged;
   if (skipTax) asset._internalRebalance = true;
   try {
@@ -2283,37 +2362,15 @@ function rebalanceMixAsset(assetEntry, surplusCash, currentAge) {
       t2 = asset2Pct / 100;
     }
 
-    var matchTolerance = 0.0001;
-    var v1 = 0;
-    var v2 = 0;
-    for (var i = 0; i < asset.portfolio.length; i++) {
-      var holding = asset.portfolio[i];
-      if (typeof holding.growth !== 'number' || typeof holding.stdev !== 'number') continue;
-      var isAsset1 = Math.abs(holding.growth - mixConfig.asset1Growth) < matchTolerance &&
-        Math.abs(holding.stdev - mixConfig.asset1Vol) < matchTolerance;
-      var isAsset2 = Math.abs(holding.growth - mixConfig.asset2Growth) < matchTolerance &&
-        Math.abs(holding.stdev - mixConfig.asset2Vol) < matchTolerance;
-      if (!isAsset1 && !isAsset2) continue;
-
-      var holdingCapital = holding.principal.amount + holding.interest.amount;
-      var holdingConverted = holdingCapital;
-      if (holding.principal.currency !== residenceCurrency || holding.principal.country !== currentCountry) {
-        holdingConverted = convertCurrencyAmount(
-          holdingCapital,
-          holding.principal.currency,
-          holding.principal.country,
-          residenceCurrency,
-          currentCountry,
-          year,
-          true
-        );
-        if (holdingConverted === null) {
-          throw new Error('rebalanceMixAsset: holding conversion failed');
-        }
-      }
-      if (isAsset1) v1 += holdingConverted;
-      if (isAsset2) v2 += holdingConverted;
-    }
+    var v1_raw = composite.leg1.capital();
+    var v2_raw = composite.leg2.capital();
+    
+    // Capital is already in residence currency for MixedInvestmentAsset legs? 
+    // Wait, InvestmentAsset.capital() returns residence currency total.
+    // Yes, InvestmentAsset.capital() does FX conversion internally.
+    // So v1_raw and v2_raw ARE in residence currency.
+    var v1 = v1_raw;
+    var v2 = v2_raw;
 
     if (v1 + v2 === 0) return 0;
 
@@ -2333,7 +2390,7 @@ function rebalanceMixAsset(assetEntry, surplusCash, currentAge) {
 
     var startingSurplus = surplusCash;
 
-    function buyIntoMix(amountResidence, growthOverride, stdevOverride) {
+    function buyIntoLeg(leg, amountResidence) {
       var amountInAssetCurrency = amountResidence;
       if (buyCurrency !== residenceCurrency) {
         amountInAssetCurrency = convertCurrencyAmount(
@@ -2349,47 +2406,27 @@ function rebalanceMixAsset(assetEntry, surplusCash, currentAge) {
           throw new Error('rebalanceMixAsset: buy conversion failed');
         }
       }
-      asset.buy(amountInAssetCurrency, buyCurrency, buyCountry, growthOverride, stdevOverride);
+      leg.buy(amountInAssetCurrency, buyCurrency, buyCountry);
     }
 
-    function sellFromAssetType(targetGrowth, targetStdev, amountToSell) {
+    function sellFromLeg(leg, amountToSell) {
       if (amountToSell <= 0) return 0;
-      var originalPortfolio = asset.portfolio;
-      var matchingHoldings = [];
-      for (var hi = 0; hi < originalPortfolio.length; hi++) {
-        var h = originalPortfolio[hi];
-        if (typeof h.growth !== 'number' || typeof h.stdev !== 'number') continue;
-        if (Math.abs(h.growth - targetGrowth) < matchTolerance &&
-          Math.abs(h.stdev - targetStdev) < matchTolerance) {
-          matchingHoldings.push(h);
-        }
-      }
-      if (matchingHoldings.length === 0) return 0;
-      var matchSet = new Set(matchingHoldings);
-      asset.portfolio = matchingHoldings;
-      var sold = asset.sell(amountToSell);
+      
+      // If pension/tax-advantaged, suppress revenue declarations during rebalance
+      if (skipTax) leg._suppressRevenue = true;
+      var sold = leg.sell(amountToSell);
+      if (skipTax) leg._suppressRevenue = false;
+      
       if (sold === null) {
-        asset.portfolio = originalPortfolio;
         throw new Error('rebalanceMixAsset: sell conversion failed');
       }
-      var remainingSet = new Set(asset.portfolio);
-      var rebuilt = [];
-      for (var pi = 0; pi < originalPortfolio.length; pi++) {
-        var ph = originalPortfolio[pi];
-        if (matchSet.has(ph)) {
-          if (remainingSet.has(ph)) rebuilt.push(ph);
-        } else {
-          rebuilt.push(ph);
-        }
-      }
-      asset.portfolio = rebuilt;
       return sold;
     }
 
     if (d1 > tolerance * V && surplusCash > 0) {
       var buy1 = Math.min(d1, surplusCash);
       if (buy1 > 0) {
-        buyIntoMix(buy1, mixConfig.asset1Growth, mixConfig.asset1Vol);
+        buyIntoLeg(composite.leg1, buy1);
         surplusCash -= buy1;
         d1 -= buy1;
       }
@@ -2397,21 +2434,21 @@ function rebalanceMixAsset(assetEntry, surplusCash, currentAge) {
     if (d2 > tolerance * V && surplusCash > 0) {
       var buy2 = Math.min(d2, surplusCash);
       if (buy2 > 0) {
-        buyIntoMix(buy2, mixConfig.asset2Growth, mixConfig.asset2Vol);
+        buyIntoLeg(composite.leg2, buy2);
         surplusCash -= buy2;
         d2 -= buy2;
       }
     }
 
     if (d1 > tolerance * V && d2 < -tolerance * V) {
-      var sold2 = sellFromAssetType(mixConfig.asset2Growth, mixConfig.asset2Vol, d1);
+      var sold2 = sellFromLeg(composite.leg2, d1);
       if (sold2 > 0) {
-        buyIntoMix(sold2, mixConfig.asset1Growth, mixConfig.asset1Vol);
+        buyIntoLeg(composite.leg1, sold2);
       }
     } else if (d2 > tolerance * V && d1 < -tolerance * V) {
-      var sold1 = sellFromAssetType(mixConfig.asset1Growth, mixConfig.asset1Vol, d2);
+      var sold1 = sellFromLeg(composite.leg1, d2);
       if (sold1 > 0) {
-        buyIntoMix(sold1, mixConfig.asset2Growth, mixConfig.asset2Vol);
+        buyIntoLeg(composite.leg2, sold1);
       }
     }
 
