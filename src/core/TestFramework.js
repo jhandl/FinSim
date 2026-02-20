@@ -63,7 +63,11 @@ class TestFramework {
 
       // Now execute the simulation using the VM's run() function
       vm.runInContext('var start = Date.now();', this.simulationContext);
-      vm.runInContext('run(); simulationResults = { dataSheet, success, failedAt, executionTime: (Date.now()-start) }', this.simulationContext);
+      const runPromise = vm.runInContext('run()', this.simulationContext);
+      if (runPromise && typeof runPromise.then === 'function') {
+        await runPromise;
+      }
+      vm.runInContext('simulationResults = { dataSheet, success, failedAt, executionTime: (Date.now()-start) }', this.simulationContext);
       const results = vm.runInContext('simulationResults', this.simulationContext);
       return results;
     } catch (error) {
@@ -724,10 +728,10 @@ class TestFramework {
             // Age and year are state values, not accumulated - don't divide by runs
             var numericFields = [
               'incomeSalaries','incomeRSUs','incomeRentals','incomePrivatePension','incomeStatePension',
-              'incomeCash','incomeDefinedBenefit','incomeTaxFree','realEstateCapital','netIncome','expenses',
+              'incomeCash','incomeDefinedBenefit','incomeTaxFree','realEstateCapital','netIncome','cashInflows','expenses',
               'pensionFund','cash','pensionContribution','withdrawalRate','worth',
               'incomeSalariesPV','incomeRSUsPV','incomeRentalsPV','incomePrivatePensionPV','incomeStatePensionPV',
-              'incomeCashPV','incomeDefinedBenefitPV','incomeTaxFreePV','realEstateCapitalPV','netIncomePV','expensesPV',
+              'incomeCashPV','incomeDefinedBenefitPV','incomeTaxFreePV','realEstateCapitalPV','netIncomePV','cashInflowsPV','expensesPV',
               'pensionFundPV','cashPV','pensionContributionPV','worthPV'
             ];
             for (var fi = 0; fi < numericFields.length; fi++) {
@@ -1141,6 +1145,15 @@ class TestFramework {
             if (testParams.priorityShares !== undefined) testParams.drawdownPrioritiesByKey[_requireLegacyKey(pKeys, 'sharesKey', cc)] = testParams.priorityShares;
           }
         }
+
+        // Default drawdown priorities to match UIManager.readParameters() behavior.
+        // Many core tests omit these fields, but Simulator.withdraw() expects them.
+        if (testParams.priorityCash === undefined || testParams.priorityCash === null || testParams.priorityCash === '') testParams.priorityCash = 1;
+        if (testParams.priorityPension === undefined || testParams.priorityPension === null || testParams.priorityPension === '') testParams.priorityPension = 2;
+        if (testParams.priorityFunds === undefined || testParams.priorityFunds === null || testParams.priorityFunds === '') testParams.priorityFunds = 3;
+        if (testParams.priorityShares === undefined || testParams.priorityShares === null || testParams.priorityShares === '') testParams.priorityShares = 4;
+        if (testParams.drawdownPrioritiesByKey.cash === undefined) testParams.drawdownPrioritiesByKey.cash = testParams.priorityCash;
+        if (testParams.drawdownPrioritiesByKey.pension === undefined) testParams.drawdownPrioritiesByKey.pension = testParams.priorityPension;
 
         return testParams;
       };

@@ -5,7 +5,7 @@
  * 
  * PV Semantics (flows):
  * - Residency-deflated: incomeRSUsPV,
- *   incomeCashPV, incomeDefinedBenefitPV, incomeTaxFreePV, netIncomePV, expensesPV,
+ *   incomeCashPV, incomeDefinedBenefitPV, incomeTaxFreePV, netIncomePV, cashInflowsPV, expensesPV,
  *   investmentIncomeByKeyPV[*], Tax__*PV
  * - Source-deflated: incomeSalariesPV, incomeRentalsPV, incomePrivatePensionPV,
  *   pensionContributionPV, incomeStatePensionPV
@@ -581,6 +581,31 @@ function computePresentValueAggregates(ctx) {
       }
     }
   }
+
+  var totalTaxPV = 0;
+  for (var rowKey in dataRow) {
+    if (!Object.prototype.hasOwnProperty.call(dataRow, rowKey)) continue;
+    if (rowKey.indexOf('Tax__') !== 0) continue;
+    if (rowKey.slice(-2) !== 'PV') continue;
+    if (typeof dataRow[rowKey] !== 'number') continue;
+    totalTaxPV += dataRow[rowKey];
+  }
+
+  var totalInvestmentIncomePV = 0;
+  for (var invKey in dataRow.investmentIncomeByKeyPV) {
+    totalInvestmentIncomePV += dataRow.investmentIncomeByKeyPV[invKey];
+  }
+  var grossInflowsPV =
+    dataRow.incomeSalariesPV +
+    dataRow.incomeRSUsPV +
+    dataRow.incomeRentalsPV +
+    dataRow.incomePrivatePensionPV +
+    dataRow.incomeStatePensionPV +
+    dataRow.incomeDefinedBenefitPV +
+    dataRow.incomeTaxFreePV +
+    dataRow.incomeCashPV +
+    totalInvestmentIncomePV;
+  dataRow.cashInflowsPV = grossInflowsPV - totalTaxPV - dataRow.pensionContributionPV;
 
 }
 

@@ -306,6 +306,9 @@ function getDeflationFactorForCountry(countryCode, ageNum, startYear, options) {
     }
   }
 
+  // PV semantics: values are entered in "today's money" at simulation start.
+  // Deflation should therefore be anchored to simulation start (age-startingAge),
+  // even for countries entered later via relocation.
   var factor = getDeflationFactor(ageVal, startYearVal, inflationRate);
 
   if (typeof factor !== 'number' || !isFinite(factor) || factor <= 0) {

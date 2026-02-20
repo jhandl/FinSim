@@ -186,7 +186,7 @@ function buildTestContext(opts) {
 
 module.exports = {
   name: 'TestDataAggregatesCalculator',
-  description: 'Validates DataAggregatesCalculator.computeNominalAggregates with 6 scenarios',
+  description: 'Validates DataAggregatesCalculator.computeNominalAggregates with 7 scenarios',
   isCustomTest: true,
   async runCustomTest() {
     const errors = [];
@@ -229,6 +229,7 @@ module.exports = {
       const dataRow = dataSheet[row];
       if (Math.abs(dataRow.incomeSalaries - 50000) > 1e-6) errors.push('Scenario 1: incomeSalaries mismatch');
       if (Math.abs(dataRow.netIncome - 60000) > 1e-6) errors.push('Scenario 1: netIncome mismatch');
+      if (Math.abs(dataRow.cashInflows - 60000) > 1e-6) errors.push('Scenario 1: cashInflows mismatch');
       if (Math.abs(dataRow.expenses - 30000) > 1e-6) errors.push('Scenario 1: expenses mismatch');
       if (Math.abs(dataRow.pensionFund - 100000) > 1e-6) errors.push('Scenario 1: pensionFund mismatch');
       if (Math.abs((dataRow.investmentCapitalByKey.indexFunds || 0) - 150000) > 1e-6) errors.push('Scenario 1: investmentCapitalByKey.indexFunds mismatch');
@@ -288,7 +289,7 @@ module.exports = {
       const ctx = buildTestContext({
         dataSheet,
         row,
-        incomeSalaries: 0,
+        incomeSalaries: 12000,
         incomeShares: 0,
         incomeRentals: 0,
         incomePrivatePension: 0,
@@ -433,6 +434,46 @@ module.exports = {
           }
         }
       }
+    }
+
+    // Scenario 7: cashInflows includes positive withdrawals only
+    {
+      const dataSheet = [];
+      const row = 0;
+      const person1 = { age: 30 };
+
+      const ctx = buildTestContext({
+        dataSheet,
+        row,
+        incomeSalaries: 12000,
+        incomeShares: 0,
+        incomeRentals: 0,
+        incomePrivatePension: 0,
+        incomeStatePension: 0,
+        cashWithdraw: 3000,
+        incomeDefinedBenefit: 0,
+        incomeTaxFree: 0,
+        netIncome: 12000,
+        expenses: 0,
+        personalPensionContribution: 0,
+        withdrawalRate: 0,
+        pensionCap: 0,
+        person1,
+        realEstateConverted: 0,
+        capsByKey: { indexFunds: 0, shares: 0 },
+        investmentIncomeByKey: {},
+        revenue: { taxTotals: {}, getTaxTotal: () => 0 },
+        stableTaxIds: [],
+        cash: 0,
+        year: 2023
+      });
+
+      DataAggregatesCalculator.computeNominalAggregates(ctx);
+
+      const dataRow = dataSheet[row];
+      if (Math.abs(dataRow.incomeCash - 3000) > 1e-6) errors.push('Scenario 7: incomeCash mismatch');
+      if (Math.abs(dataRow.netIncome - 12000) > 1e-6) errors.push('Scenario 7: netIncome mismatch');
+      if (Math.abs(dataRow.cashInflows - 15000) > 1e-6) errors.push('Scenario 7: cashInflows mismatch');
     }
 
     return { success: errors.length === 0, errors };

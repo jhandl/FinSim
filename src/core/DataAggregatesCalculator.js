@@ -28,7 +28,7 @@
  *   @param {number} ctx.cashWithdraw - Pre-extracted .amount from cash withdrawal Money objects
  *   @param {number} ctx.incomeDefinedBenefit - Pre-extracted .amount from DB pension Money objects
  *   @param {number} ctx.incomeTaxFree - Pre-extracted .amount from tax-free income Money objects
- *   @param {number} ctx.netIncome - Pre-extracted .amount (post-tax income)
+ *   @param {number} ctx.netIncome - Pre-extracted .amount (take-home cash excluding withdrawals)
  *   @param {number} ctx.expenses - Pre-extracted .amount from expense Money objects
  *   @param {number} ctx.personalPensionContribution - Pre-extracted .amount from contribution Money objects
  *   @param {number} ctx.withdrawalRate - Numeric withdrawal rate
@@ -83,6 +83,7 @@ function computeNominalAggregates(ctx) {
       "incomeTaxFree": 0,
       "realEstateCapital": 0,
       "netIncome": 0,
+      "cashInflows": 0,
       "expenses": 0,
       "pensionFund": 0,
       "cash": 0,
@@ -100,6 +101,7 @@ function computeNominalAggregates(ctx) {
       "incomeTaxFreePV": 0,
       "realEstateCapitalPV": 0,
       "netIncomePV": 0,
+      "cashInflowsPV": 0,
       "expensesPV": 0,
       "pensionFundPV": 0,
       "cashPV": 0,
@@ -140,7 +142,8 @@ function computeNominalAggregates(ctx) {
   dataSheet[row].incomeRentals += incomeRentals;
   dataSheet[row].incomePrivatePension += incomePrivatePension;
   dataSheet[row].incomeStatePension += incomeStatePension;
-  dataSheet[row].incomeCash += Math.max(cashWithdraw, 0);
+  var incomeCash = Math.max(cashWithdraw, 0);
+  dataSheet[row].incomeCash += incomeCash;
   dataSheet[row].incomeDefinedBenefit += incomeDefinedBenefit;
   dataSheet[row].incomeTaxFree += incomeTaxFree;
   dataSheet[row].realEstateCapital += realEstateConverted;
@@ -151,9 +154,11 @@ function computeNominalAggregates(ctx) {
   // Accumulate per-type income and capital for dynamic UI columns
   // Ensure investmentIncomeByKey exists even if row was pre-initialized
   if (!dataSheet[row].investmentIncomeByKey) dataSheet[row].investmentIncomeByKey = {};
+  var totalInvestmentIncome = 0;
   for (var k in investmentIncomeByKey) {
     if (!dataSheet[row].investmentIncomeByKey[k]) dataSheet[row].investmentIncomeByKey[k] = 0;
     dataSheet[row].investmentIncomeByKey[k] += investmentIncomeByKey[k];
+    totalInvestmentIncome += investmentIncomeByKey[k];
   }
   // Ensure investmentCapitalByKey exists even if row was pre-initialized
   if (!dataSheet[row].investmentCapitalByKey) dataSheet[row].investmentCapitalByKey = {};
@@ -166,13 +171,28 @@ function computeNominalAggregates(ctx) {
   dataSheet[row].withdrawalRate += withdrawalRate;
 
   // Populate dynamic tax columns
+  var totalTax = 0;
   for (const taxId in revenue.taxTotals) {
     const taxColumnName = `Tax__${taxId}`;
     if (!dataSheet[row][taxColumnName]) {
       dataSheet[row][taxColumnName] = 0;
     }
-    dataSheet[row][taxColumnName] += revenue.getTaxByType(taxId);
+    var taxAmount = revenue.getTaxByType(taxId);
+    dataSheet[row][taxColumnName] += taxAmount;
+    totalTax += taxAmount;
   }
+
+  var grossInflows =
+    incomeSalaries +
+    incomeShares +
+    incomeRentals +
+    incomePrivatePension +
+    incomeStatePension +
+    incomeDefinedBenefit +
+    incomeTaxFree +
+    incomeCash +
+    totalInvestmentIncome;
+  dataSheet[row].cashInflows += grossInflows - totalTax - personalPensionContribution;
 
   // Calculate worth: include all asset capitals from capsByKey (the canonical source)
   let totalInvestmentCaps = 0;

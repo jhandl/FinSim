@@ -263,9 +263,15 @@ function getEventCurrencyInfo(event, fallbackCountry) {
   var linkedCountry = event.linkedCountry ? normalizeCountry(event.linkedCountry) : null;
   if (event.currency) {
     info.currency = normalizeCurrency(event.currency);
-    info.country = findCountryForCurrency(info.currency, linkedCountry || fallbackCountry || currentCountry);
-    if (!info.country) {
-      info.country = normalizeCountry(linkedCountry || fallbackCountry || currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
+    // If linkedCountry is provided, it defines the economic/tax context for this flow
+    // even when the amount is denominated in a different currency (e.g. AR salary paid in EUR).
+    if (linkedCountry) {
+      info.country = linkedCountry;
+    } else {
+      info.country = findCountryForCurrency(info.currency, fallbackCountry || currentCountry);
+      if (!info.country) {
+        info.country = normalizeCountry(fallbackCountry || currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
+      }
     }
   } else if (linkedCountry) {
     info.country = linkedCountry;
@@ -2795,10 +2801,9 @@ function buildAggregateContext() {
     incomeDefinedBenefit: incomeDefinedBenefit,
     incomeTaxFree: incomeTaxFree,
     // Data sheet / chart semantics:
-    // - Use earned post-tax income (exclude withdrawals), but add back personal pension
-    //   contributions so "NetIncome" reflects net earnings including pension savings.
+    // - `netIncome` is take-home cash from non-withdrawal income streams.
     // - Internal `netIncome` may be temporarily increased by withdrawals for solvency.
-    netIncome: earnedNetIncome + personalPensionContribution,
+    netIncome: earnedNetIncome,
     expenses: expenses,
     cash: cash,
     personalPensionContribution: personalPensionContribution,

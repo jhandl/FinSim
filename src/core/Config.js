@@ -401,14 +401,15 @@ class Config {
    * @returns {Promise} Resolves with { failed: Array<string> } containing country codes that failed to load
    */
   async syncTaxRuleSetsWithEvents(events, startCountry) {
-    if (!this.isRelocationEnabled()) return Promise.resolve({ failed: [] });
     var required = new Set();
     required.add(this.getDefaultCountry());
     if (startCountry && typeof startCountry === 'string') {
       required.add(startCountry.toLowerCase());
     }
 
-    if (Array.isArray(events)) {
+    // When relocation is disabled we still need default+start-country rulesets
+    // and their investment asset-country dependencies for FX-safe simulations.
+    if (this.isRelocationEnabled() && Array.isArray(events)) {
       for (var i = 0; i < events.length; i++) {
         var evt = events[i];
         if (isRelocationEvent(evt)) {

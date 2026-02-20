@@ -8,6 +8,7 @@ const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelp
 
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
 const AR_RULES = require('../src/core/config/tax-rules-ar.json');
+const US_RULES = require('../src/core/config/tax-rules-us.json');
 const DEMO3_PATH = path.resolve(__dirname, '..', 'docs', 'demo3.csv');
 
 const FRACTIONAL_PARAM_KEYS = new Set([
@@ -940,7 +941,8 @@ module.exports = {
     }
     installTestTaxRules(syntheticFramework, {
       ie: deepClone(IE_RULES),
-      ar: deepClone(AR_RULES)
+      ar: deepClone(AR_RULES),
+      us: deepClone(US_RULES)
     });
     const syntheticResults = await syntheticFramework.runSimulation();
     // (debug-only logging removed)
@@ -1029,7 +1031,8 @@ module.exports = {
     }
     installTestTaxRules(demoFramework, {
       ie: deepClone(IE_RULES),
-      ar: deepClone(AR_RULES)
+      ar: deepClone(AR_RULES),
+      us: deepClone(US_RULES)
     });
 
     const demoResults = await demoFramework.runSimulation();
@@ -1231,7 +1234,8 @@ module.exports = {
 
     installTestTaxRules(framework, {
       ie: deepClone(IE_RULES),
-      ar: deepClone(AR_RULES)
+      ar: deepClone(AR_RULES),
+      us: deepClone(US_RULES)
     });
 
     const results = await framework.runSimulation();

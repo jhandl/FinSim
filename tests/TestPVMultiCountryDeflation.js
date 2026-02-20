@@ -430,27 +430,21 @@ module.exports = {
       return { success: false, errors: ['Missing age 45 row in salaries multi-country scenario'] };
     }
 
-    // At age 45, 15 years since start (age 30), 5 years post-relocation
+    // At age 45, 15 years since start (age 30)
     // Only AR salary is active at this point (IE salary ended at age 40)
+    // PV semantics: all inputs are entered in start-of-simulation "today's money",
+    // so AR deflation is anchored to simulation start (not relocation age).
     const salYearsSinceStart = 15;
-    const salYearsPostRelocation = 5;
-    const salIeDefFactor = 1 / Math.pow(1.02, salYearsSinceStart);  // ~0.74
-    const salArDefFactor = 1 / Math.pow(1.50, salYearsPostRelocation);  // ~0.13
+    const salArDefFactor = 1 / Math.pow(1.50, salYearsSinceStart);  // ~0.0023
 
     if (salRow45.incomeSalaries && salRow45.incomeSalaries > 0) {
       const salActualRatio = salRow45.incomeSalariesPV / salRow45.incomeSalaries;
 
-      // The cumulative residence deflation bug: uses 1/(1.02^10 * 1.50^5) = ~0.011
-      // instead of just AR deflation from relocation point: 1/1.50^5 = ~0.13
-      // The extremely low ratio indicates the bug is present
-      const bugDeflationFactor = 1 / (Math.pow(1.02, 10) * Math.pow(1.50, 5));  // ~0.011
-
-      if (salActualRatio < salArDefFactor * 0.5) {
+      if (!withinTolerance(salActualRatio, salArDefFactor, 0.02)) {
         errors.push(
           `Test 0.3 FAIL: At age 45, salary PV ratio is ${salActualRatio.toFixed(4)}. ` +
-          `Expected ratio ~${salArDefFactor.toFixed(4)} (AR deflation from relocation), ` +
-          `but got value closer to bug deflation ~${bugDeflationFactor.toFixed(4)}. ` +
-          `This indicates cumulative residence deflation is being applied incorrectly.`
+          `Expected ratio ~${salArDefFactor.toFixed(4)} (AR deflation anchored to simulation start), ` +
+          `but got ${salActualRatio.toFixed(4)}.`
         );
       }
     }
@@ -458,25 +452,19 @@ module.exports = {
     // Test at age 40 where both salaries might be active
     const salRow40 = findRowByAge(salRows, 40);
     if (salRow40) {
-      const iePortionNominal = 40000;
-      const arPortionNominal = 30000;
-      const totalNominal = iePortionNominal + arPortionNominal;
-      const ieDefFactorAt40 = 1 / Math.pow(1.02, 10);  // ~0.82
-      const arDefFactorAt40 = 1.0;  // same year as relocation
-      const expectedPV = iePortionNominal * ieDefFactorAt40 + arPortionNominal * arDefFactorAt40;
-      // Expected = 40000 * 0.82 + 30000 * 1.0 = 32,800 + 30,000 = 62,800
+      // At age 40, both salaries are present in PV terms:
+      // - IE salary amount was entered in today's money, so PV should be ~€40,000
+      // - AR salary amount was entered in today's money, so PV should be ~€30,000
+      const expectedPV = 40000 + 30000;
 
       const actualSalaries = salRow40.incomeSalaries || 0;
       const actualSalariesPV = salRow40.incomeSalariesPV || 0;
 
-      if (actualSalaries >= totalNominal * 0.9) {  // At least 90% of expected
-        // Check if PV uses per-country deflation
+      if (actualSalaries > 0) {
         if (!withinTolerance(actualSalariesPV, expectedPV, expectedPV * 0.05)) {
-          const bugPV = actualSalaries * ieDefFactorAt40;  // Bug would use single factor
           errors.push(
-            `Test 0.3 FAIL: At age 40 (relocation year), total salaries PV should use per-country deflation. ` +
-            `Expected ~€${expectedPV.toFixed(0)} (weighted: IE@0.82 + AR@1.0), ` +
-            `but got €${actualSalariesPV.toFixed(0)}.`
+            `Test 0.3 FAIL: At age 40 (relocation year), total salaries PV should reflect start-of-simulation today-values. ` +
+            `Expected ~€${expectedPV.toFixed(0)}, but got €${actualSalariesPV.toFixed(0)}.`
           );
         }
       }

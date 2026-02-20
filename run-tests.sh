@@ -31,6 +31,7 @@ show_usage() {
     echo -e "  ${YELLOW}-t, --type TYPE${NC}   Run only tests of the specified type:"
     echo -e "                      ${GREEN}core${NC}       - Custom Node tests (TestFramework.js)"
     echo -e "                      ${GREEN}fast${NC}       - Core tests excluding those tagged slow"
+    echo -e "                      ${GREEN}confidence${NC} - Core confidence tests (ConfidenceTest*.js)"
     echo -e "                      ${GREEN}jest${NC}       - Jest UI unit tests (*.test.js)"
     echo -e "                      ${GREEN}e2e${NC}        - Playwright browser tests (*.spec.js)"
     echo -e "                      ${GREEN}all${NC}        - All test types (default)"
@@ -357,11 +358,12 @@ list_tests() {
     echo -e "${BLUE}======================${NC}"
     echo ""
 
-    local custom_tests=( $(find "$TESTS_DIR" -maxdepth 1 -name "*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort) )
+    local custom_tests=( $(find "$TESTS_DIR" -maxdepth 1 -name "*.js" ! -name "ConfidenceTest*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort) )
+    local confidence_tests=( $(find "$TESTS_DIR" -maxdepth 1 -name "ConfidenceTest*.js" ! -name "*.test.js" ! -name "*.spec.js" -type f | sort) )
     local jest_tests=( $(find "$TESTS_DIR" -maxdepth 1 -name "*.test.js" -type f | sort) )
     local pw_tests=( $(find "$TESTS_DIR" -maxdepth 1 -name "*.spec.js" -type f | sort) )
 
-    if [ ${#custom_tests[@]} -eq 0 ] && [ ${#jest_tests[@]} -eq 0 ] && [ ${#pw_tests[@]} -eq 0 ]; then
+    if [ ${#custom_tests[@]} -eq 0 ] && [ ${#confidence_tests[@]} -eq 0 ] && [ ${#jest_tests[@]} -eq 0 ] && [ ${#pw_tests[@]} -eq 0 ]; then
         echo -e "${YELLOW}No test files found in $TESTS_DIR${NC}"
         return 0
     fi
@@ -369,6 +371,14 @@ list_tests() {
     if [ ${#custom_tests[@]} -gt 0 ]; then
         echo "Custom Node Tests:"
         for f in "${custom_tests[@]}"; do
+            echo -e "  ${GREEN}$(basename "$f" .js)${NC}"
+        done
+        echo ""
+    fi
+
+    if [ ${#confidence_tests[@]} -gt 0 ]; then
+        echo "Confidence Tests:"
+        for f in "${confidence_tests[@]}"; do
             echo -e "  ${GREEN}$(basename "$f" .js)${NC}"
         done
         echo ""
@@ -422,7 +432,7 @@ main() {
                 TEST_TYPE="$2"
                 # Validate test type
                 case "$TEST_TYPE" in
-                    core|fast|jest|e2e|playwright|all)
+                    core|fast|confidence|jest|e2e|playwright|all)
                         # Valid type - normalize playwright to e2e
                         [ "$TEST_TYPE" == "playwright" ] && TEST_TYPE="e2e"
                         ;;
@@ -481,9 +491,15 @@ main() {
         local failed=0
         local failed_tests=()
 
-        # Run core tests if type is 'all' or 'core' or 'fast'
-        if [ "$TEST_TYPE" == "all" ] || [ "$TEST_TYPE" == "core" ] || [ "$TEST_TYPE" == "fast" ]; then
-            local test_files=($(find_test_files))
+        # Run core tests if type is 'all' or 'core' or 'fast' or 'confidence'
+        if [ "$TEST_TYPE" == "all" ] || [ "$TEST_TYPE" == "core" ] || [ "$TEST_TYPE" == "fast" ] || [ "$TEST_TYPE" == "confidence" ]; then
+            local test_files
+            if [ "$TEST_TYPE" == "confidence" ]; then
+                test_files=($(find "$TESTS_DIR" -maxdepth 1 -name 'ConfidenceTest*.js' ! -name '*.test.js' ! -name '*.spec.js' -type f | sort))
+            else
+                test_files=($(find_test_files))
+            fi
+
             if [ ${#test_files[@]} -eq 0 ]; then
                 echo -e "${YELLOW}No core test files found in $TESTS_DIR${NC}"
             else

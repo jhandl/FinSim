@@ -137,46 +137,10 @@ class UIManager {
     if (!dataSheet || !dataSheet[row]) return null;
 
     // Data sheet semantics:
-    // - core `netIncome` includes personal pension contributions (pension savings)
-    // - UI "Inflows" should reflect cash inflows after taxes, excluding pension contributions.
-    //   It must be computed from the post-withdrawal income/tax buckets (not from core `netIncome`,
-    //   which is computed pre-withdrawal and intentionally excludes withdrawals).
-    const invMap = dataSheet[row].investmentIncomeByKey || {};
-    let invIncome = 0;
-    for (const key in invMap) invIncome += invMap[key];
-    const invMapPV = dataSheet[row].investmentIncomeByKeyPV || {};
-    let invIncomePV = 0;
-    for (const key in invMapPV) invIncomePV += invMapPV[key];
-    const taxByKey = dataSheet[row].taxByKey || {};
-    let totalTax = 0;
-    for (const tId in taxByKey) totalTax += taxByKey[tId];
-    let totalTaxPV = 0;
-    for (const tId in taxByKey) {
-      const pvKey = 'Tax__' + tId + 'PV';
-      totalTaxPV += (dataSheet[row][pvKey] || 0);
-    }
-    const grossInflows =
-      (dataSheet[row].incomeSalaries || 0) +
-      (dataSheet[row].incomeRSUs || 0) +
-      (dataSheet[row].incomeRentals || 0) +
-      (dataSheet[row].incomePrivatePension || 0) +
-      (dataSheet[row].incomeStatePension || 0) +
-      (dataSheet[row].incomeDefinedBenefit || 0) +
-      (dataSheet[row].incomeTaxFree || 0) +
-      (dataSheet[row].incomeCash || 0) +
-      invIncome;
-    const grossInflowsPV =
-      (dataSheet[row].incomeSalariesPV || 0) +
-      (dataSheet[row].incomeRSUsPV || 0) +
-      (dataSheet[row].incomeRentalsPV || 0) +
-      (dataSheet[row].incomePrivatePensionPV || 0) +
-      (dataSheet[row].incomeStatePensionPV || 0) +
-      (dataSheet[row].incomeDefinedBenefitPV || 0) +
-      (dataSheet[row].incomeTaxFreePV || 0) +
-      (dataSheet[row].incomeCashPV || 0) +
-      invIncomePV;
-    const cashInflows = grossInflows - totalTax - (dataSheet[row].pensionContribution || 0);
-    const cashInflowsPV = grossInflowsPV - totalTaxPV - (dataSheet[row].pensionContributionPV || 0);
+    // - `netIncome` is take-home cash excluding withdrawals.
+    // - `cashInflows` is take-home cash including withdrawals.
+    const cashInflows = dataSheet[row].cashInflows;
+    const cashInflowsPV = dataSheet[row].cashInflowsPV;
 
     const data = {
       // Age and year are state values, not accumulated - don't divide by scale

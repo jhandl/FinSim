@@ -328,8 +328,9 @@ module.exports = {
       age: 55,
       field: 'netIncome',
       expected: {
-        min: 39000,
-        max: 41000
+        // netIncome is take-home cash after employee pension contributions.
+        min: 25000,
+        max: 28000
       }
     },
     
