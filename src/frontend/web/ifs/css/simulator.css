@@ -4390,19 +4390,22 @@ footer {
   text-overflow: ellipsis;
 }
 
-/* Keep relocation country field width aligned with the Name input column. */
-#Events .event-country-dd {
+/* Keep relocation and mortgage country field width aligned with the Name input column. */
+#Events .event-country-dd,
+#Events .event-mortgage-dd {
   display: flex;
   align-items: center;
   width: 100%;
 }
 
-#Events .event-country-dd .dropdown-wrapper {
+#Events .event-country-dd .dropdown-wrapper,
+#Events .event-mortgage-dd .dropdown-wrapper {
   display: block;
   width: 100%;
 }
 
-#Events .event-country-dd .pseudo-select {
+#Events .event-country-dd .pseudo-select,
+#Events .event-mortgage-dd .pseudo-select {
   box-sizing: border-box;
   display: block;
   width: 100%;

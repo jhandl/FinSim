@@ -1092,6 +1092,23 @@ class EventAccordionManager {
       }
     }
 
+    // Mortgage dropdown for property selection
+    const mortgageToggleEl = container.querySelector(`#AccordionEventMortgageToggle_${event.rowId}`);
+    const mortgageDropdownEl = container.querySelector(`#AccordionEventMortgageOptions_${event.rowId}`);
+    if (nameInput && mortgageToggleEl && mortgageDropdownEl) {
+      const mortgageDropdown = DropdownUtils.create({
+        toggleEl: mortgageToggleEl,
+        dropdownEl: mortgageDropdownEl,
+        options: [], // Populated on-demand via updateAccordionMortgageOptions
+        selectedValue: String(nameInput.value || '').trim(),
+        onSelect: (val, label) => {
+          this.applyAccordionMortgageSelection(event, container, val, label);
+        },
+      });
+      container._eventMortgageDropdown = mortgageDropdown;
+      this.updateAccordionMortgageOptions(event, container);
+    }
+
     // Define editable fields and their validation types
     const editableFields = [
       { selector: '.accordion-edit-name', tableClass: '.event-name', type: 'text' },
@@ -1120,13 +1137,91 @@ class EventAccordionManager {
 
         // Final validation and summary refresh on blur
         input.addEventListener('blur', (e) => {
-          const value = e.target.value;
+          let value = e.target.value.trim();
+
+          // Handle Real Estate name uniqueness and propagation if in accordion edit mode
+          if (field.selector === '.accordion-edit-name' && event.type === 'R' && value) {
+            const oldName = (event.name || '').trim();
+            if (value !== oldName) {
+              const tbody = document.querySelector('#Events tbody');
+              if (tbody) {
+                const otherRRows = Array.from(tbody.querySelectorAll('tr')).filter(r => {
+                  // Find the table row for the current event to exclude it
+                  const currentTableRow = this.findTableRowForEvent(event);
+                  if (r === currentTableRow) return false;
+                  const t = r.querySelector('.event-type');
+                  return t && t.value === 'R';
+                });
+
+                let finalName = value;
+                let counter = 2;
+                const isDuplicate = (name) => otherRRows.some(r => {
+                  const n = r.querySelector('.event-name');
+                  return n && n.value.trim().toLowerCase() === name.toLowerCase();
+                });
+
+                while (isDuplicate(finalName)) {
+                  finalName = `${value} ${counter}`;
+                  counter++;
+                }
+
+                if (finalName !== value) {
+                  input.value = finalName;
+                  value = finalName;
+                  input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+
+                // Propagate to linked mortgages
+                if (oldName && oldName !== value) {
+                  tbody.querySelectorAll('tr').forEach(mRow => {
+                    const mTypeInput = mRow.querySelector('.event-type');
+                    const mNameInput = mRow.querySelector('.event-name');
+                    if (mTypeInput && mTypeInput.value === 'M' && mNameInput && mNameInput.value.trim() === oldName) {
+                      mNameInput.value = value;
+                      mNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+                      if (this.webUI.eventsTableManager) {
+                        this.webUI.eventsTableManager.updateMortgageOptions(mRow);
+                      }
+                    }
+                  });
+                }
+              }
+            }
+          }
 
           const validation = this.validateField(value, field.type, event);
 
           if (validation.isValid) {
             this.clearFieldValidation(input);
             this.syncFieldToTable(event, field.tableClass, value);
+            
+            // If it was an R event name change, refresh all other expanded accordion items if they are Mortgages
+            if (field.selector === '.accordion-edit-name' && event.type === 'R') {
+              const allMItems = document.querySelectorAll('.events-accordion-item');
+              allMItems.forEach(item => {
+                const itemEventId = item.dataset.eventId;
+                if (itemEventId === event.id) return; // skip self
+                
+                // We can't easily check type without finding the event, 
+                // but we can check if the mortgage dropdown exists in the item
+                const mDropdown = item._eventMortgageDropdown;
+                if (mDropdown && item.querySelector('.accordion-item-content.expanded')) {
+                  // It's an expanded mortgage - refresh its options
+                  // We need the event object though... 
+                  // Actually, easier to just trigger a refresh of M options if we find the toggle
+                  const mToggle = item.querySelector('[id^="AccordionEventMortgageToggle_"]');
+                  if (mToggle) {
+                    // Find the event for this item
+                    const events = (this.webUI.readEvents) ? this.webUI.readEvents(false) : [];
+                    const mEvent = events.find(ev => ev.rowId === item.dataset.rowId || ev.id === item.dataset.eventId);
+                    if (mEvent && mEvent.type === 'M') {
+                      this.updateAccordionMortgageOptions(mEvent, item);
+                    }
+                  }
+                }
+              });
+            }
+
             // Refresh accordion summary to reflect changes
             this.refreshEventSummary(event);
           } else {
@@ -2481,5 +2576,67 @@ class EventAccordionManager {
       const isMobile = (typeof window !== 'undefined') && window.innerWidth < 800;
       setTimeout(ensureTopSafety, isMobile ? 250 : 120);
     });
+  }
+
+  updateAccordionMortgageOptions(event, container) {
+    if (!container || !container._eventMortgageDropdown) return;
+
+    const nameInput = container.querySelector('.accordion-edit-name');
+    const currentValue = String(nameInput ? nameInput.value : '').trim();
+
+    // Find all 'R' events (Real Estate)
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return;
+
+    const rEvents = Array.from(tbody.querySelectorAll('tr')).filter(r => {
+      const typeInput = r.querySelector('.event-type');
+      return typeInput && typeInput.value === 'R';
+    }).map(r => {
+      const nameEl = r.querySelector('.event-name');
+      return nameEl ? nameEl.value : '';
+    }).filter(name => !!name);
+
+    // Remove duplicates
+    const uniqueREvents = Array.from(new Set(rEvents));
+
+    const options = uniqueREvents.map(name => ({
+      value: name,
+      label: name,
+      selected: name === currentValue
+    }));
+
+    container._eventMortgageDropdown.setOptions(options);
+
+    // Update toggle text
+    const toggleEl = container.querySelector(`#AccordionEventMortgageToggle_${event.rowId}`);
+    if (toggleEl) {
+      const matched = options.find(o => o.value === currentValue);
+      toggleEl.textContent = matched ? matched.label : 'Select Property';
+    }
+  }
+
+  applyAccordionMortgageSelection(event, container, propertyName, label) {
+    const nameInput = container.querySelector('.accordion-edit-name');
+    const toggleEl = container.querySelector(`#AccordionEventMortgageToggle_${event.rowId}`);
+
+    if (nameInput) nameInput.value = propertyName;
+    if (toggleEl) toggleEl.textContent = label;
+
+    this.clearFieldValidation(nameInput);
+    this.syncFieldToTableWithoutDefaults(event, '.event-name', propertyName);
+    event.name = propertyName;
+    this.refreshEventSummary(event);
+
+    // Refresh dropdown options to update selection highlight
+    this.updateAccordionMortgageOptions(event, container);
+
+    // Clear warnings and re-run validation to update the ready state
+    if (this.webUI) {
+      this.webUI.clearAllWarnings();
+      const uiMgr = (typeof uiManager !== 'undefined') ? uiManager : (this.webUI.uiManager);
+      if (uiMgr && typeof uiMgr.readEvents === 'function') {
+        uiMgr.readEvents(true);
+      }
+    }
   }
 }

@@ -257,6 +257,27 @@ class EventsTableManager {
       this._clearRelocationAgeShift(relocationMarkerIds);
     }
 
+    // Handle orphan Mortgage events if an 'R' event is deleted
+    const typeInput = row.querySelector('.event-type');
+    const nameInput = row.querySelector('.event-name');
+    if (typeInput && typeInput.value === 'R' && nameInput) {
+      const oldName = nameInput.value;
+      const tbody = row.closest('tbody');
+      if (oldName && tbody) {
+        tbody.querySelectorAll('tr').forEach(mRow => {
+          const mTypeInput = mRow.querySelector('.event-type');
+          const mNameInput = mRow.querySelector('.event-name');
+          if (mTypeInput && mTypeInput.value === 'M' && mNameInput && mNameInput.value === oldName) {
+            mNameInput.value = '';
+            mNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+            if (mRow._eventMortgageDropdown) {
+              this.updateMortgageOptions(mRow);
+            }
+          }
+        });
+      }
+    }
+
     // Check if this is the only row
     const allRows = document.querySelectorAll('#Events tbody tr');
     const isLastRow = allRows.length === 1;
@@ -283,6 +304,7 @@ class EventsTableManager {
           RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
           this.webUI.tableManager.setupTableCurrencyControls();
         }
+        this._refreshValidation();
       }, 400);
     } else {
       // Complex animation with slide-up for multiple rows
@@ -358,7 +380,7 @@ class EventsTableManager {
           RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
           this.webUI.tableManager.setupTableCurrencyControls();
         }
-
+        this._refreshValidation();
       }, 300); // Wait for slide animation to complete
     }, 200); // Wait for fade to complete
   }
@@ -385,6 +407,16 @@ class EventsTableManager {
       const nu = this.webUI && this.webUI.notificationUtils;
       if (nu && typeof nu.showToast === 'function') {
         nu.showToast('All relocation impacts resolved!', 'Success', 3);
+      }
+    }
+  }
+
+  _refreshValidation() {
+    if (this.webUI) {
+      this.webUI.clearAllWarnings();
+      const uiMgr = (typeof uiManager !== 'undefined') ? uiManager : (this.webUI.uiManager);
+      if (uiMgr && typeof uiMgr.readEvents === 'function') {
+        uiMgr.readEvents(true);
       }
     }
   }
@@ -441,6 +473,20 @@ class EventsTableManager {
             const oldType = row.dataset.originalEventType || '';
             const newType = e.target.value || '';
             row.dataset.originalEventType = newType;
+
+            // Refresh all mortgage dropdowns if type changed to/from 'R'
+            if (oldType === 'R' || newType === 'R') {
+              const tbody = row.closest('tbody');
+              if (tbody) {
+                tbody.querySelectorAll('tr').forEach(mRow => {
+                  const mTypeInput = mRow.querySelector('.event-type');
+                  if (mTypeInput && mTypeInput.value === 'M' && mRow._eventMortgageDropdown) {
+                    this.updateMortgageOptions(mRow);
+                  }
+                });
+              }
+            }
+
             // If event type changed to/from relocation, update currency selector
             const isOldRelocation = oldType === 'MV';
             const isNewRelocation = newType === 'MV';
@@ -492,6 +538,25 @@ class EventsTableManager {
         if (e.target.matches('.event-name, .event-amount, .event-from-age, .event-to-age, .event-rate, .event-match')) {
           if (row) {
             this.updateWizardIconsVisibility(row);
+          }
+        }
+        // Handle Real Estate name propagation to linked Mortgage events
+        if (e.target.matches('.event-name') && row) {
+          const typeInput = row.querySelector('.event-type');
+          // Skip refresh if typing in an 'R' event name field - we'll handle propagation on blur
+          if (typeInput && typeInput.value === 'R') {
+            return;
+          }
+
+          // Refresh all mortgage dropdowns when any other event name changes
+          const tbody = row.closest('tbody');
+          if (tbody) {
+            tbody.querySelectorAll('tr').forEach(mRow => {
+              const mTypeInput = mRow.querySelector('.event-type');
+              if (mTypeInput && mTypeInput.value === 'M' && mRow._eventMortgageDropdown) {
+                this.updateMortgageOptions(mRow);
+              }
+            });
           }
         }
       });
@@ -1256,10 +1321,24 @@ class EventsTableManager {
 
     const nameInput = row.querySelector('.event-name');
     const countryDropdown = row.querySelector('.event-country-dd');
-    if (nameInput && countryDropdown) {
+    const mortgageDropdown = row.querySelector('.event-mortgage-dd');
+    if (nameInput && countryDropdown && mortgageDropdown) {
       const isRelocation = eventType === 'MV';
-      nameInput.style.display = isRelocation ? 'none' : '';
+      const isMortgage = eventType === 'M';
+
+      nameInput.style.display = (isRelocation || isMortgage) ? 'none' : '';
       countryDropdown.style.display = isRelocation ? '' : 'none';
+      mortgageDropdown.style.display = isMortgage ? '' : 'none';
+
+      // Update nameInput._dropdownWrapper for validation logic
+      if (isRelocation && row._eventCountryDropdown) {
+        nameInput._dropdownWrapper = row._eventCountryDropdown.wrapper;
+      } else if (isMortgage && row._eventMortgageDropdown) {
+        nameInput._dropdownWrapper = row._eventMortgageDropdown.wrapper;
+        this.updateMortgageOptions(row);
+      } else {
+        nameInput._dropdownWrapper = null;
+      }
     }
   }
 
@@ -2796,6 +2875,80 @@ class EventsTableManager {
     this._scheduleRelocationReanalysis();
   }
 
+  async applyMortgageSelection(row, propertyName, label) {
+    if (!row) return;
+    const nameInput = row.querySelector('.event-name');
+    if (!nameInput) return;
+
+    nameInput.value = propertyName || '';
+
+    const rowId = row.dataset ? row.dataset.rowId : '';
+    let mortgageToggleEl = rowId
+      ? row.querySelector(`#EventMortgageToggle_${rowId}`)
+      : row.querySelector('.event-mortgage-dd .dd-toggle');
+    if (!mortgageToggleEl) mortgageToggleEl = row.querySelector('.event-mortgage-dd .dd-toggle');
+    if (mortgageToggleEl) {
+      mortgageToggleEl.textContent = label || 'Select Property';
+    }
+
+    // Update internal selected value in the dropdown object
+    if (row._eventMortgageDropdown && typeof row._eventMortgageDropdown.setOptions === 'function') {
+      this.updateMortgageOptions(row);
+    }
+
+    // Clear warnings and re-run validation to update the ready state
+    if (this.webUI) {
+      this.webUI.clearAllWarnings();
+      // Re-run validation. uiManager is global or accessible via webUI.
+      const uiMgr = (typeof uiManager !== 'undefined') ? uiManager : (this.webUI.uiManager);
+      if (uiMgr && typeof uiMgr.readEvents === 'function') {
+        uiMgr.readEvents(true);
+      }
+    }
+
+    nameInput.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  updateMortgageOptions(row) {
+    if (!row || !row._eventMortgageDropdown) return;
+
+    const nameInput = row.querySelector('.event-name');
+    const currentValue = String(nameInput ? nameInput.value : '').trim();
+
+    // Find all 'R' events (Real Estate)
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return;
+
+    const rEvents = Array.from(tbody.querySelectorAll('tr')).filter(r => {
+      const typeInput = r.querySelector('.event-type');
+      return typeInput && typeInput.value === 'R';
+    }).map(r => {
+      const nameEl = r.querySelector('.event-name');
+      return nameEl ? nameEl.value : '';
+    }).filter(name => !!name);
+
+    // Remove duplicates
+    const uniqueREvents = Array.from(new Set(rEvents));
+
+    const options = uniqueREvents.map(name => ({
+      value: name,
+      label: name,
+      selected: name === currentValue
+    }));
+
+    row._eventMortgageDropdown.setOptions(options);
+
+    // Update toggle text if it doesn't match current selection (e.g. after rename or initial load)
+    const rowId = row.dataset ? row.dataset.rowId : '';
+    let toggleEl = rowId
+      ? row.querySelector(`#EventMortgageToggle_${rowId}`)
+      : row.querySelector('.event-mortgage-dd .dd-toggle');
+    if (toggleEl) {
+      const matched = options.find(o => o.value === currentValue);
+      toggleEl.textContent = matched ? matched.label : 'Select Property';
+    }
+  }
+
   setRowFieldValue(row, selector, value) {
     if (!row) return;
     const input = row.querySelector(selector);
@@ -2827,6 +2980,9 @@ class EventsTableManager {
         ? countries.find(c => String(c.code).toUpperCase() === code)
         : null;
       await this.applyCountrySelection(row, code, matchedCountry ? matchedCountry.name : code);
+    } else if (resolvedType === 'M') {
+      const propertyName = eventData && eventData.name != null ? eventData.name : '';
+      await this.applyMortgageSelection(row, propertyName, propertyName || 'Select Property');
     } else {
       const nameValue = eventData && eventData.name != null ? eventData.name : '';
       this.setRowFieldValue(row, '.event-name', nameValue);
@@ -2980,6 +3136,10 @@ class EventsTableManager {
               <span id="EventCountryToggle_${rowId}" class="dd-toggle pseudo-select">Select country</span>
               <div id="EventCountryOptions_${rowId}" class="visualization-dropdown" style="display:none;"></div>
           </div>
+          <div class="event-mortgage-dd visualization-control" id="EventMortgage_${rowId}" style="display:none;">
+              <span id="EventMortgageToggle_${rowId}" class="dd-toggle pseudo-select">Select Property</span>
+              <div id="EventMortgageOptions_${rowId}" class="visualization-dropdown" style="display:none;"></div>
+          </div>
       </td>
       <td><input type="text" id="EventAmount_${rowId}" class="event-amount currency" inputmode="numeric" pattern="[0-9]*" step="1000" value="${amount}"></td>
       <td><input type="text" id="EventFromAge_${rowId}" class="event-from-age" inputmode="numeric" pattern="[0-9]*" value="${fromAge}"></td>
@@ -3053,6 +3213,31 @@ class EventsTableManager {
       }
     }
 
+    // Mortgage dropdown (stores linked property name in name input)
+    const mortgageToggleEl = row.querySelector(`#EventMortgageToggle_${rowId}`);
+    const mortgageDropdownEl = row.querySelector(`#EventMortgageOptions_${rowId}`);
+    if (nameInput && mortgageToggleEl && mortgageDropdownEl) {
+      const mortgageDropdown = DropdownUtils.create({
+        toggleEl: mortgageToggleEl,
+        dropdownEl: mortgageDropdownEl,
+        options: [], // Populated on-demand via updateMortgageOptions
+        selectedValue: String(nameInput.value || '').trim(),
+        onSelect: async (val, label) => {
+          try {
+            await this.applyMortgageSelection(row, val, label);
+          } catch (err) {
+            console.error('Error selecting mortgage property:', err);
+          }
+        },
+      });
+      row._eventMortgageDropdown = mortgageDropdown;
+      if (mortgageDropdown && mortgageDropdown.wrapper) {
+        // Reuse same wrapper for nameInput when in mortgage mode
+        // Note: nameInput._dropdownWrapper is used by validation system
+        // We'll update it in updateFieldVisibility
+      }
+    }
+
     // Initial visibility update
     this.updateFieldVisibility(typeInput);
     this.applyTypeColouring(row);
@@ -3085,6 +3270,84 @@ class EventsTableManager {
 
         // Launch wizard selection modal
         this.showWizardSelection(initialData);
+      });
+    }
+
+    // Direct listeners to enforce unique property names and handle propagation
+    if (nameInput) {
+      nameInput.addEventListener('focusin', () => {
+        const currentType = typeInput.value;
+        if (currentType === 'R') {
+          nameInput.dataset.prevName = nameInput.value.trim();
+        }
+      });
+
+      nameInput.addEventListener('blur', (e) => {
+        const currentType = typeInput.value;
+        if (currentType === 'R') {
+          let newName = nameInput.value.trim();
+          if (!newName) return;
+
+          const oldName = nameInput.dataset.prevName || '';
+          
+          // Check for duplicates
+          const tbody = row.closest('tbody') || document.querySelector('#Events tbody');
+          if (!tbody) return;
+
+          const otherRRows = Array.from(tbody.querySelectorAll('tr')).filter(r => {
+            if (r === row) return false;
+            const t = r.querySelector('.event-type');
+            return t && t.value === 'R';
+          });
+
+          let finalName = newName;
+          let counter = 2;
+          
+          const isDuplicate = (name) => otherRRows.some(r => {
+            const n = r.querySelector('.event-name');
+            return n && n.value.trim().toLowerCase() === name.toLowerCase();
+          });
+
+          while (isDuplicate(finalName)) {
+            finalName = `${newName} ${counter}`;
+            counter++;
+          }
+
+          if (finalName !== newName) {
+            nameInput.value = finalName;
+            newName = finalName;
+            // Trigger input to update icons etc
+            nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+
+          // Propagate change to linked mortgages
+          if (oldName && oldName !== newName) {
+            tbody.querySelectorAll('tr').forEach(mRow => {
+              const mTypeInput = mRow.querySelector('.event-type');
+              const mNameInput = mRow.querySelector('.event-name');
+              if (mTypeInput && mTypeInput.value === 'M' && mNameInput && mNameInput.value.trim() === oldName.trim()) {
+                mNameInput.value = newName;
+                mNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+                if (mRow._eventMortgageDropdown) {
+                  this.updateMortgageOptions(mRow);
+                }
+              }
+            });
+          }
+          
+          nameInput.dataset.prevName = newName;
+          
+          // Refresh all mortgage dropdowns to reflect the new/updated R name
+          tbody.querySelectorAll('tr').forEach(mRow => {
+            const mTypeInput = mRow.querySelector('.event-type');
+            if (mTypeInput && mTypeInput.value === 'M' && mRow._eventMortgageDropdown) {
+              this.updateMortgageOptions(mRow);
+            }
+          });
+
+          // Refresh validation to clear any "missing property" or "duplicate name" warnings
+          this._refreshValidation();
+        }
       });
     }
 

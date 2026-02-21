@@ -410,19 +410,24 @@ class EventSummaryRenderer {
       </div>
     `);
 
-    // Event name / destination country
+    // Event name / destination country / linked property
     const nameLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'name');
     const nameValue = this.escapeHtml(event.name || '');
     const isRelocation = event.type === 'MV';
+    const isMortgage = event.type === 'M';
     const displayName = this.getRelocationDisplayName(event.name);
     details.push(`
       <div class="detail-row">
         <label>${nameLabel}:</label>
         <div class="editable-field">
-          <input type="text" class="accordion-edit-name" value="${nameValue}" data-accordion-id="${event.accordionId}" data-sort-key="event-name" style="display:${isRelocation ? 'none' : ''};">
+          <input type="text" class="accordion-edit-name" value="${nameValue}" data-accordion-id="${event.accordionId}" data-sort-key="event-name" style="display:${(isRelocation || isMortgage) ? 'none' : ''};">
           <div class="event-country-dd visualization-control" id="AccordionEventCountry_${event.rowId}" style="display:${isRelocation ? '' : 'none'};">
             <span id="AccordionEventCountryToggle_${event.rowId}" class="dd-toggle pseudo-select">${displayName}</span>
             <div id="AccordionEventCountryOptions_${event.rowId}" class="visualization-dropdown" style="display:none;"></div>
+          </div>
+          <div class="event-mortgage-dd visualization-control" id="AccordionEventMortgage_${event.rowId}" style="display:${isMortgage ? '' : 'none'};">
+            <span id="AccordionEventMortgageToggle_${event.rowId}" class="dd-toggle pseudo-select">${nameValue || 'Select Property'}</span>
+            <div id="AccordionEventMortgageOptions_${event.rowId}" class="visualization-dropdown" style="display:none;"></div>
           </div>
         </div>
       </div>

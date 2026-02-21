@@ -1033,6 +1033,7 @@ class UIManager {
 
     if (validate) {
       this.validateEventFields(events);
+      this.validateRealEstateEvents(events);
       this.validateMortgageEvents(events);
       this.validateRentalIncomeEvents(events);
       this.validateAgeYearFields(events);
@@ -1040,6 +1041,21 @@ class UIManager {
     }
 
     return events;
+  }
+
+  validateRealEstateEvents(events) {
+    for (let i = 0; i < events.length; i++) {
+      if (events[i].type === 'R') {
+        const propertyName = events[i].id;
+        if (!propertyName) continue;
+
+        const duplicateProperties = events.filter((e, idx) => e.type === 'R' && e.id === propertyName && idx < i);
+        if (duplicateProperties.length > 0) {
+          this.ui.setWarning(`Events[${i + 1},1]`, `The property name '${propertyName}' is already in use. Each property must have a unique name.`);
+          errors = true;
+        }
+      }
+    }
   }
 
   // Helper function to calculate birth year for a person based on event type
@@ -1070,24 +1086,37 @@ class UIManager {
   }
 
   validateMortgageEvents(events) {
+    const rEventNames = events.filter(e => e.type === 'R').map(e => e.id);
+    const mEventNames = events.filter(e => e.type === 'M').map(e => e.id);
+
+    // Check each Mortgage event
     for (let m = 0; m < events.length; m++) {
       if (events[m].type === 'M') {
-        let found = false;
-        for (let p = 0; p < events.length; p++) {
-          if (events[p].type === 'R' && events[p].id === events[m].id) {
-            found = true;
-            if (events[p].fromAge !== events[m].fromAge) {
-              this.ui.setWarning(`Events[${m + 1},3]`, "The mortgage (M) and purchase (R) events for a property must have the same starting age.");
-              errors = true;
-            }
-            if (events[m].toAge > events[p].toAge) {
-              this.ui.setWarning(`Events[${m + 1},4]`, "The mortgage must end when the property is sold.");
-              errors = true;
-            }
+        const propertyName = events[m].id;
+        const matchingREvents = events.filter(e => e.type === 'R' && e.id === propertyName);
+        
+        if (matchingREvents.length === 0) {
+          this.ui.setWarning(`Events[${m + 1},1]`, `Couldn't find a purchase event for the property '${propertyName}'.`);
+          errors = true;
+        } else if (matchingREvents.length > 1) {
+          this.ui.setWarning(`Events[${m + 1},1]`, `Found multiple purchase events with the name '${propertyName}'.`);
+          errors = true;
+        } else {
+          const rEvent = matchingREvents[0];
+          if (rEvent.fromAge !== events[m].fromAge) {
+            this.ui.setWarning(`Events[${m + 1},3]`, "The mortgage (M) and purchase (R) events for a property must have the same starting age.");
+            errors = true;
+          }
+          if (events[m].toAge > rEvent.toAge) {
+            this.ui.setWarning(`Events[${m + 1},4]`, "The mortgage must end when the property is sold.");
+            errors = true;
           }
         }
-        if (!found) {
-          this.ui.setWarning(`Events[${m + 1},1]`, `Couldn't find a purchase event for the property '${events[m].id}'.`);
+
+        // Check for multiple mortgages for the same property
+        const duplicateMortgages = events.filter((e, idx) => e.type === 'M' && e.id === propertyName && idx < m);
+        if (duplicateMortgages.length > 0) {
+          this.ui.setWarning(`Events[${m + 1},1]`, `A property can only have one mortgage event. Property '${propertyName}' already has one.`);
           errors = true;
         }
       }
@@ -1097,22 +1126,31 @@ class UIManager {
   validateRentalIncomeEvents(events) {
     for (let ri = 0; ri < events.length; ri++) {
       if (events[ri].type === 'RI') {
-        let found = false;
-        for (let r = 0; r < events.length; r++) {
-          if (events[r].type === 'R' && events[r].id === events[ri].id) {
-            found = true;
-            if (events[ri].fromAge < events[r].fromAge) {
-              this.ui.setWarning(`Events[${ri + 1},3]`, "Rental income cannot start before the property purchase.");
-              errors = true;
-            }
-            if (events[r].toAge && events[ri].toAge > events[r].toAge) {
-              this.ui.setWarning(`Events[${ri + 1},4]`, "Rental income cannot extend beyond the property sale.");
-              errors = true;
-            }
+        const propertyName = events[ri].id;
+        const matchingREvents = events.filter(e => e.type === 'R' && e.id === propertyName);
+
+        if (matchingREvents.length === 0) {
+          this.ui.setWarning(`Events[${ri + 1},1]`, `Couldn't find a property event for rental income '${propertyName}'.`);
+          errors = true;
+        } else if (matchingREvents.length > 1) {
+          this.ui.setWarning(`Events[${ri + 1},1]`, `Found multiple property events with the name '${propertyName}'.`);
+          errors = true;
+        } else {
+          const rEvent = matchingREvents[0];
+          if (events[ri].fromAge < rEvent.fromAge) {
+            this.ui.setWarning(`Events[${ri + 1},3]`, "Rental income cannot start before the property purchase.");
+            errors = true;
+          }
+          if (rEvent.toAge && events[ri].toAge > rEvent.toAge) {
+            this.ui.setWarning(`Events[${ri + 1},4]`, "Rental income cannot extend beyond the property sale.");
+            errors = true;
           }
         }
-        if (!found) {
-          this.ui.setWarning(`Events[${ri + 1},1]`, `Couldn't find a property event for rental income '${events[ri].id}'.`);
+
+        // Check for multiple rental income events for the same property
+        const duplicateRentals = events.filter((e, idx) => e.type === 'RI' && e.id === propertyName && idx < ri);
+        if (duplicateRentals.length > 0) {
+          this.ui.setWarning(`Events[${ri + 1},1]`, `A property can only have one rental income event. Property '${propertyName}' already has one.`);
           errors = true;
         }
       }

@@ -26,6 +26,7 @@ module.exports = {
         var ui = { setWarning: function(id, msg) { warnings.push({ id: id, msg: msg }); } };
         var mgr = new UIManager(ui);
         var events = ${JSON.stringify(events)};
+        mgr.validateRealEstateEvents(events);
         mgr.validateMortgageEvents(events);
         ({ errors: errors, warnings: warnings });
       `;
@@ -77,6 +78,28 @@ module.exports = {
         ]);
         assert.strictEqual(result.errors, false, 'aligned mortgage/property should not set errors');
         assert.strictEqual((result.warnings || []).length, 0, 'aligned mortgage/property should have no warnings');
+      }
+
+      // Case 5: multiple mortgages for same property blocks.
+      {
+        const result = runCase([
+          { type: 'R', id: 'Home', fromAge: 30, toAge: 60 },
+          { type: 'M', id: 'Home', fromAge: 30, toAge: 60 },
+          { type: 'M', id: 'Home', fromAge: 30, toAge: 50 }
+        ]);
+        assert.strictEqual(result.errors, true, 'multiple mortgages should set errors');
+        expectWarningIds(result, ['Events[3,1]']);
+      }
+
+      // Case 6: multiple property events with same name blocks.
+      {
+        const result = runCase([
+          { type: 'R', id: 'Home', fromAge: 30, toAge: 60 },
+          { type: 'R', id: 'Home', fromAge: 40, toAge: 70 },
+          { type: 'M', id: 'Home', fromAge: 30, toAge: 60 }
+        ]);
+        assert.strictEqual(result.errors, true, 'ambiguous property should set errors');
+        expectWarningIds(result, ['Events[2,1]', 'Events[3,1]']);
       }
     } catch (err) {
       errors.push(err.message || String(err));
