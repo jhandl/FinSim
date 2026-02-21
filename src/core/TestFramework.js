@@ -709,8 +709,8 @@ class TestFramework {
       if (__seededEvents) {
         testEvents = __seededEvents.map(function(e) {
           var ev = new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match, e.currency, e.linkedEventId, e.linkedCountry);
-          if (e && e.name !== undefined) ev.name = e.name;
-          if (e && e.country !== undefined) ev.country = e.country;
+          // Preserve all additional fields (like mortgageTerm, relocationSellMvId, etc.)
+          Object.assign(ev, e);
           return ev;
         });
       }
@@ -778,8 +778,8 @@ class TestFramework {
           testParams = params;
           testEvents = eventsArr.map(function(e) {
             var ev = new SimEvent(e.type, e.id, e.amount, e.fromAge, e.toAge, e.rate, e.match, e.currency, e.linkedEventId, e.linkedCountry);
-            if (e && e.name !== undefined) ev.name = e.name;
-            if (e && e.country !== undefined) ev.country = e.country;
+            // Preserve all additional fields (like mortgageTerm, relocationSellMvId, etc.)
+            Object.assign(ev, e);
             return ev;
           });
         } catch (e) { throw new Error('Failed to load scenario file: ' + (e && e.message ? e.message : e)); }

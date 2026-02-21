@@ -1911,9 +1911,14 @@ function processEvents() {
       case 'M': {
         var mortgageInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
         if (person1.age == event.fromAge) {
-          // mortgage() receives numeric principal + currency/country metadata.
-          // Asset classes track Money internally; Simulator works with numbers only.
-          realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount, mortgageInfo.currency, mortgageInfo.country);
+          // Use explicit mortgageTerm if provided, otherwise fall back to event duration.
+          // This allows modeling an early payoff (by shortening toAge) without
+          // incorrectly recalculating the initial principal.
+          var term = (event.mortgageTerm !== undefined && event.mortgageTerm !== null)
+            ? parseInt(event.mortgageTerm)
+            : (event.toAge - event.fromAge);
+          
+          realEstate.mortgage(event.id, term, event.rate, event.amount, mortgageInfo.currency, mortgageInfo.country);
         }
         if (inScope) {
           var payment = realEstate.getPayment(event.id);
@@ -1929,8 +1934,12 @@ function processEvents() {
             label: 'Mortgage (' + event.id + ')'
           });
 
-          // Check if a lump-sum payoff is triggered (forced by relocation resolution)
-          if (person1.age === event.toAge && event.relocationSellMvId) {
+          // Check if a lump-sum payoff is triggered.
+          // We trigger this if:
+          // 1. It's explicitly forced by relocation resolution (relocationSellMvId)
+          // 2. OR the event is ending (person1.age === event.toAge) and there is a remaining balance.
+          //    This makes early payoff generic: just shortening toAge triggers the payoff.
+          if (person1.age === event.toAge) {
             var payoff = realEstate.settleMortgage(event.id);
             if (payoff > 0) {
               recordExpenseEntry(flowState, { currency: mortgageCurrency, country: mortgageCountry }, payoff, {
@@ -2717,9 +2726,12 @@ function initializeRealEstate() {
             props.get(event.id).fromAge = event.fromAge;
           }
           var preMortgageInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
-          // mortgage() receives numeric principal + currency/country metadata.
-          // Asset classes track Money internally; Simulator works with numbers only.
-          props.get(event.id).property = realEstate.mortgage(event.id, event.toAge - event.fromAge, event.rate, event.amount, preMortgageInfo.currency, preMortgageInfo.country);
+          // Use explicit mortgageTerm if provided, otherwise fall back to event duration.
+          var term = (event.mortgageTerm !== undefined && event.mortgageTerm !== null)
+            ? parseInt(event.mortgageTerm)
+            : (event.toAge - event.fromAge);
+          
+          props.get(event.id).property = realEstate.mortgage(event.id, term, event.rate, event.amount, preMortgageInfo.currency, preMortgageInfo.country);
         }
         break;
       default:

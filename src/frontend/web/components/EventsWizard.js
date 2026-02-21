@@ -65,7 +65,8 @@ class EventsWizard {
       fromAge: data.fromAge,
       toAge: parseInt(data.fromAge) + termYears,
       rate: interestRate * 100,
-      match: 0
+      match: 0,
+      mortgageTerm: termYears
     };
     const onComplete = this.manager.wizardState.onComplete;
     if (onComplete) return onComplete(mortgageEventData);
