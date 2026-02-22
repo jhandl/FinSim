@@ -554,6 +554,9 @@ class FileManager {
       var startCountry = config.getStartCountry();
       var loadedEvents = this.webUI.readEvents(false);
       await config.syncTaxRuleSetsWithEvents(loadedEvents, startCountry);
+      if (this.webUI && this.webUI.formatUtils && typeof this.webUI.formatUtils.setupCurrencyInputs === 'function') {
+        this.webUI.formatUtils.setupCurrencyInputs(true);
+      }
     } catch (err) {
       console.error('Error preloading tax rulesets:', err);
     }

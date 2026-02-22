@@ -238,7 +238,7 @@ class FormatUtils {
       return FormatUtils.getLocaleSettings();
     };
 
-    const parseWithLocale = (text, ls) => {
+    const parseWithLocaleCore = (text, ls) => {
       if (text == null) return undefined;
       if (typeof text !== 'string') text = String(text);
       const escSym = (ls.currencySymbol || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -250,6 +250,18 @@ class FormatUtils {
       if (decimal !== '.') s = s.split(decimal).join('.');
       const num = parseFloat(s);
       return isNaN(num) ? undefined : num;
+    };
+
+    const parseWithLocale = (text, ls, input) => {
+      if (force && input) {
+        const prevLocale = input.getAttribute('data-currency-locale');
+        const prevSymbol = input.getAttribute('data-currency-symbol') || '';
+        if (prevLocale && prevLocale !== ls.numberLocale) {
+          const prevParsed = parseWithLocaleCore(text, { numberLocale: prevLocale, currencySymbol: prevSymbol });
+          if (!isNaN(prevParsed)) return prevParsed;
+        }
+      }
+      return parseWithLocaleCore(text, ls);
     };
 
     const formatWithLocale = (num, ls) => {
@@ -296,7 +308,7 @@ class FormatUtils {
       if (!isInitialized) {
         input.addEventListener('focus', function() {
           const ls = getInputLocaleSettings(this);
-          const value = parseWithLocale(this.value, ls);
+          const value = parseWithLocale(this.value, ls, this);
           if (!isNaN(value)) {
             this.value = value;
           }
@@ -304,7 +316,7 @@ class FormatUtils {
 
         input.addEventListener('blur', function() {
           const ls = getInputLocaleSettings(this);
-          const value = parseWithLocale(this.value, ls);
+          const value = parseWithLocale(this.value, ls, this);
           if (!isNaN(value)) {
             this.value = formatWithLocale(value, ls);
           }
@@ -314,11 +326,11 @@ class FormatUtils {
       const ls = getInputLocaleSettings(input);
       const value = input.value;
       if (value) {
-        let number = parseWithLocale(value, ls);
+        let number = parseWithLocale(value, ls, input);
         
         if (isNaN(number) && force) {
           const cleanValue = value.replace(/[€$£¥₹]/g, '').trim();
-          number = parseWithLocale(cleanValue, ls);
+          number = parseWithLocale(cleanValue, ls, input);
         }
 
         if (!isNaN(number)) {
@@ -326,6 +338,9 @@ class FormatUtils {
         }
       }
 
+      input.setAttribute('data-currency-locale', ls.numberLocale || '');
+      input.setAttribute('data-currency-symbol', ls.currencySymbol || '');
+      input.setAttribute('data-currency-code', ls.currencyCode || '');
       input.setAttribute('data-currency-initialized', 'true');
     });
   }
