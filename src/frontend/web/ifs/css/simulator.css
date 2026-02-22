@@ -1249,8 +1249,8 @@ th {
   overflow-x: auto;
   margin: 0;
   width: 100%;
-  max-height: none;
-  overflow-y: visible;
+  max-height: 80vh; /* Allow internal scrolling in the data table */
+  overflow-y: auto;
 }
 
 @media (max-width: 540px) {
@@ -1657,6 +1657,7 @@ th {
   border-spacing: 0;
   font-size: 0.9rem;
   position: relative;
+  --table-sticky-top-base: 0px; /* Internal scroll starts at top of container */
 }
 
 /*
