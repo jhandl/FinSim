@@ -82,54 +82,19 @@ class NotificationUtils {
     toast.innerHTML = html;
     // Ensure line breaks are respected for any leftover plain text
     toast.style.whiteSpace = 'normal';
-    // Make the toast itself interactive; we'll absorb outside via overlay
+    // Make the toast itself interactive so it can be dismissed via click
     try { toast.style.pointerEvents = 'auto'; } catch (_) {}
     document.body.appendChild(toast);
 
-    // Full-viewport transparent overlay to catch and absorb outside clicks/taps
-    const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;background:transparent;z-index:10019;';
-    document.body.appendChild(overlay);
-
-    // Setup outside-click/tap dismissal
+    // Setup dismissal
     let timeoutId;
     const cleanup = () => {
       try { if (timeoutId) clearTimeout(timeoutId); } catch (_) {}
-      try {
-        document.removeEventListener('pointerdown', onDocPointerDown, true);
-        document.removeEventListener('mousedown', onDocPointerDown, true);
-        document.removeEventListener('touchstart', onDocPointerDown, true);
-        document.removeEventListener('click', onDocPointerDown, true);
-      } catch (_) {}
-      try { overlay.remove(); } catch (_) {}
       try { toast.remove(); } catch (_) {}
     };
 
-    // Keep toast non-interactive (CSS pointer-events: none) to avoid blocking UI.
-    // Detect outside clicks using pointer coordinates vs toast bounding box.
-    const onDocPointerDown = (ev) => {
-      try {
-        const rect = toast.getBoundingClientRect();
-        const x = ev.clientX != null ? ev.clientX : (ev.touches && ev.touches[0] ? ev.touches[0].clientX : -1);
-        const y = ev.clientY != null ? ev.clientY : (ev.touches && ev.touches[0] ? ev.touches[0].clientY : -1);
-        const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-        if (!inside) { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation(); ev.preventDefault(); ev.cancelBubble = true; cleanup(); }
-      } catch (_) {
-        cleanup();
-      }
-    };
-
-    document.addEventListener('pointerdown', onDocPointerDown, true);
-    document.addEventListener('mousedown', onDocPointerDown, true);
-    document.addEventListener('touchstart', onDocPointerDown, { capture: true, passive: false });
-    document.addEventListener('click', onDocPointerDown, true);
-
-    // Overlay absorbs interactions and closes the toast
-    const onOverlayDown = (ev) => { try { ev.stopImmediatePropagation && ev.stopImmediatePropagation(); ev.stopPropagation(); ev.preventDefault(); ev.cancelBubble = true; } catch (_) {} cleanup(); };
-    overlay.addEventListener('pointerdown', onOverlayDown, { capture: true });
-    overlay.addEventListener('mousedown', onOverlayDown, { capture: true });
-    overlay.addEventListener('touchstart', onOverlayDown, { capture: true, passive: false });
-    overlay.addEventListener('click', onOverlayDown, { capture: true });
+    // Allow manual dismissal by clicking the toast itself
+    toast.addEventListener('click', cleanup);
 
     // Auto close after timeout
     timeoutId = setTimeout(cleanup, timeout * 1000);
