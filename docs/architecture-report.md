@@ -100,7 +100,7 @@ Examples of centralization that reduce duplication and enable consistency:
   - Example globals: `src/core/Simulator.js` top-level `var ...` list.
 - “UI abstraction” is not purely an abstraction; core-adjacent code can access DOM (`UIManager`), while UI components can call deep core singletons (`Config.getInstance()`), and both rely on global state.
 - Mixed contracts (sometimes throw, sometimes return `null`, sometimes set global `errors = true`) require careful caller understanding:
-  - Example: `convertCurrencyAmount()` returns `null` in strict mode, otherwise returns original value on failure: `src/core/Simulator.js`.
+  - Example: `convertCurrencyAmount()` returns `null` on failure (strict conversion): `src/core/Simulator.js`.
 
 **Impact:** day-to-day modification cost is dominated by the orchestrator/global-state model rather than by the modular subsystems.
 
@@ -133,9 +133,9 @@ Examples of centralization that reduce duplication and enable consistency:
 
 **Non-fail-fast patterns that add ambiguity**
 - Some exceptions are intentionally swallowed to allow cross-environment shims (especially around `require`): `src/core/Config.js`.
-- Some conversions return `null` or fallback values rather than uniformly throwing, shifting error handling into callers:
+- Some conversions return `null` rather than uniformly throwing, shifting error handling into callers:
   - `EconomicData.convert()` returns `null` on invalid conversion: `src/core/EconomicData.js`.
-  - `convertCurrencyAmount()` optionally returns original value in non-strict mode: `src/core/Simulator.js`.
+  - `convertCurrencyAmount()` returns `null` on conversion failure: `src/core/Simulator.js`.
 
 **Impact:** core correctness checks are good, but glue layers mix fail-fast and “best effort”, which can surprise callers.
 
@@ -202,4 +202,3 @@ Examples of centralization that reduce duplication and enable consistency:
    then apply them to a small number of high-impact boundary functions (e.g., conversion helpers).
 4. **Centralize UI feature flag access.** Wrap `localStorage` access behind a small `Preferences` utility (web-only) to reduce scatter and improve discoverability.
 5. **Continue the “extract to focused modules” approach.** `PresentValueCalculator` is a good precedent; similar extractions from `src/core/Simulator.js` (one at a time) will steadily reduce cognitive load without large rewrites.
-

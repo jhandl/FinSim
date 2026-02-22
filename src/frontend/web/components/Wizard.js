@@ -415,15 +415,32 @@ class Wizard {
           if (events.length > 0) {
             let chosen = null;
             try {
-              // Prefer the accordion item that currently holds focus
-              const active = document.activeElement;
-              const focusedItem = active ? active.closest && active.closest('.events-accordion-item') : null;
-              if (focusedItem) {
-                const accId = focusedItem.getAttribute('data-accordion-id') || '';
-                chosen = events.find(e => e.accordionId === accId) || null;
+              // Priority 1: Use the manager's expandedItems set (preferring the most recently added)
+              // This is the most reliable indicator of user intent in accordion mode, especially during transitions.
+              if (mgr && mgr.expandedItems && mgr.expandedItems.size > 0) {
+                const expandedIds = Array.from(mgr.expandedItems);
+                const lastId = expandedIds[expandedIds.length - 1];
+                chosen = events.find(e => e.accordionId === lastId) || null;
               }
+
+              // Priority 2: Prefer the accordion item that currently holds focus (if it's different or if no expanded items tracked)
               if (!chosen) {
-                // Next, prefer the currently expanded accordion item (if any)
+                const active = document.activeElement;
+                let focusedItem = (active && active.closest) ? active.closest('.events-accordion-item') : null;
+                
+                // Fallback to lastFocusedField if activeElement is not inside an accordion item
+                if (!focusedItem && this.lastFocusedField && this.lastFocusedField.closest) {
+                  focusedItem = this.lastFocusedField.closest('.events-accordion-item');
+                }
+
+                if (focusedItem) {
+                  const accId = focusedItem.getAttribute('data-accordion-id') || '';
+                  chosen = events.find(e => e.accordionId === accId) || null;
+                }
+              }
+
+              // Priority 3: Fallback to any expanded item found in the DOM (legacy/safety check)
+              if (!chosen) {
                 const expandedAcc = document.querySelector('.events-accordion-item .accordion-item-content.expanded');
                 const expandedItem = expandedAcc ? expandedAcc.closest('.events-accordion-item') : null;
                 if (expandedItem) {
@@ -480,24 +497,8 @@ class Wizard {
       }
     }
 
-    // BEGIN ADD: Fallback to first expanded accordion item when no lastFocusedField is available
-    if (!focusedRow) {
-      const expandedAcc = document.querySelector('.events-accordion-item .accordion-item-content.expanded');
-      const expandedItem = expandedAcc ? expandedAcc.closest('.events-accordion-item') : null;
-      if (expandedItem && expandedItem.getAttribute('data-accordion-id')) {
-        const accIdStr = expandedItem.getAttribute('data-accordion-id');
-        const m = accIdStr.match(/(\d+)$/);
-        if (m && m[1] !== undefined) {
-          const idx = parseInt(m[1], 10) + 1; // accordion-item is zero-based; table rows are 1-based
-          const derivedRowId = `row_${idx}`;
-          focusedRow = Array.from(rows).find(r => r.dataset.rowId === derivedRowId) || focusedRow;
-        }
-      }
-    }
-    // END ADD
-
-
     const row = focusedRow || rows[0];
+    if (!row) return { isEmpty: true };
     const rowId = row.dataset.rowId;
     
 

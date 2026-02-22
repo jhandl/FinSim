@@ -13,7 +13,7 @@ module.exports = {
       relocationEnabled: true 
     });
     const events = [
-      { type: 'SI', id: 'salary', amount: 1000, fromAge: 30, toAge: 30, currency: 'AAA' },
+      { type: 'SI', id: 'salary', amount: 1000, fromAge: 30, toAge: 30, currency: 'AAA', linkedCountry: 'aa' },
       { type: 'MV', name: 'bb', id: 'move-bb', amount: 500, fromAge: 30, toAge: 30 }
     ];
     const scenarioDef = {

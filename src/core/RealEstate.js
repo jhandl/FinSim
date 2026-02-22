@@ -169,7 +169,7 @@ class RealEstate {
       if (!fromCountry) {
         fromCountry = country(currentCountry);
       }
-      var converted = convertCurrencyAmount(value, fromCurrency, fromCountry, targetCurrency, currentCountry, currentYear, true);
+      var converted = convertCurrencyAmount(value, fromCurrency, fromCountry, targetCurrency, currentCountry, currentYear);
       if (converted === null) {
         // Strict mode failure: return null to signal error
         return null;

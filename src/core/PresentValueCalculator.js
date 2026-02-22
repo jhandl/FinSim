@@ -142,7 +142,7 @@ function computePresentValueAggregates(ctx) {
         if (!propertyCurrencyNormalized || propertyCurrencyNormalized === normalizedResidenceCurrency) {
           propertyPVInResidenceCurrency = propertyPVInAssetCurrency;
         } else {
-          var convertedPV = convertCurrencyAmount(propertyPVInAssetCurrency, propertyCurrencyNormalized, propertyCountryForConversion, normalizedResidenceCurrency, currentCountry, conversionYear, true);
+          var convertedPV = convertCurrencyAmount(propertyPVInAssetCurrency, propertyCurrencyNormalized, propertyCountryForConversion, normalizedResidenceCurrency, currentCountry, conversionYear);
           if (convertedPV === null) {
             throw new Error('Real estate PV conversion failed: cannot convert ' + propertyPVInAssetCurrency + ' from ' + propertyCurrencyNormalized + ' to ' + normalizedResidenceCurrency + ' for property ' + propKey);
           }
@@ -184,7 +184,7 @@ function computePresentValueAggregates(ctx) {
       if (potCur && potCur === residenceCurrency) {
         potCapital_asset = potCapital_res;
       } else if (potCur) {
-        potCapital_asset = convertCurrencyAmount(potCapital_res, residenceCurrency, currentCountry, potCur, potCountry_norm, year, true);
+        potCapital_asset = convertCurrencyAmount(potCapital_res, residenceCurrency, currentCountry, potCur, potCountry_norm, year);
         if (potCapital_asset === null) throw new Error('Pension PV back-conversion failed for pot in ' + potCountry);
       } else {
         // Cannot determine pot currency for non-zero value - fail loudly
@@ -216,7 +216,7 @@ function computePresentValueAggregates(ctx) {
       var spCur = normalizeCurrency(spMoney.currency);
       var resCur = normalizeCurrency(residenceCurrency);
       if (spCur !== resCur) {
-        var spPV_res = convertCurrencyAmount(spPV_base, spCur, spCountry, resCur, currentCountry, startYear, true);
+        var spPV_res = convertCurrencyAmount(spPV_base, spCur, spCountry, resCur, currentCountry, startYear);
         if (spPV_res === null) throw new Error('State pension PV conversion failed for ' + spCountry);
         statePensionPVInResidenceCurrency += spPV_res;
       } else {
@@ -275,7 +275,7 @@ function computePresentValueAggregates(ctx) {
           if (assetCur && assetCur === residenceCurrency) {
             cap_asset = cap_res;
           } else if (assetCur) {
-            cap_asset = convertCurrencyAmount(cap_res, residenceCurrency, currentCountry, assetCur, assetCountryNormalized, year, true);
+            cap_asset = convertCurrencyAmount(cap_res, residenceCurrency, currentCountry, assetCur, assetCountryNormalized, year);
             if (cap_asset === null) throw new Error('Investment PV back-conversion failed for ' + ck);
           } else {
             // Cannot determine asset currency for non-zero value - fail loudly
@@ -313,7 +313,7 @@ function computePresentValueAggregates(ctx) {
         var resCurNorm = normalizeCurrency(residenceCurrency);
         if (salCur && resCurNorm && salCur !== resCurNorm) {
           // PV conversion must use start-year FX (not evolved FX) to avoid embedding FX evolution into PV.
-          var convertedSalPv = convertCurrencyAmount(salPv, salCur, salCountryNorm, resCurNorm, currentCountry, startYear || year, true);
+          var convertedSalPv = convertCurrencyAmount(salPv, salCur, salCountryNorm, resCurNorm, currentCountry, startYear || year);
           if (convertedSalPv === null) {
             throw new Error('Salary PV conversion failed: cannot convert ' + salPv + ' from ' + salCur + ' to ' + resCurNorm + ' (salary country ' + salCountryNorm + ')');
           }
@@ -343,7 +343,7 @@ function computePresentValueAggregates(ctx) {
         var rentPv = rentAmount * rentDeflator;
         var resCurNorm2 = normalizeCurrency(residenceCurrency);
         if (rentCur && resCurNorm2 && rentCur !== resCurNorm2) {
-          var convertedRentPv = convertCurrencyAmount(rentPv, rentCur, rentCountryNorm, resCurNorm2, currentCountry, startYear || year, true);
+          var convertedRentPv = convertCurrencyAmount(rentPv, rentCur, rentCountryNorm, resCurNorm2, currentCountry, startYear || year);
           if (convertedRentPv === null) {
             throw new Error('Rental PV conversion failed: cannot convert ' + rentPv + ' from ' + rentCur + ' to ' + resCurNorm2 + ' (rental country ' + rentCountryNorm + ')');
           }
@@ -377,7 +377,7 @@ function computePresentValueAggregates(ctx) {
         if (ppCur && ppCur === residenceCurrency) {
           ppAmount_asset = ppAmount_res;
         } else if (ppCur) {
-          ppAmount_asset = convertCurrencyAmount(ppAmount_res, residenceCurrency, currentCountry, ppCur, ppCountry_norm, year, true);
+          ppAmount_asset = convertCurrencyAmount(ppAmount_res, residenceCurrency, currentCountry, ppCur, ppCountry_norm, year);
           if (ppAmount_asset === null) throw new Error('Private pension income PV back-conversion failed for pot in ' + ppCountry);
         } else {
           // Cannot determine pot currency - fail loudly
@@ -439,7 +439,7 @@ function computePresentValueAggregates(ctx) {
         var salPv = salAmount * salDeflator;
         var resCurNorm = normalizeCurrency(residenceCurrency);
         if (salCur && resCurNorm && salCur !== resCurNorm) {
-          var convertedSalPv = convertCurrencyAmount(salPv, salCur, salCountryNorm, resCurNorm, currentCountry, startYear || year, true);
+          var convertedSalPv = convertCurrencyAmount(salPv, salCur, salCountryNorm, resCurNorm, currentCountry, startYear || year);
           if (convertedSalPv === null) {
             throw new Error('Salary PV conversion failed: cannot convert ' + salPv + ' from ' + salCur + ' to ' + resCurNorm + ' (salary country ' + salCountryNorm + ')');
           }
@@ -469,7 +469,7 @@ function computePresentValueAggregates(ctx) {
         var rentPv = rentAmount * rentDeflator;
         var resCurNorm2 = normalizeCurrency(residenceCurrency);
         if (rentCur && resCurNorm2 && rentCur !== resCurNorm2) {
-          var convertedRentPv = convertCurrencyAmount(rentPv, rentCur, rentCountryNorm, resCurNorm2, currentCountry, startYear || year, true);
+          var convertedRentPv = convertCurrencyAmount(rentPv, rentCur, rentCountryNorm, resCurNorm2, currentCountry, startYear || year);
           if (convertedRentPv === null) {
             throw new Error('Rental PV conversion failed: cannot convert ' + rentPv + ' from ' + rentCur + ' to ' + resCurNorm2 + ' (rental country ' + rentCountryNorm + ')');
           }
@@ -503,7 +503,7 @@ function computePresentValueAggregates(ctx) {
         if (ppCur && ppCur === residenceCurrency) {
           ppAmount_asset = ppAmount_res;
         } else if (ppCur) {
-          ppAmount_asset = convertCurrencyAmount(ppAmount_res, residenceCurrency, currentCountry, ppCur, ppCountry_norm, year, true);
+          ppAmount_asset = convertCurrencyAmount(ppAmount_res, residenceCurrency, currentCountry, ppCur, ppCountry_norm, year);
           if (ppAmount_asset === null) throw new Error('Private pension income PV back-conversion failed for pot in ' + ppCountry);
         } else {
           // Cannot determine pot currency - fail loudly

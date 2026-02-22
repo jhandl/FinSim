@@ -359,7 +359,7 @@ module.exports = {
           var stats = asset.getPortfolioStats();
           
           // Get FX rate to calculate expected values
-          var eurToArs = convertCurrencyAmount(1, 'EUR', 'ie', 'ARS', 'ar', year, true);
+          var eurToArs = convertCurrencyAmount(1, 'EUR', 'ie', 'ARS', 'ar', year);
           var expectedEurPrincipalInArs = 10000 * eurToArs;
           var expectedEurGainInArs = (asset.portfolio[0].interest.amount) * eurToArs;
           var expectedArsPrincipal = 50000; // Already in ARS

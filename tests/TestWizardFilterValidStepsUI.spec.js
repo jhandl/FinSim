@@ -148,7 +148,18 @@ async function focusAccordionRow(frame, index) {
     const accId = `accordion-item-${idx}`;
     const ui = window.WebUI && window.WebUI.getInstance ? window.WebUI.getInstance() : null;
     if (ui && ui.eventAccordionManager) {
-      ui.eventAccordionManager.toggleAccordionItem(accId);
+      // Collapse any currently expanded items first to ensure a clean state for the test
+      if (ui.eventAccordionManager.expandedItems && ui.eventAccordionManager.expandedItems.size > 0) {
+        const currentlyExpanded = Array.from(ui.eventAccordionManager.expandedItems);
+        currentlyExpanded.forEach(id => {
+          if (id !== accId) ui.eventAccordionManager.toggleAccordionItem(id);
+        });
+      }
+      
+      // Expand the target item if not already expanded
+      if (!ui.eventAccordionManager.expandedItems.has(accId)) {
+        ui.eventAccordionManager.toggleAccordionItem(accId);
+      }
     }
 
     const input = document.querySelector(
@@ -163,6 +174,8 @@ async function focusAccordionRow(frame, index) {
  * filtered list so expectations can run in the Node context.
  */
 async function runFilterValidSteps(frame, steps, extra = {}) {
+  // Give the browser a moment to settle (focus, animations, etc.) before running filter logic
+  await new Promise(resolve => setTimeout(resolve, 50));
   return await frame.locator('body').evaluate((el, { steps, extra }) => {
     const wizard = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
     if (!wizard) {

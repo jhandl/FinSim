@@ -33,8 +33,10 @@ var earnedNetIncome, householdPhase;
 var stableTaxIds;
 // Country context for multi-country inflation application (currency is separate)
 var currentCountry, countryInflationOverrides;
-// Active residence currency (upper-cased ISO code) and cache for currency-country lookups
-var residenceCurrency, currencyCountryCache;
+// Active residence currency (upper-cased ISO code)
+var residenceCurrency;
+// Country -> currency cache (normalized)
+var countryCurrencyCache;
 var economicData, baseCountryCode;
 // Module-level FX conversion cache - persists across Monte Carlo runs (FX rates are deterministic)
 var fxConversionCache = {};
@@ -195,99 +197,65 @@ function normalizeCurrency(code) {
 function getCurrencyForCountry(code) {
   var normalized = normalizeCountry(code);
   if (!normalized) throw new Error('getCurrencyForCountry: empty country code');
+  if (countryCurrencyCache && countryCurrencyCache.hasOwnProperty(normalized)) {
+    return countryCurrencyCache[normalized];
+  }
   var cfg = Config.getInstance();
   var rs = cfg.getCachedTaxRuleSet(normalized);
   if (!rs) return null; // Ruleset not cached - return null instead of crashing
   var cur = rs.getCurrencyCode();
-  if (cur) return normalizeCurrency(cur);
+  if (cur) {
+    var normalizedCur = normalizeCurrency(cur);
+    if (!countryCurrencyCache) countryCurrencyCache = {};
+    countryCurrencyCache[normalized] = normalizedCur;
+    return normalizedCur;
+  }
   return null; // No currency defined in ruleset
-}
-
-function ensureCurrencyCountryCache() {
-  if (!currencyCountryCache) currencyCountryCache = {};
-  return currencyCountryCache;
-}
-
-function findCountryForCurrency(currencyCode, preferredCountry) {
-  if (!currencyCode) {
-    var preferred = preferredCountry ? normalizeCountry(preferredCountry) : null;
-    return preferred || normalizeCountry(Config.getInstance().getDefaultCountry());
-  }
-  var currency = normalizeCurrency(currencyCode);
-  var preferred = preferredCountry ? normalizeCountry(preferredCountry) : null;
-  if (!currency) return preferred || normalizeCountry(Config.getInstance().getDefaultCountry());
-  var cache = ensureCurrencyCountryCache();
-  if (cache[currency]) return cache[currency];
-
-  if (preferred) {
-    var prefCurrency = getCurrencyForCountry(preferred);
-    if (prefCurrency && normalizeCurrency(prefCurrency) === currency) {
-      cache[currency] = preferred;
-      return preferred;
-    }
-  }
-
-  var cfg = Config.getInstance();
-  var cachedSets = cfg.listCachedRuleSets();
-  for (var key in cachedSets) {
-    if (!Object.prototype.hasOwnProperty.call(cachedSets, key)) continue;
-    var rs = cachedSets[key];
-    var rsCurrency = normalizeCurrency(rs.getCurrencyCode());
-    if (rsCurrency === currency) {
-      var countryCode = rs.getCountryCode();
-      if (!countryCode) {
-        countryCode = key;
-      }
-      cache[currency] = normalizeCountry(countryCode);
-      return cache[currency];
-    }
-  }
-
-  if (preferred) {
-    cache[currency] = preferred;
-    return preferred;
-  }
-
-  // Return null instead of empty string when no match found
-  // Don't cache null to allow retries with different preferredCountry
-  return null;
 }
 
 function getEventCurrencyInfo(event, fallbackCountry) {
   var info = { currency: null, country: null };
+  var fallback = normalizeCountry(fallbackCountry || currentCountry);
   if (!event) {
-    info.currency = normalizeCurrency(residenceCurrency) || 'EUR';
-    info.country = normalizeCountry(fallbackCountry || currentCountry);
+    info.country = fallback;
+    info.currency = getCurrencyForCountry(fallback);
     return info;
   }
+
   var linkedCountry = event.linkedCountry ? normalizeCountry(event.linkedCountry) : null;
+  info.country = linkedCountry || fallback;
   if (event.currency) {
     info.currency = normalizeCurrency(event.currency);
-    // If linkedCountry is provided, it defines the economic/tax context for this flow
-    // even when the amount is denominated in a different currency (e.g. AR salary paid in EUR).
-    if (linkedCountry) {
-      info.country = linkedCountry;
-    } else {
-      info.country = findCountryForCurrency(info.currency, fallbackCountry || currentCountry);
-      if (!info.country) {
-        info.country = normalizeCountry(fallbackCountry || currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
-      }
-    }
-  } else if (linkedCountry) {
-    info.country = linkedCountry;
-    info.currency = getCurrencyForCountry(linkedCountry) || normalizeCurrency(residenceCurrency) || 'EUR';
   } else {
-    var fallback = normalizeCountry(fallbackCountry || currentCountry);
-    info.country = fallback;
-    info.currency = getCurrencyForCountry(fallback) || normalizeCurrency(residenceCurrency) || 'EUR';
+    info.currency = getCurrencyForCountry(info.country);
   }
-  if (!info.currency) {
-    info.currency = normalizeCurrency(residenceCurrency) || 'EUR';
+
+  var expectedCurrency = getCurrencyForCountry(info.country);
+  if (!expectedCurrency) {
+    if (typeof errors !== 'undefined') {
+      errors = true;
+    }
+    if (typeof success !== 'undefined') {
+      success = false;
+    }
+    if (uiManager && typeof uiManager.setStatus === 'function') {
+      uiManager.setStatus("Missing ruleset currency for country: " + info.country, STATUS_COLORS.ERROR);
+    }
+    return info;
   }
-  if (!info.country) {
-    info.country = findCountryForCurrency(info.currency, fallbackCountry || currentCountry);
-    if (!info.country) {
-      info.country = normalizeCountry(fallbackCountry || currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
+  expectedCurrency = normalizeCurrency(expectedCurrency);
+  if (info.currency !== expectedCurrency) {
+    if (typeof errors !== 'undefined') {
+      errors = true;
+    }
+    if (typeof success !== 'undefined') {
+      success = false;
+    }
+    if (uiManager && typeof uiManager.setStatus === 'function') {
+      uiManager.setStatus(
+        "Currency/country mismatch: " + info.currency + " does not match " + info.country + " (" + expectedCurrency + ")",
+        STATUS_COLORS.ERROR
+      );
     }
   }
   return info;
@@ -344,59 +312,71 @@ function convertNominal(value, fromCountry, toCountry, year) {
   return value * fxRate;
 }
 
-function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toCountry, year, strict) {
+function convertCurrencyAmount(value, fromCurrency, fromCountry, toCurrency, toCountry, year) {
   if (!value) return 0;
   // NOTE: This helper delegates to convertNominal(), which uses evolved FX (inflation-driven).
   // EconomicData.convert() defaults to 'evolution' mode, adopted by all ledger paths as of T9.
   var sourceCurrency = normalizeCurrency(fromCurrency);
   var targetCurrency = normalizeCurrency(toCurrency);
-  if (!sourceCurrency || !targetCurrency || sourceCurrency === targetCurrency) {
-    return value;
-  }
-  var sourceCountry = findCountryForCurrency(sourceCurrency, fromCountry);
-  var sourceCountryMapped = !!sourceCountry; // Track if we successfully mapped currency to country
-  if (!sourceCountry) {
-    sourceCountry = normalizeCountry(fromCountry || currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
-  }
-  var targetCountry = findCountryForCurrency(targetCurrency, toCountry);
-  var targetCountryMapped = !!targetCountry; // Track if we successfully mapped currency to country
-  if (!targetCountry) {
-    targetCountry = normalizeCountry(toCountry || currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
-  }
+  var sourceCountry = normalizeCountry(fromCountry);
+  var targetCountry = normalizeCountry(toCountry);
+  var expectedSourceCurrency = getCurrencyForCountry(sourceCountry);
+  var expectedTargetCurrency = getCurrencyForCountry(targetCountry);
 
-  // In strict mode, fail if we couldn't map currency to country (even if we have fallback countries)
-  if (strict && (!sourceCountryMapped || !targetCountryMapped)) {
+  if (!expectedSourceCurrency || !expectedTargetCurrency) {
     if (typeof errors !== 'undefined') {
       errors = true;
     }
+    if (typeof success !== 'undefined') {
+      success = false;
+    }
     if (uiManager && typeof uiManager.setStatus === 'function') {
-      var missingCurrency = !sourceCountryMapped ? sourceCurrency : targetCurrency;
-      uiManager.setStatus("Unknown currency code: " + missingCurrency + " - cannot map to country", STATUS_COLORS.ERROR);
+      var missingCountry = !expectedSourceCurrency ? sourceCountry : targetCountry;
+      uiManager.setStatus("Missing ruleset currency for country: " + missingCountry, STATUS_COLORS.ERROR);
     }
     return null;
   }
 
+  expectedSourceCurrency = normalizeCurrency(expectedSourceCurrency);
+  expectedTargetCurrency = normalizeCurrency(expectedTargetCurrency);
+  if (sourceCurrency !== expectedSourceCurrency || targetCurrency !== expectedTargetCurrency) {
+    if (typeof errors !== 'undefined') {
+      errors = true;
+    }
+    if (typeof success !== 'undefined') {
+      success = false;
+    }
+    if (uiManager && typeof uiManager.setStatus === 'function') {
+      var badCountry = (sourceCurrency !== expectedSourceCurrency) ? sourceCountry : targetCountry;
+      var badCurrency = (sourceCurrency !== expectedSourceCurrency) ? sourceCurrency : targetCurrency;
+      var expectedCurrency = (sourceCurrency !== expectedSourceCurrency) ? expectedSourceCurrency : expectedTargetCurrency;
+      uiManager.setStatus(
+        "Currency/country mismatch: " + badCurrency + " does not match " + badCountry + " (" + expectedCurrency + ")",
+        STATUS_COLORS.ERROR
+      );
+    }
+    return null;
+  }
+
+  if (sourceCurrency === targetCurrency) {
+    return value;
+  }
+
   var converted = convertNominal(value, sourceCountry, targetCountry, year);
   if (converted === null || typeof converted !== 'number' || isNaN(converted)) {
-    // Existing error handling (lines 270-286) is good, keep as-is
     console.error('convertCurrencyAmount: convertNominal failed for ' + sourceCountry + '->' + targetCountry + ' at year ' + year + '');
     console.warn("Currency conversion failed:", value, sourceCurrency, targetCurrency, year);
     if (typeof errors !== 'undefined') {
       errors = true;
     }
+    if (typeof success !== 'undefined') {
+      success = false;
+    }
     if (uiManager && typeof uiManager.setStatus === 'function') {
-      if (strict) {
-        uiManager.setStatus("Currency conversion failed - check economic data for " + sourceCurrency + " to " + targetCurrency, STATUS_COLORS.ERROR);
-      } else {
-        uiManager.setStatus("Currency conversion failed - check economic data", STATUS_COLORS.WARNING);
-      }
+      uiManager.setStatus("Currency conversion failed - check economic data for " + sourceCurrency + " to " + targetCurrency, STATUS_COLORS.ERROR);
     }
-    if (strict) {
-      return null;
-    }
-    return value;
+    return null;
   }
-  // Suppress "exceeds 1e12" warnings - these are expected for large ARS values in long simulations
   return converted;
 }
 
@@ -430,6 +410,7 @@ async function initializeSimulator() {
   dataSheet = [];
   // Clear FX conversion cache for new simulation (different scenario may have different parameters)
   fxConversionCache = {};
+  countryCurrencyCache = {};
   if (!readScenario(true)) {
     return false;
   }
@@ -460,7 +441,9 @@ async function initializeSimulator() {
 
   // Pre-run in-memory completion: ensure events have linkedCountry/currency when missing.
   // This happens after the UI relocation-impact gate; it does not persist to disk.
-  completeMissingCurrencyAndLinkedCountry(events, startCountry);
+  if (!completeMissingCurrencyAndLinkedCountry(events, startCountry)) {
+    return false;
+  }
 
   // Initialize economic regimes if enabled and in Monte Carlo mode
   if (params.economicRegimesEnabled && params.economyMode === 'montecarlo') {
@@ -563,6 +546,10 @@ function completeMissingCurrencyAndLinkedCountry(events, startCountry) {
     var evt = events[i];
     if (!evt || !evt.type) continue;
     if (isRelocationEvent(evt)) continue;
+    if (!evt.linkedCountry && evt.type === 'RI') {
+      evt.__autoLinkedCountry = false;
+      continue;
+    }
     var eventCountry = getCountryForAgeCached(Number(evt.fromAge), events, startCountry);
     if (!evt.linkedCountry) {
       evt.linkedCountry = eventCountry;
@@ -570,10 +557,31 @@ function completeMissingCurrencyAndLinkedCountry(events, startCountry) {
     } else {
       evt.__autoLinkedCountry = false;
     }
+    var expectedCurrency = getCurrencyForCountry(evt.linkedCountry);
+    if (!expectedCurrency) {
+      errors = true;
+      success = false;
+      if (uiManager && typeof uiManager.setStatus === 'function') {
+        uiManager.setStatus("Missing ruleset currency for country: " + evt.linkedCountry, STATUS_COLORS.ERROR);
+      }
+      return false;
+    }
+    expectedCurrency = normalizeCurrency(expectedCurrency);
     if (!evt.currency) {
-      evt.currency = getCurrencyForCountry(evt.linkedCountry);
+      evt.currency = expectedCurrency;
+    } else if (normalizeCurrency(evt.currency) !== expectedCurrency) {
+      errors = true;
+      success = false;
+      if (uiManager && typeof uiManager.setStatus === 'function') {
+        uiManager.setStatus(
+          "Currency/country mismatch: " + normalizeCurrency(evt.currency) + " does not match " + evt.linkedCountry + " (" + expectedCurrency + ")",
+          STATUS_COLORS.ERROR
+        );
+      }
+      return false;
     }
   }
+  return true;
 }
 
 function saveToFile() {
@@ -1063,12 +1071,7 @@ function processEvents() {
 
   function getEffectiveCurrency(info) {
     var currency = normalizeCurrency((info && info.currency) ? info.currency : (residenceCurrency || 'EUR'));
-    var country = (info && info.country) ? normalizeCountry(info.country) : findCountryForCurrency(currency, currentCountry);
-    if (!country) {
-      country = normalizeCountry(currentCountry) || normalizeCountry(Config.getInstance().getDefaultCountry());
-    } else {
-      country = normalizeCountry(country);
-    }
+    var country = (info && info.country) ? normalizeCountry(info.country) : normalizeCountry(currentCountry);
     return {
       currency: currency,
       country: country
@@ -1133,32 +1136,9 @@ function processEvents() {
       conversionFactorCache[cacheKey] = 1;
       return 1;
     }
-    // In strict mode, check if currency can be mapped to country before attempting conversion
-    // We need to verify the currency actually matches a country, not just get a fallback
-    var sourceCountryMapped = findCountryForCurrency(normalizedCurrency, normalizedCountry);
-    if (sourceCountryMapped) {
-      // Verify the currency actually matches the country (not just a fallback)
-      var mappedCurrency = getCurrencyForCountry(sourceCountryMapped);
-      if (normalizeCurrency(mappedCurrency) !== normalizedCurrency) {
-        // Currency doesn't match - this was a fallback, fail in strict mode
-        sourceCountryMapped = null;
-      }
-    }
-    if (!sourceCountryMapped) {
-      // Currency cannot be mapped to any country - fail in strict mode
-      if (typeof errors !== 'undefined') {
-        errors = true;
-      }
-      if (uiManager && typeof uiManager.setStatus === 'function') {
-        uiManager.setStatus("Unknown currency code: " + normalizedCurrency + " - cannot map to country", STATUS_COLORS.ERROR);
-      }
-      success = false;
-      failedAt = person1.age;
-      return 1; // Return 1 to avoid division by zero, but simulation will fail due to errors flag
-    }
-    var factor = convertCurrencyAmount(1, normalizedCurrency, normalizedCountry, residenceCurrency, currentCountry, year, true);
+    var factor = convertCurrencyAmount(1, normalizedCurrency, normalizedCountry, residenceCurrency, currentCountry, year);
     if (factor === null) {
-      // Strict mode failure: abort simulation
+      // Conversion failure: abort simulation
       success = false;
       failedAt = person1.age;
       return 1; // Return 1 to avoid division by zero, but simulation will fail due to errors flag
@@ -1415,8 +1395,12 @@ function processEvents() {
 
               // Convert to pension country currency if bucket currency differs
               if (bucketCurrency !== pensionCurrency && typeof convertCurrencyAmount === 'function') {
-                var convertedToPensionCurrency = convertCurrencyAmount(entry.amount, bucketCurrency, bucketCountry, pensionCurrency, pensionCountry, year, false);
-                if (convertedToPensionCurrency !== null && isFinite(convertedToPensionCurrency) && convertedToPensionCurrency > 0) {
+                var convertedToPensionCurrency = convertCurrencyAmount(entry.amount, bucketCurrency, bucketCountry, pensionCurrency, pensionCountry, year);
+                if (convertedToPensionCurrency === null) {
+                  flagSimulationFailure(person1.age);
+                  return;
+                }
+                if (isFinite(convertedToPensionCurrency) && convertedToPensionCurrency > 0) {
                   pensionBaseAmount = convertedToPensionCurrency;
                 }
               }
@@ -1428,8 +1412,12 @@ function processEvents() {
                 var capValue = adjust(cap);
                 // Convert cap to pension country currency for comparison
                 if (capValue > 0 && typeof convertCurrencyAmount === 'function') {
-                  var capInPensionCurrency = convertCurrencyAmount(capValue, resCurrencyNorm, currentCountry, pensionCurrency, pensionCountry, year, false);
-                  if (capInPensionCurrency !== null && isFinite(capInPensionCurrency) && capInPensionCurrency > 0) {
+                  var capInPensionCurrency = convertCurrencyAmount(capValue, resCurrencyNorm, currentCountry, pensionCurrency, pensionCountry, year);
+                  if (capInPensionCurrency === null) {
+                    flagSimulationFailure(person1.age);
+                    return;
+                  }
+                  if (isFinite(capInPensionCurrency) && capInPensionCurrency > 0) {
                     capValue = capInPensionCurrency;
                   }
                 }
@@ -1448,8 +1436,16 @@ function processEvents() {
                 var personalAmountForDisplay = personalAmount;
                 var totalContribForDisplay = totalContrib;
                 if (pensionCurrency !== residenceCurrency) {
-                  personalAmountForDisplay = convertCurrencyAmount(personalAmount, pensionCurrency, pensionCountry, residenceCurrency, currentCountry, year, true) || personalAmount;
-                  totalContribForDisplay = convertCurrencyAmount(totalContrib, pensionCurrency, pensionCountry, residenceCurrency, currentCountry, year, true) || totalContrib;
+                  personalAmountForDisplay = convertCurrencyAmount(personalAmount, pensionCurrency, pensionCountry, residenceCurrency, currentCountry, year);
+                  if (personalAmountForDisplay === null) {
+                    flagSimulationFailure(person1.age);
+                    return;
+                  }
+                  totalContribForDisplay = convertCurrencyAmount(totalContrib, pensionCurrency, pensionCountry, residenceCurrency, currentCountry, year);
+                  if (totalContribForDisplay === null) {
+                    flagSimulationFailure(person1.age);
+                    return;
+                  }
                 }
                 pensionContribution += totalContribForDisplay;
                 personalPensionContribution += personalAmountForDisplay;
@@ -1641,21 +1637,12 @@ function processEvents() {
         var prevCountry = currentCountry;
         var destCountry = getRelocationCountryCode(event);
         var startCountry = (params.StartCountry || config.getDefaultCountry() || '').toLowerCase();
-        var infCountry = null;
-        if (event.currency) {
-          infCountry = findCountryForCurrency(event.currency, prevCountry);
-        }
-        if (!infCountry && event.linkedCountry) {
-          infCountry = normalizeCountry(event.linkedCountry);
-        }
-        if (!infCountry) {
-          infCountry = prevCountry || startCountry;
-        }
+        var infCountry = event.linkedCountry ? normalizeCountry(event.linkedCountry) : (prevCountry || startCountry);
         var reloRate = resolveCountryInflation(infCountry);
         var relocationAmount = adjust(event.amount, reloRate);
         var relocationInfo = getEventCurrencyInfo(event, prevCountry || startCountry || currentCountry);
         if (relocationAmount > 0) {
-          var relocationConverted = convertCurrencyAmount(relocationAmount, relocationInfo.currency, relocationInfo.country, residenceCurrency, prevCountry, year, true);
+          var relocationConverted = convertCurrencyAmount(relocationAmount, relocationInfo.currency, relocationInfo.country, residenceCurrency, prevCountry, year);
           if (relocationConverted === null) {
             success = false;
             failedAt = person1.age;
@@ -1669,7 +1656,7 @@ function processEvents() {
         var newResidenceCurrency = getCurrencyForCountry(destCountry) || prevCurrency || 'EUR';
         if (prevCurrency && newResidenceCurrency && prevCurrency !== newResidenceCurrency) {
           // Convert pooled cash to new residence currency.
-          var convertedCash = convertCurrencyAmount(cash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
+          var convertedCash = convertCurrencyAmount(cash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year);
           if (convertedCash === null) {
             success = false;
             failedAt = person1.age;
@@ -1685,7 +1672,7 @@ function processEvents() {
           if (pppRatio !== null) {
             targetCash = targetCash * pppRatio;
           } else {
-            var convertedTargetCash = convertCurrencyAmount(targetCash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year, true);
+            var convertedTargetCash = convertCurrencyAmount(targetCash, prevCurrency, prevCountryNormalized, newResidenceCurrency, destCountry, year);
             if (convertedTargetCash === null) {
               success = false;
               failedAt = person1.age;
@@ -2261,10 +2248,8 @@ function handleInvestments() {
                 year
               );
               if (amountInAssetCurrency === null) {
-                if (uiManager && typeof uiManager.setStatus === 'function') {
-                  uiManager.setStatus('Currency conversion failed for investment type: ' + entry.key, STATUS_COLORS.ERROR);
-                }
-                continue;
+                flagSimulationFailure(person1.age);
+                return;
               }
               buyCurrency = entry.baseCurrency;
               buyCountry = entry.assetCountry;
@@ -2414,8 +2399,7 @@ function rebalanceMixAsset(assetEntry, surplusCash, currentAge) {
           currentCountry,
           buyCurrency,
           buyCountry,
-          year,
-          true
+          year
         );
         if (amountInAssetCurrency === null) {
           throw new Error('rebalanceMixAsset: buy conversion failed');

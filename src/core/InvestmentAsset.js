@@ -161,7 +161,7 @@ class InvestmentAsset {
       const holdingCapital = holding.principal.amount + holding.interest.amount;
       let holdingCapitalConverted = holdingCapital;
       if (holdingCurrency !== residenceCurrency || holdingCountry !== currentCountry) {
-        holdingCapitalConverted = convertCurrencyAmount(holdingCapital, holdingCurrency, holdingCountry, residenceCurrency, currentCountry, year, true);
+        holdingCapitalConverted = convertCurrencyAmount(holdingCapital, holdingCurrency, holdingCountry, residenceCurrency, currentCountry, year);
         if (holdingCapitalConverted === null) {
           return null;
         }
@@ -174,7 +174,7 @@ class InvestmentAsset {
 
         let holdingGainsConverted = holding.interest.amount;
         if (holding.interest.currency !== residenceCurrency || holding.interest.country !== currentCountry) {
-          holdingGainsConverted = convertCurrencyAmount(holding.interest.amount, holding.interest.currency, holding.interest.country, residenceCurrency, currentCountry, year, true);
+          holdingGainsConverted = convertCurrencyAmount(holding.interest.amount, holding.interest.currency, holding.interest.country, residenceCurrency, currentCountry, year);
           if (holdingGainsConverted === null) {
             return null;
           }
@@ -194,8 +194,8 @@ class InvestmentAsset {
         let soldHoldingConverted = soldHolding;
         let gainsHoldingConverted = gainsHolding;
         if (holdingCurrency !== residenceCurrency || holdingCountry !== currentCountry) {
-          soldHoldingConverted = convertCurrencyAmount(soldHolding, holdingCurrency, holdingCountry, residenceCurrency, currentCountry, year, true);
-          gainsHoldingConverted = convertCurrencyAmount(gainsHolding, holding.interest.currency, holding.interest.country, residenceCurrency, currentCountry, year, true);
+          soldHoldingConverted = convertCurrencyAmount(soldHolding, holdingCurrency, holdingCountry, residenceCurrency, currentCountry, year);
+          gainsHoldingConverted = convertCurrencyAmount(gainsHolding, holding.interest.currency, holding.interest.country, residenceCurrency, currentCountry, year);
           if (soldHoldingConverted === null || gainsHoldingConverted === null) {
             return null;
           }
@@ -248,7 +248,7 @@ class InvestmentAsset {
       const holdingCapital = hj.principal.amount + hj.interest.amount;
       let holdingConverted = holdingCapital;
       if (hj.principal.currency !== residenceCurrency || hj.principal.country !== currentCountry) {
-        holdingConverted = convertCurrencyAmount(holdingCapital, hj.principal.currency, hj.principal.country, residenceCurrency, currentCountry, year, true);
+        holdingConverted = convertCurrencyAmount(holdingCapital, hj.principal.currency, hj.principal.country, residenceCurrency, currentCountry, year);
         if (holdingConverted === null) {
           throw new Error('InvestmentAsset.capital() FX conversion failed');
         }
@@ -293,8 +293,7 @@ class InvestmentAsset {
           holding.principal.country,
           residenceCurrency,
           currentCountry,
-          year,
-          true
+          year
         );
         if (principalConverted === null) {
           throw new Error('InvestmentAsset.getPortfolioStats() principal FX conversion failed');
@@ -310,8 +309,7 @@ class InvestmentAsset {
           holding.interest.country,
           residenceCurrency,
           currentCountry,
-          year,
-          true
+          year
         );
         if (gainConverted === null) {
           throw new Error('InvestmentAsset.getPortfolioStats() gain FX conversion failed');
@@ -432,7 +430,7 @@ class InvestmentAsset {
               var baseCurrency = this._getBaseCurrency();
               var assetCountry = this._getAssetCountry();
               if (baseCurrency !== residenceCurrency) {
-                gainsConverted = convertCurrencyAmount(gains, baseCurrency, assetCountry, residenceCurrency, currentCountry, year, true);
+                gainsConverted = convertCurrencyAmount(gains, baseCurrency, assetCountry, residenceCurrency, currentCountry, year);
                 if (gainsConverted === null) {
                   throw new Error('Deemed disposal FX conversion failed');
                 }
@@ -467,8 +465,8 @@ class InvestmentAsset {
     var totalCapitalConverted = totalCapital;
     var totalGainsConverted = totalGains;
     if (baseCurrency !== residenceCurrency) {
-      totalCapitalConverted = convertCurrencyAmount(totalCapital, baseCurrency, assetCountry, residenceCurrency, currentCountry, year, true);
-      totalGainsConverted = convertCurrencyAmount(totalGains, baseCurrency, assetCountry, residenceCurrency, currentCountry, year, true);
+      totalCapitalConverted = convertCurrencyAmount(totalCapital, baseCurrency, assetCountry, residenceCurrency, currentCountry, year);
+      totalGainsConverted = convertCurrencyAmount(totalGains, baseCurrency, assetCountry, residenceCurrency, currentCountry, year);
       // In strict mode, conversion failures return null - avoid incorrect nominal values in withdraw planning
       if (totalCapitalConverted === null || totalGainsConverted === null) {
         return null;

@@ -80,7 +80,7 @@ const TestRelocationOverlapSalaryIncome = {
     }
 
     const convertedEurToArs = vm.runInContext(
-      `convertCurrencyAmount(${eurSalary}, 'EUR', 'ie', 'ARS', 'ar', ${row40.year}, true)`,
+      `convertCurrencyAmount(${eurSalary}, 'EUR', 'ie', 'ARS', 'ar', ${row40.year})`,
       framework.simulationContext
     );
 
@@ -106,4 +106,3 @@ const TestRelocationOverlapSalaryIncome = {
 };
 
 module.exports = TestRelocationOverlapSalaryIncome;
-

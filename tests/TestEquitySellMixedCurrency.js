@@ -62,8 +62,8 @@ module.exports = {
           asset.portfolio[1].interest.amount = 10; // EUR gains
 
           var usdCap = asset.portfolio[0].principal.amount + asset.portfolio[0].interest.amount; // 120 USD
-          var usdCapEur = convertCurrencyAmount(usdCap, 'USD', 'us', 'EUR', 'ie', year, true);
-          var usdGainsEur = convertCurrencyAmount(20, 'USD', 'us', 'EUR', 'ie', year, true);
+          var usdCapEur = convertCurrencyAmount(usdCap, 'USD', 'us', 'EUR', 'ie', year);
+          var usdGainsEur = convertCurrencyAmount(20, 'USD', 'us', 'EUR', 'ie', year);
           if (usdCapEur === null || usdGainsEur === null) throw new Error('FX conversion failed for USD->EUR');
 
           var eurCap = asset.portfolio[1].principal.amount + asset.portfolio[1].interest.amount; // 210 EUR

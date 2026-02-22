@@ -275,7 +275,7 @@ class Person {
       );
 
       if (spCurrency && targetCurrency && spCurrency !== targetCurrency) {
-        var convertedStatePension = convertCurrencyAmount(yearlyStatePensionBase, spCurrency, spCountryNormalized, targetCurrency, currentCountry, currentYear, true);
+        var convertedStatePension = convertCurrencyAmount(yearlyStatePensionBase, spCurrency, spCountryNormalized, targetCurrency, currentCountry, currentYear);
         if (convertedStatePension === null) {
           return { lumpSumAmount: null, privatePensionByCountry: {} };
         }

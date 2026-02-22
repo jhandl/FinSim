@@ -96,7 +96,7 @@ module.exports = {
 
     // Contribution: 10% of 100,000 USD = 10,000 USD into the US pension pot.
     const expectedPensionFund = vm.runInContext(
-      `convertCurrencyAmount(10000, 'USD', 'us', 'EUR', 'ie', ${rowAge30.year}, true)`,
+      `convertCurrencyAmount(10000, 'USD', 'us', 'EUR', 'ie', ${rowAge30.year})`,
       framework.simulationContext
     );
 
