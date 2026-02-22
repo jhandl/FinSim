@@ -11,8 +11,23 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync, spawnSync } = require('child_process');
+const { execSync, spawnSync, spawn } = require('child_process');
 const os = require('os');
+const readline = require('readline');
+
+// --- Helpers ---
+
+function askUser(query) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise(resolve => rl.question(query, (ans) => {
+    rl.close();
+    resolve(ans);
+  }));
+}
 
 // --- Argument Parsing ---
 
@@ -23,6 +38,8 @@ function parseArgs(argv) {
     scenario: null,
     repo: process.cwd(),
     tolerance: 0,
+    manual: false,
+    port: 8081,
   };
 
   for (let i = 2; i < argv.length; i++) {
@@ -32,14 +49,16 @@ function parseArgs(argv) {
     if (arg === '--scenario') { args.scenario = argv[++i]; continue; }
     if (arg === '--repo') { args.repo = argv[++i]; continue; }
     if (arg === '--tolerance') { args.tolerance = parseFloat(argv[++i]); continue; }
+    if (arg === '--manual') { args.manual = true; continue; }
+    if (arg === '--port') { args.port = parseInt(argv[++i], 10); continue; }
     if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
     }
   }
 
-  if (!args.feature || !args.scenario) {
-    console.error('Error: --feature and --scenario are required.');
+  if (!args.feature || (!args.manual && !args.scenario)) {
+    console.error('Error: --feature and (either --scenario or --manual) are required.');
     printHelp();
     process.exit(1);
   }
@@ -52,12 +71,14 @@ function printHelp() {
 Regression Bisect Tool
 
 Usage:
-  ./blame --feature <branch> --scenario <path> [options]
+  ./blame --feature <branch> [--scenario <path> | --manual] [options]
 
 Options:
   --feature <branch>    Feature branch name to check against base
   --base <branch>       Base branch name (default: main)
   --scenario <path>     Path to the scenario file (CSV/JSON/JS)
+  --manual              Interactive mode for visual/manual defects
+  --port <number>       Port for local server in manual mode (default: 8081)
   --repo <path>         Path to the repository (default: current directory)
   --tolerance <number>  Tolerance for compare.js (default: 0)
 `);
@@ -154,18 +175,19 @@ async function main() {
   const args = parseArgs(process.argv);
 
   const originalRepo = path.resolve(args.repo);
-  const scenarioPath = path.resolve(args.scenario);
+  const scenarioPath = args.scenario ? path.resolve(args.scenario) : null;
 
   if (!fs.existsSync(originalRepo)) {
     throw new Error(`Repository not found at ${originalRepo}`);
   }
-  if (!fs.existsSync(scenarioPath)) {
+  if (scenarioPath && !fs.existsSync(scenarioPath)) {
     throw new Error(`Scenario not found at ${scenarioPath}`);
   }
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'blame-'));
   const dirMain = path.join(tmpDir, 'main');
   const dirFeature = path.join(tmpDir, 'feature');
+  let serverProcess = null;
 
   try {
     // Clone repo
@@ -188,11 +210,36 @@ async function main() {
       return;
     }
 
-    // Initial check: Base vs Feature (Head)
-    const initialResult = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
+    if (args.manual) {
+      console.log(`Starting server on port ${args.port} for ${dirFeature}...`);
+      serverProcess = spawn('python3', ['-m', 'http.server', String(args.port)], {
+        cwd: dirFeature,
+        stdio: 'ignore'
+      });
+      console.log(`Simulator available at: http://localhost:${args.port}\n`);
+    }
 
-    if (!initialResult.hasDiff) {
-      console.log('No differences found between base and feature branch.');
+    console.log(`Feature repo: ${dirFeature}`);
+    console.log(`Base repo:    ${dirMain} (for reference)\n`);
+
+    // Initial check: Base vs Feature (Head)
+    let hasInitialDiff = false;
+    if (args.manual) {
+      console.log(`Manual mode: Checking if defect exists in ${args.feature}...`);
+      checkout(dirFeature, args.feature);
+      
+      let answer = '';
+      while (answer !== 'y' && answer !== 'n') {
+        answer = (await askUser('Do you see the defect in the feature branch? (y/n): ')).toLowerCase();
+      }
+      hasInitialDiff = (answer === 'y');
+    } else {
+      const initialResult = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
+      hasInitialDiff = initialResult.hasDiff;
+    }
+
+    if (!hasInitialDiff) {
+      console.log('No differences/defects found between base and feature branch.');
       return;
     }
 
@@ -204,19 +251,38 @@ async function main() {
       const mid = Math.floor((low + high) / 2);
       const commitHash = commits[mid];
 
-      process.stdout.write(`Checking commit ${mid + 1}/${commits.length}: ${commitHash.substring(0, 7)}... `);
-
-      checkout(dirFeature, commitHash);
-
-      const result = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
-
-      if (result.hasDiff) {
-        offendingIndex = mid;
-        high = mid - 1;
-        console.log('Diff found.');
+      if (args.manual) {
+        console.log(`\n--- Checking commit ${mid + 1}/${commits.length}: ${commitHash.substring(0, 7)} ---`);
+        checkout(dirFeature, commitHash);
+        const info = getCommitInfo(dirFeature, commitHash);
+        console.log(`Message: ${info.msg.split('\n')[0]}`);
+        
+        let answer = '';
+        while (answer !== 'y' && answer !== 'n') {
+          answer = (await askUser('Do you see the defect? (y/n): ')).toLowerCase();
+        }
+        
+        if (answer === 'y') {
+          offendingIndex = mid;
+          high = mid - 1;
+        } else {
+          low = mid + 1;
+        }
       } else {
-        low = mid + 1;
-        console.log('No diff.');
+        process.stdout.write(`Checking commit ${mid + 1}/${commits.length}: ${commitHash.substring(0, 7)}... `);
+
+        checkout(dirFeature, commitHash);
+
+        const result = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
+
+        if (result.hasDiff) {
+          offendingIndex = mid;
+          high = mid - 1;
+          console.log('Diff found.');
+        } else {
+          low = mid + 1;
+          console.log('No diff.');
+        }
       }
     }
 
@@ -224,27 +290,31 @@ async function main() {
       const badCommit = commits[offendingIndex];
 
       const info = getCommitInfo(dirFeature, badCommit);
+      console.log(`\nFound offending commit: ${badCommit.substring(0, 7)}`);
+      console.log(`Message: ${info.msg.split('\n')[0]}`);
       console.log(`\nChanges:\n${info.stat}\n`);
 
-      console.log('Value Differences:\n');
-      checkout(dirFeature, badCommit);
-      const finalResult = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
+      if (!args.manual) {
+        console.log('Value Differences:\n');
+        checkout(dirFeature, badCommit);
+        const finalResult = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
 
-      if (finalResult.diffs.length > 0) {
-        const diffs = finalResult.diffs;
-        diffs.sort((a, b) => a.row - b.row);
+        if (finalResult.diffs.length > 0) {
+          const diffs = finalResult.diffs;
+          diffs.sort((a, b) => a.row - b.row);
 
-        // Concise output format: Age <age>: <field> Main=<val> Feature=<val>
-        diffs.forEach(d => {
-          if (d.type === 'row_mismatch') {
-            console.log(`Row ${d.row}: Row mismatch (Main=${d.aExists}, Feature=${d.bExists})`);
-          } else {
-            const ageStr = (d.age !== null && d.age !== undefined) ? `Age ${d.age}` : `Row ${d.row}`;
-            console.log(`${ageStr}, "${d.field}", Main=${d.a}, Feature=${d.b}`);
-          }
-        });
-      } else {
-        console.log('No differences found in final check? This shouldn\'t happen.');
+          // Concise output format: Age <age>: <field> Main=<val> Feature=<val>
+          diffs.forEach(d => {
+            if (d.type === 'row_mismatch') {
+              console.log(`Row ${d.row}: Row mismatch (Main=${d.aExists}, Feature=${d.bExists})`);
+            } else {
+              const ageStr = (d.age !== null && d.age !== undefined) ? `Age ${d.age}` : `Row ${d.row}`;
+              console.log(`${ageStr}, "${d.field}", Main=${d.a}, Feature=${d.b}`);
+            }
+          });
+        } else {
+          console.log('No differences found in final check? This shouldn\'t happen.');
+        }
       }
 
     } else {
@@ -254,6 +324,9 @@ async function main() {
   } catch (err) {
     console.error('An error occurred:', err);
   } finally {
+    if (serverProcess) {
+      serverProcess.kill();
+    }
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
