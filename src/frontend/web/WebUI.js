@@ -408,7 +408,9 @@ class WebUI extends AbstractUI {
   }
 
   async loadFromUrl(url, name) {
-    await this.fileManager.loadFromUrl(url, name);
+    const success = await this.fileManager.loadFromUrl(url, name);
+    if (!success) return false;
+
     RelocationUtils.extractRelocationTransitions(this, this.chartManager);
     // Rebuild currency selector now that scenario events (and currencies) are available
     this.chartManager.setupChartCurrencyControls(this);
@@ -419,6 +421,7 @@ class WebUI extends AbstractUI {
       this.tableManager.setupTableCurrencyControls();
     }
     this.syncToggleStates();
+    return true;
   }
 
   syncToggleStates() {
@@ -521,7 +524,9 @@ class WebUI extends AbstractUI {
       loadDemoButton.addEventListener('click', async () => {
         try {
           // Unsaved changes check is now handled in loadFromUrl
-          await this.loadFromUrl("/src/frontend/web/assets/demo.csv", "demo");
+          const success = await this.loadFromUrl("/src/frontend/web/assets/demo.csv", "demo");
+          if (!success) return; // User cancelled or load failed
+
           // After successfully loading the demo scenario, scroll to graphs and run the simulation
           const runButton = document.getElementById('runSimulation');
           if (runButton && !this.isSimulationRunning) {

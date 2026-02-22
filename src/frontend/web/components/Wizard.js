@@ -1293,9 +1293,9 @@ class Wizard {
             const loadExampleBtn = popover.querySelector('#load-example-scenario');
             if (loadExampleBtn && !loadExampleBtn.getAttribute('data-click-attached')) {
               loadExampleBtn.setAttribute('data-click-attached', 'true');
-              loadExampleBtn.addEventListener('click', () => {
-                WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
-                this.finishTour();
+              loadExampleBtn.addEventListener('click', async () => {
+                const success = await WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Example");
+                if (success) this.finishTour();
               });
             }
 
@@ -1303,9 +1303,9 @@ class Wizard {
             const loadDemoBtn = popover.querySelector('#load-demo-scenario');
             if (loadDemoBtn && !loadDemoBtn.getAttribute('data-click-attached')) {
               loadDemoBtn.setAttribute('data-click-attached', 'true');
-              loadDemoBtn.addEventListener('click', () => {
-                WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Demo");
-                this.finishTour();
+              loadDemoBtn.addEventListener('click', async () => {
+                const success = await WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Demo");
+                if (success) this.finishTour();
               });
             }
 
@@ -1313,9 +1313,9 @@ class Wizard {
             const loadDemoHeaderBtn = popover.querySelector('#load-demo-scenario-header');
             if (loadDemoHeaderBtn && !loadDemoHeaderBtn.getAttribute('data-click-attached')) {
               loadDemoHeaderBtn.setAttribute('data-click-attached', 'true');
-              loadDemoHeaderBtn.addEventListener('click', () => {
-                WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Demo");
-                this.finishTour();
+              loadDemoHeaderBtn.addEventListener('click', async () => {
+                const success = await WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Demo");
+                if (success) this.finishTour();
               });
             }
 
@@ -1323,9 +1323,9 @@ class Wizard {
             const loadDemoMobileBtn = popover.querySelector('#load-demo-scenario-mobile');
             if (loadDemoMobileBtn && !loadDemoMobileBtn.getAttribute('data-click-attached')) {
               loadDemoMobileBtn.setAttribute('data-click-attached', 'true');
-              loadDemoMobileBtn.addEventListener('click', () => {
-                WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Demo");
-                this.finishTour();
+              loadDemoMobileBtn.addEventListener('click', async () => {
+                const success = await WebUI.getInstance().fileManager.loadFromUrl("/src/frontend/web/assets/demo.csv", "Demo");
+                if (success) this.finishTour();
               });
             }
           }

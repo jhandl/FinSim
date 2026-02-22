@@ -168,19 +168,23 @@ class FileManager {
     if (await this.hasUnsavedChanges()) {
       const proceed = await this.webUI.showAlert("Loading the demo scenario will overwrite any unsaved changes. Are you sure you want to proceed?", "Confirm Load", true);
       if (!proceed) {
-        return; // User cancelled
+        return false; // User cancelled
       }
     }
 
     try {
       const content = await this.fetchUrl(url); // ensure await here
-      await this.loadFromString(content, name);
+      const success = await this.loadFromString(content, name);
+      if (!success) return false;
+
       await this.updateLastSavedState(); // Update state after successful load and UI update
+      return true; // Successfully loaded
     } catch (error) {
       // Handle or propagate error, e.g., show a notification via webUI
       console.error(`Error in loadFromUrl for ${name}:`, error);
       await this.webUI.showAlert(`Error loading demo scenario '${name}'. Please check console for details.`, 'Error');
       // Optionally, re-throw if WebUI needs to react further
+      return false; // Load failed
     }
   }
 
@@ -190,7 +194,7 @@ class FileManager {
       if (cfg && typeof cfg.isRelocationEnabled === 'function' && !cfg.isRelocationEnabled()) {
         if (this._csvHasRelocationEvents(content)) {
           await this.webUI.showAlert('Invalid scenario file', 'Error');
-          return;
+          return false;
         }
       }
     } catch (_) { }
@@ -588,6 +592,7 @@ class FileManager {
       console.error('Error updating status for relocation impacts after loading:', error);
       // Scenario loading continues normally even if status update fails
     }
+    return true;
   }
 
   _csvHasRelocationEvents(content) {
