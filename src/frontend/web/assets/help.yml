@@ -620,6 +620,36 @@ WizardSteps:
     accordion-element: "#AccordionEventTypeToggle"
     tours: [full, mini]
     card: events
+    eventTypes: ["MO"]
+    popover:
+      description: "<p>An extra principal payment on top of the regular mortgage repayments.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MP"]
+    popover:
+      description: "<p>A one-off mortgage payoff event. It settles the remaining mortgage balance.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MR"]
+    popover:
+      description: "<p>A reverse mortgage that pays out cash while accruing a loan balance against the property value.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventType"
+    accordion-element: "#AccordionEventTypeToggle"
+    tours: [full, mini]
+    card: events
     eventTypes: ["MV"]
     popover:
       description: "<p>A relocation event. It changes your country of residence at a specific age.</p>"
@@ -752,6 +782,33 @@ WizardSteps:
     eventTypes: ["M"]
     popover:
       description: "<p>The name of the mortgage event.</p><p>The name must match the name of the corresponding Real Estate event.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAlias"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MO"]
+    popover:
+      description: "<p>The mortgage this overpay belongs to.</p><p>Select the same property/mortgage name used by the linked Mortgage event.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAlias"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MP"]
+    popover:
+      description: "<p>The mortgage this payoff belongs to.</p><p>Select the same property/mortgage name used by the linked Mortgage event.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAlias"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MR"]
+    popover:
+      description: "<p>The property name for this reverse mortgage.</p><p>It must match the corresponding Real Estate event.</p>"
       side: "bottom"
       align: "center"
 
@@ -905,6 +962,33 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
+  - element: "#EventAmount"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MO"]
+    popover:
+      description: "<p>The extra yearly amount paid directly against mortgage principal.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MP"]
+    popover:
+      description: "<p>The one-off payoff amount for the mortgage (auto-updated when linked mortgage terms change).</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAmount"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MR"]
+    popover:
+      description: "<p>The yearly cash payout from the reverse mortgage.</p>"
+      side: "bottom"
+      align: "center"
+
 ###########################################################
 # Event From Age
 
@@ -1043,6 +1127,33 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
+  - element: "#EventFromAge"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MO"]
+    popover:
+      description: "<p>The {{age_or_year}} when overpayments start.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MP"]
+    popover:
+      description: "<p>The {{age_or_year}} when the mortgage is paid off in one lump sum.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventFromAge"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MR"]
+    popover:
+      description: "<p>The {{age_or_year}} when reverse-mortgage payouts start.</p>"
+      side: "bottom"
+      align: "center"
+
 ###########################################################
 # Event To Age
 
@@ -1169,6 +1280,33 @@ WizardSteps:
     eventTypes: ["M"]
     popover:
       description: "<p>The {{age_or_year}} up to and including which the mortgage is repaid. It can't be later than when the corresponding property is sold.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MO"]
+    popover:
+      description: "<p>The {{age_or_year}} up to and including which overpayments are made.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MP"]
+    popover:
+      description: "<p>Mortgage payoff is a one-off event, so this should match the start {{age_or_year}}.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MR"]
+    popover:
+      description: "<p>The {{age_or_year}} up to and including which reverse-mortgage payouts continue.</p>"
       side: "bottom"
       align: "center"
 
@@ -1301,6 +1439,33 @@ WizardSteps:
       side: "bottom"
       align: "center"
 
+  - element: "#EventRate"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MO"]
+    popover:
+      description: "<p>Mortgage overpay events don't use this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MP"]
+    popover:
+      description: "<p>Mortgage payoff events don't use this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MR"]
+    popover:
+      description: "<p>The reverse-mortgage interest rate applied to the outstanding reverse loan balance.</p>"
+      side: "bottom"
+      align: "center"
+
 ###########################################################
 # Event Match
 
@@ -1427,6 +1592,33 @@ WizardSteps:
     eventTypes: ["M"]
     popover:
       description: "<p>Mortgage events don't use this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MO"]
+    popover:
+      description: "<p>Mortgage overpay events don't use this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MP"]
+    popover:
+      description: "<p>Mortgage payoff events don't use this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventMatch"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MR"]
+    popover:
+      description: "<p>Reverse mortgage events don't use this field.</p>"
       side: "bottom"
       align: "center"
 

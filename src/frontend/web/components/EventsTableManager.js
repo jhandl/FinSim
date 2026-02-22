@@ -8,6 +8,9 @@ class EventsTableManager {
     this.tooltipElement = null; // Reference to current tooltip
     this.tooltipTimeout = null; // Reference to tooltip delay timeout
     this._detectorTimeout = null; // For debouncing detector calls
+    this._mortgageImpactTimeout = null;
+    this._suppressMortgagePlanSync = false;
+    this._pendingAutoPayoffIds = {};
     this._lastDetectorRun = 0; // Timestamp of last detector run (for throttling)
     this._mvAgesByRowId = {};
     this._mvAgeShiftByMarkerId = {};
@@ -31,6 +34,7 @@ class EventsTableManager {
     // Check for empty state on initial load
     setTimeout(() => this.checkEmptyState(), 0);
     setTimeout(() => this._captureRelocationAges(), 0);
+    setTimeout(() => this._scheduleMortgagePlanReanalysis(), 0);
 
     /* NEW: Apply saved preferences (view mode + age/year mode) & defaults */
     setTimeout(() => this._applySavedPreferences(), 0);
@@ -246,6 +250,8 @@ class EventsTableManager {
    * Delete table row with smooth animation
    */
   deleteTableRowWithAnimation(row) {
+    const deletedType = row && row.querySelector('.event-type') ? String(row.querySelector('.event-type').value || '') : '';
+    const deletedId = row && row.querySelector('.event-name') ? String(row.querySelector('.event-name').value || '').trim() : '';
     // If an inline resolution panel is open for this row, collapse it first to clean up listeners
     const maybePanel = row && row.nextElementSibling;
     if (maybePanel && maybePanel.classList && maybePanel.classList.contains('resolution-panel-row')) {
@@ -257,7 +263,7 @@ class EventsTableManager {
       this._clearRelocationAgeShift(relocationMarkerIds);
     }
 
-    // Handle orphan Mortgage events if an 'R' event is deleted
+    // Handle orphan mortgage-linked events if an 'R' event is deleted
     const typeInput = row.querySelector('.event-type');
     const nameInput = row.querySelector('.event-name');
     if (typeInput && typeInput.value === 'R' && nameInput) {
@@ -267,11 +273,29 @@ class EventsTableManager {
         tbody.querySelectorAll('tr').forEach(mRow => {
           const mTypeInput = mRow.querySelector('.event-type');
           const mNameInput = mRow.querySelector('.event-name');
-          if (mTypeInput && mTypeInput.value === 'M' && mNameInput && mNameInput.value === oldName) {
+          if (mTypeInput && this.isMortgageLinkedEvent(mTypeInput.value) && mNameInput && mNameInput.value === oldName) {
             mNameInput.value = '';
             mNameInput.dispatchEvent(new Event('change', { bubbles: true }));
             if (mRow._eventMortgageDropdown) {
               this.updateMortgageOptions(mRow);
+            }
+          }
+        });
+      }
+    }
+    if (typeInput && typeInput.value === 'M' && nameInput) {
+      const oldName = nameInput.value;
+      const tbody = row.closest('tbody');
+      if (oldName && tbody) {
+        tbody.querySelectorAll('tr').forEach(linkedRow => {
+          const linkedTypeInput = linkedRow.querySelector('.event-type');
+          const linkedNameInput = linkedRow.querySelector('.event-name');
+          if (!linkedTypeInput || !linkedNameInput) return;
+          if ((linkedTypeInput.value === 'MO' || linkedTypeInput.value === 'MP') && linkedNameInput.value === oldName) {
+            linkedNameInput.value = '';
+            linkedNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+            if (linkedRow._eventMortgageDropdown) {
+              this.updateMortgageOptions(linkedRow);
             }
           }
         });
@@ -287,6 +311,7 @@ class EventsTableManager {
       row.classList.add('deleting-last');
       setTimeout(() => {
         row.remove();
+        this._syncMortgagePlanAfterDeletion(deletedType, deletedId);
         // Check empty state after deletion
         this.checkEmptyState();
         // Refresh accordion if it's active
@@ -305,17 +330,18 @@ class EventsTableManager {
           this.webUI.tableManager.setupTableCurrencyControls();
         }
         this._refreshValidation();
+        this._scheduleMortgagePlanReanalysis();
       }, 400);
     } else {
       // Complex animation with slide-up for multiple rows
-      this.deleteRowWithSlideUp(row);
+      this.deleteRowWithSlideUp(row, deletedType, deletedId);
     }
   }
 
   /**
    * Delete row with slide-up animation for remaining rows
    */
-  deleteRowWithSlideUp(rowToDelete) {
+  deleteRowWithSlideUp(rowToDelete, deletedType = '', deletedId = '') {
     // If an inline resolution panel is open for this row, collapse it first to clean up listeners
     const maybePanel = rowToDelete && rowToDelete.nextElementSibling;
     if (maybePanel && maybePanel.classList && maybePanel.classList.contains('resolution-panel-row')) {
@@ -336,6 +362,7 @@ class EventsTableManager {
     setTimeout(() => {
       // Phase 2: Remove the row first, then slide up the rows below
       rowToDelete.remove();
+      this._syncMortgagePlanAfterDeletion(deletedType, deletedId);
 
       // If this was the last row, show empty state message
       if (isLastRowAfterDelete) {
@@ -381,8 +408,17 @@ class EventsTableManager {
           this.webUI.tableManager.setupTableCurrencyControls();
         }
         this._refreshValidation();
+        this._scheduleMortgagePlanReanalysis();
       }, 300); // Wait for slide animation to complete
     }, 200); // Wait for fade to complete
+  }
+
+  _syncMortgagePlanAfterDeletion(deletedType, deletedId) {
+    const type = String(deletedType || '');
+    const id = String(deletedId || '').trim();
+    if (!id) return;
+    if (type !== 'MO' && type !== 'MP') return;
+    this._syncMortgagePlanById(id, { sourceType: type, sourceField: 'delete', forceAutoAlign: true });
   }
 
   // Single recomputation call used post-deletion regardless of row position/animation path
@@ -392,17 +428,17 @@ class EventsTableManager {
     const events = this.webUI.readEvents(false);
     const startCountry = Config.getInstance().getStartCountry();
 
-    const hadImpacts = events.some(e => e.relocationImpact);
+    const hadImpacts = this._getRelocationStatusEvents(events).some(e => e.relocationImpact);
 
     if (typeof RelocationImpactDetector !== 'undefined') {
       RelocationImpactDetector.analyzeEvents(events, startCountry);
     }
     this.updateRelocationImpactIndicators(events);
-    this.webUI.updateStatusForRelocationImpacts(events);
+    this.webUI.updateStatusForRelocationImpacts(this._getRelocationStatusEvents(events));
     // Ensure accordion view reflects latest table state
     if (!options.skipAccordionRefresh && this.webUI.eventAccordionManager) this.webUI.eventAccordionManager.refresh();
 
-    const hasImpactsNow = events.some(e => e.relocationImpact);
+    const hasImpactsNow = this._getRelocationStatusEvents(events).some(e => e.relocationImpact);
     if (hadImpacts && !hasImpactsNow) {
       const nu = this.webUI && this.webUI.notificationUtils;
       if (nu && typeof nu.showToast === 'function') {
@@ -456,7 +492,7 @@ class EventsTableManager {
           const row = e.target.closest('tr');
           const typeInput = row ? row.querySelector('.event-type') : null;
           const typeValue = typeInput ? typeInput.value : '';
-          if ((typeValue === 'R' || typeValue === 'M') && !this._suppressSellMarkerClear) {
+          if ((typeValue === 'R' || this.isMortgageLinkedEvent(typeValue)) && !this._suppressSellMarkerClear) {
             this._applyToRealEstatePair(row, (pairRow) => {
               this._removeHiddenInput(pairRow, 'event-relocation-sell-mv-id');
               this._removeHiddenInput(pairRow, 'event-relocation-sell-anchor-age');
@@ -465,6 +501,7 @@ class EventsTableManager {
         }
         // Always re-analyze on any change to table inputs
         this._scheduleRelocationReanalysis();
+        this._scheduleMortgagePlanReanalysis();
 
         if (e.target.classList.contains('event-type')) {
           const row = e.target.closest('tr');
@@ -474,13 +511,13 @@ class EventsTableManager {
             const newType = e.target.value || '';
             row.dataset.originalEventType = newType;
 
-            // Refresh all mortgage dropdowns if type changed to/from 'R'
-            if (oldType === 'R' || newType === 'R') {
+            // Refresh all mortgage dropdowns if property/mortgage source rows changed type
+            if (oldType === 'R' || newType === 'R' || oldType === 'M' || newType === 'M') {
               const tbody = row.closest('tbody');
               if (tbody) {
                 tbody.querySelectorAll('tr').forEach(mRow => {
                   const mTypeInput = mRow.querySelector('.event-type');
-                  if (mTypeInput && mTypeInput.value === 'M' && mRow._eventMortgageDropdown) {
+                  if (mTypeInput && this.isMortgageLinkedEvent(mTypeInput.value) && mRow._eventMortgageDropdown) {
                     this.updateMortgageOptions(mRow);
                   }
                 });
@@ -518,6 +555,19 @@ class EventsTableManager {
           this.updateFieldVisibility(e.target);
           this.updateWizardIconsVisibility(row);
         }
+
+        const row = e.target.closest('tr');
+        if (row && !this._suppressMortgagePlanSync && e.target.classList.contains('event-amount')) {
+          const typeInput = row.querySelector('.event-type');
+          const typeValue = typeInput ? String(typeInput.value || '') : '';
+          if (typeValue === 'MP') {
+            this._removeHiddenInput(row, 'event-payoff-expected-amount');
+            this._removeHiddenInput(row, 'event-resolution-override');
+          }
+        }
+        if (row && !this._suppressMortgagePlanSync && e.target.matches('.event-type, .event-name, .event-amount, .event-from-age, .event-to-age, .event-rate')) {
+          this._handleMortgagePlanFieldChange(row, e.target);
+        }
       });
 
       // Also listen for input changes on all event fields to update wizard icons
@@ -553,7 +603,7 @@ class EventsTableManager {
           if (tbody) {
             tbody.querySelectorAll('tr').forEach(mRow => {
               const mTypeInput = mRow.querySelector('.event-type');
-              if (mTypeInput && mTypeInput.value === 'M' && mRow._eventMortgageDropdown) {
+              if (mTypeInput && this.isMortgageLinkedEvent(mTypeInput.value) && mRow._eventMortgageDropdown) {
                 this.updateMortgageOptions(mRow);
               }
             });
@@ -577,7 +627,7 @@ class EventsTableManager {
           RelocationImpactDetector.analyzeEvents(events, startCountry);
         }
         this.updateRelocationImpactIndicators(events);
-        this.webUI.updateStatusForRelocationImpacts(events);
+        this.webUI.updateStatusForRelocationImpacts(this._getRelocationStatusEvents(events));
         // Keep charts in sync with relocation changes (country timeline + markers)
         if (this.webUI && this.webUI.chartManager) {
           RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
@@ -590,6 +640,7 @@ class EventsTableManager {
           this.webUI.tableManager.setupTableCurrencyControls();
         }
         // Accordion summaries refresh after impact update via updateRelocationImpactIndicators.
+        this._scheduleMortgagePlanReanalysis();
       } catch (err) {
         console.error('Error analyzing relocation impacts:', err);
       }
@@ -807,6 +858,831 @@ class EventsTableManager {
     setTimeout(() => { input.classList.remove('age-auto-changed'); }, 3000);
   }
 
+  _parseNumericValue(value, options = {}) {
+    if (value === null || value === undefined) return NaN;
+    if (typeof value === 'number') return isNaN(value) ? NaN : value;
+    const preferThousands = !!options.preferThousands;
+    let sanitized = String(value).trim();
+    if (!sanitized) return NaN;
+    sanitized = sanitized.replace(/\s+/g, '').replace(/[^0-9,.\-]/g, '');
+    if (
+      sanitized === '' ||
+      sanitized === '-' ||
+      sanitized === '.' ||
+      sanitized === ',' ||
+      sanitized === '-.' ||
+      sanitized === '-,'
+    ) return NaN;
+
+    const hasDot = sanitized.indexOf('.') !== -1;
+    const hasComma = sanitized.indexOf(',') !== -1;
+    if (hasDot && hasComma) {
+      const lastDot = sanitized.lastIndexOf('.');
+      const lastComma = sanitized.lastIndexOf(',');
+      const decimalSep = lastDot > lastComma ? '.' : ',';
+      const groupSep = decimalSep === '.' ? ',' : '.';
+      sanitized = sanitized.split(groupSep).join('');
+      if (decimalSep === ',') sanitized = sanitized.replace(/,/g, '.');
+    } else if (hasDot || hasComma) {
+      const sep = hasDot ? '.' : ',';
+      const firstIdx = sanitized.indexOf(sep);
+      const lastIdx = sanitized.lastIndexOf(sep);
+      const hasMultiple = firstIdx !== lastIdx;
+      const fractionLen = sanitized.length - lastIdx - 1;
+      const treatAsGrouping = hasMultiple || (preferThousands && fractionLen === 3);
+      if (treatAsGrouping) {
+        sanitized = sanitized.split(sep).join('');
+      } else if (sep === ',') {
+        sanitized = sanitized.replace(',', '.');
+      }
+    }
+
+    const parsed = Number(sanitized);
+    return isNaN(parsed) ? NaN : parsed;
+  }
+
+  _parseAgeValue(value) {
+    const parsed = parseInt(String(value == null ? '' : value), 10);
+    return isNaN(parsed) ? NaN : parsed;
+  }
+
+  _normalizeRate(rateValue) {
+    const raw = this._parseNumericValue(rateValue, { preferThousands: false });
+    if (!(raw > 0)) return 0;
+    return raw > 1 ? raw / 100 : raw;
+  }
+
+  _ensureMortgageTermInput(mRow) {
+    if (!mRow) return NaN;
+    let termInput = mRow.querySelector('.event-mortgage-term');
+    const fromAgeInput = mRow.querySelector('.event-from-age');
+    const toAgeInput = mRow.querySelector('.event-to-age');
+    const fromAge = this._parseAgeValue(fromAgeInput ? fromAgeInput.value : '');
+    const toAge = this._parseAgeValue(toAgeInput ? toAgeInput.value : '');
+    const fallbackTerm = (!isNaN(fromAge) && !isNaN(toAge) && toAge > fromAge) ? (toAge - fromAge) : 30;
+
+    if (!termInput) {
+      termInput = document.createElement('input');
+      termInput.type = 'hidden';
+      termInput.className = 'event-mortgage-term';
+      const container = mRow.querySelector('.event-type-container') || mRow.querySelector('td') || mRow;
+      container.appendChild(termInput);
+      termInput.value = String(fallbackTerm);
+    }
+
+    const parsedTerm = parseInt(String(termInput.value || ''), 10);
+    if (parsedTerm > 0) return parsedTerm;
+    termInput.value = String(fallbackTerm);
+    return fallbackTerm;
+  }
+
+  _buildMortgageModel(fromAge, toAge, annualPayment, rateValue, mortgageTermValue) {
+    const parsedFrom = this._parseAgeValue(fromAge);
+    const parsedTo = this._parseAgeValue(toAge);
+    const parsedPayment = this._parseNumericValue(annualPayment, { preferThousands: true });
+    if (!(parsedPayment > 0) || isNaN(parsedFrom)) return null;
+
+    const parsedTerm = parseInt(String(mortgageTermValue == null ? '' : mortgageTermValue), 10);
+    let termYears = parsedTerm;
+    if (!(termYears > 0)) termYears = (isNaN(parsedTo) ? NaN : (parsedTo - parsedFrom));
+    if (!(termYears > 0)) termYears = 30;
+
+    const rate = this._normalizeRate(rateValue);
+    const months = termYears * 12;
+    const monthlyPayment = parsedPayment / 12;
+    let principal;
+    if (rate === 0) {
+      principal = monthlyPayment * months;
+    } else {
+      const monthlyRate = rate / 12;
+      const c = Math.pow(1 + monthlyRate, months);
+      principal = monthlyPayment * (c - 1) / (monthlyRate * c);
+    }
+    if (!(principal > 0)) return null;
+
+    return {
+      fromAge: parsedFrom,
+      toAge: isNaN(parsedTo) ? (parsedFrom + termYears) : parsedTo,
+      annualPayment: parsedPayment,
+      rate: rate,
+      principal: principal,
+      termYears: termYears
+    };
+  }
+
+  _buildMortgageModelFromRow(mRow) {
+    if (!mRow) return null;
+    const fromAgeInput = mRow.querySelector('.event-from-age');
+    const toAgeInput = mRow.querySelector('.event-to-age');
+    const amountInput = mRow.querySelector('.event-amount');
+    const rateInput = mRow.querySelector('.event-rate');
+    const termYears = this._ensureMortgageTermInput(mRow);
+    return this._buildMortgageModel(
+      fromAgeInput ? fromAgeInput.value : '',
+      toAgeInput ? toAgeInput.value : '',
+      amountInput ? amountInput.value : '',
+      rateInput ? rateInput.value : '',
+      termYears
+    );
+  }
+
+  _buildMortgageModelFromEvent(event) {
+    if (!event) return null;
+    return this._buildMortgageModel(event.fromAge, event.toAge, event.amount, event.rate, event.mortgageTerm);
+  }
+
+  _buildOverpayWindowsFromRows(moRows) {
+    const rows = Array.isArray(moRows) ? moRows : [];
+    return rows.map(row => {
+      const fromAgeInput = row.querySelector('.event-from-age');
+      const toAgeInput = row.querySelector('.event-to-age');
+      const amountInput = row.querySelector('.event-amount');
+      const fromAge = this._parseAgeValue(fromAgeInput ? fromAgeInput.value : '');
+      const toAge = this._parseAgeValue(toAgeInput ? toAgeInput.value : '');
+      const amount = this._parseNumericValue(amountInput ? amountInput.value : '', { preferThousands: true });
+      return {
+        fromAge: fromAge,
+        toAge: isNaN(toAge) ? null : toAge,
+        amount: amount
+      };
+    }).filter(w => !isNaN(w.fromAge) && (w.toAge === null || w.toAge >= w.fromAge) && (w.amount > 0));
+  }
+
+  _buildOverpayWindowsFromEvents(moEvents) {
+    const events = Array.isArray(moEvents) ? moEvents : [];
+    return events.map(event => {
+      const fromAge = this._parseAgeValue(event.fromAge);
+      const toAge = this._parseAgeValue(event.toAge);
+      const amount = this._parseNumericValue(event.amount, { preferThousands: true });
+      return {
+        fromAge: fromAge,
+        toAge: isNaN(toAge) ? null : toAge,
+        amount: amount
+      };
+    }).filter(w => !isNaN(w.fromAge) && (w.toAge === null || w.toAge >= w.fromAge) && (w.amount > 0));
+  }
+
+  _sumOverpayAtAge(overpayWindows, age) {
+    let total = 0;
+    for (let i = 0; i < overpayWindows.length; i++) {
+      const w = overpayWindows[i];
+      if (age >= w.fromAge && (w.toAge === null || age <= w.toAge)) {
+        total += w.amount;
+      }
+    }
+    return total;
+  }
+
+  _amortizeOneYear(remaining, annualPayment, rate) {
+    const epsilon = 1e-6;
+    if (!(remaining > epsilon)) return 0;
+    if (!(annualPayment > 0)) return remaining;
+    if (rate === 0) {
+      const nextZeroRate = remaining - annualPayment;
+      return nextZeroRate > epsilon ? nextZeroRate : 0;
+    }
+    const monthlyRate = rate / 12;
+    const monthlyPayment = annualPayment / 12;
+    const annualGrowth = Math.pow(1 + monthlyRate, 12);
+    const annuityFactor = (annualGrowth - 1) / monthlyRate;
+    const nextBalance = remaining * annualGrowth - monthlyPayment * annuityFactor;
+    return nextBalance > epsilon ? nextBalance : 0;
+  }
+
+  _remainingPrincipalAtAge(model, overpayWindows, targetAge) {
+    const epsilon = 1e-6;
+    if (!model || isNaN(targetAge)) return 0;
+    if (targetAge < model.fromAge) return model.principal;
+    let remaining = model.principal;
+    for (let age = model.fromAge; age <= targetAge; age++) {
+      if (age > model.fromAge) {
+        remaining = this._amortizeOneYear(remaining, model.annualPayment, model.rate);
+      }
+      if (!(remaining > epsilon)) return 0;
+      const overpay = this._sumOverpayAtAge(overpayWindows, age);
+      if (overpay > 0) remaining -= overpay;
+      if (!(remaining > epsilon)) return 0;
+    }
+    return remaining;
+  }
+
+  _estimatePayoff(model, overpayWindows) {
+    const epsilon = 1e-6;
+    if (!model) return { payoffAge: NaN, payoffAmount: 0 };
+    const maxAge = Math.max(model.toAge, model.fromAge + model.termYears + 60);
+    let remaining = model.principal;
+    for (let age = model.fromAge; age <= maxAge; age++) {
+      if (age > model.fromAge) {
+        remaining = this._amortizeOneYear(remaining, model.annualPayment, model.rate);
+      }
+      if (!(remaining > epsilon)) return { payoffAge: age, payoffAmount: 0 };
+      const overpay = this._sumOverpayAtAge(overpayWindows, age);
+      if (overpay > 0) remaining -= overpay;
+      if (!(remaining > epsilon)) return { payoffAge: age, payoffAmount: 0 };
+    }
+    const fallbackAge = isNaN(model.toAge) ? model.fromAge : model.toAge;
+    return {
+      payoffAge: fallbackAge,
+      payoffAmount: this._remainingPrincipalAtAge(model, overpayWindows, fallbackAge)
+    };
+  }
+
+  _collectMortgageRowsById(id) {
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    const sameIdRows = rows.filter(r => {
+      const nameInput = r.querySelector('.event-name');
+      return nameInput && String(nameInput.value || '').trim() === id;
+    });
+    const mRow = sameIdRows.find(r => {
+      const typeInput = r.querySelector('.event-type');
+      return typeInput && typeInput.value === 'M';
+    }) || null;
+    const mpRow = sameIdRows.find(r => {
+      const typeInput = r.querySelector('.event-type');
+      return typeInput && typeInput.value === 'MP';
+    }) || null;
+    const mrRow = sameIdRows.find(r => {
+      const typeInput = r.querySelector('.event-type');
+      return typeInput && typeInput.value === 'MR';
+    }) || null;
+    const moRows = sameIdRows.filter(r => {
+      const typeInput = r.querySelector('.event-type');
+      return typeInput && typeInput.value === 'MO';
+    });
+    return { mRow, mpRow, mrRow, moRows, all: sameIdRows };
+  }
+
+  _setInputValueWithFlash(input, nextValue, shouldDispatch = true) {
+    if (!input) return false;
+    const next = (nextValue === undefined || nextValue === null) ? '' : String(nextValue);
+    if (String(input.value || '') === next) return false;
+    input.value = next;
+    this._flashInput(input);
+    if (shouldDispatch) input.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+
+  _createMortgagePayoffEvent(id, rows, model, overpayWindows) {
+    if (!id || !rows || !rows.mRow || rows.mpRow) return;
+    if (this._pendingAutoPayoffIds[id]) return;
+
+    const mToInput = rows.mRow.querySelector('.event-to-age');
+    const payoffAge = this._parseAgeValue(mToInput ? mToInput.value : '');
+    if (isNaN(payoffAge)) return;
+
+    const rawPayoffAmount = this._remainingPrincipalAtAge(model, overpayWindows, payoffAge);
+    const payoffAmount = Math.max(0, Math.round(rawPayoffAmount));
+    if (!(payoffAmount > 0)) return;
+    const linkedCountryInput = rows.mRow.querySelector('.event-linked-country');
+    const currencyInput = rows.mRow.querySelector('.event-currency');
+    const sellMvIdInput = rows.mRow.querySelector('.event-relocation-sell-mv-id');
+    const sellAnchorAgeInput = rows.mRow.querySelector('.event-relocation-sell-anchor-age');
+
+    const createPromise = this.addEventFromWizardWithSorting({
+      eventType: 'MP',
+      name: id,
+      amount: payoffAmount,
+      fromAge: payoffAge,
+      toAge: payoffAge,
+      linkedCountry: linkedCountryInput ? linkedCountryInput.value : '',
+      currency: currencyInput ? currencyInput.value : ''
+    }).then((result) => {
+      if (result && result.row) {
+        if (sellMvIdInput && sellMvIdInput.value) {
+          this.getOrCreateHiddenInput(result.row, 'event-relocation-sell-mv-id', sellMvIdInput.value);
+        }
+        if (sellAnchorAgeInput && sellAnchorAgeInput.value) {
+          this.getOrCreateHiddenInput(result.row, 'event-relocation-sell-anchor-age', sellAnchorAgeInput.value);
+        }
+      }
+      this._syncMortgagePlanById(id, { sourceType: 'M', sourceField: 'toAge', forceAutoAlign: true });
+    }).catch((err) => {
+      console.error('Error creating mortgage payoff event:', err);
+    }).finally(() => {
+      delete this._pendingAutoPayoffIds[id];
+      this._scheduleMortgagePlanReanalysis();
+    });
+
+    this._pendingAutoPayoffIds[id] = createPromise;
+  }
+
+  _syncMortgagePlanById(id, context = {}) {
+    if (!id) return;
+    const rows = this._collectMortgageRowsById(id);
+    if (!rows.mRow) return;
+
+    const model = this._buildMortgageModelFromRow(rows.mRow);
+    if (!model) return;
+    const overpayWindows = this._buildOverpayWindowsFromRows(rows.moRows);
+    const estimate = this._estimatePayoff(model, overpayWindows);
+    const hasOverpay = rows.moRows.length > 0;
+
+    const sourceType = context.sourceType || '';
+    const sourceField = context.sourceField || '';
+    const forceAutoAlign = !!context.forceAutoAlign;
+    const forceCreatePayoff = !!context.forceCreatePayoff;
+    const preserveManualAmount = !!context.preserveManualAmount;
+
+    const mToInput = rows.mRow.querySelector('.event-to-age');
+
+    if (!rows.mpRow) {
+      const shouldCreatePayoff = forceCreatePayoff || (sourceType === 'M' && sourceField === 'toAge');
+      if (shouldCreatePayoff) {
+        this._createMortgagePayoffEvent(id, rows, model, overpayWindows);
+        this._scheduleMortgagePlanReanalysis();
+        return;
+      }
+      if (forceAutoAlign || sourceType === 'MO' || sourceType === 'MP' || (sourceType === 'M' && sourceField !== 'toAge')) {
+        this._suppressMortgagePlanSync = true;
+        try {
+          this._setInputValueWithFlash(mToInput, estimate.payoffAge, true);
+        } finally {
+          this._suppressMortgagePlanSync = false;
+        }
+      }
+      this._scheduleMortgagePlanReanalysis();
+      return;
+    }
+
+    const mpFromInput = rows.mpRow.querySelector('.event-from-age');
+    const mpToInput = rows.mpRow.querySelector('.event-to-age');
+    const mpAmountInput = rows.mpRow.querySelector('.event-amount');
+
+    let mToAge = this._parseAgeValue(mToInput ? mToInput.value : '');
+    let mpAge = this._parseAgeValue(mpFromInput ? mpFromInput.value : '');
+
+    let autoAlignAges = true;
+    if (hasOverpay && !forceAutoAlign) {
+      if ((sourceType === 'M' && sourceField === 'toAge') || (sourceType === 'MP' && (sourceField === 'fromAge' || sourceField === 'toAge')) || (sourceType === 'R' && sourceField === 'toAge')) {
+        autoAlignAges = false;
+      }
+    }
+
+    this._suppressMortgagePlanSync = true;
+    try {
+      if (hasOverpay) {
+        if (autoAlignAges || forceAutoAlign || sourceType === 'MO') {
+          const expectedAge = estimate.payoffAge;
+          this._setInputValueWithFlash(mToInput, expectedAge, true);
+          this._setInputValueWithFlash(mpFromInput, expectedAge, true);
+          this._setInputValueWithFlash(mpToInput, expectedAge, true);
+          mToAge = expectedAge;
+          mpAge = expectedAge;
+        }
+      } else {
+        // No overpay chain: keep M and MP aligned both ways.
+        if (sourceType === 'MO') {
+          const expectedAge = estimate.payoffAge;
+          this._setInputValueWithFlash(mToInput, expectedAge, true);
+          this._setInputValueWithFlash(mpFromInput, expectedAge, true);
+          this._setInputValueWithFlash(mpToInput, expectedAge, true);
+          mToAge = expectedAge;
+          mpAge = expectedAge;
+        } else if (sourceType === 'MP' && (sourceField === 'fromAge' || sourceField === 'toAge')) {
+          if (!isNaN(mpAge)) {
+            this._setInputValueWithFlash(mToInput, mpAge, true);
+            this._setInputValueWithFlash(mpToInput, mpAge, true);
+            mToAge = mpAge;
+          }
+        } else {
+          if (!isNaN(mToAge)) {
+            this._setInputValueWithFlash(mpFromInput, mToAge, true);
+            this._setInputValueWithFlash(mpToInput, mToAge, true);
+            mpAge = mToAge;
+          }
+        }
+      }
+
+      const payoffAge = !isNaN(mpAge) ? mpAge : (!isNaN(mToAge) ? mToAge : estimate.payoffAge);
+      const payoffAmount = this._remainingPrincipalAtAge(model, overpayWindows, payoffAge);
+      const roundedPayoff = Math.max(0, Math.round(payoffAmount));
+      const currentPayoff = this._parseNumericValue(mpAmountInput ? mpAmountInput.value : '', { preferThousands: true });
+      const hasManualAmountConflict = preserveManualAmount && !isNaN(currentPayoff) && Math.round(currentPayoff) !== roundedPayoff;
+      if (hasManualAmountConflict) {
+        this.getOrCreateHiddenInput(rows.mpRow, 'event-payoff-expected-amount', String(roundedPayoff));
+      } else {
+        this._removeHiddenInput(rows.mpRow, 'event-payoff-expected-amount');
+        const formattedPayoff = (typeof FormatUtils !== 'undefined' && FormatUtils.formatCurrency)
+          ? FormatUtils.formatCurrency(roundedPayoff)
+          : String(roundedPayoff);
+        this._setInputValueWithFlash(mpAmountInput, formattedPayoff, true);
+      }
+    } finally {
+      this._suppressMortgagePlanSync = false;
+    }
+
+    this._scheduleMortgagePlanReanalysis();
+  }
+
+  _handleMortgagePlanFieldChange(row, target) {
+    if (!row || !target) return;
+    const typeInput = row.querySelector('.event-type');
+    const nameInput = row.querySelector('.event-name');
+    const eventType = typeInput ? typeInput.value : '';
+    const eventId = nameInput ? String(nameInput.value || '').trim() : '';
+
+    if (!eventId || (!this.isMortgageLinkedEvent(eventType) && eventType !== 'R')) return;
+
+    let sourceField = '';
+    if (target.classList.contains('event-from-age')) sourceField = 'fromAge';
+    else if (target.classList.contains('event-to-age')) sourceField = 'toAge';
+    else if (target.classList.contains('event-amount')) sourceField = 'amount';
+    else if (target.classList.contains('event-rate')) sourceField = 'rate';
+    else if (target.classList.contains('event-name')) sourceField = 'name';
+    else if (target.classList.contains('event-type')) sourceField = 'type';
+
+    if (eventType === 'MP' && (sourceField === 'fromAge' || sourceField === 'type')) {
+      const fromAgeInput = row.querySelector('.event-from-age');
+      const toAgeInput = row.querySelector('.event-to-age');
+      const fromAge = this._parseAgeValue(fromAgeInput ? fromAgeInput.value : '');
+      if (!isNaN(fromAge)) {
+        this._suppressMortgagePlanSync = true;
+        try {
+          this._setInputValueWithFlash(toAgeInput, fromAge, true);
+        } finally {
+          this._suppressMortgagePlanSync = false;
+        }
+      }
+    }
+
+    if (eventType === 'R' && sourceField === 'toAge') {
+      this._syncLinkedMortgageEventsToPropertyAge(eventId);
+      return;
+    }
+
+    if (this.isMortgagePlanEvent(eventType)) {
+      this._syncMortgagePlanById(eventId, { sourceType: eventType, sourceField: sourceField });
+    }
+
+    if (eventType === 'R' || eventType === 'MR') {
+      this._scheduleMortgagePlanReanalysis();
+    }
+  }
+
+  ensureMortgagePayoffEvent(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const typeInput = row.querySelector('.event-type');
+    if (!typeInput || typeInput.value !== 'M') return;
+    const nameInput = row.querySelector('.event-name');
+    const id = nameInput ? String(nameInput.value || '').trim() : '';
+    if (!id) return;
+    this._syncMortgagePlanById(id, { sourceType: 'M', sourceField: 'toAge', forceCreatePayoff: true });
+  }
+
+  _syncLinkedMortgageEventsToPropertyAge(id) {
+    if (!id) return;
+    const rows = this._collectMortgageRowsById(id);
+    if (!rows.mRow) return;
+    const rRow = rows.all.find(r => {
+      const typeInput = r.querySelector('.event-type');
+      return typeInput && typeInput.value === 'R';
+    }) || null;
+    if (!rRow) return;
+
+    const propertyToAgeInput = rRow.querySelector('.event-to-age');
+    const propertyToAge = this._parseAgeValue(propertyToAgeInput ? propertyToAgeInput.value : '');
+    if (isNaN(propertyToAge)) return;
+    let preserveManualAmount = false;
+    if (rows.mpRow) {
+      const currentModel = this._buildMortgageModelFromRow(rows.mRow);
+      const currentOverpayWindows = this._buildOverpayWindowsFromRows(rows.moRows);
+      const currentPayoffAge = this._parseAgeValue(rows.mpRow.querySelector('.event-from-age') ? rows.mpRow.querySelector('.event-from-age').value : '');
+      const currentPayoffAmount = this._parseNumericValue(rows.mpRow.querySelector('.event-amount') ? rows.mpRow.querySelector('.event-amount').value : '', { preferThousands: true });
+      this._removeHiddenInput(rows.mpRow, 'event-resolution-override');
+      if (currentModel && !isNaN(currentPayoffAge) && !isNaN(currentPayoffAmount)) {
+        const computedCurrentAmount = Math.max(0, Math.round(this._remainingPrincipalAtAge(currentModel, currentOverpayWindows, currentPayoffAge)));
+        preserveManualAmount = Math.round(currentPayoffAmount) !== computedCurrentAmount;
+      }
+    }
+
+    this._suppressMortgagePlanSync = true;
+    try {
+      this._setInputValueWithFlash(rows.mRow.querySelector('.event-to-age'), propertyToAge, true);
+      if (rows.mpRow) {
+        this._setInputValueWithFlash(rows.mpRow.querySelector('.event-from-age'), propertyToAge, true);
+        this._setInputValueWithFlash(rows.mpRow.querySelector('.event-to-age'), propertyToAge, true);
+      }
+      for (let i = 0; i < rows.moRows.length; i++) {
+        const moToInput = rows.moRows[i].querySelector('.event-to-age');
+        if (!moToInput) continue;
+        const moToAge = this._parseAgeValue(moToInput.value);
+        if (!isNaN(moToAge) && moToAge > propertyToAge) {
+          this._setInputValueWithFlash(moToInput, propertyToAge, true);
+        }
+      }
+      if (rows.mrRow) {
+        this._setInputValueWithFlash(rows.mrRow.querySelector('.event-to-age'), propertyToAge, true);
+      }
+    } finally {
+      this._suppressMortgagePlanSync = false;
+    }
+
+    this._syncMortgagePlanById(id, { sourceType: 'M', sourceField: 'toAge', forceCreatePayoff: !rows.mpRow, preserveManualAmount: preserveManualAmount });
+  }
+
+  _scheduleMortgagePlanReanalysis() {
+    if (this._mortgageImpactTimeout) clearTimeout(this._mortgageImpactTimeout);
+    this._mortgageImpactTimeout = setTimeout(() => {
+      try {
+        const events = this.webUI.readEvents(false);
+        this._analyzeMortgagePlanImpacts(events);
+        this.updateRelocationImpactIndicators(events);
+      } catch (err) {
+        console.error('Error analyzing mortgage plan impacts:', err);
+      }
+    }, 120);
+  }
+
+  _isMortgageIntervalOverlap(mEvent, mrEvent) {
+    if (!mEvent || !mrEvent) return false;
+    const mFrom = this._parseAgeValue(mEvent.fromAge);
+    const mTo = this._parseAgeValue(mEvent.toAge);
+    const mrFrom = this._parseAgeValue(mrEvent.fromAge);
+    const mrToRaw = this._parseAgeValue(mrEvent.toAge);
+    const mrTo = isNaN(mrToRaw) ? 999 : mrToRaw;
+    if (isNaN(mFrom) || isNaN(mTo) || isNaN(mrFrom)) return false;
+    return Math.max(mFrom, mrFrom) <= Math.min(mTo, mrTo);
+  }
+
+  _analyzeMortgagePlanImpacts(events) {
+    if (!Array.isArray(events)) return;
+
+    // Clear stale mortgage-specific impacts while preserving relocation impacts.
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      if (!ev || !ev.relocationImpact) continue;
+      const category = String(ev.relocationImpact.category || '');
+      if (category.indexOf('mortgage_') === 0) {
+        delete ev.relocationImpact;
+      }
+    }
+
+    const byId = {};
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      if (!ev || !ev.id) continue;
+      if (ev.type !== 'R' && !this.isMortgageLinkedEvent(ev.type)) continue;
+      if (!byId[ev.id]) byId[ev.id] = { R: [], M: [], MO: [], MP: [], MR: [] };
+      if (byId[ev.id][ev.type]) byId[ev.id][ev.type].push(ev);
+    }
+
+    const ids = Object.keys(byId);
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const group = byId[id];
+      const rowsForId = this._collectMortgageRowsById(id);
+      const mEvent = group.M[0];
+      const mpEvent = group.MP[0];
+      const mrEvent = group.MR[0];
+      const moEvents = group.MO;
+
+      if (mEvent && mpEvent && moEvents.length) {
+        const model = this._buildMortgageModelFromEvent(mEvent);
+        const overpayWindows = this._buildOverpayWindowsFromEvents(moEvents);
+        if (model) {
+          const estimate = this._estimatePayoff(model, overpayWindows);
+          const expectedAge = estimate.payoffAge;
+          const mToAge = this._parseAgeValue(mEvent.toAge);
+          const mpFromAge = this._parseAgeValue(mpEvent.fromAge);
+          const mpToAge = this._parseAgeValue(mpEvent.toAge);
+          const hasConflict = !isNaN(expectedAge) && (
+            isNaN(mToAge) || isNaN(mpFromAge) || isNaN(mpToAge) ||
+            mToAge !== expectedAge || mpFromAge !== expectedAge || mpToAge !== expectedAge
+          );
+          if (hasConflict) {
+            const targetEvent = (mpEvent.relocationImpact && String(mpEvent.relocationImpact.category || '').indexOf('mortgage_') !== 0) ? mEvent : mpEvent;
+            if (!targetEvent.relocationImpact || String(targetEvent.relocationImpact.category || '').indexOf('mortgage_') === 0) {
+              targetEvent.relocationImpact = {
+                category: 'mortgage_plan_conflict',
+                autoResolvable: true,
+                message: 'Overpay schedule implies a different payoff age than M/MP.',
+                details: {
+                  id: id,
+                  expectedAge: expectedAge,
+                  mortgageEndAge: mToAge,
+                  payoffAge: mpFromAge
+                }
+              };
+            }
+          }
+        }
+      }
+
+      if (mEvent && mrEvent && this._isMortgageIntervalOverlap(mEvent, mrEvent)) {
+        const mTo = this._parseAgeValue(mEvent.toAge);
+        const mrFrom = this._parseAgeValue(mrEvent.fromAge);
+        const targetEvent = (mrEvent.relocationImpact && String(mrEvent.relocationImpact.category || '').indexOf('mortgage_') !== 0) ? mEvent : mrEvent;
+        if (!targetEvent.relocationImpact || String(targetEvent.relocationImpact.category || '').indexOf('mortgage_') === 0) {
+          targetEvent.relocationImpact = {
+            category: 'mortgage_overlap',
+            autoResolvable: true,
+            message: 'Forward and reverse mortgage periods overlap.',
+            details: {
+              id: id,
+              mortgageEndAge: mTo,
+              reverseStartAge: mrFrom,
+              suggestedReverseStart: isNaN(mTo) ? '' : (mTo + 1)
+            }
+          };
+        }
+      }
+
+      if (mpEvent && rowsForId && rowsForId.mpRow) {
+        const expectedInput = rowsForId.mpRow.querySelector('.event-payoff-expected-amount');
+        const expectedAmount = this._parseNumericValue(expectedInput ? expectedInput.value : '', { preferThousands: true });
+        const currentAmount = this._parseNumericValue(mpEvent.amount, { preferThousands: true });
+        const hasOverride = !!(
+          rowsForId.mpRow.querySelector('.event-resolution-override') &&
+          rowsForId.mpRow.querySelector('.event-resolution-category') &&
+          rowsForId.mpRow.querySelector('.event-resolution-category').value === 'mortgage_amount_conflict'
+        );
+        if (!hasOverride && !isNaN(expectedAmount) && !isNaN(currentAmount) && Math.round(expectedAmount) !== Math.round(currentAmount)) {
+          if (!mpEvent.relocationImpact || String(mpEvent.relocationImpact.category || '').indexOf('mortgage_') === 0) {
+            mpEvent.relocationImpact = {
+              category: 'mortgage_amount_conflict',
+              autoResolvable: true,
+              message: 'Payoff amount is manual and differs from the recalculated amount.',
+              details: {
+                id: id,
+                currentAmount: Math.round(currentAmount),
+                expectedAmount: Math.round(expectedAmount)
+              }
+            };
+          }
+        }
+      }
+    }
+  }
+
+  _getRelocationStatusEvents(events) {
+    if (!Array.isArray(events)) return [];
+    return events.map(ev => {
+      if (!ev || !ev.relocationImpact) return ev;
+      const category = String(ev.relocationImpact.category || '');
+      if (category.indexOf('mortgage_') !== 0) return ev;
+      const clone = Object.assign({}, ev);
+      delete clone.relocationImpact;
+      return clone;
+    });
+  }
+
+  _afterMortgageResolutionAction(rowId, options = {}) {
+    this.collapseResolutionPanel(rowId);
+    this._refreshValidation();
+    this._scheduleMortgagePlanReanalysis();
+    if (this.webUI && this.webUI.eventAccordionManager) {
+      this.webUI.eventAccordionManager.refresh({ skipSortAnimation: true });
+    }
+    const row = this._findEventRow(rowId);
+    if (row && options.pulse) {
+      setTimeout(() => this.animateRowHighlight(row, { skipScrollIfVisible: true }), 100);
+    }
+    if (row && options.flashFields) {
+      for (let i = 0; i < options.flashFields.length; i++) {
+        const input = row.querySelector(options.flashFields[i]);
+        if (input) this._flashInput(input);
+      }
+    }
+  }
+
+  adoptOverpayPayoffAge(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const id = row.querySelector('.event-name') ? String(row.querySelector('.event-name').value || '').trim() : '';
+    if (!id) return;
+    this._syncMortgagePlanById(id, { sourceType: 'MO', sourceField: 'resolve', forceAutoAlign: true });
+    this._afterMortgageResolutionAction(row.dataset.rowId || rowId, { pulse: true });
+  }
+
+  keepManualPayoffAge(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const id = row.querySelector('.event-name') ? String(row.querySelector('.event-name').value || '').trim() : '';
+    if (!id) return;
+    const rows = this._collectMortgageRowsById(id);
+    const manualAge = this._parseAgeValue(rows.mpRow && rows.mpRow.querySelector('.event-from-age') ? rows.mpRow.querySelector('.event-from-age').value : '');
+    if (isNaN(manualAge)) {
+      this._afterMortgageResolutionAction(row.dataset.rowId || rowId, { pulse: true });
+      return;
+    }
+    this._suppressMortgagePlanSync = true;
+    try {
+      rows.moRows.forEach(moRow => {
+        const fromInput = moRow.querySelector('.event-from-age');
+        const toInput = moRow.querySelector('.event-to-age');
+        const fromAge = this._parseAgeValue(fromInput ? fromInput.value : '');
+        if (!isNaN(fromAge) && fromAge > manualAge) {
+          this._setInputValueWithFlash(fromInput, manualAge, true);
+        }
+        this._setInputValueWithFlash(toInput, manualAge, true);
+      });
+    } finally {
+      this._suppressMortgagePlanSync = false;
+    }
+    this._syncMortgagePlanById(id, { sourceType: 'MO', sourceField: 'toAge' });
+    this._afterMortgageResolutionAction(row.dataset.rowId || rowId, { pulse: true });
+  }
+
+  adoptCalculatedPayoffAmount(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const expectedInput = row.querySelector('.event-payoff-expected-amount');
+    const expectedAmount = this._parseNumericValue(expectedInput ? expectedInput.value : '', { preferThousands: true });
+    if (isNaN(expectedAmount)) return;
+    const amountInput = row.querySelector('.event-amount');
+    const id = row.querySelector('.event-name') ? String(row.querySelector('.event-name').value || '').trim() : '';
+    const formattedAmount = (typeof FormatUtils !== 'undefined' && FormatUtils.formatCurrency)
+      ? FormatUtils.formatCurrency(Math.round(expectedAmount))
+      : String(Math.round(expectedAmount));
+    this._removeHiddenInput(row, 'event-payoff-expected-amount');
+    this._removeHiddenInput(row, 'event-resolution-override');
+    this._setInputValueWithFlash(amountInput, formattedAmount, true);
+    if (id) this._syncMortgagePlanById(id, { sourceType: 'MP', sourceField: 'amount' });
+    this._afterMortgageResolutionAction(row.dataset.rowId || rowId, { pulse: true, flashFields: ['.event-amount'] });
+  }
+
+  keepManualPayoffAmount(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    this._removeHiddenInput(row, 'event-payoff-expected-amount');
+    this._setResolutionOverride(row, { mvId: '', category: 'mortgage_amount_conflict' });
+    this._afterMortgageResolutionAction(row.dataset.rowId || rowId, { pulse: true, flashFields: ['.event-amount'] });
+  }
+
+  deleteMortgageOverpay(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const id = row.querySelector('.event-name') ? String(row.querySelector('.event-name').value || '').trim() : '';
+    if (!id) return;
+    const rows = this._collectMortgageRowsById(id);
+    for (let i = 0; i < rows.moRows.length; i++) {
+      this._removeRowAndResolutionPanel(rows.moRows[i]);
+    }
+    this._syncMortgagePlanById(id, { sourceType: 'M', sourceField: 'toAge', forceAutoAlign: true });
+    this._afterMortgageResolutionAction(row.dataset.rowId || rowId, { pulse: true });
+  }
+
+  shiftReverseMortgageStart(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const id = row.querySelector('.event-name') ? String(row.querySelector('.event-name').value || '').trim() : '';
+    if (!id) return;
+    const rows = this._collectMortgageRowsById(id);
+    if (!rows.mRow || !rows.mrRow) return;
+    const mTo = this._parseAgeValue(rows.mRow.querySelector('.event-to-age') ? rows.mRow.querySelector('.event-to-age').value : '');
+    if (isNaN(mTo)) return;
+    const mrFromInput = rows.mrRow.querySelector('.event-from-age');
+    const mrToInput = rows.mrRow.querySelector('.event-to-age');
+    const nextFrom = mTo + 1;
+    this._suppressMortgagePlanSync = true;
+    try {
+      this._setInputValueWithFlash(mrFromInput, nextFrom, true);
+      const currentTo = this._parseAgeValue(mrToInput ? mrToInput.value : '');
+      if (!isNaN(currentTo) && currentTo < nextFrom) {
+        this._setInputValueWithFlash(mrToInput, nextFrom, true);
+      }
+    } finally {
+      this._suppressMortgagePlanSync = false;
+    }
+    this._afterMortgageResolutionAction(row.dataset.rowId || rowId, { pulse: true, flashFields: ['.event-from-age'] });
+  }
+
+  alignMortgageToReverseStart(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const id = row.querySelector('.event-name') ? String(row.querySelector('.event-name').value || '').trim() : '';
+    if (!id) return;
+    const rows = this._collectMortgageRowsById(id);
+    if (!rows.mRow || !rows.mrRow) return;
+    const mFrom = this._parseAgeValue(rows.mRow.querySelector('.event-from-age') ? rows.mRow.querySelector('.event-from-age').value : '');
+    const mrFrom = this._parseAgeValue(rows.mrRow.querySelector('.event-from-age') ? rows.mrRow.querySelector('.event-from-age').value : '');
+    if (isNaN(mFrom) || isNaN(mrFrom)) return;
+    const nextMortgageEnd = Math.max(mFrom, mrFrom - 1);
+    this._suppressMortgagePlanSync = true;
+    try {
+      this._setInputValueWithFlash(rows.mRow.querySelector('.event-to-age'), nextMortgageEnd, true);
+      if (rows.mpRow) {
+        this._setInputValueWithFlash(rows.mpRow.querySelector('.event-from-age'), nextMortgageEnd, true);
+        this._setInputValueWithFlash(rows.mpRow.querySelector('.event-to-age'), nextMortgageEnd, true);
+      }
+    } finally {
+      this._suppressMortgagePlanSync = false;
+    }
+    this._syncMortgagePlanById(id, { sourceType: 'M', sourceField: 'toAge', forceAutoAlign: true });
+    this._afterMortgageResolutionAction(row.dataset.rowId || rowId, { pulse: true, flashFields: ['.event-to-age'] });
+  }
+
+  deleteReverseMortgage(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const id = row.querySelector('.event-name') ? String(row.querySelector('.event-name').value || '').trim() : '';
+    if (!id) return;
+    const rows = this._collectMortgageRowsById(id);
+    if (rows.mrRow) this._removeRowAndResolutionPanel(rows.mrRow);
+    this._afterMortgageResolutionAction(row.dataset.rowId || rowId, { pulse: true });
+  }
+
   _handleAgeFieldBlur(row, fieldType) {
     if (!row) return;
     const cfg = Config.getInstance();
@@ -974,7 +1850,7 @@ class EventsTableManager {
 
       const typeInput = row.querySelector('.event-type');
       const typeValue = typeInput ? typeInput.value : '';
-      if (typeValue !== 'R' && typeValue !== 'M') continue;
+      if (typeValue !== 'R' && !this.isMortgageLinkedEvent(typeValue)) continue;
 
       const fromAgeInput = row.querySelector('.event-from-age');
       const fromAge = Number(fromAgeInput ? fromAgeInput.value : '');
@@ -1311,6 +2187,12 @@ class EventsTableManager {
         }
       }
     });
+    if (eventType === 'MP') {
+      const mpToInput = row.querySelector('.event-to-age');
+      if (mpToInput) {
+        mpToInput.style.visibility = 'hidden';
+      }
+    }
     const rateInput = row.querySelector('.event-rate');
     if (eventType === 'MV' && rateInput) {
       rateInput.value = '';
@@ -1324,16 +2206,16 @@ class EventsTableManager {
     const mortgageDropdown = row.querySelector('.event-mortgage-dd');
     if (nameInput && countryDropdown && mortgageDropdown) {
       const isRelocation = eventType === 'MV';
-      const isMortgage = eventType === 'M';
+      const isMortgageLinked = this.isMortgageLinkedEvent(eventType);
 
-      nameInput.style.display = (isRelocation || isMortgage) ? 'none' : '';
+      nameInput.style.display = (isRelocation || isMortgageLinked) ? 'none' : '';
       countryDropdown.style.display = isRelocation ? '' : 'none';
-      mortgageDropdown.style.display = isMortgage ? '' : 'none';
+      mortgageDropdown.style.display = isMortgageLinked ? '' : 'none';
 
       // Update nameInput._dropdownWrapper for validation logic
       if (isRelocation && row._eventCountryDropdown) {
         nameInput._dropdownWrapper = row._eventCountryDropdown.wrapper;
-      } else if (isMortgage && row._eventMortgageDropdown) {
+      } else if (isMortgageLinked && row._eventMortgageDropdown) {
         nameInput._dropdownWrapper = row._eventMortgageDropdown.wrapper;
         this.updateMortgageOptions(row);
       } else {
@@ -2429,7 +3311,7 @@ class EventsTableManager {
     this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 
-  // Helper: apply function to all rows with same id for both R and M
+  // Helper: apply function to all rows with same id for real-estate + mortgage-linked events
   _applyToRealEstatePair(row, fn) {
     const idVal = row && row.querySelector ? (row.querySelector('.event-name')?.value) : null;
     if (!idVal) return;
@@ -2437,7 +3319,7 @@ class EventsTableManager {
     const targets = rows.filter(r => {
       const t = r.querySelector('.event-type');
       const n = r.querySelector('.event-name');
-      return t && n && (t.value === 'R' || t.value === 'M') && n.value === idVal;
+      return t && n && (t.value === 'R' || this.isMortgageLinkedEvent(t.value)) && n.value === idVal;
     });
     for (let i = 0; i < targets.length; i++) fn(targets[i]);
   }
@@ -2464,7 +3346,7 @@ class EventsTableManager {
     
     RelocationImpactDetector.analyzeEvents(events, startCountry);
     this.updateRelocationImpactIndicators(events);
-    this.webUI.updateStatusForRelocationImpacts(events);
+    this.webUI.updateStatusForRelocationImpacts(this._getRelocationStatusEvents(events));
     if (this.webUI.eventAccordionManager) {
       // Relocation resolution impacts should generally skip the "flying" sort animation
       // unless they involve creating a second event (which is handled by split/rent actions explicitly calling applySort)
@@ -2617,7 +3499,15 @@ class EventsTableManager {
   }
 
   isRealEstate(eventType) {
-    return ['R', 'M'].includes(eventType);
+    return ['R', 'M', 'MO', 'MP', 'MR'].includes(eventType);
+  }
+
+  isMortgageLinkedEvent(eventType) {
+    return ['M', 'MO', 'MP', 'MR'].includes(eventType);
+  }
+
+  isMortgagePlanEvent(eventType) {
+    return ['M', 'MO', 'MP'].includes(eventType);
   }
 
   isRelocation(eventType) {
@@ -2879,7 +3769,8 @@ class EventsTableManager {
     if (!row) return;
     const nameInput = row.querySelector('.event-name');
     if (!nameInput) return;
-
+    const rowType = row.querySelector('.event-type') ? row.querySelector('.event-type').value : '';
+    const previousName = String(nameInput.value || '').trim();
     nameInput.value = propertyName || '';
 
     const rowId = row.dataset ? row.dataset.rowId : '';
@@ -2887,13 +3778,30 @@ class EventsTableManager {
       ? row.querySelector(`#EventMortgageToggle_${rowId}`)
       : row.querySelector('.event-mortgage-dd .dd-toggle');
     if (!mortgageToggleEl) mortgageToggleEl = row.querySelector('.event-mortgage-dd .dd-toggle');
+    const placeholder = this.getMortgageDropdownPlaceholder(rowType);
     if (mortgageToggleEl) {
-      mortgageToggleEl.textContent = label || 'Select Property';
+      mortgageToggleEl.textContent = label || placeholder;
     }
 
     // Update internal selected value in the dropdown object
     if (row._eventMortgageDropdown && typeof row._eventMortgageDropdown.setOptions === 'function') {
       this.updateMortgageOptions(row);
+    }
+
+    if (rowType === 'M' && previousName && previousName !== propertyName) {
+      const tbody = row.closest('tbody');
+      if (tbody) {
+        tbody.querySelectorAll('tr').forEach(linkedRow => {
+          const linkedTypeInput = linkedRow.querySelector('.event-type');
+          const linkedNameInput = linkedRow.querySelector('.event-name');
+          if (!linkedTypeInput || !linkedNameInput) return;
+          if ((linkedTypeInput.value === 'MO' || linkedTypeInput.value === 'MP') && linkedNameInput.value.trim() === previousName) {
+            linkedNameInput.value = propertyName || '';
+            linkedNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+            if (linkedRow._eventMortgageDropdown) this.updateMortgageOptions(linkedRow);
+          }
+        });
+      }
     }
 
     // Clear warnings and re-run validation to update the ready state
@@ -2909,28 +3817,47 @@ class EventsTableManager {
     nameInput.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  getMortgageDropdownPlaceholder(eventType) {
+    return (eventType === 'MO' || eventType === 'MP') ? 'Select Mortgage' : 'Select Property';
+  }
+
+  getMortgageDropdownOptionNames(row) {
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return [];
+
+    const rowType = row && row.querySelector('.event-type') ? row.querySelector('.event-type').value : '';
+    const sourceType = (rowType === 'MO' || rowType === 'MP') ? 'M' : 'R';
+    const primary = Array.from(tbody.querySelectorAll('tr')).filter(r => {
+      const typeInput = r.querySelector('.event-type');
+      return typeInput && typeInput.value === sourceType;
+    }).map(r => {
+      const nameEl = r.querySelector('.event-name');
+      return nameEl ? String(nameEl.value || '').trim() : '';
+    }).filter(name => !!name);
+
+    if (sourceType === 'R' || primary.length > 0) {
+      return Array.from(new Set(primary));
+    }
+
+    // Fallback for MP/MO editing: if no mortgage row exists yet, allow selecting a property name.
+    const fallback = Array.from(tbody.querySelectorAll('tr')).filter(r => {
+      const typeInput = r.querySelector('.event-type');
+      return typeInput && typeInput.value === 'R';
+    }).map(r => {
+      const nameEl = r.querySelector('.event-name');
+      return nameEl ? String(nameEl.value || '').trim() : '';
+    }).filter(name => !!name);
+
+    return Array.from(new Set(fallback));
+  }
+
   updateMortgageOptions(row) {
     if (!row || !row._eventMortgageDropdown) return;
 
     const nameInput = row.querySelector('.event-name');
     const currentValue = String(nameInput ? nameInput.value : '').trim();
-
-    // Find all 'R' events (Real Estate)
-    const tbody = document.querySelector('#Events tbody');
-    if (!tbody) return;
-
-    const rEvents = Array.from(tbody.querySelectorAll('tr')).filter(r => {
-      const typeInput = r.querySelector('.event-type');
-      return typeInput && typeInput.value === 'R';
-    }).map(r => {
-      const nameEl = r.querySelector('.event-name');
-      return nameEl ? nameEl.value : '';
-    }).filter(name => !!name);
-
-    // Remove duplicates
-    const uniqueREvents = Array.from(new Set(rEvents));
-
-    const options = uniqueREvents.map(name => ({
+    const optionNames = this.getMortgageDropdownOptionNames(row);
+    const options = optionNames.map(name => ({
       value: name,
       label: name,
       selected: name === currentValue
@@ -2945,7 +3872,8 @@ class EventsTableManager {
       : row.querySelector('.event-mortgage-dd .dd-toggle');
     if (toggleEl) {
       const matched = options.find(o => o.value === currentValue);
-      toggleEl.textContent = matched ? matched.label : 'Select Property';
+      const rowType = row.querySelector('.event-type') ? row.querySelector('.event-type').value : '';
+      toggleEl.textContent = matched ? matched.label : this.getMortgageDropdownPlaceholder(rowType);
     }
   }
 
@@ -2980,9 +3908,9 @@ class EventsTableManager {
         ? countries.find(c => String(c.code).toUpperCase() === code)
         : null;
       await this.applyCountrySelection(row, code, matchedCountry ? matchedCountry.name : code);
-    } else if (resolvedType === 'M') {
+    } else if (this.isMortgageLinkedEvent(resolvedType)) {
       const propertyName = eventData && eventData.name != null ? eventData.name : '';
-      await this.applyMortgageSelection(row, propertyName, propertyName || 'Select Property');
+      await this.applyMortgageSelection(row, propertyName, propertyName || this.getMortgageDropdownPlaceholder(resolvedType));
     } else {
       const nameValue = eventData && eventData.name != null ? eventData.name : '';
       this.setRowFieldValue(row, '.event-name', nameValue);
@@ -2991,13 +3919,23 @@ class EventsTableManager {
     const amountValue = eventData && eventData.amount != null ? eventData.amount : '';
     const fromAgeValue = eventData && eventData.fromAge != null ? eventData.fromAge : '';
     const toAgeValue = eventData && eventData.toAge != null ? eventData.toAge : '';
+    const normalizedToAgeValue = (resolvedType === 'MP') ? fromAgeValue : toAgeValue;
     const rateValue = eventData && eventData.rate != null ? eventData.rate : '';
     const matchValue = eventData && eventData.match != null ? eventData.match : '';
     this.setRowFieldValue(row, '.event-amount', amountValue);
     this.setRowFieldValue(row, '.event-from-age', fromAgeValue);
-    this.setRowFieldValue(row, '.event-to-age', toAgeValue);
+    this.setRowFieldValue(row, '.event-to-age', normalizedToAgeValue);
     this.setRowFieldValue(row, '.event-rate', rateValue);
     this.setRowFieldValue(row, '.event-match', matchValue);
+
+    if (resolvedType === 'M') {
+      const explicitTerm = eventData && eventData.mortgageTerm != null ? parseInt(String(eventData.mortgageTerm), 10) : NaN;
+      const fromAgeNum = this._parseAgeValue(fromAgeValue);
+      const toAgeNum = this._parseAgeValue(normalizedToAgeValue);
+      const inferredTerm = (!isNaN(fromAgeNum) && !isNaN(toAgeNum) && toAgeNum > fromAgeNum) ? (toAgeNum - fromAgeNum) : NaN;
+      const termYears = (explicitTerm > 0) ? explicitTerm : inferredTerm;
+      if (termYears > 0) this.getOrCreateHiddenInput(row, 'event-mortgage-term', String(termYears));
+    }
 
     if (eventData && eventData.linkedCountry) {
       this.getOrCreateHiddenInput(row, 'event-linked-country', eventData.linkedCountry);
@@ -3152,6 +4090,14 @@ class EventsTableManager {
           </button>
       </td>
     `;
+
+    const initialType = type || selectedObj.value;
+    if (initialType === 'M') {
+      const fromAgeNum = this._parseAgeValue(fromAge);
+      const toAgeNum = this._parseAgeValue(toAge);
+      const termYears = (!isNaN(fromAgeNum) && !isNaN(toAgeNum) && toAgeNum > fromAgeNum) ? (toAgeNum - fromAgeNum) : NaN;
+      if (termYears > 0) this.getOrCreateHiddenInput(row, 'event-mortgage-term', String(termYears));
+    }
 
     /* =============================================================
        Instantiate dropdown for this row
@@ -3320,12 +4266,12 @@ class EventsTableManager {
             nameInput.dispatchEvent(new Event('input', { bubbles: true }));
           }
 
-          // Propagate change to linked mortgages
+                // Propagate change to linked mortgage-plan events
           if (oldName && oldName !== newName) {
             tbody.querySelectorAll('tr').forEach(mRow => {
               const mTypeInput = mRow.querySelector('.event-type');
               const mNameInput = mRow.querySelector('.event-name');
-              if (mTypeInput && mTypeInput.value === 'M' && mNameInput && mNameInput.value.trim() === oldName.trim()) {
+              if (mTypeInput && this.isMortgageLinkedEvent(mTypeInput.value) && mNameInput && mNameInput.value.trim() === oldName.trim()) {
                 mNameInput.value = newName;
                 mNameInput.dispatchEvent(new Event('change', { bubbles: true }));
                 if (mRow._eventMortgageDropdown) {
@@ -3340,7 +4286,7 @@ class EventsTableManager {
           // Refresh all mortgage dropdowns to reflect the new/updated R name
           tbody.querySelectorAll('tr').forEach(mRow => {
             const mTypeInput = mRow.querySelector('.event-type');
-            if (mTypeInput && mTypeInput.value === 'M' && mRow._eventMortgageDropdown) {
+            if (mTypeInput && this.isMortgageLinkedEvent(mTypeInput.value) && mRow._eventMortgageDropdown) {
               this.updateMortgageOptions(mRow);
             }
           });
@@ -3453,6 +4399,9 @@ class EventsTableManager {
         { value: 'E', label: 'Expense' },
         { value: 'R', label: 'Real Estate' },
         { value: 'M', label: 'Mortgage' },
+        { value: 'MO', label: 'Mortgage Overpay' },
+        { value: 'MP', label: 'Mortgage Payoff' },
+        { value: 'MR', label: 'Reverse Mortgage' },
         { value: 'SM', label: 'Stock Market' },
       ],
     );
@@ -3753,7 +4702,7 @@ class EventsTableManager {
     if (Config.getInstance().isRelocationEnabled()) {
       const events = this.webUI.readEvents(false);
       this.updateRelocationImpactIndicators(events);
-      this.webUI.updateStatusForRelocationImpacts(events);
+      this.webUI.updateStatusForRelocationImpacts(this._getRelocationStatusEvents(events));
       // Recompute relocation transitions and refresh charts so markers/currency mapping stay aligned
       if (this.webUI && this.webUI.chartManager) {
         RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);

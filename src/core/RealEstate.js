@@ -4,6 +4,7 @@ class RealEstate {
 
   constructor() {
     this.properties = {}
+    this.lastSaleBreakdowns = {};
   }
 
   buy(id, downpayment, appreciation, currency, linkedCountry) {
@@ -16,7 +17,9 @@ class RealEstate {
 
   sell(id) {
     if (id in this.properties) {
-      let value = this.properties[id].getValue();
+      var breakdown = this.properties[id].getSaleBreakdown();
+      this.lastSaleBreakdowns[id] = breakdown;
+      let value = breakdown.netProceeds;
       delete this.properties[id];
       return value;
     }
@@ -68,17 +71,46 @@ class RealEstate {
 
   settleMortgage(id) {
     if (id in this.properties) {
-      const remaining = this.properties[id].getRemainingPrincipal();
-      this.properties[id].borrowed = null;
-      this.properties[id].payment = null;
-      this.properties[id].totalPayments = 0;
-      this.properties[id].monthsPaid = 0;
-      this.properties[id].monthlyRate = 0;
-      this.properties[id].monthlyPaymentAmount = 0;
-      this.properties[id].fractionRepaid = this.properties[id].purchaseBasisAmount > 0 ? 1 : 0;
-      return remaining;
+      return this.properties[id].settleForwardMortgage();
     }
     return 0;
+  }
+
+  overpayMortgage(id, amount) {
+    if (id in this.properties) {
+      return this.properties[id].overpayMortgage(amount);
+    }
+    return 0;
+  }
+
+  reverseMortgage(id, rate, currency, linkedCountry) {
+    if (!(id in this.properties)) {
+      this.properties[id] = new Property();
+    }
+    this.properties[id].setupReverseMortgage(rate, currency, linkedCountry);
+    return this.properties[id];
+  }
+
+  advanceReverseMortgage(id, payoutAmount, rate, currency, linkedCountry) {
+    if (!(id in this.properties)) {
+      return { payout: 0, interestAccrued: 0, balanceAfter: 0, headroomBeforePayout: 0 };
+    }
+    if (!this.properties[id].hasReverseMortgage()) {
+      this.properties[id].setupReverseMortgage(rate, currency, linkedCountry);
+    }
+    return this.properties[id].advanceReverseMortgage(payoutAmount);
+  }
+
+  getReverseMortgageBalance(id) {
+    if (!(id in this.properties)) return 0;
+    return this.properties[id].getReverseMortgageBalance();
+  }
+
+  getSaleBreakdown(id) {
+    if (id in this.properties) {
+      return this.properties[id].getSaleBreakdown();
+    }
+    return this.lastSaleBreakdowns[id] || null;
   }
 
   getPurchaseBasis(id) {
@@ -210,6 +242,8 @@ class Property {
     this.paid = null;
     this.borrowed = null;
     this.payment = null;
+    this.reverseRate = 0;
+    this.reverseBalance = null;
   }
 
   buy(paid, appreciation, currency, linkedCountry) {
@@ -263,6 +297,110 @@ class Property {
     this.updatePurchaseBasis();
   }
 
+  clearForwardMortgageState() {
+    this.borrowed = null;
+    this.payment = null;
+    this.totalPayments = 0;
+    this.monthsPaid = 0;
+    this.monthlyRate = 0;
+    this.monthlyPaymentAmount = 0;
+    this.fractionRepaid = this.purchaseBasisAmount > 0 ? 1 : 0;
+  }
+
+  settleForwardMortgage() {
+    const remaining = this.getRemainingPrincipal();
+    this.clearForwardMortgageState();
+    return remaining;
+  }
+
+  overpayMortgage(amount) {
+    if (!(amount > 0)) return 0;
+    const remaining = this.getRemainingPrincipal();
+    if (!(remaining > 0)) return 0;
+
+    var applied = amount;
+    if (applied > remaining) applied = remaining;
+    var remainingAfter = remaining - applied;
+    if (remainingAfter <= 0) {
+      this.clearForwardMortgageState();
+      return applied;
+    }
+
+    var monthsLeft = this.totalPayments - this.monthsPaid;
+    if (!(monthsLeft > 0)) {
+      this.clearForwardMortgageState();
+      return applied;
+    }
+
+    this.borrowed = Money.create(remainingAfter, this.borrowed.currency, this.borrowed.country);
+    this.totalPayments = monthsLeft;
+    this.monthsPaid = 0;
+    return applied;
+  }
+
+  hasReverseMortgage() {
+    return !!this.reverseBalance;
+  }
+
+  setupReverseMortgage(rate, currency, linkedCountry) {
+    var normalizedCurrency = (currency !== undefined && currency !== null && currency !== '') ? String(currency).toUpperCase() : this.getCurrency();
+    var normalizedCountry = (linkedCountry !== undefined && linkedCountry !== null && linkedCountry !== '') ? String(linkedCountry).toLowerCase() : this.getLinkedCountry();
+    if (!normalizedCurrency) normalizedCurrency = 'EUR';
+    if (!normalizedCountry) normalizedCountry = 'ie';
+    if (this.paid) {
+      if (this.paid.currency !== normalizedCurrency) {
+        throw new Error('Property currency mismatch: paid=' + this.paid.currency + ', reverse=' + normalizedCurrency);
+      }
+      if (this.paid.country !== normalizedCountry) {
+        throw new Error('Property country mismatch: paid=' + this.paid.country + ', reverse=' + normalizedCountry);
+      }
+    }
+    if (!this.paid) {
+      this.paid = Money.create(0, normalizedCurrency, normalizedCountry);
+    }
+    if (!this.reverseBalance) {
+      this.reverseBalance = Money.create(0, normalizedCurrency, normalizedCountry);
+    }
+    this.reverseRate = (rate !== undefined && rate !== null && rate !== '') ? Number(rate) : 0;
+    if (isNaN(this.reverseRate)) this.reverseRate = 0;
+  }
+
+  getReverseMortgageBalance() {
+    return this.reverseBalance ? this.reverseBalance.amount : 0;
+  }
+
+  advanceReverseMortgage(payoutAmount) {
+    if (!this.reverseBalance) {
+      return { payout: 0, interestAccrued: 0, balanceAfter: 0, headroomBeforePayout: 0 };
+    }
+    var requested = Number(payoutAmount);
+    if (!(requested > 0)) requested = 0;
+
+    var grossValue = this.getGrossMarketValue();
+    var currentBalance = this.getReverseMortgageBalance();
+    var headroom = grossValue - currentBalance;
+    if (!(headroom > 0)) headroom = 0;
+
+    var payout = requested;
+    if (payout > headroom) payout = headroom;
+
+    var beforeInterest = currentBalance + payout;
+    var interestAccrued = 0;
+    var afterInterest = beforeInterest;
+    if (beforeInterest > 0 && this.reverseRate > 0) {
+      interestAccrued = beforeInterest * this.reverseRate;
+      afterInterest = beforeInterest + interestAccrued;
+    }
+
+    this.reverseBalance.amount = afterInterest;
+    return {
+      payout: payout,
+      interestAccrued: interestAccrued,
+      balanceAfter: afterInterest,
+      headroomBeforePayout: headroom
+    };
+  }
+
   addYear() {
     this.periods++;
     if (this.borrowed && this.totalPayments > 0 && this.monthsPaid < this.totalPayments) {
@@ -270,6 +408,9 @@ class Property {
       if (this.monthsPaid > this.totalPayments) {
         this.monthsPaid = this.totalPayments;
       }
+    }
+    if (this.borrowed && this.getRemainingPrincipal() <= 0) {
+      this.clearForwardMortgageState();
     }
     if (this.borrowed && this.borrowed.amount > 0) {
       this.fractionRepaid = 1 - (this.getRemainingPrincipal() / this.borrowed.amount);
@@ -285,7 +426,9 @@ class Property {
   }
 
   getPayment() {
-    return this.payment ? this.payment.amount : 0;
+    if (!this.payment) return 0;
+    if (this.getRemainingPrincipal() <= 0) return 0;
+    return this.payment.amount;
   }
 
   getRemainingPrincipal() {
@@ -318,53 +461,7 @@ class Property {
     return this.purchaseBasisAmount;
   }
 
-  /**
-   * Calculate current property value including appreciation and mortgage repayment.
-   * 
-   * @returns {number} Property value in native currency
-   * @assumes Same currency per property - paid, borrowed, and payment must share currency/country.
-   *          This invariant is enforced at buy/mortgage time and validated here.
-   * @performance Rare call (yearly per property), direct .amount arithmetic for zero overhead.
-   */
-  getValue() {
-    var propertyCurrency = this.getCurrency();
-    var propertyCountry = this.getLinkedCountry();
-    if (!propertyCurrency || !propertyCountry) return 0;
-
-    if (!(this.purchaseBasisAmount > 0)) {
-      if (!this.paid && !this.borrowed) return 0;
-    }
-
-    // Money path: safe currency-aware market value basis
-    var baseMoney = Money.create(this.purchaseBasisAmount, propertyCurrency, propertyCountry);
-    var remainingPrincipal = this.getRemainingPrincipal();
-
-    // Safety: enforce same-currency invariant per property
-    if (this.paid && this.borrowed) {
-      if (this.paid.currency !== this.borrowed.currency) {
-        throw new Error('Property currency mismatch: paid=' + this.paid.currency + ', borrowed=' + this.borrowed.currency);
-      }
-      if (this.paid.country !== this.borrowed.country) {
-        throw new Error('Property country mismatch: paid=' + this.paid.country + ', borrowed=' + this.borrowed.country);
-      }
-    }
-    if (this.paid && this.payment) {
-      if (this.paid.currency !== this.payment.currency) {
-        throw new Error('Property currency mismatch: paid=' + this.paid.currency + ', payment=' + this.payment.currency);
-      }
-      if (this.paid.country !== this.payment.country) {
-        throw new Error('Property country mismatch: paid=' + this.paid.country + ', payment=' + this.payment.country);
-      }
-    }
-    if (this.borrowed && this.payment) {
-      if (this.borrowed.currency !== this.payment.currency) {
-        throw new Error('Property currency mismatch: borrowed=' + this.borrowed.currency + ', payment=' + this.payment.currency);
-      }
-      if (this.borrowed.country !== this.payment.country) {
-        throw new Error('Property country mismatch: borrowed=' + this.borrowed.country + ', payment=' + this.payment.country);
-      }
-    }
-
+  resolveAppreciationRate() {
     var resolvedRate = null;
 
     // Preserve legacy behaviour when an explicit appreciation rate is set.
@@ -431,10 +528,100 @@ class Property {
         resolvedRate = fallbackRate;
       }
     }
+    return resolvedRate;
+  }
 
-    // Inflate: extract .amount, adjust, then net out remaining principal to produce equity.
-    var inflatedAmount = adjust(baseMoney.amount, resolvedRate, this.periods);
-    var equityAmount = inflatedAmount - remainingPrincipal;
+  getGrossMarketValue() {
+    var propertyCurrency = this.getCurrency();
+    var propertyCountry = this.getLinkedCountry();
+    if (!propertyCurrency || !propertyCountry) return 0;
+
+    if (!(this.purchaseBasisAmount > 0)) {
+      if (!this.paid && !this.borrowed) return 0;
+    }
+
+    // Money path: safe currency-aware market value basis
+    var baseMoney = Money.create(this.purchaseBasisAmount, propertyCurrency, propertyCountry);
+
+    // Safety: enforce same-currency invariant per property
+    if (this.paid && this.borrowed) {
+      if (this.paid.currency !== this.borrowed.currency) {
+        throw new Error('Property currency mismatch: paid=' + this.paid.currency + ', borrowed=' + this.borrowed.currency);
+      }
+      if (this.paid.country !== this.borrowed.country) {
+        throw new Error('Property country mismatch: paid=' + this.paid.country + ', borrowed=' + this.borrowed.country);
+      }
+    }
+    if (this.paid && this.payment) {
+      if (this.paid.currency !== this.payment.currency) {
+        throw new Error('Property currency mismatch: paid=' + this.paid.currency + ', payment=' + this.payment.currency);
+      }
+      if (this.paid.country !== this.payment.country) {
+        throw new Error('Property country mismatch: paid=' + this.paid.country + ', payment=' + this.payment.country);
+      }
+    }
+    if (this.borrowed && this.payment) {
+      if (this.borrowed.currency !== this.payment.currency) {
+        throw new Error('Property currency mismatch: borrowed=' + this.borrowed.currency + ', payment=' + this.payment.currency);
+      }
+      if (this.borrowed.country !== this.payment.country) {
+        throw new Error('Property country mismatch: borrowed=' + this.borrowed.country + ', payment=' + this.payment.country);
+      }
+    }
+    if (this.reverseBalance && this.paid) {
+      if (this.paid.currency !== this.reverseBalance.currency) {
+        throw new Error('Property currency mismatch: paid=' + this.paid.currency + ', reverse=' + this.reverseBalance.currency);
+      }
+      if (this.paid.country !== this.reverseBalance.country) {
+        throw new Error('Property country mismatch: paid=' + this.paid.country + ', reverse=' + this.reverseBalance.country);
+      }
+    }
+
+    var resolvedRate = this.resolveAppreciationRate();
+    return adjust(baseMoney.amount, resolvedRate, this.periods);
+  }
+
+  getSaleBreakdown() {
+    var grossValue = this.getGrossMarketValue();
+    var forwardBalance = this.getRemainingPrincipal();
+    var forwardPayoff = forwardBalance;
+    if (forwardPayoff > grossValue) forwardPayoff = grossValue;
+
+    var afterForward = grossValue - forwardPayoff;
+    if (!(afterForward > 0)) afterForward = 0;
+
+    var reverseBalance = this.getReverseMortgageBalance();
+    var reversePayoff = reverseBalance;
+    if (reversePayoff > afterForward) reversePayoff = afterForward;
+
+    var reverseWriteOff = reverseBalance - reversePayoff;
+    if (!(reverseWriteOff > 0)) reverseWriteOff = 0;
+
+    var netProceeds = afterForward - reversePayoff;
+    if (!(netProceeds > 0)) netProceeds = 0;
+
+    return {
+      grossValue: grossValue,
+      forwardMortgagePayoff: forwardPayoff,
+      reverseMortgagePayoff: reversePayoff,
+      reverseMortgageWriteOff: reverseWriteOff,
+      netProceeds: netProceeds
+    };
+  }
+
+  /**
+   * Calculate current property value including appreciation and mortgage repayment.
+   * 
+   * @returns {number} Property value in native currency
+   * @assumes Same currency per property - paid, borrowed, and payment must share currency/country.
+   *          This invariant is enforced at buy/mortgage time and validated here.
+   * @performance Rare call (yearly per property), direct .amount arithmetic for zero overhead.
+   */
+  getValue() {
+    var grossValue = this.getGrossMarketValue();
+    var remainingPrincipal = this.getRemainingPrincipal();
+    var reverseBalance = this.getReverseMortgageBalance();
+    var equityAmount = grossValue - remainingPrincipal - reverseBalance;
     return (equityAmount > 0) ? equityAmount : 0;
   }
 
@@ -442,6 +629,7 @@ class Property {
     if (this.paid) return this.paid.currency;
     if (this.borrowed) return this.borrowed.currency;
     if (this.payment) return this.payment.currency;
+    if (this.reverseBalance) return this.reverseBalance.currency;
     return null;
   }
 
@@ -449,6 +637,7 @@ class Property {
     if (this.paid) return this.paid.country;
     if (this.borrowed) return this.borrowed.country;
     if (this.payment) return this.payment.country;
+    if (this.reverseBalance) return this.reverseBalance.country;
     return null;
   }
 

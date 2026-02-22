@@ -372,7 +372,11 @@ class EventAccordionManager {
   }
 
   isRealEstate(eventType) {
-    return ['R', 'M'].includes(eventType);
+    return ['R', 'M', 'MO', 'MP', 'MR'].includes(eventType);
+  }
+
+  isMortgageLinked(eventType) {
+    return ['M', 'MO', 'MP', 'MR'].includes(eventType);
   }
 
   isRelocation(eventType) {
@@ -1176,7 +1180,7 @@ class EventAccordionManager {
                   tbody.querySelectorAll('tr').forEach(mRow => {
                     const mTypeInput = mRow.querySelector('.event-type');
                     const mNameInput = mRow.querySelector('.event-name');
-                    if (mTypeInput && mTypeInput.value === 'M' && mNameInput && mNameInput.value.trim() === oldName) {
+                    if (mTypeInput && this.isMortgageLinked(mTypeInput.value) && mNameInput && mNameInput.value.trim() === oldName) {
                       mNameInput.value = value;
                       mNameInput.dispatchEvent(new Event('change', { bubbles: true }));
                       if (this.webUI.eventsTableManager) {
@@ -1214,7 +1218,7 @@ class EventAccordionManager {
                     // Find the event for this item
                     const events = (this.webUI.readEvents) ? this.webUI.readEvents(false) : [];
                     const mEvent = events.find(ev => ev.rowId === item.dataset.rowId || ev.id === item.dataset.eventId);
-                    if (mEvent && mEvent.type === 'M') {
+                    if (mEvent && this.isMortgageLinked(mEvent.type)) {
                       this.updateAccordionMortgageOptions(mEvent, item);
                     }
                   }
@@ -1345,14 +1349,24 @@ class EventAccordionManager {
             }
             break;
 
-          case 'M': // Mortgage
-            // Mortgages need fromAge and toAge (payment period)
+          case 'M':
+          case 'MR': // Mortgage / Reverse mortgage
             // Keep existing toAge if available
             if (rateInput) {
               rateInput.value = ''; // Interest rate - no default, user must set
             }
             if (matchInput) {
               matchInput.value = ''; // No match for mortgages
+            }
+            break;
+
+          case 'MO':
+          case 'MP': // Overpay / payoff
+            if (rateInput) {
+              rateInput.value = '';
+            }
+            if (matchInput) {
+              matchInput.value = '';
             }
             break;
 
@@ -2583,23 +2597,11 @@ class EventAccordionManager {
 
     const nameInput = container.querySelector('.accordion-edit-name');
     const currentValue = String(nameInput ? nameInput.value : '').trim();
-
-    // Find all 'R' events (Real Estate)
-    const tbody = document.querySelector('#Events tbody');
-    if (!tbody) return;
-
-    const rEvents = Array.from(tbody.querySelectorAll('tr')).filter(r => {
-      const typeInput = r.querySelector('.event-type');
-      return typeInput && typeInput.value === 'R';
-    }).map(r => {
-      const nameEl = r.querySelector('.event-name');
-      return nameEl ? nameEl.value : '';
-    }).filter(name => !!name);
-
-    // Remove duplicates
-    const uniqueREvents = Array.from(new Set(rEvents));
-
-    const options = uniqueREvents.map(name => ({
+    const tableRow = this.findTableRowForEvent(event);
+    const optionNames = (this.webUI && this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.getMortgageDropdownOptionNames === 'function')
+      ? this.webUI.eventsTableManager.getMortgageDropdownOptionNames(tableRow || container)
+      : [];
+    const options = optionNames.map(name => ({
       value: name,
       label: name,
       selected: name === currentValue
@@ -2611,16 +2613,23 @@ class EventAccordionManager {
     const toggleEl = container.querySelector(`#AccordionEventMortgageToggle_${event.rowId}`);
     if (toggleEl) {
       const matched = options.find(o => o.value === currentValue);
-      toggleEl.textContent = matched ? matched.label : 'Select Property';
+      const placeholder = (this.webUI && this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.getMortgageDropdownPlaceholder === 'function')
+        ? this.webUI.eventsTableManager.getMortgageDropdownPlaceholder(event.type)
+        : 'Select Property';
+      toggleEl.textContent = matched ? matched.label : placeholder;
     }
   }
 
   applyAccordionMortgageSelection(event, container, propertyName, label) {
     const nameInput = container.querySelector('.accordion-edit-name');
     const toggleEl = container.querySelector(`#AccordionEventMortgageToggle_${event.rowId}`);
+    const previousName = String(nameInput ? nameInput.value : '').trim();
+    const placeholder = (this.webUI && this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.getMortgageDropdownPlaceholder === 'function')
+      ? this.webUI.eventsTableManager.getMortgageDropdownPlaceholder(event.type)
+      : 'Select Property';
 
     if (nameInput) nameInput.value = propertyName;
-    if (toggleEl) toggleEl.textContent = label;
+    if (toggleEl) toggleEl.textContent = label || placeholder;
 
     this.clearFieldValidation(nameInput);
     this.syncFieldToTableWithoutDefaults(event, '.event-name', propertyName);
@@ -2636,6 +2645,24 @@ class EventAccordionManager {
       const uiMgr = (typeof uiManager !== 'undefined') ? uiManager : (this.webUI.uiManager);
       if (uiMgr && typeof uiMgr.readEvents === 'function') {
         uiMgr.readEvents(true);
+      }
+    }
+
+    if (event.type === 'M' && previousName && previousName !== propertyName) {
+      const tbody = document.querySelector('#Events tbody');
+      if (tbody) {
+        tbody.querySelectorAll('tr').forEach(linkedRow => {
+          const linkedType = linkedRow.querySelector('.event-type');
+          const linkedName = linkedRow.querySelector('.event-name');
+          if (!linkedType || !linkedName) return;
+          if ((linkedType.value === 'MO' || linkedType.value === 'MP') && linkedName.value.trim() === previousName) {
+            linkedName.value = propertyName || '';
+            linkedName.dispatchEvent(new Event('change', { bubbles: true }));
+            if (this.webUI && this.webUI.eventsTableManager) {
+              this.webUI.eventsTableManager.updateMortgageOptions(linkedRow);
+            }
+          }
+        });
       }
     }
   }

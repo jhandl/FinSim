@@ -145,8 +145,6 @@ class WebUI extends AbstractUI {
   }
 
   updateRunButtonState() {
-    const runButton = document.getElementById('runSimulation');
-    const mobileRunButton = document.getElementById('runSimulationMobile');
     const hasImpacts = this.relocationImpactCount && this.relocationImpactCount > 0;
 
     // Don't disable if simulation is already running
@@ -154,60 +152,41 @@ class WebUI extends AbstractUI {
       return;
     }
 
-    if (runButton) {
-      runButton.disabled = hasImpacts;
-      if (hasImpacts) {
-        runButton.classList.add('disabled');
-        runButton.style.pointerEvents = 'none';
-      } else {
-        runButton.classList.remove('disabled');
-        runButton.style.pointerEvents = '';
+    ['runSimulation', 'runSimulationMobile'].forEach(id => {
+      const button = document.getElementById(id);
+      if (button) {
+        button.disabled = hasImpacts;
+        button.classList.toggle('disabled', hasImpacts);
+        button.style.pointerEvents = hasImpacts ? 'none' : '';
       }
-    }
-
-    if (mobileRunButton) {
-      mobileRunButton.disabled = hasImpacts;
-      if (hasImpacts) {
-        mobileRunButton.classList.add('disabled');
-        mobileRunButton.style.pointerEvents = 'none';
-      } else {
-        mobileRunButton.classList.remove('disabled');
-        mobileRunButton.style.pointerEvents = '';
-      }
-    }
+    });
   }
 
   setupStatusClickHandler() {
     this.statusElement = document.getElementById('progress');
-    this.statusElement.addEventListener('click', () => {
-      if (this.statusElement.classList.contains('relocation-impact') && this.relocationImpactCount) {
+    const handleImpactClick = (isMobile = false) => {
+      if (this.relocationImpactCount) {
         this.showAlert(
-          `${this.relocationImpactCount} events need attention due to relocations in your timeline. Click the warning badges (⚠️) on affected events to resolve them.`,
-          "Relocation Impacts Need Review"
+          `Click the warning badges (⚠️) on affected events to resolve them.`,
+          "Events Need Review"
         ).then(() => {
           if (this.eventsTableManager && typeof this.eventsTableManager.navigateToFirstImpact === 'function') {
             this.eventsTableManager.navigateToFirstImpact();
           }
         });
       }
-    });
+    };
 
-    // Also bind click handler for mobile status indicator if present
-    const mobileStatusElement = document.getElementById('progressMobile');
-    if (mobileStatusElement) {
-      mobileStatusElement.addEventListener('click', () => {
-        if (mobileStatusElement.classList.contains('relocation-impact') && this.relocationImpactCount) {
-          this.showAlert(
-            `Cannot run simulation. ${this.relocationImpactCount} events need attention due to relocations in your timeline. Click the warning badges (⚠️) on affected events to resolve them.`,
-            "Relocation Impacts Need Review"
-          ).then(() => {
-            if (this.eventsTableManager && typeof this.eventsTableManager.navigateToFirstImpact === 'function') {
-              this.eventsTableManager.navigateToFirstImpact();
-            }
-          });
-        }
-      });
-    }
+    ['progress', 'progressMobile'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('click', () => {
+          if (el.classList.contains('relocation-impact')) {
+            handleImpactClick(id === 'progressMobile');
+          }
+        });
+      }
+    });
   }
 
   getTableData(groupId, columnCount = 1, includeHiddenEventTypes = false) {

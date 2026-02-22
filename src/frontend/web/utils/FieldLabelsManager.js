@@ -91,7 +91,7 @@ class FieldLabelsManager {
     if (fieldName === 'rate') {
       if (eventType === 'R') return 'Appreciation Rate';
       if (eventType === 'SM') return 'Market Growth';
-      if (eventType === 'M') return 'Interest Rate';
+      if (eventType === 'M' || eventType === 'MR') return 'Interest Rate';
       return 'Growth Rate';
     }
     if (fieldName === 'amount' && eventType === 'MV') {
@@ -119,7 +119,7 @@ class FieldLabelsManager {
    */
   _getHardcodedPlaceholder(eventType, fieldName) {
     if (fieldName === 'rate') {
-      if (eventType === 'SM' || eventType === 'M') return '';
+      if (eventType === 'SM' || eventType === 'M' || eventType === 'MR') return '';
       return 'inflation';
     }
     return '';
@@ -153,6 +153,18 @@ class FieldLabelsManager {
           placeholders: { rate: "" }
         },
         M: {
+          rate: "Interest Rate",
+          placeholders: { rate: "" }
+        },
+        MO: {
+          amount: "Yearly Overpay"
+        },
+        MP: {
+          amount: "Payoff Amount",
+          rate: "Growth Rate",
+          placeholders: { rate: "" }
+        },
+        MR: {
           rate: "Interest Rate",
           placeholders: { rate: "" }
         },

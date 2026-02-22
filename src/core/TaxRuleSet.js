@@ -833,6 +833,14 @@ class TaxRuleSet {
     return !!(this.raw.propertyGainsTax && typeof this.raw.propertyGainsTax === 'object');
   }
 
+  getReverseMortgagePayoutTaxTreatment() {
+    var re = this.raw.realEstate || {};
+    var reverseMortgage = re.reverseMortgage || {};
+    var treatment = reverseMortgage.payoutTaxTreatment;
+    if (treatment === 'otherIncome' || treatment === 'taxFree') return treatment;
+    return 'taxFree';
+  }
+
   // ----- Investment Types (Generic) -----
   getInvestmentTypes() {
     return Array.isArray(this.raw.investmentTypes) ? this.raw.investmentTypes : [];

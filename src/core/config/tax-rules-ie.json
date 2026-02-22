@@ -78,6 +78,12 @@
     "capitalGainsOptions": { "rateRef": "capitalGainsTax.rate", "eligibleForAnnualExemption": true, "allowLossOffset": true }
   },
 
+  "realEstate": {
+    "reverseMortgage": {
+      "payoutTaxTreatment": "taxFree"
+    }
+  },
+
   "dividendTax": { "rate": 0.33, "annualExemption": 0, "withholding": false },
 
   "interestTax": { "rate": 0.33, "withholding": false },

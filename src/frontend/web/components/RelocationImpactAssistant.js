@@ -126,7 +126,10 @@ var RelocationImpactAssistant = {
     }
     const startCountry = Config.getInstance().getStartCountry();
     const canRenderWithoutMv = (impactCategory === 'simple' && (event.type === 'R' || event.type === 'M' || (event.type === 'RI' && isRelocationRentalOrphan))) ||
-      impactCategory === 'pension_conflict';
+      impactCategory === 'pension_conflict' ||
+      impactCategory === 'mortgage_plan_conflict' ||
+      impactCategory === 'mortgage_amount_conflict' ||
+      impactCategory === 'mortgage_overlap';
     if (!mvEvent && !canRenderWithoutMv && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift' && impactCategory !== 'split_amount_shift') return '';
     let destCountry = mvEvent ? String(mvEvent.name || '').trim().toLowerCase() : startCountry;
     if (impactCategory === 'pension_conflict' && impactDetails && impactDetails.country) {
@@ -166,7 +169,72 @@ var RelocationImpactAssistant = {
     const actions = [];
     let containerAttributes = '';
 
-    if (event.relocationImpact.category === 'boundary') {
+    if (event.relocationImpact.category === 'mortgage_plan_conflict') {
+      var expectedAge = impactDetails && impactDetails.expectedAge !== undefined ? impactDetails.expectedAge : '';
+      var mortgageEndAge = impactDetails && impactDetails.mortgageEndAge !== undefined ? impactDetails.mortgageEndAge : '';
+      var payoffAge = impactDetails && impactDetails.payoffAge !== undefined ? impactDetails.payoffAge : '';
+      addAction(actions, {
+        action: 'adopt_overpay_age',
+        tabLabel: 'Use overpay age',
+        instantApply: true,
+        tooltip: 'Apply the overpay-implied payoff age (' + expectedAge + ') to both Mortgage and Payoff events.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
+      });
+      addAction(actions, {
+        action: 'keep_manual_payoff_age',
+        tabLabel: 'Keep manual age',
+        instantApply: true,
+        tooltip: 'Keep the manual Mortgage/Payoff age (' + (payoffAge || mortgageEndAge) + ') and trim overpay schedule to match.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
+      });
+      addAction(actions, {
+        action: 'delete_mortgage_overpay',
+        tabLabel: 'Remove overpay',
+        instantApply: true,
+        tooltip: 'Delete linked Mortgage Overpay events for this mortgage.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
+      });
+    } else if (event.relocationImpact.category === 'mortgage_amount_conflict') {
+      var currentAmount = impactDetails && impactDetails.currentAmount !== undefined ? impactDetails.currentAmount : '';
+      var expectedAmount = impactDetails && impactDetails.expectedAmount !== undefined ? impactDetails.expectedAmount : '';
+      addAction(actions, {
+        action: 'adopt_calculated_payoff_amount',
+        tabLabel: 'Use calculated amount',
+        instantApply: true,
+        tooltip: 'Update Mortgage Payoff amount from ' + currentAmount + ' to ' + expectedAmount + '.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
+      });
+      addAction(actions, {
+        action: 'keep_manual_payoff_amount',
+        tabLabel: 'Keep manual amount',
+        instantApply: true,
+        tooltip: 'Keep your manual payoff amount and mark this impact as reviewed.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
+      });
+    } else if (event.relocationImpact.category === 'mortgage_overlap') {
+      var suggestedReverseStart = impactDetails && impactDetails.suggestedReverseStart !== undefined ? impactDetails.suggestedReverseStart : '';
+      addAction(actions, {
+        action: 'shift_reverse_start',
+        tabLabel: 'Shift reverse start',
+        instantApply: true,
+        tooltip: 'Move Reverse Mortgage start to age ' + suggestedReverseStart + ' to avoid overlap.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
+      });
+      addAction(actions, {
+        action: 'align_mortgage_to_reverse',
+        tabLabel: 'End mortgage earlier',
+        instantApply: true,
+        tooltip: 'End Mortgage/Payoff right before Reverse Mortgage starts.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
+      });
+      addAction(actions, {
+        action: 'delete_reverse_mortgage',
+        tabLabel: 'Remove reverse',
+        instantApply: true,
+        tooltip: 'Delete the Reverse Mortgage event.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
+      });
+    } else if (event.relocationImpact.category === 'boundary') {
       if (event.type === 'R') {
         const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
         const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
@@ -548,6 +616,38 @@ var RelocationImpactAssistant = {
         try { this._sellProperty(event, payload, env); } catch (_) { }
         break;
       }
+      case 'adopt_overpay_age': {
+        if (typeof etm.adoptOverpayPayoffAge === 'function') etm.adoptOverpayPayoffAge(rowId, eventId);
+        break;
+      }
+      case 'keep_manual_payoff_age': {
+        if (typeof etm.keepManualPayoffAge === 'function') etm.keepManualPayoffAge(rowId, eventId);
+        break;
+      }
+      case 'adopt_calculated_payoff_amount': {
+        if (typeof etm.adoptCalculatedPayoffAmount === 'function') etm.adoptCalculatedPayoffAmount(rowId, eventId);
+        break;
+      }
+      case 'keep_manual_payoff_amount': {
+        if (typeof etm.keepManualPayoffAmount === 'function') etm.keepManualPayoffAmount(rowId, eventId);
+        break;
+      }
+      case 'delete_mortgage_overpay': {
+        if (typeof etm.deleteMortgageOverpay === 'function') etm.deleteMortgageOverpay(rowId, eventId);
+        break;
+      }
+      case 'shift_reverse_start': {
+        if (typeof etm.shiftReverseMortgageStart === 'function') etm.shiftReverseMortgageStart(rowId, eventId);
+        break;
+      }
+      case 'align_mortgage_to_reverse': {
+        if (typeof etm.alignMortgageToReverseStart === 'function') etm.alignMortgageToReverseStart(rowId, eventId);
+        break;
+      }
+      case 'delete_reverse_mortgage': {
+        if (typeof etm.deleteReverseMortgage === 'function') etm.deleteReverseMortgage(rowId, eventId);
+        break;
+      }
       default:
         break;
     }
@@ -899,6 +999,9 @@ var RelocationImpactAssistant = {
     }
 
     etm._suppressSellMarkerClear = previousSuppress;
+    if (event.type === 'M' && typeof etm.ensureMortgagePayoffEvent === 'function') {
+      etm.ensureMortgagePayoffEvent(rowId, eventId);
+    }
     if (etm && typeof etm._afterResolutionAction === 'function') {
       etm._afterResolutionAction(rowId, { flashFields: ['.event-to-age'] });
     }

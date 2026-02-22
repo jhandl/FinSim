@@ -337,6 +337,147 @@ EventWizards:
             - template: "{name}: Purchase for {propertyValue} with a down payment of {amount} ({downPaymentPct}) {periodPhrase}{growthPart}. Loan term {mortgageTerm} years at {mortgageRate} (≈ {mortgageMonthlyPayment} per month, {mortgageAnnualPayment} per year)."
         showButtons: ["back", "create"]
 
+  - eventType: "MO"
+    name: "Mortgage Overpay"
+    category: "property"
+    steps:
+      - stepId: "name"
+        title: "Linked Mortgage"
+        contentType: "input"
+        field: "name"
+        labelPosition: "top"
+        content:
+          text: "Select the mortgage/property this overpay applies to."
+          validation: "required"
+        showButtons: ["back", "next"]
+
+      - stepId: "amount"
+        title: "Yearly Overpay Amount"
+        contentType: "input"
+        field: "amount"
+        labelPosition: "left"
+        content:
+          text: "How much extra principal will you pay each year?"
+          inputType: "currency"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+
+      - stepId: "period"
+        title: "Overpay Period"
+        contentType: "period"
+        fields: ["fromAge", "toAge"]
+        labelPosition: "left"
+        content:
+          text: "When does this overpay start and end?"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+
+      - stepId: "summary"
+        title: "Review & Create"
+        contentType: "summary"
+        content:
+          templates:
+            - template: "{name}: Overpay {amount} per year {periodPhrase}."
+        showButtons: ["back", "create"]
+
+  - eventType: "MP"
+    name: "Mortgage Payoff"
+    category: "property"
+    steps:
+      - stepId: "name"
+        title: "Linked Mortgage"
+        contentType: "input"
+        field: "name"
+        labelPosition: "top"
+        content:
+          text: "Select the mortgage/property to pay off."
+          validation: "required"
+        showButtons: ["back", "next"]
+
+      - stepId: "amount"
+        title: "Payoff Amount"
+        contentType: "input"
+        field: "amount"
+        labelPosition: "left"
+        content:
+          text: "Enter the expected payoff amount (auto-updated in the table)."
+          inputType: "currency"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+
+      - stepId: "timing"
+        title: "Payoff Timing"
+        contentType: "input"
+        field: "fromAge"
+        labelPosition: "left"
+        content:
+          text: "At what age/year will you pay off the mortgage?"
+          inputType: "age"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+
+      - stepId: "summary"
+        title: "Review & Create"
+        contentType: "summary"
+        content:
+          templates:
+            - template: "{name}: One-off mortgage payoff of {amount} at age/year {fromAge}."
+        showButtons: ["back", "create"]
+
+  - eventType: "MR"
+    name: "Reverse Mortgage"
+    category: "property"
+    steps:
+      - stepId: "name"
+        title: "Linked Property"
+        contentType: "input"
+        field: "name"
+        labelPosition: "top"
+        content:
+          text: "Select the property for this reverse mortgage."
+          validation: "required"
+        showButtons: ["back", "next"]
+
+      - stepId: "amount"
+        title: "Yearly Payout"
+        contentType: "input"
+        field: "amount"
+        labelPosition: "left"
+        content:
+          text: "How much cash will this reverse mortgage pay out each year?"
+          inputType: "currency"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+
+      - stepId: "period"
+        title: "Reverse Mortgage Period"
+        contentType: "period"
+        fields: ["fromAge", "toAge"]
+        labelPosition: "left"
+        content:
+          text: "When does this reverse mortgage run?"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+
+      - stepId: "rate"
+        title: "Interest Rate"
+        contentType: "input"
+        field: "rate"
+        labelPosition: "left"
+        content:
+          text: "What interest rate applies to the reverse mortgage balance?"
+          inputType: "percentage"
+          validation: "required"
+        showButtons: ["back", "next"]
+
+      - stepId: "summary"
+        title: "Review & Create"
+        contentType: "summary"
+        content:
+          templates:
+            - template: "{name}: Reverse mortgage payout of {amount} per year {periodPhrase} at {rate} interest."
+        showButtons: ["back", "create"]
+
   # Market Event Wizard (Investment Category)
   - eventType: "SM"
     name: "Market Event"

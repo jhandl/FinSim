@@ -10,7 +10,7 @@ class EventsWizard {
     this.manager.onCompleteAction = (eventData) => this.createEvent(eventData);
 
     // Load YAML config
-    this.manager.loadConfig('/src/frontend/web/assets/events-wizard.yml?v=20260217-3');
+    this.manager.loadConfig('/src/frontend/web/assets/events-wizard.yml?v=20260222-4');
   }
 
   // Delegated API
@@ -86,6 +86,12 @@ class EventsWizard {
       if (freq === 'weekly') annualAmount *= 52; else if (freq === 'monthly') annualAmount *= 12;
       data.amount = Math.round(annualAmount);
       if (freq === 'oneoff') { data.toAge = data.fromAge; data.rate = ''; }
+    }
+
+    if (this.manager.wizardState.eventType === 'MP') {
+      data.toAge = data.fromAge;
+      data.rate = '';
+      data.match = '';
     }
 
     if (this.manager.wizardState.eventType === 'SI' && data.incomeType === 'salary') {
@@ -493,7 +499,7 @@ class EventsRenderer extends WizardRenderer {
   processTextVariablesWithGrowth(text, wizardState, growthRequested) {
     if (!text) return text;
     const data = wizardState.data || {};
-    const isProperty = (wizardState && wizardState.eventType) ? ['R', 'M'].includes(wizardState.eventType) : false;
+    const isProperty = (wizardState && wizardState.eventType) ? ['R', 'M', 'MR'].includes(wizardState.eventType) : false;
     const derived = this.computeDerivedVariables(data, growthRequested, isProperty, wizardState);
     const variables = { ...data, ...derived };
     return text.replace(/\{([^}]+)\}/g, (match, key) => {

@@ -1088,10 +1088,11 @@ function processEvents() {
   }
 
   function recordIncomeEntry(state, info, amount, payload) {
-    if (!state || !amount) return;
+    var entry = payload || {};
+    if (!state) return;
+    if (!amount && !entry.allowZero) return;
     var key = ensureBucket(state.incomeBuckets, info);
     state.incomeBuckets[key].total += amount;
-    var entry = payload || {};
     var eff = getEffectiveCurrency(info);
     entry.info = eff;
     entry.bucketKey = key;
@@ -1269,6 +1270,19 @@ function processEvents() {
           cash += entryConvertedAmount;
           cashMoney.amount += entryConvertedAmount;
           attributionManager.record('realestatecapital', entry.label || ('Sale (' + entry.eventId + ')'), -entryConvertedAmount);
+          var salePropertyId = entry.eventId;
+          var forwardSettlement = (typeof entry.forwardMortgagePayoff === 'number') ? (entry.forwardMortgagePayoff * entryConversionFactor) : 0;
+          var reverseSettlement = (typeof entry.reverseMortgagePayoff === 'number') ? (entry.reverseMortgagePayoff * entryConversionFactor) : 0;
+          var reverseWriteOff = (typeof entry.reverseMortgageWriteOff === 'number') ? (entry.reverseMortgageWriteOff * entryConversionFactor) : 0;
+          if (forwardSettlement > 0) {
+            attributionManager.record('expenses', 'Mortgage Settlement (' + salePropertyId + ')', forwardSettlement);
+          }
+          if (reverseSettlement > 0) {
+            attributionManager.record('expenses', 'Reverse Mortgage Settlement (' + salePropertyId + ')', reverseSettlement);
+          }
+          if (reverseWriteOff > 0) {
+            attributionManager.record('realestatecapital', 'Reverse Mortgage Write-off (' + salePropertyId + ')', -reverseWriteOff);
+          }
 
           // Compute property gain and declare to Taxman
           var propertyId = entry.eventId;
@@ -1591,6 +1605,15 @@ function processEvents() {
           attributionManager.record('expenses', entry.label || entry.eventId, entryConvertedAmount);
           break;
 
+        case 'mortgage_overpay':
+          var overpayTotal = categoryTotalsByType['mortgage_overpay'] || 0;
+          if (!countedCategories[entryCategory] && overpayTotal > 0) {
+            expenses += overpayTotal;
+            countedCategories[entryCategory] = true;
+          }
+          attributionManager.record('expenses', entry.label || entry.eventId, entryConvertedAmount);
+          break;
+
         case 'mortgage_payoff':
           var payoffTotal = categoryTotalsByType['mortgage_payoff'] || 0;
           if (!countedCategories[entryCategory] && payoffTotal > 0) {
@@ -1598,6 +1621,24 @@ function processEvents() {
             countedCategories[entryCategory] = true;
           }
           attributionManager.record('expenses', entry.label || entry.eventId, entryConvertedAmount);
+          break;
+
+        case 'reverse_mortgage_payout':
+          var reversePayoutTotal = categoryTotalsByType['reverse_mortgage_payout'] || 0;
+          var reversePayoutTreatment = (entry.taxTreatment === 'otherIncome') ? 'otherIncome' : 'taxFree';
+          if (!countedCategories[entryCategory] && reversePayoutTotal > 0) {
+            if (reversePayoutTreatment === 'taxFree') {
+              incomeTaxFree += reversePayoutTotal;
+            }
+            countedCategories[entryCategory] = true;
+          }
+          if (reversePayoutTreatment === 'taxFree') {
+            attributionManager.record('incometaxfree', entry.label || entry.eventId, entryConvertedAmount);
+          } else if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
+            const reversePayoutIncomeMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
+            revenue.declareOtherIncome(reversePayoutIncomeMoney, entry.label || entry.eventId);
+            declaredEntries[entryKey] = true;
+          }
           break;
 
         case 'purchase': {
@@ -1736,17 +1777,25 @@ function processEvents() {
         residencyTimeline,
         rentalEvents
       );
+      var saleBreakdown = (realEstate && typeof realEstate.getSaleBreakdown === 'function')
+        ? realEstate.getSaleBreakdown(event.id)
+        : null;
       // sell() returns numeric amount in the property's native currency.
       var saleProceeds = realEstate.sell(event.id);
       recordIncomeEntry(saleState, saleEntryInfo, saleProceeds, {
         type: 'sale',
         eventId: event.id,
         label: 'Sale (' + event.id + ')',
+        allowZero: true,
         purchaseBasis: purchaseBasis,
         propertyCountry: salePropertyCountry,
         heldYears: heldYears,
         residentCountryAtSale: residentCountryAtSale,
-        primaryResidenceProportion: primaryResidenceProportion
+        primaryResidenceProportion: primaryResidenceProportion,
+        grossValue: saleBreakdown ? saleBreakdown.grossValue : saleProceeds,
+        forwardMortgagePayoff: saleBreakdown ? saleBreakdown.forwardMortgagePayoff : 0,
+        reverseMortgagePayoff: saleBreakdown ? saleBreakdown.reverseMortgagePayoff : 0,
+        reverseMortgageWriteOff: saleBreakdown ? saleBreakdown.reverseMortgageWriteOff : 0
       });
     }
   }
@@ -1920,21 +1969,92 @@ function processEvents() {
             eventId: event.id,
             label: 'Mortgage (' + event.id + ')'
           });
-
-          // Check if a lump-sum payoff is triggered.
-          // We trigger this if:
-          // 1. It's explicitly forced by relocation resolution (relocationSellMvId)
-          // 2. OR the event is ending (person1.age === event.toAge) and there is a remaining balance.
-          //    This makes early payoff generic: just shortening toAge triggers the payoff.
-          if (person1.age === event.toAge) {
-            var payoff = realEstate.settleMortgage(event.id);
-            if (payoff > 0) {
-              recordExpenseEntry(flowState, { currency: mortgageCurrency, country: mortgageCountry }, payoff, {
+        }
+        // Backward-compatibility: if no explicit MP event is present for this age,
+        // preserve implicit payoff behavior at M.toAge.
+        if (person1.age === event.toAge) {
+          var hasExplicitPayoff = false;
+          for (var mpi = 0; mpi < events.length; mpi++) {
+            var mpEvent = events[mpi];
+            if (mpEvent && mpEvent.type === 'MP' && mpEvent.id === event.id && mpEvent.fromAge === person1.age) {
+              hasExplicitPayoff = true;
+              break;
+            }
+          }
+          if (!hasExplicitPayoff) {
+            var implicitPayoff = realEstate.settleMortgage(event.id);
+            if (implicitPayoff > 0) {
+              var implicitCurrency = realEstate.getCurrency(event.id) || mortgageInfo.currency;
+              var implicitCountry = realEstate.getLinkedCountry(event.id) || mortgageInfo.country;
+              recordExpenseEntry(flowState, { currency: implicitCurrency, country: implicitCountry }, implicitPayoff, {
                 type: 'mortgage_payoff',
                 eventId: event.id,
                 label: 'Mortgage Payoff (' + event.id + ')'
               });
             }
+          }
+        }
+        break;
+      }
+
+      case 'MO': {
+        if (inScope) {
+          var overpayInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
+          var overpayCurrency = realEstate.getCurrency(event.id) || overpayInfo.currency;
+          var overpayCountry = realEstate.getLinkedCountry(event.id) || overpayInfo.country;
+          var overpayRawAmount = Number(event.amount);
+          if (!(overpayRawAmount > 0)) overpayRawAmount = 0;
+          var overpayAmount = realEstate.overpayMortgage(event.id, overpayRawAmount);
+          if (overpayAmount > 0) {
+            recordExpenseEntry(flowState, { currency: overpayCurrency, country: overpayCountry }, overpayAmount, {
+              type: 'mortgage_overpay',
+              eventId: event.id,
+              label: 'Mortgage Overpay (' + event.id + ')'
+            });
+          }
+        }
+        break;
+      }
+
+      case 'MP': {
+        if (person1.age === event.fromAge) {
+          var payoffInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
+          var payoffCurrency = realEstate.getCurrency(event.id) || payoffInfo.currency;
+          var payoffCountry = realEstate.getLinkedCountry(event.id) || payoffInfo.country;
+          var explicitPayoff = realEstate.settleMortgage(event.id);
+          if (explicitPayoff > 0) {
+            recordExpenseEntry(flowState, { currency: payoffCurrency, country: payoffCountry }, explicitPayoff, {
+              type: 'mortgage_payoff',
+              eventId: event.id,
+              label: 'Mortgage Payoff (' + event.id + ')'
+            });
+          }
+        }
+        break;
+      }
+
+      case 'MR': {
+        var reverseInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
+        var reverseCurrency = realEstate.getCurrency(event.id) || reverseInfo.currency;
+        var reverseCountry = realEstate.getLinkedCountry(event.id) || reverseInfo.country;
+        if (person1.age === event.fromAge || realEstate.getReverseMortgageBalance(event.id) > 0) {
+          realEstate.reverseMortgage(event.id, event.rate, reverseCurrency, reverseCountry);
+        }
+        if (inScope) {
+          var reversePayoutRequested = Number(event.amount);
+          if (!(reversePayoutRequested > 0)) reversePayoutRequested = 0;
+          var reverseResult = realEstate.advanceReverseMortgage(event.id, reversePayoutRequested, event.rate, reverseCurrency, reverseCountry);
+          if (reverseResult && reverseResult.payout > 0) {
+            var reversePayoutTaxTreatment = 'taxFree';
+            if (revenue && revenue.ruleset && typeof revenue.ruleset.getReverseMortgagePayoutTaxTreatment === 'function') {
+              reversePayoutTaxTreatment = revenue.ruleset.getReverseMortgagePayoutTaxTreatment();
+            }
+            recordIncomeEntry(flowState, { currency: reverseCurrency, country: reverseCountry }, reverseResult.payout, {
+              type: 'reverse_mortgage_payout',
+              taxTreatment: reversePayoutTaxTreatment,
+              eventId: event.id,
+              label: 'Reverse Mortgage (' + event.id + ')'
+            });
           }
         }
         break;
@@ -2718,6 +2838,22 @@ function initializeRealEstate() {
           props.get(event.id).property = realEstate.mortgage(event.id, term, event.rate, event.amount, preMortgageInfo.currency, preMortgageInfo.country);
         }
         break;
+      case 'MR':
+        if (event.fromAge < params.startingAge) {
+          if (!props.has(event.id)) {
+            props.set(event.id, {
+              "fromAge": event.fromAge,
+              "property": null
+            });
+          } else {
+            if (event.fromAge < props.get(event.id).fromAge) {
+              props.get(event.id).fromAge = event.fromAge;
+            }
+          }
+          var preReverseInfo = getEventCurrencyInfo(event, event.linkedCountry || currentCountry);
+          props.get(event.id).property = realEstate.reverseMortgage(event.id, event.rate, preReverseInfo.currency, preReverseInfo.country);
+        }
+        break;
       default:
         break;
     }
@@ -2725,6 +2861,25 @@ function initializeRealEstate() {
   // let years go by, repaying mortgage, until the starting age
   for (let [id, data] of props) {
     for (let y = data.fromAge; y < params.startingAge; y++) {
+      for (let ei = 0; ei < events.length; ei++) {
+        let preEvent = events[ei];
+        if (!preEvent || preEvent.id !== id) continue;
+        if (preEvent.type === 'MO') {
+          if (y >= preEvent.fromAge && y <= (preEvent.toAge || 999)) {
+            realEstate.overpayMortgage(id, Number(preEvent.amount) || 0);
+          }
+        } else if (preEvent.type === 'MP') {
+          if (y === preEvent.fromAge) {
+            realEstate.settleMortgage(id);
+          }
+        } else if (preEvent.type === 'MR') {
+          if (y >= preEvent.fromAge && y <= (preEvent.toAge || 999)) {
+            var preReverseInfo2 = getEventCurrencyInfo(preEvent, preEvent.linkedCountry || currentCountry);
+            realEstate.reverseMortgage(id, preEvent.rate, preReverseInfo2.currency, preReverseInfo2.country);
+            realEstate.advanceReverseMortgage(id, Number(preEvent.amount) || 0, preEvent.rate, preReverseInfo2.currency, preReverseInfo2.country);
+          }
+        }
+      }
       data.property.addYear();
     }
   }

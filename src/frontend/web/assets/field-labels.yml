@@ -97,6 +97,24 @@ eventTypes:
     placeholders:
       rate: ""
 
+  MO: # Mortgage Overpay
+    amount: "Yearly Overpay"
+    fromAge: "Overpay Start ${timeUnit}"
+    toAge: "Overpay End ${timeUnit}"
+
+  MP: # Mortgage Payoff
+    amount: "Payoff Amount"
+    fromAge: "Payoff ${timeUnit}"
+    toAge: "Payoff ${timeUnit}"
+
+  MR: # Reverse Mortgage
+    amount: "Yearly Payout"
+    fromAge: "Reverse Mortgage Start ${timeUnit}"
+    toAge: "Reverse Mortgage End ${timeUnit}"
+    rate: "Interest Rate"
+    placeholders:
+      rate: ""
+
   MV: # Relocation
     name: "Destination Country"
     amount: "Relocation cost"

@@ -235,6 +235,9 @@ class EventSummaryRenderer {
       'E': 'Expense',
       'R': 'Real Estate',
       'M': 'Mortgage',
+      'MO': 'Mortgage Overpay',
+      'MP': 'Mortgage Payoff',
+      'MR': 'Reverse Mortgage',
       'SM': 'Stock Market',
       'NOP': 'No Operation'
     };
@@ -279,7 +282,11 @@ class EventSummaryRenderer {
   }
 
   isRealEstate(eventType) {
-    return ['R', 'M'].includes(eventType);
+    return ['R', 'M', 'MO', 'MP', 'MR'].includes(eventType);
+  }
+
+  isMortgageLinked(eventType) {
+    return ['M', 'MO', 'MP', 'MR'].includes(eventType);
   }
 
   isSalaryEvent(eventType) {
@@ -315,8 +322,8 @@ class EventSummaryRenderer {
    * Based on actual simulation behavior and event type meanings
    */
   showsToAgeField(eventType, event = null) {
-    // Hide To Age for relocation; otherwise show (one-off expenses may equal fromAge)
-    if (eventType === 'MV') return false;
+    // Hide To Age for relocation and one-off mortgage payoff (MP).
+    if (eventType === 'MV' || eventType === 'MP') return false;
     return true;
   }
 
@@ -335,9 +342,14 @@ class EventSummaryRenderer {
       return false;
     }
 
-    // Mortgages (M): Rate is interest rate - show it
-    if (eventType === 'M') {
+    // Mortgages (M/MR): Rate is interest rate - show it
+    if (eventType === 'M' || eventType === 'MR') {
       return true;
+    }
+
+    // MP/MO are amount+timing controls; no growth-rate input.
+    if (eventType === 'MP' || eventType === 'MO') {
+      return false;
     }
 
     // Property purchases (R): Rate is property appreciation - show
@@ -414,7 +426,8 @@ class EventSummaryRenderer {
     const nameLabel = this.fieldLabelsManager.getFieldLabel(event.type, 'name');
     const nameValue = this.escapeHtml(event.name || '');
     const isRelocation = event.type === 'MV';
-    const isMortgage = event.type === 'M';
+    const isMortgage = this.isMortgageLinked(event.type);
+    const mortgagePlaceholder = (event.type === 'MO' || event.type === 'MP') ? 'Select Mortgage' : 'Select Property';
     const displayName = this.getRelocationDisplayName(event.name);
     details.push(`
       <div class="detail-row">
@@ -426,7 +439,7 @@ class EventSummaryRenderer {
             <div id="AccordionEventCountryOptions_${event.rowId}" class="visualization-dropdown" style="display:none;"></div>
           </div>
           <div class="event-mortgage-dd visualization-control" id="AccordionEventMortgage_${event.rowId}" style="display:${isMortgage ? '' : 'none'};">
-            <span id="AccordionEventMortgageToggle_${event.rowId}" class="dd-toggle pseudo-select">${nameValue || 'Select Property'}</span>
+            <span id="AccordionEventMortgageToggle_${event.rowId}" class="dd-toggle pseudo-select">${nameValue || mortgagePlaceholder}</span>
             <div id="AccordionEventMortgageOptions_${event.rowId}" class="visualization-dropdown" style="display:none;"></div>
           </div>
         </div>

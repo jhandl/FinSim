@@ -101,6 +101,36 @@ module.exports = {
         assert.strictEqual(result.errors, true, 'ambiguous property should set errors');
         expectWarningIds(result, ['Events[2,1]', 'Events[3,1]']);
       }
+
+      // Case 7: MO requires an existing M event.
+      {
+        const result = runCase([
+          { type: 'R', id: 'Home', fromAge: 30, toAge: 60 },
+          { type: 'MO', id: 'Home', amount: 1000, fromAge: 31, toAge: 40 }
+        ]);
+        assert.strictEqual(result.errors, true, 'MO without M should set errors');
+        expectWarningIds(result, ['Events[2,1]']);
+      }
+
+      // Case 8: MP must be one-off and align with M.toAge.
+      {
+        const result = runCase([
+          { type: 'R', id: 'Home', fromAge: 30, toAge: 60 },
+          { type: 'M', id: 'Home', fromAge: 30, toAge: 45 },
+          { type: 'MP', id: 'Home', fromAge: 44, toAge: 45 }
+        ]);
+        assert.strictEqual(result.errors, true, 'misaligned MP should set errors');
+        expectWarningIds(result, ['Events[3,4]', 'Events[3,3]']);
+      }
+
+      // Case 9: MR requires an existing R event.
+      {
+        const result = runCase([
+          { type: 'MR', id: 'Home', amount: 10000, fromAge: 40, toAge: 50, rate: 0.05 }
+        ]);
+        assert.strictEqual(result.errors, true, 'MR without R should set errors');
+        expectWarningIds(result, ['Events[1,1]']);
+      }
     } catch (err) {
       errors.push(err.message || String(err));
     }
