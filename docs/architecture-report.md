@@ -1,6 +1,6 @@
 # FinSim Architecture Quality Report
 
-Date: 2026-02-08  
+Date: 2026-02-23  
 Scope: repository-level architecture (core engine + web frontend + test harness)  
 Method: static review of key modules and cross-cutting patterns; no runtime profiling.
 
@@ -8,7 +8,7 @@ Method: static review of key modules and cross-cutting patterns; no runtime prof
 
 FinSim has a strong “static-site, config-driven simulator” architecture with a clear *intentional* separation between `src/core/` (GAS-compatible engine) and `src/frontend/` (UI environments). Several subsystems demonstrate high-quality shared logic (tax rules via JSON + `TaxRuleSet`, FX/CPI/PPP via `EconomicData`, currency-tagged amounts via `Money`, dynamic investments via `InvestmentTypeFactory`, PV via `PresentValueCalculator`).
 
-The architecture has recently been enhanced with a robust **Cross-Border Tax Engine** that orchestrates multi-country taxation, treaty application, and foreign tax credits without compromising the single-environment compatibility.
+The architecture includes a robust **Cross-Border Tax Engine** that orchestrates multi-country taxation, treaty application, and foreign tax credits without compromising single-environment compatibility. The **Real Estate & Mortgage Engine** is similarly first-class, combining property events, forward/reverse mortgage mechanics, and property gains tax integration.
 
 The main architectural tension is that the core execution path is still largely organized around **module-level global state** (notably `src/core/Simulator.js`) and a UI shim (`src/frontend/UIManager.js`) that is coupled to both core globals and browser DOM. This increases cognitive load and coupling, makes boundaries more porous than intended, and raises the cost of extensibility (especially for multi-country and UI feature growth).
 
@@ -16,11 +16,20 @@ The main architectural tension is that the core execution path is still largely 
 
 **Overall: Strong**
 
-The new cross-border tax system introduces several robust architectural patterns:
+The cross-border tax system introduces several robust architectural patterns:
 - **Residency Timeline (Cached):** `src/core/Simulator.js` computes a run-scope residency timeline once per simulation, decoupling high-frequency tax checks from event parsing.
 - **Source-Country Injection:** `Taxman` can instantiate secondary `Taxman` instances (or reload rulesets) to compute source-country taxes on specific income streams (e.g., property gains, foreign salary) before applying them as credits in the residence country.
 - **Foreign Tax Credit Logic:** `Taxman.applyForeignTaxCredit()` centralizes the complex logic of treaty verification and credit limitation (capped by residence tax), ensuring consistency across all income types.
-- **Economic Data Conversion:** The usage of `EconomicData` for all currency conversions (with 'evolution', 'ppp', 'constant' modes) ensures that cross-border calculations remain consistent with the broader simulation economy.
+- **Economic Data Conversion:** The usage of `EconomicData` for all currency conversions (with 'evolution', 'ppp', 'reversion', 'constant' modes) ensures that cross-border calculations remain consistent with the broader simulation economy.
+
+## Real Estate & Mortgage Architecture
+
+**Overall: Strong**
+
+The real estate subsystem is cohesive across core, tax, and UI layers:
+- **Event-driven modeling:** Property lifecycle is represented by event types (`R`, `M`, `MO`, `MP`, `MR`, `RI`) processed in `src/core/Simulator.js`, keeping timeline semantics consistent with other cash flows.
+- **Core invariants:** `RealEstate`/`Property` enforce same-currency invariants per property and provide appreciation, amortization, overpay/payoff, and reverse-mortgage balance tracking: `src/core/RealEstate.js`.
+- **Tax integration:** Property gains are declared via `Taxman.declarePropertyGain()` using `propertyGainsTax` rules, with proportional primary-residence exemptions; reverse mortgage payouts use `realEstate.reverseMortgage.payoutTaxTreatment`: `src/core/Taxman.js`, `src/core/TaxRuleSet.js`.
 
 ## Cohesion
 

@@ -2,20 +2,20 @@
 
 ## Overview
 
-The Relocation System enables users to simulate moving between countries with different tax systems, currencies, and economic conditions. This premium feature provides a realistic modeling of international relocations, including currency conversions, cross-border taxation, and pension system conflicts.
+The Relocation System enables users to simulate moving between countries with different tax systems, currencies, and economic conditions. The feature is gated by configuration and is fully hidden when disabled, while providing realistic modeling of international relocations, including currency conversions, cross-border taxation, and pension system conflicts.
 
 ### Core Philosophy
 
 **Natural Currency Flows:** Financial events maintain their natural currencies based on location or specification. Foreign income and expenses in the same currency offset directly, with only net foreign flows converting to residence currency.
 
-**Runtime Residency Derivation:** Country context is derived dynamically from relocation events during simulation, eliminating the need for separate residency timelines.
+**Runtime Residency Derivation:** Residency is derived from relocation events during simulation, with a cached residency timeline computed once per run for efficient lookups.
 
-**Zero-Hints Premium Gating:** When disabled, the feature is completely invisible—no placeholders, disabled buttons, or tooltips hint at its existence.
+**Zero-Hints Feature Gating:** When disabled, the feature is completely invisible—no placeholders, disabled buttons, or tooltips hint at its existence.
 
 ### Key Capabilities
 
-- **Currency Conversion:** Real-time conversion using PPP-adjusted exchange rates with multiple modes (constant, PPP, reversion).
-- **Cross-Border Taxation:** Support for trailing taxation rules (e.g., Ireland's 3-year post-emigration tax).
+- **Currency Conversion:** Real-time conversion with multiple FX modes (`constant`, `evolution`, `ppp`, `reversion`) and PPP-aware paths.
+- **Cross-Border Taxation:** Support for trailing taxation rules (e.g., Ireland's 3-year post-emigration tax), source-country taxation, and treaty-based foreign tax credits.
 - **Impact Detection:** Automatic analysis of events affected by relocations, with user-guided resolution.
 - **Resolution Assistance:** Inline panels provide contextual tools for splitting events, pegging currencies, and linking countries.
 
@@ -26,9 +26,9 @@ The Relocation System enables users to simulate moving between countries with di
 #### 1. EconomicData.js (`src/core/EconomicData.js`)
 - **Purpose**: Synchronous accessor for CPI, FX, and PPP data embedded in tax rule files.
 - **Responsibilities**:
-  - Currency conversion with multiple modes (constant, PPP-adjusted, reversion).
+  - Currency conversion with multiple modes (`constant`, `evolution`, `ppp`, `reversion`).
   - Inflation adjustments over time using embedded economic profiles.
-  - Fallback handling when data is missing.
+  - Validation and null-return on invalid conversions for strict callers.
 
 #### 2. RelocationImpactDetector.js (`src/frontend/web/components/RelocationImpactDetector.js`)
 - **Purpose**: Analyzes event timelines when relocation events are added or modified.
@@ -99,7 +99,7 @@ The `SimEvent` class includes three optional fields for multi-country support:
 
 ### Relocation Event Structure
 
-Relocation events use a single type code (`MV`) and store the destination country code in `name`:
+Relocation events use a single type code (`MV`) and store the destination country code in `name` (ISO2; normalized to lower-case in core):
 
 - **`type`**: `MV` (relocation event).
 - **`name`**: Destination country code (ISO2, e.g., `AR`, `IE`). The UI shows the full country name via a dropdown.
@@ -177,8 +177,9 @@ flowchart TD
 
 ### Currency Conversion API
 
-`EconomicData.convert(value, fromCountry, toCountry, year, options)` supports three FX modes:
+`EconomicData.convert(value, fromCountry, toCountry, year, options)` supports four FX modes (default is `evolution`):
 - **constant**: Uses base FX rate.
+- **evolution**: Inflation-driven evolution from base FX (default).
 - **ppp**: Adjusts for purchasing power parity.
 - **reversion**: Gradually reverts to PPP over time.
 

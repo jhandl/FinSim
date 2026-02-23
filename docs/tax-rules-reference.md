@@ -166,7 +166,19 @@ Configures how gains from property sales are taxed.
   - `eligibleForAnnualExemption`: Whether annual CGT exemption applies.
   - `allowLossOffset`: Whether losses can offset gains.
 
+Primary residence proportion is derived from residency timelines and rental periods (see `docs/real-estate-system.md`).
+
 This section is optional; its absence means property gains taxation is not configured for that country. See the IE rules for the canonical example.
+
+### 5.7 `realEstate` (optional)
+
+Configures real-estate-specific tax behavior:
+
+- **`reverseMortgage.payoutTaxTreatment`**:
+  - `"taxFree"`: Reverse mortgage payouts are treated as non-taxable cash inflows (default).
+  - `"otherIncome"`: Payouts are treated as taxable other income.
+
+This section is optional; if omitted, reverse mortgage payouts default to `taxFree`.
 
 ---
 

@@ -8,9 +8,11 @@ FinSim is a personal finance simulator and educational sandbox for running "what
 
 The core philosophy is to provide a private, powerful, and transparent tool for financial planning. Due to its origins, the core logic must maintain compatibility with the Google Apps Script (GAS) environment.
 
-A generic tax engine powers calculations via country rule files (Ireland provided by default).
+A generic, multi‑country tax engine powers calculations via country rule files (Ireland provided by default), including cross‑border taxation and treaty credits when relocation is enabled.
 
 The system is entirely hosted in GitHub Pages as a static website, with scenarios loading/saving as local CSV.
+
+The "main" git branch is the production version. Since no backwards compatibility is needed for any features that are not yet in production, that means that changes can be made without fallbacks except to keep compatibility with the production "main" branch. Right now that includes the whole multi-country tax engine, which has not yet been released to production.
 
 Core goals and constraints:
 
@@ -25,7 +27,9 @@ Core goals and constraints:
 *   **Single or Couple Mode:** Toggle between individual and couple scenarios with separate ages, pensions, and state pension settings (P1/P2) while sharing household cashflow.
 *   **Generic Tax Engine:** Country‑specific rule files (default: IE) loaded via `TaxRuleSet` for PAYE/PRSI/USC, CGT vs Exit Tax, pension rules, and investment type definitions.
 *   **Scenario Planning:** Users can define custom life events (e.g., salary changes, property purchases, market crashes) to see their impact.
+*   **Relocation + Multi‑Country Tax:** Relocation (MV) events create a residency timeline, preserve natural currency flows, and enable cross‑border tax with source‑country taxation, treaty‑based foreign tax credits, and FX/PPP conversion modes.
 *   **Dual Event Management Interface:** Users can choose between table and accordion views for event management, with seamless switching and real-time synchronization. Both views support direct editing, wizard-based creation, and comprehensive event lifecycle management.
+*   **Real Estate & Mortgages:** Property purchases/sales with appreciation, rental income, forward mortgages (amortization), overpay/payoff events, and reverse mortgages with tax treatment; property gains tax includes primary‑residence proportional exemptions when configured.
 *   **Monte Carlo Analysis:** In addition to deterministic projections, the simulator can run thousands of simulations with market volatility to assess the probability of success.
 *   **Economy Mode Toggle:** UI control switches deterministic vs Monte Carlo, showing volatility fields and enabling Monte Carlo only when volatility values are present.
 *   **Present Value Display:** A UI toggle deflates chart and data table values into today's terms using the core PV layer.
@@ -39,6 +43,8 @@ Core goals and constraints:
 FinSim employs a modular architecture that separates the core simulation logic from the user interface. This is a critical design feature, as the core engine must run in different environments: the modern web browser and the legacy Google Apps Script environment.
 
 The simulation is event-driven and proceeds chronologically, year by year. At the start of each year, the simulator processes all relevant financial events, calculates income and taxes, and updates the state of all financial assets.
+
+For a focused architecture quality review and tradeoffs, see [`docs/architecture-report.md`](docs/architecture-report.md).
 
 Initialization & configuration:
 
@@ -104,7 +110,7 @@ graph TD
 *   **[`TaxRuleSet.js`](src/core/TaxRuleSet.js:1):** Wraps country tax JSON and exposes getters consumed by `Taxman`.
 *   **[`InvestmentAsset.js`](src/core/InvestmentAsset.js:1):** Base class for all investment types, providing portfolio management, tax declaration, and currency conversion. Instances are created by `InvestmentTypeFactory` from tax rule definitions.
 *   **[`Pension.js`](src/core/Pension.js:1):** Manages private pension pots, extending `InvestmentAsset`.
-*   **[`RealEstate.js`](src/core/RealEstate.js:1):** Manages real estate properties and mortgages.
+*   **[`RealEstate.js`](src/core/RealEstate.js:1):** Manages property purchase/sale, appreciation, forward mortgages (payments, overpay/payoff), reverse mortgages, and sale breakdowns with multi‑currency invariants.
 *   **[`Money.js`](src/core/Money.js:1):** Currency-aware value wrapper enforcing explicit currency tracking throughout calculations; both `Money.create()` (struct) and `new Money()` (instance) exist, and hot paths should stay lightweight.
 *   **[`EconomicData.js`](src/core/EconomicData.js:1):** Exposes CPI, FX rates, and PPP profiles from tax rules for inflation and currency conversions (including `fxMode: 'constant' | 'evolution' | 'ppp' | 'reversion'`; default is evolution for coherent ledger math, PPP is typically used for analytics/suggestions).
 *   **[`PresentValueCalculator.js`](src/core/PresentValueCalculator.js:1):** Computes present values using country-specific inflation rates (PV semantics can be subtle under relocation/multi-currency).
@@ -155,6 +161,7 @@ Investment wrappers are defined in country tax rules (`investmentTypes` in `tax-
     *   **[`TableManager.js`](src/frontend/web/components/TableManager.js:1):** Builds the data table, handles natural/unified currency conversion, and applies present-value mode from the UI toggle.
     *   **[`ChartManager.js`](src/frontend/web/components/ChartManager.js:1):** Renders charts and respects present-value mode without mutating cached nominal data.
     *   **[`PinchPointVisualizer.js`](src/frontend/web/components/PinchPointVisualizer.js:1):** Computes per-row colors from Monte Carlo per-run results for cashflow/failure/survival presets.
+    *   **Data table model:** See [`docs/data-table-model.md`](docs/data-table-model.md) for column rules, visibility, and relocation-aware behaviors.
 *   **Events Wizard (guided event creation/editing):**
     *   **[`EventsWizard.js`](src/frontend/web/components/EventsWizard.js:1):** Event-domain wrapper for wizard-driven create/edit flows (including special cases like mortgages creating a second event).
     *   **[`WizardManager.js`](src/frontend/web/components/WizardManager.js:1):** Modal lifecycle, navigation, and condition gating for wizards.
@@ -163,6 +170,8 @@ Investment wrappers are defined in country tax rules (`investmentTypes` in `tax-
 *   **Help/Tour Wizard (not event creation):**
     *   **[`Wizard.js`](src/frontend/web/components/Wizard.js:1):** The guided tour / contextual field help system.
     *   **Configuration:** `src/frontend/web/assets/help.yml` (`WelcomeTabs` + `WizardSteps`), rendered via `ContentRenderer.js`.
+*   **Allocations UI layout:** See [`docs/allocations-flex-layout.md`](docs/allocations-flex-layout.md) for the compact row layout used in the Allocations panel.
+*   **Percentage formatting audit:** See [`docs/percentage-format-audit.md`](docs/percentage-format-audit.md) for UI formatting rules and audit results.
 
 #### Utils & Supporting Systems
 
@@ -177,8 +186,9 @@ Investment wrappers are defined in country tax rules (`investmentTypes` in `tax-
 *   **Initialization:** `Config.initialize(ui)` follows `latestVersion` pointers in `finsim-X.XX.json`, persists the selected version, and preloads the IE tax ruleset.
 *   **Loading/caching:** `Config.getTaxRuleSet(code)` loads and caches a `TaxRuleSet`; the preloaded IE ruleset is available synchronously via `Config.getCachedTaxRuleSet('ie')`.
 *   **API:** `TaxRuleSet` exposes income tax bands/credits and age exemptions, PRSI by age, USC brackets (including reduced age/income bands), CGT annual exemption and rate, pension rules (lump‑sum bands, contribution limits, drawdown), and investment type definitions.
-*   **Usage:** `Taxman` consumes the active ruleset to compute income tax, social contributions, additional taxes, and capital gains/exit taxes with attribution. Investment types determine whether assets are taxed under Exit Tax or CGT, and can drive dynamic per-type assets/columns.
+*   **Usage:** `Taxman` consumes the active ruleset to compute income tax, social contributions, additional taxes, property gains tax, and capital gains/exit taxes with attribution. Investment types determine whether assets are taxed under Exit Tax or CGT, and can drive dynamic per-type assets/columns.
 *   **Cross-Border Capabilities:** `Taxman` can load multiple rulesets during a single simulation run to calculate source-country taxation on foreign income and apply foreign tax credits where treaties exist.
+*   **Rule reference:** See [`docs/tax-rules-reference.md`](docs/tax-rules-reference.md) for the schema and supported fields.
 
 ### 3.4. Event Management (Table + Accordion + Wizard)
 
@@ -212,7 +222,7 @@ User scenarios are persisted as CSV files, handled by the `serializeSimulation()
 
 Tax rules and application configuration are loaded at startup by `Config.initialize(ui)`, which preloads the IE ruleset for synchronous access.
 
-### 3.6. Relocation System
+### 3.6. Relocation + Multi-Country Tax System
 
 The relocation system (see [`docs/relocation-system.md`](docs/relocation-system.md)) lets users model multi-country lives with runtime residency changes, natural currency handling, and cross-border tax rules, while staying effectively invisible when disabled (no “premium teaser” affordances).
 
@@ -222,7 +232,7 @@ Core logic extends `SimEvent` with optional `currency`, `linkedCountry`, and `li
 
 Key traits:
 
-*   **Country timeline:** Derived from `MV` events (destination code stored in `event.name`).
+*   **Country timeline:** Derived from `MV` events (destination code stored in `event.name`) and cached per run for reuse across Monte Carlo iterations.
 *   **Economic context:** `linkedCountry` can drive the inflation/currency basis for an event.
 *   **Split chains:** `linkedEventId` supports traceable event splits and guided resolution flows.
 *   **Cross-border taxation:** `Taxman` derives the active country from relocation events and handles complex multi-jurisdiction logic:
@@ -238,9 +248,21 @@ Relocation UI support:
 *   **Debounced Analysis:** `EventsTableManager._scheduleRelocationReanalysis()` provides 300ms debouncing for impact detection triggered by table edits.
 *   **Inline resolution:** [`RelocationImpactAssistant.js`](src/frontend/web/components/RelocationImpactAssistant.js:1) provides guided fixes (split, peg, link, convert) in both table and accordion flows.
 
+### 3.7. Real Estate System
+
+Real estate modeling (see [`docs/real-estate-system.md`](docs/real-estate-system.md)) spans core, tax, and UI layers to support complex property scenarios:
+
+*   **Event types:** `R` (property purchase/sale), `M` (mortgage), `MO` (mortgage overpay), `MP` (mortgage payoff), `MR` (reverse mortgage), `RI` (rental income).
+*   **Core engine:** `RealEstate` + `Property` enforce same-currency invariants per property, track purchase basis, appreciation, amortization, and reverse‑mortgage balances.
+*   **Payoff mechanics:** Overpay events reduce principal and reset remaining term; payoff events settle the remaining balance; implicit payoff can occur at mortgage end when no explicit `MP` is provided.
+*   **Sales:** Sales compute gross value, forward mortgage payoff, reverse mortgage payoff/write‑off, and net proceeds; property gains tax considers primary‑residence proportion derived from residency and rental periods.
+*   **Tax integration:** `Taxman.declarePropertyGain()` applies `propertyGainsTax` rules, and reverse‑mortgage payouts use `realEstate.reverseMortgage.payoutTaxTreatment` from the active ruleset.
+
 ## 4. Test Framework
 
 The project uses a custom Node.js testing framework for core simulation logic, plus Jest for UI/unit tests and Playwright e2e tests. All are orchestrated by the top‑level `run-tests.sh` script.
+
+See [`docs/confidence-tests-guide.md`](docs/confidence-tests-guide.md) for confidence test coverage expectations and patterns.
 
 To run tests, use `./run-tests.sh` directly. Useful options:
 
@@ -368,6 +390,7 @@ Helpful development commands:
 *   Event fields / editing UX: `src/frontend/web/components/EventsTableManager.js` (truth) + accordion/wizard adapters
 *   Scenario load/save: `src/core/Utils.js` + `src/frontend/web/components/FileManager.js`
 *   PV semantics: `src/core/PresentValueCalculator.js` (+ tests)
+*   Real estate & mortgages: `src/core/RealEstate.js` + `src/core/Simulator.js` (event processing) + `src/core/Taxman.js` (property gains) + `src/core/config/tax-rules-*.json` (`propertyGainsTax`, `realEstate.reverseMortgage`)
 
 ### 7.3. Suggested “Important Files” Reading Order
 
@@ -376,8 +399,22 @@ If you’re new to the repo, these give fast, accurate context:
 *   `src/core/Simulator.js` (year loop + currency consolidation)
 *   `src/core/Config.js` (versioning + tax rules loading)
 *   `src/core/Taxman.js` and `src/core/TaxRuleSet.js` (tax engine interface)
+*   `src/core/RealEstate.js` + `docs/real-estate-system.md` (property + mortgage engine)
 *   `src/frontend/web/components/EventsTableManager.js` (events are the core UX surface)
 *   `src/frontend/web/components/EventAccordionManager.js` + `src/frontend/web/components/EventSummaryRenderer.js` (alternate view + editing)
 *   `src/frontend/web/components/Wizard.js` + `src/frontend/web/assets/help.yml` (help/tours/field help)
 *   `src/frontend/web/components/WizardManager.js` + `src/frontend/web/components/WizardRenderer.js` + `src/frontend/web/components/EventsWizard.js` + `src/frontend/web/assets/events-wizard.yml` (events wizard)
 *   `src/frontend/web/components/ChartManager.js` and `src/frontend/web/components/TableManager.js` (rendering + unified-currency modes)
+
+### 7.4. Top-Level Docs Index
+
+*   `docs/architecture-report.md` — architecture quality review and tradeoffs.
+*   `docs/relocation-system.md` — relocation, multi-currency, and cross-border tax system.
+*   `docs/real-estate-system.md` — property, mortgage, and real-estate tax modeling.
+*   `docs/tax-rules-reference.md` — tax rules schema and field reference.
+*   `docs/data-table-model.md` — data table columns, visibility, and relocation-aware behavior.
+*   `docs/confidence-tests-guide.md` — confidence test catalog and patterns.
+*   `docs/allocations-flex-layout.md` — allocations panel compact layout implementation.
+*   `docs/percentage-format-audit.md` — percentage formatting audit for UI inputs/outputs.
+*   `docs/AIStudio-podcast-prompt.md` — podcast prompt template for AI Studio runs.
+*   `docs/NotebookLM-podcast-prompt.md` — podcast prompt template for NotebookLM runs.
