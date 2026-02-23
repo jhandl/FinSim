@@ -13,6 +13,10 @@ async function loadSimulator(page, { wizardOn = true } = {}) {
   await page.addInitScript(state => {
     try { localStorage.setItem('eventsWizardState', state ? 'on' : 'off'); } catch (_) { }
   }, wizardOn);
+  // Disable welcome modal to avoid overlay intercepting clicks on mobile
+  await page.addInitScript(() => {
+    try { localStorage.setItem('welcomeModalState', 'off'); } catch (_) { }
+  });
 
   await page.goto(BASE);
   const frame = page.frameLocator('#app-frame');
@@ -219,26 +223,32 @@ test.describe('Events Autoscroll & Accordion behaviour', () => {
       await page.waitForTimeout(400);
     }
 
-    // Growth step – optional percentage. Leave blank and click Next.
-    const growthNext = frame.locator('#eventWizardOverlay .event-wizard-button-next');
-    if (await growthNext.count()) {
-      await smartClick(growthNext);
-      await page.waitForTimeout(400);
+    // Advance through optional steps (Growth, Pension, etc.) until Create or auto-close.
+    const maxAdvances = 6;
+    for (let i = 0; i < maxAdvances; i++) {
+      if (!(await overlay.count())) break;
+      const createBtn = overlay.locator('.event-wizard-button-create');
+      if (await createBtn.count()) {
+        await createBtn.waitFor({ state: 'visible', timeout: 8000 });
+        await smartClick(createBtn);
+        break;
+      }
+      const pensionChoiceNo = overlay.locator('.event-wizard-choice-option:has-text("No")');
+      if (await pensionChoiceNo.count()) {
+        await smartClick(pensionChoiceNo);
+        await page.waitForTimeout(400);
+        continue;
+      }
+      const nextBtn = overlay.locator('.event-wizard-button-next');
+      if (await nextBtn.count()) {
+        await smartClick(nextBtn);
+        await page.waitForTimeout(400);
+        continue;
+      }
+      break;
     }
 
-    // Pension Contribution step – choose "No" to skip extra fields.
-    const pensionChoiceNo = frame.locator('#eventWizardOverlay .event-wizard-choice-option:has-text("No")');
-    if (await pensionChoiceNo.count()) {
-      await smartClick(pensionChoiceNo);
-      await page.waitForTimeout(400);
-    }
-
-    // Final Review – click "Create Event"
-    const createBtn = overlay.locator('.event-wizard-button-create');
-    await createBtn.waitFor({ state: 'visible', timeout: 8000 });
-    await smartClick(createBtn);
-
-    // Wait for the wizard to close
+    // Wait for the wizard to close (auto-create can close without a button)
     await overlay.waitFor({ state: 'detached', timeout: 8000 });
 
     // Allow accordion refresh & FLIP animation to finish

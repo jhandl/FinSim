@@ -276,6 +276,10 @@ If there is no UI test for the feature you are changing, ask the user to test ma
 
 **Do not** attempt to start a server, open a browser, or interact with the UI programmatically. When a UI change is ready, ask the user to test it in their already-running local server/browser.
 
+### 4.4. Playwright + Sandbox Notes (Codex Desktop)
+
+When running Playwright via `run-tests.sh`, invoke the script **directly** as `./run-tests.sh <TestName|flags>` (do not wrap in `/bin/zsh -lc`), and request escalated permissions. This ensures the approval prefix matches and avoids repeated prompts.
+
 ## 5. Important Guidelines
 
 *   **JavaScript Compatibility (Core):** Files under [`src/core/`](src/core/) must remain compatible with the Google Apps Script JavaScript environment:

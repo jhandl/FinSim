@@ -102,8 +102,13 @@ export async function openWizard(page, frame){
   await waitForOverlayGone(page);
   for(let i=0;i<3;i++){
     await smartClick(addBtn,{preferProgrammatic:true});
-    try{await wizard.waitFor({state:'visible',timeout:1000});return;}catch{}
+    try{
+      await wizard.waitFor({state:'visible',timeout:1000});
+      // Guard against delayed welcome modal reappearing and blocking wizard actions.
+      try { await waitForOverlayGone(page, 8000); } catch { /* best-effort */ }
+      if (await wizard.isVisible()) return;
+    }catch{}
     await page.waitForTimeout(300);
   }
   await wizard.waitFor({state:'visible',timeout:4000});
-} 
+}

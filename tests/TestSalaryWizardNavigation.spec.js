@@ -12,6 +12,11 @@ const BASE_URL = 'http://localhost:8080/#ifs';
 test.use({ actionTimeout: 20000 });
 
 async function runSalaryWizardRegressionTest(page) {
+  // Ensure wizard is enabled and welcome modal is suppressed before load
+  await page.addInitScript(() => {
+    try { localStorage.setItem('eventsWizardState', 'on'); } catch (_) { }
+    try { localStorage.setItem('welcomeModalState', 'off'); } catch (_) { }
+  });
   // 1. Load simulator directly on the IFS route
   await page.goto(BASE_URL);
 
@@ -87,6 +92,16 @@ async function runSalaryWizardRegressionTest(page) {
 
   // 10. Confirm the Amount input is visible and focused, implying keyboard is active
   const amountInputBack = frame.locator('#eventWizardOverlay input[name="amount"]');
+  // On some mobile devices, the pointerdown handler is required to trigger back.
+  const quickVisible = await amountInputBack.waitFor({ state: 'visible', timeout: 2000 }).then(() => true).catch(() => false);
+  if (!quickVisible) {
+    await backBtn.evaluate(el => {
+      const opts = { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch', isPrimary: true, button: 0, buttons: 1 };
+      el.dispatchEvent(new PointerEvent('pointerdown', opts));
+      el.dispatchEvent(new PointerEvent('pointerup', opts));
+      el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    });
+  }
   await amountInputBack.waitFor({ state: 'visible', timeout: 20000 });
   await expect(amountInputBack).toBeFocused();
 }

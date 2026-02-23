@@ -334,20 +334,22 @@ class EventsTableManager {
       }, 400);
     } else {
       // Complex animation with slide-up for multiple rows
-      this.deleteRowWithSlideUp(row, deletedType, deletedId);
+      this.deleteRowWithSlideUp(row);
     }
   }
 
   /**
    * Delete row with slide-up animation for remaining rows
    */
-  deleteRowWithSlideUp(rowToDelete, deletedType = '', deletedId = '') {
+  deleteRowWithSlideUp(rowToDelete) {
     // If an inline resolution panel is open for this row, collapse it first to clean up listeners
     const maybePanel = rowToDelete && rowToDelete.nextElementSibling;
     if (maybePanel && maybePanel.classList && maybePanel.classList.contains('resolution-panel-row')) {
       this.collapseResolutionPanel(rowToDelete.dataset.rowId);
     }
 
+    const deletedType = rowToDelete && rowToDelete.querySelector('.event-type') ? String(rowToDelete.querySelector('.event-type').value || '') : '';
+    const deletedId = rowToDelete && rowToDelete.querySelector('.event-name') ? String(rowToDelete.querySelector('.event-name').value || '').trim() : '';
     const allRows = Array.from(document.querySelectorAll('#Events tbody tr'));
     const deleteIndex = allRows.indexOf(rowToDelete);
     const rowsBelow = allRows.slice(deleteIndex + 1);
@@ -1841,39 +1843,45 @@ class EventsTableManager {
     const markerSet = new Set(markerIds.map(m => String(m || '')).filter(Boolean));
     if (markerSet.size === 0) return;
 
+    const prevMortgageSync = this._suppressMortgagePlanSync;
+    this._suppressMortgagePlanSync = true;
     const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const markerInput = row.querySelector('.event-relocation-sell-mv-id');
-      const markerValue = markerInput ? String(markerInput.value || '') : '';
-      if (!markerValue || !markerSet.has(markerValue)) continue;
+    try {
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const markerInput = row.querySelector('.event-relocation-sell-mv-id');
+        const markerValue = markerInput ? String(markerInput.value || '') : '';
+        if (!markerValue || !markerSet.has(markerValue)) continue;
 
-      const typeInput = row.querySelector('.event-type');
-      const typeValue = typeInput ? typeInput.value : '';
-      if (typeValue !== 'R' && !this.isMortgageLinkedEvent(typeValue)) continue;
+        const typeInput = row.querySelector('.event-type');
+        const typeValue = typeInput ? typeInput.value : '';
+        if (typeValue !== 'R' && !this.isMortgageLinkedEvent(typeValue)) continue;
 
-      const fromAgeInput = row.querySelector('.event-from-age');
-      const fromAge = Number(fromAgeInput ? fromAgeInput.value : '');
-      const toAgeInput = row.querySelector('.event-to-age');
-      if (!toAgeInput) continue;
-      const currentToAge = Number(toAgeInput.value);
-      if (isNaN(currentToAge)) continue;
+        const fromAgeInput = row.querySelector('.event-from-age');
+        const fromAge = Number(fromAgeInput ? fromAgeInput.value : '');
+        const toAgeInput = row.querySelector('.event-to-age');
+        if (!toAgeInput) continue;
+        const currentToAge = Number(toAgeInput.value);
+        if (isNaN(currentToAge)) continue;
 
-      const targetToAge = currentToAge + delta;
-      if (!isNaN(fromAge) && targetToAge < fromAge) {
-        this._removeHiddenInput(row, 'event-relocation-sell-mv-id');
-        this._removeHiddenInput(row, 'event-relocation-sell-anchor-age');
+        const targetToAge = currentToAge + delta;
+        if (!isNaN(fromAge) && targetToAge < fromAge) {
+          this._removeHiddenInput(row, 'event-relocation-sell-mv-id');
+          this._removeHiddenInput(row, 'event-relocation-sell-anchor-age');
+          this._removeHiddenInput(row, 'event-resolution-override');
+          continue;
+        }
+
+        this._suppressSellMarkerClear = true;
+        toAgeInput.value = String(targetToAge);
+        this._flashInput(toAgeInput);
+        toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
+        this._suppressSellMarkerClear = false;
+        this.getOrCreateHiddenInput(row, 'event-relocation-sell-anchor-age', String(newRelocationAge));
         this._removeHiddenInput(row, 'event-resolution-override');
-        continue;
       }
-
-      this._suppressSellMarkerClear = true;
-      toAgeInput.value = String(targetToAge);
-      this._flashInput(toAgeInput);
-      toAgeInput.dispatchEvent(new Event('change', { bubbles: true }));
-      this._suppressSellMarkerClear = false;
-      this.getOrCreateHiddenInput(row, 'event-relocation-sell-anchor-age', String(newRelocationAge));
-      this._removeHiddenInput(row, 'event-resolution-override');
+    } finally {
+      this._suppressMortgagePlanSync = prevMortgageSync;
     }
   }
 

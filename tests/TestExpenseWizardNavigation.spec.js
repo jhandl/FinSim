@@ -11,6 +11,11 @@ test.use({ actionTimeout: 20000 });
 
 // Test runner logic extracted into a helper for reuse across browser/device combos
 async function runWizardRegressionTest(page) {
+  // Ensure wizard is enabled and welcome modal is suppressed before load
+  await page.addInitScript(() => {
+    try { localStorage.setItem('eventsWizardState', 'on'); } catch (_) { }
+    try { localStorage.setItem('welcomeModalState', 'off'); } catch (_) { }
+  });
   // 1. Load the simulator directly on the IFS route
   await page.goto(BASE_URL);
 
