@@ -529,6 +529,7 @@ var RelocationImpactAssistant = {
         const row = document.querySelector('tr[data-row-id="' + rowId + '"]');
         if (row && typeof etm.deleteTableRowWithAnimation === 'function') {
           etm.deleteTableRowWithAnimation(row);
+          setTimeout(() => { if (typeof etm.recomputeRelocationImpacts === 'function') etm.recomputeRelocationImpacts(); }, 600);
         }
         break;
       }

@@ -121,6 +121,9 @@ class TooltipUtils {
       }
       hideTooltip();
     });
+    element.addEventListener('click', () => {
+      hideTooltip();
+    });
 
     // Mobile long-press events
     if (!SUPPRESS_TOUCH) {

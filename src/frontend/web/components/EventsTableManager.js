@@ -341,7 +341,7 @@ class EventsTableManager {
   /**
    * Delete row with slide-up animation for remaining rows
    */
-  deleteRowWithSlideUp(rowToDelete) {
+  deleteRowWithSlideUp(rowToDelete, options = {}) {
     // If an inline resolution panel is open for this row, collapse it first to clean up listeners
     const maybePanel = rowToDelete && rowToDelete.nextElementSibling;
     if (maybePanel && maybePanel.classList && maybePanel.classList.contains('resolution-panel-row')) {
@@ -350,6 +350,7 @@ class EventsTableManager {
 
     const deletedType = rowToDelete && rowToDelete.querySelector('.event-type') ? String(rowToDelete.querySelector('.event-type').value || '') : '';
     const deletedId = rowToDelete && rowToDelete.querySelector('.event-name') ? String(rowToDelete.querySelector('.event-name').value || '').trim() : '';
+    const skipMortgageSync = !!(options && options.skipMortgageSync);
     const allRows = Array.from(document.querySelectorAll('#Events tbody tr'));
     const deleteIndex = allRows.indexOf(rowToDelete);
     const rowsBelow = allRows.slice(deleteIndex + 1);
@@ -364,7 +365,7 @@ class EventsTableManager {
     setTimeout(() => {
       // Phase 2: Remove the row first, then slide up the rows below
       rowToDelete.remove();
-      this._syncMortgagePlanAfterDeletion(deletedType, deletedId);
+      if (!skipMortgageSync) this._syncMortgagePlanAfterDeletion(deletedType, deletedId);
 
       // If this was the last row, show empty state message
       if (isLastRowAfterDelete) {
@@ -430,8 +431,6 @@ class EventsTableManager {
     const events = this.webUI.readEvents(false);
     const startCountry = Config.getInstance().getStartCountry();
 
-    const hadImpacts = this._getRelocationStatusEvents(events).some(e => e.relocationImpact);
-
     if (typeof RelocationImpactDetector !== 'undefined') {
       RelocationImpactDetector.analyzeEvents(events, startCountry);
     }
@@ -440,13 +439,6 @@ class EventsTableManager {
     // Ensure accordion view reflects latest table state
     if (!options.skipAccordionRefresh && this.webUI.eventAccordionManager) this.webUI.eventAccordionManager.refresh();
 
-    const hasImpactsNow = this._getRelocationStatusEvents(events).some(e => e.relocationImpact);
-    if (hadImpacts && !hasImpactsNow) {
-      const nu = this.webUI && this.webUI.notificationUtils;
-      if (nu && typeof nu.showToast === 'function') {
-        nu.showToast('All relocation impacts resolved!', 'Success', 3);
-      }
-    }
   }
 
   _refreshValidation() {
@@ -852,6 +844,34 @@ class EventsTableManager {
     row.remove();
   }
 
+  _deleteRowWithExistingAnimation(row, options = {}) {
+    if (!row) return;
+    const skipMortgageSync = !!options.skipMortgageSync;
+    const deletedType = row.querySelector('.event-type') ? String(row.querySelector('.event-type').value || '') : '';
+    const deletedId = row.querySelector('.event-name') ? String(row.querySelector('.event-name').value || '').trim() : '';
+
+    const maybePanel = row.nextElementSibling;
+    if (maybePanel && maybePanel.classList && maybePanel.classList.contains('resolution-panel-row')) {
+      this.collapseResolutionPanel(row.dataset.rowId);
+    }
+
+    const allRows = document.querySelectorAll('#Events tbody tr');
+    const isLastRow = allRows.length === 1;
+
+    if (isLastRow) {
+      row.classList.add('deleting-last');
+      setTimeout(() => {
+        row.remove();
+        if (!skipMortgageSync) this._syncMortgagePlanAfterDeletion(deletedType, deletedId);
+        this._refreshValidation();
+        this._scheduleMortgagePlanReanalysis();
+      }, 400);
+      return;
+    }
+
+    this.deleteRowWithSlideUp(row, { skipMortgageSync: skipMortgageSync });
+  }
+
   _flashInput(input) {
     if (!input || !input.classList) return;
     input.classList.remove('age-auto-changed');
@@ -1150,6 +1170,7 @@ class EventsTableManager {
       currency: currencyInput ? currencyInput.value : ''
     }).then((result) => {
       if (result && result.row) {
+        this.getOrCreateHiddenInput(result.row, 'event-auto-payoff', '1');
         if (sellMvIdInput && sellMvIdInput.value) {
           this.getOrCreateHiddenInput(result.row, 'event-relocation-sell-mv-id', sellMvIdInput.value);
         }
@@ -1158,6 +1179,10 @@ class EventsTableManager {
         }
       }
       this._syncMortgagePlanById(id, { sourceType: 'M', sourceField: 'toAge', forceAutoAlign: true });
+      // Ensure validation runs after the auto-created payoff row is fully synced.
+      if (typeof this._refreshValidation === 'function') {
+        setTimeout(() => this._refreshValidation(), 0);
+      }
     }).catch((err) => {
       console.error('Error creating mortgage payoff event:', err);
     }).finally(() => {
@@ -1220,6 +1245,7 @@ class EventsTableManager {
       }
     }
 
+    let removedAutoPayoff = false;
     this._suppressMortgagePlanSync = true;
     try {
       if (hasOverpay) {
@@ -1259,6 +1285,12 @@ class EventsTableManager {
       const payoffAmount = this._remainingPrincipalAtAge(model, overpayWindows, payoffAge);
       const roundedPayoff = Math.max(0, Math.round(payoffAmount));
       const currentPayoff = this._parseNumericValue(mpAmountInput ? mpAmountInput.value : '', { preferThousands: true });
+      const autoPayoffInput = rows.mpRow.querySelector('.event-auto-payoff');
+      if (autoPayoffInput && !(roundedPayoff > 0)) {
+        this._deleteRowWithExistingAnimation(rows.mpRow, { skipMortgageSync: true });
+        removedAutoPayoff = true;
+      }
+      if (removedAutoPayoff) return;
       const hasManualAmountConflict = preserveManualAmount && !isNaN(currentPayoff) && Math.round(currentPayoff) !== roundedPayoff;
       if (hasManualAmountConflict) {
         this.getOrCreateHiddenInput(rows.mpRow, 'event-payoff-expected-amount', String(roundedPayoff));
@@ -1271,6 +1303,15 @@ class EventsTableManager {
       }
     } finally {
       this._suppressMortgagePlanSync = false;
+    }
+
+    if (removedAutoPayoff) {
+      this._refreshValidation();
+      this._scheduleMortgagePlanReanalysis();
+      if (this.webUI && this.webUI.eventAccordionManager) {
+        this.webUI.eventAccordionManager.refresh({ skipSortAnimation: true });
+      }
+      return;
     }
 
     this._scheduleMortgagePlanReanalysis();
@@ -1305,6 +1346,10 @@ class EventsTableManager {
           this._suppressMortgagePlanSync = false;
         }
       }
+    }
+
+    if (eventType === 'MP' && sourceField) {
+      this._removeHiddenInput(row, 'event-auto-payoff');
     }
 
     if (eventType === 'R' && sourceField === 'toAge') {
@@ -1811,7 +1856,7 @@ class EventsTableManager {
         this._removeHiddenInput(secondRow, 'event-relocation-split-mv-id');
         this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-age');
         this._removeHiddenInput(secondRow, 'event-resolution-override');
-        this._removeRowAndResolutionPanel(firstRow);
+        this._deleteRowWithExistingAnimation(firstRow);
         continue;
       }
 
@@ -1823,7 +1868,7 @@ class EventsTableManager {
         this._removeHiddenInput(firstRow, 'event-relocation-split-mv-id');
         this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-age');
         this._removeHiddenInput(firstRow, 'event-resolution-override');
-        this._removeRowAndResolutionPanel(secondRow);
+        this._deleteRowWithExistingAnimation(secondRow);
         continue;
       }
 
@@ -3349,9 +3394,6 @@ class EventsTableManager {
     const events = this.webUI.readEvents(false);
     const startCountry = Config.getInstance().getStartCountry();
     
-    // Check if there were impacts before analysis
-    const hadImpacts = events.some(e => e.relocationImpact);
-    
     RelocationImpactDetector.analyzeEvents(events, startCountry);
     this.updateRelocationImpactIndicators(events);
     this.webUI.updateStatusForRelocationImpacts(this._getRelocationStatusEvents(events));
@@ -3384,14 +3426,6 @@ class EventsTableManager {
       }
     }
 
-    // Show toast if impacts were present and now they are all gone
-    const hasImpactsNow = events.some(e => e.relocationImpact);
-    if (hadImpacts && !hasImpactsNow) {
-      const nu = this.webUI && this.webUI.notificationUtils;
-      if (nu && typeof nu.showToast === 'function') {
-        nu.showToast('All relocation impacts resolved!', 'Success', 3);
-      }
-    }
   }
 
   getOrCreateHiddenInput(row, className, value) {
@@ -3773,7 +3807,7 @@ class EventsTableManager {
     this._scheduleRelocationReanalysis();
   }
 
-  async applyMortgageSelection(row, propertyName, label) {
+  async applyMortgageSelection(row, propertyName, label, options = {}) {
     if (!row) return;
     const nameInput = row.querySelector('.event-name');
     if (!nameInput) return;
@@ -3813,7 +3847,8 @@ class EventsTableManager {
     }
 
     // Clear warnings and re-run validation to update the ready state
-    if (this.webUI) {
+    const skipValidation = !!(options && options.skipValidation);
+    if (!skipValidation && this.webUI) {
       this.webUI.clearAllWarnings();
       // Re-run validation. uiManager is global or accessible via webUI.
       const uiMgr = (typeof uiManager !== 'undefined') ? uiManager : (this.webUI.uiManager);
@@ -3918,7 +3953,12 @@ class EventsTableManager {
       await this.applyCountrySelection(row, code, matchedCountry ? matchedCountry.name : code);
     } else if (this.isMortgageLinkedEvent(resolvedType)) {
       const propertyName = eventData && eventData.name != null ? eventData.name : '';
-      await this.applyMortgageSelection(row, propertyName, propertyName || this.getMortgageDropdownPlaceholder(resolvedType));
+      await this.applyMortgageSelection(
+        row,
+        propertyName,
+        propertyName || this.getMortgageDropdownPlaceholder(resolvedType),
+        { skipValidation: true }
+      );
     } else {
       const nameValue = eventData && eventData.name != null ? eventData.name : '';
       this.setRowFieldValue(row, '.event-name', nameValue);
@@ -3983,6 +4023,7 @@ class EventsTableManager {
     }
 
     row.dataset.originalEventType = resolvedType;
+    this._refreshValidation();
   }
 
   /**

@@ -199,6 +199,10 @@ class FileManager {
       }
     } catch (_) { }
 
+    if (this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.suppressRelocationResolutionToastOnce === 'function') {
+      this.webUI.eventsTableManager.suppressRelocationResolutionToastOnce();
+    }
+
     // Reset currency selectors to default state before loading
     if (this.webUI.chartManager) {
       this.webUI.chartManager.reportingCurrency = null; // Force reset
@@ -594,6 +598,9 @@ class FileManager {
     } catch (error) {
       console.error('Error updating status for relocation impacts after loading:', error);
       // Scenario loading continues normally even if status update fails
+    }
+    if (this.webUI.eventsTableManager && typeof this.webUI.eventsTableManager.clearRelocationResolutionToastSuppression === 'function') {
+      this.webUI.eventsTableManager.clearRelocationResolutionToastSuppression();
     }
     return true;
   }
