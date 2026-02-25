@@ -15,6 +15,10 @@ The examples below reference the current IE (`tax-rules-ie.json`) and AR (`tax-r
 
 - **`country`**: Two-letter country code (upper case), e.g. `"IE"`, `"AR"`.
 - **`countryName`**: Human-readable country name, e.g. `"Ireland"`, `"Argentina"`.
+- **`jointFilingAllowed`**: Boolean (default `true`). If false, married couples are taxed as two single individuals using their respective income and single-person brackets/credits.
+- **`taxBasis`**: `"worldwide"` or `"domestic"` (default `"worldwide"`). Controls whether the engine taxes global income or only domestic income. Consumed by `TaxRuleSet.getTaxBasis()` and `Taxman.computeIT()` / `computeCGT()`.
+- **`treatyEquivalents`**: Object mapping this country's tax-type names to cross-country equivalence slots (`"income"`, `"capitalGains"`, `"dividends"`). Used by `Simulator.buildForeignTaxCredits()` to match source-country taxes to residence-country credits. Example: `{ "incomeTax": "income", "capitalGains": "capitalGains", "dividends": "dividends" }`.
+- **`drawdownPriorities`**: Array of priority configuration objects consumed by `TaxRuleSet.getDrawdownPriorities()` and the UI "Drawdown Priorities" panel. Returns an empty array when absent (backward-compatible). Each entry defines a priority type with its canonical identifier, label, and UI field ID.
 - **`version`**: Ruleset version string, e.g. `"26.4"`, `"1.0"`.
 - **`updateMessage`**: Short description of what changed in this ruleset version.
 
@@ -43,6 +47,8 @@ Provides scalar economic parameters used by `EconomicData` as base anchors:
 - **`exchangeRate`**:
   - `perEur`: Nominal FX rate (units of local currency per 1 EUR).
   - `asOf`: Date of the FX observation.
+- **`typicalRentalYield`** (optional): Typical annual rental yield percentage for the country (e.g., `7.71` for IE). Used by relocation assistant heuristics to estimate rental income.
+- **`projectionWindowYears`** (optional): Suggested projection window in years. Surfaced via `TaxRuleSet.getEconomicProfile()` and used by relocation assistant projection heuristics. Omit to use the scenario's own simulation length.
 
 These values are used to construct per-country economic profiles consumed by `EconomicData` and, indirectly, `InflationService` and FX conversion helpers.
 
@@ -56,14 +62,21 @@ Defines the core income tax structure:
 
 - **`name`**: Display name or abbreviation, e.g. `"IT"` or `"Impuesto a las Ganancias"`.
 - **`tooltip`** (optional): Short explanation for UI tooltips.
-- **`personalAllowance`**: Universal tax-free allowance (if any), in local currency.
 - **`taxCredits`** (optional):
-  - Structured object defining named credits, e.g.:
-    - `employee.min.amount` and `employee.min.rate` (credit tied to PAYE income).
-    - `age` bands like `"65": 245` (additional credits by age).
+  - Structured object defining named credits.
+  - **`uiInput`** (optional): When present on a credit object, makes the credit user-configurable via the UI. Sub-fields:
+    - `required` (boolean): Whether the user must supply a value.
+    - `section` (string): UI section where the input appears (e.g., `"personalCircumstances"`).
+    - `label` (string): Display label for the input field.
+  - **`scope`** (optional): Controls how the credit is applied in non-joint filing mode. Values: `"household"` (applied once, P1 only), `"person"` (applied per person), `"earner"` (applied only to persons with employment income). Default when absent: `employee` → `earner`; `age` → `person`; all others → `household`.
+  - **`employee` credit sub-fields**: The employee credit supports a declarative object form beyond a plain number:
+    - `employee.amount`: Explicit flat credit amount.
+    - `employee.min.amount` / `employee.min.rate`: Minimum credit, optionally tied to a fraction of employment income.
+    - `employee.max.amount` / `employee.max.rate`: Maximum credit cap, optionally tied to a fraction of employment income.
+    - Resolution order: `amount` → `min.amount` → `max.amount`.
+  - **`age`** bands like `"65": 245` (additional credits by age).
 - **`ageExemptionAge` / `ageExemptionLimit`** (optional, IE):
   - Age and income threshold for age-based income tax exemption.
-- **`jointFilingAllowed`** (optional, IE): Whether couples can file jointly.
 - **`jointBandIncreaseMax`** (optional, IE): Max extra standard rate band for the secondary earner.
 - **`bracketsByStatus`**:
   - Maps filing status → bracket map:
@@ -106,6 +119,12 @@ Array of additional tax definitions, such as USC in IE:
 - **`reducedRateAge` / `reducedRateMaxIncome`** (optional): Age/income triggers for reduced USC schedules.
 - **`ageBasedBrackets`** (optional): Alternate brackets by age (e.g. `"70": { ... }`).
 - **`base`**: Base measure, currently `"income"` (used to decide what flows this tax applies to).
+- **`deductibleExemptionAmount`** (optional): Amount subtracted from the taxable base before brackets are applied (deduction-from-base semantics). Distinct from `incomeExemptionThreshold` (which is a cliff).
+- **`exemptAmount`** (optional, legacy): Legacy alias for `deductibleExemptionAmount`. Prefer `deductibleExemptionAmount` in new rulesets.
+- **`selectionRules`** (optional): Array of conditional band-selection rules evaluated in order (highest priority over all other band selectors). Each rule object may contain: `minAge`, `maxAge`, `minIncome`, `maxIncome`, `brackets`. The first matching rule's `brackets` is used.
+- **`incomeBasedBrackets`** (optional): Map of income threshold (string) → bracket set. The highest threshold not exceeding total income is selected. Evaluated after `selectionRules` and `reducedRateAge` logic.
+- **`reducedTaxBands`** (optional): Bracket set used when `reducedRateAge` + optional `reducedRateMaxIncome` conditions are met, as an alternative to `ageBasedBrackets`.
+- **`applicableIncomeTypes`** (optional): Array of income-type strings this tax applies to. When absent, the tax applies to all income (backward-compatible). Supported vocabulary: `employment`, `privatePension`, `statePension`, `rental`, `otherIncome`, `investmentTypeIncome`, `investmentIncome`.
 
 ---
 
@@ -125,6 +144,8 @@ This is the default CGT profile; specific investment types may override or refer
 
 ### 5.2 `dividendTax` (optional, IE)
 
+> **Reserved — not yet used by the engine.** These fields are present in the schema for future use. The engine does not currently apply domestic dividend or interest taxation. Cross-border withholding is handled separately via `tax-rules-global.json` `assetTaxes.*`.
+
 Defines how dividends are taxed when separated from capital gains:
 
 - **`rate`**: Tax rate on dividends as a decimal.
@@ -133,23 +154,12 @@ Defines how dividends are taxed when separated from capital gains:
 
 ### 5.3 `interestTax` (optional, IE)
 
+> **Reserved — not yet used by the engine.** These fields are present in the schema for future use. The engine does not currently apply domestic dividend or interest taxation. Cross-border withholding is handled separately via `tax-rules-global.json` `assetTaxes.*`.
+
 Defines how interest income is taxed:
 
 - **`rate`**: Tax rate on interest.
 - **`withholding`**: Whether withholding tax is assumed.
-
-### 5.4 `wealthTax` and `inheritanceTax` (optional)
-
-Placeholders for future wealth/inheritance taxes:
-
-- **`wealthTax`**:
-  - `brackets`: Threshold → rate map (currently empty in IE).
-  - `exemptions`: List of exemptions (currently empty).
-- **`inheritanceTax`**:
-  - `threshold`: Tax-free inheritance threshold.
-  - `rate`: Inheritance tax rate as a decimal.
-
-These fields are reserved for possible future features.
 
 ### 5.6 `propertyGainsTax` (optional)
 
@@ -206,13 +216,13 @@ Configures both state and private pension behaviour:
 - **State pension specifics**:
   - `statePensionIncreaseBands`:
     - Map from age to weekly increase amount (e.g. extra after age 80).
-- **System type**:
-  - `pensionSystem.type`:
-    - `"state_only"`: Only state pension exists (no private pillar).
-    - `"mixed"`: Both state and private pillars exist.
-- **Defined benefit treatment** (optional, IE):
-  - `definedBenefit.treatment`:
-    - How DB income is treated for tax (e.g. `"privatePension"`, `"salary"`).
+  - `statePensionPeriod`: String — `"weekly"`, `"monthly"`, or `"annual"`. Determines how the user-entered state pension amount is interpreted. Default `"weekly"` when absent.
+- **`taxAdvantaged`**: Boolean. Whether private pension contributions are tax-advantaged (i.e., deducted from taxable income before IT). Default `true`. Consumed by `TaxRuleSet.isPrivatePensionTaxAdvantaged()`.
+- **`helpText`** (optional): Object providing UI help text for the pension panel. Supported sub-fields: `label` (panel heading), `contributionDescriptionP1` (HTML description for P1 contribution input), `contributionDescriptionP2` (HTML description for P2 contribution input). Consumed by the help/wizard context provider.
+- **`definedBenefit`** (optional, required when DBI events exist): Object describing how Defined Benefit income is classified for tax. Sub-field: `treatment` — `"privatePension"` (taxed as pension drawdown) or `"salary"` (taxed as employment income). Consumed by `TaxRuleSet.getDefinedBenefitSpec()` and `Simulator.js` DBI event handling.
+- **`pensionSystem.type`**:
+  - `"state_only"`: Only state pension exists (no private pillar).
+  - `"mixed"`: Both state and private pillars exist.
 
 The simulator uses these rules to:
 
@@ -271,6 +281,12 @@ Each entry in the `investmentTypes` array supports the following fields:
   - **`"local"`**: Asset tied to residency; PV uses residency CPI; flagged by relocation detector.
   - **`"global"`**: Portable asset; PV uses `assetCountry` CPI; ignored by relocation detector.
   - See section 8.4 for detailed semantics.
+- **`sellWhenReceived`** (optional, boolean): When `true`, the asset is sold immediately upon receipt (e.g., RSUs vesting). The asset is excluded from drawdown priority calculations. Default `false`.
+- **`excludeFromAllocations`** (optional, boolean): When `true`, the asset is excluded from the allocations UI panel. Useful for auto-managed types like RSUs. Default `false`.
+- **`helpText`** (optional, string): Help text displayed in the UI for this investment type. Supports template tokens:
+  - `${taxRules.capitalGainsTax.rate,percentage}` — resolves to the ruleset CGT rate.
+  - `${investmentType.taxation.exitTax.rate,percentage}` — resolves to the type's exit tax rate.
+  - `${investmentType.taxation.exitTax.deemedDisposalYears}` — resolves to the deemed disposal interval.
 - **`taxation`**: Object describing how this type is taxed:
   - **Exit tax-style regimes**:
     - `exitTax.rate`: Exit tax rate as a decimal.
@@ -280,10 +296,21 @@ Each entry in the `investmentTypes` array supports the following fields:
   - **Capital gains regimes**:
     - `capitalGains.rate` or `capitalGains.rateRef`:
       - Fixed rate, or reference into `capitalGainsTax.rate`.
+    - `capitalGains.eligibleForAnnualExemption` (optional, boolean):
+      - Whether the annual CGT exemption applies to gains from this type. Defaults to `true` for CGT assets when absent.
     - `capitalGains.annualExemption` or `annualExemptionRef` (optional):
       - Either a literal exemption or reference into `capitalGainsTax.annualExemption`.
+      - **`annualExemption`** (optional, number): Per-type annual exemption amount (local currency). When set, gains from this type draw from a **separate exemption pool** keyed by investment type, independent of the global `capitalGainsTax.annualExemption` pool.
+      - **`annualExemptionRef`** (optional, string): Reference string (e.g., `"capitalGainsTax.annualExemption"`). Opts this type into the **shared global exemption pool** rather than a per-type pool. Use this when the type should share the ruleset-wide annual exemption with other CGT assets.
     - `capitalGains.allowLossOffset`:
       - Whether losses can offset gains.
+
+> **Exemption pool resolution summary:**
+> | Configuration | Pool used |
+> |---|---|
+> | `annualExemptionRef: "capitalGainsTax.annualExemption"` | Global shared pool |
+> | No `annualExemption` or `annualExemptionRef` | Global shared pool (default) |
+> | `annualExemption: <number>` | Per-type pool (separate) |
 
 #### Examples
 

@@ -40,6 +40,8 @@ function parseArgs(argv) {
     tolerance: 0,
     manual: false,
     port: 8081,
+    search: null,
+    file: null,
   };
 
   for (let i = 2; i < argv.length; i++) {
@@ -51,14 +53,16 @@ function parseArgs(argv) {
     if (arg === '--tolerance') { args.tolerance = parseFloat(argv[++i]); continue; }
     if (arg === '--manual') { args.manual = true; continue; }
     if (arg === '--port') { args.port = parseInt(argv[++i], 10); continue; }
+    if (arg === '--search') { args.search = argv[++i]; continue; }
+    if (arg === '--file') { args.file = argv[++i]; continue; }
     if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
     }
   }
 
-  if (!args.feature || (!args.manual && !args.scenario)) {
-    console.error('Error: --feature and (either --scenario or --manual) are required.');
+  if (!args.feature || (!args.manual && !args.scenario && !args.search)) {
+    console.error('Error: --feature and (either --scenario or --manual or --search) are required.');
     printHelp();
     process.exit(1);
   }
@@ -71,13 +75,15 @@ function printHelp() {
 Regression Bisect Tool
 
 Usage:
-  ./blame --feature <branch> [--scenario <path> | --manual] [options]
+  ./blame --feature <branch> [--scenario <path> | --manual | --search <regex>] [options]
 
 Options:
   --feature <branch>    Feature branch name to check against base
   --base <branch>       Base branch name (default: main)
   --scenario <path>     Path to the scenario file (CSV/JSON/JS)
   --manual              Interactive mode for visual/manual defects
+  --search <regex>      Search for the first/last commit where a file matches this regex
+  --file <pattern>      Optional file pattern for --search (e.g., "*.js")
   --port <number>       Port for local server in manual mode (default: 8081)
   --repo <path>         Path to the repository (default: current directory)
   --tolerance <number>  Tolerance for compare.js (default: 0)
@@ -122,6 +128,23 @@ function getCommitInfo(cwd, hash) {
   const msg = runGit(`show -s --format="%s%n%b" "${hash}"`, cwd);
   const stat = runGit(`show --stat "${hash}"`, cwd);
   return { msg, stat };
+}
+
+function checkSearch(cwd, regex, fileSpec) {
+  try {
+    // -l: list files, -E: extended regex
+    let fileArg = '';
+    if (fileSpec) {
+      // Prepend magic to allow matching anywhere in the tree if not already specified
+      const pattern = fileSpec.startsWith(':') ? fileSpec : `:(glob)**/${fileSpec}`;
+      fileArg = ` -- "${pattern}"`;
+    }
+    const output = runGit(`grep -lE "${regex}"${fileArg}`, cwd);
+    return { hasMatch: true, files: output.split('\n').filter(Boolean) };
+  } catch (e) {
+    // git grep returns 1 if no matches found
+    return { hasMatch: false, files: [] };
+  }
 }
 
 // --- Comparison Logic ---
@@ -222,6 +245,15 @@ async function main() {
     console.log(`Feature repo: ${dirFeature}`);
     console.log(`Base repo:    ${dirMain} (for reference)\n`);
 
+    let searchMode = 'first';
+    if (args.search) {
+      let answer = '';
+      while (answer !== 'f' && answer !== 'l') {
+        answer = (await askUser('Search for the (f)irst or (l)ast occurrence? (f/l): ')).toLowerCase();
+      }
+      searchMode = (answer === 'f' ? 'first' : 'last');
+    }
+
     // Initial check: Base vs Feature (Head)
     let hasInitialDiff = false;
     if (args.manual) {
@@ -233,6 +265,8 @@ async function main() {
         answer = (await askUser('Do you see the defect in the feature branch? (y/n): ')).toLowerCase();
       }
       hasInitialDiff = (answer === 'y');
+    } else if (args.search) {
+      hasInitialDiff = true; // For search, we enter the loop and find out
     } else {
       const initialResult = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
       hasInitialDiff = initialResult.hasDiff;
@@ -246,6 +280,7 @@ async function main() {
     let low = 0;
     let high = commits.length - 1;
     let offendingIndex = -1;
+    let matchedFiles = [];
 
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
@@ -267,6 +302,29 @@ async function main() {
           high = mid - 1;
         } else {
           low = mid + 1;
+        }
+      } else if (args.search) {
+        process.stdout.write(`Checking commit ${mid + 1}/${commits.length}: ${commitHash.substring(0, 7)}... `);
+
+        checkout(dirFeature, commitHash);
+        const result = checkSearch(dirFeature, args.search, args.file);
+
+        if (result.hasMatch) {
+          offendingIndex = mid;
+          matchedFiles = result.files;
+          console.log(`Match found in ${result.files.length} file(s).`);
+          if (searchMode === 'first') {
+            high = mid - 1;
+          } else {
+            low = mid + 1;
+          }
+        } else {
+          console.log('No match.');
+          if (searchMode === 'first') {
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
         }
       } else {
         process.stdout.write(`Checking commit ${mid + 1}/${commits.length}: ${commitHash.substring(0, 7)}... `);
@@ -290,35 +348,40 @@ async function main() {
       const badCommit = commits[offendingIndex];
 
       const info = getCommitInfo(dirFeature, badCommit);
-      console.log(`\nFound offending commit: ${badCommit.substring(0, 7)}`);
+      console.log(`\nFound ${args.search ? 'matching' : 'offending'} commit: ${badCommit.substring(0, 7)}`);
       console.log(`Message: ${info.msg.split('\n')[0]}`);
-      console.log(`\nChanges:\n${info.stat}\n`);
 
-      if (!args.manual) {
-        console.log('Value Differences:\n');
-        checkout(dirFeature, badCommit);
-        const finalResult = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
+      if (args.search) {
+        console.log(`\nMatching files:\n${matchedFiles.join('\n')}\n`);
+      } else {
+        console.log(`\nChanges:\n${info.stat}\n`);
 
-        if (finalResult.diffs.length > 0) {
-          const diffs = finalResult.diffs;
-          diffs.sort((a, b) => a.row - b.row);
+        if (!args.manual) {
+          console.log('Value Differences:\n');
+          checkout(dirFeature, badCommit);
+          const finalResult = runCompare(dirMain, dirFeature, scenarioPath, args.tolerance);
 
-          // Concise output format: Age <age>: <field> Main=<val> Feature=<val>
-          diffs.forEach(d => {
-            if (d.type === 'row_mismatch') {
-              console.log(`Row ${d.row}: Row mismatch (Main=${d.aExists}, Feature=${d.bExists})`);
-            } else {
-              const ageStr = (d.age !== null && d.age !== undefined) ? `Age ${d.age}` : `Row ${d.row}`;
-              console.log(`${ageStr}, "${d.field}", Main=${d.a}, Feature=${d.b}`);
-            }
-          });
-        } else {
-          console.log('No differences found in final check? This shouldn\'t happen.');
+          if (finalResult.diffs.length > 0) {
+            const diffs = finalResult.diffs;
+            diffs.sort((a, b) => a.row - b.row);
+
+            // Concise output format: Age <age>: <field> Main=<val> Feature=<val>
+            diffs.forEach(d => {
+              if (d.type === 'row_mismatch') {
+                console.log(`Row ${d.row}: Row mismatch (Main=${d.aExists}, Feature=${d.bExists})`);
+              } else {
+                const ageStr = (d.age !== null && d.age !== undefined) ? `Age ${d.age}` : `Row ${d.row}`;
+                console.log(`${ageStr}, "${d.field}", Main=${d.a}, Feature=${d.b}`);
+              }
+            });
+          } else {
+            console.log('No differences found in final check? This shouldn\'t happen.');
+          }
         }
       }
 
     } else {
-      console.log('Search completed but no single offending commit found (logic error?).');
+      console.log(`Search completed but no single ${args.search ? 'matching' : 'offending'} commit found.`);
     }
 
   } catch (err) {

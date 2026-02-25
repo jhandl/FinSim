@@ -206,6 +206,13 @@ class TaxRuleSet {
     return typeof it.jointBandIncreaseMax === 'number' ? it.jointBandIncreaseMax : 0;
   }
 
+  isJointFilingAllowed() {
+    if (typeof this.raw.jointFilingAllowed === 'boolean') return this.raw.jointFilingAllowed;
+    var it = this.raw.incomeTax || {};
+    if (typeof it.jointFilingAllowed === 'boolean') return it.jointFilingAllowed;
+    return true;
+  }
+
   getIncomeTaxEmployeeCredit() {
     var it = this.raw.incomeTax || {};
     var credits = it.taxCredits || {};
@@ -331,6 +338,11 @@ class TaxRuleSet {
    */
   getIncomeTaxSpec() {
     return this.raw.incomeTax || {};
+  }
+
+  getIncomeTaxApplicableIncomeTypes() {
+    var it = this.raw.incomeTax || {};
+    return (Array.isArray(it.applicableIncomeTypes) && it.applicableIncomeTypes.length > 0) ? it.applicableIncomeTypes : null;
   }
 
   /**

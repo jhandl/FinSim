@@ -24,9 +24,11 @@ class InvestmentAsset {
     // Resolve tax properties using static helpers
     this.taxRate = InvestmentAsset._resolveTaxRate(this._typeDef, this._ruleset);
     this._taxCategory = InvestmentAsset._resolveTaxCategory(this._typeDef);
-    this._deemedDisposalYears = InvestmentAsset._resolveDeemedDisposalYears(this._typeDef);
-    this.canOffsetLosses = InvestmentAsset._resolveAllowLossOffset(this._typeDef);
+    this._deemedDisposalYears = InvestmentAsset._resolveDeemedDisposalYears(this._typeDef, this._ruleset);
+    this.canOffsetLosses = InvestmentAsset._resolveAllowLossOffset(this._typeDef, this._ruleset);
     this.eligibleForAnnualExemption = InvestmentAsset._resolveAnnualExemptionEligibility(this._typeDef);
+    this._exemptionKey = InvestmentAsset._resolveExemptionKey(this._typeDef);
+    this._annualExemptionAmount = InvestmentAsset._resolveAnnualExemptionAmount(this._typeDef);
 
     this._suppressRevenue = false;
     this._lastGainsConverted = 0;
@@ -50,16 +52,21 @@ class InvestmentAsset {
     return 'capitalGains';
   }
 
-  static _resolveAllowLossOffset(typeDef) {
+  static _resolveAllowLossOffset(typeDef, ruleset) {
     var t = (typeDef && typeDef.taxation) || {};
     if (t.exitTax && typeof t.exitTax.allowLossOffset === 'boolean') return t.exitTax.allowLossOffset;
     if (t.capitalGains && typeof t.capitalGains.allowLossOffset === 'boolean') return t.capitalGains.allowLossOffset;
-    return true; // default platform behavior
+    
+    var cgt = (ruleset && ruleset.raw && ruleset.raw.capitalGainsTax) || {};
+    return typeof cgt.allowLossOffset === 'boolean' ? cgt.allowLossOffset : true;
   }
 
-  static _resolveDeemedDisposalYears(typeDef) {
+  static _resolveDeemedDisposalYears(typeDef, ruleset) {
     var t = (typeDef && typeDef.taxation && typeDef.taxation.exitTax) || {};
-    return typeof t.deemedDisposalYears === 'number' ? t.deemedDisposalYears : 0;
+    if (typeof t.deemedDisposalYears === 'number') return t.deemedDisposalYears;
+
+    var cgt = (ruleset && ruleset.raw && ruleset.raw.capitalGainsTax) || {};
+    return typeof cgt.deemedDisposalYears === 'number' ? cgt.deemedDisposalYears : 0;
   }
 
   static _resolveAnnualExemptionEligibility(typeDef) {
@@ -70,6 +77,20 @@ class InvestmentAsset {
     if (t.exitTax) return false;
     if (t.capitalGains) return true;
     return false;
+  }
+
+  static _resolveExemptionKey(typeDef) {
+    if (typeDef && typeDef.taxation && typeDef.taxation.capitalGains && typeof typeDef.taxation.capitalGains.annualExemption === 'number') {
+      return typeDef.key;
+    }
+    return "global";
+  }
+
+  static _resolveAnnualExemptionAmount(typeDef) {
+    if (typeDef && typeDef.taxation && typeDef.taxation.capitalGains && typeof typeDef.taxation.capitalGains.annualExemption === 'number') {
+      return typeDef.taxation.capitalGains.annualExemption;
+    }
+    return null;
   }
 
   static _resolveTaxRate(typeDef, ruleset) {
@@ -123,7 +144,9 @@ class InvestmentAsset {
       revenue.declareInvestmentGains(gainsMoney, this.taxRate, this.label + ' Sale', {
         category: isExit ? 'exitTax' : 'cgt',
         eligibleForAnnualExemption: eligible,
-        allowLossOffset: allowOffset
+        allowLossOffset: allowOffset,
+        exemptionKey: this._exemptionKey,
+        annualExemptionAmount: this._annualExemptionAmount
       }, this.assetCountry);
     }
   }
@@ -378,33 +401,25 @@ class InvestmentAsset {
     // Resolve deemed disposal rules for CURRENT country (matches legacy IndexFunds behavior)
     if (this._taxCategory === 'exitTax') {
       var activeDeemedDisposalYears = 0;
-      try {
-        var cfg = Config.getInstance();
-        // Use global currentCountry variable if available, otherwise fall back to default
-        var targetCountry = (typeof currentCountry !== 'undefined') ? currentCountry : cfg.getDefaultCountry();
-        var ruleset = cfg && cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(targetCountry) : null;
-        if (ruleset && typeof ruleset.findInvestmentTypeByKey === 'function') {
-          var t = ruleset.findInvestmentTypeByKey(this.key);
-          if (t && t.taxation && t.taxation.exitTax && typeof t.taxation.exitTax.deemedDisposalYears === 'number') {
-            activeDeemedDisposalYears = t.taxation.exitTax.deemedDisposalYears;
+      var cfg = Config.getInstance();
+      var targetCountry = currentCountry || cfg.getDefaultCountry();
+      var ruleset = cfg.getCachedTaxRuleSet(targetCountry);
+      var t = ruleset.findInvestmentTypeByKey(this.key);
+      if (t && t.taxation && t.taxation.exitTax) {
+        activeDeemedDisposalYears = InvestmentAsset._resolveDeemedDisposalYears(t, ruleset);
+      }
+      if ((!activeDeemedDisposalYears || activeDeemedDisposalYears <= 0) && revenue && typeof revenue.getActiveCrossBorderTaxCountries === 'function') {
+        var trailingCountries = revenue.getActiveCrossBorderTaxCountries();
+        for (var ti = 0; ti < trailingCountries.length; ti++) {
+          var trailing = trailingCountries[ti];
+          var trailingRuleset = trailing ? trailing.ruleset : null;
+          if (!trailingRuleset || typeof trailingRuleset.findInvestmentTypeByKey !== 'function') continue;
+          var trailingType = trailingRuleset.findInvestmentTypeByKey(this.key);
+          if (trailingType && trailingType.taxation && trailingType.taxation.exitTax) {
+            activeDeemedDisposalYears = InvestmentAsset._resolveDeemedDisposalYears(trailingType, trailingRuleset);
+            break;
           }
         }
-        if ((!activeDeemedDisposalYears || activeDeemedDisposalYears <= 0) && revenue && typeof revenue.getActiveCrossBorderTaxCountries === 'function') {
-          var trailingCountries = revenue.getActiveCrossBorderTaxCountries();
-          for (var ti = 0; ti < trailingCountries.length; ti++) {
-            var trailing = trailingCountries[ti];
-            var trailingRuleset = trailing ? trailing.ruleset : null;
-            if (!trailingRuleset || typeof trailingRuleset.findInvestmentTypeByKey !== 'function') continue;
-            var trailingType = trailingRuleset.findInvestmentTypeByKey(this.key);
-            if (trailingType && trailingType.taxation && trailingType.taxation.exitTax && typeof trailingType.taxation.exitTax.deemedDisposalYears === 'number') {
-              activeDeemedDisposalYears = trailingType.taxation.exitTax.deemedDisposalYears;
-              break;
-            }
-          }
-        }
-      } catch (_) {
-        // Fallback to initial value if resolution fails
-        activeDeemedDisposalYears = this._deemedDisposalYears;
       }
       /**
        * Apply deemed disposal for exit tax assets.
@@ -439,7 +454,9 @@ class InvestmentAsset {
               revenue.declareInvestmentGains(gainsMoney, this.taxRate, 'Deemed Disposal', {
                 category: 'exitTax',
                 eligibleForAnnualExemption: !!this.eligibleForAnnualExemption,
-                allowLossOffset: !!this.canOffsetLosses
+                allowLossOffset: !!this.canOffsetLosses,
+                exemptionKey: this._exemptionKey,
+                annualExemptionAmount: this._annualExemptionAmount
               }, this.assetCountry);
             }
           }
@@ -487,7 +504,9 @@ class InvestmentAsset {
       testRevenue.declareInvestmentGains(gainsMoney, this.taxRate, this.label + ' Sim', {
         category: isExit ? 'exitTax' : 'cgt',
         eligibleForAnnualExemption: !!this.eligibleForAnnualExemption,
-        allowLossOffset: !!this.canOffsetLosses
+        allowLossOffset: !!this.canOffsetLosses,
+        exemptionKey: this._exemptionKey,
+        annualExemptionAmount: this._annualExemptionAmount
       }, this.assetCountry);
     }
   }

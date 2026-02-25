@@ -14,6 +14,11 @@ class Taxman {
     }
   }
 
+  _incomeTypeIncludes(applicableTypes, type) {
+    if (!applicableTypes) return true;
+    return Array.isArray(applicableTypes) && applicableTypes.indexOf(type) !== -1;
+  }
+
   declareSalaryIncome(money, contribRate, person, description, sourceCountry) {
     // Validate Money object
     if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
@@ -318,6 +323,8 @@ class Taxman {
       category: (options && (options.category === 'exitTax' || options.category === 'cgt')) ? options.category : 'cgt',
       eligibleForAnnualExemption: options && typeof options.eligibleForAnnualExemption === 'boolean' ? options.eligibleForAnnualExemption : true,
       allowLossOffset: options && typeof options.allowLossOffset === 'boolean' ? options.allowLossOffset : true,
+      exemptionKey: (options && options.exemptionKey) ? options.exemptionKey : 'global',
+      annualExemptionAmount: (options && typeof options.annualExemptionAmount === 'number') ? options.annualExemptionAmount : null,
       assetCountry: assetCountry ? String(assetCountry).toLowerCase() : null
     };
     rateBucket.entries.push(entry);
@@ -969,7 +976,12 @@ class Taxman {
 
     var self = this;
     var hadDomesticMetrics = false;
-    var addMetricToAttribution = function (metricKey) {
+    const itApplicableTypes = (this.ruleset && typeof this.ruleset.getIncomeTaxApplicableIncomeTypes === 'function')
+      ? this.ruleset.getIncomeTaxApplicableIncomeTypes()
+      : null;
+
+    var addMetricToAttribution = function (metricKey, typeToken) {
+      if (!self._incomeTypeIncludes(itApplicableTypes, typeToken)) return false;
       const attr = self.attributionManager.getAttribution(metricKey);
       if (!attr) return false;
       const breakdown = attr.getBreakdown();
@@ -984,12 +996,38 @@ class Taxman {
 
     // Add income sources
     if (taxBasis === 'domestic' && residenceCountry) {
-      addMetricToAttribution('incomesalaries:' + residenceCountry);
-      addMetricToAttribution('incomesalaries');
-      addMetricToAttribution('incomerentals:' + residenceCountry);
-      addMetricToAttribution('incomerentals');
-      addMetricToAttribution('incomedefinedbenefit');
-      if (!hadDomesticMetrics) {
+      addMetricToAttribution('incomesalaries:' + residenceCountry, 'employment');
+      addMetricToAttribution('incomesalaries', 'employment');
+      addMetricToAttribution('incomerentals:' + residenceCountry, 'rental');
+      addMetricToAttribution('incomerentals', 'rental');
+      addMetricToAttribution('incomedefinedbenefit', 'definedBenefit');
+      if (itApplicableTypes && this._incomeTypeIncludes(itApplicableTypes, 'otherIncome')) {
+        const incomeAttr = this.attributionManager.getAttribution('income');
+        if (incomeAttr) {
+          const bd = incomeAttr.getBreakdown();
+          const salAttr = this.attributionManager.getAttribution('incomesalaries');
+          const rentAttr = this.attributionManager.getAttribution('incomerentals');
+          const salNames = salAttr ? Object.keys(salAttr.getBreakdown()) : [];
+          const rentNames = rentAttr ? Object.keys(rentAttr.getBreakdown()) : [];
+          // Also check yearly variants
+          const yearlyAttributions = this.attributionManager.yearlyAttributions || {};
+          for (const k in yearlyAttributions) {
+            if (k.indexOf('incomesalaries:') === 0 || k.indexOf('incomerentals:') === 0) {
+              const bdk = yearlyAttributions[k].getBreakdown();
+              for (const s in bdk) {
+                if (k.indexOf('incomesalaries:') === 0) salNames.push(s);
+                else rentNames.push(s);
+              }
+            }
+          }
+          for (const s in bd) {
+            if (salNames.indexOf(s) === -1 && rentNames.indexOf(s) === -1) {
+              taxableIncomeAttribution.add(s, bd[s]);
+            }
+          }
+        }
+      }
+      if (!hadDomesticMetrics && !itApplicableTypes) {
         const incomeAttribution = this.attributionManager.getAttribution('income');
         if (incomeAttribution) {
           const incomeBreakdown = incomeAttribution.getBreakdown();
@@ -999,37 +1037,107 @@ class Taxman {
         }
       }
     } else {
-      const incomeAttribution = this.attributionManager.getAttribution('income');
-      if (incomeAttribution) {
-        const incomeBreakdown = incomeAttribution.getBreakdown();
-        for (const source in incomeBreakdown) {
-          taxableIncomeAttribution.add(source, incomeBreakdown[source]);
+      if (!itApplicableTypes) {
+        const incomeAttribution = this.attributionManager.getAttribution('income');
+        if (incomeAttribution) {
+          const incomeBreakdown = incomeAttribution.getBreakdown();
+          for (const source in incomeBreakdown) {
+            taxableIncomeAttribution.add(source, incomeBreakdown[source]);
+          }
+        }
+      } else {
+        // Worldwide path with filtering: assemble from available components
+        if (this._incomeTypeIncludes(itApplicableTypes, 'employment')) {
+          const salAttr = this.attributionManager.getAttribution('incomesalaries');
+          if (salAttr) {
+            const bd = salAttr.getBreakdown();
+            for (const s in bd) taxableIncomeAttribution.add(s, bd[s]);
+          }
+          const yearlyAttributions = this.attributionManager.yearlyAttributions || {};
+          for (const k in yearlyAttributions) {
+            if (k.indexOf('incomesalaries:') === 0) {
+              const attrS = yearlyAttributions[k];
+              const bdS = attrS.getBreakdown();
+              for (const s in bdS) taxableIncomeAttribution.add(s, bdS[s]);
+            }
+          }
+        }
+        if (this._incomeTypeIncludes(itApplicableTypes, 'rental')) {
+          const rentAttr = this.attributionManager.getAttribution('incomerentals');
+          if (rentAttr) {
+            const bd = rentAttr.getBreakdown();
+            for (const s in bd) taxableIncomeAttribution.add(s, bd[s]);
+          }
+          const yearlyAttributions = this.attributionManager.yearlyAttributions || {};
+          for (const k in yearlyAttributions) {
+            if (k.indexOf('incomerentals:') === 0) {
+              const attrR = yearlyAttributions[k];
+              const bdR = attrR.getBreakdown();
+              for (const s in bdR) taxableIncomeAttribution.add(s, bdR[s]);
+            }
+          }
+        }
+        if (this._incomeTypeIncludes(itApplicableTypes, 'investmentIncome')) {
+          const invAttr = this.attributionManager.getAttribution('investmentincome');
+          if (invAttr) {
+            const bd = invAttr.getBreakdown();
+            for (const s in bd) taxableIncomeAttribution.add(s, bd[s]);
+          }
+        }
+        if (this._incomeTypeIncludes(itApplicableTypes, 'otherIncome')) {
+          const incomeAttr = this.attributionManager.getAttribution('income');
+          if (incomeAttr) {
+            const bd = incomeAttr.getBreakdown();
+            const salAttr = this.attributionManager.getAttribution('incomesalaries');
+            const rentAttr = this.attributionManager.getAttribution('incomerentals');
+            const salNames = salAttr ? Object.keys(salAttr.getBreakdown()) : [];
+            const rentNames = rentAttr ? Object.keys(rentAttr.getBreakdown()) : [];
+            for (const s in bd) {
+              if (salNames.indexOf(s) === -1 && rentNames.indexOf(s) === -1) {
+                taxableIncomeAttribution.add(s, bd[s]);
+              }
+            }
+          }
+        }
+        if (this._incomeTypeIncludes(itApplicableTypes, 'statePension')) {
+          if (this.statePension > 0) taxableIncomeAttribution.add('State Pension', this.statePension);
+        }
+        if (this._incomeTypeIncludes(itApplicableTypes, 'definedBenefit')) {
+          const dbiAttr = this.attributionManager.getAttribution('incomedefinedbenefit');
+          if (dbiAttr) {
+            const bd = dbiAttr.getBreakdown();
+            for (const s in bd) taxableIncomeAttribution.add(s, bd[s]);
+          }
         }
       }
     }
 
     // Add private pension income
     if (taxBasis === 'domestic' && residenceCountry) {
-      addMetricToAttribution('incomeprivatepension:' + residenceCountry);
-      addMetricToAttribution('incomeprivatepension');
+      addMetricToAttribution('incomeprivatepension:' + residenceCountry, 'privatePension');
+      addMetricToAttribution('incomeprivatepension', 'privatePension');
     } else {
-      if (this.privatePensionP1 > 0) taxableIncomeAttribution.add('Private Pension P1', this.privatePensionP1);
-      if (this.privatePensionP2 > 0) taxableIncomeAttribution.add('Private Pension P2', this.privatePensionP2);
+      if (this._incomeTypeIncludes(itApplicableTypes, 'privatePension')) {
+        if (this.privatePensionP1 > 0) taxableIncomeAttribution.add('Private Pension P1', this.privatePensionP1);
+        if (this.privatePensionP2 > 0) taxableIncomeAttribution.add('Private Pension P2', this.privatePensionP2);
+      }
     }
 
     // Add investment type income sources (RSUs, etc.)
-    for (const typeKey in this.investmentTypeIncome) {
-      if (taxBasis === 'domestic' && residenceCountry) {
-        if (typeKey.indexOf('_') > -1) {
-          const suffix = typeKey.split('_').pop();
-          if (suffix !== residenceCountry) continue;
+    if (this._incomeTypeIncludes(itApplicableTypes, 'investmentTypeIncome')) {
+      for (const typeKey in this.investmentTypeIncome) {
+        if (taxBasis === 'domestic' && residenceCountry) {
+          if (typeKey.indexOf('_') > -1) {
+            const suffix = typeKey.split('_').pop();
+            if (suffix !== residenceCountry) continue;
+          }
         }
-      }
-      const attr = this.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
-      if (attr) {
-        const breakdown = attr.getBreakdown();
-        for (const source in breakdown) {
-          taxableIncomeAttribution.add(source, breakdown[source]);
+        const attr = this.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
+        if (attr) {
+          const breakdown = attr.getBreakdown();
+          for (const source in breakdown) {
+            taxableIncomeAttribution.add(source, breakdown[source]);
+          }
         }
       }
     }
@@ -1038,70 +1146,142 @@ class Taxman {
     taxableIncomeAttribution.add('Your Pension Relief', -this.pensionContribReliefP1);
     taxableIncomeAttribution.add('Their Pension Relief', -this.pensionContribReliefP2);
 
-    // Determine brackets and married band increase using ruleset if available
-    var itBands;
-    var marriedBandIncrease = 0;
-    itBands = this.ruleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
-    if (this.married) {
-      const p1TotalSalary = this.totalSalaryP1 || 0;
-      const p2TotalSalary = this.person2Ref ? (this.totalSalaryP2 || 0) : 0;
-      var maxIncrease = adjust(this.ruleset.getIncomeTaxJointBandIncreaseMax());
-      if (p1TotalSalary > 0 && p2TotalSalary > 0) {
-        marriedBandIncrease = Math.min(maxIncrease, Math.min(p1TotalSalary, p2TotalSalary));
-      } else if (p1TotalSalary > 0) {
-        marriedBandIncrease = Math.min(maxIncrease, p1TotalSalary);
-      } else if (p2TotalSalary > 0) {
-        marriedBandIncrease = Math.min(maxIncrease, p2TotalSalary);
+    if (this.married && !this.ruleset.isJointFilingAllowed()) {
+      // Non-joint path: compute tax for each person separately using single brackets
+      var p1TotalSalary = 0;
+      var p2TotalSalary = 0;
+      if (this._incomeTypeIncludes(itApplicableTypes, 'employment')) {
+        this.salariesP1.forEach(function(s) { p1TotalSalary += s.amount; });
+        this.salariesP2.forEach(function(s) { p2TotalSalary += s.amount; });
       }
-    }
 
-    let tax = this.computeProgressiveTax(itBands, taxableIncomeAttribution, 'incomeTax', 1, marriedBandIncrease);
+      var p1PrivatePension = 0;
+      var p2PrivatePension = 0;
+      if (this._incomeTypeIncludes(itApplicableTypes, 'privatePension')) {
+        p1PrivatePension = this.privatePensionP1;
+        p2PrivatePension = this.privatePensionP2;
+      }
 
+      var grossTotal = taxableIncomeAttribution.getTotal() + this.pensionContribReliefP1 + this.pensionContribReliefP2;
+      var sharedIncome = grossTotal - p1TotalSalary - p2TotalSalary - p1PrivatePension - p2PrivatePension;
 
-    if (this.privatePensionLumpSumCountP1 > 0) {
-      const lumpSumAttribution = new Attribution('pensionLumpSum');
-      lumpSumAttribution.add('Pension Lump Sum P1', this.privatePensionLumpSumP1);
-      var lumpBands = this.ruleset.getPensionLumpSumTaxBands();
-      tax += this.computeProgressiveTax(lumpBands, lumpSumAttribution, 'incomeTax');
-    }
-    if (this.privatePensionLumpSumCountP2 > 0) {
-      const lumpSumAttribution = new Attribution('pensionLumpSum');
-      lumpSumAttribution.add('Pension Lump Sum P2', this.privatePensionLumpSumP2);
-      var lumpBands2 = this.ruleset.getPensionLumpSumTaxBands();
-      tax += this.computeProgressiveTax(lumpBands2, lumpSumAttribution, 'incomeTax');
-    }
+      var p1Attribution = new Attribution('taxableIncomeP1');
+      if (this._incomeTypeIncludes(itApplicableTypes, 'employment')) {
+        this.salariesP1.forEach(function(s) { p1Attribution.add(s.description, s.amount); });
+      }
+      if (p1PrivatePension > 0) p1Attribution.add('Private Pension P1', p1PrivatePension);
+      if (sharedIncome > 0) p1Attribution.add('Shared Income P1', sharedIncome * 0.5);
+      p1Attribution.add('Your Pension Relief', -this.pensionContribReliefP1);
 
-    var ageExemptionAge = this.ruleset.getIncomeTaxAgeExemptionAge();
-    var ageExemptionLimit = this.ruleset.getIncomeTaxAgeExemptionLimit();
-    const totalIncome = taxableIncomeAttribution.getTotal();
-    const totalCredits = this._applyTaxCredits(
-      this.ruleset,
-      params,
-      totalIncome,
-      this.person1Ref ? this.person1Ref.age : null
-    );
-    let credit = adjust(totalCredits);
+      var p2Attribution = new Attribution('taxableIncomeP2');
+      if (this._incomeTypeIncludes(itApplicableTypes, 'employment')) {
+        this.salariesP2.forEach(function(s) { p2Attribution.add(s.description, s.amount); });
+      }
+      if (p2PrivatePension > 0) p2Attribution.add('Private Pension P2', p2PrivatePension);
+      if (sharedIncome > 0) p2Attribution.add('Shared Income P2', sharedIncome * 0.5);
+      p2Attribution.add('Their Pension Relief', -this.pensionContribReliefP2);
 
-    let exemption = ageExemptionLimit * (this.married ? 2 : 1);
+      var singleBands = this.ruleset.getIncomeTaxBracketsFor('single', this.dependentChildren);
+      var ageExemptionAge = this.ruleset.getIncomeTaxAgeExemptionAge();
+      var ageExemptionLimit = this.ruleset.getIncomeTaxAgeExemptionLimit();
+      var p1Age = this.person1Ref ? this.person1Ref.age : null;
+      var p2Age = this.person2Ref ? this.person2Ref.age : null;
 
-    let p1AgeEligible = (this.person1Ref && this.person1Ref.age >= ageExemptionAge);
-    let p2AgeEligible = (this.married && this.person2Ref && this.person2Ref.age >= ageExemptionAge);
-    let isEligibleForAgeExemption = p1AgeEligible || p2AgeEligible;
+      var taxP1 = 0;
+      if (!(p1Age >= ageExemptionAge && p1Attribution.getTotal() <= adjust(ageExemptionLimit))) {
+        taxP1 = this.computeProgressiveTax(singleBands, p1Attribution, 'incomeTax');
+      }
 
-    const taxableAmount = totalIncome;
-    const ageExempt = (isEligibleForAgeExemption && taxableAmount <= adjust(exemption) && (this.privatePensionLumpSumCountP1 === 0 && this.privatePensionLumpSumCountP2 === 0));
-    if (ageExempt) {
-      // Clear any previously recorded income tax for age exemption case
-      this.taxTotals['incomeTax'] = 0;
-      // Also clear attribution slices for income tax to avoid UI inconsistencies
-      try {
-        if (this.attributionManager && this.attributionManager.yearlyAttributions && this.attributionManager.yearlyAttributions['tax:incomeTax']) {
-          this.attributionManager.yearlyAttributions['tax:incomeTax'] = new Attribution('tax:incomeTax');
-        }
-      } catch (_) { }
+      var taxP2 = 0;
+      if (!(p2Age >= ageExemptionAge && p2Attribution.getTotal() <= adjust(ageExemptionLimit))) {
+        taxP2 = this.computeProgressiveTax(singleBands, p2Attribution, 'incomeTax');
+      }
+
+      // Lump-sum pension tax (already per-person)
+      if (this.privatePensionLumpSumCountP1 > 0) {
+        var lsAttr1 = new Attribution('pensionLumpSumP1');
+        lsAttr1.add('Pension Lump Sum P1', this.privatePensionLumpSumP1);
+        taxP1 += this.computeProgressiveTax(this.ruleset.getPensionLumpSumTaxBands(), lsAttr1, 'incomeTax');
+      }
+      if (this.privatePensionLumpSumCountP2 > 0) {
+        var lsAttr2 = new Attribution('pensionLumpSumP2');
+        lsAttr2.add('Pension Lump Sum P2', this.privatePensionLumpSumP2);
+        taxP2 += this.computeProgressiveTax(this.ruleset.getPensionLumpSumTaxBands(), lsAttr2, 'incomeTax');
+      }
+
+      // Apply credits per person
+      var p1Credit = adjust(this._applyTaxCredits(this.ruleset, params, p1Attribution.getTotal(), p1Age, 1));
+      var p2Credit = adjust(this._applyTaxCredits(this.ruleset, params, p2Attribution.getTotal(), p2Age, 2));
+
+      this._recordTax('incomeTax', 'Tax Credit', -Math.min(taxP1, p1Credit) - Math.min(taxP2, p2Credit));
+      // End of non-joint path
     } else {
-      // Apply credits exactly once as a negative record against band taxes already recorded above
-      this._recordTax('incomeTax', 'Tax Credit', -Math.min(tax, credit));
+      // Original joint path
+      // Determine brackets and married band increase using ruleset if available
+      var itBands;
+      var marriedBandIncrease = 0;
+      itBands = this.ruleset.getIncomeTaxBracketsFor(status, this.dependentChildren);
+      if (this.married) {
+        const p1TotalSalary = this.totalSalaryP1 || 0;
+        const p2TotalSalary = this.person2Ref ? (this.totalSalaryP2 || 0) : 0;
+        var maxIncrease = adjust(this.ruleset.getIncomeTaxJointBandIncreaseMax());
+        if (p1TotalSalary > 0 && p2TotalSalary > 0) {
+          marriedBandIncrease = Math.min(maxIncrease, Math.min(p1TotalSalary, p2TotalSalary));
+        } else if (p1TotalSalary > 0) {
+          marriedBandIncrease = Math.min(maxIncrease, p1TotalSalary);
+        } else if (p2TotalSalary > 0) {
+          marriedBandIncrease = Math.min(maxIncrease, p2TotalSalary);
+        }
+      }
+
+      let tax = this.computeProgressiveTax(itBands, taxableIncomeAttribution, 'incomeTax', 1, marriedBandIncrease);
+
+
+      if (this.privatePensionLumpSumCountP1 > 0) {
+        const lumpSumAttribution = new Attribution('pensionLumpSum');
+        lumpSumAttribution.add('Pension Lump Sum P1', this.privatePensionLumpSumP1);
+        var lumpBands = this.ruleset.getPensionLumpSumTaxBands();
+        tax += this.computeProgressiveTax(lumpBands, lumpSumAttribution, 'incomeTax');
+      }
+      if (this.privatePensionLumpSumCountP2 > 0) {
+        const lumpSumAttribution = new Attribution('pensionLumpSum');
+        lumpSumAttribution.add('Pension Lump Sum P2', this.privatePensionLumpSumP2);
+        var lumpBands2 = this.ruleset.getPensionLumpSumTaxBands();
+        tax += this.computeProgressiveTax(lumpBands2, lumpSumAttribution, 'incomeTax');
+      }
+
+      var ageExemptionAge = this.ruleset.getIncomeTaxAgeExemptionAge();
+      var ageExemptionLimit = this.ruleset.getIncomeTaxAgeExemptionLimit();
+      const totalIncome = taxableIncomeAttribution.getTotal();
+      const totalCredits = this._applyTaxCredits(
+        this.ruleset,
+        params,
+        totalIncome,
+        this.person1Ref ? this.person1Ref.age : null
+      );
+      let credit = adjust(totalCredits);
+
+      let exemption = ageExemptionLimit * (this.married ? 2 : 1);
+
+      let p1AgeEligible = (this.person1Ref && this.person1Ref.age >= ageExemptionAge);
+      let p2AgeEligible = (this.married && this.person2Ref && this.person2Ref.age >= ageExemptionAge);
+      let isEligibleForAgeExemption = p1AgeEligible || p2AgeEligible;
+
+      const taxableAmount = totalIncome;
+      const ageExempt = (isEligibleForAgeExemption && taxableAmount <= adjust(exemption) && (this.privatePensionLumpSumCountP1 === 0 && this.privatePensionLumpSumCountP2 === 0));
+      if (ageExempt) {
+        // Clear any previously recorded income tax for age exemption case
+        this.taxTotals['incomeTax'] = 0;
+        // Also clear attribution slices for income tax to avoid UI inconsistencies
+        try {
+          if (this.attributionManager && this.attributionManager.yearlyAttributions && this.attributionManager.yearlyAttributions['tax:incomeTax']) {
+            this.attributionManager.yearlyAttributions['tax:incomeTax'] = new Attribution('tax:incomeTax');
+          }
+        } catch (_) { }
+      } else {
+        // Apply credits exactly once as a negative record against band taxes already recorded above
+        this._recordTax('incomeTax', 'Tax Credit', -Math.min(tax, credit));
+      }
     }
 
     // Apply trailing countries' income tax using their ruleset on trailing-income base
@@ -1402,38 +1582,117 @@ class Taxman {
       const rate = getRateForAge(contribObj, person.age);
       if (rate <= 0) return;
 
+      const applicableTypes = contribObj.applicableIncomeTypes || null;
       const taxId = String(contribObj.name || 'contrib').toLowerCase();
+      const allocation = this.person2Ref ? 0.5 : 1.0;
+
+      let filteredSalaries = salariesList;
+      let filteredNonPaye = nonPayeIncome;
+
+      if (applicableTypes) {
+        filteredSalaries = this._incomeTypeIncludes(applicableTypes, 'employment') ? salariesList : [];
+        filteredNonPaye = {};
+        if (this._incomeTypeIncludes(applicableTypes, 'rental')) {
+          for (const k in rentalIncomeMap) filteredNonPaye[k] = (filteredNonPaye[k] || 0) + rentalIncomeMap[k];
+        }
+        if (this._incomeTypeIncludes(applicableTypes, 'investmentTypeIncome')) {
+          for (const k in investmentTypeIncomeMap) filteredNonPaye[k] = (filteredNonPaye[k] || 0) + investmentTypeIncomeMap[k];
+        }
+        if (this._incomeTypeIncludes(applicableTypes, 'investmentIncome')) {
+          for (const k in investmentIncomeMap) filteredNonPaye[k] = (filteredNonPaye[k] || 0) + investmentIncomeMap[k];
+        }
+        if (this._incomeTypeIncludes(applicableTypes, 'otherIncome')) {
+          for (const k in otherIncomeMap) filteredNonPaye[k] = (filteredNonPaye[k] || 0) + otherIncomeMap[k];
+        }
+        if (this._incomeTypeIncludes(applicableTypes, 'privatePension')) {
+          const pp = (person === this.person1Ref) ? this.privatePensionP1 : this.privatePensionP2;
+          if (pp > 0) filteredNonPaye[`Private Pension P${person === this.person1Ref ? 1 : 2}`] = pp / allocation;
+        }
+        if (this._incomeTypeIncludes(applicableTypes, 'statePension')) {
+          const sp = (person === this.person1Ref) ? p1StatePension : p2StatePension;
+          if (sp > 0) filteredNonPaye['State Pension'] = sp / allocation;
+        }
+      }
+
+      // Calculate total base to apply potential income cap
+      let totalSalary = 0;
+      filteredSalaries.forEach(s => { totalSalary += s.amount; });
+      let totalNonPaye = 0;
+      for (const source in filteredNonPaye) { totalNonPaye += filteredNonPaye[source] * allocation; }
+
+      const totalBase = totalSalary + totalNonPaye;
+      let scaleFactor = 1.0;
+      if (typeof contribObj.incomeCap === 'number' && contribObj.incomeCap > 0 && totalBase > contribObj.incomeCap) {
+        scaleFactor = contribObj.incomeCap / totalBase;
+      }
 
       // PAYE salaries
-      salariesList.forEach(s => {
-        const tax = s.amount * rate;
+      filteredSalaries.forEach(s => {
+        const tax = s.amount * rate * scaleFactor;
         this._recordTax(taxId, s.description, tax);
       });
 
       // Non-PAYE income split across persons where applicable.
-      const allocation = this.person2Ref ? 0.5 : 1.0;
-      for (const source in nonPayeIncome) {
-        const amt = nonPayeIncome[source] * allocation;
-        const tax = amt * rate;
+      for (const source in filteredNonPaye) {
+        const amt = filteredNonPaye[source] * allocation;
+        const tax = amt * rate * scaleFactor;
         const srcLabel = this.person2Ref ? `${source} (${person === this.person1Ref ? 'P1' : 'P2'})` : source;
         this._recordTax(taxId, srcLabel, tax);
       }
     };
 
-    // Build non PAYE income attribution once
-    const nonPayeIncomeAttribution = {};
-    const incomeAttr = this.attributionManager.getAttribution('income');
-    if (incomeAttr) Object.assign(nonPayeIncomeAttribution, incomeAttr.getBreakdown());
+    // Build per-type income maps for filtering
+    const rentalIncomeMap = {};
+    const investmentTypeIncomeMap = {};
+    const investmentIncomeMap = {};
+    const otherIncomeMap = {};
+
+    const spAttr = this.attributionManager.getAttribution('incomestatepension');
+    const p1StatePension = spAttr ? (spAttr.getBreakdown()['Your State Pension'] || 0) : 0;
+    const p2StatePension = spAttr ? (spAttr.getBreakdown()['Their State Pension'] || 0) : 0;
+
+    const rentalAttr = this.attributionManager.getAttribution('incomerentals');
+    if (rentalAttr) Object.assign(rentalIncomeMap, rentalAttr.getBreakdown());
+    const yearlyAttributions = this.attributionManager.yearlyAttributions || {};
+    for (const k in yearlyAttributions) {
+      if (k.indexOf('incomerentals:') === 0) {
+        const attr = yearlyAttributions[k];
+        if (attr) Object.assign(rentalIncomeMap, attr.getBreakdown());
+      }
+    }
+
+    const invAttr = this.attributionManager.getAttribution('investmentincome');
+    if (invAttr) Object.assign(investmentIncomeMap, invAttr.getBreakdown());
+
     for (const typeKey in this.investmentTypeIncome) {
       const neAttr = this.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
-      if (neAttr) {
-        const ne = neAttr.getBreakdown();
-        for (const k in ne) nonPayeIncomeAttribution[k] = (nonPayeIncomeAttribution[k] || 0) + ne[k];
+      if (neAttr) Object.assign(investmentTypeIncomeMap, neAttr.getBreakdown());
+    }
+
+    const incomeAttr = this.attributionManager.getAttribution('income');
+    if (incomeAttr) {
+      const fullIncomeBreakdown = incomeAttr.getBreakdown();
+      for (const k in fullIncomeBreakdown) {
+        if (!rentalIncomeMap.hasOwnProperty(k)) {
+          otherIncomeMap[k] = (otherIncomeMap[k] || 0) + fullIncomeBreakdown[k];
+        }
       }
+    }
+
+    // Build legacy non PAYE income attribution for backward compatibility
+    const nonPayeIncomeAttribution = {};
+    if (incomeAttr) Object.assign(nonPayeIncomeAttribution, incomeAttr.getBreakdown());
+    for (const k in investmentTypeIncomeMap) {
+      nonPayeIncomeAttribution[k] = (nonPayeIncomeAttribution[k] || 0) + investmentTypeIncomeMap[k];
     }
     // Remove PAYE salary descriptions to avoid double-charging social contributions like PRSI.
     const removeSalarySources = (list) => {
-      list.forEach(s => { if (s && s.description && nonPayeIncomeAttribution.hasOwnProperty(s.description)) delete nonPayeIncomeAttribution[s.description]; });
+      list.forEach(s => {
+        if (s && s.description) {
+          if (nonPayeIncomeAttribution.hasOwnProperty(s.description)) delete nonPayeIncomeAttribution[s.description];
+          if (otherIncomeMap.hasOwnProperty(s.description)) delete otherIncomeMap[s.description];
+        }
+      });
     };
     removeSalarySources(this.salariesP1);
     removeSalarySources(this.salariesP2);
@@ -1450,9 +1709,10 @@ class Taxman {
    * @param {Object} params - Simulation parameters
    * @param {number} grossIncome - Gross income for credit calculations
    * @param {number} age - Person's age for age-based credits
+   * @param {number} personContext - Optional: 1 for P1, 2 for P2 (null for household joint path)
    * @returns {number} - Total credits amount
    */
-  _applyTaxCredits(ruleset, params, grossIncome, age) {
+  _applyTaxCredits(ruleset, params, grossIncome, age, personContext) {
     var spec = ruleset.getIncomeTaxSpec();
     var credits = spec.taxCredits || {};
     var totalCredits = 0;
@@ -1468,6 +1728,23 @@ class Taxman {
       if (!credits.hasOwnProperty(creditId)) continue;
       var creditDef = credits[creditId];
       var creditAmount = 0;
+
+      // Handle scope if personContext is provided
+      if (personContext) {
+        var scope = creditDef.scope;
+        if (!scope) {
+          if (creditId === 'employee') scope = 'earner';
+          else if (creditId === 'age') scope = 'person';
+          else scope = 'household'; // Default generic credits to single-application per household
+        }
+
+        if (scope === 'household') {
+          if (personContext !== 1) continue; // Apply only once for P1
+        } else if (scope === 'earner') {
+          var salary = (personContext === 1) ? (this.totalSalaryP1 || 0) : (this.totalSalaryP2 || 0);
+          if (salary <= 0) continue;
+        }
+      }
 
       // Check for user override first
       if (country && params.taxCreditsByCountry && params.taxCreditsByCountry[country]) {
@@ -1487,19 +1764,6 @@ class Taxman {
         var empSpec = (ruleset && typeof ruleset.getIncomeTaxEmployeeCreditSpec === 'function')
           ? ruleset.getIncomeTaxEmployeeCreditSpec()
           : { amount: 0, min: null, max: null };
-        var p1TotalSalary = this.totalSalaryP1 || 0;
-        var p2TotalSalary = this.totalSalaryP2 || 0;
-        var earners = (p1TotalSalary > 0 ? 1 : 0) + (p2TotalSalary > 0 ? 1 : 0);
-
-        // If user override exists, treat it as a per-earner override.
-        if (country && params.taxCreditsByCountry && params.taxCreditsByCountry[country]
-          && params.taxCreditsByCountry[country][creditId] !== undefined
-          && params.taxCreditsByCountry[country][creditId] !== null
-          && params.taxCreditsByCountry[country][creditId] !== '') {
-          creditAmount = Number(params.taxCreditsByCountry[country][creditId]) * earners;
-          totalCredits += creditAmount;
-          continue;
-        }
 
         var computePerPersonEmployeeCredit = function (salaryTotal) {
           if (!salaryTotal || salaryTotal <= 0) return 0;
@@ -1524,9 +1788,16 @@ class Taxman {
           return candidate;
         };
 
-        var empCreditP1 = computePerPersonEmployeeCredit(p1TotalSalary);
-        var empCreditP2 = computePerPersonEmployeeCredit(p2TotalSalary);
-        creditAmount = empCreditP1 + empCreditP2;
+        if (personContext) {
+          var salaryContext = (personContext === 1) ? (this.totalSalaryP1 || 0) : (this.totalSalaryP2 || 0);
+          creditAmount = computePerPersonEmployeeCredit(salaryContext);
+        } else {
+          var p1TotalSalary = this.totalSalaryP1 || 0;
+          var p2TotalSalary = this.totalSalaryP2 || 0;
+          var empCreditP1 = computePerPersonEmployeeCredit(p1TotalSalary);
+          var empCreditP2 = computePerPersonEmployeeCredit(p2TotalSalary);
+          creditAmount = empCreditP1 + empCreditP2;
+        }
       } else if (creditId === 'age') {
         // Age credit is applied per eligible person (P1/P2) using threshold map when present.
         var ageSpec = creditDef;
@@ -1546,9 +1817,13 @@ class Taxman {
           }
           return amt;
         };
-        var p1Age = this.person1Ref ? this.person1Ref.age : age;
-        var p2Age = (this.person2Ref && this.married) ? this.person2Ref.age : null;
-        creditAmount = creditForAge(p1Age || 0) + (p2Age !== null ? creditForAge(p2Age) : 0);
+        if (personContext) {
+          creditAmount = creditForAge(age || 0);
+        } else {
+          var p1Age = this.person1Ref ? this.person1Ref.age : age;
+          var p2Age = (this.person2Ref && this.married) ? this.person2Ref.age : null;
+          creditAmount = creditForAge(p1Age || 0) + (p2Age !== null ? creditForAge(p2Age) : 0);
+        }
       } else if (creditId === 'personal') {
         // Legacy compatibility: scenarios/tests can provide a single PersonalTaxCredit override.
         // This corresponds to the total personal credit amount to apply for the household.
@@ -1581,14 +1856,23 @@ class Taxman {
 
     const buildAdditionalTaxIncomeAttribution = (personIdx, taxObj) => {
       const attr = new Attribution('additionalTaxIncome');
-      const salaries = personIdx === 1 ? this.salariesP1 : this.salariesP2;
-      salaries.forEach(s => attr.add(s.description, s.amount));
-      const privPension = personIdx === 1 ? this.privatePensionP1 : this.privatePensionP2;
-      if (privPension > 0) attr.add(`Private Pension P${personIdx}`, privPension);
+      const applicableTypes = taxObj.applicableIncomeTypes || null;
+      const person = personIdx === 1 ? this.person1Ref : this.person2Ref;
+      const allocation = this.person2Ref ? 0.5 : 1.0;
+
+      if (this._incomeTypeIncludes(applicableTypes, 'employment')) {
+        const salaries = personIdx === 1 ? this.salariesP1 : this.salariesP2;
+        salaries.forEach(s => attr.add(s.description, s.amount));
+      }
+
+      if (this._incomeTypeIncludes(applicableTypes, 'privatePension')) {
+        const privPension = personIdx === 1 ? this.privatePensionP1 : this.privatePensionP2;
+        if (privPension > 0) attr.add(`Private Pension P${personIdx}`, privPension);
+      }
 
       // Default base includes investment type income (RSUs, etc.) when tax base is 'income'
       const base = taxObj && taxObj.base ? taxObj.base : 'income';
-      if (base === 'income') {
+      if (base === 'income' && this._incomeTypeIncludes(applicableTypes, 'investmentTypeIncome')) {
         for (const typeKey in this.investmentTypeIncome) {
           const neAttr = this.attributionManager.getAttribution('investmentTypeIncome:' + typeKey);
           if (neAttr) {
@@ -1598,6 +1882,51 @@ class Taxman {
               attr.add(source, part);
             }
           }
+        }
+      }
+
+      // If filtering is active, we can explicitly include other types that were previously omitted from buildAdditionalTaxIncomeAttribution
+      if (applicableTypes) {
+        if (this._incomeTypeIncludes(applicableTypes, 'investmentIncome')) {
+          const invAttr = this.attributionManager.getAttribution('investmentincome');
+          if (invAttr) {
+            const bd = invAttr.getBreakdown();
+            for (const s in bd) attr.add(s, bd[s] * allocation);
+          }
+        }
+        if (this._incomeTypeIncludes(applicableTypes, 'rental')) {
+          const rentalAttr = this.attributionManager.getAttribution('incomerentals');
+          if (rentalAttr) {
+            const bd = rentalAttr.getBreakdown();
+            for (const s in bd) attr.add(s, bd[s] * allocation);
+          }
+          const yearlyAttributions = this.attributionManager.yearlyAttributions || {};
+          for (const k in yearlyAttributions) {
+            if (k.indexOf('incomerentals:') === 0) {
+              const attrR = yearlyAttributions[k];
+              const bdR = attrR.getBreakdown();
+              for (const s in bdR) attr.add(s, bdR[s] * allocation);
+            }
+          }
+        }
+        if (this._incomeTypeIncludes(applicableTypes, 'otherIncome')) {
+          const incomeAttr = this.attributionManager.getAttribution('income');
+          if (incomeAttr) {
+            const bd = incomeAttr.getBreakdown();
+            const salaryDescriptions = (personIdx === 1 ? this.salariesP1 : this.salariesP2).map(s => s.description);
+            // Also need to exclude rental descriptions if we want "other" to be pure
+            const rentalAttr = this.attributionManager.getAttribution('incomerentals');
+            const rentalDescriptions = rentalAttr ? Object.keys(rentalAttr.getBreakdown()) : [];
+
+            for (const s in bd) {
+              if (salaryDescriptions.indexOf(s) === -1 && rentalDescriptions.indexOf(s) === -1) {
+                attr.add(s, bd[s] * allocation);
+              }
+            }
+          }
+        }
+        if (this._incomeTypeIncludes(applicableTypes, 'statePension')) {
+          if (this.statePension > 0) attr.add('State Pension', this.statePension * allocation);
         }
       }
 
@@ -1724,8 +2053,7 @@ class Taxman {
     // Separate handling for Exit Tax vs CGT, and respect per-gain flags
     let totalTax = 0;
     const annualExemption = adjust(this.ruleset.getCapitalGainsAnnualExemption());
-    let remainingExemption = annualExemption;
-    let remainingExemptionMoney = remainingExemption;
+    let remainingExemptionByKey = { global: annualExemption };
 
     // Aggregate allowable losses from CGT entries that explicitly allow loss offset
     let remainingAllowableLosses = 0;
@@ -1770,13 +2098,20 @@ class Taxman {
         }
 
         // For CGT entries, apply annual exemption if eligible
-        if (entry.category === 'cgt' && entry.eligibleForAnnualExemption && remainingExemption > 0 && remainingForThis > 0) {
-          const usedExemption = Math.min(remainingExemption, remainingForThis);
-          remainingExemption -= usedExemption;
-          remainingForThis -= usedExemption;
-          // Record display-only tax relief corresponding to exempted gains at this entry's rate
-          if (usedExemption > 0 && isFinite(numericRate) && numericRate > 0) {
-            displayReliefTax += usedExemption * numericRate;
+        if (entry.category === 'cgt' && entry.eligibleForAnnualExemption && remainingForThis > 0) {
+          var poolKey = entry.exemptionKey || 'global';
+          if (!remainingExemptionByKey.hasOwnProperty(poolKey) && typeof entry.annualExemptionAmount === 'number') {
+            remainingExemptionByKey[poolKey] = adjust(entry.annualExemptionAmount);
+          }
+          var poolRemaining = remainingExemptionByKey[poolKey] || 0;
+          if (poolRemaining > 0) {
+            const usedExemption = Math.min(poolRemaining, remainingForThis);
+            remainingExemptionByKey[poolKey] -= usedExemption;
+            remainingForThis -= usedExemption;
+            // Record display-only tax relief corresponding to exempted gains at this entry's rate
+            if (usedExemption > 0 && isFinite(numericRate) && numericRate > 0) {
+              displayReliefTax += usedExemption * numericRate;
+            }
           }
         }
 
@@ -1805,7 +2140,7 @@ class Taxman {
       var taxForTrailingCountry = (trailingRuleset, trailingCountryCode) => {
         var trailingBasis = trailingRuleset.getTaxBasis();
         var trailingAnnualExemption = adjust(trailingRuleset.getCapitalGainsAnnualExemption());
-        var trailingRemainingExemption = trailingAnnualExemption;
+        var trailingRemainingExemptionByKey = { global: trailingAnnualExemption };
         var trailingRemainingLosses = 0;
 
         for (const trailingRateKey in this.gains) {
@@ -1838,10 +2173,17 @@ class Taxman {
               trailingTaxableAmount -= usedTrailingLoss;
             }
 
-            if (trailingEntry.category === 'cgt' && trailingEntry.eligibleForAnnualExemption && trailingRemainingExemption > 0 && trailingTaxableAmount > 0) {
-              const usedTrailingExemption = Math.min(trailingRemainingExemption, trailingTaxableAmount);
-              trailingRemainingExemption -= usedTrailingExemption;
-              trailingTaxableAmount -= usedTrailingExemption;
+            if (trailingEntry.category === 'cgt' && trailingEntry.eligibleForAnnualExemption && trailingTaxableAmount > 0) {
+              var tPoolKey = trailingEntry.exemptionKey || 'global';
+              if (!trailingRemainingExemptionByKey.hasOwnProperty(tPoolKey) && typeof trailingEntry.annualExemptionAmount === 'number') {
+                trailingRemainingExemptionByKey[tPoolKey] = adjust(trailingEntry.annualExemptionAmount);
+              }
+              var tPoolRemaining = trailingRemainingExemptionByKey[tPoolKey] || 0;
+              if (tPoolRemaining > 0) {
+                const usedTrailingExemption = Math.min(tPoolRemaining, trailingTaxableAmount);
+                trailingRemainingExemptionByKey[tPoolKey] -= usedTrailingExemption;
+                trailingTaxableAmount -= usedTrailingExemption;
+              }
             }
 
             if (trailingTaxableAmount > 0) {
@@ -1891,7 +2233,7 @@ class Taxman {
       copy.gains[key] = {
         amount: gainData.amount,
         sources: {},
-        entries: Array.isArray(gainData.entries) ? gainData.entries.map(function (e) { return { amount: e.amount, description: e.description, category: e.category, eligibleForAnnualExemption: e.eligibleForAnnualExemption, allowLossOffset: e.allowLossOffset, assetCountry: e.assetCountry }; }) : []
+        entries: Array.isArray(gainData.entries) ? gainData.entries.map(function (e) { return { amount: e.amount, description: e.description, category: e.category, eligibleForAnnualExemption: e.eligibleForAnnualExemption, allowLossOffset: e.allowLossOffset, assetCountry: e.assetCountry, exemptionKey: e.exemptionKey, annualExemptionAmount: e.annualExemptionAmount }; }) : []
       };
     }
     copy.income = this.income;

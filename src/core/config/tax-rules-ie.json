@@ -3,6 +3,7 @@
   "countryName": "Ireland",
   "version": "2025.12",
   "taxBasis": "worldwide",
+  "jointFilingAllowed": true,
 
   "treatyEquivalents": { "incomeTax": "income", "capitalGains": "capitalGains", "dividends": "dividends" },
 
@@ -20,7 +21,6 @@
   "incomeTax": {
     "name": "IT",
     "tooltip": "Income Tax paid on taxable income",
-    "personalAllowance": 0,
     "taxCredits": {
       "personal": {
         "amount": 1875,
@@ -33,7 +33,6 @@
     },
     "ageExemptionAge": 65,
     "ageExemptionLimit": 18000,
-    "jointFilingAllowed": true,
     "jointBandIncreaseMax": 35000,
     "bracketsByStatus": {
       "single": { "0": 0.2, "44000": 0.4 },
@@ -88,13 +87,6 @@
 
   "interestTax": { "rate": 0.33, "withholding": false },
 
-  "wealthTax": {
-    "brackets": {  },
-    "exemptions": []
-  },
-
-  "inheritanceTax": { "threshold": 0, "rate": 0 },
-
   "pensionRules": {
     "minRetirementAgePrivate": 60,
     "minRetirementAgeOccupational": 60,
@@ -137,7 +129,7 @@
       "assetCountry": "ie",
       "residenceScope": "local",
       "taxation": {
-        "capitalGains": { "rateRef": "capitalGainsTax.rate", "annualExemptionRef": "capitalGainsTax.annualExemption", "allowLossOffset": true }
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "annualExemptionRef": "capitalGainsTax.annualExemption" }
       },
       "helpText": "Individual shares and investment trusts are subject to Capital Gains Tax at ${taxRules.capitalGainsTax.rate,percentage} on disposal."
     },
@@ -151,7 +143,7 @@
       "sellWhenReceived": true,
       "excludeFromAllocations": true,
       "taxation": {
-        "capitalGains": { "rateRef": "capitalGainsTax.rate", "annualExemptionRef": "capitalGainsTax.annualExemption", "allowLossOffset": true }
+        "capitalGains": { "rateRef": "capitalGainsTax.rate", "annualExemptionRef": "capitalGainsTax.annualExemption" }
       },
       "helpText": "Restricted Stock Units are taxed as employment income (IT/USC/PRSI) at vesting based on market value. Subsequent disposal of vested shares is subject to Capital Gains Tax at ${taxRules.capitalGainsTax.rate,percentage}."
     }
