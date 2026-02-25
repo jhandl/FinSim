@@ -409,9 +409,6 @@ class Property {
         this.monthsPaid = this.totalPayments;
       }
     }
-    if (this.borrowed && this.getRemainingPrincipal() <= 0) {
-      this.clearForwardMortgageState();
-    }
     if (this.borrowed && this.borrowed.amount > 0) {
       this.fractionRepaid = 1 - (this.getRemainingPrincipal() / this.borrowed.amount);
       if (this.fractionRepaid < 0) this.fractionRepaid = 0;
@@ -426,9 +423,7 @@ class Property {
   }
 
   getPayment() {
-    if (!this.payment) return 0;
-    if (this.getRemainingPrincipal() <= 0) return 0;
-    return this.payment.amount;
+    return this.payment ? this.payment.amount : 0;
   }
 
   getRemainingPrincipal() {
