@@ -3309,7 +3309,10 @@ class EventsTableManager {
       if (typeof convertedAmountNum === 'number' && !isNaN(convertedAmountNum)) {
         const amountInput = targetRows[i].querySelector('.event-amount');
         if (amountInput) {
-          amountInput.value = String(convertedAmountNum);
+          const formattedAmount = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.formatCurrency === 'function')
+            ? FormatUtils.formatCurrency(convertedAmountNum, currency, selectedCountry)
+            : String(convertedAmountNum);
+          amountInput.value = formattedAmount;
           amountInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
       }
