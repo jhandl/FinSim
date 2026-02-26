@@ -78,6 +78,7 @@ Defines the core income tax structure:
 - **`ageExemptionAge` / `ageExemptionLimit`** (optional, IE):
   - Age and income threshold for age-based income tax exemption.
 - **`jointBandIncreaseMax`** (optional, IE): Max extra standard rate band for the secondary earner.
+- **`applicableIncomeTypes`** (optional): Array of income-type strings this tax applies to. When absent, the tax applies to all income (backward-compatible). Supported vocabulary: `employment`, `privatePension`, `statePension`, `definedBenefit`, `rental`, `otherIncome`, `investmentTypeIncome`, `investmentIncome`.
 - **`bracketsByStatus`**:
   - Maps filing status → bracket map:
     - Keys: income thresholds as strings, e.g. `"0"`, `"44000"`.
@@ -124,7 +125,8 @@ Array of additional tax definitions, such as USC in IE:
 - **`selectionRules`** (optional): Array of conditional band-selection rules evaluated in order (highest priority over all other band selectors). Each rule object may contain: `minAge`, `maxAge`, `minIncome`, `maxIncome`, `brackets`. The first matching rule's `brackets` is used.
 - **`incomeBasedBrackets`** (optional): Map of income threshold (string) → bracket set. The highest threshold not exceeding total income is selected. Evaluated after `selectionRules` and `reducedRateAge` logic.
 - **`reducedTaxBands`** (optional): Bracket set used when `reducedRateAge` + optional `reducedRateMaxIncome` conditions are met, as an alternative to `ageBasedBrackets`.
-- **`applicableIncomeTypes`** (optional): Array of income-type strings this tax applies to. When absent, the tax applies to all income (backward-compatible). Supported vocabulary: `employment`, `privatePension`, `statePension`, `rental`, `otherIncome`, `investmentTypeIncome`, `investmentIncome`.
+- **`applicableIncomeTypes`** (optional): Array of income-type strings this tax applies to. When absent, the tax applies to all income (backward-compatible). Supported vocabulary: `employment`, `privatePension`, `statePension`, `definedBenefit`, `rental`, `otherIncome`, `investmentTypeIncome`, `investmentIncome`.
+  - **Important**: `investmentIncome` currently represents *investment sale proceeds* (declared via `declareInvestmentIncome()` by `InvestmentAsset.sell()`), not just dividends/interest. Do **not** include `investmentIncome` in income tax bases unless you intentionally want sale proceeds taxed as ordinary income. Dividend/interest taxation is not yet implemented.
 
 ---
 
