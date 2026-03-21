@@ -7,7 +7,7 @@ class ChartManager {
     this.cachedRowData = {};
     this.reportingCurrency = null; // Selected currency for display (defaults to StartCountry currency)
     this.relocationTransitions = []; // Array of {age, fromCountry, toCountry} for visual markers
-    this.countryInflationOverrides = {}; // MV event rate overrides: country -> inflation rate (decimal)
+    this.countryInflationOverrides = {};
     this.originalValues = {}; // Cache of unconverted values for tooltip display
     this.currencyMode = 'unified'; // Charts always use unified mode (no mode selector in charts)
     this.presentValueMode = false; // Display monetary values in today's terms when enabled

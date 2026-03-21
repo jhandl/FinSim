@@ -435,9 +435,11 @@ class EconomicData {
         var cpi = this._getCPI(countryKey);
         if (cpi != null && isFinite(cpi)) {
           inflation = Number(cpi) / 100;
-        } else {
-          inflation = 0.02;
         }
+      }
+
+      if (inflation == null || !isFinite(inflation)) {
+        return null;
       }
 
       var ratio = 1 + Number(inflation);

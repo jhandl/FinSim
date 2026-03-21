@@ -798,7 +798,31 @@ class WebUI extends AbstractUI {
     };
     if (tbody) {
       const cfg = Config.getInstance();
+      const economicData = cfg.getEconomicData ? cfg.getEconomicData() : null;
       const baseTypes = cfg.getInvestmentBaseTypes();
+      const getCountryInflationDefault = (code) => {
+        const countryCode = String(code || '').trim().toLowerCase();
+        if (!countryCode) return null;
+        if (economicData && economicData.ready && typeof economicData.getInflation === 'function') {
+          const cpi = economicData.getInflation(countryCode);
+          if (cpi != null && isFinite(cpi)) return cpi;
+        }
+        const rs = cfg.getCachedTaxRuleSet(countryCode);
+        if (rs && typeof rs.getInflationRate === 'function') {
+          const rate = rs.getInflationRate();
+          if (typeof rate === 'number' && isFinite(rate)) return rate * 100;
+        }
+        return null;
+      };
+      const formatInflationPlaceholder = (value) => {
+        if (value == null || !isFinite(value)) return '';
+        return FormatUtils.formatPercentage(value / 100).replace('%', '');
+      };
+      const applyInflationPlaceholder = (input, code) => {
+        if (!input) return;
+        const defaultInflation = getCountryInflationDefault(code);
+        input.placeholder = formatInflationPlaceholder(defaultInflation);
+      };
       const makeGrowthRow = (labelText, growthId, volId) => {
         const tr = document.createElement('tr');
         tr.setAttribute('data-dynamic-investment-param', 'true');
@@ -858,6 +882,17 @@ class WebUI extends AbstractUI {
         this.growthRatesCountryChipSelector = null;
         setRowHeadingForInput('Inflation', 'Inflation');
         if (inflationRow) inflationRow.style.display = '';
+        const singleCountryInflation = document.getElementById('Inflation');
+        const startCountry = cfg.getStartCountry();
+        if (singleCountryInflation) {
+          applyInflationPlaceholder(singleCountryInflation, startCountry);
+          const startInflationId = 'Inflation_' + String(startCountry || '').toLowerCase();
+          const startInflationInput = document.getElementById(startInflationId);
+          const startInflationValue = startInflationInput ? String(startInflationInput.value || '').trim() : '';
+          if (!String(singleCountryInflation.value || '').trim() && startInflationValue) {
+            this.setValue('Inflation', startInflationValue);
+          }
+        }
         const rows = tbody.querySelectorAll('[data-dynamic-inflation-row="true"]');
         rows.forEach(el => {
           const inputs = el.querySelectorAll('input');
@@ -959,6 +994,7 @@ class WebUI extends AbstractUI {
           infInput.setAttribute('inputmode', 'numeric');
           infInput.setAttribute('pattern', '[0-9]*');
           infInput.setAttribute('step', '0.1');
+          applyInflationPlaceholder(infInput, selectedCode);
           infWrap.appendChild(infInput);
           infGrowth.appendChild(infWrap);
           trInflation.appendChild(infGrowth);
@@ -980,19 +1016,24 @@ class WebUI extends AbstractUI {
         );
         this.growthRatesCountryChipSelector.render(chipContainer);
 
-        const legacyInflation = this.getValue('Inflation');
-        const legacyInfInput = document.getElementById('Inflation');
-        const legacyInfRaw = legacyInfInput ? String(legacyInfInput.value || '').trim() : '';
         const startCode = String(startCountry || '').toLowerCase();
         if (startCode) {
           this.ensureParameterInput('Inflation_' + startCode, 'percentage');
           const startInf = document.getElementById('Inflation_' + startCode);
-          const startInfLoaded = startInf && startInf.getAttribute('data-csv-loaded') === '1';
-          if (startInf && !startInf.value && legacyInfRaw !== '' && !startInfLoaded) this.setValue(startInf.id, legacyInflation);
+          if (startInf) applyInflationPlaceholder(startInf, startCode);
+          const visibleInflation = document.getElementById('Inflation');
+          if (visibleInflation) {
+            applyInflationPlaceholder(visibleInflation, startCode);
+            if (!String(visibleInflation.value || '').trim() && startInf && startInf.value) this.setValue('Inflation', startInf.value);
+          }
         }
 
         for (let ci = 0; ci < scenarioCountries.length; ci++) {
           const code = scenarioCountries[ci];
+          const infId = 'Inflation_' + code;
+          this.ensureParameterInput(infId, 'percentage');
+          const infInput = document.getElementById(infId);
+          if (infInput) applyInflationPlaceholder(infInput, code);
           const rs = cfg.getCachedTaxRuleSet(code);
           const invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
           const localTypes = invTypes.filter(t => (t && t.residenceScope || '').toLowerCase() === 'local' && !t.baseRef && !(t && t.sellWhenReceived));
@@ -4101,6 +4142,7 @@ class WebUI extends AbstractUI {
           const currencyInputs = document.querySelectorAll('input.currency, input.percentage');
           currencyInputs.forEach(input => {
             if (input && input.id) {
+              if (input.value === undefined || String(input.value).trim() === '') return;
               try {
                 const num = this.getValue(input.id);
                 if (num !== undefined && num !== null && !isNaN(num)) {

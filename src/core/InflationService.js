@@ -11,8 +11,8 @@
  *
  * IMPORTANT:
  * - The service prefers explicit options when provided, but will gracefully
- *   fall back to global `params`, `Config`, `countryInflationOverrides`, and
- *   `EconomicData` when running inside the simulator.
+ *   fall back to global `params`, `Config`, and `EconomicData` when running
+ *   inside the simulator.
  */
 (function (root) {
   function normalizeCountry(code) {
@@ -31,11 +31,11 @@
    * Resolve the inflation rate (decimal, e.g. 0.02 for 2%) for a given
    * country/year using the same priority order as the simulator:
    *
-   * 1. Explicit overrides (MV events) in countryInflationOverrides[country]
-   * 2. Scenario base-country inflation (params.inflation) when applicable
-   * 3. EconomicData.getInflationForYear(country, year) or getInflation(country)
-   * 4. TaxRuleSet.getInflationRate() for the country
-   * 5. Fallback to params.inflation or defaultRate (0.02)
+   * 1. Explicit per-country overrides passed in options.countryInflationOverrides
+   * 2. Scenario per-country inflation input (Inflation_<country>) when present
+   * 3. Legacy base-country inflation (params.inflation) when applicable
+   * 4. EconomicData.getInflationForYear(country, year) or getInflation(country)
+   * 5. Return null when no country-specific inflation can be resolved
    *
    * @param {string|null} countryCode - ISO-2 country code (case-insensitive)
    * @param {number|null} year        - Calendar year for CPI lookup
@@ -45,7 +45,6 @@
    *   - economicData
    *   - countryInflationOverrides
    *   - baseCountry
-   *   - defaultRate
    * @returns {number} inflation rate as decimal
    */
   InflationService.resolveInflationRate = function (countryCode, year, options) {
@@ -64,9 +63,13 @@
       paramsObj = params;
     }
 
-    var overrides = opts.countryInflationOverrides;
-    if (!overrides && typeof countryInflationOverrides !== 'undefined') {
-      overrides = countryInflationOverrides;
+    var overrides = opts.countryInflationOverrides || null;
+    if (!overrides) {
+      try {
+        if (typeof countryInflationOverrides !== 'undefined') {
+          overrides = countryInflationOverrides;
+        }
+      } catch (_) { }
     }
 
     var economicData = opts.economicData || null;
@@ -75,8 +78,6 @@
         economicData = cfg.getEconomicData();
       } catch (_) { }
     }
-
-    var defaultRate = (typeof opts.defaultRate === 'number') ? opts.defaultRate : 0.02;
 
     // Base country used when no country is provided
     var baseCountryCode = opts.baseCountry || null;
@@ -91,7 +92,7 @@
     var key = normalizeCountry(countryCode);
     if (!key) key = baseCountryNorm;
 
-    // 1) Explicit per-country overrides (typically set by MV relocation events)
+    // 1) Explicit per-country overrides (used by helper/test contexts)
     if (overrides && Object.prototype.hasOwnProperty.call(overrides, key)) {
       var override = overrides[key];
       if (override !== null && override !== undefined && override !== '') {
@@ -99,12 +100,20 @@
       }
     }
 
-    // 2) Scenario base-country inflation (single scalar) when key is base
+    // 2) Scenario per-country inflation (preferred for user-entered country overrides)
+    if (paramsObj) {
+      var perCountryKey = 'Inflation_' + key;
+      if (typeof paramsObj[perCountryKey] === 'number') {
+        return paramsObj[perCountryKey];
+      }
+    }
+
+    // 3) Legacy scalar inflation remains as a StartCountry-only fallback.
     if (key === baseCountryNorm && paramsObj && typeof paramsObj.inflation === 'number') {
       return paramsObj.inflation;
     }
 
-    // 3) EconomicData CPI per year or base CPI
+    // 4) EconomicData CPI per year or base CPI
     if (economicData && economicData.ready) {
       try {
         var effectiveYear = (typeof year === 'number') ? year : null;
@@ -131,25 +140,7 @@
       } catch (_) { }
     }
 
-    // 4) TaxRuleSet inflationRate (already a decimal)
-    if (cfg && typeof cfg.getCachedTaxRuleSet === 'function') {
-      try {
-        var rs = cfg.getCachedTaxRuleSet(key);
-        if (rs && typeof rs.getInflationRate === 'function') {
-          var rate = rs.getInflationRate();
-          if (rate !== null && rate !== undefined) {
-            return Number(rate);
-          }
-        }
-      } catch (_) { }
-    }
-
-    // 5) Fallback to scenario scalar or default
-    if (paramsObj && typeof paramsObj.inflation === 'number') {
-      return paramsObj.inflation;
-    }
-
-    return defaultRate;
+    return null;
   };
 
   /**
@@ -201,4 +192,3 @@
     root.InflationService = InflationService;
   }
 })(typeof this !== 'undefined' ? this : (typeof self !== 'undefined' ? self : (typeof globalThis !== 'undefined' ? globalThis : null)));
-

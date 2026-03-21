@@ -15,7 +15,6 @@ class RelocationUtils {
     const startCountry = cfg.getStartCountry();
 
     instance.relocationTransitions = [];
-    // Store MV event rate overrides: country -> inflation rate (decimal)
     instance.countryInflationOverrides = {};
 
     const mvEvents = events.filter(e => isRelocationEvent(e)).sort((a, b) => a.fromAge - b.fromAge);
@@ -26,8 +25,6 @@ class RelocationUtils {
       instance.relocationTransitions.push({ age: ev.fromAge, fromCountry: prevCountry, toCountry: destCountry });
       prevCountry = destCountry;
 
-      // Store MV event rate as inflation override for destination country (if provided)
-      // event.rate is already a decimal (parsePercentage divides by 100)
       if (ev.rate !== null && ev.rate !== undefined && ev.rate !== '') {
         const parsed = parseFloat(ev.rate);
         if (!isNaN(parsed) && isFinite(parsed)) {

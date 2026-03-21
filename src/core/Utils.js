@@ -33,8 +33,7 @@ function adjust(value, rate = null, n = periods) {
         config: cfg,
         economicData: economicData,
         countryInflationOverrides: countryInflationOverrides,
-        baseCountry: baseCountry,
-        defaultRate: 0.02
+        baseCountry: baseCountry
       });
     } catch (_) {
       effectiveRate = null;
@@ -342,11 +341,22 @@ function isBetween(num, min, max) {
 
 function serializeSimulation(ui) {
   var config = Config.getInstance();
-  var startCountry = config.getStartCountry();
+  var rawStartCountry = null;
+  try {
+    rawStartCountry = ui.getValue('StartCountry');
+  } catch (_) {
+    rawStartCountry = null;
+  }
+  var startCountry = String(rawStartCountry || config.getDefaultCountry() || '').trim().toLowerCase();
   var startRuleset = config.getCachedTaxRuleSet(startCountry);
   var investmentTypes = startRuleset.getResolvedInvestmentTypes() || [];
   // Collect events early so we can infer scenario countries for economy fields.
-  var events = ui.getTableData('Events', 6, true);
+  var events = [];
+  try {
+    events = ui.getTableData('Events', 6, true);
+  } catch (_) {
+    events = [];
+  }
   var scenarioCountries = [];
   var scenarioCountrySet = {};
   var scLower = (startCountry || config.getDefaultCountry() || '').toString().trim().toLowerCase();
@@ -393,8 +403,36 @@ function serializeSimulation(ui) {
     if (value === undefined || value === null || value === '') return fallbackValue;
     return value;
   };
+  var getRawInputValue = function(id) {
+    try {
+      if (typeof document !== 'undefined') {
+        var el = document.getElementById(id);
+        if (el && el.value !== undefined) return String(el.value);
+      }
+    } catch (_) { }
+    return null;
+  };
+  var isMissingRaw = function(raw) {
+    return (raw === null || raw === undefined || String(raw).trim() === '');
+  };
 
   // Collect all parameters
+  var startCountryForInflation = startCountry || config.getDefaultCountry();
+  var normalizedStartCountry = String(startCountryForInflation || '').toLowerCase();
+  var legacyInflationRaw = getRawInputValue('Inflation');
+  var startCountryInflationValue = isMissingRaw(legacyInflationRaw) ? '' : ui.getValue('Inflation');
+  if (normalizedStartCountry) {
+    try {
+      var startCountryInflationInput = document.getElementById('Inflation_' + normalizedStartCountry);
+      if (startCountryInflationInput) {
+        var dynamicInflationRaw = String(startCountryInflationInput.value || '').trim();
+        if (dynamicInflationRaw !== '') {
+          var dynamicInflationValue = ui.getValue('Inflation_' + normalizedStartCountry);
+          startCountryInflationValue = dynamicInflationValue;
+        }
+      }
+    } catch (_) { }
+  }
   const parameters = {
     StartingAge: ui.getValue('StartingAge'),
     TargetAge: ui.getValue('TargetAge'),
@@ -406,7 +444,7 @@ function serializeSimulation(ui) {
     PensionContributionCapped: ui.getValue('PensionContributionCapped'),
     PensionGrowthRate: ui.getValue('PensionGrowthRate'),
     PensionGrowthStdDev: ui.getValue('PensionGrowthStdDev'),
-    Inflation: ui.getValue('Inflation'),
+    Inflation: startCountryInflationValue,
     MarriageYear: ui.getValue('MarriageYear'),
     YoungestChildBorn: ui.getValue('YoungestChildBorn'),
     OldestChildBorn: ui.getValue('OldestChildBorn'),
@@ -468,19 +506,6 @@ function serializeSimulation(ui) {
   }
 
   // Global + local economy inputs (dynamic rows rendered in the growth rates panel).
-  var getRawInputValue = function(id) {
-    try {
-      if (typeof document !== 'undefined') {
-        var el = document.getElementById(id);
-        if (el && el.value !== undefined) return String(el.value);
-      }
-    } catch (_) { }
-    return null;
-  };
-  var isMissingRaw = function(raw) {
-    return (raw === null || raw === undefined || String(raw).trim() === '');
-  };
-
   var economyFeatureActive = false;
   if (scenarioCountries.length > 1) economyFeatureActive = true;
   if (ui.getValue('perCountryInvestmentsEnabled') === 'on' || ui.getValue('perCountryInvestmentsEnabled') === true) {
@@ -1454,17 +1479,10 @@ function deserializeSimulation(content, ui) {
       return (raw === null || raw === undefined || String(raw).trim() === '');
     };
 
-    var legacyInflation = ui.getValue('Inflation');
-
     for (var sci = 0; sci < scenarioCountries.length; sci++) {
       var cc = scenarioCountries[sci];
-      var isStartCountry = (cc === sc2);
       var inflationId = 'Inflation_' + cc;
       try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(inflationId, 'percentage'); } catch (_) { }
-
-      if (isStartCountry && !sawPerCountryInflation[cc] && isMissingRaw(getRawInputValue(inflationId))) {
-        ui.setValue(inflationId, legacyInflation);
-      }
 
       var rs = cfg2.getCachedTaxRuleSet(cc);
       var invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
@@ -1493,6 +1511,7 @@ function deserializeSimulation(content, ui) {
         }
       }
     }
+
   } catch (_) { }
 
   return eventData;

@@ -8,7 +8,7 @@ class TableManager {
     this._incomeVisibilityInitialized = false; // kept for backward compatibility with existing initialization flow
     this.currencyMode = 'natural'; // 'natural' or 'unified'
     this.reportingCurrency = null;
-    this.countryInflationOverrides = {}; // MV event rate overrides: country -> inflation rate (decimal)
+    this.countryInflationOverrides = {};
     this.conversionCache = {};
     this.presentValueMode = false; // Display monetary values in today's terms when enabled
     // Dynamic sections manager for elastic column layouts during relocations

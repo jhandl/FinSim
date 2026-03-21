@@ -183,7 +183,7 @@ class TaxRuleSet {
     if (cpiValue != null) {
       return Number(cpiValue) / 100;
     }
-    return 0.02;
+    return null;
   }
 
   // ----- Income Tax -----

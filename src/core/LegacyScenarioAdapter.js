@@ -55,6 +55,17 @@ class LegacyScenarioAdapter {
    * @throws {Error} If startCountry is missing for investment-related fields and no fallback is allowed.
    */
   mapFieldName(key, startCountry, allowIeFallback = false) {
+    if (key === 'Inflation') {
+      if (!startCountry) {
+        if (allowIeFallback) {
+          startCountry = 'ie';
+        } else {
+          throw new Error('Cannot map legacy Inflation because startCountry is missing and no default is allowed.');
+        }
+      }
+      return 'Inflation_' + String(startCountry).toLowerCase();
+    }
+
     const mappedKey = this.legacyFieldMap[key] || key;
 
     // Legacy index funds growth/volatility should map to global equity settings.

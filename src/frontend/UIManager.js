@@ -308,6 +308,23 @@ class UIManager {
   }
 
   readParameters(validate = true) {
+    const getRawInputValue = (id) => {
+      try {
+        if (typeof document === 'undefined') return null;
+        const el = document.getElementById(id);
+        if (!el || el.value === undefined) return null;
+        return String(el.value).trim();
+      } catch (_) {
+        return null;
+      }
+    };
+    const getOptionalPercentageValue = (id) => {
+      const raw = getRawInputValue(id);
+      if (raw === null) return this.ui.getValue(id);
+      if (raw === '') return undefined;
+      return this.ui.getValue(id);
+    };
+
     const params = {
       startingAge: this.ui.getValue("StartingAge"),
       targetAge: this.ui.getValue("TargetAge"),
@@ -320,7 +337,7 @@ class UIManager {
       statePensionWeekly: this.ui.getValue("StatePensionWeekly"),
       growthRatePension: this.ui.getValue("PensionGrowthRate"),
       growthDevPension: this.ui.getValue("PensionGrowthStdDev"),
-      inflation: this.ui.getValue("Inflation"),
+      inflation: getOptionalPercentageValue("Inflation"),
       marriageYear: this.ui.getValue("MarriageYear"),
       youngestChildBorn: this.ui.getValue("YoungestChildBorn"),
       oldestChildBorn: this.ui.getValue("OldestChildBorn"),
@@ -352,6 +369,7 @@ class UIManager {
     const startCountry = params.StartCountry.toLowerCase();
     const perCountryEnabledVal = this.ui.getValue('perCountryInvestmentsEnabled');
     const perCountryEnabled = (perCountryEnabledVal === 'on' || perCountryEnabledVal === true);
+    params[`Inflation_${startCountry}`] = getOptionalPercentageValue('Inflation');
     investmentAllocationsByCountry[startCountry] = {};
     for (let i = 0; i < investmentTypes.length; i++) {
       const type = investmentTypes[i];
@@ -437,6 +455,7 @@ class UIManager {
         for (let ci = 0; ci < scenarioCountries.length; ci++) {
           const c = String(scenarioCountries[ci] || '').trim().toLowerCase();
           if (!c) continue;
+          params[`Inflation_${c}`] = getOptionalPercentageValue(`Inflation_${c}`);
           if (!investmentAllocationsByCountry[c]) investmentAllocationsByCountry[c] = {};
           const rs = cfg.getCachedTaxRuleSet(c);
           const types = rs.getResolvedInvestmentTypes() || [];

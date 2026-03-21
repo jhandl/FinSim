@@ -434,8 +434,10 @@ module.exports = {
     // Only AR salary is active at this point (IE salary ended at age 40)
     // PV semantics: all inputs are entered in start-of-simulation "today's money",
     // so AR deflation is anchored to simulation start (not relocation age).
+    // Inflation now comes from the country rules/economic data, not the MV event rate.
     const salYearsSinceStart = 15;
-    const salArDefFactor = 1 / Math.pow(1.50, salYearsSinceStart);  // ~0.0023
+    const salArInflation = Number((((buildEuroARRules().economicData || {}).inflation || {}).cpi)) / 100;
+    const salArDefFactor = 1 / Math.pow(1 + salArInflation, salYearsSinceStart);  // ~0.0324
 
     if (salRow45.incomeSalaries && salRow45.incomeSalaries > 0) {
       const salActualRatio = salRow45.incomeSalariesPV / salRow45.incomeSalaries;
@@ -443,7 +445,7 @@ module.exports = {
       if (!withinTolerance(salActualRatio, salArDefFactor, 0.02)) {
         errors.push(
           `Test 0.3 FAIL: At age 45, salary PV ratio is ${salActualRatio.toFixed(4)}. ` +
-          `Expected ratio ~${salArDefFactor.toFixed(4)} (AR deflation anchored to simulation start), ` +
+          `Expected ratio ~${salArDefFactor.toFixed(4)} (AR rules inflation anchored to simulation start), ` +
           `but got ${salActualRatio.toFixed(4)}.`
         );
       }

@@ -778,9 +778,6 @@ function initializeSimulationVariables() {
   // Only event.rate (override), event.linkedCountry, and currentCountry determine inflation
   currentCountry = ((params.StartCountry || config.getDefaultCountry() || '') + '').toLowerCase();
   countryInflationOverrides = {};
-  if (currentCountry && typeof params.inflation === 'number') {
-    countryInflationOverrides[currentCountry] = params.inflation;
-  }
   residenceCurrency = getCurrencyForCountry(currentCountry)
     || getCurrencyForCountry(params.StartCountry || config.getDefaultCountry())
     || normalizeCurrency(residenceCurrency)
@@ -878,24 +875,16 @@ function resolveCountryInflation(code) {
       params: params,
       config: config,
       economicData: economicData,
-      countryInflationOverrides: countryInflationOverrides,
-      baseCountry: baseCountryCode,
-      defaultRate: 0.02
+      baseCountry: baseCountryCode
     });
   }
 
   // Fallback: legacy inline logic (kept for safety in non-browser test contexts).
   var key = normalizeCountry(code);
   if (!key) key = baseCountryCode;
-  if (countryInflationOverrides && countryInflationOverrides.hasOwnProperty(key)) {
-    var override = countryInflationOverrides[key];
-
-    if (override !== null && override !== undefined && override !== '') {
-      return override;
-    }
-  }
-  if (key === baseCountryCode && typeof params.inflation === 'number') {
-    return params.inflation;
+  var perCountryKey = 'Inflation_' + key;
+  if (typeof params[perCountryKey] === 'number') {
+    return params[perCountryKey];
   }
   if (economicData && economicData.ready) {
 
@@ -910,19 +899,10 @@ function resolveCountryInflation(code) {
       return Number(cpi) / 100;
     }
   }
-  var rs = config.getCachedTaxRuleSet ? config.getCachedTaxRuleSet(key) : null;
-  if (rs && typeof rs.getInflationRate === 'function') {
-    var rate = rs.getInflationRate();
-    if (rate !== null && rate !== undefined) {
-
-      return rate;
-    }
-  }
-  if (typeof params.inflation === 'number') {
+  if (key === baseCountryCode && typeof params.inflation === 'number') {
     return params.inflation;
   }
-
-  return 0.02;
+  return null;
 }
 
 function runSimulation() {
@@ -1725,10 +1705,6 @@ function processEvents() {
         currentCountry = destCountry;
         residenceCurrency = newResidenceCurrency;
         conversionFactorCache = {};
-        if (event.rate !== null && event.rate !== undefined && event.rate !== '') {
-          if (!countryInflationOverrides) countryInflationOverrides = {};
-          countryInflationOverrides[currentCountry] = event.rate;
-        }
         // Reset Taxman with the new country to ensure correct ruleset is loaded
         revenue.reset(person1, person2, attributionManager, currentCountry, year);
       }

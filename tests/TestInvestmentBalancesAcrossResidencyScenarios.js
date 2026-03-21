@@ -16,7 +16,7 @@ const baselineMetadata = {
   simulatorVersion: "2.0",
   taxYear: "2025/2026",
   investmentTypes: ["indexFunds_ie", "shares_ie", "usIndexFunds", "usShares"],
-  updateNotes: "Rebaselined for residency-scope tax changes affecting IE→US relocation investment balances",
+  updateNotes: "Rebaselined for country-default inflation resolution affecting IE→US relocation investment balances",
   maintainer: "Investment balances across residency scenarios test"
 };
 
@@ -45,10 +45,10 @@ const expectedBaselines = {
   },
   "IE→US Relocation": {
     cash: 0,
-    indexFunds_ie: 142758.56,
-    shares_ie: 88986.39,
-    usIndexFunds: 20191.91,
-    usShares: 15946.51,
+    indexFunds_ie: 159988.66,
+    shares_ie: 99457.62,
+    usIndexFunds: 20739.83,
+    usShares: 16424.01,
     it: 0,
     prsi: 0,
     usc: 0,
