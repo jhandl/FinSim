@@ -1399,11 +1399,12 @@ class Wizard {
   }
 
   finishTour() {
-    // If a temporary NOP row was added for a mini tour, clean it up first
-    this.cleanupTemporaryMiniTourRow();
-
-    // Collapse auto-expanded accordion if still open
+    // Collapse auto-expanded accordion BEFORE cleanup so that refresh() inside
+    // cleanupTemporaryMiniTourRow() sees an empty expandedItems and doesn't re-expand.
     this.collapseAutoExpandedAccordion();
+
+    // If a temporary NOP row was added for a mini tour, clean it up
+    this.cleanupTemporaryMiniTourRow();
 
     this.cleanupHighlighting();
 

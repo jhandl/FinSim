@@ -416,16 +416,27 @@ test('Mini tour in table view highlights each first-row field', async ({ page })
       expect(selector).toContain('_row_1');
     }
 
-    // Locate the "Next" / "Done" button inside the popover and click it
     const nextBtn = frame.locator('.driver-popover button:has-text("Next"), .driver-popover button:has-text("Done")');
     const text = (await nextBtn.innerText()).trim();
-    await smartClick(nextBtn);
 
     if (text === 'Done') {
-      // Tour finished successfully
+      await frame.locator('body').evaluate(() => {
+        const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+        if (wiz && typeof wiz.finishTour === 'function') wiz.finishTour();
+      });
       break;
     }
-    // Small delay to allow DOM updates before next iteration; BubblesEngine reuses the same popover element
+
+    // Advance programmatically: mirrors onNextClick but via evaluate so Playwright awaits the async work
+    await frame.locator('body').evaluate(async () => {
+      const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+      if (!wiz || !wiz.tour) return;
+      const nextIdx = wiz.tour.getActiveIndex() + 1;
+      if (nextIdx < (wiz.validSteps || []).length) {
+        await wiz.exposeHiddenElement(nextIdx);
+        wiz.tour.moveNext();
+      }
+    });
     await page.waitForTimeout(100);
   }
 });
@@ -526,31 +537,23 @@ test('Mini tour in accordion view auto-expands and collapses first event', async
     const nextBtn = frame.locator('.driver-popover button:has-text("Next"), .driver-popover button:has-text("Done")');
     const text = (await nextBtn.innerText()).trim();
 
-    // Check tour state before click to detect if smartClick fails on mobile
-    const beforeClick = await frame.locator('body').evaluate(() => {
-      const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
-      return wiz && wiz.tour && typeof wiz.tour.getActiveIndex === 'function' ? wiz.tour.getActiveIndex() : -1;
-    });
-
-    // Try smartClick first
-    await smartClick(nextBtn);
-
-    let afterClick = await frame.locator('body').evaluate(() => {
-      const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
-      return wiz && wiz.tour && typeof wiz.tour.getActiveIndex === 'function' ? wiz.tour.getActiveIndex() : -1;
-    });
-
-    // If smartClick didn't advance the tour (mobile issue), use programmatic advancement
-    if (afterClick === beforeClick && text === 'Next') {
+    if (text === 'Done') {
       await frame.locator('body').evaluate(() => {
         const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
-        if (wiz && wiz.tour && typeof wiz.tour.moveNext === 'function') {
-          wiz.tour.moveNext();
-        }
+        if (wiz && typeof wiz.finishTour === 'function') wiz.finishTour();
       });
+      break;
     }
 
-    if (text === 'Done') break;
+    await frame.locator('body').evaluate(async () => {
+      const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+      if (!wiz || !wiz.tour) return;
+      const nextIdx = wiz.tour.getActiveIndex() + 1;
+      if (nextIdx < (wiz.validSteps || []).length) {
+        await wiz.exposeHiddenElement(nextIdx);
+        wiz.tour.moveNext();
+      }
+    });
     await page.waitForTimeout(100);
   }
 
@@ -627,8 +630,24 @@ test('Mini tour in accordion view uses pre-expanded second event', async ({ page
 
     const nextBtn = frame.locator('.driver-popover button:has-text("Next"), .driver-popover button:has-text("Done")');
     const txt = (await nextBtn.innerText()).trim();
-    await smartClick(nextBtn);
-    if (txt === 'Done') break;
+
+    if (txt === 'Done') {
+      await frame.locator('body').evaluate(() => {
+        const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+        if (wiz && typeof wiz.finishTour === 'function') wiz.finishTour();
+      });
+      break;
+    }
+
+    await frame.locator('body').evaluate(async () => {
+      const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+      if (!wiz || !wiz.tour) return;
+      const nextIdx = wiz.tour.getActiveIndex() + 1;
+      if (nextIdx < (wiz.validSteps || []).length) {
+        await wiz.exposeHiddenElement(nextIdx);
+        wiz.tour.moveNext();
+      }
+    });
     await page.waitForTimeout(100);
   }
 
@@ -687,8 +706,24 @@ test('Mini tour in accordion view shows only visible fields for EXPENSE event', 
     if (sel) encountered.add(sel);
     const nextBtn = frame.locator('.driver-popover button:has-text("Next"), .driver-popover button:has-text("Done")');
     const txt = (await nextBtn.innerText()).trim();
-    await smartClick(nextBtn);
-    if (txt === 'Done') break;
+
+    if (txt === 'Done') {
+      await frame.locator('body').evaluate(() => {
+        const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+        if (wiz && typeof wiz.finishTour === 'function') wiz.finishTour();
+      });
+      break;
+    }
+
+    await frame.locator('body').evaluate(async () => {
+      const wiz = window.Wizard && window.Wizard.getInstance ? window.Wizard.getInstance() : null;
+      if (!wiz || !wiz.tour) return;
+      const nextIdx = wiz.tour.getActiveIndex() + 1;
+      if (nextIdx < (wiz.validSteps || []).length) {
+        await wiz.exposeHiddenElement(nextIdx);
+        wiz.tour.moveNext();
+      }
+    });
     await page.waitForTimeout(100);
   }
 

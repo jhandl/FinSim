@@ -488,7 +488,10 @@ describe('Relocation Split No Pension', () => {
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-1"]'), 'event-relocation-split-mv-id', 'mvlink_test');
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-2"]'), 'event-relocation-split-mv-id', 'mvlink_test');
 
+    jest.useFakeTimers();
     manager._syncSplitChainsForRelocationAgeShift(10, ['mvlink_test'], 45);
+    jest.advanceTimersByTime(200);
+    jest.useRealTimers();
 
     const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
     expect(rows).toHaveLength(1);
@@ -554,7 +557,10 @@ describe('Relocation Split No Pension', () => {
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-2"]'), 'event-relocation-split-mv-id', 'mvlink_test');
     manager.getOrCreateHiddenInput(document.querySelector('tr[data-row-id="row-2"]'), 'event-currency', 'BBB');
 
+    jest.useFakeTimers();
     manager._syncSplitChainsForRelocationAgeShift(-5, ['mvlink_test'], 30);
+    jest.advanceTimersByTime(200);
+    jest.useRealTimers();
 
     const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
     expect(rows).toHaveLength(1);
