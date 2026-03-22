@@ -200,7 +200,6 @@ module.exports = {
       ui2.ensureParameterInput('simulation_mode', 'string');
       ui2.ensureParameterInput('economy_mode', 'string');
       ui2.ensureParameterInput('investmentStrategiesEnabled', 'string');
-      ui2.ensureParameterInput('perCountryInvestmentsEnabled', 'string');
       const csv = buildCsv([
         'GlobalAllocation_indexFunds,40',
         'MixConfig_ie_indexFunds_type,glide',

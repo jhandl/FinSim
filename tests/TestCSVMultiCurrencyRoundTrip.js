@@ -68,8 +68,7 @@ module.exports = {
         P2StartingAge: '',
         simulation_mode: 'single',
         economy_mode: 'deterministic',
-        investmentStrategiesEnabled: 'off',
-        perCountryInvestmentsEnabled: 'off'
+        investmentStrategiesEnabled: 'off'
       };
 
       const fakeUI = {

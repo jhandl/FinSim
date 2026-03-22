@@ -135,14 +135,6 @@
           </div>
         </button>
 
-        <button id="perCountryInvestmentsToggleMobile" class="mobile-menu-button secondary-button toggle-button"
-          data-toggle-state="off">
-          <span>Per-Country Investments</span>
-          <div class="toggle-switch">
-            <div class="toggle-slider"></div>
-          </div>
-        </button>
-
         <button id="economicRegimesToggleMobile" class="mobile-menu-button secondary-button toggle-button"
           data-toggle-state="off">
           <span>Economic regimes</span>
@@ -492,7 +484,7 @@
 
   <!-- SYSTEM UTILITIES SECTION -->
   <script src="/src/frontend/AbstractUI.js?v=20251101"></script>
-  <script src="/src/frontend/UIManager.js?v=20260307-1"></script>
+  <script src="/src/frontend/UIManager.js?v=20260321-2"></script>
   <script src="/src/frontend/web/utils/DOMUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/DeviceUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/FormatUtils.js?v=20260222-2"></script>
@@ -528,7 +520,7 @@
   <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
   <script src="/src/frontend/web/components/CountryTabSyncManager.js?v=20260114-1"></script>
   <script src="/src/frontend/web/components/CountryChipSelector.js?v=20260130-1"></script>
-  <script src="/src/frontend/web/WebUI.js?v=20260307-2"></script>
+  <script src="/src/frontend/web/WebUI.js?v=20260321-2"></script>
   <script src="/src/core/TaxRuleSet.js?v=20260307-1"></script>
   <script src="/src/core/Config.js?v=20260218-1"></script>
   <script src="/src/core/Events.js?v=20260213-4"></script>
@@ -544,7 +536,7 @@
   <script src="/src/core/RealEstate.js?v=20260225-1"></script>
   <script src="/src/core/InflationService.js?v=20260307-2"></script>
   <script src="/src/core/LegacyScenarioAdapter.js?v=20260307-1"></script>
-  <script src="/src/core/Utils.js?v=20260307-2"></script>
+  <script src="/src/core/Utils.js?v=20260321-2"></script>
   <script src="/src/core/PresentValueCalculator.js?v=20260222-1"></script>
   <script src="/src/core/AttributionPopulator.js?v=20260207-1"></script>
   <script src="/src/core/DataAggregatesCalculator.js?v=2026-01-09-2"></script>
@@ -721,7 +713,6 @@
         const presentValueToggleButton = document.getElementById('presentValueToggleMobile');
         const countryTabsSyncToggleButton = document.getElementById('countryTabsSyncToggleMobile');
         const investmentStrategiesToggleButton = document.getElementById('investmentStrategiesToggleMobile');
-        const perCountryInvestmentsToggleButton = document.getElementById('perCountryInvestmentsToggleMobile');
         const economicRegimesToggleButton = document.getElementById('economicRegimesToggleMobile');
         const firstDivider = document.querySelector('.mobile-menu-divider');
         const secondDivider = document.querySelectorAll('.mobile-menu-divider')[1];
@@ -736,7 +727,6 @@
         // Show only when relocation is active and there is an effective relocation (MV to a different country).
         let SHOW_COUNTRY_TABS_SYNC_TOGGLE = false;
         const SHOW_INVESTMENT_STRATEGIES_TOGGLE = true;
-        const SHOW_PER_COUNTRY_INVESTMENTS_TOGGLE = true;
         let SHOW_ECONOMIC_REGIMES_TOGGLE = false;
         try {
           if (typeof Config !== 'undefined') {
@@ -754,7 +744,7 @@
         let hasRunSection = false;
         let hasSaveLoadSection = false;
         let hasDemoHelpSection = false;
-        let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE || SHOW_COUNTRY_TABS_SYNC_TOGGLE || SHOW_INVESTMENT_STRATEGIES_TOGGLE || SHOW_PER_COUNTRY_INVESTMENTS_TOGGLE || SHOW_ECONOMIC_REGIMES_TOGGLE;
+        let hasToggleSection = SHOW_TOGGLE_BUTTON || SHOW_EVENTS_WIZARD_TOGGLE || SHOW_PRESENT_VALUE_TOGGLE || SHOW_COUNTRY_TABS_SYNC_TOGGLE || SHOW_INVESTMENT_STRATEGIES_TOGGLE || SHOW_ECONOMIC_REGIMES_TOGGLE;
 
         if (currentWidth > breakpoints.tablet) {
           // Desktop mode: Only show Demo/Help/Coffee buttons that are visible in header but burger menu is always available
@@ -821,9 +811,6 @@
         }
         if (investmentStrategiesToggleButton) {
           investmentStrategiesToggleButton.style.display = SHOW_INVESTMENT_STRATEGIES_TOGGLE ? 'flex' : 'none';
-        }
-        if (perCountryInvestmentsToggleButton) {
-          perCountryInvestmentsToggleButton.style.display = SHOW_PER_COUNTRY_INVESTMENTS_TOGGLE ? 'flex' : 'none';
         }
         if (economicRegimesToggleButton) {
           economicRegimesToggleButton.style.display = SHOW_ECONOMIC_REGIMES_TOGGLE ? 'flex' : 'none';
@@ -923,14 +910,6 @@
         if (investmentStrategiesToggleMobile) {
           investmentStrategiesToggleMobile.addEventListener('click', () => {
             this.handleInvestmentStrategiesToggle(investmentStrategiesToggleMobile);
-          });
-        }
-
-        // Per-Country Investments Toggle
-        const perCountryInvestmentsToggleMobile = document.getElementById('perCountryInvestmentsToggleMobile');
-        if (perCountryInvestmentsToggleMobile) {
-          perCountryInvestmentsToggleMobile.addEventListener('click', () => {
-            this.handlePerCountryInvestmentsToggle(perCountryInvestmentsToggleMobile);
           });
         }
 
@@ -1097,24 +1076,6 @@
         }));
       }
 
-      handlePerCountryInvestmentsToggle(toggleButton) {
-        const currentState = toggleButton.getAttribute('data-toggle-state');
-        const newState = currentState === 'off' ? 'on' : 'off';
-        const toggleSwitch = toggleButton.querySelector('.toggle-switch');
-
-        toggleButton.setAttribute('data-toggle-state', newState);
-        if (toggleSwitch) {
-          if (newState === 'on') toggleSwitch.classList.add('active');
-          else toggleSwitch.classList.remove('active');
-        }
-
-        localStorage.setItem('perCountryInvestmentsEnabled', newState);
-
-        window.dispatchEvent(new CustomEvent('perCountryInvestmentsToggle', {
-          detail: { state: newState, enabled: newState === 'on' }
-        }));
-      }
-
       handleEconomicRegimesToggle(toggleButton) {
         try {
           const cfg = Config.getInstance();
@@ -1258,23 +1219,6 @@
           }
 
           window.dispatchEvent(new CustomEvent('investmentStrategiesToggle', {
-            detail: { state: savedState, enabled: savedState === 'on' }
-          }));
-        }
-
-        // Initialize Per-Country Investments toggle
-        const perCountryInvestmentsToggleButton = document.getElementById('perCountryInvestmentsToggleMobile');
-        if (perCountryInvestmentsToggleButton) {
-          const savedState = localStorage.getItem('perCountryInvestmentsEnabled') || 'off';
-          const toggleSwitch = perCountryInvestmentsToggleButton.querySelector('.toggle-switch');
-
-          perCountryInvestmentsToggleButton.setAttribute('data-toggle-state', savedState);
-          if (toggleSwitch) {
-            if (savedState === 'on') toggleSwitch.classList.add('active');
-            else toggleSwitch.classList.remove('active');
-          }
-
-          window.dispatchEvent(new CustomEvent('perCountryInvestmentsToggle', {
             detail: { state: savedState, enabled: savedState === 'on' }
           }));
         }

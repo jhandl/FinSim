@@ -465,8 +465,7 @@ function serializeSimulation(ui) {
     // Economy Mode
     economy_mode: ui.getValue('economy_mode'),
     // Feature toggles
-    investmentStrategiesEnabled: ui.getValue('investmentStrategiesEnabled'),
-    perCountryInvestmentsEnabled: ui.getValue('perCountryInvestmentsEnabled')
+    investmentStrategiesEnabled: ui.getValue('investmentStrategiesEnabled')
   };
 
   var priorityBaseTypes = {};
@@ -506,11 +505,7 @@ function serializeSimulation(ui) {
   }
 
   // Global + local economy inputs (dynamic rows rendered in the growth rates panel).
-  var economyFeatureActive = false;
-  if (scenarioCountries.length > 1) economyFeatureActive = true;
-  if (ui.getValue('perCountryInvestmentsEnabled') === 'on' || ui.getValue('perCountryInvestmentsEnabled') === true) {
-    economyFeatureActive = true;
-  }
+  var economyFeatureActive = scenarioCountries.length > 1;
 
   var globalBaseTypes = config.getInvestmentBaseTypes();
   var globalEntries = [];
@@ -1152,11 +1147,6 @@ function deserializeSimulation(content, ui) {
   var investmentStrategiesValue = ui.getValue('investmentStrategiesEnabled');
   if (investmentStrategiesValue === undefined || investmentStrategiesValue === null || investmentStrategiesValue === '') {
     ui.setValue('investmentStrategiesEnabled', 'off');
-  }
-
-  var perCountryInvestmentsValue = ui.getValue('perCountryInvestmentsEnabled');
-  if (perCountryInvestmentsValue === undefined || perCountryInvestmentsValue === null || perCountryInvestmentsValue === '') {
-    ui.setValue('perCountryInvestmentsEnabled', 'off');
   }
 
   // Map generic per-country keys into chip-driven UI fields (web UI only).

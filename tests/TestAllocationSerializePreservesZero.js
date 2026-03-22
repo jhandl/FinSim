@@ -150,7 +150,6 @@ module.exports = {
       doc.ensureEl('shares_ieGrowthRate', 'percentage').value = '';
       doc.ensureEl('shares_ieGrowthStdDev', 'percentage').value = '';
       doc.ensureEl('investmentStrategiesEnabled', 'string').value = 'off';
-      doc.ensureEl('perCountryInvestmentsEnabled', 'string').value = 'off';
       doc.ensureEl('StartCountry', 'string').value = 'ie';
       doc.ensureEl('simulation_mode', 'string').value = 'single';
       doc.ensureEl('economy_mode', 'string').value = 'deterministic';

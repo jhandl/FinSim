@@ -59,8 +59,7 @@ module.exports = {
       PensionContributionPercentageP2: '',
       simulation_mode: 'single',
       economy_mode: 'deterministic',
-      investmentStrategiesEnabled: 'off',
-      perCountryInvestmentsEnabled: 'off'
+      investmentStrategiesEnabled: 'off'
     };
 
     framework.simulationContext.__eventRows = [

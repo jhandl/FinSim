@@ -116,10 +116,10 @@ module.exports = {
           ]),
           getCachedTaxRuleSet: (code) => {
             const cc = String(code || '').toLowerCase();
-            if (cc === 'ie') return ieRuleset;
+            if (cc === 'ie' || cc === 'us') return ieRuleset;
             return null;
           },
-          getAvailableCountries: () => ([{ code: 'ie', name: 'Ireland' }]),
+          getAvailableCountries: () => ([{ code: 'ie', name: 'Ireland' }, { code: 'us', name: 'United States' }]),
           isRelocationEnabled: () => true
         })
       };
@@ -164,7 +164,6 @@ module.exports = {
       global.document = doc2;
 
       ui2.ensureParameterInput('investmentStrategiesEnabled', 'string');
-      ui2.ensureParameterInput('perCountryInvestmentsEnabled', 'string');
       ui2.ensureParameterInput('simulation_mode', 'string');
       ui2.ensureParameterInput('economy_mode', 'string');
       ui2.ensureParameterInput('PensionGrowthRate', 'percentage');
@@ -198,7 +197,7 @@ module.exports = {
 
       // Phase B: defaults from legacy values when per-country inputs are missing
       const doc3 = createParameterDocument();
-      const ui3 = createUiStub(doc3);
+      const ui3 = createUiStub(doc3, [['MV:US', 'US', '', '', '', '', '']]);
       global.document = doc3;
       doc3.ensureEl('StartCountry', 'string').value = 'ie';
       doc3.ensureEl('PensionGrowthRate', 'percentage').value = '6';
@@ -206,7 +205,6 @@ module.exports = {
       doc3.ensureEl('Inflation', 'percentage').value = '2';
       doc3.ensureEl('shares_ieGrowthRate', 'percentage').value = '4';
       doc3.ensureEl('shares_ieGrowthStdDev', 'percentage').value = '9';
-      doc3.ensureEl('perCountryInvestmentsEnabled', 'string').value = 'on';
 
       csv = serializeSimulation(ui3);
 
@@ -230,7 +228,6 @@ module.exports = {
       const ui4 = createUiStub(doc4);
       global.document = doc4;
       ui4.ensureParameterInput('investmentStrategiesEnabled', 'string');
-      ui4.ensureParameterInput('perCountryInvestmentsEnabled', 'string');
       ui4.ensureParameterInput('simulation_mode', 'string');
       ui4.ensureParameterInput('economy_mode', 'string');
       ui4.ensureParameterInput('PensionGrowthRate', 'percentage');
@@ -298,7 +295,6 @@ module.exports = {
       const ui6 = createUiStub(doc6);
       global.document = doc6;
       ui6.ensureParameterInput('investmentStrategiesEnabled', 'string');
-      ui6.ensureParameterInput('perCountryInvestmentsEnabled', 'string');
       ui6.ensureParameterInput('simulation_mode', 'string');
       ui6.ensureParameterInput('economy_mode', 'string');
 

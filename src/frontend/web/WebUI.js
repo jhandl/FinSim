@@ -11,7 +11,6 @@ class WebUI extends AbstractUI {
     this.currentEconomyMode = 'deterministic'; // Default to deterministic mode
     this.preservedVolatilityValues = {}; // Store volatility values when switching modes
     this.investmentStrategiesEnabled = false;
-    this.perCountryInvestmentsEnabled = false;
     this.economicRegimesEnabled = 'off';
 
     this.p1Labels = {
@@ -329,9 +328,6 @@ class WebUI extends AbstractUI {
     if (elementId === 'investmentStrategiesEnabled') {
       return this.investmentStrategiesEnabled;
     }
-    if (elementId === 'perCountryInvestmentsEnabled') {
-      return this.perCountryInvestmentsEnabled;
-    }
     if (elementId === 'economicRegimesEnabled') {
       return this.economicRegimesEnabled;
     }
@@ -355,10 +351,6 @@ class WebUI extends AbstractUI {
     }
     if (elementId === 'investmentStrategiesEnabled') {
       this.investmentStrategiesEnabled = (value === 'on' || value === true || value === 'true');
-      return;
-    }
-    if (elementId === 'perCountryInvestmentsEnabled') {
-      this.perCountryInvestmentsEnabled = (value === 'on' || value === true || value === 'true');
       return;
     }
     DOMUtils.setValue(elementId, value);
@@ -419,20 +411,6 @@ class WebUI extends AbstractUI {
       detail: { state: strategiesState, enabled: strategiesState === 'on' }
     }));
 
-    const perCountryState = this.perCountryInvestmentsEnabled ? 'on' : 'off';
-    localStorage.setItem('perCountryInvestmentsEnabled', perCountryState);
-    const perCountryButton = document.getElementById('perCountryInvestmentsToggleMobile');
-    if (perCountryButton) {
-      perCountryButton.setAttribute('data-toggle-state', perCountryState);
-      const toggleSwitch = perCountryButton.querySelector('.toggle-switch');
-      if (toggleSwitch) {
-        if (perCountryState === 'on') toggleSwitch.classList.add('active');
-        else toggleSwitch.classList.remove('active');
-      }
-    }
-    window.dispatchEvent(new CustomEvent('perCountryInvestmentsToggle', {
-      detail: { state: perCountryState, enabled: perCountryState === 'on' }
-    }));
   }
 
   // Lightweight proxy to read events without creating a new UIManager instance
@@ -876,8 +854,7 @@ class WebUI extends AbstractUI {
       }
 
       const relocationEnabled = cfg.isRelocationEnabled();
-      const hasMV = relocationEnabled && this.hasRelocationEvents();
-      const showCountryChips = this.perCountryInvestmentsEnabled && hasMV;
+      const showCountryChips = relocationEnabled && this.hasEffectiveRelocationEvents();
       if (!showCountryChips) {
         this.growthRatesCountryChipSelector = null;
         setRowHeadingForInput('Inflation', 'Inflation');
@@ -1110,7 +1087,7 @@ class WebUI extends AbstractUI {
 
     const refreshGrowthRatesForRelocation = () => {
       const cfg = Config.getInstance();
-      const shouldShow = this.perCountryInvestmentsEnabled && cfg.isRelocationEnabled() && this.hasRelocationEvents();
+      const shouldShow = cfg.isRelocationEnabled() && this.hasEffectiveRelocationEvents();
       const hasChips = !!this.growthRatesCountryChipSelector;
       if (shouldShow !== hasChips) {
         this.renderInvestmentParameterFields(this._lastInvestmentTypesForGrowthRates || types);
@@ -1127,12 +1104,6 @@ class WebUI extends AbstractUI {
       }
     }
 
-    if (!this._growthRatesToggleListener) {
-      this._growthRatesToggleListener = () => {
-        refreshGrowthRatesForRelocation();
-      };
-      window.addEventListener('perCountryInvestmentsToggle', this._growthRatesToggleListener);
-    }
   }
 
   // -------------------------------------------------------------
@@ -1264,7 +1235,6 @@ class WebUI extends AbstractUI {
     const cfg = Config.getInstance();
     const relocationEnabled = cfg.isRelocationEnabled();
     const hasMV = relocationEnabled && this.hasEffectiveRelocationEvents();
-    const perCountryEnabled = !!this.perCountryInvestmentsEnabled;
 
     // If we were called from a generic events-table change (no types provided),
     // fall back to StartCountry-resolved investment types so we can correctly
@@ -1276,10 +1246,8 @@ class WebUI extends AbstractUI {
       types = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
     }
 
-    // Allocations chips + per-country allocation inputs
-    // Per-country OFF: hide chips and render global-only fields (independent keys).
-    // Per-country ON: existing relocation-driven chip behavior.
-    this._setupAllocationsCountryChips(perCountryEnabled && hasMV, types);
+    // Allocations chips + per-country allocation inputs.
+    this._setupAllocationsCountryChips(hasMV, types);
 
     // Personal circumstances chips + per-country state pension inputs
     this.setupPersonalCircumstancesCountryChips();
@@ -1350,81 +1318,6 @@ class WebUI extends AbstractUI {
       } catch (_) { }
       if (el && el.parentNode) el.parentNode.removeChild(el);
     });
-
-    // Per-country toggle OFF: global allocations only (no chips, no per-country containers).
-    if (!this.perCountryInvestmentsEnabled) {
-      chipContainer.style.display = 'none';
-      this.allocationsCountryChipSelector = null;
-
-      const types = this._sortInvestmentTypes(Array.isArray(fallbackStartTypes) ? fallbackStartTypes : [])
-        .filter(t => !(t && t.excludeFromAllocations));
-      const startCountry = (cfg.getStartCountry() || '').toLowerCase();
-
-      // Render global allocation fields using GlobalAllocation_* keys (independent of per-country fields).
-      for (let i = 0; i < types.length; i++) {
-        const t = types[i] || {};
-        const key = t.key;
-        if (!key) continue;
-        const baseKey = this._toBaseInvestmentKey(key, startCountry);
-        const labelText = (t.label || baseKey);
-        const inputId = 'GlobalAllocation_' + baseKey;
-        const legacyId = 'InvestmentAllocation_' + key;
-        const perCountryId = 'InvestmentAllocation_' + startCountry + '_' + baseKey;
-
-        if (!this._allocationValueCache[inputId]) {
-          if (this._allocationValueCache[perCountryId]) {
-            this._allocationValueCache[inputId] = this._allocationValueCache[perCountryId];
-          } else if (this._allocationValueCache[legacyId]) {
-            this._allocationValueCache[inputId] = this._allocationValueCache[legacyId];
-          }
-        }
-        if (!this._allocationValueCache[legacyId] && this._allocationValueCache[inputId]) {
-          this._allocationValueCache[legacyId] = this._allocationValueCache[inputId];
-        }
-        if (!this._allocationValueCache[perCountryId] && this._allocationValueCache[inputId]) {
-          this._allocationValueCache[perCountryId] = this._allocationValueCache[inputId];
-        }
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'input-wrapper';
-        wrapper.setAttribute('data-dynamic-investment-param', 'true');
-        wrapper.setAttribute('data-allocations-row', 'true');
-
-        const label = document.createElement('label');
-        label.setAttribute('for', inputId);
-        const labelSpan = document.createElement('span');
-        labelSpan.className = 'alloc-label-text';
-        labelSpan.textContent = labelText;
-        label.appendChild(labelSpan);
-        wrapper.appendChild(label);
-
-        // "Holds" dropdown for baseRef-backed types (e.g., IE Index Funds) lives in the label area.
-        const defaultHold = t.baseRef || t.baseKey || '';
-        if (defaultHold) {
-          const holdId = 'GlobalMixConfig_' + baseKey + '_asset1';
-          this._appendHoldsDropdown(wrapper, holdId, String(defaultHold));
-        }
-
-        const pctContainer = document.createElement('div');
-        pctContainer.className = 'percentage-container';
-        const input = this._takeOrCreateInput(inputId, 'percentage');
-        input.type = 'text';
-        input.setAttribute('inputmode', 'numeric');
-        input.setAttribute('pattern', '[0-9]*');
-        input.setAttribute('step', '1');
-        input.setAttribute('placeholder', ' ');
-        this._applyAllocationValueIfCached(inputId, input);
-        pctContainer.appendChild(input);
-        wrapper.appendChild(pctContainer);
-
-        allocGroup.appendChild(wrapper);
-      }
-      // Pension contribution controls remain StartCountry-scoped (same ids as per-country mode)
-      this._renderCountryPensionContributionFields(allocGroup, startCountry, simulationMode);
-      this.formatUtils.setupPercentageInputs();
-      this._refreshAllocationsLabelLayout();
-      return;
-    }
 
     if (!hasMV) {
       // Chips hidden: keep StartCountry inputs effectively identical to multi-country mode.
@@ -4543,9 +4436,6 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     const investmentStrategiesState = localStorage.getItem('investmentStrategiesEnabled') || 'off';
     webUi.investmentStrategiesEnabled = (investmentStrategiesState === 'on');
 
-    const perCountryInvestmentsState = localStorage.getItem('perCountryInvestmentsEnabled') || 'off';
-    webUi.perCountryInvestmentsEnabled = (perCountryInvestmentsState === 'on');
-
     const cfg = Config.getInstance();
     const isRegimesEnabled = !!(cfg && cfg.isEconomicRegimesFeatureEnabled && cfg.isEconomicRegimesFeatureEnabled());
     const economicRegimesState = isRegimesEnabled ? (localStorage.getItem('economicRegimesEnabled') || 'off') : 'off';
@@ -4555,13 +4445,6 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     window.addEventListener('investmentStrategiesToggle', (e) => {
       webUi.investmentStrategiesEnabled = e.detail.enabled;
       webUi.refreshCountryChipsFromScenario(webUi._lastInvestmentTypesForGrowthRates);
-    });
-
-    // Listen for Per-Country Investments toggle
-    window.addEventListener('perCountryInvestmentsToggle', (e) => {
-      webUi.perCountryInvestmentsEnabled = e.detail.enabled;
-      // Refresh allocations UI immediately (global ↔ per-country mode)
-      try { webUi.refreshCountryChipsFromScenario(webUi._lastInvestmentTypesForGrowthRates); } catch (_) { }
     });
 
     // Listen for Economic Regimes toggle

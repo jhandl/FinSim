@@ -367,33 +367,15 @@ class UIManager {
     const investmentVolatilitiesByKey = {};
     const globalBaseRefs = {};
     const startCountry = params.StartCountry.toLowerCase();
-    const perCountryEnabledVal = this.ui.getValue('perCountryInvestmentsEnabled');
-    const perCountryEnabled = (perCountryEnabledVal === 'on' || perCountryEnabledVal === true);
     params[`Inflation_${startCountry}`] = getOptionalPercentageValue('Inflation');
     investmentAllocationsByCountry[startCountry] = {};
     for (let i = 0; i < investmentTypes.length; i++) {
       const type = investmentTypes[i];
       const key = type.key;
       initialCapitalByKey[key] = this.ui.getValue(`InitialCapital_${key}`);
-      // Allocation inputs can be rendered either as legacy `InvestmentAllocation_{typeKey}`
-      // or as per-country `InvestmentAllocation_{countryCode}_{baseKey}` when relocation UI is enabled.
       let alloc = 0;
       try {
-        if (!perCountryEnabled) {
-          const suffix = '_' + startCountry;
-          let baseKey = key;
-          if (String(key).toLowerCase().endsWith(suffix)) {
-            baseKey = String(key).slice(0, String(key).length - suffix.length);
-          }
-          const globalId = `GlobalAllocation_${baseKey}`;
-          if (typeof document === 'undefined' || document.getElementById(globalId)) {
-            alloc = this.ui.getValue(globalId);
-          } else {
-            alloc = this.ui.getValue(`InvestmentAllocation_${key}`);
-          }
-        } else {
-          alloc = this.ui.getValue(`InvestmentAllocation_${key}`);
-        }
+        alloc = this.ui.getValue(`InvestmentAllocation_${key}`);
       } catch (_) {
         alloc = 0;
       }

@@ -91,7 +91,6 @@ function seedParameterIds(ui) {
   ui.ensureParameterInput('simulation_mode', 'string');
   ui.ensureParameterInput('economy_mode', 'string');
   ui.ensureParameterInput('investmentStrategiesEnabled', 'string');
-  ui.ensureParameterInput('perCountryInvestmentsEnabled', 'string');
 }
 
 module.exports = {

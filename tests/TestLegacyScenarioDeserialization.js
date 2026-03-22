@@ -114,7 +114,6 @@ function seedLegacyDemoBaseParameterIds(ui) {
     'simulation_mode',
     'economy_mode',
     'investmentStrategiesEnabled',
-    'perCountryInvestmentsEnabled',
 
     // Legacy allocation + capital keys that are later normalized/migrated
     'InvestmentAllocation_indexFunds',

@@ -50,8 +50,8 @@ function buildCsv(parameterLines) {
 }
 
 module.exports = {
-  name: 'InvestmentTogglePersistence',
-  description: 'Ensures investment toggle fields serialize and default to off on legacy loads.',
+  name: 'InvestmentStrategiesTogglePersistence',
+  description: 'Ensures investment strategy toggle serializes and defaults to off on legacy loads.',
   isCustomTest: true,
   async runCustomTest() {
     const originalConfig = global.Config;
@@ -80,34 +80,23 @@ module.exports = {
       if (uiLegacy.getValue('investmentStrategiesEnabled') !== 'off') {
         errors.push('Expected investmentStrategiesEnabled to default to off for legacy scenario.');
       }
-      if (uiLegacy.getValue('perCountryInvestmentsEnabled') !== 'off') {
-        errors.push('Expected perCountryInvestmentsEnabled to default to off for legacy scenario.');
-      }
 
       const uiLoaded = createUiStub();
       const explicitCsv = buildCsv([
         'StartingAge,30',
         'simulation_mode,single',
-        'investmentStrategiesEnabled,on',
-        'perCountryInvestmentsEnabled,off'
+        'investmentStrategiesEnabled,on'
       ]);
       deserializeSimulation(explicitCsv, uiLoaded);
       if (uiLoaded.getValue('investmentStrategiesEnabled') !== 'on') {
         errors.push('Expected investmentStrategiesEnabled to preserve on from file.');
       }
-      if (uiLoaded.getValue('perCountryInvestmentsEnabled') !== 'off') {
-        errors.push('Expected perCountryInvestmentsEnabled to preserve off from file.');
-      }
 
       const uiSerialize = createUiStub();
       uiSerialize.setValue('investmentStrategiesEnabled', true);
-      uiSerialize.setValue('perCountryInvestmentsEnabled', false);
       const serializedCsv = serializeSimulation(uiSerialize);
       if (serializedCsv.indexOf('investmentStrategiesEnabled,true') === -1) {
         errors.push('Expected serializeSimulation to include investmentStrategiesEnabled,true.');
-      }
-      if (serializedCsv.indexOf('perCountryInvestmentsEnabled,false') === -1) {
-        errors.push('Expected serializeSimulation to include perCountryInvestmentsEnabled,false.');
       }
     } catch (err) {
       errors.push('Unexpected error: ' + (err && err.message ? err.message : String(err)));

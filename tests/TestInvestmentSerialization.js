@@ -148,7 +148,7 @@ function seedParameterIds(ui, extraIds) {
     'P2StartingAge', 'P2RetirementAge', 'P2StatePensionWeekly',
     'InitialPensionP2', 'PensionContributionPercentageP2',
     'simulation_mode', 'economy_mode',
-    'investmentStrategiesEnabled', 'perCountryInvestmentsEnabled',
+    'investmentStrategiesEnabled',
     'InitialCapital_indexFunds_ie', 'InitialCapital_shares_ie',
     'InvestmentAllocation_indexFunds_ie', 'InvestmentAllocation_shares_ie',
     'InitialCapital_indexFunds', 'InitialCapital_shares',
@@ -177,7 +177,7 @@ function seedLegacyDemoBaseParameterIds(ui) {
     'Priority_cash', 'Priority_pension', 'Priority_indexFunds', 'Priority_shares',
     'P2StartingAge', 'P2RetirementAge', 'P2StatePensionWeekly', 'InitialPensionP2',
     'PensionContributionPercentageP2', 'simulation_mode', 'economy_mode',
-    'investmentStrategiesEnabled', 'perCountryInvestmentsEnabled',
+    'investmentStrategiesEnabled',
     'InvestmentAllocation_indexFunds', 'InvestmentAllocation_shares',
     'InitialCapital_indexFunds', 'InitialCapital_shares',
     'InvestmentAllocation_indexFunds_ie', 'InvestmentAllocation_shares_ie',
@@ -382,7 +382,6 @@ module.exports = {
         ui1.setValue('simulation_mode', 'single');
         ui1.setValue('economy_mode', 'deterministic');
         ui1.setValue('investmentStrategiesEnabled', 'off');
-        ui1.setValue('perCountryInvestmentsEnabled', 'off');
 
         const csv1 = serializeSimulation(ui1);
 

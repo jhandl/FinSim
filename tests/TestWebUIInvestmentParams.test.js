@@ -92,6 +92,7 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     });
     webUI.refreshCountryChipsFromScenario = jest.fn();
     webUI.hasRelocationEvents = jest.fn(() => false);
+    webUI.hasEffectiveRelocationEvents = jest.fn(() => false);
     webUI.getScenarioCountries = jest.fn(() => ['ie']);
   });
 
@@ -142,9 +143,8 @@ describe('WebUI.renderInvestmentParameterFields', () => {
 
   test('filters out inheriting wrappers from per-country growth rates table', () => {
     // Setup scenario with multiple countries and mixed investment types
-    webUI.perCountryInvestmentsEnabled = true;
     mockConfig.isRelocationEnabled.mockReturnValue(true);
-    webUI.hasRelocationEvents.mockReturnValue(true);
+    webUI.hasEffectiveRelocationEvents.mockReturnValue(true);
     webUI.getScenarioCountries = jest.fn(() => ['ie', 'ar']);
     
     const ieTypes = [
@@ -179,9 +179,8 @@ describe('WebUI.renderInvestmentParameterFields', () => {
 
   test('renders local investment types in economy table when relocation disabled', () => {
     // Setup
-    webUI.perCountryInvestmentsEnabled = false;
     mockConfig.isRelocationEnabled.mockReturnValue(false);
-    webUI.hasRelocationEvents.mockReturnValue(false);
+    webUI.hasEffectiveRelocationEvents.mockReturnValue(false);
 
     const types = [
       { key: 'localInv', label: 'Local', residenceScope: 'local' }
