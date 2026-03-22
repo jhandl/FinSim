@@ -90,6 +90,7 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     webUI._stashInputElement = jest.fn((el) => {
       stash.appendChild(el);
     });
+    webUI.dragAndDrop = { renderPriorities: jest.fn(async () => {}) };
     webUI.refreshCountryChipsFromScenario = jest.fn();
     webUI.hasRelocationEvents = jest.fn(() => false);
     webUI.hasEffectiveRelocationEvents = jest.fn(() => false);
@@ -198,5 +199,29 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     expect(tbody.contains(tr)).toBe(true);
     // Verify it is visible (not display: none)
     expect(tr.style.display).not.toBe('none');
+  });
+});
+
+describe('WebUI.refreshCountryChipsFromScenario', () => {
+  let webUI;
+
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <div id="hidden-parameter-stash"></div>
+      <div id="Allocations"><div class="input-group"></div></div>
+    `;
+
+    webUI = new WebUI();
+    webUI.dragAndDrop = { renderPriorities: jest.fn(async () => {}) };
+    webUI._setupAllocationsCountryChips = jest.fn();
+    webUI.setupPersonalCircumstancesCountryChips = jest.fn();
+    webUI.formatUtils = { setupCurrencyInputs: jest.fn() };
+    webUI.hasEffectiveRelocationEvents = jest.fn(() => true);
+  });
+
+  test('rerenders priorities when scenario-country UI refreshes', () => {
+    webUI.refreshCountryChipsFromScenario([]);
+
+    expect(webUI.dragAndDrop.renderPriorities).toHaveBeenCalledTimes(1);
   });
 });

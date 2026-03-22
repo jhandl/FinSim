@@ -1252,6 +1252,10 @@ class WebUI extends AbstractUI {
     // Personal circumstances chips + per-country state pension inputs
     this.setupPersonalCircumstancesCountryChips();
 
+    if (this.dragAndDrop && typeof this.dragAndDrop.renderPriorities === 'function') {
+      this.dragAndDrop.renderPriorities();
+    }
+
     if (this.formatUtils) {
       this.formatUtils.setupCurrencyInputs();
     }
