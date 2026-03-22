@@ -1106,27 +1106,27 @@ class UIManager {
       if (event.type === 'M') {
         const matchingREvents = getMatchingEvents('R', propertyName);
         if (matchingREvents.length === 0) {
-          this.ui.setWarning(`Events[${i + 1},1]`, `Couldn't find a purchase event for the property '${propertyName}'.`);
+          this.ui.setWarning(`Events[${i + 1},1]`, `No property purchase event was found for '${propertyName}'.`);
           errors = true;
           continue;
         }
         if (matchingREvents.length > 1) {
-          this.ui.setWarning(`Events[${i + 1},1]`, `Found multiple purchase events with the name '${propertyName}'.`);
+          this.ui.setWarning(`Events[${i + 1},1]`, `There are multiple property purchase events named '${propertyName}'. Keep exactly one.`);
           errors = true;
           continue;
         }
         const rEvent = matchingREvents[0];
         if (rEvent.fromAge !== event.fromAge) {
-          this.ui.setWarning(`Events[${i + 1},3]`, "The mortgage (M) and purchase (R) events for a property must have the same starting age.");
+          this.ui.setWarning(`Events[${i + 1},3]`, "The mortgage and property purchase must start at the same age.");
           errors = true;
         }
         if (event.toAge > rEvent.toAge) {
-          this.ui.setWarning(`Events[${i + 1},4]`, "The mortgage must end when the property is sold.");
+          this.ui.setWarning(`Events[${i + 1},4]`, "The mortgage end age cannot be later than the property sale age.");
           errors = true;
         }
         const duplicateMortgages = events.filter((e, idx) => e.type === 'M' && e.id === propertyName && idx < i);
         if (duplicateMortgages.length > 0) {
-          this.ui.setWarning(`Events[${i + 1},1]`, `A property can only have one mortgage event. Property '${propertyName}' already has one.`);
+          this.ui.setWarning(`Events[${i + 1},1]`, `Only one mortgage event is allowed for '${propertyName}'.`);
           errors = true;
         }
       }
@@ -1134,7 +1134,7 @@ class UIManager {
       if (event.type === 'MO') {
         const matchingMEvents = getMatchingEvents('M', propertyName);
         if (matchingMEvents.length !== 1) {
-          this.ui.setWarning(`Events[${i + 1},1]`, `Mortgage overpay (${propertyName}) requires exactly one mortgage (M) event with the same name.`);
+          this.ui.setWarning(`Events[${i + 1},1]`, `A mortgage overpayment requires exactly one mortgage event for '${propertyName}'.`);
           errors = true;
           continue;
         }
@@ -1152,7 +1152,7 @@ class UIManager {
       if (event.type === 'MP') {
         const matchingMEvents = getMatchingEvents('M', propertyName);
         if (matchingMEvents.length !== 1) {
-          this.ui.setWarning(`Events[${i + 1},1]`, `Mortgage payoff (${propertyName}) requires exactly one mortgage (M) event with the same name.`);
+          this.ui.setWarning(`Events[${i + 1},1]`, `A mortgage payoff requires exactly one mortgage event for '${propertyName}'.`);
           errors = true;
           continue;
         }
@@ -1162,12 +1162,12 @@ class UIManager {
           errors = true;
         }
         if (event.fromAge !== mEvent.toAge) {
-          this.ui.setWarning(`Events[${i + 1},3]`, "Mortgage payoff age must match the mortgage end age.");
+          this.ui.setWarning(`Events[${i + 1},3]`, "The mortgage payoff age must match the mortgage end age.");
           errors = true;
         }
         const duplicatePayoffs = events.filter((e, idx) => e.type === 'MP' && e.id === propertyName && idx < i);
         if (duplicatePayoffs.length > 0) {
-          this.ui.setWarning(`Events[${i + 1},1]`, `A property can only have one mortgage payoff event. Property '${propertyName}' already has one.`);
+          this.ui.setWarning(`Events[${i + 1},1]`, `Only one mortgage payoff event is allowed for '${propertyName}'.`);
           errors = true;
         }
       }
@@ -1175,11 +1175,12 @@ class UIManager {
       if (event.type === 'MR') {
         const matchingREvents = getMatchingEvents('R', propertyName);
         if (matchingREvents.length !== 1) {
-          this.ui.setWarning(`Events[${i + 1},1]`, `Reverse mortgage (${propertyName}) requires exactly one purchase (R) event with the same name.`);
+          this.ui.setWarning(`Events[${i + 1},1]`, `A reverse mortgage requires exactly one property purchase event for '${propertyName}'.`);
           errors = true;
           continue;
         }
         const rEvent = matchingREvents[0];
+        const matchingMEvents = getMatchingEvents('M', propertyName);
         if (event.fromAge < rEvent.fromAge) {
           this.ui.setWarning(`Events[${i + 1},3]`, "Reverse mortgage cannot start before the property is purchased.");
           errors = true;
@@ -1188,9 +1189,26 @@ class UIManager {
           this.ui.setWarning(`Events[${i + 1},4]`, "Reverse mortgage cannot extend beyond the property sale.");
           errors = true;
         }
+        if (matchingMEvents.length === 1) {
+          const mEvent = matchingMEvents[0];
+          const mortgageFromAge = Number(mEvent.fromAge);
+          const mortgageToAge = Number(mEvent.toAge);
+          const reverseFromAge = Number(event.fromAge);
+          const reverseToRaw = Number(event.toAge);
+          const reverseToAge = isNaN(reverseToRaw) ? 999 : reverseToRaw;
+          if (
+            !isNaN(mortgageFromAge) &&
+            !isNaN(mortgageToAge) &&
+            !isNaN(reverseFromAge) &&
+            Math.max(mortgageFromAge, reverseFromAge) <= Math.min(mortgageToAge, reverseToAge)
+          ) {
+            this.ui.setWarning(`Events[${i + 1},3]`, "Reverse mortgage starts before the regular mortgage is fully paid off.");
+            errors = true;
+          }
+        }
         const duplicateReverse = events.filter((e, idx) => e.type === 'MR' && e.id === propertyName && idx < i);
         if (duplicateReverse.length > 0) {
-          this.ui.setWarning(`Events[${i + 1},1]`, `A property can only have one reverse mortgage event. Property '${propertyName}' already has one.`);
+          this.ui.setWarning(`Events[${i + 1},1]`, `Only one reverse mortgage event is allowed for '${propertyName}'.`);
           errors = true;
         }
       }

@@ -32,7 +32,7 @@ describe('Mortgage plan sync regressions', () => {
     tr.innerHTML = `
       <td>
         <div class="event-type-container">
-          <input class="event-type" value="${type}">
+          <input class="event-type event-type-dd" value="${type}">
         </div>
       </td>
       <td><input class="event-name" value="${id}"></td>
@@ -282,7 +282,7 @@ describe('Mortgage plan sync regressions', () => {
     expect(parseNumeric(rows.mpRow.querySelector('.event-amount'))).toBeGreaterThan(0);
   });
 
-  test('R.toAge propagation keeps manual MP amount and raises mortgage_amount_conflict impact', async () => {
+  test('R.toAge propagation keeps manual MP amount without relocation-impact metadata', async () => {
     const rRow = createRow('row-r', 'R', 'home', '300000', '35', '60', '0');
     const mRow = createRow('row-m', 'M', 'home', '4000', '35', '60', '4');
     const mpRow = createRow('row-mp', 'MP', 'home', '1', '60', '60', '');
@@ -310,10 +310,10 @@ describe('Mortgage plan sync regressions', () => {
         mortgageTerm: row.querySelector('.event-mortgage-term') ? Number(row.querySelector('.event-mortgage-term').value) : undefined
       };
     });
-
-    manager._analyzeMortgagePlanImpacts(events);
     const mpEvent = events.find((e) => e.type === 'MP' && e.id === 'home');
-    expect(mpEvent.relocationImpact).toBeTruthy();
-    expect(mpEvent.relocationImpact.category).toBe('mortgage_amount_conflict');
+    mpEvent.relocationImpact = { category: 'mortgage_amount_conflict', message: 'legacy-mortgage-impact' };
+
+    manager.updateRelocationImpactIndicators(events);
+    expect(mpEvent.relocationImpact).toBeUndefined();
   });
 });
