@@ -11,7 +11,7 @@ const BASE_RULES = {
     countryName: 'Country A',
     locale: { currencyCode: 'AAA', currencySymbol: '¤A' },
     economicData: {
-      inflation: { cpi: 2.0, year: 2025 },
+      inflation: 2.0,
       purchasingPowerParity: { value: 1.0, year: 2025 },
       exchangeRate: { perEur: 1.0, asOf: '2025-01-01' }
     },
@@ -42,7 +42,7 @@ const BASE_RULES = {
     countryName: 'Country B',
     locale: { currencyCode: 'BBB', currencySymbol: '¤B' },
     economicData: {
-      inflation: { cpi: 5.0, year: 2025 },
+      inflation: 5.0,
       purchasingPowerParity: { value: 1.6, year: 2025 },
       exchangeRate: { perEur: 1.4, asOf: '2025-01-01' }
     },
@@ -73,7 +73,7 @@ const BASE_RULES = {
     countryName: 'Country C',
     locale: { currencyCode: 'CCC', currencySymbol: '¤C' },
     economicData: {
-      inflation: { cpi: 3.0, year: 2025 },
+      inflation: 3.0,
       purchasingPowerParity: { value: 1.2, year: 2025 },
       exchangeRate: { perEur: 1.1, asOf: '2025-01-01' }
     },

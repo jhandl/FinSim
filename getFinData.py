@@ -1,31 +1,18 @@
 #!/usr/bin/env python3
 """
 Fetch the most current inflation, FX (vs EUR), and PPP data for a list of ISO2 country codes.
-Outputs compact JSON.
-
-Example output:
-[
-  {
-    "country": "IE",
-    "curr": "EUR",
-    "infl": 2.34,
-    "infl_year": 2024,
-    "ppp": 0.80,
-    "ppp_year": 2024,
-    "fx": 1.0,
-    "fx_date": "2025-10-15"
-  }
-]
 
 Run: python3 getFinData.py IE AR
-This script now writes the fetched economic data directly into each
+
+This script writes the fetched economic data directly into each
 `src/core/config/tax-rules-<country>.json` file under the `economicData`
 section (creating or updating it as needed).
-It also fetches rental yields (migrated from `get2.py`) and writes
+It also fetches rental yields and writes
 `economicData.typicalRentalYield` for each selected country.
 """
 
 import sys, json, time, re, urllib.request, urllib.parse, xml.etree.ElementTree as ET
+from html.parser import HTMLParser
 from typing import Dict, Any, List, Optional, Tuple
 from collections import OrderedDict
 from pathlib import Path
@@ -35,7 +22,7 @@ IMF_BASE = "https://www.imf.org/external/datamapper/api/v1"
 ECB_XML_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
 EXCHANGERATE_API_BASE = "https://api.exchangerate-api.com/v4/latest/EUR"
 EXCHANGERATE_HOST_BASE = "https://api.exchangerate.host/latest"
-RENTAL_YIELDS_URL = "https://www.globalpropertyguide.com/rental-yields"
+RENTAL_YIELDS_URL = "https://www.numbeo.com/property-investment/rankings_by_country.jsp"
 
 def http_get_json(url: str):
     for _ in range(3):
@@ -211,7 +198,7 @@ def imf_fetch_series(country_iso3: str, indicator: str) -> Dict[int, float]:
     return out
 
 
-def imf_fetch_cpi_series(country_iso3: str) -> Dict[int, float]:
+def imf_fetch_inflation_series(country_iso3: str) -> Dict[int, float]:
     # IMF WEO CPI (annual % change) - indicator PCPIPCH
     return imf_fetch_series(country_iso3, "PCPIPCH")
 
@@ -296,7 +283,7 @@ def fetch(codes: List[str]) -> Tuple[List[Dict[str, Any]], Dict[str, float], Opt
                     # Convert: LCU/EUR = (LCU/USD) * (USD/EUR)
                     fx = lcu_per_usd * usd_per_eur
         
-        cpi_series = imf_fetch_cpi_series(iso3)
+        inflation_series = imf_fetch_inflation_series(iso3)
         ppp_series = imf_fetch_ppp_series(iso3)
         out.append({
             "country": c,
@@ -309,7 +296,7 @@ def fetch(codes: List[str]) -> Tuple[List[Dict[str, Any]], Dict[str, float], Opt
             "fx": round(fx, 6) if fx is not None else None,
             "fx_date": fx_date,
             "series": {
-                "inflation": _ordered_series(cpi_series),
+                "inflation": _ordered_series(inflation_series),
                 "ppp": _ordered_series(ppp_series),
                 "fx": _ordered_series(fx_series)
             }
@@ -402,68 +389,92 @@ def round_if(value: Optional[float], digits: int) -> Optional[float]:
         return None
     return round(value, digits)
 
-def calculate_median_log_cpi(cpi_series: Dict[Any, float], window_years: int = 20) -> Tuple[Optional[float], Optional[int]]:
+def calculate_blended_log_inflation(
+    inflation_series: Dict[Any, float],
+    window_years: int = 20,
+    historical_weight_min: float = 1.0,
+    historical_weight_max: float = 3.0,
+    current_year_weight: float = 4.0,
+    forecast_year_weights: Tuple[float, ...] = (3.0, 2.0, 1.0),
+) -> Optional[float]:
     """
-    Calculates CPI using the median of annual log-changes over historical data only (excludes forecasts).
-    This is robust to outliers while respecting the multiplicative nature of inflation.
-    Returns (median_log_cpi, most_recent_historical_year).
+    Calculates a planning inflation anchor as a weighted average of annual log-changes.
+
+    Policy:
+    - Keep a long-run anchor from historical data (up to last 20 years).
+    - Increase historical weights linearly toward recent years.
+    - Add explicit influence from current-year inflation and near-term forecasts.
+
+    This returns a single scalar annual inflation rate suitable as a long-horizon default
+    in the simulator (a guideline, not a nowcast).
     """
     import math
-    
-    if not cpi_series:
-        return None, None
+
+    if not inflation_series:
+        return None
 
     try:
-        # Ensure keys are integers
-        series_int = {int(k): float(v) for k, v in cpi_series.items() if v is not None}
+        # Ensure keys are integers and values are numeric percentages.
+        series_int = {int(k): float(v) for k, v in inflation_series.items() if v is not None}
     except (ValueError, TypeError):
-        return None, None
+        return None
+
+    if not series_int:
+        return None
 
     current_year = time.localtime().tm_year
-    
-    # Filter to historical years only (exclude IMF forecasts)
-    historical = {year: cpi for year, cpi in series_int.items() if year <= current_year}
-    
-    if not historical:
-        return None, None
+    weighted_log_sum = 0.0
+    total_weight = 0.0
 
-    years = sorted(historical.keys())
-    most_recent_historical_year = years[-1]
-    
-    # Optionally limit to a window of recent years
-    if window_years > 0:
-        cutoff_year = most_recent_historical_year - window_years + 1
-        historical = {year: cpi for year, cpi in historical.items() if year >= cutoff_year}
-        if not historical:
-            return None, None
-        years = sorted(historical.keys())
-    
-    # Convert each CPI percentage to log-growth: ln(1 + cpi/100)
-    log_growths = []
-    for year in years:
-        cpi_pct = historical[year]
-        # Handle edge case: if CPI is exactly -100%, log-growth would be undefined
-        # In practice, CPI is almost never negative and never that extreme
+    def add_weighted_observation(cpi_pct: float, weight: float) -> None:
+        nonlocal weighted_log_sum, total_weight
+        if cpi_pct is None:
+            return
+        if weight is None or weight <= 0:
+            return
         if cpi_pct <= -100:
-            continue
-        log_growth = math.log(1 + cpi_pct / 100.0)
-        log_growths.append(log_growth)
-    
-    if not log_growths:
-        return None, None
+            return
+        weighted_log_sum += float(weight) * math.log(1 + float(cpi_pct) / 100.0)
+        total_weight += float(weight)
 
-    # Take median of log-growths
-    log_growths_sorted = sorted(log_growths)
-    n = len(log_growths_sorted)
-    if n % 2 == 0:
-        median_log_growth = (log_growths_sorted[n // 2 - 1] + log_growths_sorted[n // 2]) / 2.0
-    else:
-        median_log_growth = log_growths_sorted[n // 2]
-    
-    # Convert back to CPI percentage: (exp(median_log_growth) - 1) * 100
-    cpi_val = (math.exp(median_log_growth) - 1.0) * 100.0
-    
-    return cpi_val, most_recent_historical_year
+    # 1) Historical base: use years before current_year to avoid contaminating
+    # "history" with current-year projections in partially observed years.
+    historical = {y: v for y, v in series_int.items() if y < current_year}
+    if not historical:
+        # Fallback: if no strict history, allow <= current year.
+        historical = {y: v for y, v in series_int.items() if y <= current_year}
+
+    hist_years = sorted(historical.keys())
+    if window_years > 0 and len(hist_years) > window_years:
+        hist_years = hist_years[-window_years:]
+
+    if hist_years:
+        n_hist = len(hist_years)
+        for idx, y in enumerate(hist_years):
+            if n_hist <= 1:
+                hist_weight = historical_weight_max
+            else:
+                t = float(idx) / float(n_hist - 1)
+                hist_weight = historical_weight_min + (historical_weight_max - historical_weight_min) * t
+            add_weighted_observation(historical[y], hist_weight)
+
+    # 2) Current-year influence (if available in source series).
+    if current_year in series_int:
+        add_weighted_observation(series_int[current_year], current_year_weight)
+
+    # 3) Near-term forecast influence.
+    forecast_years = sorted([y for y in series_int.keys() if y > current_year])
+    for idx, y in enumerate(forecast_years):
+        if idx >= len(forecast_year_weights):
+            break
+        add_weighted_observation(series_int[y], forecast_year_weights[idx])
+
+    if total_weight <= 0:
+        return None
+
+    blended_log_growth = weighted_log_sum / total_weight
+    inflation_val = (math.exp(blended_log_growth) - 1.0) * 100.0
+    return inflation_val
 
 def _promote_key_first(d: OrderedDict, key: str) -> OrderedDict:
     if not isinstance(d, dict) or key not in d:
@@ -496,27 +507,20 @@ def update_economic_block(
     if typical_rental_yield_pct is not None:
         econ["typicalRentalYield"] = round(float(typical_rental_yield_pct), 2)
     
-    # Calculate CPI using median of log-changes over historical data
-    cpi_series = entry.get("series", {}).get("inflation", {})
-    median_log_cpi, median_year = calculate_median_log_cpi(cpi_series)
+    # Calculate inflation using a blended weighted-log anchor:
+    # 20y historical baseline + current-year + near-term forecast influence.
+    inflation_series = entry.get("series", {}).get("inflation", {})
+    blended_inflation = calculate_blended_log_inflation(inflation_series)
     
-    # Determine CPI value and year (prefer median log-CPI, fallback to scalar)
-    cpi_val = median_log_cpi
-    cpi_year = median_year
+    # Determine inflation value (prefer blended anchor, fallback to scalar)
+    inflation_val = blended_inflation
     
-    if cpi_val is None:
-        cpi_val = entry.get("infl")
-        if cpi_val is None:
-            cpi_val = entry.get("cpi")
-        cpi_year = entry.get("infl_year")
-        if cpi_year is None:
-            cpi_year = entry.get("cpi_year")
+    if inflation_val is None:
+        inflation_val = entry.get("infl")
 
-    if cpi_val is not None:
-        econ["inflation"] = OrderedDict()
-        econ["inflation"]["cpi"] = round_if(cpi_val, 4) # median of log-changes over historical data
-        if cpi_year is not None:
-            econ["inflation"]["year"] = cpi_year
+    if inflation_val is not None:
+        # Schema: economicData.inflation is a scalar percentage.
+        econ["inflation"] = round_if(inflation_val, 4)
             
     if entry.get("ppp") is not None:
         econ["purchasingPowerParity"] = OrderedDict()
@@ -525,7 +529,7 @@ def update_economic_block(
             econ["purchasingPowerParity"]["year"] = entry["ppp_year"]
         if not econ["purchasingPowerParity"]:
             econ.pop("purchasingPowerParity")
-    # Always include exchangeRate if we have FX value or date
+    # Always include exchangeRate/asOf if we have FX value or date
     fx_val = entry.get("fx")
     fx_date_val = entry.get("fx_date")
     
@@ -545,8 +549,9 @@ def update_economic_block(
         if fx_val is not None:
             econ["exchangeRate"]["perEur"] = round_if(fx_val, 6)
         if fx_date_val:
-            econ["exchangeRate"]["asOf"] = fx_date_val
-        # Only remove if both fx_val and fx_date_val are missing
+            # Schema: keep timestamp one level up at economicData.asOf
+            econ["asOf"] = fx_date_val
+        # Only remove if perEur is missing
         if not econ["exchangeRate"]:
             econ.pop("exchangeRate")
 
@@ -594,49 +599,119 @@ def get_fx_rate_from_apis(currency_code: str, fx_map: Dict[str, float]) -> Optio
         return 1.0
     return fx_map.get(curr_upper) if fx_map else None
 
-def _parse_yield_table_rows(rows: List[Dict[str, Any]]) -> Dict[str, float]:
+class _SimpleHtmlTableParser(HTMLParser):
+    """
+    Minimal table parser for extracting text rows from HTML tables.
+    """
+    def __init__(self):
+        super().__init__()
+        self.rows: List[List[str]] = []
+        self._in_row = False
+        self._in_cell = False
+        self._current_row: List[str] = []
+        self._current_cell_parts: List[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        t = (tag or "").lower()
+        if t == "tr":
+            self._in_row = True
+            self._current_row = []
+        elif self._in_row and (t == "td" or t == "th"):
+            self._in_cell = True
+            self._current_cell_parts = []
+
+    def handle_data(self, data):
+        if self._in_cell and data:
+            self._current_cell_parts.append(data)
+
+    def handle_endtag(self, tag):
+        t = (tag or "").lower()
+        if self._in_row and (t == "td" or t == "th"):
+            cell = "".join(self._current_cell_parts).strip()
+            self._current_row.append(re.sub(r"\s+", " ", cell))
+            self._in_cell = False
+            self._current_cell_parts = []
+        elif t == "tr":
+            if self._in_row and self._current_row:
+                self.rows.append(self._current_row)
+            self._in_row = False
+            self._current_row = []
+
+def _normalize_header_text(value: str) -> str:
+    return re.sub(r"\s+", " ", (value or "").strip().lower())
+
+def _parse_number(value: str) -> Optional[float]:
+    if value is None:
+        return None
+    txt = str(value).strip()
+    if not txt:
+        return None
+    m = re.search(r"-?\d+(?:[.,]\d+)?", txt)
+    if not m:
+        return None
+    try:
+        return float(m.group(0).replace(",", "."))
+    except Exception:
+        return None
+
+def fetch_rental_yields_numbeo() -> Dict[str, float]:
+    html_bytes = http_get_bytes(RENTAL_YIELDS_URL)
+    if not html_bytes:
+        raise RuntimeError("Failed to download rental-yield page from Numbeo.")
+
+    html_text = html_bytes.decode("utf-8", errors="ignore")
+    parser = _SimpleHtmlTableParser()
+    parser.feed(html_text)
+
+    rows = parser.rows
+    if not rows:
+        raise RuntimeError("No table rows found on Numbeo rental-yield page.")
+
+    country_idx = None
+    yield_idx = None
+    header_row_index = None
+
+    yield_headers = {
+        "gross rental yield outside of centre",
+        "gross rental yield outside of center",
+    }
+
+    for i, row in enumerate(rows):
+        normalized = [_normalize_header_text(c) for c in row]
+        if "country" not in normalized:
+            continue
+        found_yield = None
+        for y in yield_headers:
+            if y in normalized:
+                found_yield = y
+                break
+        if found_yield is None:
+            continue
+        country_idx = normalized.index("country")
+        yield_idx = normalized.index(found_yield)
+        header_row_index = i
+        break
+
+    if header_row_index is None or country_idx is None or yield_idx is None:
+        raise RuntimeError("Could not find Numbeo country/yield columns in table.")
+
     yields: Dict[str, float] = {}
-    for r in rows:
-        c = (r.get("country") or "").strip()
-        ytxt = (r.get("yieldText") or "").strip()
-        if not c or not ytxt:
+    required_cells = max(country_idx, yield_idx)
+
+    for row in rows[header_row_index + 1:]:
+        if len(row) <= required_cells:
             continue
-        m = re.search(r"(\d+(?:\.\d+)?)\s*%", ytxt)
-        if not m:
+        country = (row[country_idx] or "").strip()
+        if not country:
             continue
-        yields[c] = round(float(m.group(1)), 2)
+        value = _parse_number(row[yield_idx])
+        if value is None:
+            continue
+        yields[country] = round(float(value), 2)
+
+    if not yields:
+        raise RuntimeError("Numbeo table parsed, but no rental-yield values were extracted.")
     return yields
-
-async def fetch_rental_yields_via_playwright(headless: bool) -> Dict[str, float]:
-    # Migrated from get2.py (Playwright scrape of globalpropertyguide.com).
-    from playwright.async_api import async_playwright, TimeoutError as PWTimeout
-
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=headless)
-        context = await browser.new_context()
-        page = await context.new_page()
-
-        await page.goto(RENTAL_YIELDS_URL, wait_until="domcontentloaded", timeout=120_000)
-
-        try:
-            await page.wait_for_selector("#simpletable tbody tr", timeout=60_000)
-        except PWTimeout:
-            raise RuntimeError("Timed out waiting for #simpletable rows (paywall/challenge/selector changed).") from None
-
-        rows = await page.eval_on_selector_all(
-            "#simpletable tbody tr",
-            """trs => trs.map(tr => {
-                const tds = Array.from(tr.querySelectorAll("td"));
-                const country = (tds[0]?.innerText || "").trim();
-                const yieldText = (tds[1]?.innerText || "").trim();
-                return { country, yieldText };
-            })""",
-        )
-
-        yields = _parse_yield_table_rows(rows)
-        await context.close()
-        await browser.close()
-        return yields
 
 def write_rental_yields_tsv(path: Path, yields_by_country_name: Dict[str, float]):
     lines = []
@@ -660,8 +735,7 @@ def main():
 
     codes = sys.argv[1:]
     data, fx_map_free, fx_date_free = fetch(codes)
-    import asyncio
-    yields_by_country = asyncio.run(fetch_rental_yields_via_playwright(headless=False))
+    yields_by_country = fetch_rental_yields_numbeo()
     write_rental_yields_tsv(yields_path, yields_by_country)
     yields_by_norm_name = build_normalized_rental_yield_map(yields_by_country)
     

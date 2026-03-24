@@ -11,7 +11,7 @@ const PROPERTY_RULES = {
     countryName: 'Country S',
     locale: { currencyCode: 'SSS', currencySymbol: '¤S' },
     economicData: {
-      inflation: { cpi: 0.0, year: 2025 },
+      inflation: 0.0,
       purchasingPowerParity: { value: 1.0, year: 2025 },
       exchangeRate: { perEur: 1.0, asOf: '2025-01-01' }
     },
@@ -30,7 +30,7 @@ const PROPERTY_RULES = {
     countryName: 'Country T',
     locale: { currencyCode: 'TTT', currencySymbol: '¤T' },
     economicData: {
-      inflation: { cpi: 0.0, year: 2025 },
+      inflation: 0.0,
       purchasingPowerParity: { value: 50.0, year: 2025 },
       exchangeRate: { perEur: 50.0, asOf: '2025-01-01' }
     },

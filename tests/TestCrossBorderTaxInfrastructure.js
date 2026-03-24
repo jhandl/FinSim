@@ -283,7 +283,7 @@ module.exports = {
       + '    treatyEquivalents: { incomeTax: "income", capitalGains: "capitalGains", dividends: "dividends" },'
       + '    locale: { currencyCode: code, currencySymbol: code },'
       + '    economicData: {'
-      + '      inflation: { cpi: 0, year: 2025 },'
+      + '      inflation: 0,'
       + '      purchasingPowerParity: { value: 1, year: 2025 },'
       + '      exchangeRate: { perEur: 1, asOf: "2025-01-01" }'
       + '    },'

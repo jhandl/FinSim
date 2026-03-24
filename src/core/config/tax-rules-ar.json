@@ -11,10 +11,11 @@
   "locale": { "numberLocale": "es-AR", "currencyCode": "ARS", "currencySymbol": "$" },
 
   "economicData": {
-    "typicalRentalYield": 5.09,
-    "inflation": { "cpi": 25.7, "year": 2026 },
+    "typicalRentalYield": 5.0,
+    "inflation": 34.6223,
     "purchasingPowerParity": { "value": 419.90104, "year": 2024 },
-    "exchangeRate": { "perEur": 1723.09, "asOf": "2026-02-16" }
+    "exchangeRate": { "perEur": 1684.07 },
+    "asOf": "2026-03-24"
   },
 
   "incomeTax": {

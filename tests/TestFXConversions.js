@@ -60,7 +60,7 @@ function makeRuleSet(def) {
     countryName: def.countryName,
     locale: { currencyCode: def.currency, numberFormat: { decimal: '.', thousand: ',' } },
     economicData: {
-      inflation: { cpi: def.cpi, year: BASE_YEAR },
+      inflation: def.inflation,
       purchasingPowerParity: { value: def.ppp, year: BASE_YEAR },
       exchangeRate: { perEur: def.fx, asOf: BASE_YEAR + '-01-01' },
       timeSeries: def.timeSeries
@@ -97,7 +97,7 @@ module.exports = {
         country: 'IE',
         countryName: 'Ireland',
         currency: 'EUR',
-        cpi: 3.0,
+        inflation: 3.0,
         ppp: 1.0,
         fx: 1.0,
         timeSeries: {
@@ -111,7 +111,7 @@ module.exports = {
         country: 'AR',
         countryName: 'Argentina',
         currency: 'ARS',
-        cpi: 42.0,
+        inflation: 42.0,
         ppp: 1100,
         fx: 1500,
         timeSeries: {

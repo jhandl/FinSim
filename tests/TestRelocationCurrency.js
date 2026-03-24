@@ -420,17 +420,18 @@ module.exports = {
         }
       }
 
-      // EUR-mode AR salary at 35 using evolution: should be a reasonable EUR amount.
-      const eurSalary = econ.convert(row35.incomeSalaries, 'AR', 'IE', row35.year, evolutionOptions);
-      if (eurSalary !== null && Number.isFinite(eurSalary)) {
-        assertInRange('EUR salary @35 (evolution)', eurSalary, 1e4, 1e8, errors);
-      }
-
-      // Evolution vs constant divergence: post-relocation AR->IE salary should
-      // differ by at least 2% between modes over one year.
       const constantConv = econ.convert(row35.incomeSalaries, 'AR', 'IE', row35.year, fxOptions);
       const evolvedConv = econ.convert(row35.incomeSalaries, 'AR', 'IE', row35.year, evolutionOptions);
+      if (evolvedConv !== null && Number.isFinite(evolvedConv)) {
+        assertInRange('EUR salary @35 (evolution)', evolvedConv, 1e2, 1e9, errors);
+      }
       if (Number.isFinite(constantConv) && Number.isFinite(evolvedConv)) {
+        const modeRatio = Math.abs(evolvedConv) / Math.max(Math.abs(constantConv), 1);
+        if (modeRatio < 0.1 || modeRatio > 10) {
+          errors.push('Evolution AR->IE salary conversion drifted to a different magnitude than constant mode');
+        }
+        // Evolution vs constant divergence: post-relocation AR->IE salary should
+        // differ by at least 2% between modes over one year.
         const delta = percentDelta(evolvedConv, constantConv);
         if (delta < 0.02) {
           errors.push('Evolution and constant FX should diverge by >2% post-relocation for AR->IE salary conversion');

@@ -392,8 +392,8 @@ module.exports = {
       // Test 8i: Split part-1 amount changes should flag part-2 with a recalculated suggestion.
       runTest('8i', function () {
         econ = new EconomicData({
-          AA: { country: 'AA', currency: 'AAA', cpi: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
-          BB: { country: 'BB', currency: 'BBB', cpi: 3.0, ppp: 2.0, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
+          AA: { country: 'AA', currency: 'AAA', inflation: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', inflation: 3.0, ppp: 2.0, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
         });
         const mv = makeEvent({ id: 'mv_split_amount_shift', type: 'MV', name: 'BB', fromAge: 35, toAge: 35, relocationLinkId: 'mvlink_split_amount_shift' });
         const part1 = makeEvent({
@@ -759,8 +759,8 @@ module.exports = {
       // Install economic data for AA->BB with FX=1.5, PPP=2.0 (cross-rates).
       (function setupEconomicData() {
         econ = new EconomicData({
-          AA: { country: 'AA', currency: 'AAA', cpi: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
-          BB: { country: 'BB', currency: 'BBB', cpi: 3.0, ppp: 2.0, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
+          AA: { country: 'AA', currency: 'AAA', inflation: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', inflation: 3.0, ppp: 2.0, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
         });
       })();
 
@@ -912,8 +912,8 @@ module.exports = {
       runTest('14', function () {
         // Rebuild economic data where BB PPP is missing
         econ = new EconomicData({
-          AA: { country: 'AA', currency: 'AAA', cpi: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
-          BB: { country: 'BB', currency: 'BBB', cpi: 3.0, ppp: null, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
+          AA: { country: 'AA', currency: 'AAA', inflation: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', inflation: 3.0, ppp: null, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
         });
         const base = 10000;
         const suggested = RelocationImpactAssistant.calculatePPPSuggestion(base, 'aa', 'bb');
@@ -933,8 +933,8 @@ module.exports = {
       runTest('15', function () {
         // Restore full economic data
         econ = new EconomicData({
-          AA: { country: 'AA', currency: 'AAA', cpi: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
-          BB: { country: 'BB', currency: 'BBB', cpi: 3.0, ppp: 2.0, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
+          AA: { country: 'AA', currency: 'AAA', inflation: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', inflation: 3.0, ppp: 2.0, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
         });
         const fxRate = econ.getFX('aa', 'bb');
         const pppRatio = econ.getPPP('aa', 'bb');

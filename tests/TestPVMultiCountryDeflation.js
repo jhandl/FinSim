@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { TestFramework } = require('../src/core/TestFramework.js');
+const { TaxRuleSet } = require('../src/core/TaxRuleSet.js');
 const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelpers.js');
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
 const AR_RULES = require('../src/core/config/tax-rules-ar.json');
@@ -436,7 +437,7 @@ module.exports = {
     // so AR deflation is anchored to simulation start (not relocation age).
     // Inflation now comes from the country rules/economic data, not the MV event rate.
     const salYearsSinceStart = 15;
-    const salArInflation = Number((((buildEuroARRules().economicData || {}).inflation || {}).cpi)) / 100;
+    const salArInflation = new TaxRuleSet(buildEuroARRules()).getInflationRate();
     const salArDefFactor = 1 / Math.pow(1 + salArInflation, salYearsSinceStart);  // ~0.0324
 
     if (salRow45.incomeSalaries && salRow45.incomeSalaries > 0) {

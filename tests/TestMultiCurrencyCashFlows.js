@@ -11,7 +11,7 @@ const CURRENCY_RULES = {
     countryName: 'Country Q',
     locale: { currencyCode: 'QQQ', currencySymbol: '¤Q' },
     economicData: {
-      inflation: { cpi: 0.0, year: 2025 },
+      inflation: 0.0,
       purchasingPowerParity: { value: 1.0, year: 2025 },
       exchangeRate: { perEur: 1.0, asOf: '2025-01-01' }
     },
@@ -30,7 +30,7 @@ const CURRENCY_RULES = {
     countryName: 'Country P',
     locale: { currencyCode: 'PPP', currencySymbol: '¤P' },
     economicData: {
-      inflation: { cpi: 0.0, year: 2025 },
+      inflation: 0.0,
       purchasingPowerParity: { value: 2.0, year: 2025 },
       exchangeRate: { perEur: 2.0, asOf: '2025-01-01' }
     },
@@ -49,7 +49,7 @@ const CURRENCY_RULES = {
     countryName: 'Country R',
     locale: { currencyCode: 'RRR', currencySymbol: '¤R' },
     economicData: {
-      inflation: { cpi: 0.0, year: 2025 },
+      inflation: 0.0,
       purchasingPowerParity: { value: 0.5, year: 2025 },
       exchangeRate: { perEur: 0.5, asOf: '2025-01-01' }
     },

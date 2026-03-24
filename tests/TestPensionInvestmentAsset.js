@@ -314,7 +314,7 @@ module.exports = {
              ],
              pinnedIncomeTypes: [],
              economicData: {
-                inflation: { cpi: 1.02, year: 2025 },
+                inflation: 1.02,
                 purchasingPowerParity: { value: 1.0, year: 2025 },
                 exchangeRate: { perEur: 1.1, asOf: '2025-01-01' }
              }

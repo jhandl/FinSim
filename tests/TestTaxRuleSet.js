@@ -58,11 +58,18 @@ module.exports = {
         testResults.success = false; testResults.errors.push('Pension lump sum tax bands incorrect');
       }
 
+      // Inflation (scalar economicData schema)
+      const profile = ruleset.getEconomicProfile();
+      if (!profile || profile.inflation !== raw.economicData.inflation) {
+        testResults.success = false; testResults.errors.push('Economic profile inflation should come from scalar economicData.inflation');
+      }
+      if (ruleset.getInflationRate() !== (raw.economicData.inflation / 100)) {
+        testResults.success = false; testResults.errors.push('Inflation rate getter mismatch');
+      }
+
       return testResults;
     } catch (e) {
       return { success: false, errors: [e.message] };
     }
   }
 };
-
-

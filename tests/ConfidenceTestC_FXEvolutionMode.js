@@ -9,7 +9,7 @@ module.exports = {
   async runCustomTest() {
     // Create BB with 2% inflation (CPI=2.0), AA has 0%
     const TOY_BB_DRIFT = deepClone(TOY_BB);
-    TOY_BB_DRIFT.economicData.inflation.cpi = 2.0;
+    TOY_BB_DRIFT.economicData.inflation = 2.0;
 
     const params = microParams({ 
       targetAge: 32, 

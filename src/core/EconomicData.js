@@ -1,5 +1,5 @@
 /*
- * EconomicData: synchronous accessor for the CPI / FX / PPP metadata embedded
+ * EconomicData: synchronous accessor for the inflation / FX / PPP metadata embedded
  * inside each country's tax ruleset. The class consumes the normalized
  * profiles returned by TaxRuleSet#getEconomicProfile(), keeping the legacy
  * public API that the simulator, relocation tools, and tests expect.
@@ -7,7 +7,7 @@
  * Typical usage:
  *   const econ = new EconomicData();
  *   econ.refreshFromConfig(Config.getInstance());
- *   const cpi = econ.getInflation('ie'); // -> yearly CPI percentage
+ *   const inflation = econ.getInflation('ie'); // -> yearly inflation percentage
  */
 
 class EconomicData {
@@ -75,11 +75,23 @@ class EconomicData {
         projectionWindowYears = parsedWindow;
       }
     }
+    var inflationByYear = null;
+    if (entry.inflationByYear && typeof entry.inflationByYear === 'object') {
+      inflationByYear = {};
+      for (var y in entry.inflationByYear) {
+        if (!Object.prototype.hasOwnProperty.call(entry.inflationByYear, y)) continue;
+        var yearVal = entry.inflationByYear[y];
+        if (typeof yearVal === 'number' && isFinite(yearVal)) {
+          inflationByYear[String(y)] = Number(yearVal);
+        }
+      }
+      if (!Object.keys(inflationByYear).length) inflationByYear = null;
+    }
     this.data[code] = {
       country: code,
       currency: entry.currency || null,
-      cpi: entry.cpi != null ? Number(entry.cpi) : null,
-      cpi_year: entry.cpi_year != null ? entry.cpi_year : null,
+      inflation: entry.inflation != null ? Number(entry.inflation) : null,
+      inflationByYear: inflationByYear,
       ppp: entry.ppp != null ? Number(entry.ppp) : null,
       ppp_year: entry.ppp_year != null ? entry.ppp_year : null,
       fx: entry.fx != null ? Number(entry.fx) : null,
@@ -93,7 +105,7 @@ class EconomicData {
 
   getInflation(countryCode) {
     const entry = this.data[this._key(countryCode)];
-    return entry && entry.cpi != null ? entry.cpi : null;
+    return entry && entry.inflation != null ? entry.inflation : null;
   }
 
   getFX(countryCode1, countryCode2) {
@@ -116,10 +128,17 @@ class EconomicData {
     return ppp2 / ppp1;
   }
 
-  // Year parameter ignored; returns base CPI for backward compatibility.
+  // Returns year-specific inflation when available; otherwise falls back to base inflation.
   getInflationForYear(countryCode, year) {
-    // TODO: when inflation-variation events are added, implement year-specific lookup here.
-    return this.getInflation(countryCode);
+    const entry = this.data[this._key(countryCode)];
+    if (!entry) return null;
+    if (entry.inflationByYear && typeof year === 'number') {
+      const key = String(Math.trunc(year));
+      if (Object.prototype.hasOwnProperty.call(entry.inflationByYear, key)) {
+        return entry.inflationByYear[key];
+      }
+    }
+    return entry.inflation != null ? entry.inflation : null;
   }
 
 
@@ -181,17 +200,17 @@ class EconomicData {
       if (anchorPPP == null) {
         return null;
       }
-      var cpiFrom = this._getCPI(fromCountry);
-      var cpiTo = this._getCPI(toCountry);
-      if ((cpiFrom == null || cpiTo == null) && fallback === 'error') {
+      var inflationFrom = this._getInflationPercent(fromCountry);
+      var inflationTo = this._getInflationPercent(toCountry);
+      if ((inflationFrom == null || inflationTo == null) && fallback === 'error') {
         return null;
       }
-      // If either CPI is missing, treat the missing side as 0% so we still
+      // If either inflation rate is missing, treat the missing side as 0% so we still
       // move along a reasonable path.
-      if (cpiFrom == null) cpiFrom = 0;
-      if (cpiTo == null) cpiTo = 0;
-      var gTo = this._growthFactor(cpiTo, nYears);
-      var gFrom = this._growthFactor(cpiFrom, nYears);
+      if (inflationFrom == null) inflationFrom = 0;
+      if (inflationTo == null) inflationTo = 0;
+      var gTo = this._growthFactor(inflationTo, nYears);
+      var gFrom = this._growthFactor(inflationFrom, nYears);
       fxY = anchorPPP * (gTo / gFrom);
     } else if (fxMode === 'reversion') {
       // Reversion mode: move from constant FX towards the PPP path over time.
@@ -210,26 +229,26 @@ class EconomicData {
       if (reversionSpeed <= 0) {
         fxY = baseFxRev;
       } else if (reversionSpeed >= 1) {
-        var cpiFromRev = this._getCPI(fromCountry);
-        var cpiToRev = this._getCPI(toCountry);
-        if (cpiFromRev == null) cpiFromRev = 0;
-        if (cpiToRev == null) cpiToRev = 0;
-        var gToRev = this._growthFactor(cpiToRev, nYearsRev);
-        var gFromRev = this._growthFactor(cpiFromRev, nYearsRev);
+        var inflationFromRev = this._getInflationPercent(fromCountry);
+        var inflationToRev = this._getInflationPercent(toCountry);
+        if (inflationFromRev == null) inflationFromRev = 0;
+        if (inflationToRev == null) inflationToRev = 0;
+        var gToRev = this._growthFactor(inflationToRev, nYearsRev);
+        var gFromRev = this._growthFactor(inflationFromRev, nYearsRev);
         fxY = anchorPPPRev * (gToRev / gFromRev);
       } else {
         // Incremental reversion: for each elapsed year, pull the FX rate
         // towards that year's PPP-implied cross-rate.
-        var cpiFromStep = this._getCPI(fromCountry);
-        var cpiToStep = this._getCPI(toCountry);
-        if (cpiFromStep == null) cpiFromStep = 0;
-        if (cpiToStep == null) cpiToStep = 0;
+        var inflationFromStep = this._getInflationPercent(fromCountry);
+        var inflationToStep = this._getInflationPercent(toCountry);
+        if (inflationFromStep == null) inflationFromStep = 0;
+        if (inflationToStep == null) inflationToStep = 0;
         var currentFx = baseFxRev;
         if (nYearsRev > 0) {
           for (var i = 1; i <= nYearsRev; i++) {
             var yearI = baseYear + i;
-            var gToI = this._growthFactor(cpiToStep, i);
-            var gFromI = this._growthFactor(cpiFromStep, i);
+            var gToI = this._growthFactor(inflationToStep, i);
+            var gFromI = this._growthFactor(inflationFromStep, i);
             var pppRateI = anchorPPPRev * (gToI / gFromI);
             currentFx = currentFx + reversionSpeed * (pppRateI - currentFx);
           }
@@ -276,9 +295,9 @@ class EconomicData {
     return Config.getInstance().getSimulationStartYear();
   }
 
-  _getCPI(countryCode) {
+  _getInflationPercent(countryCode) {
     var entry = this.data[this._key(countryCode)];
-    if (entry && entry.cpi != null) return Number(entry.cpi);
+    if (entry && entry.inflation != null) return Number(entry.inflation);
     // Fallback to Config tax rules inflation if available
     var cfg = Config.getInstance();
     var rs = cfg.getCachedTaxRuleSet(String(countryCode).toLowerCase());
@@ -288,8 +307,8 @@ class EconomicData {
     return null;
   }
 
-  _growthFactor(cpi, nYears) {
-    return Math.pow(1 + Number(cpi) / 100, Number(nYears));
+  _growthFactor(inflationPercent, nYears) {
+    return Math.pow(1 + Number(inflationPercent) / 100, Number(nYears));
   }
 
   // Year parameter ignored; uses base PPP rates.
@@ -327,7 +346,7 @@ class EconomicData {
    *   IE→AR at all horizons.
    *
    * Per-country per-EUR paths are cached per run, keyed by "COUNTRY:BASEYEAR".
-   * Missing inflation falls back to base CPI or a 2% default.
+   * Missing inflation falls back to base inflation.
    */
   _computeEvolvedFX(fromCountry, toCountry, baseYear, targetYear, options) {
     var fromKey = this._key(fromCountry);
@@ -432,9 +451,9 @@ class EconomicData {
       }
 
       if (inflation == null || !isFinite(inflation)) {
-        var cpi = this._getCPI(countryKey);
-        if (cpi != null && isFinite(cpi)) {
-          inflation = Number(cpi) / 100;
+        var inflationPercent = this._getInflationPercent(countryKey);
+        if (inflationPercent != null && isFinite(inflationPercent)) {
+          inflation = Number(inflationPercent) / 100;
         }
       }
 

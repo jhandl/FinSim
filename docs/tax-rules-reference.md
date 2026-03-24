@@ -39,18 +39,19 @@ Controls how numbers and currencies are formatted for this country:
 Provides scalar economic parameters used by `EconomicData` as base anchors:
 
 - **`inflation`**:
-  - `cpi`: Long-run CPI level or rate (percentage, not decimal), e.g. `1.0499` for IE, `25.7` for AR.
-  - `year`: Reference year for the CPI data.
+  - Long-run inflation rate (percentage, not decimal), computed by `getFinData.py` as a weighted geometric-style blend (in log-growth space) of a recency-weighted 20-year historical inflation anchor plus added current-year and next-3-year forecast influence.
 - **`purchasingPowerParity`**:
   - `value`: PPP cross-rate vs EUR (units of local currency per 1 EUR in PPP terms).
   - `year`: Reference year for PPP data.
 - **`exchangeRate`**:
   - `perEur`: Nominal FX rate (units of local currency per 1 EUR).
-  - `asOf`: Date of the FX observation.
+- **`asOf`**:
+  - Date of the FX observation (top-level under `economicData`).
 - **`typicalRentalYield`** (optional): Typical annual rental yield percentage for the country (e.g., `7.71` for IE). Used by relocation assistant heuristics to estimate rental income.
 - **`projectionWindowYears`** (optional): Suggested projection window in years. Surfaced via `TaxRuleSet.getEconomicProfile()` and used by relocation assistant projection heuristics. Omit to use the scenario's own simulation length.
 
 These values are used to construct per-country economic profiles consumed by `EconomicData` and, indirectly, `InflationService` and FX conversion helpers.
+
 
 ---
 
@@ -278,10 +279,10 @@ Each entry in the `investmentTypes` array supports the following fields:
   - Used for FX conversion in multi-currency scenarios.
 - **`assetCountry`**: Two-letter country code for the asset's economic home (e.g., `"ie"`, `"us"`, `"ar"`).
   - Inherited from `baseRef` if omitted.
-  - Determines which country's CPI is used for PV deflation (when scope is global).
+  - Determines which country's inflation is used for PV deflation (when scope is global).
 - **`residenceScope`**: `"local"` or `"global"`.
-  - **`"local"`**: Asset tied to residency; PV uses residency CPI; flagged by relocation detector.
-  - **`"global"`**: Portable asset; PV uses `assetCountry` CPI; ignored by relocation detector.
+  - **`"local"`**: Asset tied to residency; PV uses residency inflation; flagged by relocation detector.
+  - **`"global"`**: Portable asset; PV uses `assetCountry` inflation; ignored by relocation detector.
   - See section 8.4 for detailed semantics.
 - **`sellWhenReceived`** (optional, boolean): When `true`, the asset is sold immediately upon receipt (e.g., RSUs vesting). The asset is excluded from drawdown priority calculations. Default `false`.
 - **`excludeFromAllocations`** (optional, boolean): When `true`, the asset is excluded from the allocations UI panel. Useful for auto-managed types like RSUs. Default `false`.
@@ -526,7 +527,7 @@ Describes the behavioral differences between local and global scope:
 
 | Aspect | `residenceScope: "local"` | `residenceScope: "global"` |
 |--------|---------------------------|----------------------------|
-| **PV Deflation** | Uses **residency CPI** (where you live) | Uses **assetCountry CPI** (asset's home) |
+| **PV Deflation** | Uses **residency inflation** (where you live) | Uses **assetCountry inflation** (asset's home) |
 | **Relocation Impact** | Flagged if `assetCountry === originCountry` and capital > 0 | Not flagged (portable) |
 | **UI Parameters** | Per-country rows: `LocalAssetGrowth_{cc}_{baseKey}` | Global rows: `GlobalAssetGrowth_{baseKey}` |
 | **Serialization** | Saves wrapper-level growth/vol for locals | No per-country params saved |
@@ -536,8 +537,8 @@ Describes the behavioral differences between local and global scope:
 ```mermaid
 graph TD
     A[Investment Capital PV] --> B{residenceScope?}
-    B -->|global| C[Use assetCountry CPI]
-    B -->|local| D[Use residency CPI]
+    B -->|global| C[Use assetCountry inflation]
+    B -->|local| D[Use residency inflation]
     C --> E[Back-convert to asset currency]
     C --> F[Apply asset deflator]
     D --> G[No conversion needed]
@@ -561,9 +562,9 @@ graph TD
     D --> E
     E -->|local| F[Local Investment]
     E -->|global| G[Global Investment]
-    F --> H[PV: residency CPI]
+    F --> H[PV: residency inflation]
     F --> J[UI: per-country params]
-    G --> K[PV: assetCountry CPI]
+    G --> K[PV: assetCountry inflation]
     G --> M[UI: global params]
 ```
 

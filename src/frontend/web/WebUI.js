@@ -782,8 +782,8 @@ class WebUI extends AbstractUI {
         const countryCode = String(code || '').trim().toLowerCase();
         if (!countryCode) return null;
         if (economicData && economicData.ready && typeof economicData.getInflation === 'function') {
-          const cpi = economicData.getInflation(countryCode);
-          if (cpi != null && isFinite(cpi)) return cpi;
+          const inflation = economicData.getInflation(countryCode);
+          if (inflation != null && isFinite(inflation)) return inflation;
         }
         const rs = cfg.getCachedTaxRuleSet(countryCode);
         if (rs && typeof rs.getInflationRate === 'function') {

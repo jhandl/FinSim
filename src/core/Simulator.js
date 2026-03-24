@@ -889,14 +889,14 @@ function resolveCountryInflation(code) {
   if (economicData && economicData.ready) {
 
     if (typeof economicData.getInflationForYear === 'function') {
-      var cpiYear = economicData.getInflationForYear(key, year);
-      if (cpiYear != null) {
-        return Number(cpiYear) / 100;
+      var inflationForYear = economicData.getInflationForYear(key, year);
+      if (inflationForYear != null) {
+        return Number(inflationForYear) / 100;
       }
     }
-    var cpi = economicData.getInflation(key);
-    if (cpi != null) {
-      return Number(cpi) / 100;
+    var inflation = economicData.getInflation(key);
+    if (inflation != null) {
+      return Number(inflation) / 100;
     }
   }
   if (key === baseCountryCode && typeof params.inflation === 'number') {

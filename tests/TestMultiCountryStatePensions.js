@@ -41,9 +41,7 @@ function buildARRules(statePensionPeriod) {
   clone.locale.currencyCode = 'ARS';
   clone.locale.currencySymbol = '$';
   if (!clone.economicData) clone.economicData = {};
-  if (!clone.economicData.inflation) clone.economicData.inflation = {};
-  clone.economicData.inflation.cpi = 10;
-  clone.economicData.inflation.year = 2025;
+  clone.economicData.inflation = 10;
   if (!clone.economicData.exchangeRate) clone.economicData.exchangeRate = {};
   clone.economicData.exchangeRate.perEur = 1;
   clone.economicData.exchangeRate.asOf = '2025-01-01';

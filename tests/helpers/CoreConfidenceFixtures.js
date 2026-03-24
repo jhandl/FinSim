@@ -65,7 +65,7 @@ const TOY_AA = {
     taxesForeignIncome: true
   },
   economicData: {
-    inflation: { cpi: 0.0, year: 2025 },
+    inflation: 0.0,
     exchangeRate: { perEur: 1.0, asOf: '2025-01-01' },
     purchasingPowerParity: { value: 1.0, year: 2025 }
   },

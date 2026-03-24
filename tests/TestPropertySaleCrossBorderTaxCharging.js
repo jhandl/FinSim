@@ -25,7 +25,7 @@ module.exports = {
     ieRules.capitalGainsTax.rate = 0.2;
     ieRules.capitalGainsTax.annualExemption = 0;
     if (ieRules.locale) ieRules.locale.currencyCode = 'EUR';
-    if (ieRules.economicData && ieRules.economicData.inflation) ieRules.economicData.inflation.cpi = 0;
+    if (ieRules.economicData) ieRules.economicData.inflation = 0;
     if (ieRules.economicData && ieRules.economicData.exchangeRate) ieRules.economicData.exchangeRate.perEur = 1;
 
     const usRules = deepClone(US_RULES);
@@ -47,7 +47,7 @@ module.exports = {
       }
     };
     if (usRules.locale) usRules.locale.currencyCode = 'USD';
-    if (usRules.economicData && usRules.economicData.inflation) usRules.economicData.inflation.cpi = 0;
+    if (usRules.economicData) usRules.economicData.inflation = 0;
     if (usRules.economicData && usRules.economicData.exchangeRate) usRules.economicData.exchangeRate.perEur = 1;
 
     installTestTaxRules(framework, {

@@ -122,8 +122,8 @@ module.exports = {
       // 6) State pension-like scenario:
       //    Simulate an IE-born person who has relocated to AR, where the state
       //    pension is effectively indexed to AR inflation. We model this by
-      //    constructing EconomicData from IE/AR rules and pegging IE CPI to
-      //    AR's CPI, then asking for IE's deflation factor while the base
+      //    constructing EconomicData from IE/AR rules and pegging IE inflation to
+      //    AR's inflation, then asking for IE's deflation factor while the base
       //    country is AR.
       const ieRules = new TaxRuleSet(require('../src/core/config/tax-rules-ie.json'));
       const arRules = new TaxRuleSet(require('../src/core/config/tax-rules-ar.json'));
@@ -132,12 +132,12 @@ module.exports = {
         arRules.getEconomicProfile()
       ]);
 
-      if (!econ || !econ.data || !econ.data.IE || !econ.data.AR || econ.data.AR.cpi == null) {
+      if (!econ || !econ.data || !econ.data.IE || !econ.data.AR || econ.data.AR.inflation == null) {
         testResults.success = false;
         testResults.errors.push('Failed to construct EconomicData for IE/AR state pension-like test');
       } else {
-        // Peg IE CPI to AR CPI to emulate AR-indexed IE pension after relocation.
-        econ.data.IE.cpi = econ.data.AR.cpi;
+        // Peg IE inflation to AR inflation to emulate AR-indexed IE pension after relocation.
+        econ.data.IE.inflation = econ.data.AR.inflation;
 
         ctx.econForPension = econ;
         vm.runInContext('params = { startingAge: 65, inflation: 0.02, StartCountry: "ar" };', ctx);
@@ -147,8 +147,8 @@ module.exports = {
           ctx
         );
 
-        const arCpi = econ.getInflation('AR');
-        const arRate = (arCpi != null) ? Number(arCpi) / 100 : 0;
+        const arInflation = econ.getInflation('AR');
+        const arRate = (arInflation != null) ? Number(arInflation) / 100 : 0;
         const expectedPension = 1 / Math.pow(1 + arRate, 5); // 5 years from 65 to 70
 
         if (!withinTolerance(fPension, expectedPension, 1e-8)) {
@@ -166,4 +166,3 @@ module.exports = {
     }
   }
 };
-

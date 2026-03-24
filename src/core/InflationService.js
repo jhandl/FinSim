@@ -38,7 +38,7 @@
    * 5. Return null when no country-specific inflation can be resolved
    *
    * @param {string|null} countryCode - ISO-2 country code (case-insensitive)
-   * @param {number|null} year        - Calendar year for CPI lookup
+   * @param {number|null} year        - Calendar year for inflation lookup
    * @param {Object=} options         - Optional context overrides:
    *   - params
    *   - config
@@ -113,7 +113,7 @@
       return paramsObj.inflation;
     }
 
-    // 4) EconomicData CPI per year or base CPI
+    // 4) EconomicData inflation per year or base inflation
     if (economicData && economicData.ready) {
       try {
         var effectiveYear = (typeof year === 'number') ? year : null;
@@ -126,15 +126,15 @@
           } catch (_) { }
         }
         if (effectiveYear !== null && typeof economicData.getInflationForYear === 'function') {
-          var cpiYear = economicData.getInflationForYear(key, effectiveYear);
-          if (cpiYear != null) {
-            return Number(cpiYear) / 100;
+          var inflationForYear = economicData.getInflationForYear(key, effectiveYear);
+          if (inflationForYear != null) {
+            return Number(inflationForYear) / 100;
           }
         }
         if (typeof economicData.getInflation === 'function') {
-          var cpi = economicData.getInflation(key);
-          if (cpi != null) {
-            return Number(cpi) / 100;
+          var inflation = economicData.getInflation(key);
+          if (inflation != null) {
+            return Number(inflation) / 100;
           }
         }
       } catch (_) { }

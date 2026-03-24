@@ -12,10 +12,11 @@
   "locale": { "numberLocale": "en-IE", "currencyCode": "EUR", "currencySymbol": "€" },
 
   "economicData": {
-    "typicalRentalYield": 7.71,
-    "inflation": { "cpi": 1.0499, "year": 2026 },
+    "typicalRentalYield": 7.8,
+    "inflation": 1.653,
     "purchasingPowerParity": { "value": 0.740894, "year": 2024 },
-    "exchangeRate": { "perEur": 1.0, "asOf": "2026-02-16" }
+    "exchangeRate": { "perEur": 1.0 },
+    "asOf": "2026-03-24"
   },
 
   "incomeTax": {
@@ -78,9 +79,7 @@
   },
 
   "realEstate": {
-    "reverseMortgage": {
-      "payoutTaxTreatment": "taxFree"
-    }
+    "reverseMortgage": { "payoutTaxTreatment": "taxFree" }
   },
 
   "dividendTax": { "rate": 0.33, "annualExemption": 0, "withholding": false },

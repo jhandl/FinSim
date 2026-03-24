@@ -1,15 +1,15 @@
-// Custom test for EconomicData convert() across modes and CPI fallback
+// Custom test for EconomicData convert() across modes and inflation fallback
 
 module.exports = {
   name: 'EconomicData',
-  description: 'Validates EconomicData.convert for constant/ppp/reversion and CPI fallback to Config',
+  description: 'Validates EconomicData.convert for constant/ppp/reversion and inflation fallback to Config',
   isCustomTest: true,
   runCustomTest: async function() {
     // Load module under test
     const { EconomicData } = require('../src/core/EconomicData.js');
     const { TaxRuleSet } = require('../src/core/TaxRuleSet.js');
 
-    // Shim minimal Config used by _getCPI fallback and EconomicData refresh
+    // Shim minimal Config used by inflation fallback and EconomicData refresh
     global.Config = (function() {
       function C() {
         this._taxRuleSets = {};
@@ -33,7 +33,7 @@ module.exports = {
         countryName: 'Ireland',
         locale: { currencyCode: 'EUR' },
         economicData: {
-          inflation: { cpi: 2.0, year: 2025 },
+          inflation: 2.0,
           purchasingPowerParity: { value: 0.80, year: 2025 },
           exchangeRate: { perEur: 1.0, asOf: '2025-10-15' },
           timeSeries: {
@@ -47,7 +47,7 @@ module.exports = {
         countryName: 'Argentina',
         locale: { currencyCode: 'ARS' },
         economicData: {
-          inflation: { cpi: 50.0, year: 2025 },
+          inflation: 50.0,
           purchasingPowerParity: { value: 1200.0, year: 2025 },
           exchangeRate: { perEur: 1500.0, asOf: '2025-10-15' },
           timeSeries: {
@@ -172,14 +172,14 @@ module.exports = {
         }
       }
 
-      // 4) CPI fallback path: remove IE CPI to force fallback to Config (0.02)
+      // 4) Inflation fallback path: remove IE inflation to force fallback to Config (0.02)
       {
-        econ.data['IE'].cpi = null;
+        econ.data['IE'].inflation = null;
         const out = econ.convert(1, 'IE', 'AR', 2026, { fxMode: 'ppp', baseYear: 2025 });
-        // Use cpiFrom=0.02 via Config, cpiTo=0.50 from data, n=1; PPP anchor = 1500
+        // Use inflationFrom=0.02 via Config, inflationTo=0.50 from data, n=1; PPP anchor = 1500
         const expected = (1500) * ((1+0.50)/(1+0.02));
         if (Math.abs(out - expected) / expected > 1e-10) {
-          testResults.success = false; testResults.errors.push('CPI fallback to Config failed');
+          testResults.success = false; testResults.errors.push('Inflation fallback to Config failed');
         }
       }
 

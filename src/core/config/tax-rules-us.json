@@ -13,9 +13,10 @@
 
   "economicData": {
     "typicalRentalYield": 6.56,
-    "inflation": { "cpi": 2.2499, "year": 2026 },
+    "inflation": 2.2499,
     "purchasingPowerParity": { "value": 1.0, "year": 2024 },
-    "exchangeRate": { "perEur": 1.19, "asOf": "2026-02-16" }
+    "exchangeRate": { "perEur": 1.19 },
+    "asOf": "2026-02-16"
   },
 
   "incomeTax": {

@@ -79,16 +79,22 @@ class TaxRuleSet {
     if (!code) return null;
     var locale = this.raw.locale || {};
     var economic = this.getEconomicData();
-    var inflation = economic.inflation || economic.cpi || {};
     var ppp = economic.purchasingPowerParity || economic.ppp || {};
     var fx = economic.exchangeRate || economic.fx || {};
 
-    var cpiValue = null;
-    if (typeof inflation === 'number') cpiValue = inflation;
-    else if (inflation && typeof inflation.cpi === 'number') cpiValue = inflation.cpi;
-    else if (inflation && typeof inflation.value === 'number') cpiValue = inflation.value;
-
-    var cpiYear = (inflation && typeof inflation.year === 'number') ? inflation.year : null;
+    var inflationValue = (typeof economic.inflation === 'number') ? economic.inflation : null;
+    var inflationByYear = null;
+    if (economic && economic.inflationByYear && typeof economic.inflationByYear === 'object') {
+      inflationByYear = {};
+      for (var yearKey in economic.inflationByYear) {
+        if (!Object.prototype.hasOwnProperty.call(economic.inflationByYear, yearKey)) continue;
+        var yearVal = economic.inflationByYear[yearKey];
+        if (typeof yearVal === 'number' && isFinite(yearVal)) {
+          inflationByYear[yearKey] = yearVal;
+        }
+      }
+      if (!Object.keys(inflationByYear).length) inflationByYear = null;
+    }
 
     var pppValue = null;
     if (typeof ppp === 'number') pppValue = ppp;
@@ -135,7 +141,8 @@ class TaxRuleSet {
       }
     }
 
-    var fxDate = (fx && typeof fx.asOf === 'string') ? fx.asOf : null;
+    // Schema: economicData.asOf (top-level economic timestamp).
+    var fxDate = (economic && typeof economic.asOf === 'string') ? economic.asOf : null;
 
     var projectionWindowYears = null;
     if (economic && economic.projectionWindowYears !== undefined && economic.projectionWindowYears !== null) {
@@ -154,12 +161,12 @@ class TaxRuleSet {
       currency = locale.countryCode.trim();
     }
 
-    // Scalar-only profile; timeSeries omitted (processed upstream by getFinData.py).
+    // Inflation profile (scalar + optional per-year map); timeSeries omitted.
     var profile = {
       country: codeUpper,
       currency: currency,
-      cpi: cpiValue != null ? Number(cpiValue) : null,
-      cpi_year: cpiYear,
+      inflation: inflationValue != null ? Number(inflationValue) : null,
+      inflationByYear: inflationByYear,
       ppp: pppValue != null ? Number(pppValue) : null,
       ppp_year: pppYear,
       fx: fxValue != null ? Number(fxValue) : null,
@@ -175,13 +182,9 @@ class TaxRuleSet {
       return this.raw.inflationRate;
     }
     var economic = this.getEconomicData();
-    var inflation = economic.inflation || economic.cpi || {};
-    var cpiValue = null;
-    if (typeof inflation === 'number') cpiValue = inflation;
-    else if (inflation && typeof inflation.cpi === 'number') cpiValue = inflation.cpi;
-    else if (inflation && typeof inflation.value === 'number') cpiValue = inflation.value;
-    if (cpiValue != null) {
-      return Number(cpiValue) / 100;
+    var inflationValue = (typeof economic.inflation === 'number') ? economic.inflation : null;
+    if (inflationValue != null) {
+      return Number(inflationValue) / 100;
     }
     return null;
   }

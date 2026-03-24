@@ -15,7 +15,7 @@ module.exports = {
       return (diff / denom) <= relTol;
     }
 
-    // Minimal Config shim for CPI fallback and relocation gating.
+    // Minimal Config shim for inflation fallback and relocation gating.
     global.Config = (function() {
       function C() {
         this._taxRuleSets = {};
@@ -42,7 +42,7 @@ module.exports = {
         countryName: 'Country M',
         locale: { currencyCode: 'MMM', numberFormat: { decimal: '.', thousand: ',' } },
         economicData: {
-          inflation: { cpi: 3.0, year: 2025 },
+          inflation: 3.0,
           purchasingPowerParity: { value: 1.0, year: 2025 },
           exchangeRate: { perEur: 1.0, asOf: '2025-01-01' }
         },
@@ -54,7 +54,7 @@ module.exports = {
         countryName: 'Country N',
         locale: { currencyCode: 'NNN', numberFormat: { decimal: ',', thousand: '.' } },
         economicData: {
-          inflation: { cpi: 10.0, year: 2025 },
+          inflation: 10.0,
           purchasingPowerParity: { value: 2.5, year: 2025 },
           exchangeRate: { perEur: 3.0, asOf: '2025-01-01' }
         },
@@ -66,7 +66,7 @@ module.exports = {
         countryName: 'Country O',
         locale: { currencyCode: 'OOO' },
         economicData: {
-          inflation: { cpi: 1.5, year: 2025 },
+          inflation: 1.5,
           purchasingPowerParity: { value: 0.9, year: 2025 },
           exchangeRate: { perEur: 0.85, asOf: '2025-01-01' }
         },
@@ -130,9 +130,9 @@ module.exports = {
         }
       }
 
-      // Negative Test: Ensure PPP not used by constant even with extreme CPI
+      // Negative Test: Ensure PPP not used by constant even with extreme inflation
       {
-        econ.data.NN.cpi = 100.0; // extreme inflation
+        econ.data.NN.inflation = 100.0; // extreme inflation
         const amount = 10;
         const outConst = econ.convert(amount, 'MM', 'NN', 2032, { fxMode: 'constant', baseYear: 2025 });
         const expected = amount * (nnProfile.fx / mmProfile.fx);
@@ -140,7 +140,7 @@ module.exports = {
           errors.push('Constant mode should ignore PPP drift');
         }
         // restore
-        econ.data.NN.cpi = 10.0;
+        econ.data.NN.inflation = 10.0;
       }
 
       // Test Case 2: PPP mode with inflation adjustment.
@@ -206,16 +206,15 @@ module.exports = {
         }
       }
 
-      // Test Case 8: CPI fallback to Config when source CPI missing.
+      // Test Case 8: Inflation fallback to Config when source inflation missing.
       {
-        econ.data.MM.cpi = null;
+        econ.data.MM.inflation = null;
         const expected = (2.5 / 1.0) * ((1 + 0.10) / (1 + 0.03));
         const converted = econ.convert(1, 'MM', 'NN', 2026, { fxMode: 'ppp', baseYear: 2025 });
         if (!withinTolerance(converted, expected, 1e-9, 1e-6)) {
-          errors.push('CPI fallback to Config failed when source CPI missing');
+          errors.push('Inflation fallback to Config failed when source inflation missing');
         }
-        econ.data.MM.cpi = 3.0;
-        econ.data.MM.cpi_year = 2025;
+        econ.data.MM.inflation = 3.0;
       }
 
       // Test Case 9: Missing economic data returns null.

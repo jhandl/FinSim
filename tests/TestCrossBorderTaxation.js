@@ -13,7 +13,7 @@ const TRAILING_RULES = {
     countryName: 'Country X',
     locale: { currencyCode: 'XXX', currencySymbol: '¤X' },
     economicData: {
-      inflation: { cpi: 0.0, year: 2025 },
+      inflation: 0.0,
       purchasingPowerParity: { value: 1.0, year: 2025 },
       exchangeRate: { perEur: 1.0, asOf: '2025-01-01' }
     },
@@ -50,7 +50,7 @@ const TRAILING_RULES = {
     countryName: 'Country Y',
     locale: { currencyCode: 'YYY', currencySymbol: '¤Y' },
     economicData: {
-      inflation: { cpi: 0.0, year: 2025 },
+      inflation: 0.0,
       purchasingPowerParity: { value: 1.0, year: 2025 },
       exchangeRate: { perEur: 1.0, asOf: '2025-01-01' }
     },
@@ -81,7 +81,7 @@ const TRAILING_RULES = {
     countryName: 'Country Z',
     locale: { currencyCode: 'ZZZ', currencySymbol: '¤Z' },
     economicData: {
-      inflation: { cpi: 0.0, year: 2025 },
+      inflation: 0.0,
       purchasingPowerParity: { value: 1.0, year: 2025 },
       exchangeRate: { perEur: 1.0, asOf: '2025-01-01' }
     },

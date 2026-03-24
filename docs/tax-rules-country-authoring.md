@@ -55,7 +55,7 @@ FinSim can load multiple rulesets in a single simulation run when relocation is 
 3. **Tax thresholds are inflation-adjusted in the simulation**:
    - The core `adjust()` helper inflates thresholds each year using country inflation (via `InflationService` / `EconomicData`).
    - So the numeric thresholds you encode should be for a specific base year (typically the simulation start year).
-   - If a country indexes brackets to something other than CPI (or not at all), that mismatch must be recorded in the gap report.
+   - If a country indexes brackets to something other than inflation (or not at all), that mismatch must be recorded in the gap report.
 
 ---
 
@@ -210,14 +210,13 @@ Fields:
 Fields used today:
 - `typicalRentalYield` (number): percent, not decimal (e.g., `6.5` means 6.5%)
   - Used by relocation assistant heuristics for rental defaults.
-- `inflation.cpi` (number): percent, not decimal (e.g., `2.25` means 2.25%).
+- `inflation` (number): percent, not decimal (e.g., `2.25` means 2.25%).
   - This is used as a country inflation profile input and indirectly affects `adjust()` behavior.
-- `inflation.year` (number): reference year of the inflation statistic.
 - `purchasingPowerParity.value` (number): PPP conversion factor (LCU per international dollar).
   - Current rules use values consistent with World Bank style PPP conversion factors where US is ~1.0.
 - `purchasingPowerParity.year` (number)
 - `exchangeRate.perEur` (number): nominal FX (LCU per 1 EUR) at the stated date.
-- `exchangeRate.asOf` (string): ISO-like date string (e.g., `2026-02-16`).
+- `asOf` (string): ISO-like date string (e.g., `2026-02-16`) for the FX observation date.
 
 If you cannot produce good economic anchors, write something plausible but mark it as low-confidence in the sources doc and the gap report. Economic anchors matter for relocation FX/PPP modes and PV.
 
@@ -423,8 +422,8 @@ Important engine behavior:
 ### 4.4 `residenceScope` decision
 
 Choose one:
-- `local`: investment is tied to residency context; relocation assistant may flag it; PV uses residency CPI.
-- `global`: portable asset; PV uses `assetCountry` CPI; relocation assistant ignores it.
+- `local`: investment is tied to residency context; relocation assistant may flag it; PV uses residency inflation.
+- `global`: portable asset; PV uses `assetCountry` inflation; relocation assistant ignores it.
 
 Rule of thumb:
 - Domestic tax-advantaged wrappers, domestic-domiciled funds, and things likely to be sold/re-wrapped on emigration: `local`.
@@ -659,9 +658,10 @@ Use this as a starting point (fill values; do not leave placeholders in committe
   "locale": { "numberLocale": "en-XX", "currencyCode": "XXX", "currencySymbol": "$" },
   "economicData": {
     "typicalRentalYield": 0,
-    "inflation": { "cpi": 2.0, "year": 2026 },
+    "inflation": 2.0,
     "purchasingPowerParity": { "value": 1.0, "year": 2024 },
-    "exchangeRate": { "perEur": 1.0, "asOf": "2026-01-01" }
+    "exchangeRate": { "perEur": 1.0 },
+    "asOf": "2026-01-01"
   },
   "incomeTax": {
     "name": "Income Tax",
@@ -734,7 +734,7 @@ This is the maintenance workflow for updating an existing `tax-rules-<cc>.json` 
    - Pension contribution limits / ages / lump-sum rules
    - Property gains rules
 3. Whether indexing rules changed:
-   - If the country indexes thresholds to CPI/wages but FinSim uses CPI inflation, record the mismatch in the gap report.
+   - If the country indexes thresholds to inflation/wages but FinSim uses inflation, record the mismatch in the gap report.
 
 ### 11.2 Update Steps (In Order)
 
@@ -745,7 +745,7 @@ This is the maintenance workflow for updating an existing `tax-rules-<cc>.json` 
    - Update `version` (recommend `YYYY.MM`).
    - Update `updateMessage` with a user-facing summary (this is shown via a toast when the version changes).
    - Apply the new numeric values (thresholds/rates/credits) for the simulation base year.
-   - Update `economicData` anchors if you maintain them regularly (FX date, CPI reference year, PPP year).
+   - Update `economicData` anchors if you maintain them regularly (FX date and PPP year).
 3. Keep keys stable unless you are intentionally breaking scenarios:
    - Do not rename `investmentTypes[].key` once published; scenario CSVs and allocations reference these keys.
    - Prefer changing labels/help text/taxation rules in-place while keeping the key stable.

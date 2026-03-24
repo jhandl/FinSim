@@ -34,7 +34,7 @@ const TestContributionCurrencyModeARAsset = {
       countryName: 'United States',
       locale: { currencyCode: 'USD', currencySymbol: '$' },
       economicData: {
-        inflation: { cpi: 2.0, year: 2025 },
+        inflation: 2.0,
         purchasingPowerParity: { value: 1.0, year: 2025 },
         exchangeRate: { perEur: 1.1, asOf: '2025-11-22' }
       },
