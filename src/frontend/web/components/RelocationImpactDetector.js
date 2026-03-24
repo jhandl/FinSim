@@ -123,6 +123,7 @@ var RelocationImpactDetector = {
       this.addSplitAmountShiftImpacts(events, mvEvents, startCountry);
       this.addOrphanSplitImpacts(events, mvEvents);
       this.addOrphanRentalImpacts(events, mvEvents);
+      this.addOrphanSaleMarkerImpacts(events, mvEvents);
 
       // Pension conflicts: pensionable salary in a state-only pension system.
       // This blocks simulation until converted to a non-pensionable salary type.
@@ -306,11 +307,15 @@ var RelocationImpactDetector = {
   },
 
   isProtectedBySellMarkerForMv: function (event, mvEvents, mvImpactId) {
-    if (!event || (event.type !== 'R' && event.type !== 'M')) return false;
+    if (!event || !this.isSaleMarkerEventType(event.type)) return false;
     if (!event.relocationSellMvId) return false;
     var markerMv = this.getMvEventByImpactRef(mvEvents, String(event.relocationSellMvId));
     if (!markerMv) return false;
     return this.getMvImpactId(markerMv) === String(mvImpactId || '');
+  },
+
+  isSaleMarkerEventType: function (type) {
+    return type === 'R' || type === 'M' || type === 'MO' || type === 'MP' || type === 'MR';
   },
 
   shouldDeferMortgageBoundaryImpact: function (event, events, mvFromAge) {
@@ -384,7 +389,7 @@ var RelocationImpactDetector = {
     for (var i = 0; i < events.length; i++) {
       var event = events[i];
       if (!event) continue;
-      if (event.type !== 'R' && event.type !== 'M') continue;
+      if (!this.isSaleMarkerEventType(event.type)) continue;
       if (!event.relocationSellMvId) continue;
 
       var markerId = String(event.relocationSellMvId);
@@ -500,6 +505,92 @@ var RelocationImpactDetector = {
       };
       var message = 'This rental income was created for a relocation that no longer exists. Keep renting or remove this event.';
       this.addImpact(event, 'simple', message, '', true, details);
+    }
+  },
+
+  addOrphanSaleMarkerImpacts: function (events, mvEvents) {
+    if (!events || !events.length) return;
+
+    var orphanGroups = {};
+    var boundaryIds = {};
+    for (var i = 0; i < events.length; i++) {
+      var impactedEvent = events[i];
+      if (!impactedEvent || !this.isSaleMarkerEventType(impactedEvent.type)) continue;
+      if (impactedEvent.relocationImpact && impactedEvent.relocationImpact.category === 'boundary') {
+        boundaryIds[String(impactedEvent.id || '')] = true;
+      }
+    }
+
+    for (var j = 0; j < events.length; j++) {
+      var event = events[j];
+      if (!event || !this.isSaleMarkerEventType(event.type)) continue;
+      if (!event.relocationSellMvId) continue;
+
+      var markerId = String(event.relocationSellMvId || '');
+      if (!markerId) continue;
+      if (this.getMvEventByImpactRef(mvEvents, markerId)) continue;
+
+      var realEstateId = String(event.id || '');
+      var groupKey = realEstateId + '::' + markerId;
+      if (!orphanGroups[groupKey]) {
+        orphanGroups[groupKey] = {
+          id: realEstateId,
+          markerId: markerId,
+          anchorAge: event.relocationSellAnchorAge,
+          markerTypes: {}
+        };
+      }
+      orphanGroups[groupKey].markerTypes[String(event.type || '')] = true;
+      if (orphanGroups[groupKey].anchorAge == null && event.relocationSellAnchorAge != null) {
+        orphanGroups[groupKey].anchorAge = event.relocationSellAnchorAge;
+      }
+    }
+
+    var groupKeys = Object.keys(orphanGroups);
+    for (var k = 0; k < groupKeys.length; k++) {
+      var group = orphanGroups[groupKeys[k]];
+      if (!group || !group.id) continue;
+      if (boundaryIds[group.id]) continue;
+
+      var hasMortgageRow = false;
+      var hasMarkerRows = false;
+      var groupRows = [];
+      for (var n = 0; n < events.length; n++) {
+        var candidate = events[n];
+        if (!candidate || !this.isSaleMarkerEventType(candidate.type)) continue;
+        if (String(candidate.id || '') !== group.id) continue;
+        groupRows.push(candidate);
+        if (candidate.type === 'M') hasMortgageRow = true;
+        if (candidate.relocationSellMvId && String(candidate.relocationSellMvId) === group.markerId) {
+          hasMarkerRows = true;
+        }
+      }
+
+      if (!groupRows.length || !hasMarkerRows) continue;
+
+      var affectedTypes = [];
+      var markerTypeKeys = Object.keys(group.markerTypes);
+      for (var m = 0; m < markerTypeKeys.length; m++) {
+        affectedTypes.push(markerTypeKeys[m]);
+      }
+      affectedTypes.sort();
+
+      var message = hasMortgageRow
+        ? 'This sale or payoff plan was tied to a relocation that no longer exists. Keep the current timing or restore the mortgage plan.'
+        : 'This sale timing was tied to a relocation that no longer exists. Keep the current timing or revisit it.';
+
+      for (var r = 0; r < groupRows.length; r++) {
+        var rowEvent = groupRows[r];
+        var details = {
+          saleMarkerOrphan: true,
+          sellMvId: group.markerId,
+          realEstateId: group.id,
+          anchorAge: group.anchorAge,
+          canRestoreMortgagePlan: hasMortgageRow,
+          affectedTypes: affectedTypes
+        };
+        this.addImpact(rowEvent, 'sale_marker_orphan', message, '', true, details);
+      }
     }
   },
 

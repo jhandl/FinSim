@@ -13,6 +13,7 @@ const EventAccordionManager = loadClass('src/frontend/web/components/EventAccord
 const EventSummaryRenderer = loadClass('src/frontend/web/components/EventSummaryRenderer.js', 'EventSummaryRenderer');
 const WizardRenderer = loadClass('src/frontend/web/components/WizardRenderer.js', 'WizardRenderer');
 const UIManagerClass = loadClass('src/frontend/UIManager.js', 'UIManager');
+const SimEventClass = loadClass('src/core/Events.js', 'SimEvent');
 const RelocationUtils = loadClass('src/frontend/web/utils/RelocationUtils.js', 'RelocationUtils');
 const FileManager = loadClass('src/frontend/web/components/FileManager.js', 'FileManager');
 
@@ -46,6 +47,10 @@ describe('MV relocation remediation', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    jest.useRealTimers();
+    delete global.uiManager;
+    delete global.SimEvent;
+    delete global.RelocationImpactDetector;
     document.body.innerHTML = '';
   });
 
@@ -359,6 +364,217 @@ describe('MV relocation remediation', () => {
     const mvEvent = { type: 'MV', name: 'AR', fromAge: 40 };
     RelocationImpactDetector.addImpact(mvEvent, 'simple', 'Relocation impact', 'mv-id', false);
     expect(mvEvent.relocationImpact).toBeUndefined();
+  });
+
+  test('UI delete flow re-surfaces orphan sale and rental impacts after removing the relocation row', () => {
+    jest.useFakeTimers();
+    global.UIManager = UIManagerClass;
+    global.SimEvent = SimEventClass;
+    global.RelocationImpactDetector = RelocationImpactDetector;
+    global.Config = {
+      getInstance: () => ({
+        isRelocationEnabled: () => true,
+        getStartCountry: () => 'ie',
+        getDefaultCountry: () => 'ie',
+        getCountryNameByCode: (code) => {
+          const normalized = String(code || '').toLowerCase();
+          if (normalized === 'ie') return 'Ireland';
+          if (normalized === 'ar') return 'Argentina';
+          return normalized.toUpperCase();
+        },
+        getAvailableCountries: () => [
+          { code: 'IE', name: 'Ireland' },
+          { code: 'AR', name: 'Argentina' }
+        ],
+        getCachedTaxRuleSet: (code) => {
+          const normalized = String(code || '').toLowerCase();
+          const currency = normalized === 'ar' ? 'ARS' : 'EUR';
+          return {
+            getCurrencyCode: () => currency,
+            getPensionSystemType: () => 'mixed',
+            getInflationRate: () => 0.02
+          };
+        },
+        getEconomicData: () => null
+      })
+    };
+
+    tableConstructorNoops
+      .filter((method) => method !== 'setupEventTableRowDelete')
+      .forEach((method) => {
+        jest.spyOn(EventsTableManager.prototype, method).mockImplementation(() => {});
+      });
+
+    function renderRow(rowId, eventId, type, name, amount, fromAge, toAge, rate, match, extraInputs) {
+      return `
+        <tr data-row-id="${rowId}"${eventId ? ` data-event-id="${eventId}"` : ''}>
+          <td>
+            <div class="event-type-container">
+              <div class="event-type-dd visualization-control"><span class="dd-toggle pseudo-select">${type}</span></div>
+              <input class="event-type" value="${type}" />
+              ${extraInputs || ''}
+            </div>
+          </td>
+          <td><input class="event-name" value="${name || ''}" /></td>
+          <td><input class="event-amount" value="${amount || ''}" /></td>
+          <td><input class="event-from-age" value="${fromAge || ''}" /></td>
+          <td><input class="event-to-age" value="${toAge || ''}" /></td>
+          <td><input class="event-rate" value="${rate || ''}" /></td>
+          <td><input class="event-match" value="${match || ''}" /></td>
+          <td><button class="delete-event" type="button">Delete</button></td>
+        </tr>
+      `;
+    }
+
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          ${renderRow(
+            'row-r1',
+            '',
+            'R',
+            'Family House',
+            '40000',
+            '35',
+            '65',
+            '',
+            '',
+            '<input type="hidden" class="event-linked-country" value="ie" />' +
+              '<input type="hidden" class="event-country" value="ie" />' +
+              '<input type="hidden" class="event-currency" value="EUR" />' +
+              '<input type="hidden" class="event-resolution-override" value="1" />' +
+              '<input type="hidden" class="event-resolution-mv-id" value="mvlink_demo_ar_40" />' +
+              '<input type="hidden" class="event-resolution-category" value="boundary" />'
+          )}
+          ${renderRow(
+            'row-m1',
+            '',
+            'M',
+            'Family House',
+            '18000',
+            '35',
+            '39',
+            '0.035',
+            '',
+            '<input type="hidden" class="event-relocation-sell-mv-id" value="mvlink_demo_ar_40" />' +
+              '<input type="hidden" class="event-relocation-sell-anchor-age" value="40" />' +
+              '<input type="hidden" class="event-mortgage-term" value="25" />'
+          )}
+          ${renderRow(
+            'row-mp1',
+            '',
+            'MP',
+            'Family House',
+            '9999',
+            '39',
+            '39',
+            '',
+            '',
+            '<input type="hidden" class="event-relocation-sell-mv-id" value="mvlink_demo_ar_40" />' +
+              '<input type="hidden" class="event-relocation-sell-anchor-age" value="40" />'
+          )}
+          ${renderRow(
+            'row-ri1',
+            '',
+            'RI',
+            'Family House',
+            '1600',
+            '40',
+            '65',
+            '',
+            '',
+            '<input type="hidden" class="event-linked-country" value="ie" />' +
+              '<input type="hidden" class="event-country" value="ie" />' +
+              '<input type="hidden" class="event-currency" value="EUR" />' +
+              '<input type="hidden" class="event-relocation-rent-mv-id" value="mvlink_demo_ar_40" />'
+          )}
+          ${renderRow(
+            'row-mv',
+            'mv-runtime-1',
+            'MV',
+            'AR',
+            '',
+            '40',
+            '40',
+            '',
+            '',
+            '<input type="hidden" class="event-relocation-link-id" value="mvlink_demo_ar_40" />'
+          )}
+        </tbody>
+      </table>
+    `;
+
+    const uiStub = {
+      clearAllWarnings: jest.fn(),
+      clearElementWarning: jest.fn(),
+      setWarning: jest.fn(),
+      getValue: jest.fn((key) => {
+        if (key === 'simulation_mode') return 'single';
+        if (key === 'StartingAge') return '30';
+        if (key === 'P2StartingAge') return '';
+        return '';
+      }),
+      getTableData: jest.fn(() => {
+        return Array.from(document.querySelectorAll('#Events tbody tr'))
+          .filter((row) => row && row.style.display !== 'none' && !(row.classList && row.classList.contains('resolution-panel-row')))
+          .map((row) => {
+            const type = row.querySelector('.event-type') ? row.querySelector('.event-type').value : '';
+            const name = row.querySelector('.event-name') ? row.querySelector('.event-name').value : '';
+            const amount = row.querySelector('.event-amount') ? row.querySelector('.event-amount').value : '';
+            const fromAge = row.querySelector('.event-from-age') ? row.querySelector('.event-from-age').value : '';
+            const toAge = row.querySelector('.event-to-age') ? row.querySelector('.event-to-age').value : '';
+            const rate = row.querySelector('.event-rate') ? row.querySelector('.event-rate').value : '';
+            const match = row.querySelector('.event-match') ? row.querySelector('.event-match').value : '';
+            return [`${type}:${name}`, amount, fromAge, toAge, rate, match];
+          });
+      })
+    };
+
+    const uiMgr = new UIManagerClass(uiStub);
+    global.uiManager = uiMgr;
+
+    const webUIStub = {
+      uiManager: uiMgr,
+      readEvents: uiMgr.readEvents.bind(uiMgr),
+      clearAllWarnings: jest.fn(),
+      getValue: uiStub.getValue,
+      updateStatusForRelocationImpacts: jest.fn(),
+      formatUtils: {
+        setupCurrencyInputs: jest.fn(),
+        setupPercentageInputs: jest.fn()
+      },
+      eventAccordionManager: null,
+      chartManager: null,
+      tableManager: null
+    };
+
+    const manager = new EventsTableManager(webUIStub);
+    webUIStub.eventsTableManager = manager;
+    uiStub.eventsTableManager = manager;
+    jest.spyOn(manager, '_refreshValidation').mockImplementation(() => {});
+
+    const deleteButton = document.querySelector('tr[data-row-id="row-mv"] .delete-event');
+    deleteButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    jest.advanceTimersByTime(650);
+
+    const propertyRow = document.querySelector('tr[data-row-id="row-r1"]');
+    const mortgageRow = document.querySelector('tr[data-row-id="row-m1"]');
+    const payoffRow = document.querySelector('tr[data-row-id="row-mp1"]');
+    const rentalRow = document.querySelector('tr[data-row-id="row-ri1"]');
+
+    expect(document.querySelector('tr[data-row-id="row-mv"]')).toBeNull();
+    expect(propertyRow.dataset.relocationImpact).toBe('1');
+    expect(propertyRow.dataset.relocationImpactCategory).toBe('sale_marker_orphan');
+    expect(mortgageRow.dataset.relocationImpactCategory).toBe('sale_marker_orphan');
+    expect(payoffRow.dataset.relocationImpactCategory).toBe('sale_marker_orphan');
+    expect(rentalRow.dataset.relocationImpactCategory).toBe('simple');
+    expect(propertyRow.querySelector('.relocation-impact-badge')).not.toBeNull();
+    expect(mortgageRow.querySelector('.relocation-impact-badge')).not.toBeNull();
+    expect(payoffRow.querySelector('.relocation-impact-badge')).not.toBeNull();
+    expect(rentalRow.querySelector('.relocation-impact-badge')).not.toBeNull();
+
+    delete global.uiManager;
+    jest.useRealTimers();
   });
 
   test('wizard event creation reuses addEventRow flow instead of constructing rows directly', async () => {

@@ -700,6 +700,184 @@ describe('Relocation Rent Option', () => {
     expect(ambiguousNameLink).toBe('');
   });
 
+  test('orphan sale-marker panel exposes keep-timing and restore-mortgage actions without an MV row', () => {
+    const configStub = {
+      isRelocationEnabled: () => true,
+      getDefaultCountry: () => 'ar',
+      getStartCountry: () => 'ar',
+      getCountryNameByCode: () => 'Argentina',
+      getCachedTaxRuleSet: () => ({
+        getCurrencySymbol: () => '$',
+        getNumberLocale: () => 'en-US',
+        getCurrencyCode: () => 'USD'
+      }),
+      getEconomicData: () => ({ ready: false, getFX: jest.fn(() => 1.0), getPPP: jest.fn(() => 1.0) }),
+      getAvailableCountries: () => []
+    };
+    global.Config = { getInstance: () => configStub };
+
+    const event = {
+      id: 'HomeA',
+      type: 'R',
+      fromAge: 30,
+      toAge: 65,
+      relocationImpact: {
+        category: 'sale_marker_orphan',
+        message: 'Sale marker orphan',
+        details: {
+          sellMvId: 'mvlink_orphan_sale',
+          canRestoreMortgagePlan: true
+        }
+      }
+    };
+    const env = {
+      webUI: { readEvents: jest.fn(() => [event]) },
+      eventsTableManager: {
+        getStartCountry: () => 'ar',
+        getOriginCountry: () => 'ar'
+      }
+    };
+
+    const html = RelocationImpactAssistant.createPanelHtml(event, 'row-sale-orphan', env);
+    expect(html).toContain('data-action="keep_sale_timing"');
+    expect(html).toContain('data-action="restore_mortgage_plan"');
+  });
+
+  test('keep current timing after deleted relocation clears sale markers and stale review metadata across the workflow', () => {
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-r1" data-relocation-impact-details='{"sellMvId":"mvlink_orphan_sale"}'>
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="R" />
+                <input type="hidden" class="event-resolution-override" value="1" />
+                <input type="hidden" class="event-resolution-mv-id" value="mv-runtime-old" />
+                <input type="hidden" class="event-resolution-category" value="boundary" />
+              </div>
+            </td>
+            <td><input class="event-name" value="HomeA" /></td>
+            <td><input class="event-from-age" value="30" /></td>
+            <td><input class="event-to-age" value="65" /></td>
+          </tr>
+          <tr data-row-id="row-m1">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="M" />
+                <input type="hidden" class="event-relocation-sell-mv-id" value="mvlink_orphan_sale" />
+                <input type="hidden" class="event-relocation-sell-anchor-age" value="40" />
+              </div>
+            </td>
+            <td><input class="event-name" value="HomeA" /></td>
+            <td><input class="event-from-age" value="30" /></td>
+            <td><input class="event-to-age" value="39" /></td>
+          </tr>
+          <tr data-row-id="row-mp1">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="MP" />
+                <input type="hidden" class="event-relocation-sell-mv-id" value="mvlink_orphan_sale" />
+                <input type="hidden" class="event-relocation-sell-anchor-age" value="40" />
+              </div>
+            </td>
+            <td><input class="event-name" value="HomeA" /></td>
+            <td><input class="event-from-age" value="39" /></td>
+            <td><input class="event-to-age" value="39" /></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    constructorNoops.forEach((method) => {
+      jest.spyOn(EventsTableManager.prototype, method).mockImplementation(() => {});
+    });
+
+    const webUIStub = {
+      readEvents: jest.fn(() => []),
+      getValue: jest.fn(() => 'single'),
+      formatUtils: {
+        setupCurrencyInputs: jest.fn(),
+        setupPercentageInputs: jest.fn()
+      }
+    };
+    const manager = new EventsTableManager(webUIStub);
+    jest.spyOn(manager, '_afterResolutionAction').mockImplementation(() => {});
+
+    manager.keepSaleTimingAfterDeletedRelocation('row-r1');
+
+    expect(document.querySelector('tr[data-row-id="row-r1"] .event-resolution-override')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-r1"] .event-resolution-mv-id')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-m1"] .event-relocation-sell-mv-id')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-mp1"] .event-relocation-sell-mv-id')).toBeNull();
+  });
+
+  test('restore mortgage plan after deleted relocation reopens the mortgage term and removes relocation payoff rows', () => {
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-r1" data-relocation-impact-details='{"sellMvId":"mvlink_orphan_sale"}'>
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="R" />
+              </div>
+            </td>
+            <td><input class="event-name" value="HomeA" /></td>
+            <td><input class="event-from-age" value="30" /></td>
+            <td><input class="event-to-age" value="65" /></td>
+          </tr>
+          <tr data-row-id="row-m1">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="M" />
+                <input type="hidden" class="event-mortgage-term" value="25" />
+                <input type="hidden" class="event-relocation-sell-mv-id" value="mvlink_orphan_sale" />
+                <input type="hidden" class="event-relocation-sell-anchor-age" value="40" />
+              </div>
+            </td>
+            <td><input class="event-name" value="HomeA" /></td>
+            <td><input class="event-from-age" value="35" /></td>
+            <td><input class="event-to-age" value="39" /></td>
+          </tr>
+          <tr data-row-id="row-mp1">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="MP" />
+                <input type="hidden" class="event-relocation-sell-mv-id" value="mvlink_orphan_sale" />
+                <input type="hidden" class="event-relocation-sell-anchor-age" value="40" />
+                <input type="hidden" class="event-auto-payoff" value="1" />
+              </div>
+            </td>
+            <td><input class="event-name" value="HomeA" /></td>
+            <td><input class="event-from-age" value="39" /></td>
+            <td><input class="event-to-age" value="39" /></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    constructorNoops.forEach((method) => {
+      jest.spyOn(EventsTableManager.prototype, method).mockImplementation(() => {});
+    });
+
+    const webUIStub = {
+      readEvents: jest.fn(() => []),
+      getValue: jest.fn(() => 'single'),
+      formatUtils: {
+        setupCurrencyInputs: jest.fn(),
+        setupPercentageInputs: jest.fn()
+      }
+    };
+    const manager = new EventsTableManager(webUIStub);
+    jest.spyOn(manager, '_afterResolutionAction').mockImplementation(() => {});
+    jest.spyOn(manager, '_scheduleMortgagePlanReanalysis').mockImplementation(() => {});
+
+    manager.restoreMortgagePlanAfterDeletedRelocation('row-r1');
+
+    expect(document.querySelector('tr[data-row-id="row-m1"] .event-to-age').value).toBe('60');
+    expect(document.querySelector('tr[data-row-id="row-m1"] .event-relocation-sell-mv-id')).toBeNull();
+    expect(document.querySelector('tr[data-row-id="row-mp1"]')).toBeNull();
+  });
+
   test('mortgage pay-off action is decoupled from property row', () => {
     const configStub = {
       isRelocationEnabled: () => true,

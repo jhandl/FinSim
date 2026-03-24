@@ -127,7 +127,7 @@ var RelocationImpactAssistant = {
     const startCountry = Config.getInstance().getStartCountry();
     const canRenderWithoutMv = (impactCategory === 'simple' && (event.type === 'R' || event.type === 'M' || (event.type === 'RI' && isRelocationRentalOrphan))) ||
       impactCategory === 'pension_conflict';
-    if (!mvEvent && !canRenderWithoutMv && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift' && impactCategory !== 'split_amount_shift') return '';
+    if (!mvEvent && !canRenderWithoutMv && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift' && impactCategory !== 'sale_marker_orphan' && impactCategory !== 'split_amount_shift') return '';
     let destCountry = mvEvent ? String(mvEvent.name || '').trim().toLowerCase() : startCountry;
     if (impactCategory === 'pension_conflict' && impactDetails && impactDetails.country) {
       destCountry = String(impactDetails.country || '').trim().toLowerCase() || destCountry;
@@ -419,6 +419,27 @@ var RelocationImpactAssistant = {
         tooltip: 'Keep the current sale timing and mark this impact as reviewed.',
         buttonAttrs: ' data-row-id="' + rowId + '"'
       });
+    } else if (event.relocationImpact.category === 'sale_marker_orphan') {
+      let saleMarkerDetails = event.relocationImpact.details;
+      if (typeof saleMarkerDetails === 'string') {
+        try { saleMarkerDetails = JSON.parse(saleMarkerDetails); } catch (_) { saleMarkerDetails = null; }
+      }
+      addAction(actions, {
+        action: 'keep_sale_timing',
+        tabLabel: 'Keep current timing',
+        instantApply: true,
+        tooltip: 'Keep the current timing and detach this real-estate workflow from the deleted relocation.',
+        buttonAttrs: ' data-row-id="' + rowId + '"'
+      });
+      if (saleMarkerDetails && saleMarkerDetails.canRestoreMortgagePlan) {
+        addAction(actions, {
+          action: 'restore_mortgage_plan',
+          tabLabel: 'Restore mortgage plan',
+          instantApply: true,
+          tooltip: 'Restores the base mortgage timing and removes relocation-linked payoff rows when possible.',
+          buttonAttrs: ' data-row-id="' + rowId + '"'
+        });
+      }
     } else if (event.relocationImpact.category === 'split_orphan') {
       let splitDetails = event.relocationImpact.details;
       if (typeof splitDetails === 'string') {
@@ -531,6 +552,14 @@ var RelocationImpactAssistant = {
       }
       case 'keep_sale_as_is': {
         if (typeof etm.keepSaleAsIs === 'function') etm.keepSaleAsIs(rowId, eventId);
+        break;
+      }
+      case 'keep_sale_timing': {
+        if (typeof etm.keepSaleTimingAfterDeletedRelocation === 'function') etm.keepSaleTimingAfterDeletedRelocation(rowId, eventId);
+        break;
+      }
+      case 'restore_mortgage_plan': {
+        if (typeof etm.restoreMortgagePlanAfterDeletedRelocation === 'function') etm.restoreMortgagePlanAfterDeletedRelocation(rowId, eventId);
         break;
       }
       case 'keep_property': {
@@ -888,15 +917,15 @@ var RelocationImpactAssistant = {
     // If it's a mortgage payoff (M), we only want to clear the debt.
     if (event.type === 'R' && typeof etm._applyToRealEstatePair === 'function') {
       etm._applyToRealEstatePair(baseRow, function (row) {
-        setToAgeGuarded(row, cutoffAge);
         if (sellMarkerId) etm.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', sellMarkerId);
         etm.getOrCreateHiddenInput(row, 'event-relocation-sell-anchor-age', String(relocationAge));
+        setToAgeGuarded(row, cutoffAge);
       });
     } else {
       // Single row action (e.g. Mortgage Pay Off only)
-      setToAgeGuarded(baseRow, cutoffAge);
       if (sellMarkerId) etm.getOrCreateHiddenInput(baseRow, 'event-relocation-sell-mv-id', sellMarkerId);
       etm.getOrCreateHiddenInput(baseRow, 'event-relocation-sell-anchor-age', String(relocationAge));
+      setToAgeGuarded(baseRow, cutoffAge);
     }
 
     etm._suppressSellMarkerClear = previousSuppress;

@@ -517,6 +517,127 @@ module.exports = {
         assert(!rentalEvt.relocationImpact, 'Removing relocation rent marker should resolve orphan rental impact');
       });
 
+      // Test 8m: Mixed rent-out plus mortgage pay-off workflow should re-surface R/M/MP and RI when the move is deleted.
+      runTest('8m', function () {
+        const property = makeEvent({
+          id: 'Family House',
+          type: 'R',
+          fromAge: 35,
+          toAge: 65,
+          linkedCountry: 'aa',
+          currency: 'AAA',
+          resolutionOverride: '1',
+          resolutionOverrideMvId: 'mv_removed_sale_mix',
+          resolutionOverrideCategory: 'boundary'
+        });
+        const mortgage = makeEvent({
+          id: 'Family House',
+          type: 'M',
+          fromAge: 35,
+          toAge: 39,
+          relocationSellMvId: 'mvlink_removed_sale_mix',
+          relocationSellAnchorAge: 40
+        });
+        const payoff = makeEvent({
+          id: 'Family House',
+          type: 'MP',
+          fromAge: 39,
+          toAge: 39,
+          relocationSellMvId: 'mvlink_removed_sale_mix',
+          relocationSellAnchorAge: 40
+        });
+        const rental = makeEvent({
+          id: 'Family House',
+          type: 'RI',
+          fromAge: 40,
+          toAge: 65,
+          linkedCountry: 'aa',
+          currency: 'AAA',
+          relocationRentMvId: 'mvlink_removed_sale_mix'
+        });
+
+        const result = runDetector([property, mortgage, payoff, rental], 'aa');
+        const propertyImpact = result.find(e => e.type === 'R').relocationImpact;
+        const mortgageImpact = result.find(e => e.type === 'M').relocationImpact;
+        const payoffImpact = result.find(e => e.type === 'MP').relocationImpact;
+        const rentalImpact = result.find(e => e.type === 'RI').relocationImpact;
+
+        assert(propertyImpact && propertyImpact.category === 'sale_marker_orphan', 'Property should be re-flagged when paired sale markers outlive the move');
+        assert(mortgageImpact && mortgageImpact.category === 'sale_marker_orphan', 'Mortgage should be re-flagged when its relocation sale marker loses the move');
+        assert(payoffImpact && payoffImpact.category === 'sale_marker_orphan', 'Payoff row should be re-flagged when its relocation sale marker loses the move');
+        assert(rentalImpact && rentalImpact.category === 'simple', 'Rent-out rental should still use the existing orphan rental flow');
+        assert.strictEqual(propertyImpact.details.sellMvId, 'mvlink_removed_sale_mix', 'Property orphan-sale impact should preserve the missing marker id');
+        assert.strictEqual(propertyImpact.details.canRestoreMortgagePlan, true, 'Mixed sale-marker orphan should advertise mortgage-plan restoration');
+      });
+
+      // Test 8n: Sell-marked MO/MP/MR rows should all be re-surfaced when the linked move is removed.
+      runTest('8n', function () {
+        const property = makeEvent({ id: 'HomeA', type: 'R', fromAge: 30, toAge: 55 });
+        const mortgage = makeEvent({
+          id: 'HomeA',
+          type: 'M',
+          fromAge: 30,
+          toAge: 39,
+          relocationSellMvId: 'mvlink_removed_sale_chain',
+          relocationSellAnchorAge: 40
+        });
+        const overpay = makeEvent({
+          id: 'HomeA',
+          type: 'MO',
+          fromAge: 35,
+          toAge: 39,
+          relocationSellMvId: 'mvlink_removed_sale_chain',
+          relocationSellAnchorAge: 40
+        });
+        const payoff = makeEvent({
+          id: 'HomeA',
+          type: 'MP',
+          fromAge: 39,
+          toAge: 39,
+          relocationSellMvId: 'mvlink_removed_sale_chain',
+          relocationSellAnchorAge: 40
+        });
+        const reverseMortgage = makeEvent({
+          id: 'HomeA',
+          type: 'MR',
+          fromAge: 39,
+          toAge: 45,
+          relocationSellMvId: 'mvlink_removed_sale_chain',
+          relocationSellAnchorAge: 40
+        });
+
+        const result = runDetector([property, mortgage, overpay, payoff, reverseMortgage], 'aa');
+        ['MO', 'MP', 'MR'].forEach(function (type) {
+          const impact = result.find(e => e.type === type).relocationImpact;
+          assert(impact && impact.category === 'sale_marker_orphan', type + ' should be re-flagged for orphan sale-marker review');
+        });
+      });
+
+      // Test 8o: Missing split marker should stay clean when the split still matches a current relocation boundary.
+      runTest('8o', function () {
+        const mv = makeEvent({ id: 'mv_split_marker_gone', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });
+        const part1 = makeEvent({
+          id: 'salary_split_marker_gone_p1',
+          type: 'SI',
+          fromAge: 30,
+          toAge: 34,
+          linkedEventId: 'split_marker_gone_1',
+          relocationSplitMvId: 'mvlink_removed_split_marker'
+        });
+        const part2 = makeEvent({
+          id: 'salary_split_marker_gone_p2',
+          type: 'SI',
+          fromAge: 35,
+          toAge: 40,
+          linkedEventId: 'split_marker_gone_1',
+          relocationSplitMvId: 'mvlink_removed_split_marker'
+        });
+
+        const result = runDetector([part1, part2, mv], 'aa');
+        assert(!result.find(e => e.id === 'salary_split_marker_gone_p1').relocationImpact, 'Part 1 should remain clean when a current move still matches the split boundary');
+        assert(!result.find(e => e.id === 'salary_split_marker_gone_p2').relocationImpact, 'Part 2 should remain clean when a current move still matches the split boundary');
+      });
+
       // Test 9: Resolution detection via property linking.
       runTest('9', function () {
         const mv = makeEvent({ id: 'mv_prop_res', type: 'MV', name: 'BB', fromAge: 35, toAge: 35 });

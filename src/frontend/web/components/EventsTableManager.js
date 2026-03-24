@@ -1161,6 +1161,8 @@ class EventsTableManager {
       amount: payoffAmount,
       fromAge: payoffAge,
       toAge: payoffAge,
+      relocationSellMvId: sellMvIdInput ? sellMvIdInput.value : '',
+      relocationSellAnchorAge: sellAnchorAgeInput ? sellAnchorAgeInput.value : '',
       linkedCountry: linkedCountryInput ? linkedCountryInput.value : '',
       currency: currencyInput ? currencyInput.value : ''
     }).then((result) => {
@@ -1242,7 +1244,9 @@ class EventsTableManager {
     }
 
     let removedAutoPayoff = false;
+    const prevSuppressSellMarkerClear = this._suppressSellMarkerClear;
     this._suppressMortgagePlanSync = true;
+    this._suppressSellMarkerClear = true;
     try {
       if (hasOverpay) {
         if (isManualMpAgeEdit && !isNaN(mpAge)) {
@@ -1316,6 +1320,7 @@ class EventsTableManager {
       }
     } finally {
       this._suppressMortgagePlanSync = false;
+      this._suppressSellMarkerClear = prevSuppressSellMarkerClear;
     }
 
     if (removedAutoPayoff) {
@@ -1407,6 +1412,18 @@ class EventsTableManager {
     const propertyToAgeInput = rRow.querySelector('.event-to-age');
     const propertyToAge = this._parseAgeValue(propertyToAgeInput ? propertyToAgeInput.value : '');
     if (isNaN(propertyToAge)) return;
+    let targetMortgageToAge = propertyToAge;
+    if (rows.mRow) {
+      const mortgageFromInput = rows.mRow.querySelector('.event-from-age');
+      const mortgageFromAge = this._parseAgeValue(mortgageFromInput ? mortgageFromInput.value : '');
+      const mortgageTermYears = this._ensureMortgageTermInput(rows.mRow);
+      const baselineMortgageToAge = (!isNaN(mortgageFromAge) && mortgageTermYears > 0)
+        ? (mortgageFromAge + mortgageTermYears)
+        : NaN;
+      if (!isNaN(baselineMortgageToAge) && targetMortgageToAge > baselineMortgageToAge) {
+        targetMortgageToAge = baselineMortgageToAge;
+      }
+    }
     let preserveManualAmount = false;
     if (rows.mRow && rows.mpRow) {
       const currentModel = this._buildMortgageModelFromRow(rows.mRow);
@@ -1425,8 +1442,8 @@ class EventsTableManager {
       if (rows.mRow) {
         const mToInput = rows.mRow.querySelector('.event-to-age');
         const mToAge = this._parseAgeValue(mToInput ? mToInput.value : '');
-        if (!isNaN(mToAge) && mToAge > propertyToAge) {
-          this._setInputValueWithFlash(mToInput, propertyToAge, true);
+        if (!isNaN(mToAge) && !isNaN(targetMortgageToAge) && mToAge !== targetMortgageToAge) {
+          this._setInputValueWithFlash(mToInput, targetMortgageToAge, true);
         }
       }
       if (rows.mpRow) {
@@ -1434,11 +1451,11 @@ class EventsTableManager {
         const mpToInput = rows.mpRow.querySelector('.event-to-age');
         const mpFromAge = this._parseAgeValue(mpFromInput ? mpFromInput.value : '');
         const mpToAge = this._parseAgeValue(mpToInput ? mpToInput.value : '');
-        if (!isNaN(mpFromAge) && mpFromAge > propertyToAge) {
-          this._setInputValueWithFlash(mpFromInput, propertyToAge, true);
+        if (!isNaN(mpFromAge) && !isNaN(targetMortgageToAge) && mpFromAge !== targetMortgageToAge) {
+          this._setInputValueWithFlash(mpFromInput, targetMortgageToAge, true);
         }
-        if (!isNaN(mpToAge) && mpToAge > propertyToAge) {
-          this._setInputValueWithFlash(mpToInput, propertyToAge, true);
+        if (!isNaN(mpToAge) && !isNaN(targetMortgageToAge) && mpToAge !== targetMortgageToAge) {
+          this._setInputValueWithFlash(mpToInput, targetMortgageToAge, true);
         }
       }
       for (let i = 0; i < rows.moRows.length; i++) {
@@ -2869,6 +2886,145 @@ class EventsTableManager {
     this.markAsReviewed(rowId, eventId);
   }
 
+  _getOrphanSaleMarkerContext(row) {
+    if (!row) return { realEstateId: '', markerId: '', rows: [] };
+
+    const nameInput = row.querySelector('.event-name');
+    const realEstateId = nameInput ? String(nameInput.value || '').trim() : '';
+    let markerId = '';
+    let details = null;
+
+    if (row.dataset && row.dataset.relocationImpactDetails) {
+      try {
+        details = JSON.parse(row.dataset.relocationImpactDetails);
+      } catch (_) {
+        details = null;
+      }
+    }
+    if (details && details.sellMvId) markerId = String(details.sellMvId || '');
+    if (!markerId) {
+      const markerInput = row.querySelector('.event-relocation-sell-mv-id');
+      markerId = markerInput ? String(markerInput.value || '') : '';
+    }
+
+    const workflowRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter((candidate) => {
+      if (!candidate || (candidate.classList && candidate.classList.contains('resolution-panel-row'))) return false;
+      const candidateName = candidate.querySelector('.event-name');
+      const typeInput = candidate.querySelector('.event-type');
+      const candidateId = candidateName ? String(candidateName.value || '').trim() : '';
+      const typeValue = typeInput ? String(typeInput.value || '') : '';
+      return candidateId === realEstateId && this.isRealEstate(typeValue);
+    });
+
+    return {
+      realEstateId: realEstateId,
+      markerId: markerId,
+      rows: workflowRows
+    };
+  }
+
+  _rowMatchesSaleMarker(row, markerId) {
+    if (!row) return false;
+    const markerInput = row.querySelector('.event-relocation-sell-mv-id');
+    let rowMarkerId = markerInput ? String(markerInput.value || '') : '';
+    if (!rowMarkerId && row.dataset && row.dataset.relocationImpactDetails) {
+      try {
+        const details = JSON.parse(row.dataset.relocationImpactDetails);
+        rowMarkerId = details && details.sellMvId ? String(details.sellMvId || '') : '';
+      } catch (_) {
+        rowMarkerId = '';
+      }
+    }
+    if (!markerId) return !!rowMarkerId;
+    return rowMarkerId === String(markerId);
+  }
+
+  _clearOrphanSaleWorkflowState(rows, markerId) {
+    const workflowRows = Array.isArray(rows) ? rows : [];
+    for (let i = 0; i < workflowRows.length; i++) {
+      const workflowRow = workflowRows[i];
+      this._removeHiddenInput(workflowRow, 'event-resolution-override');
+      this._removeHiddenInput(workflowRow, 'event-resolution-mv-id');
+      this._removeHiddenInput(workflowRow, 'event-resolution-category');
+      if (!this._rowMatchesSaleMarker(workflowRow, markerId)) continue;
+      this._removeHiddenInput(workflowRow, 'event-relocation-sell-mv-id');
+      this._removeHiddenInput(workflowRow, 'event-relocation-sell-anchor-age');
+    }
+  }
+
+  keepSaleTimingAfterDeletedRelocation(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+
+    const context = this._getOrphanSaleMarkerContext(row);
+    if (!context.rows.length) return;
+    if (context.markerId) this._clearRelocationAgeShift([context.markerId]);
+    this._clearOrphanSaleWorkflowState(context.rows, context.markerId);
+    this._afterResolutionAction(row.dataset.rowId, { pulse: true });
+  }
+
+  restoreMortgagePlanAfterDeletedRelocation(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+
+    const context = this._getOrphanSaleMarkerContext(row);
+    if (!context.rows.length || !context.realEstateId) return;
+
+    const mortgageRows = this._collectMortgageRowsById(context.realEstateId);
+    if (!mortgageRows.mRow) {
+      this.keepSaleTimingAfterDeletedRelocation(rowId, eventId);
+      return;
+    }
+
+    const mFromInput = mortgageRows.mRow.querySelector('.event-from-age');
+    const mToInput = mortgageRows.mRow.querySelector('.event-to-age');
+    const mortgageFromAge = this._parseAgeValue(mFromInput ? mFromInput.value : '');
+    const mortgageTermYears = this._ensureMortgageTermInput(mortgageRows.mRow);
+    if (isNaN(mortgageFromAge) || !(mortgageTermYears > 0) || !mToInput) {
+      this.keepSaleTimingAfterDeletedRelocation(rowId, eventId);
+      return;
+    }
+
+    const restoredMortgageToAge = mortgageFromAge + mortgageTermYears;
+    const prevMortgageSync = this._suppressMortgagePlanSync;
+    this._suppressMortgagePlanSync = true;
+    try {
+      mToInput.value = String(restoredMortgageToAge);
+      mToInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+      const propertyRow = context.rows.find((candidate) => {
+        const typeInput = candidate.querySelector('.event-type');
+        return typeInput && typeInput.value === 'R';
+      }) || null;
+      if (propertyRow) {
+        const propertyToInput = propertyRow.querySelector('.event-to-age');
+        const propertyToAge = this._parseAgeValue(propertyToInput ? propertyToInput.value : '');
+        if (propertyToInput && (isNaN(propertyToAge) || propertyToAge < restoredMortgageToAge)) {
+          propertyToInput.value = String(restoredMortgageToAge);
+          propertyToInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+    } finally {
+      this._suppressMortgagePlanSync = prevMortgageSync;
+    }
+
+    const removablePayoffRows = context.rows.filter((candidate) => {
+      const typeInput = candidate.querySelector('.event-type');
+      return typeInput && typeInput.value === 'MP' && this._rowMatchesSaleMarker(candidate, context.markerId);
+    });
+    for (let i = 0; i < removablePayoffRows.length; i++) {
+      this._removeRowAndResolutionPanel(removablePayoffRows[i]);
+    }
+
+    this._clearOrphanSaleWorkflowState(context.rows, context.markerId);
+    if (context.markerId) this._clearRelocationAgeShift([context.markerId]);
+    this._scheduleMortgagePlanReanalysis();
+
+    const focusRow = mortgageRows.mRow && mortgageRows.mRow.isConnected ? mortgageRows.mRow : row;
+    const focusRowId = focusRow && focusRow.dataset ? focusRow.dataset.rowId : rowId;
+    this._afterResolutionAction(focusRowId, { flashFields: ['.event-to-age'], pulse: true });
+  }
+
   pegCurrencyToOriginal(rowId, currencyCode, linkedCountry, eventId) {
     const row = this._findEventRow(rowId, eventId);
     if (!row) return;
@@ -3738,11 +3894,26 @@ class EventsTableManager {
     const normalizedToAgeValue = (resolvedType === 'MP') ? fromAgeValue : toAgeValue;
     const rateValue = eventData && eventData.rate != null ? eventData.rate : '';
     const matchValue = eventData && eventData.match != null ? eventData.match : '';
-    this.setRowFieldValue(row, '.event-amount', amountValue);
-    this.setRowFieldValue(row, '.event-from-age', fromAgeValue);
-    this.setRowFieldValue(row, '.event-to-age', normalizedToAgeValue);
-    this.setRowFieldValue(row, '.event-rate', rateValue);
-    this.setRowFieldValue(row, '.event-match', matchValue);
+    const sellMvIdValue = eventData && eventData.relocationSellMvId ? String(eventData.relocationSellMvId) : '';
+    const sellAnchorAgeValue = eventData && eventData.relocationSellAnchorAge != null ? String(eventData.relocationSellAnchorAge) : '';
+    const previousSuppressSellMarkerClear = this._suppressSellMarkerClear;
+    const protectSellMarkersDuringPopulate = !!(sellMvIdValue || sellAnchorAgeValue);
+
+    if (protectSellMarkersDuringPopulate) {
+      this._suppressSellMarkerClear = true;
+      if (sellMvIdValue) this.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', sellMvIdValue);
+      if (sellAnchorAgeValue) this.getOrCreateHiddenInput(row, 'event-relocation-sell-anchor-age', sellAnchorAgeValue);
+    }
+
+    try {
+      this.setRowFieldValue(row, '.event-amount', amountValue);
+      this.setRowFieldValue(row, '.event-from-age', fromAgeValue);
+      this.setRowFieldValue(row, '.event-to-age', normalizedToAgeValue);
+      this.setRowFieldValue(row, '.event-rate', rateValue);
+      this.setRowFieldValue(row, '.event-match', matchValue);
+    } finally {
+      this._suppressSellMarkerClear = previousSuppressSellMarkerClear;
+    }
 
     if (resolvedType === 'M') {
       const explicitTerm = eventData && eventData.mortgageTerm != null ? parseInt(String(eventData.mortgageTerm), 10) : NaN;
