@@ -307,6 +307,44 @@ module.exports = {
       if (!usVol || usVol.value !== '14') {
         errors.push('Relocation local volatility did not deserialize for US.');
       }
+
+      // Phase D: serialization must stay stable when Inflation_<startCountry> is not present.
+      global.Config = {
+        getInstance: () => ({
+          getStartCountry: () => 'ie',
+          getDefaultCountry: () => 'ie',
+          getInvestmentBaseTypes: () => ([
+            { baseKey: 'globalEquity', label: 'Global Equity' },
+            { baseKey: 'globalBonds', label: 'Global Bonds' }
+          ]),
+          getCachedTaxRuleSet: (code) => {
+            const cc = String(code || '').toLowerCase();
+            if (cc === 'ie') return ieRuleset;
+            return null;
+          },
+          getAvailableCountries: () => ([{ code: 'ie', name: 'Ireland' }]),
+          isRelocationEnabled: () => true
+        })
+      };
+
+      const doc7 = createParameterDocument();
+      const ui7 = createUiStub(doc7);
+      global.document = doc7;
+      doc7.ensureEl('StartCountry', 'string').value = 'ie';
+      doc7.ensureEl('PensionGrowthRate', 'percentage').value = '6';
+      doc7.ensureEl('PensionGrowthStdDev', 'percentage').value = '12';
+      doc7.ensureEl('Inflation', 'percentage').value = '2';
+      doc7.ensureEl('shares_ieGrowthRate', 'percentage').value = '4';
+      doc7.ensureEl('shares_ieGrowthStdDev', 'percentage').value = '9';
+
+      const csvFirst = serializeSimulation(ui7);
+      const csvSecond = serializeSimulation(ui7);
+      if (csvFirst !== csvSecond) {
+        errors.push('serializeSimulation should be stable across repeated calls for unchanged state.');
+      }
+      if (csvFirst.indexOf('Inflation_ie,') !== -1 || csvSecond.indexOf('Inflation_ie,') !== -1) {
+        errors.push('Inflation_ie should not be emitted unless it existed, had a value, or economy mode requires it.');
+      }
     } catch (err) {
       errors.push('Unexpected error: ' + (err && err.message ? err.message : String(err)));
     } finally {

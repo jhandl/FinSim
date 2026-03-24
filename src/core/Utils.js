@@ -547,12 +547,12 @@ function serializeSimulation(ui) {
         hadInfInput = !!document.getElementById(inflationId);
       }
     } catch (_) { }
-    try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(inflationId, 'percentage'); } catch (_) { }
 
     var infRaw = getRawInputValue(inflationId);
-    var infVal = ui.getValue(inflationId);
     var shouldWriteInflation = economyFeatureActive || hadInfInput || !isMissingRaw(infRaw);
     if (shouldWriteInflation) {
+      try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(inflationId, 'percentage'); } catch (_) { }
+      var infVal = ui.getValue(inflationId);
       if (isMissingRaw(infRaw)) infVal = '';
       parameters[inflationId] = infVal;
     }
