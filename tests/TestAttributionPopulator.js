@@ -6,7 +6,7 @@ const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelp
 
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
 const AR_RULES = require('../src/core/config/tax-rules-ar.json');
-const DEMO3_PATH = path.resolve(__dirname, '..', 'docs', 'demo3.csv');
+const REFERENCE_PATH = path.resolve(__dirname, 'fixtures', 'reference.csv');
 
 function withinTolerance(actual, expected, tol) {
   if (!isFinite(actual) || !isFinite(expected)) return false;
@@ -184,7 +184,7 @@ function addParameter(target, rawKey, rawValue) {
   }
 }
 
-function parseDemoCsvScenario(filePath) {
+function parseReferenceCsvScenario(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
   const lines = content.split('\n').map(line => line.replace(/\r$/, ''));
   const params = {};
@@ -279,11 +279,11 @@ function percentDelta(a, b) {
   return Math.abs(a - b) / denom;
 }
 
-// Baseline for demo3.csv attribution and tax breakdowns
+// Baseline for reference.csv attribution and tax breakdowns
 // These values represent the expected attribution breakdowns and taxByKey entries
 // from a known-good pre-refactor run. The test will capture actual values on first run
 // if baseline is missing, then use them for subsequent comparisons.
-const DEMO3_ATTRIBUTION_BASELINE = {
+const REFERENCE_ATTRIBUTION_BASELINE = {
   // Age 40: Pre-relocation (IE)
   40: {
     attributions: {
@@ -503,7 +503,7 @@ function runTest() {
     }
   }
 
-  // Test Case 5: Demo3-Like Relocation Scenario
+  // Test Case 5: Reference-Like Relocation Scenario
   {
     const dataRow = { attributions: {}, taxByKey: {} };
     const indexFundsAsset = {
@@ -586,25 +586,25 @@ function runTest() {
   return errors;
 }
 
-// Regression test: Run demo3.csv and validate attribution breakdowns and taxByKey entries
-async function runDemo3RegressionTest() {
+// Regression test: Run reference.csv and validate attribution breakdowns and taxByKey entries
+async function runReferenceRegressionTest() {
   const errors = [];
   const ATTRIBUTION_TOL = 0.01; // 1% tolerance for attribution values
 
   try {
-    // Parse demo3.csv scenario
-    const parsed = parseDemoCsvScenario(DEMO3_PATH);
+    // Parse reference.csv scenario
+    const parsed = parseReferenceCsvScenario(REFERENCE_PATH);
     parsed.parameters.relocationEnabled = parsed.parameters.relocationEnabled !== false;
 
     // Load scenario into TestFramework
     const framework = new TestFramework();
     if (!framework.loadScenario({
-      name: 'Demo3AttributionRegression',
-      description: 'demo3.csv attribution and tax breakdown regression',
+      name: 'ReferenceAttributionRegression',
+      description: 'reference.csv attribution and tax breakdown regression',
       scenario: { parameters: parsed.parameters, events: parsed.events },
       assertions: []
     })) {
-      return ['Failed to load demo3 scenario'];
+      return ['Failed to load reference scenario'];
     }
 
     // Install test tax rules
@@ -616,15 +616,15 @@ async function runDemo3RegressionTest() {
     // Run simulation (deterministic, no Monte Carlo)
     const results = await framework.runSimulation();
     if (!results || !Array.isArray(results.dataSheet)) {
-      return ['demo3 scenario failed to run'];
+      return ['reference scenario failed to run'];
     }
 
     const rows = filterRows(results.dataSheet);
     if (!rows.length) {
-      return ['demo3 scenario produced no rows'];
+      return ['reference scenario produced no rows'];
     }
 
-    // Key ages to validate (matching DEMO3_BASELINE from TestChartValues.js)
+    // Key ages to validate (matching REFERENCE_BASELINE from TestChartValues.js)
     const keyAges = [40, 65, 80];
 
     for (const age of keyAges) {
@@ -635,7 +635,7 @@ async function runDemo3RegressionTest() {
       }
 
       // Validate taxByKey entries
-      const baselineTax = DEMO3_ATTRIBUTION_BASELINE[age]?.taxByKey || {};
+      const baselineTax = REFERENCE_ATTRIBUTION_BASELINE[age]?.taxByKey || {};
       const actualTax = row.taxByKey || {};
 
       // Check all tax keys in baseline
@@ -660,7 +660,7 @@ async function runDemo3RegressionTest() {
       }
 
       // Validate attribution breakdowns
-      const baselineAttribs = DEMO3_ATTRIBUTION_BASELINE[age]?.attributions || {};
+      const baselineAttribs = REFERENCE_ATTRIBUTION_BASELINE[age]?.attributions || {};
       const actualAttribs = row.attributions || {};
 
       // Check portfolio attributions (indexfundscapital, sharescapital)
@@ -733,8 +733,8 @@ module.exports = {
   runCustomTest: async function() {
     const errors = runTest();
     
-    // Run demo3.csv regression test
-    const regressionErrors = await runDemo3RegressionTest();
+    // Run reference.csv regression test
+    const regressionErrors = await runReferenceRegressionTest();
     errors.push(...regressionErrors);
     
     return {

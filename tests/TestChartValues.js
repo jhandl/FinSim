@@ -9,7 +9,7 @@ const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelp
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
 const AR_RULES = require('../src/core/config/tax-rules-ar.json');
 const US_RULES = require('../src/core/config/tax-rules-us.json');
-const DEMO3_PATH = path.resolve(__dirname, '..', 'docs', 'demo3.csv');
+const REFERENCE_PATH = path.resolve(__dirname, 'fixtures', 'reference.csv');
 
 const FRACTIONAL_PARAM_KEYS = new Set([
   'FundsAllocation',
@@ -79,7 +79,7 @@ const PARAM_KEY_MAP = {
   StartCountry: 'StartCountry'
 };
 
-const DEMO3_BASELINE = {
+const REFERENCE_BASELINE = {
   // Baselines updated after emergency-stash (targetCash) conversion switched to PPP
   // at relocation time. This keeps the emergency stash purchasing-power consistent
   // across countries (vs ballooning nominally under evolved FX).
@@ -874,7 +874,7 @@ function validateEvolutionChartDisplay(rows, residenceCountryMap, economicData, 
 
 module.exports = {
   name: 'ChartValuesAndDemoRegression',
-  description: 'Validates chart-facing data stays smooth and matches demo3.csv regression baselines.',
+  description: 'Validates chart-facing data stays smooth and matches reference.csv regression baselines.',
   isCustomTest: true,
   async runCustomTest() {
     // NOTE: Baselines updated for evolution FX mode (inflation-driven FX rates).
@@ -1016,20 +1016,20 @@ module.exports = {
       'Synthetic'
     );
 
-    // demo3 regression
-    const parsed = parseDemoCsvScenario(DEMO3_PATH);
+    // reference regression
+    const parsed = parseDemoCsvScenario(REFERENCE_PATH);
     parsed.parameters.relocationEnabled = parsed.parameters.relocationEnabled !== false;
     // Force deterministic mode for regression runs (single pass, no volatility).
     parsed.parameters.economy_mode = 'deterministic';
     parsed.parameters.economyMode = 'deterministic';
     const demoFramework = new TestFramework();
     if (!demoFramework.loadScenario({
-      name: 'Demo3Regression',
-      description: 'demo3.csv baseline regression',
+      name: 'ReferenceRegression',
+      description: 'reference.csv baseline regression',
       scenario: { parameters: parsed.parameters, events: parsed.events },
       assertions: []
     })) {
-      return { success: false, errors: ['Failed to load demo3 scenario'] };
+      return { success: false, errors: ['Failed to load reference scenario'] };
     }
     installTestTaxRules(demoFramework, {
       ie: deepClone(IE_RULES),
@@ -1039,16 +1039,16 @@ module.exports = {
 
     const demoResults = await demoFramework.runSimulation();
     if (!demoResults || !Array.isArray(demoResults.dataSheet)) {
-      return { success: false, errors: ['demo3 scenario failed to run'] };
+      return { success: false, errors: ['reference scenario failed to run'] };
     }
     const demoRows = filterRows(demoResults.dataSheet);
     if (!demoRows.length) {
-      return { success: false, errors: ['demo3 scenario produced no rows'] };
+      return { success: false, errors: ['reference scenario produced no rows'] };
     }
 
     ensureFiniteRange(demoRows, ['incomeSalaries', 'incomeRentals', 'expenses', 'cash', 'worth', 'netIncome'], 5e15, errors); // Increased for evolution FX mode with high-inflation countries
     const relocationAges = detectRelocationAges(parsed.events);
-    // For demo3 we allow larger late-life spikes in net worth/cash due to combined
+    // For reference we allow larger late-life spikes in net worth/cash due to combined
     // effects of AR inflation and end-of-horizon portfolio behaviour.
     // Also allow spikes at retirement age since income/expense changes cause cash flow shifts.
     // Also allow spikes at ages with major events (real estate sales, crashes).
@@ -1059,7 +1059,7 @@ module.exports = {
     if (parsed.parameters.retirementAge) {
       demoAllowedSpikeAges.add(parsed.parameters.retirementAge);
     }
-    // Add ages with major real estate/market events (demo3: age 70 has R,Downsize and SM,Crash)
+    // Add ages with major real estate/market events (reference: age 70 has R,Downsize and SM,Crash)
     demoAllowedSpikeAges.add(70);
     ensureSmoothSeries(demoRows, 'worth', demoAllowedSpikeAges, 1.25, errors, 'Demo net worth');
     ensureSmoothSeries(demoRows, 'cash', demoAllowedSpikeAges, 1.3, errors, 'Demo cash');
@@ -1094,7 +1094,7 @@ module.exports = {
       parsed.parameters.StartCountry
     );
 
-    // Dynamic investment income regression: demo3 should emit per-investment-type liquidation income
+    // Dynamic investment income regression: reference should emit per-investment-type liquidation income
     // into investmentIncomeByKey, using resolved type keys (e.g. *_ie) rather than legacy unscoped keys.
     const demoLiquidationAge = 35;
     const demoLiquidationRow = findRow(demoRows, demoLiquidationAge);
@@ -1148,14 +1148,14 @@ module.exports = {
       'Demo'
     );
 
-    Object.keys(DEMO3_BASELINE.ages).forEach(ageKey => {
+    Object.keys(REFERENCE_BASELINE.ages).forEach(ageKey => {
       const age = parseInt(ageKey, 10);
       const row = findRow(demoRows, age);
       if (!row) {
         errors.push(`Missing demo row for age ${age}`);
         return;
       }
-      const baseline = DEMO3_BASELINE.ages[age];
+      const baseline = REFERENCE_BASELINE.ages[age];
       assertBaseline(`Worth@${age}`, row.worth, baseline.worth, BASELINE_TOLERANCE, errors);
       assertBaseline(`Cash@${age}`, row.cash, baseline.cash, BASELINE_TOLERANCE, errors);
       assertBaseline(`NetIncome@${age}`, row.netIncome, baseline.netIncome, BASELINE_TOLERANCE, errors);
@@ -1164,13 +1164,13 @@ module.exports = {
     const finalRow = demoRows[demoRows.length - 1];
     const maxWorth = extractMaxAbsolute(demoRows, 'worth');
 
-    assertBaseline('FinalAge', finalRow.age, DEMO3_BASELINE.final.age, CRITICAL_TOLERANCE, errors);
-    assertBaseline('FinalWorth', finalRow.worth, DEMO3_BASELINE.final.worth, BASELINE_TOLERANCE, errors);
-    assertBaseline('FinalCash', finalRow.cash, DEMO3_BASELINE.final.cash, BASELINE_TOLERANCE, errors);
+    assertBaseline('FinalAge', finalRow.age, REFERENCE_BASELINE.final.age, CRITICAL_TOLERANCE, errors);
+    assertBaseline('FinalWorth', finalRow.worth, REFERENCE_BASELINE.final.worth, BASELINE_TOLERANCE, errors);
+    assertBaseline('FinalCash', finalRow.cash, REFERENCE_BASELINE.final.cash, BASELINE_TOLERANCE, errors);
 
-    assertBaseline('MaxWorth', maxWorth, DEMO3_BASELINE.maxWorth, BASELINE_TOLERANCE, errors);
+    assertBaseline('MaxWorth', maxWorth, REFERENCE_BASELINE.maxWorth, BASELINE_TOLERANCE, errors);
 
-    // Validate EUR mode chart display for demo3: No raw ARS values
+    // Validate EUR mode chart display for reference: No raw ARS values
     const demoAgeCheckpoints = [40, 50, 60, 70];
     demoAgeCheckpoints.forEach(age => {
       const row = findRow(demoRows, age);

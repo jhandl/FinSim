@@ -267,4 +267,5 @@ describe('Wizard.filterValidSteps – accordion mode', () => {
       expect(sel).not.toEqual(expect.arrayContaining(['.events-section', '.graphs-section', '.parameters-section']));
     });
   });
+
 });

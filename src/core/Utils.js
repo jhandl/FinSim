@@ -417,39 +417,20 @@ function serializeSimulation(ui) {
   };
 
   // Collect all parameters
-  var startCountryForInflation = startCountry || config.getDefaultCountry();
-  var normalizedStartCountry = String(startCountryForInflation || '').toLowerCase();
-  var legacyInflationRaw = getRawInputValue('Inflation');
-  var startCountryInflationValue = isMissingRaw(legacyInflationRaw) ? '' : ui.getValue('Inflation');
-  if (normalizedStartCountry) {
-    try {
-      var startCountryInflationInput = document.getElementById('Inflation_' + normalizedStartCountry);
-      if (startCountryInflationInput) {
-        var dynamicInflationRaw = String(startCountryInflationInput.value || '').trim();
-        if (dynamicInflationRaw !== '') {
-          var dynamicInflationValue = ui.getValue('Inflation_' + normalizedStartCountry);
-          startCountryInflationValue = dynamicInflationValue;
-        }
-      }
-    } catch (_) { }
-  }
+  var normalizedStartCountry = String(startCountry || config.getDefaultCountry() || '').toLowerCase();
   const parameters = {
+    StartCountry: normalizedStartCountry,
     StartingAge: ui.getValue('StartingAge'),
     TargetAge: ui.getValue('TargetAge'),
     InitialSavings: ui.getValue('InitialSavings'),
     InitialPension: ui.getValue('InitialPension'),
     RetirementAge: ui.getValue('RetirementAge'),
     EmergencyStash: ui.getValue('EmergencyStash'),
-    PensionContributionPercentage: ui.getValue('PensionContributionPercentage'),
-    PensionContributionCapped: ui.getValue('PensionContributionCapped'),
     PensionGrowthRate: ui.getValue('PensionGrowthRate'),
     PensionGrowthStdDev: ui.getValue('PensionGrowthStdDev'),
-    Inflation: startCountryInflationValue,
     MarriageYear: ui.getValue('MarriageYear'),
     YoungestChildBorn: ui.getValue('YoungestChildBorn'),
     OldestChildBorn: ui.getValue('OldestChildBorn'),
-    PersonalTaxCredit: ui.getValue('PersonalTaxCredit'),
-    StatePensionWeekly: ui.getValue('StatePensionWeekly'),
     PriorityCash: getPriorityValue('cash', 1),
     PriorityPension: getPriorityValue('pension', 2),
     PriorityFunds: getPriorityValue('indexFunds', 3),
@@ -457,9 +438,7 @@ function serializeSimulation(ui) {
     // Person 2 Parameters
     P2StartingAge: ui.getValue('P2StartingAge'),
     P2RetirementAge: ui.getValue('P2RetirementAge'),
-    P2StatePensionWeekly: ui.getValue('P2StatePensionWeekly'),
     InitialPensionP2: ui.getValue('InitialPensionP2'),
-    PensionContributionPercentageP2: ui.getValue('PensionContributionPercentageP2'),
     // Simulation Mode
     simulation_mode: ui.getValue('simulation_mode'),
     // Economy Mode
@@ -467,6 +446,16 @@ function serializeSimulation(ui) {
     // Feature toggles
     investmentStrategiesEnabled: ui.getValue('investmentStrategiesEnabled')
   };
+  if (normalizedStartCountry) {
+    var canonicalStartInflationId = 'Inflation_' + normalizedStartCountry;
+    try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(canonicalStartInflationId, 'percentage'); } catch (_) { }
+    var canonicalStartInflationRaw = getRawInputValue(canonicalStartInflationId);
+    if (canonicalStartInflationRaw !== null && String(canonicalStartInflationRaw).trim() === '') {
+      parameters[canonicalStartInflationId] = '';
+    } else {
+      try { parameters[canonicalStartInflationId] = ui.getValue(canonicalStartInflationId); } catch (_) { }
+    }
+  }
 
   var priorityBaseTypes = {};
   priorityBaseTypes.cash = true;
@@ -497,11 +486,6 @@ function serializeSimulation(ui) {
     var type = investmentTypes[i];
     var key = type.key;
     parameters['InitialCapital_' + key] = ui.getValue('InitialCapital_' + key);
-    // Wrapper-level growth/volatility inputs are only present for local investments (no baseRef)
-    if (!type.baseRef) {
-      parameters[key + 'GrowthRate'] = ui.getValue(key + 'GrowthRate');
-      parameters[key + 'GrowthStdDev'] = ui.getValue(key + 'GrowthStdDev');
-    }
   }
 
   // Global + local economy inputs (dynamic rows rendered in the growth rates panel).
@@ -578,11 +562,6 @@ function serializeSimulation(ui) {
       var lgVal = ui.getValue(localGrowthId);
       var shouldWriteLocalGrowth = economyFeatureActive || !isMissingRaw(lgRaw);
       if (shouldWriteLocalGrowth) {
-        if (isMissingRaw(lgRaw) && economyFeatureActive) {
-          var legacyGrowthId = key + 'GrowthRate';
-          var legacyGrowthRaw = getRawInputValue(legacyGrowthId);
-          if (!isMissingRaw(legacyGrowthRaw)) lgVal = ui.getValue(legacyGrowthId);
-        }
         parameters[localGrowthId] = lgVal;
       }
 
@@ -590,11 +569,6 @@ function serializeSimulation(ui) {
       var lvVal = ui.getValue(localVolId);
       var shouldWriteLocalVol = economyFeatureActive || !isMissingRaw(lvRaw);
       if (shouldWriteLocalVol) {
-        if (isMissingRaw(lvRaw) && economyFeatureActive) {
-          var legacyVolId = key + 'GrowthStdDev';
-          var legacyVolRaw = getRawInputValue(legacyVolId);
-          if (!isMissingRaw(legacyVolRaw)) lvVal = ui.getValue(legacyVolId);
-        }
         parameters[localVolId] = lvVal;
       }
     }
@@ -604,7 +578,6 @@ function serializeSimulation(ui) {
   // - Allocations: InvestmentAllocation_{typeKey} where typeKey already encodes country (e.g. indexFunds_ie)
   // - State pension by country: StatePension_{countryCode} / P2StatePension_{countryCode}
   // Deserializer maps these into the chip-driven UI inputs.
-  var isRelocationEnabled = config && typeof config.isRelocationEnabled === 'function' && config.isRelocationEnabled();
   // Always write StartCountry allocation keys (generic). If relocation UI is active the visible inputs
   // may be per-country, so prefer those when present.
   var sc = (startCountry || '').toString().trim().toLowerCase();
@@ -634,9 +607,8 @@ function serializeSimulation(ui) {
     } catch (_) { }
   }
 
-  // When relocation is enabled, also persist ANY country-dependent fields that exist in the DOM (including hidden stash),
-  // regardless of current MV events, so values don't vanish when the user removes a relocation temporarily.
-  if (isRelocationEnabled && typeof document !== 'undefined') {
+  // Persist canonical country-scoped fields from DOM (including hidden stash) regardless of UI mode.
+  if (typeof document !== 'undefined') {
     // Allocations: per-country ids -> generic ids
     try {
       var inputs = Array.prototype.slice.call(document.querySelectorAll('input[id^="InvestmentAllocation_"]'));
@@ -644,7 +616,7 @@ function serializeSimulation(ui) {
         var el = inputs[ii];
         if (!el || !el.id) continue;
         var id = String(el.id);
-        var m = id.match(/^InvestmentAllocation_([a-z]{2,})_(.+)$/i); // cc_baseKey
+        var m = id.match(/^InvestmentAllocation_([a-z]{2})_(.+)$/i); // cc_baseKey
         if (!m) continue;
         var cc = String(m[1]).toLowerCase();
         var baseKey = String(m[2]);
@@ -664,7 +636,7 @@ function serializeSimulation(ui) {
       for (var si = 0; si < sp.length; si++) {
         var el = sp[si];
         if (!el || !el.id) continue;
-        var m = String(el.id).match(/^StatePension_([a-z]{2,})$/i);
+        var m = String(el.id).match(/^StatePension_([a-z]{2})$/i);
         if (!m) continue;
         var cc = String(m[1]).toLowerCase();
         parameters['StatePension_' + cc] = ui.getValue(el.id);
@@ -675,7 +647,7 @@ function serializeSimulation(ui) {
       for (var si2 = 0; si2 < sp2.length; si2++) {
         var el = sp2[si2];
         if (!el || !el.id) continue;
-        var m = String(el.id).match(/^P2StatePension_([a-z]{2,})$/i);
+        var m = String(el.id).match(/^P2StatePension_([a-z]{2})$/i);
         if (!m) continue;
         var cc = String(m[1]).toLowerCase();
         parameters['P2StatePension_' + cc] = ui.getValue(el.id);
@@ -688,7 +660,7 @@ function serializeSimulation(ui) {
       for (var pc1 = 0; pc1 < p1Inputs.length; pc1++) {
         var el = p1Inputs[pc1];
         if (!el || !el.id) continue;
-        var m = String(el.id).match(/^P1PensionContrib_([a-z]{2,})$/i);
+        var m = String(el.id).match(/^P1PensionContrib_([a-z]{2})$/i);
         if (!m) continue;
         var cc = String(m[1]).toLowerCase();
         parameters['P1PensionContrib_' + cc] = ui.getValue(el.id);
@@ -699,7 +671,7 @@ function serializeSimulation(ui) {
       for (var pc2 = 0; pc2 < p2Inputs.length; pc2++) {
         var el = p2Inputs[pc2];
         if (!el || !el.id) continue;
-        var m = String(el.id).match(/^P2PensionContrib_([a-z]{2,})$/i);
+        var m = String(el.id).match(/^P2PensionContrib_([a-z]{2})$/i);
         if (!m) continue;
         var cc = String(m[1]).toLowerCase();
         parameters['P2PensionContrib_' + cc] = ui.getValue(el.id);
@@ -710,20 +682,13 @@ function serializeSimulation(ui) {
       for (var pci = 0; pci < capInputs.length; pci++) {
         var el = capInputs[pci];
         if (!el || !el.id) continue;
-        var m = String(el.id).match(/^PensionCapped_([a-z]{2,})$/i);
+        var m = String(el.id).match(/^PensionCapped_([a-z]{2})$/i);
         if (!m) continue;
         var cc = String(m[1]).toLowerCase();
         parameters['PensionCapped_' + cc] = ui.getValue(el.id);
       }
     } catch (_) { }
 
-    // Keep legacy scalar pensions aligned with StartCountry per-country fields when present
-    try {
-      var spStart = 'StatePension_' + sc;
-      var sp2Start = 'P2StatePension_' + sc;
-      if (document.getElementById(spStart)) parameters.StatePensionWeekly = ui.getValue(spStart);
-      if (document.getElementById(sp2Start)) parameters.P2StatePensionWeekly = ui.getValue(sp2Start);
-    } catch (_) { }
   }
 
   // Tax credits: persist per-country ids whenever present (independent of relocation setting).
@@ -733,16 +698,12 @@ function serializeSimulation(ui) {
       for (var ci = 0; ci < credits.length; ci++) {
         var el = credits[ci];
         if (!el || !el.id) continue;
-        var m = String(el.id).match(/^TaxCredit_(.+)_([a-z]{2,})$/i);
+        var m = String(el.id).match(/^TaxCredit_(.+)_([a-z]{2})$/i);
         if (!m) continue;
         var creditId = String(m[1]);
         var cc = String(m[2]).toLowerCase();
         var val = ui.getValue(el.id);
         parameters['TaxCredit_' + creditId + '_' + cc] = val;
-        // Keep legacy PersonalTaxCredit aligned for StartCountry.
-        if (creditId === 'personal' && cc === sc) {
-          parameters.PersonalTaxCredit = val;
-        }
       }
     } catch (_) { }
   }
@@ -774,10 +735,8 @@ function serializeSimulation(ui) {
     }
   }
 
-  // Conditionally add StartCountry if relocation is enabled
-  if (config.isRelocationEnabled()) {
-    parameters.StartCountry = ui.getValue('StartCountry');
-  }
+  // StartCountry is always serialized as canonical scenario context.
+  parameters.StartCountry = ui.getValue('StartCountry') || normalizedStartCountry;
 
   // Preserve empty input values as empty strings in CSV output.
   if (typeof document !== 'undefined') {
@@ -1000,24 +959,13 @@ function deserializeSimulation(content, ui) {
       startCountryForNormalization = Config.getInstance().getStartCountry();
     } catch (_) { }
   }
+  startCountryForNormalization = String(startCountryForNormalization || '').trim().toLowerCase();
 
   let section = '';
   let p2StartingAgeExists = false;
   let simulationModeExists = false;
   let economyModeExists = false;
   let hasVolatilityInFile = false;
-  // Legacy scalars that must be copied into per-country fields when relocation UI is enabled
-  var legacyStatePensionWeekly = null;
-  var legacyP2StatePensionWeekly = null;
-  var legacyPensionContributionPercentage = null;
-  var legacyPensionContributionPercentageP2 = null;
-  var legacyPensionContributionCapped = null;
-  var sawLegacyStatePensionWeekly = false;
-  var sawLegacyP2StatePensionWeekly = false;
-  var sawLegacyPensionContributionPercentage = false;
-  var sawLegacyPensionContributionPercentageP2 = false;
-  var sawLegacyPensionContributionCapped = false;
-  var sawPerCountryInflation = {};
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -1034,16 +982,12 @@ function deserializeSimulation(content, ui) {
       let value = (commaIndex >= 0) ? line.substring(commaIndex + 1) : '';
 
       const actualKey = legacyAdapter.mapFieldName(key, startCountryForNormalization, isLegacyIeScenario);
-      if (/^Inflation_[a-z]{2,}$/i.test(actualKey)) {
-        sawPerCountryInflation[String(actualKey.substring('Inflation_'.length)).toLowerCase()] = true;
+      if (/^PensionCapped_[a-z]{2,}$/i.test(actualKey)) {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (normalized === 'yes') value = 'Yes';
+        if (normalized === 'no') value = 'No';
+        if (normalized === 'match') value = 'Match';
       }
-
-      // Track legacy scalar values for later per-country migration.
-      if (actualKey === 'StatePensionWeekly') { legacyStatePensionWeekly = value; sawLegacyStatePensionWeekly = true; }
-      if (actualKey === 'P2StatePensionWeekly') { legacyP2StatePensionWeekly = value; sawLegacyP2StatePensionWeekly = true; }
-      if (actualKey === 'PensionContributionPercentage') { legacyPensionContributionPercentage = value; sawLegacyPensionContributionPercentage = true; }
-      if (actualKey === 'PensionContributionPercentageP2') { legacyPensionContributionPercentageP2 = value; sawLegacyPensionContributionPercentageP2 = true; }
-      if (actualKey === 'PensionContributionCapped') { legacyPensionContributionCapped = value; sawLegacyPensionContributionCapped = true; }
 
       // Ensure dynamic fields exist before setting values (web UI only).
       // This keeps CSV load working even if chip-driven DOM sections aren't built yet.
@@ -1107,11 +1051,6 @@ function deserializeSimulation(content, ui) {
         }
       } catch (_) { }
 
-      // Track StartCountry for investment key normalization
-      if (actualKey === 'StartCountry' && value && value.trim() !== '') {
-        startCountryForNormalization = value.trim();
-      }
-
       try {
         ui.setValue(actualKey, value);
         try {
@@ -1134,7 +1073,10 @@ function deserializeSimulation(content, ui) {
           economyModeExists = true;
         }
         // Track if file has volatility values (pension or any investment type)
-        if ((actualKey === 'PensionGrowthStdDev' || actualKey.endsWith('GrowthStdDev'))
+        if ((actualKey === 'PensionGrowthStdDev' ||
+          actualKey.endsWith('GrowthStdDev') ||
+          actualKey.indexOf('GlobalAssetVolatility_') === 0 ||
+          actualKey.indexOf('LocalAssetVolatility_') === 0)
           && value && parseFloat(value) > 0) {
           hasVolatilityInFile = true;
         }
@@ -1225,29 +1167,6 @@ function deserializeSimulation(content, ui) {
         }
       } catch (_) { }
 
-      // 3) Legacy personal tax credit -> per-country tax credit input
-      let legacyCredit = null;
-      let legacyCreditRaw = null;
-      try {
-        if (typeof document !== 'undefined') {
-          const el = document.getElementById('PersonalTaxCredit');
-          if (el && el.value !== undefined) legacyCreditRaw = String(el.value);
-        }
-      } catch (_) { }
-      if (legacyCreditRaw !== null) {
-        if (String(legacyCreditRaw).trim() !== '') legacyCredit = legacyCreditRaw;
-      } else if (ui && typeof ui.getValue === 'function') {
-        legacyCredit = ui.getValue('PersonalTaxCredit');
-      }
-      if (legacyCredit !== undefined && legacyCredit !== null && legacyCredit !== '') {
-        const startRaw = (ui && typeof ui.getValue === 'function') ? ui.getValue('StartCountry') : null;
-        const startCountry = String(startRaw || cfg.getStartCountry() || '').trim().toLowerCase();
-        if (startCountry) {
-          const creditId = 'TaxCredit_personal_' + startCountry;
-          ui.ensureParameterInput(creditId, 'currency');
-          ui.setValue(creditId, legacyCredit);
-        }
-      }
     }
   } catch (_) { }
 
@@ -1275,119 +1194,16 @@ function deserializeSimulation(content, ui) {
     try {
       ui.setValue('P2StartingAge', '');
       ui.setValue('P2RetirementAge', '');
-      ui.setValue('P2StatePensionWeekly', '');
       ui.setValue('InitialPensionP2', '');
-      ui.setValue('PensionContributionPercentageP2', '');
+      const startCountry = String((ui.getValue && ui.getValue('StartCountry')) || Config.getInstance().getStartCountry() || '').trim().toLowerCase();
+      if (startCountry) {
+        try { ui.setValue('P2StatePension_' + startCountry, ''); } catch (_) { }
+        try { ui.setValue('P2PensionContrib_' + startCountry, ''); } catch (_) { }
+      }
     } catch (e) {
       // Skip if parameters don't exist in the UI
     }
   }
-
-  // Legacy fallback: map global pension contribution fields to StartCountry-prefixed fields
-  try {
-    var fallbackStartCountry = startCountryForNormalization || Config.getInstance().getStartCountry();
-    if (fallbackStartCountry) {
-      var ccLower = String(fallbackStartCountry).toLowerCase();
-      var p1Key = 'P1PensionContrib_' + ccLower;
-      var p2Key = 'P2PensionContrib_' + ccLower;
-      var capKey = 'PensionCapped_' + ccLower;
-      // Ensure per-country fields exist so the migration can run during load,
-      // even before the chip-driven allocation UI has built those inputs.
-      try {
-        if (ui && typeof ui.ensureParameterInput === 'function') {
-          ui.ensureParameterInput(p1Key, 'percentage');
-          ui.ensureParameterInput(p2Key, 'percentage');
-          ui.ensureParameterInput(capKey, 'string');
-        }
-      } catch (_) { }
-
-      // IMPORTANT: Use raw DOM .value checks here (DOMUtils.getValue returns 0 for empty numeric inputs),
-      // otherwise empty fields look "present" and we skip the migration.
-      var existingP1Raw = '';
-      var existingP2Raw = '';
-      var existingCapRaw = '';
-      try {
-        if (typeof document !== 'undefined') {
-          var el1 = document.getElementById(p1Key);
-          var el2 = document.getElementById(p2Key);
-          var el3 = document.getElementById(capKey);
-          existingP1Raw = (el1 && el1.value !== undefined) ? String(el1.value) : '';
-          existingP2Raw = (el2 && el2.value !== undefined) ? String(el2.value) : '';
-          existingCapRaw = (el3 && el3.value !== undefined) ? String(el3.value) : '';
-        }
-      } catch (_) { }
-      var hasExisting = (existingP1Raw && existingP1Raw.trim() !== '') ||
-        (existingP2Raw && existingP2Raw.trim() !== '') ||
-        (existingCapRaw && existingCapRaw.trim() !== '');
-      if (!hasExisting) {
-        var legacyP1 = ui.getValue('PensionContributionPercentage');
-        var legacyP2 = ui.getValue('PensionContributionPercentageP2');
-        var legacyCap = ui.getValue('PensionContributionCapped');
-        // Normalize legacy string values to the exact dropdown option values (Yes/No/Match).
-        try {
-          var lc = (legacyCap !== undefined && legacyCap !== null) ? String(legacyCap).trim().toLowerCase() : '';
-          if (lc === 'yes') legacyCap = 'Yes';
-          if (lc === 'no') legacyCap = 'No';
-          if (lc === 'match') legacyCap = 'Match';
-        } catch (_) { }
-        if (legacyP1 !== undefined && legacyP1 !== null && legacyP1 !== '') ui.setValue(p1Key, legacyP1);
-        if (legacyP2 !== undefined && legacyP2 !== null && legacyP2 !== '') ui.setValue(p2Key, legacyP2);
-        if (legacyCap !== undefined && legacyCap !== null && legacyCap !== '') ui.setValue(capKey, legacyCap);
-      }
-
-      // If the legacy scalar keys were present in the file, they should win over any pre-filled defaults
-      // (e.g. €0 or Yes) that may exist before deserialization finishes.
-      try {
-        if (sawLegacyPensionContributionPercentage && legacyPensionContributionPercentage !== null && legacyPensionContributionPercentage !== undefined) {
-          ui.setValue(p1Key, legacyPensionContributionPercentage);
-        }
-      } catch (_) { }
-      try {
-        if (sawLegacyPensionContributionPercentageP2 && legacyPensionContributionPercentageP2 !== null && legacyPensionContributionPercentageP2 !== undefined) {
-          ui.setValue(p2Key, legacyPensionContributionPercentageP2);
-        }
-      } catch (_) { }
-      try {
-        if (sawLegacyPensionContributionCapped && legacyPensionContributionCapped !== null && legacyPensionContributionCapped !== undefined) {
-          var lc2 = String(legacyPensionContributionCapped).trim().toLowerCase();
-          var normalized = legacyPensionContributionCapped;
-          if (lc2 === 'yes') normalized = 'Yes';
-          if (lc2 === 'no') normalized = 'No';
-          if (lc2 === 'match') normalized = 'Match';
-          ui.setValue(capKey, normalized);
-          // Also sync the visible toggle text if it already exists (dropdown may have initialized earlier).
-          try {
-            if (typeof document !== 'undefined') {
-              var t = document.getElementById('PensionCappedToggle_' + ccLower);
-              if (t) t.textContent = normalized;
-            }
-          } catch (_) { }
-        }
-      } catch (_) { }
-    }
-  } catch (_) { }
-
-  // Legacy fallback: map scalar state pension fields to StartCountry per-country IDs (period-agnostic).
-  // Without this, relocation UI hides the legacy inputs and the visible per-country fields stay empty (0).
-  try {
-    if (ui && typeof ui.ensureParameterInput === 'function') {
-      var sc = (startCountryForNormalization || Config.getInstance().getStartCountry() || '').toString().trim().toLowerCase();
-      if (sc) {
-        var spKey = 'StatePension_' + sc;
-        var sp2Key = 'P2StatePension_' + sc;
-        ui.ensureParameterInput(spKey, 'currency');
-        ui.ensureParameterInput(sp2Key, 'currency');
-
-        // If the legacy scalar keys were present in the file, they should win over any pre-filled defaults.
-        if (sawLegacyStatePensionWeekly && legacyStatePensionWeekly !== null && legacyStatePensionWeekly !== undefined) {
-          ui.setValue(spKey, legacyStatePensionWeekly);
-        }
-        if (sawLegacyP2StatePensionWeekly && legacyP2StatePensionWeekly !== null && legacyP2StatePensionWeekly !== undefined) {
-          ui.setValue(sp2Key, legacyP2StatePensionWeekly);
-        }
-      }
-    }
-  } catch (_) { }
 
   // Migrate legacy flat allocations to per-country structure
   if (typeof params !== 'undefined' && !params.investmentAllocationsByCountry && params.investmentAllocationsByKey) {
@@ -1428,81 +1244,6 @@ function deserializeSimulation(content, ui) {
       eventData.push(parts);
     }
   }
-
-  // Default new economy fields from legacy values when missing (globals/locals/pension/inflation).
-  try {
-    var cfg2 = Config.getInstance();
-    var rawStart = startCountryForNormalization;
-    if (!rawStart && ui && typeof ui.getValue === 'function') {
-      rawStart = ui.getValue('StartCountry');
-    }
-    if (!rawStart) rawStart = cfg2.getStartCountry();
-    var sc2 = (rawStart || '').toString().trim().toLowerCase();
-    var scenarioCountries = [];
-    var scenarioSet = {};
-    if (sc2) {
-      scenarioSet[sc2] = true;
-      scenarioCountries.push(sc2);
-    }
-    for (var ei2 = 0; ei2 < eventData.length; ei2++) {
-      var row = eventData[ei2];
-      var t = row && row[0] ? String(row[0]) : '';
-      if (t === 'MV') {
-        var cc2 = String(row[1] || '').trim().toLowerCase();
-        if (cc2 && !scenarioSet[cc2]) {
-          scenarioSet[cc2] = true;
-          scenarioCountries.push(cc2);
-        }
-      }
-    }
-
-    var getRawInputValue = function(id) {
-      try {
-        if (typeof document !== 'undefined') {
-          var el = document.getElementById(id);
-          if (el && el.value !== undefined) return String(el.value);
-        }
-      } catch (_) { }
-      return null;
-    };
-    var isMissingRaw = function(raw) {
-      return (raw === null || raw === undefined || String(raw).trim() === '');
-    };
-
-    for (var sci = 0; sci < scenarioCountries.length; sci++) {
-      var cc = scenarioCountries[sci];
-      var inflationId = 'Inflation_' + cc;
-      try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(inflationId, 'percentage'); } catch (_) { }
-
-      var rs = cfg2.getCachedTaxRuleSet(cc);
-      var invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
-      for (var li = 0; li < invTypes.length; li++) {
-        var it = invTypes[li] || {};
-        var key = it.key;
-        if (!key) continue;
-        var scope = (it.residenceScope || '').toString().trim().toLowerCase();
-        if (scope !== 'local') continue;
-        // Skip inheriting wrappers (baseRef) - they use asset-level params
-        if (it.baseRef) continue;
-        var suffix = '_' + cc;
-        var baseKey2 = (String(key).toLowerCase().endsWith(suffix)) ? String(key).slice(0, String(key).length - suffix.length) : String(key);
-        var localGrowthId = 'LocalAssetGrowth_' + cc + '_' + baseKey2;
-        var localVolId = 'LocalAssetVolatility_' + cc + '_' + baseKey2;
-        try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(localGrowthId, 'percentage'); } catch (_) { }
-        try { if (ui && typeof ui.ensureParameterInput === 'function') ui.ensureParameterInput(localVolId, 'percentage'); } catch (_) { }
-
-        if (isMissingRaw(getRawInputValue(localGrowthId))) {
-          var legacyGrowthId = key + 'GrowthRate';
-          if (!isMissingRaw(getRawInputValue(legacyGrowthId))) ui.setValue(localGrowthId, ui.getValue(legacyGrowthId));
-        }
-        if (isMissingRaw(getRawInputValue(localVolId))) {
-          var legacyVolId = key + 'GrowthStdDev';
-          if (!isMissingRaw(getRawInputValue(legacyVolId))) ui.setValue(localVolId, ui.getValue(legacyVolId));
-        }
-      }
-    }
-
-  } catch (_) { }
 
   return eventData;
 }

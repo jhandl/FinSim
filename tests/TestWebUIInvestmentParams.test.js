@@ -82,6 +82,11 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     const inputs = {};
     webUI._takeOrCreateInput = jest.fn((id, type) => {
       if (inputs[id]) return inputs[id];
+      const existing = document.getElementById(id);
+      if (existing) {
+        inputs[id] = existing;
+        return existing;
+      }
       const el = document.createElement('input');
       el.id = id;
       inputs[id] = el;
@@ -99,47 +104,47 @@ describe('WebUI.renderInvestmentParameterFields', () => {
 
   test('skips wrapper-level inputs for investment types with baseRef', () => {
     const types = [
-      { key: 'localInv', label: 'Local' }, // Should create inputs
-      { key: 'wrapperInv', label: 'Wrapper', baseRef: 'globalEquity' } // Should SKIP inputs
+      { key: 'localInv_ie', label: 'Local', residenceScope: 'local' }, // Should create inputs
+      { key: 'wrapperInv_ie', label: 'Wrapper', baseRef: 'globalEquity', residenceScope: 'local' } // Should SKIP inputs
     ];
     
     webUI.renderInvestmentParameterFields(types);
     
     // Verify localInv inputs created
-    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('localInvGrowthRate', 'percentage');
-    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('localInvGrowthStdDev', 'percentage');
+    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('LocalAssetGrowth_ie_localInv', 'percentage');
+    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('LocalAssetVolatility_ie_localInv', 'percentage');
     
     // Verify wrapperInv inputs NOT created
-    expect(webUI._takeOrCreateInput).not.toHaveBeenCalledWith('wrapperInvGrowthRate', 'percentage');
-    expect(webUI._takeOrCreateInput).not.toHaveBeenCalledWith('wrapperInvGrowthStdDev', 'percentage');
+    expect(webUI._takeOrCreateInput).not.toHaveBeenCalledWith('LocalAssetGrowth_ie_wrapperInv', 'percentage');
+    expect(webUI._takeOrCreateInput).not.toHaveBeenCalledWith('LocalAssetVolatility_ie_wrapperInv', 'percentage');
   });
 
   test('creates wrapper-level inputs for local investments', () => {
      const types = [
-      { key: 'cedear_ar', label: 'CEDEARs', assetCountry: 'ar', residenceScope: 'local' } 
+      { key: 'cedear_ie', label: 'CEDEARs', assetCountry: 'ie', residenceScope: 'local' } 
     ];
     
     webUI.renderInvestmentParameterFields(types);
 
-    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('cedear_arGrowthRate', 'percentage');
-    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('cedear_arGrowthStdDev', 'percentage');
+    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('LocalAssetGrowth_ie_cedear', 'percentage');
+    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('LocalAssetVolatility_ie_cedear', 'percentage');
   });
 
   test('handles mixed list of types correctly', () => {
      const types = [
-      { key: 'cedear_ar', label: 'CEDEARs', assetCountry: 'ar', residenceScope: 'local' },
-      { key: 'indexFunds_ie', label: 'Index Funds', baseRef: 'globalEquity', assetCountry: 'ie' }
+      { key: 'cedear_ie', label: 'CEDEARs', assetCountry: 'ie', residenceScope: 'local' },
+      { key: 'indexFunds_ie', label: 'Index Funds', baseRef: 'globalEquity', assetCountry: 'ie', residenceScope: 'local' }
     ];
     
     webUI.renderInvestmentParameterFields(types);
 
     // Local: Yes
-    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('cedear_arGrowthRate', 'percentage');
-    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('cedear_arGrowthStdDev', 'percentage');
+    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('LocalAssetGrowth_ie_cedear', 'percentage');
+    expect(webUI._takeOrCreateInput).toHaveBeenCalledWith('LocalAssetVolatility_ie_cedear', 'percentage');
 
     // Wrapper: No
-    expect(webUI._takeOrCreateInput).not.toHaveBeenCalledWith('indexFunds_ieGrowthRate', 'percentage');
-    expect(webUI._takeOrCreateInput).not.toHaveBeenCalledWith('indexFunds_ieGrowthStdDev', 'percentage');
+    expect(webUI._takeOrCreateInput).not.toHaveBeenCalledWith('LocalAssetGrowth_ie_indexFunds', 'percentage');
+    expect(webUI._takeOrCreateInput).not.toHaveBeenCalledWith('LocalAssetVolatility_ie_indexFunds', 'percentage');
   });
 
   test('filters out inheriting wrappers from per-country growth rates table', () => {
@@ -184,14 +189,14 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     webUI.hasEffectiveRelocationEvents.mockReturnValue(false);
 
     const types = [
-      { key: 'localInv', label: 'Local', residenceScope: 'local' }
+      { key: 'localInv_ie', label: 'Local', residenceScope: 'local' }
     ];
 
     webUI.renderInvestmentParameterFields(types);
 
     const tbody = document.querySelector('.growth-rates-table tbody');
-    // Check for row containing localInvGrowthRate
-    const input = document.getElementById('localInvGrowthRate');
+    // Check for row containing canonical LocalAssetGrowth id
+    const input = document.getElementById('LocalAssetGrowth_ie_localInv');
     expect(input).not.toBeNull();
     // Verify it is inside the table
     const tr = input.closest('tr');
@@ -199,6 +204,97 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     expect(tbody.contains(tr)).toBe(true);
     // Verify it is visible (not display: none)
     expect(tr.style.display).not.toBe('none');
+  });
+
+  test('renders inflation row as last row in single-country mode', () => {
+    mockConfig.isRelocationEnabled.mockReturnValue(false);
+    webUI.hasEffectiveRelocationEvents.mockReturnValue(false);
+
+    const types = [
+      { key: 'localInv_ie', label: 'Local', residenceScope: 'local' }
+    ];
+
+    webUI.renderInvestmentParameterFields(types);
+
+    const tbody = document.querySelector('.growth-rates-table tbody');
+    const lastRow = tbody.querySelector('tr:last-child');
+    expect(lastRow.getAttribute('data-dynamic-inflation-row')).toBe('true');
+  });
+
+  test('renders inflation row as last row in multi-country mode', () => {
+    mockConfig.isRelocationEnabled.mockReturnValue(true);
+    webUI.hasEffectiveRelocationEvents.mockReturnValue(true);
+    webUI.getScenarioCountries = jest.fn(() => ['ie', 'ar']);
+
+    const ieTypes = [
+      { key: 'localInv_ie', label: 'Local IE', residenceScope: 'local' }
+    ];
+    const arTypes = [
+      { key: 'localInv_ar', label: 'Local AR', residenceScope: 'local' }
+    ];
+    mockConfig.getCachedTaxRuleSet.mockImplementation((code) => {
+      if (String(code || '').toLowerCase() === 'ie') return { getResolvedInvestmentTypes: () => ieTypes };
+      if (String(code || '').toLowerCase() === 'ar') return { getResolvedInvestmentTypes: () => arTypes };
+      return { getResolvedInvestmentTypes: () => [] };
+    });
+
+    webUI.renderInvestmentParameterFields([]);
+
+    const tbody = document.querySelector('.growth-rates-table tbody');
+    const lastRow = tbody.querySelector('tr:last-child');
+    expect(lastRow.getAttribute('data-dynamic-inflation-row')).toBe('true');
+  });
+
+  test('keeps canonical StartCountry inflation when switching chip visibility', () => {
+    webUI.ensureParameterInput('Inflation_ie', 'percentage');
+    document.getElementById('Inflation_ie').value = '10';
+
+    mockConfig.isRelocationEnabled.mockReturnValue(false);
+    webUI.hasEffectiveRelocationEvents.mockReturnValue(false);
+    webUI.getScenarioCountries = jest.fn(() => ['ie']);
+
+    webUI.renderInvestmentParameterFields([]);
+    expect(document.getElementById('Inflation_ie').value).toBe('10');
+
+    mockConfig.isRelocationEnabled.mockReturnValue(true);
+    webUI.hasEffectiveRelocationEvents.mockReturnValue(true);
+    webUI.getScenarioCountries = jest.fn(() => ['ie', 'ar']);
+
+    webUI.renderInvestmentParameterFields([]);
+
+    expect(document.getElementById('Inflation_ie').value).toBe('10');
+  });
+
+  test('keeps canonical StartCountry local growth/volatility when switching chip visibility', () => {
+    webUI.ensureParameterInput('LocalAssetGrowth_ie_localInv', 'percentage');
+    webUI.ensureParameterInput('LocalAssetVolatility_ie_localInv', 'percentage');
+    document.getElementById('LocalAssetGrowth_ie_localInv').value = '5';
+    document.getElementById('LocalAssetVolatility_ie_localInv').value = '12';
+
+    const ieTypes = [
+      { key: 'localInv_ie', label: 'Local IE', residenceScope: 'local' }
+    ];
+    const arTypes = [
+      { key: 'localInv_ar', label: 'Local AR', residenceScope: 'local' }
+    ];
+    mockConfig.getCachedTaxRuleSet.mockImplementation((code) => {
+      if (String(code || '').toLowerCase() === 'ie') return { getResolvedInvestmentTypes: () => ieTypes };
+      if (String(code || '').toLowerCase() === 'ar') return { getResolvedInvestmentTypes: () => arTypes };
+      return { getResolvedInvestmentTypes: () => [] };
+    });
+
+    mockConfig.isRelocationEnabled.mockReturnValue(false);
+    webUI.hasEffectiveRelocationEvents.mockReturnValue(false);
+    webUI.getScenarioCountries = jest.fn(() => ['ie']);
+    webUI.renderInvestmentParameterFields(ieTypes);
+
+    mockConfig.isRelocationEnabled.mockReturnValue(true);
+    webUI.hasEffectiveRelocationEvents.mockReturnValue(true);
+    webUI.getScenarioCountries = jest.fn(() => ['ie', 'ar']);
+    webUI.renderInvestmentParameterFields(ieTypes);
+
+    expect(document.getElementById('LocalAssetGrowth_ie_localInv').value).toBe('5');
+    expect(document.getElementById('LocalAssetVolatility_ie_localInv').value).toBe('12');
   });
 });
 

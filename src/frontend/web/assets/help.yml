@@ -281,7 +281,7 @@ WizardSteps:
       side: "right"
       align: "start"
 
-  - element: "#PersonalTaxCredit"
+  - element: "#TaxCredit_personal_currentCountry"
     tours: [full, mini]
     card: personalCircumstances
     popover:
@@ -289,7 +289,7 @@ WizardSteps:
       side: "right"
       align: "start"
 
-  - element: "#StatePensionWeekly"
+  - element: "#StatePension_currentCountry"
     tours: [full, mini]
     card: personalCircumstances
     popover:
@@ -297,7 +297,7 @@ WizardSteps:
       side: "right"
       align: "start"
 
-  - element: "#P2StatePensionWeekly"
+  - element: "#P2StatePension_currentCountry"
     tours: [full, mini]
     card: personalCircumstances
     popover:
@@ -449,7 +449,7 @@ WizardSteps:
       side: "right"
       align: "start"
 
-  - element: "#Inflation"
+  - element: "#Inflation_currentCountry"
     tours: [full, mini]
     card: growthRates
     popover:

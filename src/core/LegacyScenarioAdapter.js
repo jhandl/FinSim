@@ -25,6 +25,7 @@ class LegacyScenarioAdapter {
       'SharesGrowthRate': 'sharesGrowthRate',
       'TrustGrowthStdDev': 'sharesGrowthStdDev',
       'SharesGrowthStdDev': 'sharesGrowthStdDev',
+      'Inflation': 'Inflation',
       'PriorityCash': 'Priority_cash',
       'PriorityPension': 'Priority_pension',
       'PriorityFunds': 'Priority_indexFunds',
@@ -55,36 +56,37 @@ class LegacyScenarioAdapter {
    * @throws {Error} If startCountry is missing for investment-related fields and no fallback is allowed.
    */
   mapFieldName(key, startCountry, allowIeFallback = false) {
-    if (key === 'Inflation') {
-      if (!startCountry) {
-        if (allowIeFallback) {
-          startCountry = 'ie';
-        } else {
-          throw new Error('Cannot map legacy Inflation because startCountry is missing and no default is allowed.');
-        }
+    const mappedKey = this.legacyFieldMap[key] || key;
+    let normalizedCountry = (startCountry || '').toString().trim().toLowerCase();
+
+    if (!normalizedCountry) {
+      if (allowIeFallback) {
+        normalizedCountry = 'ie';
+      } else {
+        throw new Error(`Cannot map field "${key}" (mapped to "${mappedKey}") because startCountry is missing and no default is allowed.`);
       }
-      return 'Inflation_' + String(startCountry).toLowerCase();
     }
 
-    const mappedKey = this.legacyFieldMap[key] || key;
+    // Country-scoped legacy scalar fields always normalize to canonical per-country ids.
+    if (mappedKey === 'Inflation') return 'Inflation_' + normalizedCountry;
+    if (mappedKey === 'StatePensionWeekly') return 'StatePension_' + normalizedCountry;
+    if (mappedKey === 'P2StatePensionWeekly') return 'P2StatePension_' + normalizedCountry;
+    if (mappedKey === 'PersonalTaxCredit') return 'TaxCredit_personal_' + normalizedCountry;
+    if (mappedKey === 'PensionContributionPercentage') return 'P1PensionContrib_' + normalizedCountry;
+    if (mappedKey === 'PensionContributionPercentageP2') return 'P2PensionContrib_' + normalizedCountry;
+    if (mappedKey === 'PensionContributionCapped') return 'PensionCapped_' + normalizedCountry;
 
     // Legacy index funds growth/volatility should map to global equity settings.
     if (mappedKey === 'indexFundsGrowthRate') return 'GlobalAssetGrowth_globalEquity';
     if (mappedKey === 'indexFundsGrowthStdDev') return 'GlobalAssetVolatility_globalEquity';
+    if (mappedKey === 'sharesGrowthRate') return 'LocalAssetGrowth_' + normalizedCountry + '_shares';
+    if (mappedKey === 'sharesGrowthStdDev') return 'LocalAssetVolatility_' + normalizedCountry + '_shares';
     
     // Check if this is an investment field that needs normalization
     const isInvestmentField = this.investmentFields.includes(mappedKey);
     
     if (isInvestmentField) {
-      if (!startCountry) {
-        if (allowIeFallback) {
-          startCountry = 'ie';
-        } else {
-          throw new Error(`Cannot map investment field "${key}" (mapped to "${mappedKey}") because startCountry is missing and no default is allowed.`);
-        }
-      }
-      
-      return this.normalizeInvestmentKey(mappedKey, startCountry);
+      return this.normalizeInvestmentKey(mappedKey, normalizedCountry);
     }
     
     return mappedKey;

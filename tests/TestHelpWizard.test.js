@@ -55,6 +55,9 @@ const setupMocks = () => {
       isOpen: false,
       openMenu: jest.fn(),
       closeMenu: jest.fn()
+    },
+    countryTabSyncManager: {
+      getSelectedCountry: jest.fn(() => null)
     }
   };
 
@@ -137,6 +140,38 @@ class TestWizard {
       if (aHas === bHas) return 0;
       return aHas ? 1 : -1;
     });
+  }
+
+  _getDynamicStepCountry(step, fieldType) {
+    const config = global.Config.getInstance();
+    let panelId = null;
+    const card = String((step && step.card) || '').toLowerCase();
+
+    if (card === 'allocations') panelId = 'allocations';
+    else if (card === 'growthrates') panelId = 'growthRates';
+    else if (
+      fieldType === 'InitialCapital' ||
+      fieldType === 'InvestmentAllocation' ||
+      fieldType === 'PensionContribution' ||
+      fieldType === 'PensionContributionP2' ||
+      fieldType === 'PensionContributionCapped'
+    ) panelId = 'allocations';
+    else if (
+      fieldType === 'GlobalAssetGrowth' ||
+      fieldType === 'GlobalAssetVolatility' ||
+      fieldType === 'LocalAssetGrowth' ||
+      fieldType === 'LocalAssetVolatility'
+    ) panelId = 'growthRates';
+
+    const webUI = global.WebUI && typeof global.WebUI.getInstance === 'function'
+      ? global.WebUI.getInstance()
+      : null;
+    const selected = panelId && webUI && webUI.countryTabSyncManager &&
+      typeof webUI.countryTabSyncManager.getSelectedCountry === 'function'
+        ? webUI.countryTabSyncManager.getSelectedCountry(panelId)
+        : null;
+
+    return String(selected || config.getStartCountry() || '').toLowerCase();
   }
 
   processAgeYearInContent(content, context = null) {
@@ -241,17 +276,20 @@ class TestWizard {
     
     const expanded = [];
     const config = global.Config.getInstance();
-    const activeCountry = config.getStartCountry();
-    const ruleset = config.getCachedTaxRuleSet(activeCountry);
-    let investmentTypes = ruleset ? (ruleset.getResolvedInvestmentTypes() || []) : [];
-    investmentTypes = this._sortInvestmentTypes(investmentTypes);
     const baseTypes = config.getInvestmentBaseTypes() || [];
+    const getInvestmentTypesForCountry = (countryCode) => {
+      const ruleset = config.getCachedTaxRuleSet(countryCode);
+      let types = ruleset ? (ruleset.getResolvedInvestmentTypes() || []) : [];
+      return this._sortInvestmentTypes(types);
+    };
 
     for (const step of steps) {
       if (step.dynamicInvestmentField) {
         const fieldType = step.dynamicInvestmentField;
+        const activeCountry = this._getDynamicStepCountry(step, fieldType);
         
         if (fieldType === 'InitialCapital') {
+          const investmentTypes = getInvestmentTypesForCountry(activeCountry);
           for (const type of investmentTypes) {
             const newStep = JSON.parse(JSON.stringify(step));
             delete newStep.dynamicInvestmentField;
@@ -259,6 +297,7 @@ class TestWizard {
             expanded.push(newStep);
           }
         } else if (fieldType === 'InvestmentAllocation') {
+          const investmentTypes = getInvestmentTypesForCountry(activeCountry);
           for (const type of investmentTypes) {
             // RSU filtering removed to match WebUI
             
@@ -280,13 +319,19 @@ class TestWizard {
             expanded.push(stepReloc);
           }
         } else if (fieldType === 'PensionContribution') {
-          const newStep = JSON.parse(JSON.stringify(step));
-          delete newStep.dynamicInvestmentField;
-          newStep.element = `#PensionContributionPercentage`; 
-          expanded.push(newStep);
           const newStepCountry = JSON.parse(JSON.stringify(step));
           delete newStepCountry.dynamicInvestmentField;
           newStepCountry.element = `#P1PensionContrib_${activeCountry.toLowerCase()}`;
+          expanded.push(newStepCountry);
+        } else if (fieldType === 'PensionContributionP2') {
+          const newStepCountry = JSON.parse(JSON.stringify(step));
+          delete newStepCountry.dynamicInvestmentField;
+          newStepCountry.element = `#P2PensionContrib_${activeCountry.toLowerCase()}`;
+          expanded.push(newStepCountry);
+        } else if (fieldType === 'PensionContributionCapped') {
+          const newStepCountry = JSON.parse(JSON.stringify(step));
+          delete newStepCountry.dynamicInvestmentField;
+          newStepCountry.element = `#PensionCappedToggle_${activeCountry.toLowerCase()}`;
           expanded.push(newStepCountry);
         } else if (fieldType === 'GlobalAssetGrowth') {
           for (const base of baseTypes) {
@@ -296,11 +341,31 @@ class TestWizard {
             expanded.push(newStep);
           }
         } else if (fieldType === 'LocalAssetGrowth') {
+          const investmentTypes = getInvestmentTypesForCountry(activeCountry);
           for (const type of investmentTypes) {
             if (type.baseRef) continue; 
             const newStep = JSON.parse(JSON.stringify(step));
             delete newStep.dynamicInvestmentField;
-            newStep.element = `#${type.key}GrowthRate`;
+            let baseKey = type.key;
+            const suffix = '_' + activeCountry.toLowerCase();
+            if (baseKey.toLowerCase().endsWith(suffix)) {
+              baseKey = baseKey.substring(0, baseKey.length - suffix.length);
+            }
+            newStep.element = `#LocalAssetGrowth_${activeCountry.toLowerCase()}_${baseKey}`;
+            expanded.push(newStep);
+          }
+        } else if (fieldType === 'LocalAssetVolatility') {
+          const investmentTypes = getInvestmentTypesForCountry(activeCountry);
+          for (const type of investmentTypes) {
+            if (type.baseRef) continue; 
+            const newStep = JSON.parse(JSON.stringify(step));
+            delete newStep.dynamicInvestmentField;
+            let baseKey = type.key;
+            const suffix = '_' + activeCountry.toLowerCase();
+            if (baseKey.toLowerCase().endsWith(suffix)) {
+              baseKey = baseKey.substring(0, baseKey.length - suffix.length);
+            }
+            newStep.element = `#LocalAssetVolatility_${activeCountry.toLowerCase()}_${baseKey}`;
             expanded.push(newStep);
           }
         }
@@ -1050,7 +1115,7 @@ describe('Wizard Component', () => {
       const expanded = wizard.expandDynamicSteps(steps);
       expect(expanded).toHaveLength(1);
       // indexFunds_ie has baseRef, so it's skipped. shares_ie is local.
-      expect(expanded[0].element).toBe('#shares_ieGrowthRate');
+      expect(expanded[0].element).toBe('#LocalAssetGrowth_ie_shares');
     });
 
     test('should expand PensionContribution template', () => {
@@ -1058,10 +1123,110 @@ describe('Wizard Component', () => {
         { dynamicInvestmentField: 'PensionContribution', popover: { title: 'Pension' } }
       ];
       const expanded = wizard.expandDynamicSteps(steps);
-      expect(expanded).toHaveLength(2);
-      expect(expanded[0].element).toBe('#PensionContributionPercentage'); // Legacy
-      expect(expanded[1].element).toBe('#P1PensionContrib_ie'); // Country
+      expect(expanded).toHaveLength(1);
+      expect(expanded[0].element).toBe('#P1PensionContrib_ie');
+    });
+
+    test('uses growth-rates selected country for LocalAsset* dynamic steps', () => {
+      const customConfig = {
+        getStartCountry: jest.fn(() => 'ie'),
+        getInvestmentBaseTypes: jest.fn(() => [{ baseKey: 'globalEquity', label: 'Global Equity' }]),
+        getInvestmentBaseTypeByKey: jest.fn(() => null),
+        getCachedTaxRuleSet: jest.fn((countryCode) => {
+          const cc = String(countryCode || '').toLowerCase();
+          if (cc === 'ar') {
+            return {
+              getInvestmentType: jest.fn(() => null),
+              getResolvedInvestmentTypes: jest.fn(() => [
+                { key: 'merval_ar', label: 'Merval' }
+              ])
+            };
+          }
+          return {
+            getInvestmentType: jest.fn(() => null),
+            getResolvedInvestmentTypes: jest.fn(() => [
+              { key: 'shares_ie', label: 'Shares' }
+            ])
+          };
+        })
+      };
+      global.Config.getInstance.mockImplementation(() => customConfig);
+      mockWebUIInstance.countryTabSyncManager.getSelectedCountry.mockImplementation((panelId) => {
+        if (panelId === 'growthRates') return 'ar';
+        if (panelId === 'allocations') return 'ie';
+        return null;
+      });
+
+      const growthSteps = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'LocalAssetGrowth', card: 'growthRates', popover: { title: 'Growth' } }
+      ]);
+      expect(growthSteps).toHaveLength(1);
+      expect(growthSteps[0].element).toBe('#LocalAssetGrowth_ar_merval');
+
+      const volSteps = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'LocalAssetVolatility', card: 'growthRates', popover: { title: 'Vol' } }
+      ]);
+      expect(volSteps).toHaveLength(1);
+      expect(volSteps[0].element).toBe('#LocalAssetVolatility_ar_merval');
+    });
+
+    test('uses allocations selected country for allocation and pension dynamic steps', () => {
+      const customConfig = {
+        getStartCountry: jest.fn(() => 'ie'),
+        getInvestmentBaseTypes: jest.fn(() => [{ baseKey: 'globalEquity', label: 'Global Equity' }]),
+        getInvestmentBaseTypeByKey: jest.fn(() => null),
+        getCachedTaxRuleSet: jest.fn((countryCode) => {
+          const cc = String(countryCode || '').toLowerCase();
+          if (cc === 'ar') {
+            return {
+              getInvestmentType: jest.fn(() => null),
+              getResolvedInvestmentTypes: jest.fn(() => [
+                { key: 'cedear_ar', label: 'CEDEAR' },
+                { key: 'merval_ar', label: 'Merval' }
+              ])
+            };
+          }
+          return {
+            getInvestmentType: jest.fn(() => null),
+            getResolvedInvestmentTypes: jest.fn(() => [
+              { key: 'indexFunds_ie', label: 'Index Funds', baseRef: 'globalEquity' },
+              { key: 'shares_ie', label: 'Shares' }
+            ])
+          };
+        })
+      };
+      global.Config.getInstance.mockImplementation(() => customConfig);
+      mockWebUIInstance.countryTabSyncManager.getSelectedCountry.mockImplementation((panelId) => {
+        if (panelId === 'allocations') return 'ar';
+        if (panelId === 'growthRates') return 'ie';
+        return null;
+      });
+
+      const allocationSteps = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'InvestmentAllocation', card: 'allocations', popover: { title: 'Alloc' } }
+      ]);
+      const canonicalAlloc = allocationSteps.filter(s => /^#InvestmentAllocation_ar_/.test(s.element));
+      expect(canonicalAlloc.length).toBeGreaterThan(0);
+      expect(canonicalAlloc.some(s => s.element === '#InvestmentAllocation_ar_cedear')).toBe(true);
+      expect(canonicalAlloc.some(s => s.element === '#InvestmentAllocation_ar_merval')).toBe(true);
+
+      const p1 = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'PensionContribution', card: 'allocations', popover: { title: 'P1' } }
+      ]);
+      expect(p1).toHaveLength(1);
+      expect(p1[0].element).toBe('#P1PensionContrib_ar');
+
+      const p2 = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'PensionContributionP2', card: 'allocations', popover: { title: 'P2' } }
+      ]);
+      expect(p2).toHaveLength(1);
+      expect(p2[0].element).toBe('#P2PensionContrib_ar');
+
+      const capped = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'PensionContributionCapped', card: 'allocations', popover: { title: 'Capped' } }
+      ]);
+      expect(capped).toHaveLength(1);
+      expect(capped[0].element).toBe('#PensionCappedToggle_ar');
     });
   });
 });
-

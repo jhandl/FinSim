@@ -143,7 +143,7 @@ module.exports = {
         getInstance: () => ({
           getStartCountry: () => 'ie',
           getDefaultCountry: () => 'ie',
-          getAvailableCountries: () => ([{ code: 'ie', name: 'Ireland' }])
+          getAvailableCountries: () => ([{ code: 'ie', name: 'Ireland' }, { code: 'us', name: 'United States' }])
         })
       };
 
@@ -153,6 +153,17 @@ module.exports = {
 
       const legacyCsv = fs.readFileSync(path.join(__dirname, '..', 'src', 'frontend', 'web', 'assets', 'demo.csv'), 'utf8');
       deserializeSimulation(legacyCsv, ui);
+
+      // Legacy Inflation should normalize directly to canonical per-country field.
+      const inflationLegacy = doc.getElementById('Inflation');
+      const inflationLegacyValue = inflationLegacy ? String(inflationLegacy.value || '').trim() : '';
+      if (inflationLegacy && inflationLegacyValue !== '') {
+        errors.push('Legacy Inflation field should not be authoritative after normalization');
+      }
+      const inflationStart = doc.getElementById('Inflation_ie');
+      if (!inflationStart || !inflationStart.value || inflationStart.value.trim() === '') {
+        errors.push('Inflation_ie should be populated from legacy Inflation');
+      }
 
       // Per-country state pensions should be populated for StartCountry.
       const sp = doc.getElementById('StatePension_ie');
@@ -223,6 +234,35 @@ module.exports = {
       const cap2 = doc2.getElementById('PensionCapped_ie');
       if (!cap2 || cap2.value !== 'No') {
         errors.push('PensionCapped_ie did not normalize legacy "no" to "No"');
+      }
+
+      // StartCountry lock should come from pre-scan, not encounter order during parameter loop.
+      const delayedStartCountryCsv = [
+        '# FinSim v5.0 Save File',
+        '# Parameters',
+        'Inflation,4%',
+        'StatePensionWeekly,300',
+        'StartCountry,us',
+        'simulation_mode,single',
+        'economy_mode,deterministic',
+        '',
+        '# Events',
+        'Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta',
+        'NOP,,,,,,,'
+      ].join('\n');
+
+      const doc3 = createParameterDocument();
+      global.document = doc3;
+      const ui3 = createStrictUi(doc3);
+      seedLegacyDemoBaseParameterIds(ui3);
+      deserializeSimulation(delayedStartCountryCsv, ui3);
+      const delayedInflUs = doc3.getElementById('Inflation_us');
+      const delayedInflIe = doc3.getElementById('Inflation_ie');
+      if (!delayedInflUs || !String(delayedInflUs.value || '').trim()) {
+        errors.push('Delayed StartCountry load should map legacy Inflation to Inflation_us.');
+      }
+      if (delayedInflIe && String(delayedInflIe.value || '').trim()) {
+        errors.push('Delayed StartCountry load should not map legacy Inflation to Inflation_ie.');
       }
     } catch (err) {
       errors.push('Unexpected error: ' + (err && err.message ? err.message : String(err)));

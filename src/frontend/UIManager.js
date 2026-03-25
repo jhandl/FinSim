@@ -332,23 +332,23 @@ class UIManager {
       initialPension: this.ui.getValue("InitialPension"),
       retirementAge: this.ui.getValue("RetirementAge"),
       emergencyStash: this.ui.getValue("EmergencyStash"),
-      pensionPercentage: this.ui.getValue("PensionContributionPercentage"),
-      pensionCapped: this.ui.getValue("PensionContributionCapped"),
-      statePensionWeekly: this.ui.getValue("StatePensionWeekly"),
+      pensionPercentage: 0,
+      pensionCapped: 'No',
+      statePensionWeekly: 0,
       growthRatePension: this.ui.getValue("PensionGrowthRate"),
       growthDevPension: this.ui.getValue("PensionGrowthStdDev"),
-      inflation: getOptionalPercentageValue("Inflation"),
+      inflation: undefined,
       marriageYear: this.ui.getValue("MarriageYear"),
       youngestChildBorn: this.ui.getValue("YoungestChildBorn"),
       oldestChildBorn: this.ui.getValue("OldestChildBorn"),
-      personalTaxCredit: this.ui.getValue("PersonalTaxCredit"),
+      personalTaxCredit: undefined,
 
       // Person 2 Parameters
       p2StartingAge: this.ui.getValue("P2StartingAge"),
       p2RetirementAge: this.ui.getValue("P2RetirementAge"),
-      p2StatePensionWeekly: this.ui.getValue("P2StatePensionWeekly"),
+      p2StatePensionWeekly: 0,
       initialPensionP2: this.ui.getValue("InitialPensionP2"),
-      pensionPercentageP2: this.ui.getValue("PensionContributionPercentageP2"),
+      pensionPercentageP2: 0,
       simulation_mode: this.ui.getValue("simulation_mode"),
       economyMode: this.ui.getValue("economy_mode"),
       economicRegimesEnabled: this.ui.getValue('economicRegimesEnabled') === 'on'
@@ -367,7 +367,8 @@ class UIManager {
     const investmentVolatilitiesByKey = {};
     const globalBaseRefs = {};
     const startCountry = params.StartCountry.toLowerCase();
-    params[`Inflation_${startCountry}`] = getOptionalPercentageValue('Inflation');
+    params[`Inflation_${startCountry}`] = getOptionalPercentageValue(`Inflation_${startCountry}`);
+    params.inflation = params[`Inflation_${startCountry}`];
     investmentAllocationsByCountry[startCountry] = {};
     for (let i = 0; i < investmentTypes.length; i++) {
       const type = investmentTypes[i];
@@ -384,12 +385,28 @@ class UIManager {
         if (type.baseRef) {
           globalBaseRefs[type.baseRef] = true;
         } else {
-          const growthId = `${key}GrowthRate`;
-          if (typeof document !== 'undefined' && !document.getElementById(growthId)) {
-            continue;
+          const suffix = '_' + startCountry;
+          const baseKey = (String(key).toLowerCase().endsWith(suffix))
+            ? String(key).slice(0, String(key).length - suffix.length)
+            : String(key);
+          const localGrowthId = `LocalAssetGrowth_${startCountry}_${baseKey}`;
+          const localVolId = `LocalAssetVolatility_${startCountry}_${baseKey}`;
+          const hasGrowthInput = (typeof document === 'undefined') || !!document.getElementById(localGrowthId);
+          const hasVolInput = (typeof document === 'undefined') || !!document.getElementById(localVolId);
+          if (hasGrowthInput) {
+            const growthRaw = getRawInputValue(localGrowthId);
+            const growthVal = this.ui.getValue(localGrowthId);
+            if ((growthRaw === null || growthRaw !== '') && growthVal !== null && growthVal !== undefined && growthVal !== '') {
+              investmentGrowthRatesByKey[key] = growthVal;
+            }
           }
-          investmentGrowthRatesByKey[key] = this.ui.getValue(growthId);
-          investmentVolatilitiesByKey[key] = this.ui.getValue(`${key}GrowthStdDev`);
+          if (hasVolInput) {
+            const volRaw = getRawInputValue(localVolId);
+            const volVal = this.ui.getValue(localVolId);
+            if ((volRaw === null || volRaw !== '') && volVal !== null && volVal !== undefined && volVal !== '') {
+              investmentVolatilitiesByKey[key] = volVal;
+            }
+          }
         }
       }        
     }
@@ -462,14 +479,16 @@ class UIManager {
                 const hasGrowthInput = (typeof document === 'undefined') || !!document.getElementById(localGrowthId);
                 const hasVolInput = (typeof document === 'undefined') || !!document.getElementById(localVolId);
                 if (hasGrowthInput) {
+                  const growthRaw = getRawInputValue(localGrowthId);
                   const growthVal = this.ui.getValue(localGrowthId);
-                  if (growthVal !== null && growthVal !== undefined && growthVal !== '') {
+                  if ((growthRaw === null || growthRaw !== '') && growthVal !== null && growthVal !== undefined && growthVal !== '') {
                     investmentGrowthRatesByKey[key] = growthVal;
                   }
                 }
                 if (hasVolInput) {
+                  const volRaw = getRawInputValue(localVolId);
                   const volVal = this.ui.getValue(localVolId);
-                  if (volVal !== null && volVal !== undefined && volVal !== '') {
+                  if ((volRaw === null || volRaw !== '') && volVal !== null && volVal !== undefined && volVal !== '') {
                     investmentVolatilitiesByKey[key] = volVal;
                   }
                 }
@@ -477,21 +496,6 @@ class UIManager {
             }
           }
         }
-
-        // Backward compatibility: if old format `InvestmentAllocation_{key}` exists, map to StartCountry
-        // (DOMUtils.getValue throws if missing; detect via DOM when possible).
-        try {
-          if (typeof document !== 'undefined') {
-            for (let i = 0; i < investmentTypes.length; i++) {
-              const key = investmentTypes[i] && investmentTypes[i].key;
-              if (!key) continue;
-              const oldId = `InvestmentAllocation_${key}`;
-              if (document.getElementById(oldId)) {
-                investmentAllocationsByCountry[startCountry][key] = this.ui.getValue(oldId);
-              }
-            }
-          }
-        } catch (_) { }
       }
     } catch (_) { }
 
@@ -521,12 +525,19 @@ class UIManager {
     // Ensure StartCountry pension contribution settings exist (single-country UI uses global fields).
     const startCountryLower = startCountry.toLowerCase();
     if (!params.pensionContributionsByCountry[startCountryLower]) {
+      const p1Id = `P1PensionContrib_${startCountryLower}`;
+      const p2Id = `P2PensionContrib_${startCountryLower}`;
+      const cappedId = `PensionCapped_${startCountryLower}`;
       params.pensionContributionsByCountry[startCountryLower] = {
-        p1Pct: params.pensionPercentage || 0,
-        p2Pct: params.pensionPercentageP2 || 0,
-        capped: params.pensionCapped || 'No'
+        p1Pct: this.ui.getValue(p1Id) || 0,
+        p2Pct: this.ui.getValue(p2Id) || 0,
+        capped: this.ui.getValue(cappedId) || 'No'
       };
     }
+    const startPensionContrib = params.pensionContributionsByCountry[startCountryLower] || { p1Pct: 0, p2Pct: 0, capped: 'No' };
+    params.pensionPercentage = startPensionContrib.p1Pct || 0;
+    params.pensionPercentageP2 = startPensionContrib.p2Pct || 0;
+    params.pensionCapped = startPensionContrib.capped || 'No';
 
     // State pension (per-country): Convention StatePension_{countryCode}
     // Note: actual period semantics are derived from ruleset config, not the field ID.
@@ -552,15 +563,26 @@ class UIManager {
         }
       }
     }
-    // Single-country UI: StatePensionWeekly / P2StatePensionWeekly apply to StartCountry.
+    const startStatePensionId = `StatePension_${startCountry}`;
+    const startP2StatePensionId = `P2StatePension_${startCountry}`;
     if (statePensionByCountry[startCountry] === undefined || statePensionByCountry[startCountry] === null) {
-      statePensionByCountry[startCountry] = params.statePensionWeekly;
+      if (typeof document === 'undefined' || document.getElementById(startStatePensionId)) {
+        statePensionByCountry[startCountry] = this.ui.getValue(startStatePensionId);
+      }
     }
     if (p2StatePensionByCountry[startCountry] === undefined || p2StatePensionByCountry[startCountry] === null) {
-      p2StatePensionByCountry[startCountry] = params.p2StatePensionWeekly;
+      if (typeof document === 'undefined' || document.getElementById(startP2StatePensionId)) {
+        p2StatePensionByCountry[startCountry] = this.ui.getValue(startP2StatePensionId);
+      }
     }
     params.statePensionByCountry = statePensionByCountry;
     params.p2StatePensionByCountry = p2StatePensionByCountry;
+    params.statePensionWeekly = (statePensionByCountry[startCountry] !== undefined && statePensionByCountry[startCountry] !== null)
+      ? statePensionByCountry[startCountry]
+      : 0;
+    params.p2StatePensionWeekly = (p2StatePensionByCountry[startCountry] !== undefined && p2StatePensionByCountry[startCountry] !== null)
+      ? p2StatePensionByCountry[startCountry]
+      : 0;
 
     // Read per-country tax credits
     params.taxCreditsByCountry = params.taxCreditsByCountry || {};
@@ -588,15 +610,11 @@ class UIManager {
       });
     });
 
-    // Map PersonalTaxCredit override to StartCountry personal credit input (UI convenience).
-    const legacyCredit = this.ui.getValue('PersonalTaxCredit');
-    if (legacyCredit !== null && legacyCredit !== '' && legacyCredit !== undefined) {
-      const startCountryLegacy = params.StartCountry.toLowerCase();
-      if (!params.taxCreditsByCountry[startCountryLegacy]) {
-        params.taxCreditsByCountry[startCountryLegacy] = {};
-      }
-      if (!params.taxCreditsByCountry[startCountryLegacy].personal) {
-        params.taxCreditsByCountry[startCountryLegacy].personal = parseFloat(legacyCredit);
+    const startCountryCredits = params.taxCreditsByCountry[startCountry] || {};
+    if (startCountryCredits.personal !== undefined && startCountryCredits.personal !== null && startCountryCredits.personal !== '') {
+      const personalCredit = parseFloat(startCountryCredits.personal);
+      if (!isNaN(personalCredit)) {
+        params.personalTaxCredit = personalCredit;
       }
     }
 
@@ -793,7 +811,17 @@ class UIManager {
           const labels = investmentTypes.map(function (t) { return t.label || t.key; }).join(', ');
           this.ui.setWarning("PensionGrowthStdDev", "At least one volatility rate must be greater than 0% in variable growth mode");
           for (let i = 0; i < investmentTypes.length; i++) {
-            const volId = `${investmentTypes[i].key}GrowthStdDev`;
+            const investmentType = investmentTypes[i] || {};
+            let volId = '';
+            if (investmentType.baseRef) {
+              volId = `GlobalAssetVolatility_${investmentType.baseRef}`;
+            } else {
+              const suffix = '_' + startCountry;
+              const baseKey = (String(investmentType.key || '').toLowerCase().endsWith(suffix))
+                ? String(investmentType.key).slice(0, String(investmentType.key).length - suffix.length)
+                : String(investmentType.key || '');
+              volId = `LocalAssetVolatility_${startCountry}_${baseKey}`;
+            }
             this.ui.setWarning(volId, `At least one of Pension, ${labels} volatility must be > 0% in variable growth mode`);
           }
           errors = true;
@@ -1516,7 +1544,7 @@ class UIManager {
       },
       {
         value: params.pensionPercentage,
-        fieldId: 'PensionContributionPercentage',
+        fieldId: `P1PensionContrib_${String(params.StartCountry || '').toLowerCase()}`,
         name: 'Pension Contribution Percentage',
         min: 0,
         max: 1,
@@ -1526,7 +1554,7 @@ class UIManager {
       },
       {
         value: params.pensionPercentageP2,
-        fieldId: 'PensionContributionPercentageP2',
+        fieldId: `P2PensionContrib_${String(params.StartCountry || '').toLowerCase()}`,
         name: 'Partner Pension Contribution Percentage',
         min: 0,
         max: 1,

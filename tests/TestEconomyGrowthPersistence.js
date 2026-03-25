@@ -209,16 +209,16 @@ module.exports = {
       csv = serializeSimulation(ui3);
 
       if (csv.indexOf('Inflation_ie,2') !== -1) {
-        errors.push('Legacy inflation should not backfill Inflation_ie.');
+        errors.push('Legacy Inflation must not backfill canonical Inflation_ie.');
       }
       if (csv.indexOf('Inflation_ie,') === -1) {
-        errors.push('Expected Inflation_ie to serialize as empty.');
+        errors.push('Expected canonical Inflation_ie key in CSV.');
       }
-      if (csv.indexOf('LocalAssetGrowth_ie_shares,4') === -1) {
-        errors.push('Legacy growth did not map to LocalAssetGrowth_ie_shares.');
+      if (csv.indexOf('LocalAssetGrowth_ie_shares,4') !== -1) {
+        errors.push('Legacy shares_ieGrowthRate must not backfill LocalAssetGrowth_ie_shares.');
       }
-      if (csv.indexOf('LocalAssetVolatility_ie_shares,9') === -1) {
-        errors.push('Legacy volatility did not map to LocalAssetVolatility_ie_shares.');
+      if (csv.indexOf('LocalAssetVolatility_ie_shares,9') !== -1) {
+        errors.push('Legacy shares_ieGrowthStdDev must not backfill LocalAssetVolatility_ie_shares.');
       }
       if (csv.indexOf('LocalAssetGrowth_ie_indexFunds') !== -1) {
         errors.push('Inheriting wrapper LocalAssetGrowth_ie_indexFunds should NOT be serialized even from legacy.');
@@ -243,12 +243,12 @@ module.exports = {
         errors.push('Inflation_ie should remain blank when serialized blank.');
       }
       const dlGrow = doc4.getElementById('LocalAssetGrowth_ie_shares');
-      if (!dlGrow || dlGrow.value !== '4') {
-        errors.push('Default LocalAssetGrowth_ie_shares did not deserialize.');
+      if (!dlGrow || dlGrow.value !== '') {
+        errors.push('LocalAssetGrowth_ie_shares should remain blank without canonical value.');
       }
       const dlVol = doc4.getElementById('LocalAssetVolatility_ie_shares');
-      if (!dlVol || dlVol.value !== '9') {
-        errors.push('Default LocalAssetVolatility_ie_shares did not deserialize.');
+      if (!dlVol || dlVol.value !== '') {
+        errors.push('LocalAssetVolatility_ie_shares should remain blank without canonical value.');
       }
 
       // Phase C: relocation scenario with MV event should serialize per-country locals
@@ -342,8 +342,8 @@ module.exports = {
       if (csvFirst !== csvSecond) {
         errors.push('serializeSimulation should be stable across repeated calls for unchanged state.');
       }
-      if (csvFirst.indexOf('Inflation_ie,') !== -1 || csvSecond.indexOf('Inflation_ie,') !== -1) {
-        errors.push('Inflation_ie should not be emitted unless it existed, had a value, or economy mode requires it.');
+      if (csvFirst.indexOf('Inflation_ie,') === -1 || csvSecond.indexOf('Inflation_ie,') === -1) {
+        errors.push('Canonical Inflation_ie key should always be emitted for StartCountry.');
       }
     } catch (err) {
       errors.push('Unexpected error: ' + (err && err.message ? err.message : String(err)));

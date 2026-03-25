@@ -675,10 +675,6 @@ class WebUI extends AbstractUI {
     hideInputWrapper('InitialCapital_shares');
     hideInputWrapper('InvestmentAllocation_indexFunds');
     hideInputWrapper('InvestmentAllocation_shares');
-    // Legacy pension contribution fields (now per-country) kept hidden for back-compat serialization
-    this.ensureParameterInput('PensionContributionPercentage', 'percentage');
-    this.ensureParameterInput('PensionContributionPercentageP2', 'percentage');
-    this.ensureParameterInput('PensionContributionCapped', 'string');
     hideGrowthRow('indexFundsGrowthRate');
     hideGrowthRow('sharesGrowthRate');
 
@@ -690,35 +686,6 @@ class WebUI extends AbstractUI {
       if (!key) continue;
       this.ensureParameterInput('InitialCapital_' + key, 'currency');
       this.ensureParameterInput('InvestmentAllocation_' + key, 'percentage');
-    }
-
-    // Ensure per-type growth inputs exist for local investments (no baseRef) for serialization/back-compat.
-    // Non-local wrappers (with baseRef) use asset-level params and don't need wrapper-level inputs.
-    for (let i = 0; i < types.length; i++) {
-      const t = types[i] || {};
-      const key = t.key;
-      if (!key) continue;
-      
-      // Skip wrapper-level inputs for non-local wrappers (those with baseRef)
-      // Non-local wrappers use asset-level params: GlobalAssetGrowth_{baseRef}, GlobalAssetVolatility_{baseRef}
-      if (t.baseRef) continue;
-
-      const grId = key + 'GrowthRate';
-      const sdId = key + 'GrowthStdDev';
-
-      const gr = this._takeOrCreateInput(grId, 'percentage');
-      gr.type = 'text';
-      gr.setAttribute('inputmode', 'numeric');
-      gr.setAttribute('pattern', '[0-9]*');
-      gr.setAttribute('step', '1');
-      this._stashInputElement(gr);
-
-      const sd = this._takeOrCreateInput(sdId, 'percentage');
-      sd.type = 'text';
-      sd.setAttribute('inputmode', 'numeric');
-      sd.setAttribute('pattern', '[0-9]*');
-      sd.setAttribute('step', '1');
-      this._stashInputElement(sd);
     }
 
     const startGroup = document.querySelector('#startingPosition .input-group');
@@ -764,16 +731,6 @@ class WebUI extends AbstractUI {
     const tbody = document.querySelector('#growthRates table.growth-rates-table tbody');
     const inflationInput = document.getElementById('Inflation');
     const inflationRow = inflationInput ? inflationInput.closest('tr') : null;
-    const setRowHeadingForInput = (inputId, label) => {
-      const input = document.getElementById(inputId);
-      if (!input) return;
-      const td = input.closest('td');
-      if (!td) return;
-      const tr = td.parentElement;
-      if (!tr) return;
-      const firstCell = tr.children && tr.children[0];
-      if (firstCell) firstCell.textContent = label;
-    };
     if (tbody) {
       const cfg = Config.getInstance();
       const economicData = cfg.getEconomicData ? cfg.getEconomicData() : null;
@@ -855,52 +812,92 @@ class WebUI extends AbstractUI {
 
       const relocationEnabled = cfg.isRelocationEnabled();
       const showCountryChips = relocationEnabled && this.hasEffectiveRelocationEvents();
-      if (!showCountryChips) {
-        this.growthRatesCountryChipSelector = null;
-        setRowHeadingForInput('Inflation', 'Inflation');
-        if (inflationRow) inflationRow.style.display = '';
-        const singleCountryInflation = document.getElementById('Inflation');
-        const startCountry = cfg.getStartCountry();
-        if (singleCountryInflation) {
-          applyInflationPlaceholder(singleCountryInflation, startCountry);
-          const startInflationId = 'Inflation_' + String(startCountry || '').toLowerCase();
-          const startInflationInput = document.getElementById(startInflationId);
-          const startInflationValue = startInflationInput ? String(startInflationInput.value || '').trim() : '';
-          if (!String(singleCountryInflation.value || '').trim() && startInflationValue) {
-            this.setValue('Inflation', startInflationValue);
-          }
-        }
+      if (inflationRow) inflationRow.style.display = 'none';
+      const insertBeforeRow = inflationRow || null;
+      const clearInflationRows = () => {
         const rows = tbody.querySelectorAll('[data-dynamic-inflation-row="true"]');
         rows.forEach(el => {
           const inputs = el.querySelectorAll('input');
           for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
           if (el && el.parentNode) el.parentNode.removeChild(el);
         });
-
-        // Render local investment types for start country (when no chips shown)
-        for (let i = 0; i < economyTypes.length; i++) {
-          const t = economyTypes[i] || {};
+      };
+      const clearCountryGrowthRows = () => {
+        const rows = tbody.querySelectorAll('[data-country-growth-row="true"]');
+        rows.forEach(el => {
+          const inputs = el.querySelectorAll('input');
+          for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        });
+      };
+      const renderInflationRow = (code) => {
+        const selectedCode = (code || '').toString().trim().toLowerCase();
+        clearInflationRows();
+        if (!selectedCode) return;
+        const infId = 'Inflation_' + selectedCode;
+        const trInflation = document.createElement('tr');
+        trInflation.setAttribute('data-dynamic-inflation-row', 'true');
+        const infLabel = document.createElement('td');
+        infLabel.textContent = 'Inflation (' + selectedCode.toUpperCase() + ')';
+        trInflation.appendChild(infLabel);
+        const infGrowth = document.createElement('td');
+        const infWrap = document.createElement('div');
+        infWrap.className = 'percentage-container';
+        const infInput = this._takeOrCreateInput(infId, 'percentage');
+        infInput.type = 'text';
+        infInput.setAttribute('inputmode', 'numeric');
+        infInput.setAttribute('pattern', '[0-9]*');
+        infInput.setAttribute('step', '0.1');
+        applyInflationPlaceholder(infInput, selectedCode);
+        infWrap.appendChild(infInput);
+        infGrowth.appendChild(infWrap);
+        trInflation.appendChild(infGrowth);
+        trInflation.appendChild(document.createElement('td'));
+        if (insertBeforeRow) {
+          tbody.insertBefore(trInflation, insertBeforeRow);
+        } else {
+          tbody.appendChild(trInflation);
+        }
+        this.formatUtils.setupPercentageInputs();
+        this.updateUIForEconomyMode();
+      };
+      const addLocalRowsForCountry = (code, selectedCode, providedTypes = null) => {
+        const cc = (code || '').toString().trim().toLowerCase();
+        if (!cc) return;
+        const rs = cfg.getCachedTaxRuleSet(cc);
+        const invTypes = Array.isArray(providedTypes)
+          ? providedTypes
+          : ((rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : []);
+        const localTypes = invTypes.filter(t => (t && t.residenceScope || '').toLowerCase() === 'local' && !t.baseRef && !(t && t.sellWhenReceived));
+        for (let i = 0; i < localTypes.length; i++) {
+          const t = localTypes[i] || {};
           const key = t.key;
           if (!key) continue;
-          
-          // Only show local investments (no baseRef)
-          // Non-local (with baseRef) are handled by global rows at the top
-          if (t.baseRef) continue;
-
-          const labelText = t.label || key;
-          const growthId = key + 'GrowthRate';
-          const volId = key + 'GrowthStdDev';
-
+          const baseKey = this._toBaseInvestmentKey(key, cc);
+          if (!baseKey) continue;
+          const labelText = t.label || baseKey;
+          const growthId = 'LocalAssetGrowth_' + cc + '_' + baseKey;
+          const volId = 'LocalAssetVolatility_' + cc + '_' + baseKey;
           const tr = makeGrowthRow(labelText, growthId, volId);
-          if (inflationRow) tbody.insertBefore(tr, inflationRow);
-          else tbody.appendChild(tr);
+          tr.setAttribute('data-country-growth-row', 'true');
+          tr.setAttribute('data-country-code', cc);
+          tr.style.display = (String(cc).toLowerCase() === String(selectedCode).toLowerCase()) ? '' : 'none';
+          if (insertBeforeRow) {
+            tbody.insertBefore(tr, insertBeforeRow);
+          } else {
+            tbody.appendChild(tr);
+          }
         }
+      };
+      if (!showCountryChips) {
+        this.growthRatesCountryChipSelector = null;
+        const startCountry = String(cfg.getStartCountry() || '').toLowerCase();
+        clearCountryGrowthRows();
+        addLocalRowsForCountry(startCountry, startCountry, economyTypes);
+        renderInflationRow(startCountry);
       }
 
       if (showCountryChips) {
-        if (inflationRow) inflationRow.style.display = 'none';
-        const insertBeforeRow = inflationRow || null;
-
         const chipsRow = document.createElement('tr');
         chipsRow.setAttribute('data-dynamic-investment-param', 'true');
         const chipsCell = document.createElement('td');
@@ -926,13 +923,6 @@ class WebUI extends AbstractUI {
         let selected = mgrSelected || prevSelected || startCountry;
         if (scenarioCountries.indexOf(String(selected).toLowerCase()) === -1) selected = startCountry;
 
-        const updateCountryLabels = (code) => {
-          const cc = (code || '').toString().trim().toUpperCase();
-          if (cc) {
-            setRowHeadingForInput('Inflation', 'Inflation (' + cc + ')');
-          }
-        };
-
         const showGrowthCountry = (code) => {
           const selectedCode = (code || '').toString().trim().toLowerCase();
           const rows = tbody.querySelectorAll('[data-country-growth-row="true"]');
@@ -940,49 +930,6 @@ class WebUI extends AbstractUI {
             const c = (el.getAttribute('data-country-code') || '').toLowerCase();
             el.style.display = (c === selectedCode) ? '' : 'none';
           });
-          updateCountryLabels(selectedCode);
-        };
-
-        const clearInflationRows = () => {
-          const rows = tbody.querySelectorAll('[data-dynamic-inflation-row="true"]');
-          rows.forEach(el => {
-            const inputs = el.querySelectorAll('input');
-            for (let i = 0; i < inputs.length; i++) this._stashInputElement(inputs[i]);
-            if (el && el.parentNode) el.parentNode.removeChild(el);
-          });
-        };
-
-        const renderInflationRow = (code) => {
-          const selectedCode = (code || '').toString().trim().toLowerCase();
-          clearInflationRows();
-          if (!selectedCode) return;
-          const cc = selectedCode.toUpperCase();
-          const infId = 'Inflation_' + selectedCode;
-          const trInflation = document.createElement('tr');
-          trInflation.setAttribute('data-dynamic-inflation-row', 'true');
-          const infLabel = document.createElement('td');
-          infLabel.textContent = 'Inflation (' + cc + ')';
-          trInflation.appendChild(infLabel);
-          const infGrowth = document.createElement('td');
-          const infWrap = document.createElement('div');
-          infWrap.className = 'percentage-container';
-          const infInput = this._takeOrCreateInput(infId, 'percentage');
-          infInput.type = 'text';
-          infInput.setAttribute('inputmode', 'numeric');
-          infInput.setAttribute('pattern', '[0-9]*');
-          infInput.setAttribute('step', '0.1');
-          applyInflationPlaceholder(infInput, selectedCode);
-          infWrap.appendChild(infInput);
-          infGrowth.appendChild(infWrap);
-          trInflation.appendChild(infGrowth);
-          trInflation.appendChild(document.createElement('td'));
-          if (insertBeforeRow) {
-            tbody.insertBefore(trInflation, insertBeforeRow);
-          } else {
-            tbody.appendChild(trInflation);
-          }
-          this.formatUtils.setupPercentageInputs();
-          this.updateUIForEconomyMode();
         };
 
         this.growthRatesCountryChipSelector = new CountryChipSelector(
@@ -993,46 +940,14 @@ class WebUI extends AbstractUI {
         );
         this.growthRatesCountryChipSelector.render(chipContainer);
 
-        const startCode = String(startCountry || '').toLowerCase();
-        if (startCode) {
-          this.ensureParameterInput('Inflation_' + startCode, 'percentage');
-          const startInf = document.getElementById('Inflation_' + startCode);
-          if (startInf) applyInflationPlaceholder(startInf, startCode);
-          const visibleInflation = document.getElementById('Inflation');
-          if (visibleInflation) {
-            applyInflationPlaceholder(visibleInflation, startCode);
-            if (!String(visibleInflation.value || '').trim() && startInf && startInf.value) this.setValue('Inflation', startInf.value);
-          }
-        }
-
+        clearCountryGrowthRows();
         for (let ci = 0; ci < scenarioCountries.length; ci++) {
           const code = scenarioCountries[ci];
           const infId = 'Inflation_' + code;
           this.ensureParameterInput(infId, 'percentage');
           const infInput = document.getElementById(infId);
           if (infInput) applyInflationPlaceholder(infInput, code);
-          const rs = cfg.getCachedTaxRuleSet(code);
-          const invTypes = (rs && typeof rs.getResolvedInvestmentTypes === 'function') ? (rs.getResolvedInvestmentTypes() || []) : [];
-          const localTypes = invTypes.filter(t => (t && t.residenceScope || '').toLowerCase() === 'local' && !t.baseRef && !(t && t.sellWhenReceived));
-          for (let i = 0; i < localTypes.length; i++) {
-            const t = localTypes[i] || {};
-            const key = t.key;
-            if (!key) continue;
-            const baseKey = this._toBaseInvestmentKey(key, code);
-            if (!baseKey) continue;
-            const labelText = t.label || baseKey;
-            const growthId = 'LocalAssetGrowth_' + code + '_' + baseKey;
-            const volId = 'LocalAssetVolatility_' + code + '_' + baseKey;
-            const tr = makeGrowthRow(labelText, growthId, volId);
-            tr.setAttribute('data-country-growth-row', 'true');
-            tr.setAttribute('data-country-code', code);
-            tr.style.display = (String(code).toLowerCase() === String(selected).toLowerCase()) ? '' : 'none';
-            if (insertBeforeRow) {
-              tbody.insertBefore(tr, insertBeforeRow);
-            } else {
-              tbody.appendChild(tr);
-            }
-          }
+          addLocalRowsForCountry(code, selected);
         }
 
         showGrowthCountry(selected);
@@ -1050,34 +965,6 @@ class WebUI extends AbstractUI {
         }
       }
       this._growthRateCacheForRestore = null;
-    }
-
-    // Seed global asset rows from legacy wrapper-level growth inputs (baseRef types).
-    if (types && types.length) {
-      for (let i = 0; i < types.length; i++) {
-        const t = types[i] || {};
-        if (!t || !t.baseRef || !t.key || t.sellWhenReceived) continue;
-        const legacyGrowthId = t.key + 'GrowthRate';
-        const legacyVolId = t.key + 'GrowthStdDev';
-        const globalGrowthId = 'GlobalAssetGrowth_' + t.baseRef;
-        const globalVolId = 'GlobalAssetVolatility_' + t.baseRef;
-
-        const globalGrowthEl = document.getElementById(globalGrowthId);
-        const globalVolEl = document.getElementById(globalVolId);
-        const legacyGrowthEl = document.getElementById(legacyGrowthId);
-        const legacyVolEl = document.getElementById(legacyVolId);
-
-        if (globalGrowthEl && legacyGrowthEl) {
-          const gRaw = (globalGrowthEl.value !== undefined && globalGrowthEl.value !== null) ? String(globalGrowthEl.value).trim() : '';
-          const lRaw = (legacyGrowthEl.value !== undefined && legacyGrowthEl.value !== null) ? String(legacyGrowthEl.value).trim() : '';
-          if (!gRaw && lRaw) globalGrowthEl.value = legacyGrowthEl.value;
-        }
-        if (globalVolEl && legacyVolEl) {
-          const gRaw = (globalVolEl.value !== undefined && globalVolEl.value !== null) ? String(globalVolEl.value).trim() : '';
-          const lRaw = (legacyVolEl.value !== undefined && legacyVolEl.value !== null) ? String(legacyVolEl.value).trim() : '';
-          if (!gRaw && lRaw) globalVolEl.value = legacyVolEl.value;
-        }
-      }
     }
 
     // Re-apply economy mode visibility to newly created volatility cells
@@ -2698,9 +2585,62 @@ class WebUI extends AbstractUI {
       this.personalCircumstancesCountryChipSelector = null;
 
       const startCountry = cfg.getStartCountry();
+      const startCountryLower = String(startCountry || '').toLowerCase();
 
       const legacyCredit = document.getElementById('PersonalTaxCredit');
       const legacyCreditWrap = legacyCredit ? legacyCredit.closest('.input-wrapper') : null;
+      const legacyState = document.getElementById('StatePensionWeekly');
+      const legacyStateWrap = legacyState ? legacyState.closest('.input-wrapper') : null;
+      const legacyStateP2 = document.getElementById('P2StatePensionWeekly');
+      const legacyStateP2Wrap = legacyStateP2 ? legacyStateP2.closest('.input-wrapper') : null;
+      const insertBeforeEl = legacyStateWrap || group.querySelector('.input-wrapper:last-child');
+
+      const periodLabel = this.getStatePensionPeriodLabel(startCountryLower);
+      const inputId = 'StatePension_' + startCountryLower;
+      const inputIdP2 = 'P2StatePension_' + startCountryLower;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'input-wrapper';
+      wrapper.setAttribute('data-country-state-pension', 'true');
+      wrapper.setAttribute('data-country-code', startCountryLower);
+      const label = document.createElement('label');
+      label.setAttribute('for', inputId);
+      label.textContent = (this.currentSimMode === 'single')
+        ? ('State Pension (' + periodLabel + ')')
+        : ('Your State Pension (' + periodLabel + ')');
+      wrapper.appendChild(label);
+      const input = this._takeOrCreateInput(inputId, 'currency');
+      input.type = 'text';
+      input.setAttribute('inputmode', 'numeric');
+      input.setAttribute('pattern', '[0-9]*');
+      input.setAttribute('data-1p-ignore', '');
+      wrapper.appendChild(input);
+
+      const wrapperP2 = document.createElement('div');
+      wrapperP2.className = 'input-wrapper';
+      wrapperP2.setAttribute('data-country-state-pension-p2', 'true');
+      wrapperP2.setAttribute('data-country-code', startCountryLower);
+      const labelP2 = document.createElement('label');
+      labelP2.setAttribute('for', inputIdP2);
+      labelP2.textContent = 'Their State Pension (' + periodLabel + ')';
+      wrapperP2.appendChild(labelP2);
+      const inputP2 = this._takeOrCreateInput(inputIdP2, 'currency');
+      inputP2.type = 'text';
+      inputP2.setAttribute('inputmode', 'numeric');
+      inputP2.setAttribute('pattern', '[0-9]*');
+      inputP2.setAttribute('data-1p-ignore', '');
+      wrapperP2.appendChild(inputP2);
+
+      if (insertBeforeEl && insertBeforeEl.parentNode === group) {
+        group.insertBefore(wrapper, insertBeforeEl);
+        group.insertBefore(wrapperP2, insertBeforeEl);
+      } else {
+        group.appendChild(wrapper);
+        group.appendChild(wrapperP2);
+      }
+
+      if (legacyStateWrap) legacyStateWrap.style.display = 'none';
+      if (legacyStateP2Wrap) legacyStateP2Wrap.style.display = 'none';
 
       const creditContainer = document.createElement('div');
       creditContainer.setAttribute('data-country-credit-container', 'true');
@@ -2708,30 +2648,21 @@ class WebUI extends AbstractUI {
       creditContainer.style.display = '';
       this._renderCountryTaxCreditFields(creditContainer, startCountry);
 
-      // If this country has no configurable credits, keep legacy field visible and stop.
-      if (!creditContainer.firstChild) {
-        if (legacyCreditWrap) legacyCreditWrap.style.display = '';
-        return;
-      }
-
-      // Hide legacy PersonalTaxCredit field whenever the new per-country credit fields are shown.
-      if (legacyCreditWrap) legacyCreditWrap.style.display = 'none';
-
-      // Pre-populate the new personal credit input from legacy value (if present).
-      if (legacyCredit && legacyCredit.value) {
-        const newPersonal = document.getElementById('TaxCredit_personal_' + String(startCountry).toLowerCase());
-        if (newPersonal && (!newPersonal.value || String(newPersonal.value).trim() === '')) {
-          newPersonal.value = legacyCredit.value;
+      if (creditContainer.firstChild) {
+        if (legacyCreditWrap) legacyCreditWrap.style.display = 'none';
+        if (legacyCreditWrap && legacyCreditWrap.parentNode) {
+          legacyCreditWrap.parentNode.insertBefore(creditContainer, legacyCreditWrap);
+        } else {
+          group.appendChild(creditContainer);
         }
+      } else if (legacyCreditWrap) {
+        // Canonical country-scoped credits are the only runtime source of truth.
+        // If a country has no configurable credits, keep the legacy scalar hidden.
+        legacyCreditWrap.style.display = 'none';
       }
 
-      // Insert where the legacy credit used to be; otherwise append.
-      if (legacyCreditWrap && legacyCreditWrap.parentNode) {
-        legacyCreditWrap.parentNode.insertBefore(creditContainer, legacyCreditWrap);
-      } else {
-        group.appendChild(creditContainer);
-      }
-
+      this._syncP2CountryStatePensionVisibility();
+      this._enforceLegacyStatePensionVisibilityWhenChipsActive();
       if (this.formatUtils) {
         this.formatUtils.setupCurrencyInputs();
       }
@@ -2897,10 +2828,11 @@ class WebUI extends AbstractUI {
 
   _enforceLegacyStatePensionVisibilityWhenChipsActive() {
     const cfg = Config.getInstance();
-    // When relocation UI is enabled, legacy StatePensionWeekly fields should never be visible,
-    // otherwise they can resurface on single/couple toggle and duplicate the per-country fields.
-    const chipsActive = cfg.isRelocationEnabled && cfg.isRelocationEnabled();
-    if (!chipsActive) return;
+    const relocationUiEnabled = cfg.isRelocationEnabled && cfg.isRelocationEnabled();
+    const hasCanonicalStatePension = !!document.querySelector('#personalCircumstances .input-group [data-country-state-pension="true"]');
+    // When canonical per-country state pension inputs exist, legacy fields must stay hidden
+    // even in single-country/non-chip views to avoid dual-source runtime state.
+    if (!relocationUiEnabled && !hasCanonicalStatePension) return;
     try {
       const legacy = document.getElementById('StatePensionWeekly');
       const legacyWrap = legacy ? legacy.closest('.input-wrapper') : null;
@@ -3660,7 +3592,7 @@ class WebUI extends AbstractUI {
   }
 
   preserveVolatilityValues() {
-    const elements = document.querySelectorAll('#growthRates input[id$="GrowthStdDev"]');
+    const elements = document.querySelectorAll('#growthRates input[id$="GrowthStdDev"], #growthRates input[id^="GlobalAssetVolatility_"], #growthRates input[id^="LocalAssetVolatility_"]');
     elements.forEach(el => {
       if (el && el.id && el.value) {
         this.preservedVolatilityValues[el.id] = el.value;
@@ -3669,7 +3601,7 @@ class WebUI extends AbstractUI {
   }
 
   restoreVolatilityValues() {
-    const elements = document.querySelectorAll('#growthRates input[id$="GrowthStdDev"]');
+    const elements = document.querySelectorAll('#growthRates input[id$="GrowthStdDev"], #growthRates input[id^="GlobalAssetVolatility_"], #growthRates input[id^="LocalAssetVolatility_"]');
     elements.forEach(el => {
       if (el && el.id && this.preservedVolatilityValues[el.id]) {
         el.value = this.preservedVolatilityValues[el.id];

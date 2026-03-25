@@ -241,6 +241,167 @@ module.exports = {
       errors.push(err.message || String(err));
     }
 
+    try {
+      const result = vm.runInContext(`
+        var elementValues = {
+          shares_ieGrowthRate: '10',
+          shares_ieGrowthStdDev: '16',
+          LocalAssetGrowth_ie_shares: '',
+          LocalAssetVolatility_ie_shares: '',
+          InvestmentAllocation_ie_shares: '100'
+        };
+        document = {
+          getElementById: function(id) {
+            if (!Object.prototype.hasOwnProperty.call(elementValues, id)) return null;
+            return { id: id, value: elementValues[id] };
+          }
+        };
+        Config = {
+          getInstance: function() {
+            return {
+              getStartCountry: function() { return 'ie'; },
+              getDefaultCountry: function() { return 'ie'; },
+              isRelocationEnabled: function() { return true; },
+              getCachedTaxRuleSet: function(code) {
+                if (String(code || '').toLowerCase() === 'ie') {
+                  return {
+                    getResolvedInvestmentTypes: function() {
+                      return [
+                        { key: 'shares_ie', baseRef: null, sellWhenReceived: false }
+                      ];
+                    },
+                    getUIConfigurableCredits: function() { return []; },
+                    hasPrivatePensions: function() { return true; }
+                  };
+                }
+                return {
+                  getResolvedInvestmentTypes: function() { return []; },
+                  getUIConfigurableCredits: function() { return []; },
+                  hasPrivatePensions: function() { return true; }
+                };
+              }
+            };
+          }
+        };
+
+        var values = {
+          StartingAge: 30,
+          TargetAge: 90,
+          InitialSavings: 10000,
+          InitialPension: 0,
+          RetirementAge: 65,
+          EmergencyStash: 0,
+          PensionContributionPercentage: 10,
+          PensionContributionCapped: 'No',
+          StatePensionWeekly: 0,
+          PensionGrowthRate: 5,
+          PensionGrowthStdDev: 0,
+          Inflation: 2,
+          MarriageYear: '',
+          YoungestChildBorn: '',
+          OldestChildBorn: '',
+          PersonalTaxCredit: '',
+          P2StartingAge: '',
+          P2RetirementAge: '',
+          P2StatePensionWeekly: '',
+          InitialPensionP2: '',
+          PensionContributionPercentageP2: '',
+          simulation_mode: 'single',
+          economy_mode: 'montecarlo',
+          InitialCapital_shares_ie: 0,
+          InvestmentAllocation_ie_shares: 1,
+          shares_ieGrowthRate: 0.10,
+          shares_ieGrowthStdDev: 0.16,
+          // Simulate DOMUtils: empty numeric parameter inputs read back as 0.
+          LocalAssetGrowth_ie_shares: 0,
+          LocalAssetVolatility_ie_shares: 0
+        };
+        var ui = {
+          getValue: function(id) {
+            if (Object.prototype.hasOwnProperty.call(values, id)) return values[id];
+            return '';
+          },
+          getScenarioCountries: function() { return ['ie']; }
+        };
+
+        var manager = new UIManager(ui);
+        manager.readEvents = function() { return []; };
+        var params = manager.readParameters(false);
+        ({ params: params });
+      `, ctx);
+
+      assert.strictEqual(result.params.investmentGrowthRatesByKey.shares_ie, undefined, 'Expected canonical-only read: blank LocalAssetGrowth_ie_shares should stay unset');
+      assert.strictEqual(result.params.investmentVolatilitiesByKey.shares_ie, undefined, 'Expected canonical-only read: blank LocalAssetVolatility_ie_shares should stay unset');
+    } catch (err) {
+      errors.push(err.message || String(err));
+    }
+
+    try {
+      const result = vm.runInContext(`
+        var elementValues = {
+          Inflation: '7',
+          Inflation_ie: '',
+          TaxCredit_personal_ie: ''
+        };
+        document = {
+          getElementById: function(id) {
+            if (!Object.prototype.hasOwnProperty.call(elementValues, id)) return null;
+            return { id: id, value: elementValues[id] };
+          }
+        };
+        Config = {
+          getInstance: function() {
+            return {
+              getStartCountry: function() { return 'ie'; },
+              getDefaultCountry: function() { return 'ie'; },
+              isRelocationEnabled: function() { return false; },
+              getCachedTaxRuleSet: function() {
+                return {
+                  getResolvedInvestmentTypes: function() { return []; },
+                  getUIConfigurableCredits: function() { return [{ id: 'personal' }]; },
+                  hasPrivatePensions: function() { return true; }
+                };
+              }
+            };
+          }
+        };
+        var values = {
+          StartingAge: 30,
+          TargetAge: 90,
+          InitialSavings: 10000,
+          InitialPension: 0,
+          RetirementAge: 65,
+          EmergencyStash: 0,
+          PensionGrowthRate: 5,
+          PensionGrowthStdDev: 0,
+          Inflation: 0.07,
+          Inflation_ie: 0,
+          PersonalTaxCredit: 5000,
+          P2StartingAge: '',
+          P2RetirementAge: '',
+          InitialPensionP2: '',
+          simulation_mode: 'single',
+          economy_mode: 'deterministic'
+        };
+        var ui = {
+          getValue: function(id) {
+            if (Object.prototype.hasOwnProperty.call(values, id)) return values[id];
+            return '';
+          },
+          getScenarioCountries: function() { return ['ie']; }
+        };
+        var manager = new UIManager(ui);
+        manager.readEvents = function() { return []; };
+        var params = manager.readParameters(false);
+        ({ params: params });
+      `, ctx);
+
+      assert.strictEqual(result.params.inflation, undefined, 'Legacy Inflation must not override canonical Inflation_ie');
+      assert.strictEqual(result.params.personalTaxCredit, undefined, 'Legacy PersonalTaxCredit must not override canonical TaxCredit_personal_ie');
+    } catch (err) {
+      errors.push(err.message || String(err));
+    }
+
     return { success: errors.length === 0, errors: errors };
   }
 };

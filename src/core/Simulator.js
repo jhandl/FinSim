@@ -899,6 +899,8 @@ function resolveCountryInflation(code) {
       return Number(inflation) / 100;
     }
   }
+  // Compatibility scalar bridge for non-country-aware callers/tests.
+  // UIManager derives params.inflation from canonical Inflation_<StartCountry>.
   if (key === baseCountryCode && typeof params.inflation === 'number') {
     return params.inflation;
   }

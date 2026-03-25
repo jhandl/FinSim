@@ -3,6 +3,7 @@ require('../src/core/Utils.js');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const REFERENCE_FIXTURE_PATH = path.join(__dirname, 'fixtures', 'reference.csv');
 
 const adapterSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'core', 'LegacyScenarioAdapter.js'), 'utf8');
 vm.runInThisContext(adapterSource);
@@ -83,8 +84,6 @@ function seedParameterIds(ui) {
   // These must exist so deserializeSimulation's legacy normalization path can run.
   ui.ensureParameterInput('InvestmentAllocation_indexFunds', 'percentage');
   ui.ensureParameterInput('InvestmentAllocation_shares', 'percentage');
-
-  // Also seed StartCountry to match demo3b and config.
   ui.ensureParameterInput('StartCountry', 'string');
 
   // deserializeSimulation may set these outside try/catch blocks for older files.
@@ -117,7 +116,7 @@ module.exports = {
       const ui = createUiSimulatingDomUtils(doc);
       seedParameterIds(ui);
 
-      const csv = fs.readFileSync(path.join(__dirname, '..', 'docs', 'demo3.csv'), 'utf8');
+      const csv = fs.readFileSync(REFERENCE_FIXTURE_PATH, 'utf8');
       deserializeSimulation(csv, ui);
 
       const gFunds = doc.getElementById('InvestmentAllocation_indexFunds_ie');

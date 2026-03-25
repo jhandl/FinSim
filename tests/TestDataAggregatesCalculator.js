@@ -12,7 +12,7 @@ const { installTestTaxRules } = require('./helpers/RelocationTestHelpers.js');
 
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
 const AR_RULES = require('../src/core/config/tax-rules-ar.json');
-const DEMO3_PATH = path.resolve(__dirname, '..', 'docs', 'demo3.csv');
+const REFERENCE_PATH = path.resolve(__dirname, 'fixtures', 'reference.csv');
 
 function parseDemoCsvScenario(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
@@ -406,19 +406,19 @@ module.exports = {
       if (Math.abs(dataRow['Tax__usc'] - 2000) > 1e-6) errors.push('Scenario 5: Tax__usc mismatch');
     }
 
-    // Scenario 6: demo3.csv Regression
-    // Note: This scenario may fail if demo3.csv simulation doesn't populate dataSheet correctly
+    // Scenario 6: reference.csv Regression
+    // Note: This scenario may fail if reference.csv simulation doesn't populate dataSheet correctly
     {
-      const parsed = parseDemoCsvScenario(DEMO3_PATH);
+      const parsed = parseDemoCsvScenario(REFERENCE_PATH);
       parsed.parameters.targetAge = 49; // Run to age 49
       const framework = new TestFramework();
       if (!framework.loadScenario({
-        name: 'Demo3Regression',
-        description: 'demo3.csv regression to age 49',
+        name: 'ReferenceRegression',
+        description: 'reference.csv regression to age 49',
         scenario: { parameters: parsed.parameters, events: parsed.events },
         assertions: []
       })) {
-        errors.push('Failed to load demo3 scenario');
+        errors.push('Failed to load reference scenario');
       } else {
         installTestTaxRules(framework, { ie: IE_RULES, ar: AR_RULES });
         const results = await framework.runSimulation();
@@ -426,7 +426,7 @@ module.exports = {
         if (!results || !results.dataSheet || results.dataSheet.length === 0 || !results.success) {
           // Skip Scenario 6
         } else {
-          // Baselines for demo3 are intentionally not enforced here (requires curated golden values).
+          // Baselines for reference are intentionally not enforced here (requires curated golden values).
           // Keep this scenario as a smoke-run only when it succeeds.
           const row = results.dataSheet.find(r => r && r.age === 49);
           if (!row) {

@@ -1825,8 +1825,9 @@ class Taxman {
           creditAmount = creditForAge(p1Age || 0) + (p2Age !== null ? creditForAge(p2Age) : 0);
         }
       } else if (creditId === 'personal') {
-        // Legacy compatibility: scenarios/tests can provide a single PersonalTaxCredit override.
-        // This corresponds to the total personal credit amount to apply for the household.
+        // Compatibility scalar bridge: scenarios/tests may provide a household-level override.
+        // In UI flows this scalar is derived from canonical TaxCredit_personal_<StartCountry>.
+        // When absent, ruleset defaults apply.
         if (params && params.personalTaxCredit !== undefined && params.personalTaxCredit !== null && params.personalTaxCredit !== '') {
           creditAmount = Number(params.personalTaxCredit);
         } else if (typeof creditDef === 'number') creditAmount = creditDef;
