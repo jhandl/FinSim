@@ -246,6 +246,9 @@ Configures cross-border tax behaviour:
   - Number of years after emigration during which the country may still tax certain income (e.g. 3 years for IE).
 - **`taxesForeignIncome`**:
   - Boolean indicating whether, during those trailing years, foreign income is still within scope.
+- **`minResidencyYearsBeforePostEmigrationTax`** (optional):
+  - Minimum years that must be spent as resident in that country (in the just-ended residency period) before post-emigration taxation can activate.
+  - Default when omitted: `0` (no residency-duration gate).
 
 `Taxman` uses these rules alongside relocation events to determine which countries have active taxing rights in a given simulation year.
 

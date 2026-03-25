@@ -106,7 +106,7 @@
     "definedBenefit": { "treatment": "privatePension" }
   },
 
-  "residencyRules": { "postEmigrationTaxYears": 3, "taxesForeignIncome": true },
+  "residencyRules": { "postEmigrationTaxYears": 3, "taxesForeignIncome": true, "minResidencyYearsBeforePostEmigrationTax": 3 },
 
   "investmentTypes": [
     {

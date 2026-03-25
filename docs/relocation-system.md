@@ -191,7 +191,7 @@ flowchart TD
 
 ### Cross-Border Taxation
 
-Tax rules include `residencyRules` with `postEmigrationTaxYears` and `taxesForeignIncome`. Ireland taxes for 3 years post-emigration. `getActiveCrossBorderTaxCountries()` identifies active trailing tax countries.
+Tax rules include `residencyRules` with `postEmigrationTaxYears`, `taxesForeignIncome`, and optional `minResidencyYearsBeforePostEmigrationTax`. Ireland taxes for 3 years post-emigration after meeting a 3-year prior-residency threshold. `getActiveCrossBorderTaxCountries()` identifies active trailing tax countries.
 
 ### Source-Country Taxation
 

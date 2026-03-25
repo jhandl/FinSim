@@ -237,7 +237,7 @@ Key traits:
 *   **Split chains:** `linkedEventId` supports traceable event splits and guided resolution flows.
 *   **Cross-border taxation:** `Taxman` derives the active country from relocation events and handles complex multi-jurisdiction logic:
     *   **Source-Country Taxation:** Income/gains linked to a specific country (e.g., property in previous residence) are taxed using that country's ruleset.
-    *   **Trailing Residency:** Supports post-emigration tax rules (e.g., IE’s three-year ordinary residence tail).
+    *   **Trailing Residency:** Supports post-emigration tax rules (e.g., IE’s three-year ordinary residence tail), including residency-duration gates via `residencyRules.minResidencyYearsBeforePostEmigrationTax`.
     *   **Foreign Tax Credits:** Automatically applies credits for foreign tax paid if a tax treaty exists between the source and residence countries.
 
 Relocation UI support:

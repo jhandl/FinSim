@@ -572,6 +572,7 @@ class Taxman {
       var entry = this.countryHistory[i];
       var exitYear = this.countryHistory[i + 1].fromYear;
       var yearsSinceExit = currentYear - exitYear;
+      var yearsResidentBeforeExit = exitYear - entry.fromYear;
       // Load the previous country's ruleset to check residency rules
       var cfg = Config.getInstance();
       var prevRuleset = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(entry.country) : null;
@@ -580,15 +581,22 @@ class Taxman {
       var residencyRules = prevRuleset.getResidencyRules();
       var trailingYears = residencyRules.postEmigrationTaxYears || 0;
       var taxesForeign = residencyRules.taxesForeignIncome || false;
+      var minResidencyYearsBeforeTrailing = residencyRules.minResidencyYearsBeforePostEmigrationTax || 0;
 
       // Include trailing taxation starting in the relocation year.
       // Example: postEmigrationTaxYears = 3, exit at Y:
       // active in Y+0, Y+1, Y+2 (yearsSinceExit = 0..2); not active at Y+3 (3).
-      if (trailingYears > 0 && yearsSinceExit >= 0 && yearsSinceExit < trailingYears && taxesForeign) {
+      if (trailingYears > 0
+        && yearsSinceExit >= 0
+        && yearsSinceExit < trailingYears
+        && taxesForeign
+        && yearsResidentBeforeExit >= minResidencyYearsBeforeTrailing) {
         active.push({
           country: entry.country,
           exitYear: exitYear,
           yearsSinceExit: yearsSinceExit,
+          yearsResidentBeforeExit: yearsResidentBeforeExit,
+          minResidencyYearsBeforeTrailing: minResidencyYearsBeforeTrailing,
           remainingYears: (trailingYears - yearsSinceExit),
           ruleset: prevRuleset
         });

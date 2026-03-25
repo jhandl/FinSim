@@ -361,8 +361,10 @@ If the country's pension system has multiple account types (401k/IRA/ISA, etc.) 
 Fields:
 - `postEmigrationTaxYears` (number)
 - `taxesForeignIncome` (boolean)
+- `minResidencyYearsBeforePostEmigrationTax` (optional number, default `0`)
 
 Used by `Taxman.getActiveCrossBorderTaxCountries()` to apply trailing taxation on emigration.
+When `minResidencyYearsBeforePostEmigrationTax` is set, trailing taxation only applies if the person spent at least that many years resident in the just-ended residency period before exit.
 
 ---
 
