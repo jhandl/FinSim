@@ -556,6 +556,9 @@ class EventsTableManager {
             this._removeHiddenInput(row, 'event-resolution-override');
           }
         }
+        if (row && e.target.classList.contains('event-amount') && e.isTrusted) {
+          this._markSplitPart2ValueCustom(row);
+        }
         if (row && !this._suppressMortgagePlanSync && e.target.matches('.event-type, .event-name, .event-amount, .event-from-age, .event-to-age, .event-rate')) {
           this._handleMortgagePlanFieldChange(row, e.target);
         }
@@ -838,6 +841,27 @@ class EventsTableManager {
     else this._removeHiddenInput(row, 'event-resolution-mv-id');
     if (category) this.getOrCreateHiddenInput(row, 'event-resolution-category', category);
     else this._removeHiddenInput(row, 'event-resolution-category');
+  }
+
+  _isSplitPart2Row(row) {
+    return !!(row && row.querySelector && row.querySelector('.event-relocation-split-anchor-amount'));
+  }
+
+  _getSplitValueMode(row) {
+    if (!row || !row.querySelector) return '';
+    const input = row.querySelector('.event-relocation-split-value-mode');
+    return input && input.value ? String(input.value).toLowerCase() : '';
+  }
+
+  _setSplitValueMode(row, mode) {
+    if (!row || !mode) return;
+    this.getOrCreateHiddenInput(row, 'event-relocation-split-value-mode', String(mode).toLowerCase());
+  }
+
+  _markSplitPart2ValueCustom(row) {
+    if (!this._isSplitPart2Row(row)) return;
+    if (this._getSplitValueMode(row) === 'custom') return;
+    this._setSplitValueMode(row, 'custom');
   }
 
   _removeRowAndResolutionPanel(row) {
@@ -1637,6 +1661,8 @@ class EventsTableManager {
         this._removeHiddenInput(secondRow, 'event-linked-event-id');
         this._removeHiddenInput(secondRow, 'event-relocation-split-mv-id');
         this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-age');
+        this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-amount');
+        this._removeHiddenInput(secondRow, 'event-relocation-split-value-mode');
         this._removeHiddenInput(secondRow, 'event-resolution-override');
         this._deleteRowWithExistingAnimation(firstRow);
         continue;
@@ -1649,6 +1675,8 @@ class EventsTableManager {
         this._removeHiddenInput(firstRow, 'event-linked-event-id');
         this._removeHiddenInput(firstRow, 'event-relocation-split-mv-id');
         this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-age');
+        this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-amount');
+        this._removeHiddenInput(firstRow, 'event-relocation-split-value-mode');
         this._removeHiddenInput(firstRow, 'event-resolution-override');
         this._deleteRowWithExistingAnimation(secondRow);
         continue;
@@ -2436,6 +2464,7 @@ class EventsTableManager {
     if (typeof part1AmountNum === 'number' && !isNaN(part1AmountNum)) {
       this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-amount', String(part1AmountNum));
     }
+    this._setSplitValueMode(part2Row, 'suggested');
     this.getOrCreateHiddenInput(part2Row, 'event-currency', destCurrency);
     const part2LinkedCountry = toCountryHint ? String(toCountryHint).toLowerCase() : destCountry;
     if (part2LinkedCountry) {
@@ -2700,6 +2729,8 @@ class EventsTableManager {
       this._removeHiddenInput(secondRow, 'event-linked-event-id');
       this._removeHiddenInput(secondRow, 'event-relocation-split-mv-id');
       this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-age');
+      this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-amount');
+      this._removeHiddenInput(secondRow, 'event-relocation-split-value-mode');
       this._removeHiddenInput(secondRow, 'event-resolution-override');
       this._removeRowAndResolutionPanel(firstRow);
       this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-from-age'], pulse: true });
@@ -2712,6 +2743,8 @@ class EventsTableManager {
       this._removeHiddenInput(firstRow, 'event-linked-event-id');
       this._removeHiddenInput(firstRow, 'event-relocation-split-mv-id');
       this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-age');
+      this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-amount');
+      this._removeHiddenInput(firstRow, 'event-relocation-split-value-mode');
       this._removeHiddenInput(firstRow, 'event-resolution-override');
       this._removeRowAndResolutionPanel(secondRow);
       this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-to-age'], pulse: true });
@@ -2783,6 +2816,9 @@ class EventsTableManager {
     const part1Amount = Number(String(part1AmountInput.value || '').replace(/[^0-9.\-]/g, ''));
     if (isNaN(part1Amount)) return;
     this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-amount', String(part1Amount));
+    if (this._getSplitValueMode(part2Row) !== 'custom') {
+      this._setSplitValueMode(part2Row, 'suggested');
+    }
     this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 

@@ -429,6 +429,13 @@ module.exports = {
           mv
         ], 'aa');
         assert(!acknowledged.find(e => e.id === 'salary_split_amount_p2').relocationImpact, 'Updating split anchor amount should clear split amount impact');
+
+        const custom = runDetector([
+          part1,
+          Object.assign({}, part2, { relocationSplitValueMode: 'custom' }),
+          mv
+        ], 'aa');
+        assert(!custom.find(e => e.id === 'salary_split_amount_p2').relocationImpact, 'Custom split values should suppress split amount impacts');
       });
 
       // Test 8j: Stale sold-property marker from a removed relocation must not suppress a new boundary impact.

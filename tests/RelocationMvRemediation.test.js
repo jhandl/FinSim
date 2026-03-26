@@ -314,6 +314,39 @@ describe('MV relocation remediation', () => {
     expect(row.querySelector('#EventCountryToggle_row-1').textContent).toBe('United States');
   });
 
+  test('accordion amount sync marks split part 2 values as custom', () => {
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-1">
+            <td>
+              <div class="event-type-container">
+                <input class="event-type" value="SI">
+                <input class="event-relocation-split-anchor-amount" value="10000">
+                <input class="event-relocation-split-value-mode" value="suggested">
+              </div>
+            </td>
+            <td>
+              <input class="event-amount currency" value="$9000">
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const row = document.querySelector('tr[data-row-id="row-1"]');
+    const tableManager = {
+      _markSplitPart2ValueCustom: jest.fn()
+    };
+    const manager = Object.create(EventAccordionManager.prototype);
+    manager.webUI = { eventsTableManager: tableManager };
+    manager.findTableRowForEvent = () => row;
+
+    manager.syncFieldToTable({ rowId: 'row-1' }, '.event-amount', '9500');
+
+    expect(tableManager._markSplitPart2ValueCustom).toHaveBeenCalledWith(row);
+  });
+
   test('RelocationUtils ignores invalid MV destinations in transitions and overrides', () => {
     global.Config = {
       getInstance: () => ({

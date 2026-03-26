@@ -646,6 +646,7 @@ var RelocationImpactDetector = {
       var second = chain[1];
       if (!first || !second) continue;
       if (second.relocationSplitAnchorAmount == null || second.relocationSplitAnchorAmount === '') continue;
+      if (String(second.relocationSplitValueMode || '').toLowerCase() === 'custom') continue;
 
       var splitMarkerId = '';
       for (var n = 0; n < chain.length; n++) {

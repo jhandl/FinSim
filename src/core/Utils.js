@@ -353,7 +353,8 @@ var EVENT_META_FIELD_DEFS = [
   { key: 'resolved', header: 'Resolved' },
   { key: 'resolvedMvRow', header: 'ResolvedMvRow' },
   { key: 'resolvedMvId', header: 'ResolvedMvId' },
-  { key: 'resolvedCategory', header: 'ResolvedCategory' }
+  { key: 'resolvedCategory', header: 'ResolvedCategory' },
+  { key: 'splitValueMode', header: 'SplitValueMode' }
 ];
 
 var EVENT_META_HEADER_KEY_MAP = {
@@ -364,6 +365,7 @@ var EVENT_META_HEADER_KEY_MAP = {
   SplitMvId: 'splitMvId',
   SplitMvRow: 'splitMvRow',
   SplitAnchorAmount: 'splitAnchorAmount',
+  SplitValueMode: 'splitValueMode',
   MvLinkId: 'mvLinkId',
   SellMvId: 'sellMvId',
   SellMvRow: 'sellMvRow',
@@ -382,6 +384,7 @@ var EVENT_META_INLINE_KEYS = [
   'splitMvId',
   'splitMvRow',
   'splitAnchorAmount',
+  'splitValueMode',
   'mvLinkId',
   'sellMvId',
   'sellMvRow',
@@ -390,7 +393,8 @@ var EVENT_META_INLINE_KEYS = [
   'resolved',
   'resolvedMvId',
   'resolvedMvRow',
-  'resolvedCategory'
+  'resolvedCategory',
+  'splitValueMode'
 ];
 
 function encodeScenarioCsvValue(value) {
@@ -911,6 +915,12 @@ function serializeSimulation(ui) {
             meta.splitAnchorAmount = splitAnchorAmountInput.value;
           }
         } catch (_e3d) { }
+        try {
+          var splitValueModeInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-split-value-mode') : null;
+          if (splitValueModeInput && splitValueModeInput.value) {
+            meta.splitValueMode = splitValueModeInput.value;
+          }
+        } catch (_e3da) { }
         try {
           var mvLinkIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-link-id') : null;
           if (mvLinkIdInput && mvLinkIdInput.value) {

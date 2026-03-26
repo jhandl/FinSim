@@ -152,6 +152,8 @@ describe('Relocation Split No Pension', () => {
     
     // Second call (Part 2): Should change to SInp (destination has no pension)
     expect(manager.createEventRow).toHaveBeenNthCalledWith(2, 'SInp', 'Job', '90000', 40, 60, expect.anything(), expect.anything());
+    const part2Row = manager.createEventRow.mock.results[1].value;
+    expect(manager.getOrCreateHiddenInput).toHaveBeenCalledWith(part2Row, 'event-relocation-split-value-mode', 'suggested');
   });
 
   test('splits SI2 to SI2np when destination has no private pension', () => {

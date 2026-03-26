@@ -1428,6 +1428,9 @@ class EventAccordionManager {
       }
 
       tableInput.value = formattedValue;
+      if (tableFieldClass === '.event-amount') {
+        this.webUI.eventsTableManager._markSplitPart2ValueCustom(tableRow);
+      }
 
       // Trigger change event to ensure any table-side validation/formatting occurs
       const changeEvent = new Event('change', { bubbles: true });

@@ -1023,6 +1023,8 @@ class UIManager {
               const splitAnchorAmount = Number(splitAnchorAmountInput.value);
               if (!isNaN(splitAnchorAmount)) eventObj.relocationSplitAnchorAmount = splitAnchorAmount;
             }
+            const splitValueModeInput = domRow.querySelector('.event-relocation-split-value-mode');
+            if (splitValueModeInput && splitValueModeInput.value) eventObj.relocationSplitValueMode = splitValueModeInput.value;
 
             const relocationLinkIdInput = domRow.querySelector('.event-relocation-link-id');
             if (relocationLinkIdInput && relocationLinkIdInput.value) eventObj.relocationLinkId = relocationLinkIdInput.value;
