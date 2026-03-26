@@ -160,26 +160,15 @@ class Wizard {
           const investmentTypes = getInvestmentTypesForCountry(activeCountry);
           // Iterate types (RSUs included as WebUI renders them)
           for (const type of investmentTypes) {
-            
-            // 1. Legacy/No-Relocation format: InvestmentAllocation_{key} (e.g. indexFunds_ie)
-            const stepLegacy = JSON.parse(JSON.stringify(step));
-            delete stepLegacy.dynamicInvestmentField;
-            stepLegacy.element = `#InvestmentAllocation_${type.key}`;
-            expanded.push(stepLegacy);
-
-            // 2. Relocation format: InvestmentAllocation_{country}_{baseKey} (e.g. ie_indexFunds)
-            // Derive baseKey by stripping country suffix if present
             let baseKey = type.key;
             const suffix = '_' + activeCountry.toLowerCase();
             if (baseKey.toLowerCase().endsWith(suffix)) {
               baseKey = baseKey.substring(0, baseKey.length - suffix.length);
             }
-            // Only add if baseKey differs or if format logic dictates (WebUI uses both depending on mode)
-            // But since filterValidSteps removes non-existent ones, it's safe to add both variations.
-            const stepReloc = JSON.parse(JSON.stringify(step));
-            delete stepReloc.dynamicInvestmentField;
-            stepReloc.element = `#InvestmentAllocation_${activeCountry.toLowerCase()}_${baseKey}`;
-            expanded.push(stepReloc);
+            const canonicalStep = JSON.parse(JSON.stringify(step));
+            delete canonicalStep.dynamicInvestmentField;
+            canonicalStep.element = `#InvestmentAllocation_${activeCountry.toLowerCase()}_${baseKey}`;
+            expanded.push(canonicalStep);
           }
         } else if (fieldType === 'PensionContribution') {
           const newStepCountry = JSON.parse(JSON.stringify(step));
@@ -321,14 +310,14 @@ class Wizard {
     }
 
     // Pattern matching for investment fields
-    // InitialCapital_{typeKey}, InvestmentAllocation_{typeKey}, 
+    // InitialCapital_{typeKey}, InvestmentAllocation_{country}_{baseKey},
     // GlobalAssetGrowth_{baseKey}, GlobalAssetVolatility_{baseKey}
     // LocalAssetGrowth_{cc}_{baseKey}, LocalAssetVolatility_{cc}_{baseKey}
     
     const patterns = [
       /^InitialCapital_(.+)$/,
       /^InvestmentAllocation_([a-z]{2})_(.+)$/, // Relocation format: {cc}_{baseKey}
-      /^InvestmentAllocation_(.+)$/,             // Legacy format: {typeKey}
+      /^InvestmentAllocation_(.+)$/,             // Legacy compatibility format: {typeKey}
       /^GlobalAssetGrowth_(.+)$/,
       /^GlobalAssetVolatility_(.+)$/,
       /^LocalAssetGrowth_[a-z]{2}_(.+)$/,

@@ -136,7 +136,7 @@
 
 ### 8. Tests
 
-- [ ] Update `tests/TestLegacyScenarioDeserialization.js` so legacy CSV expectations target canonical per-country fields instead of legacy runtime fields.
+- [ ] Update `tests/ConfidenceTestH_LegacyDeserial.js` so legacy CSV expectations target canonical per-country fields instead of legacy runtime fields.
 - [ ] Update `tests/TestEconomyGrowthPersistence.js` so its single-country and MV-switch scenarios assert canonical IDs throughout.
 - [ ] Add a focused regression test for the exact bug class:
 - [ ] Edit StartCountry local growth/volatility in single-country mode.

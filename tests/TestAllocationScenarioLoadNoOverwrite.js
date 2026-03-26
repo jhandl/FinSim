@@ -3,7 +3,6 @@ require('../src/core/Utils.js');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const REFERENCE_FIXTURE_PATH = path.join(__dirname, 'fixtures', 'reference.csv');
 
 const adapterSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'core', 'LegacyScenarioAdapter.js'), 'utf8');
 vm.runInThisContext(adapterSource);
@@ -81,9 +80,10 @@ function createUiSimulatingDomUtils(doc) {
 
 function seedParameterIds(ui) {
   // Seed the legacy allocation fields (present in static HTML but empty on load).
-  // These must exist so deserializeSimulation's legacy normalization path can run.
   ui.ensureParameterInput('InvestmentAllocation_indexFunds', 'percentage');
   ui.ensureParameterInput('InvestmentAllocation_shares', 'percentage');
+  ui.ensureParameterInput('InvestmentAllocation_ie_indexFunds', 'percentage');
+  ui.ensureParameterInput('InvestmentAllocation_ie_shares', 'percentage');
   ui.ensureParameterInput('StartCountry', 'string');
 
   // deserializeSimulation may set these outside try/catch blocks for older files.
@@ -94,7 +94,7 @@ function seedParameterIds(ui) {
 
 module.exports = {
   name: 'AllocationScenarioLoadNoOverwrite',
-  description: 'Ensures namespaced allocation keys from scenario are not overwritten by empty legacy allocation fields.',
+  description: 'Ensures canonical allocation keys from scenario are not overwritten by empty legacy allocation fields.',
   isCustomTest: true,
   async runCustomTest() {
     const originalDocument = global.document;
@@ -116,13 +116,25 @@ module.exports = {
       const ui = createUiSimulatingDomUtils(doc);
       seedParameterIds(ui);
 
-      const csv = fs.readFileSync(REFERENCE_FIXTURE_PATH, 'utf8');
+      const csv = [
+        '# FinSim v2.1 Save File',
+        '# Parameters',
+        'StartCountry,ie',
+        'simulation_mode,single',
+        'economy_mode,deterministic',
+        'InvestmentAllocation_ie_indexFunds,50',
+        'InvestmentAllocation_ie_shares,50',
+        '',
+        '# Events',
+        'Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta',
+        'NOP,,,,,,,'
+      ].join('\n');
       deserializeSimulation(csv, ui);
 
       const gFunds = doc.getElementById('InvestmentAllocation_indexFunds_ie');
       const gShares = doc.getElementById('InvestmentAllocation_shares_ie');
-      if (!gFunds || String(gFunds.value) !== '50') errors.push('Expected InvestmentAllocation_indexFunds_ie to remain 50, got ' + (gFunds ? gFunds.value : 'null'));
-      if (!gShares || String(gShares.value) !== '50') errors.push('Expected InvestmentAllocation_shares_ie to remain 50, got ' + (gShares ? gShares.value : 'null'));
+      if (gFunds && String(gFunds.value) !== '') errors.push('Expected legacy InvestmentAllocation_indexFunds_ie to remain empty, got ' + gFunds.value);
+      if (gShares && String(gShares.value) !== '') errors.push('Expected legacy InvestmentAllocation_shares_ie to remain empty, got ' + gShares.value);
 
       const pFunds = doc.getElementById('InvestmentAllocation_ie_indexFunds');
       const pShares = doc.getElementById('InvestmentAllocation_ie_shares');

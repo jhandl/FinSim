@@ -87,7 +87,7 @@ module.exports = {
 
       return {
         initialCapitalKey: doc.getElementById('InitialCapital_indexFunds_aa') ? doc.getElementById('InitialCapital_indexFunds_aa').value : '',
-        allocationKey: doc.getElementById('InvestmentAllocation_indexFunds_aa') ? doc.getElementById('InvestmentAllocation_indexFunds_aa').value : '',
+        allocationKey: doc.getElementById('InvestmentAllocation_aa_indexFunds') ? doc.getElementById('InvestmentAllocation_aa_indexFunds').value : '',
         priorityKey: doc.getElementById('Priority_indexFunds') ? doc.getElementById('Priority_indexFunds').value : ''
       };
     })()`, framework.simulationContext);
@@ -97,7 +97,7 @@ module.exports = {
       errors.push(`Expected InitialCapital_indexFunds_aa = 5000, got ${result.initialCapitalKey}`);
     }
     if (result.allocationKey !== '60') {
-      errors.push(`Expected InvestmentAllocation_indexFunds_aa = 60, got ${result.allocationKey}`);
+      errors.push(`Expected InvestmentAllocation_aa_indexFunds = 60, got ${result.allocationKey}`);
     }
     if (result.priorityKey !== '2') {
       errors.push(`Expected Priority_indexFunds = 2, got ${result.priorityKey}`);

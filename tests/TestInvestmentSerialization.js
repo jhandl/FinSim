@@ -2,7 +2,7 @@
  * TestInvestmentSerialization.js
  * Verifies CSV round-trip behavior for investment parameters: IE namespaced keys,
  * legacy field mapping (InitialETFs/InitialFunds → InitialCapital_indexFunds_ie),
- * per-country allocation format (generic vs chip-driven IDs), and idempotence.
+ * canonical per-country allocation format, and idempotence.
  *
  * Legacy field mapping: InitialETFs and InitialFunds both map to InitialCapital_indexFunds;
  * InitialShares → InitialCapital_shares; FundsAllocation/EtfAllocation →
@@ -11,10 +11,9 @@
  * StartCountry (e.g. InitialCapital_indexFunds → InitialCapital_indexFunds_ie) and
  * clears the legacy keys.
  *
- * Per-country allocation format: CSV stores generic keys (InvestmentAllocation_indexFunds_ie);
- * when relocation is enabled the UI may use chip-driven IDs (InvestmentAllocation_ie_indexFunds).
- * Serialization prefers chip-driven when present and writes generic; deserialization sets
- * generic then maps to chip-driven via document.querySelectorAll.
+ * Per-country allocation format: runtime and CSV both use canonical keys
+ * (InvestmentAllocation_ie_indexFunds). Legacy/current-old allocation keys are accepted
+ * on load and normalized immediately into canonical per-country ids.
  *
  * Idempotence: we verify csv1 === csv2 after serialize → deserialize → serialize.
  * Seeding must include all params that serializeSimulation writes (e.g. economy toggles,
@@ -150,7 +149,7 @@ function seedParameterIds(ui, extraIds) {
     'simulation_mode', 'economy_mode',
     'investmentStrategiesEnabled',
     'InitialCapital_indexFunds_ie', 'InitialCapital_shares_ie',
-    'InvestmentAllocation_indexFunds_ie', 'InvestmentAllocation_shares_ie',
+    'InvestmentAllocation_ie_indexFunds', 'InvestmentAllocation_ie_shares',
     'InitialCapital_indexFunds', 'InitialCapital_shares',
     'InvestmentAllocation_indexFunds', 'InvestmentAllocation_shares',
     'InitialFunds', 'InitialShares', 'FundsAllocation', 'SharesAllocation',
@@ -180,7 +179,7 @@ function seedLegacyDemoBaseParameterIds(ui) {
     'investmentStrategiesEnabled',
     'InvestmentAllocation_indexFunds', 'InvestmentAllocation_shares',
     'InitialCapital_indexFunds', 'InitialCapital_shares',
-    'InvestmentAllocation_indexFunds_ie', 'InvestmentAllocation_shares_ie',
+    'InvestmentAllocation_ie_indexFunds', 'InvestmentAllocation_ie_shares',
     'InitialCapital_indexFunds_ie', 'InitialCapital_shares_ie'
   ];
   ids.forEach((id) => {
@@ -215,8 +214,8 @@ module.exports = {
         ui.setValue('StartCountry', 'ie');
         ui.setValue('InitialCapital_indexFunds_ie', '10000');
         ui.setValue('InitialCapital_shares_ie', '5000');
-        ui.setValue('InvestmentAllocation_indexFunds_ie', '60');
-        ui.setValue('InvestmentAllocation_shares_ie', '40');
+        ui.setValue('InvestmentAllocation_ie_indexFunds', '60');
+        ui.setValue('InvestmentAllocation_ie_shares', '40');
         ui.setValue('StartingAge', '30');
         ui.setValue('TargetAge', '90');
         ui.setValue('InitialSavings', '5000');
@@ -227,8 +226,8 @@ module.exports = {
 
         if (csv.indexOf('InitialCapital_indexFunds_ie,10000') === -1) fail(errors, 'CSV missing InitialCapital_indexFunds_ie,10000');
         if (csv.indexOf('InitialCapital_shares_ie,5000') === -1) fail(errors, 'CSV missing InitialCapital_shares_ie,5000');
-        if (csv.indexOf('InvestmentAllocation_indexFunds_ie,60') === -1) fail(errors, 'CSV missing InvestmentAllocation_indexFunds_ie,60');
-        if (csv.indexOf('InvestmentAllocation_shares_ie,40') === -1) fail(errors, 'CSV missing InvestmentAllocation_shares_ie,40');
+        if (csv.indexOf('InvestmentAllocation_ie_indexFunds,60') === -1) fail(errors, 'CSV missing InvestmentAllocation_ie_indexFunds,60');
+        if (csv.indexOf('InvestmentAllocation_ie_shares,40') === -1) fail(errors, 'CSV missing InvestmentAllocation_ie_shares,40');
         if (csv.indexOf('InitialFunds,') >= 0 || csv.indexOf('InitialShares,') >= 0) fail(errors, 'CSV must not contain legacy InitialFunds/InitialShares');
         if (csv.indexOf('FundsAllocation,') >= 0 || csv.indexOf('SharesAllocation,') >= 0) fail(errors, 'CSV must not contain legacy FundsAllocation/SharesAllocation');
       } catch (e) {
@@ -243,8 +242,8 @@ module.exports = {
           'StartCountry,ie',
           'InitialCapital_indexFunds_ie,10000',
           'InitialCapital_shares_ie,5000',
-          'InvestmentAllocation_indexFunds_ie,60',
-          'InvestmentAllocation_shares_ie,40',
+          'InvestmentAllocation_ie_indexFunds,60',
+          'InvestmentAllocation_ie_shares,40',
           '',
           '# Events',
           'Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta',
@@ -262,8 +261,8 @@ module.exports = {
         const raw = (id) => { const el = doc.getElementById(id); return el ? String(el.value || '') : ''; };
         if (raw('InitialCapital_indexFunds_ie') !== '10000') fail(errors, 'Load: InitialCapital_indexFunds_ie expected 10000, got ' + raw('InitialCapital_indexFunds_ie'));
         if (raw('InitialCapital_shares_ie') !== '5000') fail(errors, 'Load: InitialCapital_shares_ie expected 5000, got ' + raw('InitialCapital_shares_ie'));
-        if (raw('InvestmentAllocation_indexFunds_ie') !== '60') fail(errors, 'Load: InvestmentAllocation_indexFunds_ie expected 60, got ' + raw('InvestmentAllocation_indexFunds_ie'));
-        if (raw('InvestmentAllocation_shares_ie') !== '40') fail(errors, 'Load: InvestmentAllocation_shares_ie expected 40, got ' + raw('InvestmentAllocation_shares_ie'));
+        if (raw('InvestmentAllocation_ie_indexFunds') !== '60') fail(errors, 'Load: InvestmentAllocation_ie_indexFunds expected 60, got ' + raw('InvestmentAllocation_ie_indexFunds'));
+        if (raw('InvestmentAllocation_ie_shares') !== '40') fail(errors, 'Load: InvestmentAllocation_ie_shares expected 40, got ' + raw('InvestmentAllocation_ie_shares'));
       } catch (e) {
         fail(errors, 'Load IE scenario: ' + (e.message || String(e)));
       }
@@ -296,8 +295,8 @@ module.exports = {
         const raw = (id) => { const el = doc.getElementById(id); return el ? String(el.value || '') : ''; };
         if (raw('InitialCapital_indexFunds_ie') !== '15000') fail(errors, 'Legacy: InitialCapital_indexFunds_ie expected 15000, got ' + raw('InitialCapital_indexFunds_ie'));
         if (raw('InitialCapital_shares_ie') !== '8000') fail(errors, 'Legacy: InitialCapital_shares_ie expected 8000, got ' + raw('InitialCapital_shares_ie'));
-        if (raw('InvestmentAllocation_indexFunds_ie') !== '70') fail(errors, 'Legacy: InvestmentAllocation_indexFunds_ie expected 70, got ' + raw('InvestmentAllocation_indexFunds_ie'));
-        if (raw('InvestmentAllocation_shares_ie') !== '30') fail(errors, 'Legacy: InvestmentAllocation_shares_ie expected 30, got ' + raw('InvestmentAllocation_shares_ie'));
+        if (raw('InvestmentAllocation_ie_indexFunds') !== '70') fail(errors, 'Legacy: InvestmentAllocation_ie_indexFunds expected 70, got ' + raw('InvestmentAllocation_ie_indexFunds'));
+        if (raw('InvestmentAllocation_ie_shares') !== '30') fail(errors, 'Legacy: InvestmentAllocation_ie_shares expected 30, got ' + raw('InvestmentAllocation_ie_shares'));
         const legacyFunds = raw('InitialETFs');
         const legacyFundsAlt = raw('InitialFunds');
         if (legacyFunds !== '' && legacyFunds !== undefined) fail(errors, 'Legacy: InitialETFs should be cleared, got ' + legacyFunds);
@@ -324,8 +323,8 @@ module.exports = {
         ui.setValue('economy_mode', 'deterministic');
 
         const csv = serializeSimulation(ui);
-        if (csv.indexOf('InvestmentAllocation_indexFunds_ie,60') === -1) fail(errors, 'Per-country serialize: missing InvestmentAllocation_indexFunds_ie,60');
-        if (csv.indexOf('InvestmentAllocation_shares_ie,40') === -1) fail(errors, 'Per-country serialize: missing InvestmentAllocation_shares_ie,40');
+        if (csv.indexOf('InvestmentAllocation_ie_indexFunds,60') === -1) fail(errors, 'Per-country serialize: missing InvestmentAllocation_ie_indexFunds,60');
+        if (csv.indexOf('InvestmentAllocation_ie_shares,40') === -1) fail(errors, 'Per-country serialize: missing InvestmentAllocation_ie_shares,40');
 
         const doc2 = createParameterDocument();
         global.document = doc2;
@@ -358,8 +357,8 @@ module.exports = {
         if (raw('simulation_mode') !== 'couple') fail(errors, 'demo.csv: simulation_mode expected couple, got ' + raw('simulation_mode'));
         if (!raw('InitialCapital_indexFunds_ie') && !raw('InitialCapital_indexFunds')) fail(errors, 'demo.csv: InitialCapital_indexFunds_ie or InitialCapital_indexFunds should have value');
         if (!raw('InitialCapital_shares_ie') && !raw('InitialCapital_shares')) fail(errors, 'demo.csv: InitialCapital_shares_ie or InitialCapital_shares should have value');
-        if (!raw('InvestmentAllocation_indexFunds_ie') && !raw('InvestmentAllocation_indexFunds')) fail(errors, 'demo.csv: InvestmentAllocation_indexFunds_ie or _indexFunds should have value');
-        if (!raw('InvestmentAllocation_shares_ie') && !raw('InvestmentAllocation_shares')) fail(errors, 'demo.csv: InvestmentAllocation_shares_ie or _shares should have value');
+        if (!raw('InvestmentAllocation_ie_indexFunds')) fail(errors, 'demo.csv: InvestmentAllocation_ie_indexFunds should have value');
+        if (!raw('InvestmentAllocation_ie_shares')) fail(errors, 'demo.csv: InvestmentAllocation_ie_shares should have value');
       } catch (e) {
         fail(errors, 'demo.csv deserialize: ' + (e.message || String(e)));
       }
@@ -374,8 +373,8 @@ module.exports = {
         ui1.setValue('StartCountry', 'ie');
         ui1.setValue('InitialCapital_indexFunds_ie', '10000');
         ui1.setValue('InitialCapital_shares_ie', '5000');
-        ui1.setValue('InvestmentAllocation_indexFunds_ie', '60');
-        ui1.setValue('InvestmentAllocation_shares_ie', '40');
+        ui1.setValue('InvestmentAllocation_ie_indexFunds', '60');
+        ui1.setValue('InvestmentAllocation_ie_shares', '40');
         ui1.setValue('StartingAge', '30');
         ui1.setValue('TargetAge', '90');
         ui1.setValue('InitialSavings', '5000');
@@ -419,8 +418,8 @@ module.exports = {
           'StartCountry,ie',
           'simulation_mode,single',
           'economy_mode,deterministic',
-          'InvestmentAllocation_indexFunds_ie,',
-          'InvestmentAllocation_shares_ie,',
+          'InvestmentAllocation_ie_indexFunds,',
+          'InvestmentAllocation_ie_shares,',
           '',
           '# Events',
           'Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta',
@@ -442,7 +441,7 @@ module.exports = {
         if (ieShares !== '') fail(errors, 'Empty allocations: InvestmentAllocation_ie_shares should stay empty, got "' + ieShares + '"');
 
         const csv2 = serializeSimulation(ui);
-        if (csv2.indexOf('InvestmentAllocation_indexFunds_ie,') === -1 || csv2.indexOf('InvestmentAllocation_shares_ie,') === -1) {
+        if (csv2.indexOf('InvestmentAllocation_ie_indexFunds,') === -1 || csv2.indexOf('InvestmentAllocation_ie_shares,') === -1) {
           fail(errors, 'Empty allocations: re-serialized CSV should contain empty allocation values');
         }
       } catch (e) {
@@ -474,7 +473,7 @@ module.exports = {
 
         const raw = (id) => { const el = doc.getElementById(id); return el ? String(el.value || '') : ''; };
         if (!raw('InitialCapital_indexFunds_ie') && !raw('InitialCapital_indexFunds')) fail(errors, 'Missing StartCountry: legacy InitialFunds should map (via default ie)');
-        if (!raw('InvestmentAllocation_indexFunds_ie') && !raw('InvestmentAllocation_indexFunds')) fail(errors, 'Missing StartCountry: legacy FundsAllocation should map');
+        if (!raw('InvestmentAllocation_ie_indexFunds')) fail(errors, 'Missing StartCountry: legacy FundsAllocation should map');
       } catch (e) {
         fail(errors, 'Missing StartCountry: ' + (e.message || String(e)));
       }
@@ -486,8 +485,8 @@ module.exports = {
           '# Parameters',
           'StartCountry,ie',
           'InitialCapital_unknown_ie,999',
-          'InvestmentAllocation_indexFunds_ie,50',
-          'InvestmentAllocation_shares_ie,50',
+          'InvestmentAllocation_ie_indexFunds,50',
+          'InvestmentAllocation_ie_shares,50',
           '',
           '# Events',
           'Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta',
@@ -503,8 +502,8 @@ module.exports = {
         deserializeSimulation(csv, ui);
 
         const raw = (id) => { const el = doc.getElementById(id); return el ? String(el.value || '') : ''; };
-        if (raw('InvestmentAllocation_indexFunds_ie') !== '50') fail(errors, 'Invalid keys: known InvestmentAllocation_indexFunds_ie should be 50');
-        if (raw('InvestmentAllocation_shares_ie') !== '50') fail(errors, 'Invalid keys: known InvestmentAllocation_shares_ie should be 50');
+        if (raw('InvestmentAllocation_ie_indexFunds') !== '50') fail(errors, 'Invalid keys: known InvestmentAllocation_ie_indexFunds should be 50');
+        if (raw('InvestmentAllocation_ie_shares') !== '50') fail(errors, 'Invalid keys: known InvestmentAllocation_ie_shares should be 50');
       } catch (e) {
         fail(errors, 'Invalid keys: ' + (e.message || String(e)));
       }

@@ -115,8 +115,6 @@ module.exports = {
 
       doc.ensureEl('InvestmentAllocation_ie_indexFunds', 'percentage').value = '0';
       doc.ensureEl('InvestmentAllocation_ie_shares', 'percentage').value = '';
-      doc.ensureEl('InvestmentAllocation_indexFunds_ie', 'percentage').value = '';
-      doc.ensureEl('InvestmentAllocation_shares_ie', 'percentage').value = '';
       doc.ensureEl('StartingAge', 'number').value = '';
       doc.ensureEl('TargetAge', 'number').value = '';
       doc.ensureEl('InitialSavings', 'currency').value = '';
@@ -157,11 +155,11 @@ module.exports = {
       const ui = createUi(doc, [['MV', 'US', '', '', '', '']]);
       const csv = serializeSimulation(ui);
 
-      if (csv.indexOf('InvestmentAllocation_indexFunds_ie,0') === -1) {
-        errors.push('Expected InvestmentAllocation_indexFunds_ie to serialize as 0.');
+      if (csv.indexOf('InvestmentAllocation_ie_indexFunds,0') === -1) {
+        errors.push('Expected InvestmentAllocation_ie_indexFunds to serialize as 0.');
       }
-      if (csv.indexOf('InvestmentAllocation_shares_ie,') !== -1) {
-        errors.push('Blank InvestmentAllocation_shares_ie should not serialize.');
+      if (csv.indexOf('InvestmentAllocation_ie_shares,') !== -1) {
+        errors.push('Blank InvestmentAllocation_ie_shares should not serialize.');
       }
       if (csv.indexOf('Priority_cash,1') === -1) {
         errors.push('Expected Priority_cash to serialize as 1.');

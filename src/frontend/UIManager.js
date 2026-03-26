@@ -373,10 +373,15 @@ class UIManager {
     for (let i = 0; i < investmentTypes.length; i++) {
       const type = investmentTypes[i];
       const key = type.key;
+      const suffix = '_' + startCountry;
+      const baseKey = (String(key).toLowerCase().endsWith(suffix))
+        ? String(key).slice(0, String(key).length - suffix.length)
+        : String(key);
+      const allocationFieldId = `InvestmentAllocation_${startCountry}_${baseKey}`;
       initialCapitalByKey[key] = this.ui.getValue(`InitialCapital_${key}`);
       let alloc = 0;
       try {
-        alloc = this.ui.getValue(`InvestmentAllocation_${key}`);
+        alloc = this.ui.getValue(allocationFieldId);
       } catch (_) {
         alloc = 0;
       }
@@ -385,10 +390,6 @@ class UIManager {
         if (type.baseRef) {
           globalBaseRefs[type.baseRef] = true;
         } else {
-          const suffix = '_' + startCountry;
-          const baseKey = (String(key).toLowerCase().endsWith(suffix))
-            ? String(key).slice(0, String(key).length - suffix.length)
-            : String(key);
           const localGrowthId = `LocalAssetGrowth_${startCountry}_${baseKey}`;
           const localVolId = `LocalAssetVolatility_${startCountry}_${baseKey}`;
           const hasGrowthInput = (typeof document === 'undefined') || !!document.getElementById(localGrowthId);
@@ -784,13 +785,10 @@ class UIManager {
             const t = types[i] || {};
             const key = t.key;
             if (!key) continue;
-            // Prefer country-prefixed ID; fall back to unprefixed if present.
             const suffix = '_' + cc;
             const baseKey = (String(key).toLowerCase().endsWith(suffix)) ? String(key).slice(0, String(key).length - suffix.length) : String(key);
             const prefId = `InvestmentAllocation_${cc}_${baseKey}`;
-            const legacyId = `InvestmentAllocation_${key}`;
-            const warnId = (typeof document !== 'undefined' && document.getElementById(prefId)) ? prefId : legacyId;
-            this.ui.setWarning(warnId, `${labels} allocations can't exceed 100%`);
+            this.ui.setWarning(prefId, `${labels} allocations can't exceed 100%`);
           }
           errors = true;
         }

@@ -300,23 +300,15 @@ class TestWizard {
           const investmentTypes = getInvestmentTypesForCountry(activeCountry);
           for (const type of investmentTypes) {
             // RSU filtering removed to match WebUI
-            
-            // Legacy
-            const stepLegacy = JSON.parse(JSON.stringify(step));
-            delete stepLegacy.dynamicInvestmentField;
-            stepLegacy.element = `#InvestmentAllocation_${type.key}`;
-            expanded.push(stepLegacy);
-
-            // Relocation
             let baseKey = type.key;
             const suffix = '_' + activeCountry.toLowerCase();
             if (baseKey.toLowerCase().endsWith(suffix)) {
               baseKey = baseKey.substring(0, baseKey.length - suffix.length);
             }
-            const stepReloc = JSON.parse(JSON.stringify(step));
-            delete stepReloc.dynamicInvestmentField;
-            stepReloc.element = `#InvestmentAllocation_${activeCountry.toLowerCase()}_${baseKey}`;
-            expanded.push(stepReloc);
+            const canonicalStep = JSON.parse(JSON.stringify(step));
+            delete canonicalStep.dynamicInvestmentField;
+            canonicalStep.element = `#InvestmentAllocation_${activeCountry.toLowerCase()}_${baseKey}`;
+            expanded.push(canonicalStep);
           }
         } else if (fieldType === 'PensionContribution') {
           const newStepCountry = JSON.parse(JSON.stringify(step));
@@ -1085,18 +1077,16 @@ describe('Wizard Component', () => {
       ];
       const expanded = wizard.expandDynamicSteps(steps);
       // InitialCapital: 2 types -> 2 steps
-      // InvestmentAllocation: 2 types -> 4 steps (legacy + relocation for each)
-      expect(expanded).toHaveLength(6); 
+      // InvestmentAllocation: 2 types -> 2 canonical per-country steps
+      expect(expanded).toHaveLength(4); 
       // Sorted: Shares (local) first, then Index Funds (global wrapper)
       expect(expanded[0].element).toBe('#InitialCapital_shares_ie');
       expect(expanded[1].element).toBe('#InitialCapital_indexFunds_ie');
       
       // Verify InvestmentAllocation steps
       const allocSteps = expanded.slice(2);
-      expect(allocSteps[0].element).toBe('#InvestmentAllocation_shares_ie');
-      expect(allocSteps[1].element).toBe('#InvestmentAllocation_ie_shares');
-      expect(allocSteps[2].element).toBe('#InvestmentAllocation_indexFunds_ie');
-      expect(allocSteps[3].element).toBe('#InvestmentAllocation_ie_indexFunds');
+      expect(allocSteps[0].element).toBe('#InvestmentAllocation_ie_shares');
+      expect(allocSteps[1].element).toBe('#InvestmentAllocation_ie_indexFunds');
     });
 
     test('should expand GlobalAssetGrowth template', () => {

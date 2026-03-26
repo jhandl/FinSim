@@ -1238,15 +1238,6 @@ class WebUI extends AbstractUI {
           const baseKey = this._toBaseInvestmentKey(key, startCountry);
           const labelText = (t.label || key);
           const inputId = 'InvestmentAllocation_' + startCountry + '_' + baseKey;
-          const legacyId = 'InvestmentAllocation_' + key;
-
-          // Keep legacy cache seeded for serialization/back-compat
-          if (!this._allocationValueCache[inputId] && this._allocationValueCache[legacyId]) {
-            this._allocationValueCache[inputId] = this._allocationValueCache[legacyId];
-          }
-          if (!this._allocationValueCache[legacyId] && this._allocationValueCache[inputId]) {
-            this._allocationValueCache[legacyId] = this._allocationValueCache[inputId];
-          }
 
           const wrapper = document.createElement('div');
           wrapper.className = 'input-wrapper';
@@ -1289,13 +1280,14 @@ class WebUI extends AbstractUI {
         this.formatUtils.setupPercentageInputs();
         this._refreshAllocationsLabelLayout();
       } else {
-        // Relocation disabled: keep original legacy layout/IDs.
+        // Relocation-disabled single-country view still uses canonical per-country allocation ids.
         for (let i = 0; i < types.length; i++) {
           const t = types[i] || {};
           const key = t.key;
           if (!key) continue;
+          const baseKey = this._toBaseInvestmentKey(key, startCountry);
           const labelText = (t.label || key);
-          const inputId = 'InvestmentAllocation_' + key;
+          const inputId = 'InvestmentAllocation_' + startCountry + '_' + baseKey;
 
           const wrapper = document.createElement('div');
           wrapper.className = 'input-wrapper';
@@ -1310,10 +1302,9 @@ class WebUI extends AbstractUI {
           label.appendChild(labelSpan);
           wrapper.appendChild(label);
 
-          // "Holds" dropdown for baseRef-backed types in legacy single-country mode.
+          // "Holds" dropdown for baseRef-backed types in single-country mode.
           const defaultHold = t.baseRef || t.baseKey || '';
           if (defaultHold) {
-            const baseKey = this._toBaseInvestmentKey(key, startCountry);
             const holdId = 'GlobalMixConfig_' + baseKey + '_asset1';
             this._appendHoldsDropdown(wrapper, holdId, String(defaultHold));
           }
@@ -1382,16 +1373,6 @@ class WebUI extends AbstractUI {
         // Field IDs are country-prefixed so the chip selector can switch contexts without losing values.
         // Convention: InvestmentAllocation_{countryCode}_{typeKey}
         const inputId = 'InvestmentAllocation_' + code + '_' + baseKey;
-        const legacyId = 'InvestmentAllocation_' + key;
-
-        // If user previously entered StartCountry allocations in legacy fields and is now enabling MV,
-        // seed the StartCountry per-country values (only when per-country is empty).
-        if (String(code).toLowerCase() === String(startCountry).toLowerCase()) {
-          if (!this._allocationValueCache[inputId] && this._allocationValueCache[legacyId]) {
-            this._allocationValueCache[inputId] = this._allocationValueCache[legacyId];
-          }
-        }
-
         const wrapper = document.createElement('div');
         wrapper.className = 'input-wrapper';
         wrapper.setAttribute('data-dynamic-investment-param', 'true');

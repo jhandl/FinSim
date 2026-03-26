@@ -168,8 +168,8 @@ module.exports = {
       if (serialized.indexOf('MixConfig_ie_indexFunds_endAsset2Pct,50') === -1) {
         errors.push('Expected MixConfig_ie_indexFunds_endAsset2Pct to be serialized.');
       }
-      if (serialized.indexOf('InvestmentAllocation_indexFunds_ie,25') === -1) {
-        errors.push('Expected InvestmentAllocation_indexFunds_ie to be serialized.');
+      if (serialized.indexOf('InvestmentAllocation_ie_indexFunds,25') === -1) {
+        errors.push('Expected InvestmentAllocation_ie_indexFunds to be serialized.');
       }
       if (serialized.indexOf('GlobalMixConfig_indexFunds_type,fixed') === -1) {
         errors.push('Expected GlobalMixConfig_indexFunds_type to be serialized.');
@@ -220,7 +220,7 @@ module.exports = {
         'MixConfig_ie_indexFunds_startAsset2Pct,35',
         'MixConfig_ie_indexFunds_endAsset1Pct,45',
         'MixConfig_ie_indexFunds_endAsset2Pct,55',
-        'InvestmentAllocation_indexFunds_ie,20',
+        'InvestmentAllocation_ie_indexFunds,20',
         'GlobalMixConfig_indexFunds_type,fixed',
         'GlobalMixConfig_indexFunds_asset1,Stocks',
         'GlobalMixConfig_indexFunds_asset2,Bonds',

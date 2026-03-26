@@ -683,42 +683,32 @@ function serializeSimulation(ui) {
     }
   }
 
-  // Allocations + per-country state pension: serialize ONLY via generic keys.
-  // - Allocations: InvestmentAllocation_{typeKey} where typeKey already encodes country (e.g. indexFunds_ie)
-  // - State pension by country: StatePension_{countryCode} / P2StatePension_{countryCode}
-  // Deserializer maps these into the chip-driven UI inputs.
-  // Always write StartCountry allocation keys (generic). If relocation UI is active the visible inputs
-  // may be per-country, so prefer those when present.
-  var sc = (startCountry || '').toString().trim().toLowerCase();
-  for (var i = 0; i < investmentTypes.length; i++) {
-    var type = investmentTypes[i];
-    var key = type.key;
-    var suffix = '_' + sc;
-    var baseKey = (String(key).toLowerCase().endsWith(suffix)) ? String(key).slice(0, String(key).length - suffix.length) : String(key);
-    var perId = 'InvestmentAllocation_' + sc + '_' + baseKey;
-    var genericId = 'InvestmentAllocation_' + key;
-    try {
-      if (typeof document !== 'undefined' && document.getElementById(perId)) {
-        var perRaw = getRawInputValue(perId);
-        if (perRaw !== null && String(perRaw).trim() === '') {
-          parameters[genericId] = '';
+  // Persist canonical per-country allocations directly.
+  for (var sciAlloc = 0; sciAlloc < scenarioCountries.length; sciAlloc++) {
+    var allocCountry = scenarioCountries[sciAlloc];
+    var allocRuleset = config.getCachedTaxRuleSet(allocCountry);
+    var allocTypes = (allocRuleset && typeof allocRuleset.getResolvedInvestmentTypes === 'function') ? (allocRuleset.getResolvedInvestmentTypes() || []) : [];
+    for (var ati = 0; ati < allocTypes.length; ati++) {
+      var allocType = allocTypes[ati] || {};
+      var allocKey = allocType.key;
+      if (!allocKey || allocType.excludeFromAllocations) continue;
+      var allocSuffix = '_' + allocCountry;
+      var allocBaseKey = (String(allocKey).toLowerCase().endsWith(allocSuffix)) ? String(allocKey).slice(0, String(allocKey).length - allocSuffix.length) : String(allocKey);
+      var allocId = 'InvestmentAllocation_' + allocCountry + '_' + allocBaseKey;
+      try {
+        var allocRaw = getRawInputValue(allocId);
+        if (allocRaw !== null && String(allocRaw).trim() === '') {
+          parameters[allocId] = '';
         } else {
-          parameters[genericId] = ui.getValue(perId);
+          parameters[allocId] = ui.getValue(allocId);
         }
-      } else if (typeof document !== 'undefined' && document.getElementById(genericId)) {
-        var genRaw = getRawInputValue(genericId);
-        if (genRaw !== null && String(genRaw).trim() === '') {
-          parameters[genericId] = '';
-        } else {
-          parameters[genericId] = ui.getValue(genericId);
-        }
-      }
-    } catch (_) { }
+      } catch (_) { }
+    }
   }
 
   // Persist canonical country-scoped fields from DOM (including hidden stash) regardless of UI mode.
   if (typeof document !== 'undefined') {
-    // Allocations: per-country ids -> generic ids
+    // Allocations: persist canonical per-country ids only.
     try {
       var inputs = Array.prototype.slice.call(document.querySelectorAll('input[id^="InvestmentAllocation_"]'));
       for (var ii = 0; ii < inputs.length; ii++) {
@@ -727,14 +717,11 @@ function serializeSimulation(ui) {
         var id = String(el.id);
         var m = id.match(/^InvestmentAllocation_([a-z]{2})_(.+)$/i); // cc_baseKey
         if (!m) continue;
-        var cc = String(m[1]).toLowerCase();
-        var baseKey = String(m[2]);
-        var typeKey = baseKey + '_' + cc;
         var rawAlloc = (el.value !== undefined) ? String(el.value) : '';
         if (rawAlloc.trim() === '') {
-          parameters['InvestmentAllocation_' + typeKey] = '';
+          parameters[id] = '';
         } else {
-          parameters['InvestmentAllocation_' + typeKey] = ui.getValue(id);
+          parameters[id] = ui.getValue(id);
         }
       }
     } catch (_) { }
@@ -1163,8 +1150,7 @@ function deserializeSimulation(content, ui) {
       // This keeps CSV load working even if chip-driven DOM sections aren't built yet.
       try {
         if (ui && typeof ui.ensureParameterInput === 'function') {
-          // Generic allocations are saved as InvestmentAllocation_{typeKey} (e.g. InvestmentAllocation_indexFunds_ie).
-          // Also allow chip-driven per-country ids to exist in files (future-proof).
+          // Allocation CSV keys are canonical per-country ids (e.g. InvestmentAllocation_ie_indexFunds).
           if (/^InvestmentAllocation_/.test(actualKey)) {
             ui.ensureParameterInput(actualKey, 'percentage');
           } else if (/^InitialCapital_.+_[a-z]{2,}$/i.test(actualKey)) {
@@ -1270,10 +1256,7 @@ function deserializeSimulation(content, ui) {
     ui.setValue('investmentStrategiesEnabled', 'off');
   }
 
-  // Map generic per-country keys into chip-driven UI fields (web UI only).
-  // - InvestmentAllocation_{typeKey} -> InvestmentAllocation_{country}_{baseKey}
-  // - StatePension_{country} -> StatePension_{country}
-  // - P2StatePension_{country} -> P2StatePension_{country}
+  // Ensure canonical country-scoped inputs are materialized after load (web UI only).
   try {
     if (ui && typeof ui.ensureParameterInput === 'function') {
       const cfg = Config.getInstance();
@@ -1311,49 +1294,6 @@ function deserializeSimulation(content, ui) {
           if (!countrySet[cc]) continue;
           ui.ensureParameterInput('P2StatePension_' + cc, 'currency');
           try { ui.setValue('P2StatePension_' + cc, ui.getValue(id)); } catch (_) { }
-        }
-      } catch (_) { }
-
-      // 2) Map saved generic allocation keys into chip-driven per-country allocation inputs.
-      try {
-        const allocKeys = (typeof document !== 'undefined')
-          ? Array.prototype.slice.call(document.querySelectorAll('input[id^="InvestmentAllocation_"]'))
-          : [];
-        for (let i = 0; i < allocKeys.length; i++) {
-          const id = allocKeys[i] && allocKeys[i].id ? String(allocKeys[i].id) : '';
-          // Generic key form: InvestmentAllocation_{baseKey}_{cc}
-          const m = id.match(/^InvestmentAllocation_(.+)_([a-z]{2,})$/i);
-          if (!m) continue;
-          const baseKey = String(m[1]);
-          const cc = String(m[2]).toLowerCase();
-          if (!countrySet[cc]) continue;
-          const perId = 'InvestmentAllocation_' + cc + '_' + baseKey;
-          ui.ensureParameterInput(perId, 'percentage');
-          try {
-            var rawAlloc = null;
-            try {
-              if (typeof document !== 'undefined') {
-                var elAlloc = document.getElementById(id);
-                if (elAlloc && elAlloc.value !== undefined) rawAlloc = String(elAlloc.value);
-              }
-            } catch (_) { rawAlloc = null; }
-            if (rawAlloc !== null && rawAlloc.trim() === '') {
-              ui.setValue(perId, '');
-            } else {
-              ui.setValue(perId, ui.getValue(id));
-            }
-            try {
-              if (typeof document !== 'undefined') {
-                var perAllocEl = document.getElementById(perId);
-                if (perAllocEl) {
-                  perAllocEl.__csvLoaded = true;
-                  if (typeof perAllocEl.setAttribute === 'function') {
-                    perAllocEl.setAttribute('data-csv-loaded', '1');
-                  }
-                }
-              }
-            } catch (_) { }
-          } catch (_) { }
         }
       } catch (_) { }
 

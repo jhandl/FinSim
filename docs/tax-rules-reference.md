@@ -449,8 +449,8 @@ Document how growth/volatility parameters flow through the system:
 - **Format**: Whole number percentages
 
 **Allocation Parameters**:
-- **Generic**: `InvestmentAllocation_indexFunds_ie`, `InvestmentAllocation_cedear_ar`
-- **Per-country (chip-driven)**: `InvestmentAllocation_ie_indexFunds`, `InvestmentAllocation_ar_cedear`
+- **Canonical**: `InvestmentAllocation_ie_indexFunds`, `InvestmentAllocation_ar_cedear`
+- **Legacy load compatibility**: older files may still contain `InvestmentAllocation_indexFunds_ie`, `InvestmentAllocation_cedear_ar`
 - **Location**: `src/frontend/web/WebUI.js` lines 568-569, `src/core/Utils.js` lines 599-600
 - **Format**: Whole number percentages
 

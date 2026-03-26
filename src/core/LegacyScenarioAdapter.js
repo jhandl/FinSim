@@ -83,7 +83,9 @@ class LegacyScenarioAdapter {
     if (mappedKey === 'sharesGrowthStdDev') return 'LocalAssetVolatility_' + normalizedCountry + '_shares';
     
     // Check if this is an investment field that needs normalization
-    const isInvestmentField = this.investmentFields.includes(mappedKey);
+    const isInvestmentField = this.investmentFields.includes(mappedKey) ||
+      mappedKey.indexOf('InvestmentAllocation_') === 0 ||
+      mappedKey.indexOf('InitialCapital_') === 0;
     
     if (isInvestmentField) {
       return this.normalizeInvestmentKey(mappedKey, normalizedCountry);
@@ -102,16 +104,25 @@ class LegacyScenarioAdapter {
   }
 
   /**
-   * Internal helper to normalize investment keys with country suffix.
+   * Internal helper to normalize investment keys into canonical forms.
    * @param {string} key - The mapped field name.
    * @param {string} startCountry - The country code.
-   * @returns {string} The normalized key with suffix.
+   * @returns {string} The normalized key.
    */
   normalizeInvestmentKey(key, startCountry) {
     if (!key || typeof key !== 'string') return key;
     
     const countryCode = startCountry.toLowerCase();
     const suffix = `_${countryCode}`;
+    const knownCountries = {};
+    if (countryCode) knownCountries[countryCode] = true;
+    if (typeof Config !== 'undefined' && Config.getInstance) {
+      const countries = Config.getInstance().getAvailableCountries ? (Config.getInstance().getAvailableCountries() || []) : [];
+      for (let i = 0; i < countries.length; i++) {
+        const code = String(countries[i] && countries[i].code ? countries[i].code : '').trim().toLowerCase();
+        if (code) knownCountries[code] = true;
+      }
+    }
 
     if (key.startsWith('InitialCapital_')) {
       const baseKey = key.replace('InitialCapital_', '');
@@ -123,9 +134,16 @@ class LegacyScenarioAdapter {
     
     if (key.startsWith('InvestmentAllocation_')) {
       const baseKey = key.replace('InvestmentAllocation_', '');
-      if (baseKey.endsWith(suffix)) return key;
-      if (baseKey.indexOf('_') >= 0) return key;
-      return `InvestmentAllocation_${baseKey}${suffix}`;
+      const parts = baseKey.split('_');
+      if (parts.length >= 2) {
+        const first = String(parts[0] || '').toLowerCase();
+        const last = String(parts[parts.length - 1] || '').toLowerCase();
+        if (knownCountries[first]) return key;
+        if (knownCountries[last]) {
+          return `InvestmentAllocation_${last}_${parts.slice(0, -1).join('_')}`;
+        }
+      }
+      return `InvestmentAllocation_${countryCode}_${baseKey}`;
     }
     
     if (key.endsWith('GrowthRate')) {
