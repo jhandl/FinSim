@@ -23,13 +23,12 @@ function createParameterDocument() {
 
   return {
     _elements: elements,
-    ensureEl,
+    ensureEl: ensureEl,
     getElementById(id) {
       return elements[id] || null;
     },
     querySelectorAll(selector) {
-      const raw = String(selector || '');
-      const m = raw.match(/^(?:[a-zA-Z]+)?\[id\^="([^"]+)"\]$/);
+      const m = String(selector || '').match(/^(?:[a-zA-Z]+)?\[id\^="([^"]+)"\]$/);
       if (!m) return [];
       const prefix = m[1];
       const out = [];
@@ -38,40 +37,22 @@ function createParameterDocument() {
         if (id.indexOf(prefix) === 0) out.push(elements[id]);
       }
       return out;
-    },
-    querySelector(selector) {
-      const raw = String(selector || '');
-      const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
-      for (let i = 0; i < parts.length; i++) {
-        const m = parts[i].match(/^\[id\^="([^"]+)"\]$/);
-        if (!m) continue;
-        const prefix = m[1];
-        for (const id in elements) {
-          if (!Object.prototype.hasOwnProperty.call(elements, id)) continue;
-          if (id.indexOf(prefix) === 0) return elements[id];
-        }
-      }
-      return null;
     }
   };
 }
 
-function createUiStub(doc, eventsData) {
-  const store = {};
+function createUiStub(doc, eventRows) {
   return {
     ensureParameterInput(id, className) {
       doc.ensureEl(id, className);
     },
     setValue(id, value) {
-      const el = doc.getElementById(id);
-      if (!el) throw new Error('Element not found: ' + id);
+      const el = doc.ensureEl(id, '');
       el.value = (value === undefined || value === null) ? '' : String(value);
-      store[id] = el.value;
     },
     getValue(id) {
       const el = doc.getElementById(id);
-      if (el) return el.value;
-      return store[id];
+      return el ? el.value : '';
     },
     getVersion() {
       return '5.0';
@@ -83,14 +64,213 @@ function createUiStub(doc, eventsData) {
       return false;
     },
     getTableData() {
-      return Array.isArray(eventsData) ? eventsData : [];
+      return Array.isArray(eventRows) ? eventRows : [];
     }
   };
 }
 
+function createRuleSet(currencyCode, investmentTypes) {
+  const types = investmentTypes || [];
+  return {
+    getCurrencyCode: () => currencyCode,
+    getCurrencySymbol: () => '¤',
+    getInvestmentTypes: () => types,
+    getResolvedInvestmentTypes: () => types
+  };
+}
+
+function createConfigStub() {
+  const ieRuleSet = createRuleSet('EUR', [
+    { key: 'indexFunds_ie', residenceScope: 'local', baseRef: 'globalEquity' },
+    { key: 'shares_ie', residenceScope: 'local' }
+  ]);
+  const usRuleSet = createRuleSet('USD', [
+    { key: 'localIndex_us', residenceScope: 'local' }
+  ]);
+
+  return {
+    getInstance: () => ({
+      getStartCountry: () => 'ie',
+      getDefaultCountry: () => 'ie',
+      getCountryNameByCode: code => String(code || '').toUpperCase(),
+      getInvestmentBaseTypes: () => ([
+        { baseKey: 'globalEquity', label: 'Global Equity' },
+        { baseKey: 'globalBonds', label: 'Global Bonds' }
+      ]),
+      listCachedRuleSets: () => ({ ie: ieRuleSet, us: usRuleSet }),
+      getCachedTaxRuleSet: code => {
+        const cc = String(code || '').trim().toLowerCase();
+        if (cc === 'ie') return ieRuleSet;
+        if (cc === 'us') return usRuleSet;
+        return null;
+      },
+      getAvailableCountries: () => ([
+        { code: 'ie', name: 'Ireland' },
+        { code: 'us', name: 'United States' }
+      ]),
+      isRelocationEnabled: () => true
+    })
+  };
+}
+
+function assertEqual(actual, expected, label, errors) {
+  if (actual !== expected) {
+    errors.push(label + ': expected "' + expected + '", got "' + actual + '"');
+  }
+}
+
+function assertContains(text, fragment, label, errors) {
+  if (String(text || '').indexOf(fragment) === -1) {
+    errors.push(label + ': missing "' + fragment + '"');
+  }
+}
+
+function assertNotContains(text, fragment, label, errors) {
+  if (String(text || '').indexOf(fragment) !== -1) {
+    errors.push(label + ': should not contain "' + fragment + '"');
+  }
+}
+
+function runCase(caseName, errors, fn) {
+  const caseErrors = [];
+  try {
+    fn(caseErrors);
+  } catch (err) {
+    caseErrors.push(err && err.message ? err.message : String(err));
+  }
+  for (let i = 0; i < caseErrors.length; i++) {
+    errors.push('[' + caseName + '] ' + caseErrors[i]);
+  }
+}
+
+function runCanonicalEconomyRoundTripCase(errors) {
+  global.Config = createConfigStub();
+
+  const doc = createParameterDocument();
+  global.document = doc;
+  const ui = createUiStub(doc, []);
+
+  ui.setValue('StartCountry', 'ie');
+  ui.setValue('simulation_mode', 'single');
+  ui.setValue('economy_mode', 'deterministic');
+  ui.setValue('investmentStrategiesEnabled', 'off');
+
+  ui.setValue('GlobalAssetGrowth_globalEquity', '7');
+  ui.setValue('GlobalAssetVolatility_globalEquity', '15');
+  ui.setValue('GlobalAssetGrowth_globalBonds', '3');
+  ui.setValue('GlobalAssetVolatility_globalBonds', '6');
+  ui.setValue('Inflation_ie', '2');
+  ui.setValue('LocalAssetGrowth_ie_shares', '5');
+  ui.setValue('LocalAssetVolatility_ie_shares', '12');
+
+  // indexFunds_ie inherits from globalEquity, so local wrapper economy keys must not persist.
+  ui.setValue('LocalAssetGrowth_ie_indexFunds', '99');
+  ui.setValue('LocalAssetVolatility_ie_indexFunds', '88');
+
+  const csv = serializeSimulation(ui);
+  assertContains(csv, 'GlobalAssetGrowth_globalEquity,7', 'Serialize global growth', errors);
+  assertContains(csv, 'GlobalAssetVolatility_globalEquity,15', 'Serialize global volatility', errors);
+  assertContains(csv, 'GlobalAssetGrowth_globalBonds,3', 'Serialize second global growth', errors);
+  assertContains(csv, 'GlobalAssetVolatility_globalBonds,6', 'Serialize second global volatility', errors);
+  assertContains(csv, 'Inflation_ie,2', 'Serialize start-country inflation', errors);
+  assertContains(csv, 'LocalAssetGrowth_ie_shares,5', 'Serialize local wrapper growth', errors);
+  assertContains(csv, 'LocalAssetVolatility_ie_shares,12', 'Serialize local wrapper volatility', errors);
+  assertNotContains(csv, 'LocalAssetGrowth_ie_indexFunds', 'Skip inherited local growth', errors);
+  assertNotContains(csv, 'LocalAssetVolatility_ie_indexFunds', 'Skip inherited local volatility', errors);
+
+  const doc2 = createParameterDocument();
+  global.document = doc2;
+  const ui2 = createUiStub(doc2, []);
+  deserializeSimulation(csv, ui2);
+
+  assertEqual(ui2.getValue('GlobalAssetGrowth_globalEquity'), '7', 'Deserialize global growth', errors);
+  assertEqual(ui2.getValue('GlobalAssetVolatility_globalEquity'), '15', 'Deserialize global volatility', errors);
+  assertEqual(ui2.getValue('GlobalAssetGrowth_globalBonds'), '3', 'Deserialize second global growth', errors);
+  assertEqual(ui2.getValue('GlobalAssetVolatility_globalBonds'), '6', 'Deserialize second global volatility', errors);
+  assertEqual(ui2.getValue('Inflation_ie'), '2', 'Deserialize start-country inflation', errors);
+  assertEqual(ui2.getValue('LocalAssetGrowth_ie_shares'), '5', 'Deserialize local wrapper growth', errors);
+  assertEqual(ui2.getValue('LocalAssetVolatility_ie_shares'), '12', 'Deserialize local wrapper volatility', errors);
+
+  const csv2 = serializeSimulation(ui2);
+  assertEqual(csv2, csv, 'Canonical economy idempotent re-serialize', errors);
+}
+
+function runRelocationEconomyRoundTripCase(errors) {
+  global.Config = createConfigStub();
+
+  const relocationEvents = [
+    ['MV:US', '', '35', '35', '', '']
+  ];
+
+  const doc = createParameterDocument();
+  global.document = doc;
+  const ui = createUiStub(doc, relocationEvents);
+
+  ui.setValue('StartCountry', 'ie');
+  ui.setValue('simulation_mode', 'single');
+  ui.setValue('economy_mode', 'deterministic');
+  ui.setValue('investmentStrategiesEnabled', 'off');
+  ui.setValue('Inflation_ie', '2');
+  ui.setValue('Inflation_us', '3');
+  ui.setValue('LocalAssetGrowth_us_localIndex', '6');
+  ui.setValue('LocalAssetVolatility_us_localIndex', '14');
+
+  const csv = serializeSimulation(ui);
+  assertContains(csv, 'Inflation_us,3', 'Serialize relocation-country inflation', errors);
+  assertContains(csv, 'LocalAssetGrowth_us_localIndex,6', 'Serialize relocation-country local growth', errors);
+  assertContains(csv, 'LocalAssetVolatility_us_localIndex,14', 'Serialize relocation-country local volatility', errors);
+
+  const doc2 = createParameterDocument();
+  global.document = doc2;
+  const ui2 = createUiStub(doc2, relocationEvents);
+  deserializeSimulation(csv, ui2);
+
+  assertEqual(ui2.getValue('Inflation_us'), '3', 'Deserialize relocation-country inflation', errors);
+  assertEqual(ui2.getValue('LocalAssetGrowth_us_localIndex'), '6', 'Deserialize relocation-country local growth', errors);
+  assertEqual(ui2.getValue('LocalAssetVolatility_us_localIndex'), '14', 'Deserialize relocation-country local volatility', errors);
+
+  const csv2 = serializeSimulation(ui2);
+  assertEqual(csv2, csv, 'Relocation economy idempotent re-serialize', errors);
+}
+
+function runLegacyNoBackfillCase(errors) {
+  global.Config = createConfigStub();
+
+  const doc = createParameterDocument();
+  global.document = doc;
+  const ui = createUiStub(doc, []);
+
+  ui.setValue('StartCountry', 'ie');
+  ui.setValue('simulation_mode', 'single');
+  ui.setValue('economy_mode', 'deterministic');
+  ui.setValue('investmentStrategiesEnabled', 'off');
+
+  // Legacy scalar ids should not backfill canonical per-country economy ids on save.
+  ui.setValue('Inflation', '3');
+  ui.setValue('shares_ieGrowthRate', '4');
+  ui.setValue('shares_ieGrowthStdDev', '9');
+
+  const csv = serializeSimulation(ui);
+  assertNotContains(csv, 'Inflation_ie,3', 'Legacy Inflation should not backfill Inflation_ie', errors);
+  assertNotContains(csv, 'LocalAssetGrowth_ie_shares,4', 'Legacy growth should not backfill local growth', errors);
+  assertNotContains(csv, 'LocalAssetVolatility_ie_shares,9', 'Legacy volatility should not backfill local volatility', errors);
+
+  const csvAgain = serializeSimulation(ui);
+  assertEqual(csvAgain, csv, 'Stable serialize without canonical economy values', errors);
+
+  const doc2 = createParameterDocument();
+  global.document = doc2;
+  const ui2 = createUiStub(doc2, []);
+  deserializeSimulation(csv, ui2);
+
+  assertEqual(ui2.getValue('Inflation_ie'), '', 'Deserialize should not synthesize Inflation_ie from legacy scalar', errors);
+  assertEqual(ui2.getValue('LocalAssetGrowth_ie_shares'), '', 'Deserialize should not synthesize local growth from legacy scalar', errors);
+  assertEqual(ui2.getValue('LocalAssetVolatility_ie_shares'), '', 'Deserialize should not synthesize local volatility from legacy scalar', errors);
+}
+
 module.exports = {
   name: 'EconomyGrowthPersistence',
-  description: 'Ensures GlobalAsset*/LocalAsset* growth and volatility fields round-trip through CSV.',
+  description: 'Owns current economy-field persistence contracts (canonical keys, baseRef behavior, relocation-country locals).',
   isCustomTest: true,
   async runCustomTest() {
     const originalConfig = global.Config;
@@ -98,255 +278,9 @@ module.exports = {
     const errors = [];
 
     try {
-      const doc = createParameterDocument();
-      global.document = doc;
-      const ieRuleset = {
-        getResolvedInvestmentTypes: () => ([
-          { key: 'indexFunds_ie', label: 'Index Funds', baseRef: 'globalEquity', residenceScope: 'local' },
-          { key: 'shares_ie', label: 'Shares', residenceScope: 'local' }
-        ])
-      };
-      global.Config = {
-        getInstance: () => ({
-          getStartCountry: () => 'ie',
-          getDefaultCountry: () => 'ie',
-          getInvestmentBaseTypes: () => ([
-            { baseKey: 'globalEquity', label: 'Global Equity' },
-            { baseKey: 'globalBonds', label: 'Global Bonds' }
-          ]),
-          getCachedTaxRuleSet: (code) => {
-            const cc = String(code || '').toLowerCase();
-            if (cc === 'ie' || cc === 'us') return ieRuleset;
-            return null;
-          },
-          getAvailableCountries: () => ([{ code: 'ie', name: 'Ireland' }, { code: 'us', name: 'United States' }]),
-          isRelocationEnabled: () => true
-        })
-      };
-
-      const ui = createUiStub(doc);
-      doc.ensureEl('StartCountry', 'string').value = 'ie';
-
-      // Phase A: per-country values should win and round-trip
-      doc.ensureEl('GlobalAssetGrowth_globalEquity', 'percentage').value = '7';
-      doc.ensureEl('GlobalAssetVolatility_globalEquity', 'percentage').value = '15';
-      doc.ensureEl('LocalAssetGrowth_ie_shares', 'percentage').value = '5';
-      doc.ensureEl('LocalAssetVolatility_ie_shares', 'percentage').value = '12';
-      doc.ensureEl('Inflation_ie', 'percentage').value = '2';
-      doc.ensureEl('PensionGrowthRate', 'percentage').value = '8';
-      doc.ensureEl('PensionGrowthStdDev', 'percentage').value = '11';
-      doc.ensureEl('Inflation', 'percentage').value = '3';
-
-      let csv = serializeSimulation(ui);
-
-      if (csv.indexOf('GlobalAssetGrowth_globalEquity,7') === -1) {
-        errors.push('Missing GlobalAssetGrowth_globalEquity in CSV.');
-      }
-      if (csv.indexOf('GlobalAssetVolatility_globalEquity,15') === -1) {
-        errors.push('Missing GlobalAssetVolatility_globalEquity in CSV.');
-      }
-      // Inheriting wrappers should NOT serialize LocalAssetGrowth
-      if (csv.indexOf('LocalAssetGrowth_ie_indexFunds') !== -1) {
-        errors.push('LocalAssetGrowth_ie_indexFunds should NOT be in CSV for inheriting wrapper.');
-      }
-      if (csv.indexOf('LocalAssetGrowth_ie_shares,5') === -1) {
-        errors.push('Missing LocalAssetGrowth_ie_shares in CSV.');
-      }
-      if (csv.indexOf('LocalAssetVolatility_ie_shares,12') === -1) {
-        errors.push('Missing LocalAssetVolatility_ie_shares in CSV.');
-      }
-      if (csv.indexOf('Inflation_ie,2') === -1) {
-        errors.push('Missing Inflation_ie in CSV.');
-      }
-
-      let doc2 = createParameterDocument();
-      let ui2 = createUiStub(doc2);
-      global.document = doc2;
-
-      ui2.ensureParameterInput('investmentStrategiesEnabled', 'string');
-      ui2.ensureParameterInput('simulation_mode', 'string');
-      ui2.ensureParameterInput('economy_mode', 'string');
-      ui2.ensureParameterInput('PensionGrowthRate', 'percentage');
-      ui2.ensureParameterInput('PensionGrowthStdDev', 'percentage');
-      ui2.ensureParameterInput('Inflation', 'percentage');
-      ui2.ensureParameterInput('shares_ieGrowthRate', 'percentage');
-      ui2.ensureParameterInput('shares_ieGrowthStdDev', 'percentage');
-
-      deserializeSimulation(csv, ui2);
-
-      const gGrow = doc2.getElementById('GlobalAssetGrowth_globalEquity');
-      if (!gGrow || gGrow.value !== '7') {
-        errors.push('GlobalAssetGrowth_globalEquity did not deserialize.');
-      }
-      const gVol = doc2.getElementById('GlobalAssetVolatility_globalEquity');
-      if (!gVol || gVol.value !== '15') {
-        errors.push('GlobalAssetVolatility_globalEquity did not deserialize.');
-      }
-      const lGrow = doc2.getElementById('LocalAssetGrowth_ie_shares');
-      if (!lGrow || lGrow.value !== '5') {
-        errors.push('LocalAssetGrowth_ie_shares did not deserialize.');
-      }
-      const lVol = doc2.getElementById('LocalAssetVolatility_ie_shares');
-      if (!lVol || lVol.value !== '12') {
-        errors.push('LocalAssetVolatility_ie_shares did not deserialize.');
-      }
-      const inf = doc2.getElementById('Inflation_ie');
-      if (!inf || inf.value !== '2') {
-        errors.push('Inflation_ie did not deserialize.');
-      }
-
-      // Phase B: defaults from legacy values when per-country inputs are missing
-      const doc3 = createParameterDocument();
-      const ui3 = createUiStub(doc3, [['MV:US', 'US', '', '', '', '', '']]);
-      global.document = doc3;
-      doc3.ensureEl('StartCountry', 'string').value = 'ie';
-      doc3.ensureEl('PensionGrowthRate', 'percentage').value = '6';
-      doc3.ensureEl('PensionGrowthStdDev', 'percentage').value = '12';
-      doc3.ensureEl('Inflation', 'percentage').value = '2';
-      doc3.ensureEl('shares_ieGrowthRate', 'percentage').value = '4';
-      doc3.ensureEl('shares_ieGrowthStdDev', 'percentage').value = '9';
-
-      csv = serializeSimulation(ui3);
-
-      if (csv.indexOf('Inflation_ie,2') !== -1) {
-        errors.push('Legacy Inflation must not backfill canonical Inflation_ie.');
-      }
-      if (csv.indexOf('Inflation_ie,') === -1) {
-        errors.push('Expected canonical Inflation_ie key in CSV.');
-      }
-      if (csv.indexOf('LocalAssetGrowth_ie_shares,4') !== -1) {
-        errors.push('Legacy shares_ieGrowthRate must not backfill LocalAssetGrowth_ie_shares.');
-      }
-      if (csv.indexOf('LocalAssetVolatility_ie_shares,9') !== -1) {
-        errors.push('Legacy shares_ieGrowthStdDev must not backfill LocalAssetVolatility_ie_shares.');
-      }
-      if (csv.indexOf('LocalAssetGrowth_ie_indexFunds') !== -1) {
-        errors.push('Inheriting wrapper LocalAssetGrowth_ie_indexFunds should NOT be serialized even from legacy.');
-      }
-
-      const doc4 = createParameterDocument();
-      const ui4 = createUiStub(doc4);
-      global.document = doc4;
-      ui4.ensureParameterInput('investmentStrategiesEnabled', 'string');
-      ui4.ensureParameterInput('simulation_mode', 'string');
-      ui4.ensureParameterInput('economy_mode', 'string');
-      ui4.ensureParameterInput('PensionGrowthRate', 'percentage');
-      ui4.ensureParameterInput('PensionGrowthStdDev', 'percentage');
-      ui4.ensureParameterInput('Inflation', 'percentage');
-      ui4.ensureParameterInput('shares_ieGrowthRate', 'percentage');
-      ui4.ensureParameterInput('shares_ieGrowthStdDev', 'percentage');
-
-      deserializeSimulation(csv, ui4);
-
-      const dInf = doc4.getElementById('Inflation_ie');
-      if (!dInf || dInf.value !== '') {
-        errors.push('Inflation_ie should remain blank when serialized blank.');
-      }
-      const dlGrow = doc4.getElementById('LocalAssetGrowth_ie_shares');
-      if (!dlGrow || dlGrow.value !== '') {
-        errors.push('LocalAssetGrowth_ie_shares should remain blank without canonical value.');
-      }
-      const dlVol = doc4.getElementById('LocalAssetVolatility_ie_shares');
-      if (!dlVol || dlVol.value !== '') {
-        errors.push('LocalAssetVolatility_ie_shares should remain blank without canonical value.');
-      }
-
-      // Phase C: relocation scenario with MV event should serialize per-country locals
-      const usRuleset = {
-        getResolvedInvestmentTypes: () => ([
-          { key: 'localIndex_us', label: 'Local Index', residenceScope: 'local' }
-        ])
-      };
-      global.Config = {
-        getInstance: () => ({
-          getStartCountry: () => 'ie',
-          getDefaultCountry: () => 'ie',
-          getInvestmentBaseTypes: () => ([
-            { baseKey: 'globalEquity', label: 'Global Equity' },
-            { baseKey: 'globalBonds', label: 'Global Bonds' }
-          ]),
-          getCachedTaxRuleSet: (code) => {
-            const cc = String(code || '').toLowerCase();
-            if (cc === 'ie') return ieRuleset;
-            if (cc === 'us') return usRuleset;
-            return null;
-          },
-          getAvailableCountries: () => ([{ code: 'ie', name: 'Ireland' }, { code: 'us', name: 'United States' }]),
-          isRelocationEnabled: () => true
-        })
-      };
-
-      const doc5 = createParameterDocument();
-      const ui5 = createUiStub(doc5, [['MV:US', 'US', '', '', '', '', '']]);
-      global.document = doc5;
-      doc5.ensureEl('StartCountry', 'string').value = 'ie';
-      doc5.ensureEl('LocalAssetGrowth_us_localIndex', 'percentage').value = '6';
-      doc5.ensureEl('LocalAssetVolatility_us_localIndex', 'percentage').value = '14';
-
-      csv = serializeSimulation(ui5);
-      if (csv.indexOf('LocalAssetGrowth_us_localIndex,6') === -1) {
-        errors.push('Relocation locals did not serialize for US.');
-      }
-      if (csv.indexOf('LocalAssetVolatility_us_localIndex,14') === -1) {
-        errors.push('Relocation local volatility did not serialize for US.');
-      }
-
-      const doc6 = createParameterDocument();
-      const ui6 = createUiStub(doc6);
-      global.document = doc6;
-      ui6.ensureParameterInput('investmentStrategiesEnabled', 'string');
-      ui6.ensureParameterInput('simulation_mode', 'string');
-      ui6.ensureParameterInput('economy_mode', 'string');
-
-      deserializeSimulation(csv, ui6);
-      const usGrow = doc6.getElementById('LocalAssetGrowth_us_localIndex');
-      if (!usGrow || usGrow.value !== '6') {
-        errors.push('Relocation local growth did not deserialize for US.');
-      }
-      const usVol = doc6.getElementById('LocalAssetVolatility_us_localIndex');
-      if (!usVol || usVol.value !== '14') {
-        errors.push('Relocation local volatility did not deserialize for US.');
-      }
-
-      // Phase D: serialization must stay stable when Inflation_<startCountry> is not present.
-      global.Config = {
-        getInstance: () => ({
-          getStartCountry: () => 'ie',
-          getDefaultCountry: () => 'ie',
-          getInvestmentBaseTypes: () => ([
-            { baseKey: 'globalEquity', label: 'Global Equity' },
-            { baseKey: 'globalBonds', label: 'Global Bonds' }
-          ]),
-          getCachedTaxRuleSet: (code) => {
-            const cc = String(code || '').toLowerCase();
-            if (cc === 'ie') return ieRuleset;
-            return null;
-          },
-          getAvailableCountries: () => ([{ code: 'ie', name: 'Ireland' }]),
-          isRelocationEnabled: () => true
-        })
-      };
-
-      const doc7 = createParameterDocument();
-      const ui7 = createUiStub(doc7);
-      global.document = doc7;
-      doc7.ensureEl('StartCountry', 'string').value = 'ie';
-      doc7.ensureEl('PensionGrowthRate', 'percentage').value = '6';
-      doc7.ensureEl('PensionGrowthStdDev', 'percentage').value = '12';
-      doc7.ensureEl('Inflation', 'percentage').value = '2';
-      doc7.ensureEl('shares_ieGrowthRate', 'percentage').value = '4';
-      doc7.ensureEl('shares_ieGrowthStdDev', 'percentage').value = '9';
-
-      const csvFirst = serializeSimulation(ui7);
-      const csvSecond = serializeSimulation(ui7);
-      if (csvFirst !== csvSecond) {
-        errors.push('serializeSimulation should be stable across repeated calls for unchanged state.');
-      }
-      if (csvFirst.indexOf('Inflation_ie,') === -1 || csvSecond.indexOf('Inflation_ie,') === -1) {
-        errors.push('Canonical Inflation_ie key should always be emitted for StartCountry.');
-      }
-    } catch (err) {
-      errors.push('Unexpected error: ' + (err && err.message ? err.message : String(err)));
+      runCase('Canonical economy round-trip', errors, runCanonicalEconomyRoundTripCase);
+      runCase('Relocation-country local economy round-trip', errors, runRelocationEconomyRoundTripCase);
+      runCase('Legacy scalar no-backfill', errors, runLegacyNoBackfillCase);
     } finally {
       global.Config = originalConfig;
       global.document = originalDocument;

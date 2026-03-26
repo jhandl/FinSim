@@ -403,14 +403,26 @@ class FileManager {
         shouldValidateCurrencyMeta = false;
       }
 
+      const createdEventRows = [];
+      const pendingMarkerRefs = [];
+      const queueMarkerRef = (row, metaValues, metaKey, inputClass) => {
+        const raw = metaValues && metaValues[metaKey] ? String(metaValues[metaKey]).trim() : '';
+        if (!raw) return false;
+        const rowNumber = parseInt(raw, 10);
+        if (!Number.isFinite(rowNumber) || rowNumber < 1) return false;
+        pendingMarkerRefs.push({ row: row, rowNumber: rowNumber, inputClass: inputClass });
+        return true;
+      };
+
       eventData.forEach(([type, name, amount, fromAge, toAge, rate, match, meta]) => {
         if (type) {
           const displayRate = (rate !== undefined && rate !== '') ? String(parseFloat((Number(rate) * 100).toFixed(2))) : '';
           const displayMatch = (match !== undefined && match !== '') ? String(parseFloat((Number(match) * 100).toFixed(2))) : '';
           const row = this.webUI.eventsTableManager.createEventRow(type, name, amount, fromAge || '', toAge || '', displayRate, displayMatch);
           tbody.appendChild(row);
+          createdEventRows.push(row);
 
-          // Parse optional Meta column to restore hidden fields (currency, linkedCountry, linkedEventId, splitMvId, splitAnchorAmount, mvLinkId, sellMvId, rentMvId, resolved, resolvedMvId, resolvedCategory)
+          // Parse optional Meta column to restore hidden fields. New saves may store MV references as event row numbers.
           try {
             if (meta && typeof meta === 'string') {
               // Meta format: key=value;key=value (values URL-encoded)
@@ -516,13 +528,17 @@ class FileManager {
               }
               if (metaValues.linkedEventId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-linked-event-id', metaValues.linkedEventId);
               if (metaValues.splitMvId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-mv-id', metaValues.splitMvId);
+              else queueMarkerRef(row, metaValues, 'splitMvRow', 'event-relocation-split-mv-id');
               if (metaValues.splitAnchorAmount) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-anchor-amount', metaValues.splitAnchorAmount);
               if (metaValues.mvLinkId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-link-id', metaValues.mvLinkId);
               if (metaValues.sellMvId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', metaValues.sellMvId);
+              else queueMarkerRef(row, metaValues, 'sellMvRow', 'event-relocation-sell-mv-id');
               if (metaValues.rentMvId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-rent-mv-id', metaValues.rentMvId);
+              else queueMarkerRef(row, metaValues, 'rentMvRow', 'event-relocation-rent-mv-id');
               if (metaValues.resolved === '1') {
                 this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-resolution-override', '1');
                 if (metaValues.resolvedMvId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-resolution-mv-id', metaValues.resolvedMvId);
+                else queueMarkerRef(row, metaValues, 'resolvedMvRow', 'event-resolution-mv-id');
                 if (metaValues.resolvedCategory) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-resolution-category', metaValues.resolvedCategory);
               }
               if (metaValues.resolved === '0') {
@@ -538,6 +554,23 @@ class FileManager {
           } catch (_) { /* Non-fatal: loading continues without meta */ }
         }
       });
+
+      const ensureMarkerForEventRow = (rowNumber) => {
+        const targetRow = createdEventRows[rowNumber - 1];
+        if (!targetRow) return '';
+        const existing = targetRow.querySelector('.event-relocation-link-id');
+        if (existing && existing.value) return String(existing.value);
+        const markerId = 'mvrow_' + rowNumber;
+        this.webUI.eventsTableManager.getOrCreateHiddenInput(targetRow, 'event-relocation-link-id', markerId);
+        return markerId;
+      };
+      for (let i = 0; i < pendingMarkerRefs.length; i++) {
+        const pending = pendingMarkerRefs[i];
+        if (!pending || !pending.row || !pending.inputClass) continue;
+        const markerId = ensureMarkerForEventRow(pending.rowNumber);
+        if (!markerId) continue;
+        this.webUI.eventsTableManager.getOrCreateHiddenInput(pending.row, pending.inputClass, markerId);
+      }
 
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();

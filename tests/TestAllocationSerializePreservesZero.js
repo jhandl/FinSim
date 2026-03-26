@@ -160,8 +160,8 @@ module.exports = {
       if (csv.indexOf('InvestmentAllocation_indexFunds_ie,0') === -1) {
         errors.push('Expected InvestmentAllocation_indexFunds_ie to serialize as 0.');
       }
-      if (csv.indexOf('InvestmentAllocation_shares_ie,') === -1) {
-        errors.push('Expected InvestmentAllocation_shares_ie to serialize as empty.');
+      if (csv.indexOf('InvestmentAllocation_shares_ie,') !== -1) {
+        errors.push('Blank InvestmentAllocation_shares_ie should not serialize.');
       }
       if (csv.indexOf('Priority_cash,1') === -1) {
         errors.push('Expected Priority_cash to serialize as 1.');
@@ -177,6 +177,9 @@ module.exports = {
       }
       if (csv.indexOf('Priority_bonds,5') === -1) {
         errors.push('Expected Priority_bonds to serialize as 5.');
+      }
+      if (csv.indexOf('PriorityCash,') >= 0 || csv.indexOf('PriorityPension,') >= 0 || csv.indexOf('PriorityFunds,') >= 0 || csv.indexOf('PriorityShares,') >= 0) {
+        errors.push('Legacy PriorityCash/PriorityPension/PriorityFunds/PriorityShares should not serialize.');
       }
       if (csv.indexOf('Priority_rsu') >= 0) {
         errors.push('Priority_rsu should not serialize when sellWhenReceived is true.');

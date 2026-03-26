@@ -9,6 +9,13 @@ function loadClass(relativePath, className) {
   return new Function(source + '\nreturn ' + className + ';')();
 }
 
+const serializeSimulation = loadClass('src/core/Utils.js', 'serializeSimulation');
+const deserializeSimulation = loadClass('src/core/Utils.js', 'deserializeSimulation');
+const LegacyScenarioAdapter = loadClass('src/core/LegacyScenarioAdapter.js', 'LegacyScenarioAdapter');
+global.LegacyScenarioAdapter = LegacyScenarioAdapter;
+global.serializeSimulation = serializeSimulation;
+global.deserializeSimulation = deserializeSimulation;
+
 const EventAccordionManager = loadClass('src/frontend/web/components/EventAccordionManager.js', 'EventAccordionManager');
 const EventSummaryRenderer = loadClass('src/frontend/web/components/EventSummaryRenderer.js', 'EventSummaryRenderer');
 const WizardRenderer = loadClass('src/frontend/web/components/WizardRenderer.js', 'WizardRenderer');
@@ -386,6 +393,7 @@ describe('MV relocation remediation', () => {
           { code: 'IE', name: 'Ireland' },
           { code: 'AR', name: 'Argentina' }
         ],
+        getInvestmentBaseTypes: () => ([]),
         getCachedTaxRuleSet: (code) => {
           const normalized = String(code || '').toLowerCase();
           const currency = normalized === 'ar' ? 'ARS' : 'EUR';
@@ -575,6 +583,302 @@ describe('MV relocation remediation', () => {
 
     delete global.uiManager;
     jest.useRealTimers();
+  });
+
+  test('save/load round-trip preserves orphan sale and rental marker impacts after the relocation row is gone', async () => {
+    global.UIManager = UIManagerClass;
+    global.SimEvent = SimEventClass;
+    global.RelocationImpactDetector = RelocationImpactDetector;
+    global.Config = {
+      getInstance: () => ({
+        isRelocationEnabled: () => true,
+        getStartCountry: () => 'ie',
+        getDefaultCountry: () => 'ie',
+        getCountryNameByCode: (code) => {
+          const normalized = String(code || '').toLowerCase();
+          if (normalized === 'ie') return 'Ireland';
+          if (normalized === 'ar') return 'Argentina';
+          return normalized.toUpperCase();
+        },
+        getAvailableCountries: () => [
+          { code: 'IE', name: 'Ireland' },
+          { code: 'AR', name: 'Argentina' }
+        ],
+        getInvestmentBaseTypes: () => ([]),
+        getCachedTaxRuleSet: (code) => {
+          const normalized = String(code || '').toLowerCase();
+          const currency = normalized === 'ar' ? 'ARS' : 'EUR';
+          return {
+            getCurrencyCode: () => currency,
+            getResolvedInvestmentTypes: () => [],
+            hasPrivatePensions: () => true,
+            getPensionSystemType: () => 'mixed',
+            getInflationRate: () => 0.02
+          };
+        },
+        getTaxRuleSet: jest.fn(async (code) => {
+          return global.Config.getInstance().getCachedTaxRuleSet(code);
+        }),
+        listCachedRuleSets: () => ({
+          ie: global.Config.getInstance().getCachedTaxRuleSet('ie'),
+          ar: global.Config.getInstance().getCachedTaxRuleSet('ar')
+        }),
+        syncTaxRuleSetsWithEvents: jest.fn(async () => ({ failed: [] })),
+        getEconomicData: () => null
+      })
+    };
+
+    function renderSourceRow(rowId, type, name, amount, fromAge, toAge, rate, match, extraInputs, datasetAttrs) {
+      return `
+        <tr data-row-id="${rowId}"${datasetAttrs || ''}>
+          <td><input class="event-type" value="${type}" /></td>
+          <td><input class="event-name" value="${name || ''}" /></td>
+          <td><input class="event-amount" value="${amount || ''}" /></td>
+          <td><input class="event-from-age" value="${fromAge || ''}" /></td>
+          <td><input class="event-to-age" value="${toAge || ''}" /></td>
+          <td><input class="event-rate" value="${rate || ''}" /></td>
+          <td><input class="event-match" value="${match || ''}" /></td>
+          ${extraInputs || ''}
+        </tr>
+      `;
+    }
+
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          ${renderSourceRow(
+            'row-r1',
+            'R',
+            'Family House',
+            '40000',
+            '35',
+            '65',
+            '',
+            '',
+            '<input type="hidden" class="event-linked-country" value="ie" />' +
+              '<input type="hidden" class="event-country" value="ie" />' +
+              '<input type="hidden" class="event-currency" value="EUR" />' +
+              '<input type="hidden" class="event-resolution-override" value="1" />' +
+              '<input type="hidden" class="event-resolution-mv-id" value="mvlink_demo_ar_40" />' +
+              '<input type="hidden" class="event-resolution-category" value="boundary" />',
+            ' data-relocation-impact="1" data-relocation-impact-category="sale_marker_orphan"'
+          )}
+          ${renderSourceRow(
+            'row-m1',
+            'M',
+            'Family House',
+            '18000',
+            '35',
+            '39',
+            '0.035',
+            '',
+            '<input type="hidden" class="event-relocation-sell-mv-id" value="mvlink_demo_ar_40" />' +
+              '<input type="hidden" class="event-relocation-sell-anchor-age" value="40" />' +
+              '<input type="hidden" class="event-mortgage-term" value="25" />',
+            ' data-relocation-impact="1" data-relocation-impact-category="sale_marker_orphan"'
+          )}
+          ${renderSourceRow(
+            'row-mp1',
+            'MP',
+            'Family House',
+            '9999',
+            '39',
+            '39',
+            '',
+            '',
+            '<input type="hidden" class="event-relocation-sell-mv-id" value="mvlink_demo_ar_40" />' +
+              '<input type="hidden" class="event-relocation-sell-anchor-age" value="40" />',
+            ' data-relocation-impact="1" data-relocation-impact-category="sale_marker_orphan"'
+          )}
+          ${renderSourceRow(
+            'row-ri1',
+            'RI',
+            'Family House',
+            '1600',
+            '40',
+            '65',
+            '',
+            '',
+            '<input type="hidden" class="event-linked-country" value="ie" />' +
+              '<input type="hidden" class="event-country" value="ie" />' +
+              '<input type="hidden" class="event-currency" value="EUR" />' +
+              '<input type="hidden" class="event-relocation-rent-mv-id" value="mvlink_demo_ar_40" />',
+            ' data-relocation-impact="1" data-relocation-impact-category="simple"'
+          )}
+          ${renderSourceRow(
+            'row-safe',
+            'E',
+            'Safe Expense',
+            '500',
+            '30',
+            '31',
+            '',
+            '',
+            '',
+            ''
+          )}
+        </tbody>
+      </table>
+    `;
+
+    const sourceUi = {
+      getVersion: () => '2.1',
+      getValue: (key) => {
+        if (key === 'StartCountry') return 'ie';
+        if (key === 'simulation_mode') return 'single';
+        if (key === 'economy_mode') return 'deterministic';
+        if (key === 'StartingAge') return '30';
+        if (key === 'P2StartingAge') return '';
+        return '';
+      },
+      isPercentage: () => false,
+      isBoolean: () => false,
+      getTableData: () => ([
+        ['R:Family House', '40000', '35', '65', '', ''],
+        ['M:Family House', '18000', '35', '39', '0.035', ''],
+        ['MP:Family House', '9999', '39', '39', '', ''],
+        ['RI:Family House', '1600', '40', '65', '', ''],
+        ['E:Safe Expense', '500', '30', '31', '', '']
+      ])
+    };
+
+    const csv = serializeSimulation(sourceUi);
+    expect(csv).toContain('SellMvId');
+    expect(csv).toContain('mvlink_demo_ar_40');
+
+    document.body.innerHTML = `
+      <div class="parameters-section">
+        <input id="StartCountry" value="">
+        <input id="simulation_mode" value="">
+        <input id="economy_mode" value="">
+        <input id="StartingAge" value="">
+        <input id="P2StartingAge" value="">
+      </div>
+      <table id="Events"><tbody></tbody></table>
+    `;
+
+    let created = 0;
+    const state = {};
+    const webUIStub = {
+      chartManager: {
+        reportingCurrency: null,
+        setupChartCurrencyControls: jest.fn(),
+        clearExtraChartRows: jest.fn()
+      },
+      tableManager: {
+        reportingCurrency: null,
+        setupTableCurrencyControls: jest.fn(),
+        clearContent: jest.fn(),
+        clearExtraDataRows: jest.fn(),
+        setDataRow: jest.fn()
+      },
+      eventsTableManager: {
+        eventRowCounter: 0,
+        handleAgeYearToggle: jest.fn(),
+        createEventRow: (type, name, amount, fromAge, toAge, rate, match) => {
+          const tr = document.createElement('tr');
+          created += 1;
+          tr.dataset.rowId = 'loaded-' + created;
+          tr.innerHTML = `
+            <td><input class="event-type" value="${type || ''}"></td>
+            <td><input class="event-name" value="${name || ''}"></td>
+            <td><input class="event-amount" value="${amount || ''}"></td>
+            <td><input class="event-from-age" value="${fromAge || ''}"></td>
+            <td><input class="event-to-age" value="${toAge || ''}"></td>
+            <td><input class="event-rate" value="${rate || ''}"></td>
+            <td><input class="event-match" value="${match || ''}"></td>
+          `;
+          return tr;
+        },
+        getOrCreateHiddenInput: (row, className, value) => {
+          let el = row.querySelector('.' + className);
+          if (!el) {
+            el = document.createElement('input');
+            el.className = className;
+            row.appendChild(el);
+          }
+          el.value = value;
+          return el;
+        },
+        updateEventRowsVisibilityAndTypes: jest.fn(),
+        updateRelocationImpactIndicators: jest.fn((events) => {
+          const rows = Array.from(document.querySelectorAll('#Events tbody tr'));
+          rows.forEach((row, index) => {
+            const event = events[index];
+            delete row.dataset.relocationImpact;
+            delete row.dataset.relocationImpactCategory;
+            delete row.dataset.relocationImpactMvId;
+            if (event && event.relocationImpact) {
+              row.dataset.relocationImpact = '1';
+              row.dataset.relocationImpactCategory = event.relocationImpact.category || '';
+              row.dataset.relocationImpactMvId = event.relocationImpact.mvEventId || '';
+            }
+          });
+        }),
+        clearRelocationResolutionToastSuppression: jest.fn(),
+        suppressRelocationResolutionToastOnce: jest.fn()
+      },
+      formatUtils: {
+        setupCurrencyInputs: jest.fn(),
+        setupPercentageInputs: jest.fn()
+      },
+      dragAndDrop: {
+        renderPriorities: jest.fn(async () => {})
+      },
+      eventAccordionManager: null,
+      clearAllWarnings: jest.fn(),
+      setValue: jest.fn((key, value) => {
+        state[key] = value;
+        const el = document.getElementById(key);
+        if (el) el.value = value;
+      }),
+      getValue: jest.fn((key) => {
+        const el = document.getElementById(key);
+        if (el) return el.value;
+        return state[key] || '';
+      }),
+      getTableData: jest.fn(() => {
+        return Array.from(document.querySelectorAll('#Events tbody tr'))
+          .filter((row) => row && !(row.classList && row.classList.contains('resolution-panel-row')))
+          .map((row) => {
+            const type = row.querySelector('.event-type') ? row.querySelector('.event-type').value : '';
+            const name = row.querySelector('.event-name') ? row.querySelector('.event-name').value : '';
+            const amount = row.querySelector('.event-amount') ? row.querySelector('.event-amount').value : '';
+            const fromAge = row.querySelector('.event-from-age') ? row.querySelector('.event-from-age').value : '';
+            const toAge = row.querySelector('.event-to-age') ? row.querySelector('.event-to-age').value : '';
+            const rate = row.querySelector('.event-rate') ? row.querySelector('.event-rate').value : '';
+            const match = row.querySelector('.event-match') ? row.querySelector('.event-match').value : '';
+            return [`${type}:${name}`, amount, fromAge, toAge, rate, match];
+          });
+      }),
+      setStatus: jest.fn(),
+      readEvents: null,
+      updateStatusForRelocationImpacts: jest.fn()
+    };
+
+    const uiMgr = new UIManagerClass(webUIStub);
+    webUIStub.readEvents = uiMgr.readEvents.bind(uiMgr);
+    global.uiManager = uiMgr;
+
+    const fm = new FileManager(webUIStub);
+    const loaded = await fm.loadFromString(csv, 'orphan-save-load');
+
+    expect(loaded).toBe(true);
+
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr'));
+    expect(rows).toHaveLength(5);
+
+    expect(rows[0].dataset.relocationImpactCategory).toBe('sale_marker_orphan');
+    expect(rows[1].dataset.relocationImpactCategory).toBe('sale_marker_orphan');
+    expect(rows[2].dataset.relocationImpactCategory).toBe('sale_marker_orphan');
+    expect(rows[3].dataset.relocationImpactCategory).toBe('simple');
+    expect(rows[4].dataset.relocationImpactCategory || '').toBe('');
+
+    expect(rows[1].querySelector('.event-relocation-sell-mv-id').value).toBe('mvlink_demo_ar_40');
+    expect(rows[2].querySelector('.event-relocation-sell-mv-id').value).toBe('mvlink_demo_ar_40');
+    expect(rows[3].querySelector('.event-relocation-rent-mv-id').value).toBe('mvlink_demo_ar_40');
+
+    delete global.uiManager;
   });
 
   test('wizard event creation reuses addEventRow flow instead of constructing rows directly', async () => {

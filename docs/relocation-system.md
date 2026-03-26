@@ -282,7 +282,7 @@ Property class tracks currency via `RealEstate.getCurrency()`. Mortgage currency
 - `TestRelocationImpactDetection.js`: Impact classification.
 - `TestPropertyCurrencyPersistence.js`: Location-tied inflation.
 - `TestPensionSystemConflicts.js`: Pension portability.
-- `TestCSVMultiCurrencyRoundTrip.js`: Serialization/deserialization.
+- `ConfidenceTestH_CSVRoundtrip.js`: Authoritative relocation/non-relocation CSV round-trip coverage.
 - `TestRelocationEventResolution.spec.js`: E2E resolution workflow.
 - `TestRelocationWizardFlow.spec.js`: E2E wizard creation.
 - `TestChartCurrencyConversion.spec.js`: E2E chart currency display.

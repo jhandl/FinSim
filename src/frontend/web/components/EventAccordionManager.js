@@ -176,7 +176,7 @@ class EventAccordionManager {
 
         // Generate a unique ID if one doesn't exist on the row
         if (!row.dataset.eventId) {
-          row.dataset.eventId = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`;
+          row.dataset.eventId = 'event_fallback_' + (index + 1).toString(36);
         }
 
         event.id = row.dataset.eventId;

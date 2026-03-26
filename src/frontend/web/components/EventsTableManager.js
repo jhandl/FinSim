@@ -3,6 +3,7 @@ class EventsTableManager {
   constructor(webUI) {
     this.webUI = webUI;
     this.eventRowCounter = 0;
+    this._compactIdCounters = {};
     this.ageYearMode = 'age'; // Track current toggle mode
     this.viewMode = 'table'; // Track current view mode (table/accordion)
     this.tooltipElement = null; // Reference to current tooltip
@@ -783,9 +784,16 @@ class EventsTableManager {
     if (!row) return '';
     const existing = row.querySelector('.event-relocation-link-id');
     if (existing && existing.value) return String(existing.value);
-    const linkId = 'mvlink_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const linkId = this._nextCompactId('mvlink');
     this.getOrCreateHiddenInput(row, 'event-relocation-link-id', linkId);
     return linkId;
+  }
+
+  _nextCompactId(prefix) {
+    const key = String(prefix || 'id');
+    const next = (this._compactIdCounters[key] || 0) + 1;
+    this._compactIdCounters[key] = next;
+    return key + '_' + next.toString(36);
   }
 
   _getRelocationLinkIdByImpactId(mvImpactId) {
@@ -2379,7 +2387,7 @@ class EventsTableManager {
       else if (event.type === 'SI2') part2EventType = 'SI2np';
     }
 
-    const linkedEventId = 'split_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    const linkedEventId = this._nextCompactId('split');
     const splitMvId = this._getRelocationLinkIdByImpactId(mvImpactId) || String(mvImpactId || '');
     // Prefer parsing the original row's displayed amount using the row's current locale/country hint.
     // This avoids blank amount issues when an event was first created post-relocation and later moved
@@ -4031,7 +4039,7 @@ class EventsTableManager {
     row.dataset.creationIndex = this.eventRowCounter;
 
     // Generate unique ID for this event to track it in accordion view
-    const eventId = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const eventId = this._nextCompactId('event');
     row.dataset.eventId = eventId;
 
     // Build dropdown options & find label for current selection

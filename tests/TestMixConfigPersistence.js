@@ -130,6 +130,8 @@ module.exports = {
       doc.ensureEl('GlobalMixConfig_indexFunds_startAsset2Pct', 'percentage').value = '40';
       doc.ensureEl('GlobalMixConfig_indexFunds_endAsset1Pct', 'percentage').value = '50';
       doc.ensureEl('GlobalMixConfig_indexFunds_endAsset2Pct', 'percentage').value = '50';
+      doc.ensureEl('MixConfig_ar_cedear_endAsset2Pct', 'percentage').value = '';
+      doc.ensureEl('MixConfig_ar_cedear_type', 'string').value = '';
       doc._elements['MixConfig_ie_indexFunds_type'].tagName = 'SELECT';
 
       const serialized = serializeSimulation(ui);
@@ -192,6 +194,12 @@ module.exports = {
       }
       if (serialized.indexOf('GlobalMixConfig_indexFunds_endAsset2Pct,50') === -1) {
         errors.push('Expected GlobalMixConfig_indexFunds_endAsset2Pct to be serialized.');
+      }
+      if (serialized.indexOf('MixConfig_ar_cedear_endAsset2Pct,') !== -1) {
+        errors.push('Blank MixConfig_ar_cedear_endAsset2Pct should not be serialized.');
+      }
+      if (serialized.indexOf('MixConfig_ar_cedear_type,') !== -1) {
+        errors.push('Blank MixConfig_ar_cedear_type should not be serialized.');
       }
 
       const doc2 = createParameterDocument();

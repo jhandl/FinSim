@@ -339,6 +339,118 @@ function isBetween(num, min, max) {
   return ((num >= min) && (num <= max));
 }
 
+var EVENT_META_FIELD_DEFS = [
+  { key: 'currency', header: 'Currency' },
+  { key: 'linkedCountry', header: 'LinkedCountry' },
+  { key: 'linkedRows', header: 'LinkedRows' },
+  { key: 'splitMvRow', header: 'SplitMvRow' },
+  { key: 'splitMvId', header: 'SplitMvId' },
+  { key: 'splitAnchorAmount', header: 'SplitAnchorAmount' },
+  { key: 'sellMvRow', header: 'SellMvRow' },
+  { key: 'sellMvId', header: 'SellMvId' },
+  { key: 'rentMvRow', header: 'RentMvRow' },
+  { key: 'rentMvId', header: 'RentMvId' },
+  { key: 'resolved', header: 'Resolved' },
+  { key: 'resolvedMvRow', header: 'ResolvedMvRow' },
+  { key: 'resolvedMvId', header: 'ResolvedMvId' },
+  { key: 'resolvedCategory', header: 'ResolvedCategory' }
+];
+
+var EVENT_META_HEADER_KEY_MAP = {
+  Currency: 'currency',
+  LinkedCountry: 'linkedCountry',
+  LinkedRows: 'linkedRows',
+  LinkedEventId: 'linkedEventId',
+  SplitMvId: 'splitMvId',
+  SplitMvRow: 'splitMvRow',
+  SplitAnchorAmount: 'splitAnchorAmount',
+  MvLinkId: 'mvLinkId',
+  SellMvId: 'sellMvId',
+  SellMvRow: 'sellMvRow',
+  RentMvId: 'rentMvId',
+  RentMvRow: 'rentMvRow',
+  Resolved: 'resolved',
+  ResolvedMvId: 'resolvedMvId',
+  ResolvedMvRow: 'resolvedMvRow',
+  ResolvedCategory: 'resolvedCategory'
+};
+
+var EVENT_META_INLINE_KEYS = [
+  'currency',
+  'linkedCountry',
+  'linkedEventId',
+  'splitMvId',
+  'splitMvRow',
+  'splitAnchorAmount',
+  'mvLinkId',
+  'sellMvId',
+  'sellMvRow',
+  'rentMvId',
+  'rentMvRow',
+  'resolved',
+  'resolvedMvId',
+  'resolvedMvRow',
+  'resolvedCategory'
+];
+
+function encodeScenarioCsvValue(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).replace(/,/g, '%2C');
+}
+
+function decodeScenarioCsvValue(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).replace(/%2C/g, ',');
+}
+
+function hasEventMeta(meta) {
+  if (!meta || typeof meta !== 'object') return false;
+  for (var i = 0; i < EVENT_META_FIELD_DEFS.length; i++) {
+    var key = EVENT_META_FIELD_DEFS[i].key;
+    if (meta[key] !== undefined && meta[key] !== null && String(meta[key]) !== '') {
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildEventMetaString(meta) {
+  if (!meta || typeof meta !== 'object') return '';
+  var pairs = [];
+  for (var i = 0; i < EVENT_META_INLINE_KEYS.length; i++) {
+    var key = EVENT_META_INLINE_KEYS[i];
+    var value = meta[key];
+    if (value === undefined || value === null || String(value) === '') continue;
+    pairs.push(key + '=' + encodeURIComponent(String(value)));
+  }
+  return pairs.join(';');
+}
+
+function normalizeEventRowListString(value) {
+  if (value === undefined || value === null) return '';
+  var parts = String(value).split('|');
+  var unique = {};
+  var rows = [];
+  for (var i = 0; i < parts.length; i++) {
+    var rowNum = parseInt(parts[i], 10);
+    if (!isFinite(rowNum) || rowNum < 1) continue;
+    if (unique[rowNum]) continue;
+    unique[rowNum] = true;
+    rows.push(rowNum);
+  }
+  rows.sort(function(a, b) { return a - b; });
+  return rows.join('|');
+}
+
+function shouldPersistEmptyScenarioParameter(key) {
+  if (String(key || '').indexOf('InvestmentAllocation_') !== 0) return false;
+  if (typeof document === 'undefined') return false;
+  var el = document.getElementById(String(key));
+  if (!el) return false;
+  if (el.__csvLoaded === true) return true;
+  return !!(typeof el.getAttribute === 'function' && el.getAttribute('data-csv-loaded') === '1');
+}
+
 function serializeSimulation(ui) {
   var config = Config.getInstance();
   var rawStartCountry = null;
@@ -370,7 +482,8 @@ function serializeSimulation(ui) {
     var type = rawType;
     if (rawType.indexOf(':') >= 0) type = rawType.split(':')[0];
     if (type === 'MV') {
-      var cc = String(evt[1] || '').trim().toLowerCase();
+      var eventName = rawType.indexOf(':') >= 0 ? rawType.split(':').slice(1).join(':') : String(evt[1] || '');
+      var cc = getRelocationCountryCode({ type: 'MV', name: eventName });
       if (cc && !scenarioCountrySet[cc]) {
         scenarioCountrySet[cc] = true;
         scenarioCountries.push(cc);
@@ -431,10 +544,6 @@ function serializeSimulation(ui) {
     MarriageYear: ui.getValue('MarriageYear'),
     YoungestChildBorn: ui.getValue('YoungestChildBorn'),
     OldestChildBorn: ui.getValue('OldestChildBorn'),
-    PriorityCash: getPriorityValue('cash', 1),
-    PriorityPension: getPriorityValue('pension', 2),
-    PriorityFunds: getPriorityValue('indexFunds', 3),
-    PriorityShares: getPriorityValue('shares', 4),
     // Person 2 Parameters
     P2StartingAge: ui.getValue('P2StartingAge'),
     P2RetirementAge: ui.getValue('P2RetirementAge'),
@@ -770,6 +879,7 @@ function serializeSimulation(ui) {
 
   // Collect Meta per-row from DOM when running in web UI (GAS-safe guard)
   var metaByRow = [];
+  var mvRowByMarkerId = {};
   try {
     // Build a parallel list of event table rows in the same order as getTableData (skip resolution rows)
     var table = (typeof document !== 'undefined') ? document.getElementById('Events') : null;
@@ -783,90 +893,140 @@ function serializeSimulation(ui) {
         // When includeHiddenEventTypes is true, hidden rows are still included by getTableData
         // so we do not filter by display here.
         // Extract hidden inputs
-        var metaPairs = [];
+        var meta = {};
         try {
           var currencyInput = rowEl.querySelector ? rowEl.querySelector('.event-currency') : null;
           if (currencyInput && currencyInput.value) {
-            metaPairs.push('currency=' + encodeURIComponent(currencyInput.value));
+            meta.currency = currencyInput.value;
           }
         } catch (_e1) { }
         try {
           var linkedCountryInput = rowEl.querySelector ? rowEl.querySelector('.event-linked-country') : null;
           if (linkedCountryInput && linkedCountryInput.value) {
-            metaPairs.push('linkedCountry=' + encodeURIComponent(linkedCountryInput.value));
+            meta.linkedCountry = linkedCountryInput.value;
           }
         } catch (_e2) { }
         try {
           var linkedEventIdInput = rowEl.querySelector ? rowEl.querySelector('.event-linked-event-id') : null;
           if (linkedEventIdInput && linkedEventIdInput.value) {
-            metaPairs.push('linkedEventId=' + encodeURIComponent(linkedEventIdInput.value));
+            meta.linkedEventId = linkedEventIdInput.value;
           }
         } catch (_e3) { }
         try {
           var splitMvIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-split-mv-id') : null;
           if (splitMvIdInput && splitMvIdInput.value) {
-            metaPairs.push('splitMvId=' + encodeURIComponent(splitMvIdInput.value));
+            meta.splitMvId = splitMvIdInput.value;
           }
         } catch (_e3c) { }
         try {
           var splitAnchorAmountInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-split-anchor-amount') : null;
           if (splitAnchorAmountInput && splitAnchorAmountInput.value !== '') {
-            metaPairs.push('splitAnchorAmount=' + encodeURIComponent(splitAnchorAmountInput.value));
+            meta.splitAnchorAmount = splitAnchorAmountInput.value;
           }
         } catch (_e3d) { }
         try {
           var mvLinkIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-link-id') : null;
           if (mvLinkIdInput && mvLinkIdInput.value) {
-            metaPairs.push('mvLinkId=' + encodeURIComponent(mvLinkIdInput.value));
+            meta.mvLinkId = mvLinkIdInput.value;
           }
         } catch (_e3a) { }
         try {
           var sellMvIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-sell-mv-id') : null;
           if (sellMvIdInput && sellMvIdInput.value) {
-            metaPairs.push('sellMvId=' + encodeURIComponent(sellMvIdInput.value));
+            meta.sellMvId = sellMvIdInput.value;
           }
         } catch (_e3b) { }
         try {
           var rentMvIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-rent-mv-id') : null;
           if (rentMvIdInput && rentMvIdInput.value) {
-            metaPairs.push('rentMvId=' + encodeURIComponent(rentMvIdInput.value));
+            meta.rentMvId = rentMvIdInput.value;
           }
         } catch (_e3e) { }
+        try {
+          var typeInput = rowEl.querySelector ? rowEl.querySelector('.event-type') : null;
+          var rowType = typeInput && typeInput.value ? String(typeInput.value) : '';
+          if (rowType === 'MV') {
+            var rowNumber = metaByRow.length + 1;
+            var mvLinkInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-link-id') : null;
+            var mvLinkValue = mvLinkInput && mvLinkInput.value ? String(mvLinkInput.value) : '';
+            if (mvLinkValue) mvRowByMarkerId[mvLinkValue] = rowNumber;
+            var runtimeId = rowEl && rowEl.dataset && rowEl.dataset.eventId ? String(rowEl.dataset.eventId) : '';
+            if (runtimeId) mvRowByMarkerId[runtimeId] = rowNumber;
+          }
+        } catch (_e3f) { }
         var resolvedMeta = null;
         try {
           var resolutionOverrideInput = rowEl.querySelector ? rowEl.querySelector('.event-resolution-override') : null;
           if (resolutionOverrideInput && resolutionOverrideInput.value) {
             resolvedMeta = '1';
-            metaPairs.push('resolved=1');
+            meta.resolved = '1';
             var resolutionMvIdInput = rowEl.querySelector ? rowEl.querySelector('.event-resolution-mv-id') : null;
             if (resolutionMvIdInput && resolutionMvIdInput.value) {
-              metaPairs.push('resolvedMvId=' + encodeURIComponent(resolutionMvIdInput.value));
+              meta.resolvedMvId = resolutionMvIdInput.value;
             }
             var resolutionCategoryInput = rowEl.querySelector ? rowEl.querySelector('.event-resolution-category') : null;
             if (resolutionCategoryInput && resolutionCategoryInput.value) {
-              metaPairs.push('resolvedCategory=' + encodeURIComponent(resolutionCategoryInput.value));
+              meta.resolvedCategory = resolutionCategoryInput.value;
             }
           }
         } catch (_e4) { }
         try {
           if (resolvedMeta !== '1' && rowEl && rowEl.dataset && rowEl.dataset.relocationImpact === '1') {
-            metaPairs.push('resolved=0');
+            meta.resolved = '0';
           }
         } catch (_e5) { }
-        metaByRow.push(metaPairs.join(';'));
+        metaByRow.push(meta);
       }
     }
   } catch (_err) {
     // Non-web environments (e.g., GAS) won't have a DOM; leave meta arrays empty
     metaByRow = [];
+    mvRowByMarkerId = {};
+  }
+
+  var linkedRowsById = {};
+  for (var lri = 0; lri < metaByRow.length; lri++) {
+    var linkedMeta = metaByRow[lri];
+    if (!linkedMeta || typeof linkedMeta !== 'object' || !linkedMeta.linkedEventId) continue;
+    var linkedId = String(linkedMeta.linkedEventId);
+    if (!linkedRowsById[linkedId]) linkedRowsById[linkedId] = [];
+    linkedRowsById[linkedId].push(lri + 1);
+  }
+
+  for (var mri = 0; mri < metaByRow.length; mri++) {
+    var rowMeta = metaByRow[mri];
+    if (!rowMeta || typeof rowMeta !== 'object') continue;
+    if (rowMeta.linkedEventId) {
+      var linkedRowList = linkedRowsById[String(rowMeta.linkedEventId)] || [mri + 1];
+      rowMeta.linkedRows = linkedRowList.join('|');
+      delete rowMeta.linkedEventId;
+    }
+    if (rowMeta.splitMvId) {
+      rowMeta.splitMvRow = mvRowByMarkerId[String(rowMeta.splitMvId)] || '';
+      if (rowMeta.splitMvRow) delete rowMeta.splitMvId;
+    }
+    if (rowMeta.sellMvId) {
+      rowMeta.sellMvRow = mvRowByMarkerId[String(rowMeta.sellMvId)] || '';
+      if (rowMeta.sellMvRow) delete rowMeta.sellMvId;
+    }
+    if (rowMeta.rentMvId) {
+      rowMeta.rentMvRow = mvRowByMarkerId[String(rowMeta.rentMvId)] || '';
+      if (rowMeta.rentMvRow) delete rowMeta.rentMvId;
+    }
+    if (rowMeta.resolvedMvId) {
+      rowMeta.resolvedMvRow = mvRowByMarkerId[String(rowMeta.resolvedMvId)] || '';
+      if (rowMeta.resolvedMvRow) delete rowMeta.resolvedMvId;
+    }
+    delete rowMeta.mvLinkId;
   }
 
   // Create CSV content (always save with FinSim header for forward compatibility)
   let csvContent = "# FinSim v" + ui.getVersion() + " Save File\n";
   csvContent += "# Parameters\n";
   for (const [key, value] of Object.entries(parameters)) {
-    // Convert undefined values to empty strings to avoid "undefined" in CSV
-    const csvValue = (value === undefined || value === null) ? '' : value;
+    if (value === undefined || value === null) continue;
+    if (value === '' && !shouldPersistEmptyScenarioParameter(key)) continue;
+    const csvValue = value;
     csvContent += `${key},${csvValue}\n`;
   }
 
@@ -875,38 +1035,48 @@ function serializeSimulation(ui) {
   var isRelocationEnabled = config && typeof config.isRelocationEnabled === 'function' && config.isRelocationEnabled();
 
   csvContent += "# Events\n";
-  // Use conditional header based on relocation enabled state
-  if (isRelocationEnabled) {
-    csvContent += "Type,Name,Amount,FromAge,ToAge,Rate,Extra,Meta\n";
-  } else {
-    csvContent += "Type,Name,Amount,FromAge,ToAge,Rate,Extra\n";
-  }
-
-  var metaIndex = 0;
+  csvContent += "Type,Name,Amount,FromAge,ToAge,Rate,Extra\n";
   events.forEach(event => {
     // Split the first field (which contains "type:name") into separate type and name
     const [type, ...nameParts] = event[0].split(':');
     const name = nameParts.join(':'); // Rejoin in case name contained colons
 
     // URL-encode commas in the name to prevent breaking CSV format
-    const encodedName = name.replace(/,/g, "%2C");
+    const encodedName = encodeScenarioCsvValue(name);
 
     // Convert undefined values in event fields to empty strings
     const otherFields = event.slice(1).map(field =>
       (field === undefined || field === null) ? '' : field
     );
-    // Append Meta value only if relocation is enabled
-    if (isRelocationEnabled) {
-      var metaVal = '';
-      if (metaByRow && metaIndex < metaByRow.length) {
-        metaVal = metaByRow[metaIndex] || '';
-      }
-      metaIndex++;
-      csvContent += `${type},${encodedName},${otherFields.join(',')},${metaVal}\n`;
-    } else {
-      csvContent += `${type},${encodedName},${otherFields.join(',')}\n`;
-    }
+    csvContent += `${type},${encodedName},${otherFields.join(',')}\n`;
   });
+
+  if (isRelocationEnabled) {
+    var anyEventMeta = false;
+    for (var metaIndex = 0; metaIndex < metaByRow.length; metaIndex++) {
+      if (hasEventMeta(metaByRow[metaIndex])) {
+        anyEventMeta = true;
+        break;
+      }
+    }
+    if (anyEventMeta) {
+      csvContent += "\n# EventMeta\n";
+      csvContent += "Row";
+      for (var mf = 0; mf < EVENT_META_FIELD_DEFS.length; mf++) {
+        csvContent += "," + EVENT_META_FIELD_DEFS[mf].header;
+      }
+      csvContent += "\n";
+      for (var rowIndex = 0; rowIndex < metaByRow.length; rowIndex++) {
+        var rowMeta = metaByRow[rowIndex];
+        if (!hasEventMeta(rowMeta)) continue;
+        var metaColumns = [];
+        for (var mc = 0; mc < EVENT_META_FIELD_DEFS.length; mc++) {
+          metaColumns.push(encodeScenarioCsvValue(rowMeta[EVENT_META_FIELD_DEFS[mc].key]));
+        }
+        csvContent += (rowIndex + 1) + "," + metaColumns.join(',') + "\n";
+      }
+    }
+  }
 
   return csvContent;
 }
@@ -1055,6 +1225,15 @@ function deserializeSimulation(content, ui) {
         ui.setValue(actualKey, value);
         try {
           if (typeof document !== 'undefined') {
+            if (/^InvestmentAllocation_/.test(actualKey)) {
+              var loadedAllocationEl = document.getElementById(actualKey);
+              if (loadedAllocationEl) {
+                loadedAllocationEl.__csvLoaded = true;
+                if (typeof loadedAllocationEl.setAttribute === 'function') {
+                  loadedAllocationEl.setAttribute('data-csv-loaded', '1');
+                }
+              }
+            }
             if (/^PensionGrowth_[a-z]{2,}$/i.test(actualKey) ||
                 /^PensionVolatility_[a-z]{2,}$/i.test(actualKey) ||
                 /^Inflation_[a-z]{2,}$/i.test(actualKey)) {
@@ -1163,6 +1342,17 @@ function deserializeSimulation(content, ui) {
             } else {
               ui.setValue(perId, ui.getValue(id));
             }
+            try {
+              if (typeof document !== 'undefined') {
+                var perAllocEl = document.getElementById(perId);
+                if (perAllocEl) {
+                  perAllocEl.__csvLoaded = true;
+                  if (typeof perAllocEl.setAttribute === 'function') {
+                    perAllocEl.setAttribute('data-csv-loaded', '1');
+                  }
+                }
+              }
+            } catch (_) { }
           } catch (_) { }
         }
       } catch (_) { }
@@ -1222,17 +1412,25 @@ function deserializeSimulation(content, ui) {
     const code = String(country.code || '').trim().toLowerCase();
     if (code) validRelocationCountries[code] = true;
   }
-  let inEvents = false;
+  let currentSection = '';
+  let eventsHeaderHasMeta = false;
+  let eventMetaHeaders = null;
+  let eventMetaByRowIndex = {};
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (line.includes('# Events')) {
-      inEvents = true;
+    if (line.startsWith('#')) {
+      currentSection = line;
       continue;
     }
-    if (inEvents && line && !line.startsWith('Type,')) {
+    if (line === '') continue;
+    if (currentSection.includes('# Events')) {
+      if (line.startsWith('Type,')) {
+        eventsHeaderHasMeta = line.indexOf(',Meta') >= 0;
+        continue;
+      }
       const parts = line.split(',');
       if (parts.length > 1) {
-        parts[1] = parts[1].replace(/%2C/g, ",");
+        parts[1] = decodeScenarioCsvValue(parts[1]);
       }
       const eventType = String(parts[0] || '').trim();
       if (eventType === 'MV') {
@@ -1242,6 +1440,66 @@ function deserializeSimulation(content, ui) {
         }
       }
       eventData.push(parts);
+      continue;
+    }
+    if (currentSection.includes('# EventMeta')) {
+      if (line.startsWith('Row,')) {
+        eventMetaHeaders = line.split(',');
+        continue;
+      }
+      const parts = line.split(',');
+      const rowIndex = parseInt(parts[0], 10) - 1;
+      if (isNaN(rowIndex) || rowIndex < 0 || rowIndex >= eventData.length) continue;
+      var rowMeta = {};
+      if (eventMetaHeaders && eventMetaHeaders.length > 1) {
+        for (var hi = 1; hi < eventMetaHeaders.length; hi++) {
+          var header = String(eventMetaHeaders[hi] || '').trim();
+          var key = EVENT_META_HEADER_KEY_MAP[header] || '';
+          if (!key) continue;
+          var rawHeaderValue = (hi < parts.length) ? parts[hi] : '';
+          var decodedHeaderValue = decodeScenarioCsvValue(rawHeaderValue);
+          if (decodedHeaderValue !== '') {
+            rowMeta[key] = decodedHeaderValue;
+          }
+        }
+      } else {
+        for (var mi = 0; mi < EVENT_META_FIELD_DEFS.length; mi++) {
+          var rawValue = (mi + 1 < parts.length) ? parts[mi + 1] : '';
+          var decodedValue = decodeScenarioCsvValue(rawValue);
+          if (decodedValue !== '') {
+            rowMeta[EVENT_META_FIELD_DEFS[mi].key] = decodedValue;
+          }
+        }
+      }
+      eventMetaByRowIndex[rowIndex] = rowMeta;
+    }
+  }
+
+  var linkedGroupIdsByRows = {};
+  var linkedGroupCounter = 0;
+  var eventMetaRowIndexes = Object.keys(eventMetaByRowIndex);
+  for (let i = 0; i < eventMetaRowIndexes.length; i++) {
+    var rowIndexKey = eventMetaRowIndexes[i];
+    var normalizedRowIndex = parseInt(rowIndexKey, 10);
+    if (!isFinite(normalizedRowIndex) || normalizedRowIndex < 0 || normalizedRowIndex >= eventData.length) continue;
+    var finalMeta = eventMetaByRowIndex[rowIndexKey] || {};
+    if (finalMeta.linkedRows) {
+      var normalizedRows = normalizeEventRowListString(finalMeta.linkedRows);
+      if (normalizedRows) {
+        if (!linkedGroupIdsByRows[normalizedRows]) {
+          linkedGroupCounter++;
+          linkedGroupIdsByRows[normalizedRows] = 'split_' + linkedGroupCounter;
+        }
+        finalMeta.linkedEventId = linkedGroupIdsByRows[normalizedRows];
+      }
+      delete finalMeta.linkedRows;
+    }
+    var metaString = buildEventMetaString(finalMeta);
+    if (!metaString) continue;
+    if (eventsHeaderHasMeta && eventData[normalizedRowIndex].length > 0) {
+      eventData[normalizedRowIndex][eventData[normalizedRowIndex].length - 1] = metaString;
+    } else {
+      eventData[normalizedRowIndex].push(metaString);
     }
   }
 
