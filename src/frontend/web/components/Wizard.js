@@ -95,6 +95,10 @@ class Wizard {
     else if (
       fieldType === 'InitialCapital' ||
       fieldType === 'InvestmentAllocation' ||
+      fieldType === 'InvestmentAllocationHolds' ||
+      fieldType === 'PensionContributionHolds' ||
+      fieldType === 'PensionContributionHoldsP1' ||
+      fieldType === 'PensionContributionHoldsP2' ||
       fieldType === 'PensionContribution' ||
       fieldType === 'PensionContributionP2' ||
       fieldType === 'PensionContributionCapped'
@@ -160,6 +164,40 @@ class Wizard {
             canonicalStep.element = `#InvestmentAllocation_${activeCountry.toLowerCase()}_${baseKey}`;
             expanded.push(canonicalStep);
           }
+        } else if (fieldType === 'InvestmentAllocationHolds') {
+          const investmentTypes = getInvestmentTypesForCountry(activeCountry);
+          for (const type of investmentTypes) {
+            const defaultHold = type && (type.baseRef || type.baseKey);
+            if (!defaultHold) continue;
+            let baseKey = type.key;
+            const suffix = '_' + activeCountry.toLowerCase();
+            if (baseKey.toLowerCase().endsWith(suffix)) {
+              baseKey = baseKey.substring(0, baseKey.length - suffix.length);
+            }
+            const holdsStep = JSON.parse(JSON.stringify(step));
+            delete holdsStep.dynamicInvestmentField;
+            holdsStep.element = `#HoldsToggle_MixConfig_${activeCountry.toLowerCase()}_${baseKey}_asset1, #HoldsToggle_GlobalMixConfig_${baseKey}_asset1`;
+            expanded.push(holdsStep);
+          }
+        } else if (fieldType === 'PensionContributionHolds') {
+          const p1Step = JSON.parse(JSON.stringify(step));
+          delete p1Step.dynamicInvestmentField;
+          p1Step.element = `#HoldsToggle_MixConfig_${activeCountry.toLowerCase()}_pensionP1_asset1`;
+          expanded.push(p1Step);
+
+          const p2Step = JSON.parse(JSON.stringify(step));
+          p2Step.element = `#HoldsToggle_MixConfig_${activeCountry.toLowerCase()}_pensionP2_asset1`;
+          expanded.push(p2Step);
+        } else if (fieldType === 'PensionContributionHoldsP1') {
+          const p1Step = JSON.parse(JSON.stringify(step));
+          delete p1Step.dynamicInvestmentField;
+          p1Step.element = `#HoldsToggle_MixConfig_${activeCountry.toLowerCase()}_pensionP1_asset1`;
+          expanded.push(p1Step);
+        } else if (fieldType === 'PensionContributionHoldsP2') {
+          const p2Step = JSON.parse(JSON.stringify(step));
+          delete p2Step.dynamicInvestmentField;
+          p2Step.element = `#HoldsToggle_MixConfig_${activeCountry.toLowerCase()}_pensionP2_asset1`;
+          expanded.push(p2Step);
         } else if (fieldType === 'PensionContribution') {
           const newStepCountry = JSON.parse(JSON.stringify(step));
           delete newStepCountry.dynamicInvestmentField;
@@ -309,12 +347,14 @@ class Wizard {
     
     const patterns = [
       /^InitialCapital_(.+)$/,
+      /^HoldsToggle_MixConfig_([a-z]{2})_(.+)_asset1$/,
+      /^HoldsToggle_GlobalMixConfig_(.+)_asset1$/,
       /^InvestmentAllocation_([a-z]{2})_(.+)$/, // Relocation format: {cc}_{baseKey}
       /^InvestmentAllocation_(.+)$/,             // Legacy compatibility format: {typeKey}
       /^GlobalAssetGrowth_(.+)$/,
       /^GlobalAssetVolatility_(.+)$/,
-      /^LocalAssetGrowth_[a-z]{2}_(.+)$/,
-      /^LocalAssetVolatility_[a-z]{2}_(.+)$/
+      /^LocalAssetGrowth_([a-z]{2})_(.+)$/,
+      /^LocalAssetVolatility_([a-z]{2})_(.+)$/
     ];
     
     if (!typeKey) {
@@ -356,6 +396,10 @@ class Wizard {
       // Fallback: if reconstruction failed, maybe typeKey IS the key (if key doesn't follow pattern)
       if (!investmentType && ccFromId) {
         investmentType = ruleset.getInvestmentType(typeKey);
+      }
+      // Fallback for selectors that carry base keys without country suffix (e.g., HoldsToggle_GlobalMixConfig_*).
+      if (!investmentType && !ccFromId && activeCountry) {
+        investmentType = ruleset.getInvestmentType(typeKey + '_' + activeCountry);
       }
 
       if (investmentType) {
@@ -723,6 +767,42 @@ class Wizard {
     return selector;
   }
 
+  isPropertyLinkedEventType(eventType) {
+    return eventType === 'M' || eventType === 'MO' || eventType === 'MP' || eventType === 'MR';
+  }
+
+  _resolveTableEventStepSelector(fieldType, rowId, eventType) {
+    const isNameColumnField = (
+      fieldType === 'EventAlias' ||
+      fieldType === 'EventCountry' ||
+      fieldType === 'EventCountryToggle' ||
+      fieldType === 'EventMortgage' ||
+      fieldType === 'EventMortgageToggle'
+    );
+    if (isNameColumnField) {
+      if (eventType === 'MV') {
+        return `#EventCountryToggle_${rowId}`;
+      }
+      if (this.isPropertyLinkedEventType(eventType)) {
+        return `#EventMortgageToggle_${rowId}`;
+      }
+      return `#EventAlias_${rowId}`;
+    }
+    return `#${fieldType}_${rowId}`;
+  }
+
+  _getLogicalEventFieldType(fieldType) {
+    if (
+      fieldType === 'EventCountry' ||
+      fieldType === 'EventCountryToggle' ||
+      fieldType === 'EventMortgage' ||
+      fieldType === 'EventMortgageToggle'
+    ) {
+      return 'EventAlias';
+    }
+    return fieldType;
+  }
+
   filterValidSteps(stepsOverride = null) {
     // Decide which set of steps we are filtering
     const sourceSteps = stepsOverride || (this.config ? this.config.steps : []);
@@ -931,10 +1011,11 @@ class Wizard {
               }
             }
           }
-          // Preserve the static #EventType selector so it highlights the dropdown wrapper we assign.
-          // Only append the rowId once to prevent duplicate suffixes when filterValidSteps is called multiple times.
-          if (!step.element.includes(`_${this.tableState.rowId}`)) {
-            step.element = step.element.replace(/Event([A-Za-z]+)/, `Event$1_${this.tableState.rowId}`);
+          // Resolve row-scoped table selector for the current event row.
+          // Name-field steps for mortgage-linked events must target the visible mortgage selector.
+          const eventFieldMatch = step.element.match(/^#(Event[A-Za-z]+)(?:_.*)?$/);
+          if (eventFieldMatch && eventFieldMatch[1]) {
+            step.element = this._resolveTableEventStepSelector(eventFieldMatch[1], this.tableState.rowId, this.tableState.eventType);
           }
           
         if (this.tableState.isEmpty) {
@@ -1173,6 +1254,12 @@ class Wizard {
         if (containerMatchIndex === -1 && el.contains && el.contains(this.lastFocusedField)) {
           containerMatchIndex = i;
           // Keep looking – maybe we find an exact match later
+        }
+
+        // Reverse containment supports focus captured on dropdown wrappers while
+        // the wizard step targets the toggle inside the wrapper.
+        if (containerMatchIndex === -1 && this.lastFocusedField.contains && this.lastFocusedField.contains(el)) {
+          containerMatchIndex = i;
         }
       }
     }
@@ -1764,22 +1851,31 @@ class Wizard {
           const currentFieldId = currentField && currentField.id ? currentField.id : '';
           const fallbackFieldType = currentFieldId ? currentFieldId.split('_')[0] : '';
           const fieldType = activeStepMatch && activeStepMatch[1] ? activeStepMatch[1] : fallbackFieldType;
+          const logicalFieldType = this._getLogicalEventFieldType(fieldType);
           const targetEventTypeInput = targetRow.querySelector('.event-type');
           const targetEventType = targetEventTypeInput ? targetEventTypeInput.value : '';
+          const targetIsPropertyLinked = this.isPropertyLinkedEventType(targetEventType);
 
-          // Crossing MV boundaries needs a field remap:
-          // relocation rows use the country picker where non-relocation rows use alias.
-          let desiredStepFieldType = fieldType;
-          if (fieldType === 'EventCountry' || fieldType === 'EventCountryToggle') {
-            desiredStepFieldType = targetEventType === 'MV' ? 'EventCountryToggle' : 'EventAlias';
-          } else if (fieldType === 'EventAlias' && targetEventType === 'MV') {
-            desiredStepFieldType = 'EventCountryToggle';
+          // Crossing MV/property-linked boundaries may remap name-column guidance
+          // between alias input, relocation country selector, and mortgage selector.
+          let desiredStepFieldType = logicalFieldType;
+          if (logicalFieldType === 'EventCountry' || logicalFieldType === 'EventCountryToggle') {
+            desiredStepFieldType = targetEventType === 'MV'
+              ? 'EventCountryToggle'
+              : (targetIsPropertyLinked ? 'EventMortgageToggle' : 'EventAlias');
+          } else if (logicalFieldType === 'EventAlias') {
+            desiredStepFieldType = targetEventType === 'MV'
+              ? 'EventCountryToggle'
+              : (targetIsPropertyLinked ? 'EventMortgageToggle' : 'EventAlias');
           }
 
           let targetField = null;
           if (desiredStepFieldType === 'EventCountryToggle') {
             targetField = targetRow.querySelector(`#EventCountry_${targetRowId}`) ||
                          targetRow.querySelector(`#EventCountryToggle_${targetRowId}`);
+          } else if (desiredStepFieldType === 'EventMortgageToggle' || desiredStepFieldType === 'EventMortgage') {
+            targetField = targetRow.querySelector(`#EventMortgage_${targetRowId}`) ||
+                         targetRow.querySelector(`#EventMortgageToggle_${targetRowId}`);
           } else if (desiredStepFieldType === 'EventAlias') {
             targetField = targetRow.querySelector(`#EventAlias_${targetRowId}`);
           } else if (desiredStepFieldType) {
@@ -1809,20 +1905,21 @@ class Wizard {
               if (step.element && step.element.includes('Event') && step.element.includes('_')) {
                 // Extract the field type from the step element (e.g., "EventType" from "#EventType_123")
                 const stepFieldType = step.element.replace(/#(Event[A-Za-z]+)_.*/, '$1');
-                // Update to point to the same field type in the new row
-                step.element = `#${stepFieldType}_${targetRowId}`;
+                const logicalStepFieldType = this._getLogicalEventFieldType(stepFieldType);
+                // Update to point to the same logical field in the new row
+                step.element = this._resolveTableEventStepSelector(logicalStepFieldType, targetRowId, targetEventType);
 
                 // Update the step content based on the current event type
-                this.updateStepContentForEventType(step, stepFieldType);
+                this.updateStepContentForEventType(step, logicalStepFieldType);
               }
             });
 
             // Keep index stable to preserve deterministic field order.
             // Only remap the highlighted step index if we had to switch field types
-            // (e.g. EventAlias <-> EventCountryToggle when crossing MV boundaries).
+            // (e.g. EventAlias <-> EventCountryToggle/EventMortgageToggle when crossing row types).
             let driveIndex = currentStepIndex;
             if (desiredStepFieldType && desiredStepFieldType !== fieldType) {
-              const desiredSelector = `#${desiredStepFieldType}_${targetRowId}`;
+              const desiredSelector = this._resolveTableEventStepSelector(desiredStepFieldType, targetRowId, targetEventType);
               let bestIndex = -1;
               let bestDistance = Number.MAX_SAFE_INTEGER;
               for (let i = 0; i < this.validSteps.length; i++) {
@@ -1840,7 +1937,7 @@ class Wizard {
                 // If the target event type does not expose a dedicated step in validSteps,
                 // repurpose the current slot so the country selector is still reachable.
                 this.validSteps[currentStepIndex].element = desiredSelector;
-                this.updateStepContentForEventType(this.validSteps[currentStepIndex], desiredStepFieldType);
+                this.updateStepContentForEventType(this.validSteps[currentStepIndex], this._getLogicalEventFieldType(desiredStepFieldType));
               }
             }
 
@@ -1865,14 +1962,15 @@ class Wizard {
     if (!this.originalConfig || !this.originalConfig.steps || !this.tableState) {
       return;
     }
+    const logicalStepFieldType = this._getLogicalEventFieldType(stepFieldType);
 
     // Find all original steps that match this field type
     const matchingOriginalSteps = this.originalConfig.steps.filter(originalStep => {
       if (!originalStep.element) return false;
 
       // Check if this step is for the same field type
-      const originalFieldType = originalStep.element.replace(/#(Event[A-Za-z]+)(_.*)?$/, '$1');
-      const isMatch = originalFieldType === stepFieldType;
+      const originalFieldType = this._getLogicalEventFieldType(originalStep.element.replace(/#(Event[A-Za-z]+)(_.*)?$/, '$1'));
+      const isMatch = originalFieldType === logicalStepFieldType;
       return isMatch;
     });
 

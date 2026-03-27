@@ -269,3 +269,132 @@ describe('Wizard.filterValidSteps – accordion mode', () => {
   });
 
 });
+
+describe('Wizard.filterValidSteps – table mode mortgage name selectors', () => {
+  let wizard;
+
+  function stubDom() {
+    jest.spyOn(document, 'querySelector').mockImplementation((sel) => {
+      if (!sel) return null;
+      return { tagName: 'DIV', style: {}, contains: () => false };
+    });
+
+    jest.spyOn(document, 'querySelectorAll').mockImplementation(() => {
+      return [{ tagName: 'DIV', style: {}, contains: () => false }];
+    });
+  }
+
+  beforeEach(() => {
+    global.window.driver = { js: { driver: jest.fn() } };
+    wizard = new Wizard();
+    wizard.getCurrentEventsMode = () => 'table';
+    wizard.isElementVisible = () => true;
+    wizard.getEventTableState = () => wizard.tableState;
+    stubDom();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test('maps EventAlias step to mortgage selector for mortgage-linked event types', () => {
+    wizard.tableState = {
+      isEmpty: false,
+      rowIsEmpty: false,
+      eventType: 'MP',
+      rowId: 'row_3'
+    };
+
+    const steps = [
+      { element: '#EventAlias', eventTypes: ['MP'], popover: { description: 'payoff name' } },
+      { element: '#EventAlias', eventTypes: ['SI'], popover: { description: 'salary name' } }
+    ];
+
+    const filtered = wizard.filterValidSteps(steps);
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].element).toBe('#EventMortgageToggle_row_3');
+    expect(filtered[0].eventTypes).toEqual(['MP']);
+  });
+
+  test('keeps EventAlias step on text input for non-mortgage events', () => {
+    wizard.tableState = {
+      isEmpty: false,
+      rowIsEmpty: false,
+      eventType: 'SI',
+      rowId: 'row_2'
+    };
+
+    const steps = [
+      { element: '#EventAlias', eventTypes: ['SI'], popover: { description: 'salary name' } }
+    ];
+
+    const filtered = wizard.filterValidSteps(steps);
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].element).toBe('#EventAlias_row_2');
+  });
+
+  test('maps EventAlias step to relocation country selector for MV events', () => {
+    wizard.tableState = {
+      isEmpty: false,
+      rowIsEmpty: false,
+      eventType: 'MV',
+      rowId: 'row_4'
+    };
+
+    const steps = [
+      { element: '#EventAlias', eventTypes: ['MV'], popover: { description: 'relocation name' } }
+    ];
+
+    const filtered = wizard.filterValidSteps(steps);
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].element).toBe('#EventCountryToggle_row_4');
+  });
+
+  test('normalizes name-column selector variants to a visible target per event type', () => {
+    expect(wizard._resolveTableEventStepSelector('EventCountryToggle', 'row_5', 'SI')).toBe('#EventAlias_row_5');
+    expect(wizard._resolveTableEventStepSelector('EventCountryToggle', 'row_5', 'M')).toBe('#EventMortgageToggle_row_5');
+    expect(wizard._resolveTableEventStepSelector('EventMortgageToggle', 'row_5', 'MV')).toBe('#EventCountryToggle_row_5');
+  });
+
+  test('uses EventAlias help content when selector is EventMortgageToggle', () => {
+    wizard.tableState = {
+      isEmpty: false,
+      rowIsEmpty: false,
+      eventType: 'MP',
+      rowId: 'row_1'
+    };
+    wizard.originalConfig = {
+      steps: [
+        { element: '#EventAlias', eventTypes: ['MP'], popover: { description: 'Mortgage payoff name help' } }
+      ]
+    };
+    wizard.processAgeYearInContent = (value) => value;
+
+    const step = { popover: { description: 'placeholder' } };
+    wizard.updateStepContentForEventType(step, 'EventMortgageToggle');
+
+    expect(step.popover.description).toBe('Mortgage payoff name help');
+  });
+
+  test('uses EventAlias help content when selector is EventCountryToggle after crossing rows', () => {
+    wizard.tableState = {
+      isEmpty: false,
+      rowIsEmpty: false,
+      eventType: 'MP',
+      rowId: 'row_2'
+    };
+    wizard.originalConfig = {
+      steps: [
+        { element: '#EventAlias', eventTypes: ['MV'], popover: { description: 'Relocation selector help' } },
+        { element: '#EventAlias', eventTypes: ['MP'], popover: { description: 'Mortgage payoff selector help' } },
+        { element: '#EventCountryToggle', eventTypes: ['MV'], popover: { description: 'Relocation country legacy help' } }
+      ]
+    };
+    wizard.processAgeYearInContent = (value) => value;
+
+    const step = { popover: { description: 'Relocation selector help' } };
+    wizard.updateStepContentForEventType(step, 'EventCountryToggle');
+
+    expect(step.popover.description).toBe('Mortgage payoff selector help');
+  });
+});

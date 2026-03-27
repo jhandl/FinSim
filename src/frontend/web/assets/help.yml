@@ -361,6 +361,30 @@ WizardSteps:
       side: "right"
       align: "start"
 
+  - dynamicInvestmentField: "InvestmentAllocationHolds"
+    tours: [full, mini]
+    card: Allocations
+    popover:
+      description: "<p>Selects which global instrument <b>${investmentType.label}</b> invests in.</p><p>Use <b>Mix...</b> to split between two instruments over time (fixed mix or glidepath).</p>"
+      side: "right"
+      align: "start"
+
+  - dynamicInvestmentField: "PensionContributionHoldsP1"
+    tours: [full, mini]
+    card: Allocations
+    popover:
+      description: "<p>Selects which global instrument your private pension contributions are invested in.</p><p>Use <b>Mix...</b> to split between two instruments over time (fixed mix or glidepath).</p>"
+      side: "right"
+      align: "start"
+
+  - dynamicInvestmentField: "PensionContributionHoldsP2"
+    tours: [full, mini]
+    card: Allocations
+    popover:
+      description: "<p>Selects which global instrument your partners's private pension contributions are invested in.</p><p>Use <b>Mix...</b> to split between two instruments over time (fixed mix or glidepath).</p>"
+      side: "right"
+      align: "start"
+
   - dynamicInvestmentField: "PensionContribution"
     tours: [full, mini]
     card: Allocations
@@ -421,7 +445,7 @@ WizardSteps:
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>The expected average annual growth rate of **${investmentType.label}**, not adjusted for inflation.</p><p>${investmentType.helpText}</p>"
+      description: "<p>The expected average annual growth rate of <b>${investmentType.label}</b>, not adjusted for inflation.</p><p>${investmentType.helpText}</p>"
       side: "right"
       align: "start"
 
@@ -429,7 +453,7 @@ WizardSteps:
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>The expected standard deviation of the annual growth rate of **${investmentType.label}**.</p><p>This field is only used in variable rate simulation mode.</p><p>${investmentType.helpText}</p>"
+      description: "<p>The expected standard deviation of the annual growth rate of <b>${investmentType.label}</b>.</p><p>This field is only used in variable rate simulation mode.</p><p>${investmentType.helpText}</p>"
       side: "right"
       align: "start"
 
@@ -437,7 +461,7 @@ WizardSteps:
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>The expected average annual growth rate of **${investmentType.label}**, not adjusted for inflation.</p><p>${investmentType.helpText}</p>"
+      description: "<p>The expected average annual growth rate of <b>${investmentType.label}</b>, not adjusted for inflation.</p><p>${investmentType.helpText}</p>"
       side: "right"
       align: "start"
 
@@ -445,7 +469,7 @@ WizardSteps:
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>The expected standard deviation of the annual growth rate of **${investmentType.label}**.</p><p>This field is only used in variable rate simulation mode.</p><p>${investmentType.helpText}</p>"
+      description: "<p>The expected standard deviation of the annual growth rate of <b>${investmentType.label}</b>.</p><p>This field is only used in variable rate simulation mode.</p><p>${investmentType.helpText}</p>"
       side: "right"
       align: "start"
 
@@ -453,7 +477,7 @@ WizardSteps:
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>The expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of 2% to 3%. However, deviations due to shocks (e.g., pandemics, wars, etc) are skewed towards higher numbers. Tip: Enable the Present Value toggle in the menu (☰) to see all projected values adjusted back to today's currency terms, making it easier to understand real purchasing power across years.</p>"
+      description: "<p>The expected average annual inflation rate.</p><p>Central banks aim for an inflation rate of 2% to 3%. However, deviations due to shocks (e.g., pandemics, wars, etc) are skewed towards higher numbers.</p><p>Tip: Enable the Present Value toggle in the menu (☰) to see all projected values adjusted back to today's currency terms, making it easier to understand real purchasing power across years.</p>"
       side: "right"
       align: "start"
 
@@ -602,7 +626,7 @@ WizardSteps:
     card: events
     eventTypes: ["R"]
     popover:
-      description: "<p>The ownership of a real estate property. If you buy a property with a mortgage, you must also add a 'Mortgage' event with the same name.</p>"
+      description: "<p>The ownership of a real estate property.</p><p>If the purchase is financed, also add a Mortgage event and link it using the selector in the name column of mortgage-related rows.</p>"
       side: "bottom"
       align: "center"
 
@@ -612,7 +636,7 @@ WizardSteps:
     card: events
     eventTypes: ["M"]
     popover:
-      description: "<p>A mortgage on a real estate property. The name must match the name of the corresponding 'Real Estate' event.</p>"
+      description: "<p>A mortgage on a real estate property.</p><p>Use the name-column selector to choose which property this mortgage belongs to.</p>"
       side: "bottom"
       align: "center"
 
@@ -664,7 +688,7 @@ WizardSteps:
     tours: [full, mini]
     card: events
     popover:
-      description: "<p>The name of the event.</p><p>In most cases you can enter any name you want. It's just for your reference. But in some cases, like for the 'Mortgage' event, it will be used to match the corresponding 'Real Estate' event, so they must have the same name.</p>"
+      description: "<p>The name of the event.</p><p>For regular text fields, you can enter any label you want for your own reference.</p>"
       side: "bottom"
       align: "center"
 
@@ -772,7 +796,7 @@ WizardSteps:
     card: events
     eventTypes: ["R"]
     popover:
-      description: "<p>The name of the Real Estate event.</p><p>You can enter any name you want, but if it's bought with a mortgage, the corresponding 'Mortgage' event must have the same name.</p>"
+      description: "<p>The name of the Real Estate event.</p><p>You can enter any name you want. Mortgage-related events will link to this property through their selector in the name column.</p>"
       side: "bottom"
       align: "center"
 
@@ -781,7 +805,7 @@ WizardSteps:
     card: events
     eventTypes: ["M"]
     popover:
-      description: "<p>The name of the mortgage event.</p><p>The name must match the name of the corresponding Real Estate event.</p>"
+      description: "<p>This cell is a selector for the linked property.</p><p>Choose the property this mortgage belongs to from the dropdown list.</p>"
       side: "bottom"
       align: "center"
 
@@ -790,7 +814,7 @@ WizardSteps:
     card: events
     eventTypes: ["MO"]
     popover:
-      description: "<p>The mortgage this overpay belongs to.</p><p>Select the same property/mortgage name used by the linked Mortgage event.</p>"
+      description: "<p>This cell is a selector for the linked mortgage/property.</p><p>Choose which mortgage this overpay should apply to.</p>"
       side: "bottom"
       align: "center"
 
@@ -799,7 +823,7 @@ WizardSteps:
     card: events
     eventTypes: ["MP"]
     popover:
-      description: "<p>The mortgage this payoff belongs to.</p><p>Select the same property/mortgage name used by the linked Mortgage event.</p>"
+      description: "<p>This cell is a selector for the linked mortgage/property.</p><p>Choose which mortgage this payoff should settle.</p>"
       side: "bottom"
       align: "center"
 
@@ -808,7 +832,16 @@ WizardSteps:
     card: events
     eventTypes: ["MR"]
     popover:
-      description: "<p>The property name for this reverse mortgage.</p><p>It must match the corresponding Real Estate event.</p>"
+      description: "<p>This cell is a selector for the linked property.</p><p>Choose the property this reverse mortgage is tied to.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventAlias"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MV"]
+    popover:
+      description: "<p>This cell is a destination-country selector.</p><p>Choose the country you are moving to. The simulator will apply that country's tax and economic rules from the relocation age.</p>"
       side: "bottom"
       align: "center"
 
@@ -818,7 +851,7 @@ WizardSteps:
     card: events
     eventTypes: ["MV"]
     popover:
-      description: "<p>Select the country you are moving to.</p><p>This sets the new residence and tax rules starting at the relocation age.</p>"
+      description: "<p>This cell is a destination-country selector.</p><p>Choose the country you are moving to. The simulator will apply that country's tax and economic rules from the relocation age.</p>"
       side: "bottom"
       align: "center"
 
@@ -1169,6 +1202,15 @@ WizardSteps:
   - element: "#EventToAge"
     tours: [full, mini]
     card: events
+    eventTypes: ["MV"]
+    popover:
+      description: "<p>Relocation events don't use this field.</p>"
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventToAge"
+    tours: [full, mini]
+    card: events
     eventTypes: ["NOP"]
     popover:
       description: "<p>No Operation events ignore all fields.</p>"
@@ -1297,7 +1339,7 @@ WizardSteps:
     card: events
     eventTypes: ["MP"]
     popover:
-      description: "<p>Mortgage payoff is a one-off event, so this should match the start {{age_or_year}}.</p>"
+      description: "<p>Mortgage payoff events don't use this field.</p>"
       side: "bottom"
       align: "center"
 
@@ -1319,6 +1361,15 @@ WizardSteps:
     card: events
     popover:
       description: "<p>The expected average annual growth rate of the event.</p><p>If you leave it blank, it will use the inflation rate.</p><p>For 'Stock Market' events, enter the change rate of the stock market over the full period you specified. This will replace all the growth rates you entered in the 'Economy' panel for that period."
+      side: "bottom"
+      align: "center"
+
+  - element: "#EventRate"
+    tours: [full, mini]
+    card: events
+    eventTypes: ["MV"]
+    popover:
+      description: "<p>Relocation events don't use this field.</p>"
       side: "bottom"
       align: "center"
 

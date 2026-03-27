@@ -152,6 +152,10 @@ class TestWizard {
     else if (
       fieldType === 'InitialCapital' ||
       fieldType === 'InvestmentAllocation' ||
+      fieldType === 'InvestmentAllocationHolds' ||
+      fieldType === 'PensionContributionHolds' ||
+      fieldType === 'PensionContributionHoldsP1' ||
+      fieldType === 'PensionContributionHoldsP2' ||
       fieldType === 'PensionContribution' ||
       fieldType === 'PensionContributionP2' ||
       fieldType === 'PensionContributionCapped'
@@ -208,12 +212,14 @@ class TestWizard {
     // Pattern matching for investment fields
     const patterns = [
       /^InitialCapital_(.+)$/,
+      /^HoldsToggle_MixConfig_([a-z]{2})_(.+)_asset1$/,
+      /^HoldsToggle_GlobalMixConfig_(.+)_asset1$/,
       /^InvestmentAllocation_([a-z]{2})_(.+)$/, // Relocation format: {cc}_{baseKey}
       /^InvestmentAllocation_(.+)$/,             // Legacy format: {typeKey}
       /^GlobalAssetGrowth_(.+)$/,
       /^GlobalAssetVolatility_(.+)$/,
-      /^LocalAssetGrowth_[a-z]{2}_(.+)$/,
-      /^LocalAssetVolatility_[a-z]{2}_(.+)$/,
+      /^LocalAssetGrowth_([a-z]{2})_(.+)$/,
+      /^LocalAssetVolatility_([a-z]{2})_(.+)$/,
       /^(.+)GrowthRate$/,
       /^(.+)GrowthStdDev$/
     ];
@@ -247,6 +253,9 @@ class TestWizard {
       let investmentType = ruleset.getInvestmentType(lookupKey);
       if (!investmentType && ccFromId) {
         investmentType = ruleset.getInvestmentType(typeKey);
+      }
+      if (!investmentType && !ccFromId && activeCountry) {
+        investmentType = ruleset.getInvestmentType(typeKey + '_' + activeCountry);
       }
       if (investmentType) {
         return {
@@ -310,6 +319,40 @@ class TestWizard {
             canonicalStep.element = `#InvestmentAllocation_${activeCountry.toLowerCase()}_${baseKey}`;
             expanded.push(canonicalStep);
           }
+        } else if (fieldType === 'InvestmentAllocationHolds') {
+          const investmentTypes = getInvestmentTypesForCountry(activeCountry);
+          for (const type of investmentTypes) {
+            const defaultHold = type && (type.baseRef || type.baseKey);
+            if (!defaultHold) continue;
+            let baseKey = type.key;
+            const suffix = '_' + activeCountry.toLowerCase();
+            if (baseKey.toLowerCase().endsWith(suffix)) {
+              baseKey = baseKey.substring(0, baseKey.length - suffix.length);
+            }
+            const holdsStep = JSON.parse(JSON.stringify(step));
+            delete holdsStep.dynamicInvestmentField;
+            holdsStep.element = `#HoldsToggle_MixConfig_${activeCountry.toLowerCase()}_${baseKey}_asset1, #HoldsToggle_GlobalMixConfig_${baseKey}_asset1`;
+            expanded.push(holdsStep);
+          }
+        } else if (fieldType === 'PensionContributionHolds') {
+          const p1Step = JSON.parse(JSON.stringify(step));
+          delete p1Step.dynamicInvestmentField;
+          p1Step.element = `#HoldsToggle_MixConfig_${activeCountry.toLowerCase()}_pensionP1_asset1`;
+          expanded.push(p1Step);
+
+          const p2Step = JSON.parse(JSON.stringify(step));
+          p2Step.element = `#HoldsToggle_MixConfig_${activeCountry.toLowerCase()}_pensionP2_asset1`;
+          expanded.push(p2Step);
+        } else if (fieldType === 'PensionContributionHoldsP1') {
+          const p1Step = JSON.parse(JSON.stringify(step));
+          delete p1Step.dynamicInvestmentField;
+          p1Step.element = `#HoldsToggle_MixConfig_${activeCountry.toLowerCase()}_pensionP1_asset1`;
+          expanded.push(p1Step);
+        } else if (fieldType === 'PensionContributionHoldsP2') {
+          const p2Step = JSON.parse(JSON.stringify(step));
+          delete p2Step.dynamicInvestmentField;
+          p2Step.element = `#HoldsToggle_MixConfig_${activeCountry.toLowerCase()}_pensionP2_asset1`;
+          expanded.push(p2Step);
         } else if (fieldType === 'PensionContribution') {
           const newStepCountry = JSON.parse(JSON.stringify(step));
           delete newStepCountry.dynamicInvestmentField;
@@ -1054,6 +1097,42 @@ describe('Wizard Component', () => {
       expect(context).not.toBeNull();
       expect(context.investmentType.label).toBe('Shares');
     });
+
+    test('should resolve context for holds dropdown fields', () => {
+      const element = { id: 'HoldsToggle_MixConfig_ie_indexFunds_asset1' };
+      const context = wizard.resolveInvestmentTypeContext(element);
+      expect(context).not.toBeNull();
+      expect(context.investmentType.label).toBe('Index Funds');
+    });
+
+    test('should resolve context for local growth fields using id country code', () => {
+      const originalConfigGetInstance = global.Config.getInstance;
+      global.Config.getInstance = jest.fn(() => ({
+        getStartCountry: jest.fn(() => 'ie'),
+        getInvestmentBaseTypes: jest.fn(() => []),
+        getInvestmentBaseTypeByKey: jest.fn(() => null),
+        getCachedTaxRuleSet: jest.fn((countryCode) => {
+          const cc = String(countryCode || '').toLowerCase();
+          if (cc === 'ar') {
+            return {
+              getInvestmentType: jest.fn((key) => (key === 'merval_ar' ? { label: 'Merval', helpText: 'AR local' } : null)),
+              getResolvedInvestmentTypes: jest.fn(() => [])
+            };
+          }
+          return {
+            getInvestmentType: jest.fn(() => null),
+            getResolvedInvestmentTypes: jest.fn(() => [])
+          };
+        })
+      }));
+
+      const element = { id: 'LocalAssetGrowth_ar_merval' };
+      const context = wizard.resolveInvestmentTypeContext(element);
+      expect(context).not.toBeNull();
+      expect(context.investmentType.label).toBe('Merval');
+
+      global.Config.getInstance = originalConfigGetInstance;
+    });
     
     test('should return null for non-investment fields', () => {
       const element = { id: 'RetirementAge' };
@@ -1117,6 +1196,26 @@ describe('Wizard Component', () => {
       expect(expanded[0].element).toBe('#P1PensionContrib_ie');
     });
 
+    test('should expand holds templates for wrappers and pension', () => {
+      const wrapperHolds = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'InvestmentAllocationHolds', popover: { title: 'Wrapper Holds' } }
+      ]);
+      expect(wrapperHolds).toHaveLength(1);
+      expect(wrapperHolds[0].element).toBe('#HoldsToggle_MixConfig_ie_indexFunds_asset1, #HoldsToggle_GlobalMixConfig_indexFunds_asset1');
+
+      const pensionHoldsP1 = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'PensionContributionHoldsP1', popover: { title: 'Pension Holds P1' } }
+      ]);
+      expect(pensionHoldsP1).toHaveLength(1);
+      expect(pensionHoldsP1[0].element).toBe('#HoldsToggle_MixConfig_ie_pensionP1_asset1');
+
+      const pensionHoldsP2 = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'PensionContributionHoldsP2', popover: { title: 'Pension Holds P2' } }
+      ]);
+      expect(pensionHoldsP2).toHaveLength(1);
+      expect(pensionHoldsP2[0].element).toBe('#HoldsToggle_MixConfig_ie_pensionP2_asset1');
+    });
+
     test('uses growth-rates selected country for LocalAsset* dynamic steps', () => {
       const customConfig = {
         getStartCountry: jest.fn(() => 'ie'),
@@ -1171,7 +1270,7 @@ describe('Wizard Component', () => {
             return {
               getInvestmentType: jest.fn(() => null),
               getResolvedInvestmentTypes: jest.fn(() => [
-                { key: 'cedear_ar', label: 'CEDEAR' },
+                { key: 'cedear_ar', label: 'CEDEAR', baseRef: 'globalEquity' },
                 { key: 'merval_ar', label: 'Merval' }
               ])
             };
@@ -1217,6 +1316,24 @@ describe('Wizard Component', () => {
       ]);
       expect(capped).toHaveLength(1);
       expect(capped[0].element).toBe('#PensionCappedToggle_ar');
+
+      const allocationHolds = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'InvestmentAllocationHolds', card: 'allocations', popover: { title: 'Alloc Holds' } }
+      ]);
+      expect(allocationHolds).toHaveLength(1);
+      expect(allocationHolds[0].element).toBe('#HoldsToggle_MixConfig_ar_cedear_asset1, #HoldsToggle_GlobalMixConfig_cedear_asset1');
+
+      const pensionHoldsP1 = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'PensionContributionHoldsP1', card: 'allocations', popover: { title: 'Pension Holds P1' } }
+      ]);
+      expect(pensionHoldsP1).toHaveLength(1);
+      expect(pensionHoldsP1[0].element).toBe('#HoldsToggle_MixConfig_ar_pensionP1_asset1');
+
+      const pensionHoldsP2 = wizard.expandDynamicSteps([
+        { dynamicInvestmentField: 'PensionContributionHoldsP2', card: 'allocations', popover: { title: 'Pension Holds P2' } }
+      ]);
+      expect(pensionHoldsP2).toHaveLength(1);
+      expect(pensionHoldsP2[0].element).toBe('#HoldsToggle_MixConfig_ar_pensionP2_asset1');
     });
   });
 });
