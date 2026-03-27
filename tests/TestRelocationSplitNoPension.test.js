@@ -90,6 +90,7 @@ describe('Relocation Split No Pension', () => {
             getCurrencySymbol: () => '$'
         };
       },
+      getEconomicData: () => null,
       getInstance: () => configStub
     };
     global.Config = { getInstance: () => configStub };
@@ -177,6 +178,7 @@ describe('Relocation Split No Pension', () => {
             getCurrencySymbol: () => '$'
         };
       },
+      getEconomicData: () => null,
       getInstance: () => configStub
     };
     global.Config = { getInstance: () => configStub };
@@ -236,6 +238,7 @@ describe('Relocation Split No Pension', () => {
             getCurrencySymbol: () => '£'
         };
       },
+      getEconomicData: () => null,
       getInstance: () => configStub
     };
     global.Config = { getInstance: () => configStub };
@@ -293,6 +296,7 @@ describe('Relocation Split No Pension', () => {
         getNumberLocale: () => 'en-US',
         getCurrencySymbol: () => '$'
       }),
+      getEconomicData: () => null,
       getInstance: () => configStub
     };
     global.Config = { getInstance: () => configStub };
@@ -381,6 +385,7 @@ describe('Relocation Split No Pension', () => {
         getNumberLocale: () => 'en-US',
         getCurrencySymbol: () => '$'
       }),
+      getEconomicData: () => null,
       getInstance: () => configStub
     };
     global.Config = { getInstance: () => configStub };
@@ -446,6 +451,7 @@ describe('Relocation Split No Pension', () => {
         getNumberLocale: () => 'en-US',
         getCurrencySymbol: () => '$'
       }),
+      getEconomicData: () => null,
       getInstance: () => configStub
     };
     global.Config = { getInstance: () => configStub };
@@ -514,6 +520,7 @@ describe('Relocation Split No Pension', () => {
         getNumberLocale: () => 'en-US',
         getCurrencySymbol: () => '$'
       }),
+      getEconomicData: () => null,
       getInstance: () => configStub
     };
     global.Config = { getInstance: () => configStub };

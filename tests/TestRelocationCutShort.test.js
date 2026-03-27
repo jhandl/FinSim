@@ -375,6 +375,55 @@ describe('Relocation cut-short resolution', () => {
     expect(env.eventsTableManager.updateSplitValue).toHaveBeenCalledWith('row-1', '240000', 'event-1');
   });
 
+  test('split suggestion-shift panel reuses leave/update actions', () => {
+    setupConfigStub();
+    buildTableDom('SInp');
+
+    const eventRow = document.querySelector('tr[data-row-id="row-1"]');
+    const event = {
+      id: 'Salary',
+      type: 'SInp',
+      fromAge: 35,
+      toAge: 60,
+      amount: 200000,
+      relocationImpact: {
+        category: 'split_suggestion_shift',
+        mvEventId: 'Move_US',
+        details: { suggestedAmount: 245000, destinationCountry: 'us', reason: 'model' }
+      }
+    };
+    const relocationEvent = {
+      id: 'Move_US',
+      type: 'MV',
+      name: 'US',
+      fromAge: 45,
+      toAge: 45
+    };
+    const env = {
+      webUI: {
+        readEvents: jest.fn(() => [event, relocationEvent]),
+        updateStatusForRelocationImpacts: jest.fn(),
+        eventAccordionManager: { refresh: jest.fn() }
+      },
+      eventsTableManager: {
+        getOriginCountry: jest.fn(() => 'ar'),
+        keepSplitValueAsIs: jest.fn(),
+        updateSplitValue: jest.fn(),
+        updateRelocationImpactIndicators: jest.fn()
+      }
+    };
+
+    RelocationImpactAssistant.renderPanelForTableRow(eventRow, event, env);
+
+    const panel = document.querySelector('.resolution-panel-row');
+    expect(panel).toBeTruthy();
+    expect(panel.querySelector('.resolution-tab[data-action="keep_split_value_as_is"]')).toBeTruthy();
+    const updateButton = panel.querySelector('.resolution-instant-btn[data-action="update_split_value"]');
+    expect(updateButton).toBeTruthy();
+    updateButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(env.eventsTableManager.updateSplitValue).toHaveBeenCalledWith('row-1', '245000', 'event-1');
+  });
+
   test('sale relocation age-shift panel exposes adapt/leave actions', () => {
     setupConfigStub();
     buildRealEstateTableDom();

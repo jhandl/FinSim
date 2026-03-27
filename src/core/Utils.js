@@ -354,7 +354,9 @@ var EVENT_META_FIELD_DEFS = [
   { key: 'resolvedMvRow', header: 'ResolvedMvRow' },
   { key: 'resolvedMvId', header: 'ResolvedMvId' },
   { key: 'resolvedCategory', header: 'ResolvedCategory' },
-  { key: 'splitValueMode', header: 'SplitValueMode' }
+  { key: 'splitValueMode', header: 'SplitValueMode' },
+  { key: 'splitReviewedSuggestedAmount', header: 'SplitReviewedSuggestedAmount' },
+  { key: 'splitSuggestionModelVersion', header: 'SplitSuggestionModelVersion' }
 ];
 
 var EVENT_META_HEADER_KEY_MAP = {
@@ -366,6 +368,8 @@ var EVENT_META_HEADER_KEY_MAP = {
   SplitMvRow: 'splitMvRow',
   SplitAnchorAmount: 'splitAnchorAmount',
   SplitValueMode: 'splitValueMode',
+  SplitReviewedSuggestedAmount: 'splitReviewedSuggestedAmount',
+  SplitSuggestionModelVersion: 'splitSuggestionModelVersion',
   MvLinkId: 'mvLinkId',
   SellMvId: 'sellMvId',
   SellMvRow: 'sellMvRow',
@@ -385,6 +389,8 @@ var EVENT_META_INLINE_KEYS = [
   'splitMvRow',
   'splitAnchorAmount',
   'splitValueMode',
+  'splitReviewedSuggestedAmount',
+  'splitSuggestionModelVersion',
   'mvLinkId',
   'sellMvId',
   'sellMvRow',
@@ -921,6 +927,18 @@ function serializeSimulation(ui) {
             meta.splitValueMode = splitValueModeInput.value;
           }
         } catch (_e3da) { }
+        try {
+          var splitReviewedSuggestedAmountInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-split-reviewed-suggested-amount') : null;
+          if (splitReviewedSuggestedAmountInput && splitReviewedSuggestedAmountInput.value !== '') {
+            meta.splitReviewedSuggestedAmount = splitReviewedSuggestedAmountInput.value;
+          }
+        } catch (_e3db) { }
+        try {
+          var splitSuggestionModelVersionInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-split-suggestion-model-version') : null;
+          if (splitSuggestionModelVersionInput && splitSuggestionModelVersionInput.value !== '') {
+            meta.splitSuggestionModelVersion = splitSuggestionModelVersionInput.value;
+          }
+        } catch (_e3dc) { }
         try {
           var mvLinkIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-link-id') : null;
           if (mvLinkIdInput && mvLinkIdInput.value) {

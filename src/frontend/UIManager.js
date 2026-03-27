@@ -1025,6 +1025,16 @@ class UIManager {
             }
             const splitValueModeInput = domRow.querySelector('.event-relocation-split-value-mode');
             if (splitValueModeInput && splitValueModeInput.value) eventObj.relocationSplitValueMode = splitValueModeInput.value;
+            const splitReviewedSuggestedAmountInput = domRow.querySelector('.event-relocation-split-reviewed-suggested-amount');
+            if (splitReviewedSuggestedAmountInput && splitReviewedSuggestedAmountInput.value !== '') {
+              const splitReviewedSuggestedAmount = Number(splitReviewedSuggestedAmountInput.value);
+              if (!isNaN(splitReviewedSuggestedAmount)) eventObj.relocationSplitReviewedSuggestedAmount = splitReviewedSuggestedAmount;
+            }
+            const splitSuggestionModelVersionInput = domRow.querySelector('.event-relocation-split-suggestion-model-version');
+            if (splitSuggestionModelVersionInput && splitSuggestionModelVersionInput.value !== '') {
+              const splitSuggestionModelVersion = Number(splitSuggestionModelVersionInput.value);
+              if (!isNaN(splitSuggestionModelVersion)) eventObj.relocationSplitSuggestionModelVersion = splitSuggestionModelVersion;
+            }
 
             const relocationLinkIdInput = domRow.querySelector('.event-relocation-link-id');
             if (relocationLinkIdInput && relocationLinkIdInput.value) eventObj.relocationLinkId = relocationLinkIdInput.value;

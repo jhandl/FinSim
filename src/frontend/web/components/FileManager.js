@@ -531,6 +531,8 @@ class FileManager {
               else queueMarkerRef(row, metaValues, 'splitMvRow', 'event-relocation-split-mv-id');
               if (metaValues.splitAnchorAmount) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-anchor-amount', metaValues.splitAnchorAmount);
               if (metaValues.splitValueMode) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-value-mode', metaValues.splitValueMode);
+              if (metaValues.splitReviewedSuggestedAmount) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-reviewed-suggested-amount', metaValues.splitReviewedSuggestedAmount);
+              if (metaValues.splitSuggestionModelVersion) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-suggestion-model-version', metaValues.splitSuggestionModelVersion);
               if (metaValues.mvLinkId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-link-id', metaValues.mvLinkId);
               if (metaValues.sellMvId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', metaValues.sellMvId);
               else queueMarkerRef(row, metaValues, 'sellMvRow', 'event-relocation-sell-mv-id');

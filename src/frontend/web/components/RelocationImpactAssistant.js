@@ -1,5 +1,10 @@
 /* RelocationImpactAssistant centralizes inline resolution panel rendering and actions for both table and accordion views. The legacy relocation modal has been removed. */
 
+var RelocationSplitSuggestionLib = this.RelocationSplitSuggestion;
+if (!RelocationSplitSuggestionLib && typeof require === 'function') {
+  RelocationSplitSuggestionLib = require('./RelocationSplitSuggestion.js').RelocationSplitSuggestion;
+}
+
 var RelocationImpactAssistant = {
 
   // Public API
@@ -127,7 +132,7 @@ var RelocationImpactAssistant = {
     const startCountry = Config.getInstance().getStartCountry();
     const canRenderWithoutMv = (impactCategory === 'simple' && (event.type === 'R' || event.type === 'M' || (event.type === 'RI' && isRelocationRentalOrphan))) ||
       impactCategory === 'pension_conflict';
-    if (!mvEvent && !canRenderWithoutMv && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift' && impactCategory !== 'sale_marker_orphan' && impactCategory !== 'split_amount_shift') return '';
+    if (!mvEvent && !canRenderWithoutMv && impactCategory !== 'split_orphan' && impactCategory !== 'split_relocation_shift' && impactCategory !== 'sale_relocation_shift' && impactCategory !== 'sale_marker_orphan' && impactCategory !== 'split_amount_shift' && impactCategory !== 'split_suggestion_shift') return '';
     let destCountry = mvEvent ? String(mvEvent.name || '').trim().toLowerCase() : startCountry;
     if (impactCategory === 'pension_conflict' && impactDetails && impactDetails.country) {
       destCountry = String(impactDetails.country || '').trim().toLowerCase() || destCountry;
@@ -337,7 +342,7 @@ var RelocationImpactAssistant = {
         tooltip: 'Changes currency to ' + (destCurrency || 'new currency') + ' and links to ' + (toCountry || 'new country') + '.',
         buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + destCurrency + '" data-country="' + toCountry + '" data-from-country="' + toCountry + '"'
       });
-    } else if (event.relocationImpact.category === 'split_amount_shift') {
+    } else if (event.relocationImpact.category === 'split_amount_shift' || event.relocationImpact.category === 'split_suggestion_shift') {
       let splitAmountDetails = event.relocationImpact.details;
       if (typeof splitAmountDetails === 'string') {
         try { splitAmountDetails = JSON.parse(splitAmountDetails); } catch (_) { splitAmountDetails = null; }
@@ -359,6 +364,10 @@ var RelocationImpactAssistant = {
       containerAttributes = ' data-from-country="' + originCountryForSplit + '" data-to-country="' + destinationCountry + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmount) ? '' : String(baseAmount)) + '" data-fx="' + (fxForSplit != null ? fxForSplit : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppForSplit != null ? pppForSplit : '') + '" data-fx-amount="' + (fxAmountForSplit != null ? fxAmountForSplit : '') + '" data-ppp-amount="' + (pppAmountForSplit != null ? pppAmountForSplit : '') + '"';
       const toMeta = getSymbolAndLocaleByCountry(destinationCountry);
       const suggestedFormatted = !isNaN(suggestedAmount) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, suggestedAmount) : '';
+      const splitReason = splitAmountDetails && splitAmountDetails.reason ? String(splitAmountDetails.reason) : '';
+      const updateTooltip = (splitReason === 'model')
+        ? ('Updates Part 2 to ' + suggestedFormatted + ' ' + (destCurrency || '') + ' using the latest split-suggestion formula.')
+        : ('Updates the Part 2 value to ' + suggestedFormatted + ' ' + (destCurrency || '') + ' based on current PPP data.');
       addAction(actions, {
         action: 'keep_split_value_as_is',
         tabLabel: 'Leave as is',
@@ -370,7 +379,7 @@ var RelocationImpactAssistant = {
         action: 'update_split_value',
         tabLabel: 'Update value',
         instantApply: true,
-        tooltip: 'Updates the Part 2 value to ' + suggestedFormatted + ' ' + (destCurrency || '') + ' based on the changed Part 1 amount and current PPP.',
+        tooltip: updateTooltip,
         buttonAttrs: ' data-row-id="' + rowId + '" data-suggested-amount="' + (isNaN(suggestedAmount) ? '' : String(suggestedAmount)) + '"'
       });
     } else if (event.relocationImpact.category === 'split_relocation_shift') {
@@ -584,18 +593,7 @@ var RelocationImpactAssistant = {
   },
 
   calculatePPPSuggestion: function (amount, fromCountry, toCountry) {
-    var raw = (amount == null) ? '' : String(amount);
-    var sanitized = raw.replace(/[^0-9.\-]/g, '');
-    var numeric = Number(sanitized);
-    if (isNaN(numeric)) numeric = Number(amount);
-    const economicData = Config.getInstance().getEconomicData();
-    if (!economicData || !economicData.ready) return numeric;
-    const pppRatio = economicData.getPPP(fromCountry, toCountry);
-    if (pppRatio === null) {
-      const fxRate = economicData.getFX(fromCountry, toCountry);
-      return fxRate !== null ? Math.round(numeric * fxRate) : numeric;
-    }
-    return Math.round(numeric * pppRatio);
+    return RelocationSplitSuggestionLib.getSuggestedAmount(amount, fromCountry, toCountry);
   },
 
   // Internal helpers

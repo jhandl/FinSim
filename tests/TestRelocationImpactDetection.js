@@ -422,13 +422,28 @@ module.exports = {
         assert(!p1Impact, 'Part 1 should not be flagged for split amount change');
         assert(p2Impact && p2Impact.category === 'split_amount_shift', 'Part 2 should be flagged when split Part 1 amount changes');
         assert.strictEqual(Number(p2Impact.details.suggestedAmount), 24000, 'Part 2 suggestion should be recalculated from the updated Part 1 amount');
+        assert.strictEqual(p2Impact.details.previousDistance, 0, 'Initial split drift should compare against reviewed distance baseline');
+        assert.strictEqual(p2Impact.details.currentDistance, 4000, 'Current split drift distance should use current suggestion vs current part 2');
 
-        const acknowledged = runDetector([
+        const anchorOnly = runDetector([
           part1,
           Object.assign({}, part2, { relocationSplitAnchorAmount: 12000 }),
           mv
         ], 'aa');
-        assert(!acknowledged.find(e => e.id === 'salary_split_amount_p2').relocationImpact, 'Updating split anchor amount should clear split amount impact');
+        const anchorOnlyImpact = anchorOnly.find(e => e.id === 'salary_split_amount_p2').relocationImpact;
+        assert(anchorOnlyImpact && anchorOnlyImpact.category === 'split_suggestion_shift', 'Anchor-only updates should still surface suggestion drift until reviewed baseline is refreshed');
+
+        const acknowledged = runDetector([
+          part1,
+          Object.assign({}, part2, {
+            relocationSplitAnchorAmount: 12000,
+            relocationSplitReviewedSuggestedAmount: 24000,
+            relocationSplitSuggestionModelVersion: 1,
+            relocationSplitValueMode: 'suggested'
+          }),
+          mv
+        ], 'aa');
+        assert(!acknowledged.find(e => e.id === 'salary_split_amount_p2').relocationImpact, 'Refreshing reviewed suggested baseline should clear split drift impact');
 
         const custom = runDetector([
           part1,
@@ -436,6 +451,61 @@ module.exports = {
           mv
         ], 'aa');
         assert(!custom.find(e => e.id === 'salary_split_amount_p2').relocationImpact, 'Custom split values should suppress split amount impacts');
+      });
+
+      // Test 8i2: Non-Part-1 suggestion drift classification and repeat gate.
+      runTest('8i2', function () {
+        econ = new EconomicData({
+          AA: { country: 'AA', currency: 'AAA', inflation: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', inflation: 3.0, ppp: 2.0, ppp_year: 2024, fx: 1.5, fx_date: '2024-12-31' }
+        });
+        const mv = makeEvent({ id: 'mv_split_suggestion_shift', type: 'MV', name: 'BB', fromAge: 35, toAge: 35, relocationLinkId: 'mvlink_split_suggestion_shift' });
+        const part1 = makeEvent({
+          id: 'salary_split_suggestion_p1',
+          type: 'SI',
+          amount: 12000,
+          fromAge: 30,
+          toAge: 34,
+          linkedEventId: 'split_suggestion_shift_1',
+          relocationSplitMvId: 'mvlink_split_suggestion_shift'
+        });
+        const part2 = makeEvent({
+          id: 'salary_split_suggestion_p2',
+          type: 'SInp',
+          amount: 18000,
+          fromAge: 35,
+          toAge: 40,
+          currency: 'BBB',
+          linkedEventId: 'split_suggestion_shift_1',
+          relocationSplitMvId: 'mvlink_split_suggestion_shift',
+          relocationSplitAnchorAmount: 12000,
+          relocationSplitReviewedSuggestedAmount: 20000,
+          relocationSplitSuggestionModelVersion: 1,
+          relocationSplitValueMode: 'suggested'
+        });
+
+        const economicShift = runDetector([part1, part2, mv], 'aa');
+        const economicImpact = economicShift.find(e => e.id === 'salary_split_suggestion_p2').relocationImpact;
+        assert(economicImpact && economicImpact.category === 'split_suggestion_shift', 'Suggestion drift should be raised when anchor is unchanged and suggestion moved');
+        assert.strictEqual(economicImpact.details.reason, 'economic', 'Stable model version should classify suggestion drift as economic');
+        assert.strictEqual(economicImpact.details.previousDistance, 2000, 'Previous distance should use reviewed suggestion vs retained part 2');
+        assert.strictEqual(economicImpact.details.currentDistance, 6000, 'Current distance should use current suggestion vs retained part 2');
+
+        const unchangedDistance = runDetector([
+          part1,
+          Object.assign({}, part2, { relocationSplitReviewedSuggestedAmount: 24000 }),
+          mv
+        ], 'aa');
+        assert(!unchangedDistance.find(e => e.id === 'salary_split_suggestion_p2').relocationImpact, 'Equal-or-better suggestion distance should suppress repeat drift impact');
+
+        const modelShift = runDetector([
+          part1,
+          Object.assign({}, part2, { relocationSplitSuggestionModelVersion: 0 }),
+          mv
+        ], 'aa');
+        const modelImpact = modelShift.find(e => e.id === 'salary_split_suggestion_p2').relocationImpact;
+        assert(modelImpact && modelImpact.category === 'split_suggestion_shift', 'Model-version drift should use split_suggestion_shift category');
+        assert.strictEqual(modelImpact.details.reason, 'model', 'Changed reviewed model version should classify suggestion drift as model');
       });
 
       // Test 8j: Stale sold-property marker from a removed relocation must not suppress a new boundary impact.

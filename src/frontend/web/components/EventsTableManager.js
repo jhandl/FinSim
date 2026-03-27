@@ -1,3 +1,8 @@
+var RelocationSplitSuggestionLib = this.RelocationSplitSuggestion;
+if (!RelocationSplitSuggestionLib && typeof require === 'function') {
+  RelocationSplitSuggestionLib = require('./RelocationSplitSuggestion.js').RelocationSplitSuggestion;
+}
+
 class EventsTableManager {
 
   constructor(webUI) {
@@ -736,6 +741,10 @@ class EventsTableManager {
       if (chainId !== linkedId) continue;
       this._removeHiddenInput(rows[i], 'event-linked-event-id');
       this._removeHiddenInput(rows[i], 'event-relocation-split-mv-id');
+      this._removeHiddenInput(rows[i], 'event-relocation-split-anchor-age');
+      this._removeHiddenInput(rows[i], 'event-relocation-split-anchor-amount');
+      this._removeHiddenInput(rows[i], 'event-relocation-split-value-mode');
+      this._clearSplitSuggestionTracking(rows[i]);
     }
   }
 
@@ -856,6 +865,52 @@ class EventsTableManager {
   _setSplitValueMode(row, mode) {
     if (!row || !mode) return;
     this.getOrCreateHiddenInput(row, 'event-relocation-split-value-mode', String(mode).toLowerCase());
+  }
+
+  _clearSplitSuggestionTracking(row) {
+    if (!row) return;
+    this._removeHiddenInput(row, 'event-relocation-split-reviewed-suggested-amount');
+    this._removeHiddenInput(row, 'event-relocation-split-suggestion-model-version');
+  }
+
+  _resolveSplitSuggestionCountries(row, fallbackPart1Row) {
+    const panelContainer = row.nextElementSibling && row.nextElementSibling.querySelector
+      ? row.nextElementSibling.querySelector('.resolution-panel-container')
+      : null;
+    let fromCountry = panelContainer ? String(panelContainer.getAttribute('data-from-country') || '').toLowerCase() : '';
+    let toCountry = panelContainer ? String(panelContainer.getAttribute('data-to-country') || '').toLowerCase() : '';
+    if (fromCountry && toCountry) return { fromCountry, toCountry };
+
+    const impacted = this._findRelocationEventForImpactedRow(row);
+    if (!toCountry && impacted && impacted.mvEvent) {
+      toCountry = String(impacted.mvEvent.name || '').trim().toLowerCase();
+    }
+    if (!fromCountry && impacted && impacted.mvEvent) {
+      fromCountry = this.getOriginCountry(impacted.mvEvent, Config.getInstance().getStartCountry());
+    }
+
+    if (!toCountry) {
+      const linkedCountryInput = row.querySelector('.event-linked-country');
+      toCountry = linkedCountryInput && linkedCountryInput.value ? String(linkedCountryInput.value).toLowerCase() : toCountry;
+    }
+    if (!fromCountry && fallbackPart1Row) {
+      const part1CountryInput = fallbackPart1Row.querySelector('.event-country');
+      const part1LinkedCountryInput = fallbackPart1Row.querySelector('.event-linked-country');
+      if (part1CountryInput && part1CountryInput.value) fromCountry = String(part1CountryInput.value).toLowerCase();
+      else if (part1LinkedCountryInput && part1LinkedCountryInput.value) fromCountry = String(part1LinkedCountryInput.value).toLowerCase();
+    }
+    if (!fromCountry) fromCountry = Config.getInstance().getStartCountry();
+    return { fromCountry, toCountry };
+  }
+
+  _setSplitSuggestionReviewBaseline(part2Row, part1Amount, fromCountry, toCountry) {
+    if (!part2Row) return NaN;
+    this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-suggestion-model-version', String(RelocationSplitSuggestionLib.SPLIT_SUGGESTION_MODEL_VERSION));
+    const suggestedAmount = RelocationSplitSuggestionLib.getSuggestedAmount(part1Amount, fromCountry, toCountry);
+    if (!isNaN(suggestedAmount)) {
+      this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-reviewed-suggested-amount', String(suggestedAmount));
+    }
+    return suggestedAmount;
   }
 
   _markSplitPart2ValueCustom(row) {
@@ -1663,6 +1718,7 @@ class EventsTableManager {
         this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-age');
         this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-amount');
         this._removeHiddenInput(secondRow, 'event-relocation-split-value-mode');
+        this._clearSplitSuggestionTracking(secondRow);
         this._removeHiddenInput(secondRow, 'event-resolution-override');
         this._deleteRowWithExistingAnimation(firstRow);
         continue;
@@ -1677,6 +1733,7 @@ class EventsTableManager {
         this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-age');
         this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-amount');
         this._removeHiddenInput(firstRow, 'event-relocation-split-value-mode');
+        this._clearSplitSuggestionTracking(firstRow);
         this._removeHiddenInput(firstRow, 'event-resolution-override');
         this._deleteRowWithExistingAnimation(secondRow);
         continue;
@@ -2465,8 +2522,14 @@ class EventsTableManager {
       this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-amount', String(part1AmountNum));
     }
     this._setSplitValueMode(part2Row, 'suggested');
-    this.getOrCreateHiddenInput(part2Row, 'event-currency', destCurrency);
     const part2LinkedCountry = toCountryHint ? String(toCountryHint).toLowerCase() : destCountry;
+    this._setSplitSuggestionReviewBaseline(
+      part2Row,
+      part1AmountNum,
+      fromCountryHint || Config.getInstance().getStartCountry(),
+      part2LinkedCountry || destCountry
+    );
+    this.getOrCreateHiddenInput(part2Row, 'event-currency', destCurrency);
     if (part2LinkedCountry) {
       this.getOrCreateHiddenInput(part2Row, 'event-country', part2LinkedCountry);
       this.getOrCreateHiddenInput(part2Row, 'event-linked-country', part2LinkedCountry);
@@ -2731,6 +2794,7 @@ class EventsTableManager {
       this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-age');
       this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-amount');
       this._removeHiddenInput(secondRow, 'event-relocation-split-value-mode');
+      this._clearSplitSuggestionTracking(secondRow);
       this._removeHiddenInput(secondRow, 'event-resolution-override');
       this._removeRowAndResolutionPanel(firstRow);
       this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-from-age'], pulse: true });
@@ -2745,6 +2809,7 @@ class EventsTableManager {
       this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-age');
       this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-amount');
       this._removeHiddenInput(firstRow, 'event-relocation-split-value-mode');
+      this._clearSplitSuggestionTracking(firstRow);
       this._removeHiddenInput(firstRow, 'event-resolution-override');
       this._removeRowAndResolutionPanel(secondRow);
       this._afterResolutionAction(row.dataset.rowId, { flashFields: ['.event-to-age'], pulse: true });
@@ -2813,12 +2878,12 @@ class EventsTableManager {
     const part2Row = splitRows[1];
     const part1AmountInput = part1Row.querySelector('.event-amount');
     if (!part1AmountInput) return;
-    const part1Amount = Number(String(part1AmountInput.value || '').replace(/[^0-9.\-]/g, ''));
+    const part1Amount = RelocationSplitSuggestionLib.parseAmountValue(part1AmountInput.value);
     if (isNaN(part1Amount)) return;
     this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-amount', String(part1Amount));
-    if (this._getSplitValueMode(part2Row) !== 'custom') {
-      this._setSplitValueMode(part2Row, 'suggested');
-    }
+    this._setSplitValueMode(part2Row, 'suggested');
+    const countries = this._resolveSplitSuggestionCountries(row, part1Row);
+    this._setSplitSuggestionReviewBaseline(part2Row, part1Amount, countries.fromCountry, countries.toCountry);
     this._afterResolutionAction(row.dataset.rowId, { pulse: true });
   }
 
@@ -3446,20 +3511,7 @@ class EventsTableManager {
   }
 
   calculatePPPSuggestion(amount, fromCountry, toCountry) {
-    // Sanitize amount robustly: accept numbers or strings with currency symbols/grouping
-    var raw = (amount == null) ? '' : String(amount);
-    var sanitized = raw.replace(/[^0-9.\-]/g, '');
-    var numeric = Number(sanitized);
-    if (isNaN(numeric)) numeric = Number(amount); // fallback if already numeric
-
-    const economicData = Config.getInstance().getEconomicData();
-    if (!economicData || !economicData.ready) return numeric;
-    const pppRatio = economicData.getPPP(fromCountry, toCountry);
-    if (pppRatio === null) {
-      const fxRate = economicData.getFX(fromCountry, toCountry);
-      return fxRate !== null ? Math.round(numeric * fxRate) : numeric;
-    }
-    return Math.round(numeric * pppRatio);
+    return RelocationSplitSuggestionLib.getSuggestedAmount(amount, fromCountry, toCountry);
   }
 
   detectPropertyCountry(eventFromAge, startCountry) {

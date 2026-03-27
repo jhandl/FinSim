@@ -1,5 +1,10 @@
 /* This file has to work on both the website and Google Apps Script */
 
+var RelocationSplitSuggestionLib = this.RelocationSplitSuggestion;
+if (!RelocationSplitSuggestionLib && typeof require === 'function') {
+  RelocationSplitSuggestionLib = require('./RelocationSplitSuggestion.js').RelocationSplitSuggestion;
+}
+
 /**
  * RelocationImpactDetector analyzes events for impacts when MV relocations are added or edited.
  * It modifies events in-place by adding/removing a relocationImpact property.
@@ -403,7 +408,7 @@ var RelocationImpactDetector = {
       if (relocationAge === anchorAge) continue;
 
       var expectedToAge = relocationAge - 1;
-      var message = 'Relocation age changed from ' + anchorAge + ' to ' + relocationAge + '. Update this sale timing or keep it as-is.';
+      var message = 'Relocation age changed from ' + anchorAge + ' to ' + relocationAge + '.';
       var details = {
         relocationAge: relocationAge,
         previousRelocationAge: anchorAge,
@@ -464,7 +469,7 @@ var RelocationImpactDetector = {
               amount: first ? first.amount : '',
               currency: (first && first.currency) ? String(first.currency).toUpperCase() : ''
             };
-            var shiftMessage = 'Relocation age changed from ' + anchorAge + ' to ' + markerAge + '. Update both halves or keep their current ages.';
+            var shiftMessage = 'Relocation age changed from ' + anchorAge + ' to ' + markerAge + '. Do you want to update the events?';
             for (var s = 0; s < chain.length; s++) {
               this.addImpact(chain[s], 'split_relocation_shift', shiftMessage, this.getMvImpactId(markerMv), true, shiftDetails);
             }
@@ -482,7 +487,7 @@ var RelocationImpactDetector = {
         fromAge: first ? first.fromAge : '',
         toAge: last ? last.toAge : ''
       };
-      var message = 'This split no longer matches any relocation boundary. Join both halves back into a single event.';
+      var message = 'This split no longer matches any relocation boundary.';
       for (var k = 0; k < chain.length; k++) {
         this.addImpact(chain[k], 'split_orphan', message, '', true, details);
       }
@@ -503,7 +508,7 @@ var RelocationImpactDetector = {
         relocationRentalOrphan: true,
         rentMvId: rentMarkerId
       };
-      var message = 'This rental income was created for a relocation that no longer exists. Keep renting or remove this event.';
+      var message = 'This rental income was created for a relocation that no longer exists.';
       this.addImpact(event, 'simple', message, '', true, details);
     }
   },
@@ -576,8 +581,8 @@ var RelocationImpactDetector = {
       affectedTypes.sort();
 
       var message = hasMortgageRow
-        ? 'This sale or payoff plan was tied to a relocation that no longer exists. Keep the current timing or restore the mortgage plan.'
-        : 'This sale timing was tied to a relocation that no longer exists. Keep the current timing or revisit it.';
+        ? 'This sale or payoff plan was tied to a relocation that no longer exists.'
+        : 'This sale timing was tied to a relocation that no longer exists.';
 
       for (var r = 0; r < groupRows.length; r++) {
         var rowEvent = groupRows[r];
@@ -595,30 +600,15 @@ var RelocationImpactDetector = {
   },
 
   parseSplitAmountValue: function (amount) {
-    var raw = (amount == null) ? '' : String(amount);
-    var sanitized = raw.replace(/[^0-9.\-]/g, '');
-    var numeric = Number(sanitized);
-    if (isNaN(numeric)) numeric = Number(amount);
-    return isNaN(numeric) ? NaN : numeric;
+    return RelocationSplitSuggestionLib.parseAmountValue(amount);
   },
 
   amountsRoughlyEqual: function (a, b) {
-    if (isNaN(a) || isNaN(b)) return false;
-    return Math.abs(a - b) < 0.5;
+    return RelocationSplitSuggestionLib.amountsRoughlyEqual(a, b);
   },
 
   calculateSplitAmountSuggestion: function (baseAmount, fromCountry, toCountry) {
-    var numeric = this.parseSplitAmountValue(baseAmount);
-    if (isNaN(numeric)) return NaN;
-    var economicData = Config.getInstance().getEconomicData();
-    if (!economicData || !economicData.ready) return Math.round(numeric);
-    var pppRatio = economicData.getPPP(fromCountry, toCountry);
-    if (pppRatio === null) {
-      var fxRate = economicData.getFX(fromCountry, toCountry);
-      if (fxRate === null) return Math.round(numeric);
-      return Math.round(numeric * fxRate);
-    }
-    return Math.round(numeric * pppRatio);
+    return RelocationSplitSuggestionLib.getSuggestedAmount(baseAmount, fromCountry, toCountry);
   },
 
   addSplitAmountShiftImpacts: function (events, mvEvents, startCountry) {
@@ -662,7 +652,6 @@ var RelocationImpactDetector = {
       var anchorAmount = this.parseSplitAmountValue(second.relocationSplitAnchorAmount);
       var updatedPart1Amount = this.parseSplitAmountValue(first.amount);
       if (isNaN(anchorAmount) || isNaN(updatedPart1Amount)) continue;
-      if (this.amountsRoughlyEqual(anchorAmount, updatedPart1Amount)) continue;
 
       var markerAge = Number(markerMv.fromAge);
       if (isNaN(markerAge)) continue;
@@ -672,25 +661,72 @@ var RelocationImpactDetector = {
       var destinationRuleSet = Config.getInstance().getCachedTaxRuleSet(destinationCountry);
       var suggestedCurrency = destinationRuleSet && destinationRuleSet.getCurrencyCode ? String(destinationRuleSet.getCurrencyCode()).toUpperCase() : '';
       var currentPart2Amount = this.parseSplitAmountValue(second.amount);
-      if (!isNaN(currentPart2Amount) && this.amountsRoughlyEqual(currentPart2Amount, suggestedAmount)) {
+      if (isNaN(suggestedAmount) || isNaN(currentPart2Amount)) continue;
+      if (this.amountsRoughlyEqual(currentPart2Amount, suggestedAmount)) continue;
+
+      var reviewedSuggestedAmount = this.parseSplitAmountValue(second.relocationSplitReviewedSuggestedAmount);
+      if (isNaN(reviewedSuggestedAmount)) reviewedSuggestedAmount = currentPart2Amount;
+      var reviewedDistance = Math.abs(reviewedSuggestedAmount - currentPart2Amount);
+      var currentDistance = Math.abs(suggestedAmount - currentPart2Amount);
+      if (!RelocationSplitSuggestionLib.isMaterialDistanceIncrease(currentDistance, reviewedDistance)) continue;
+
+      var suggestedLabel = String(suggestedAmount) + (suggestedCurrency ? (' ' + suggestedCurrency) : '');
+      var isAmountDrift = !this.amountsRoughlyEqual(anchorAmount, updatedPart1Amount);
+      if (isAmountDrift) {
+        var amountMessage = 'Part 1 amount changed. Suggested Part 2 value: ' + suggestedLabel + '.';
+        var amountDetails = {
+          linkedEventId: String(chainIds[j]),
+          anchorAmount: anchorAmount,
+          part1Amount: updatedPart1Amount,
+          suggestedAmount: suggestedAmount,
+          suggestedCurrency: suggestedCurrency,
+          currentPart2Amount: currentPart2Amount,
+          reviewedSuggestedAmount: reviewedSuggestedAmount,
+          previousDistance: reviewedDistance,
+          currentDistance: currentDistance,
+          originCountry: originCountry,
+          destinationCountry: destinationCountry,
+          splitSuggestionModelVersion: RelocationSplitSuggestionLib.SPLIT_SUGGESTION_MODEL_VERSION,
+          reviewedSuggestionModelVersion: second.relocationSplitSuggestionModelVersion
+        };
+        this.addImpact(second, 'split_amount_shift', amountMessage, this.getMvImpactId(markerMv), true, amountDetails);
         continue;
       }
 
-      var suggestedLabel = !isNaN(suggestedAmount) ? (String(suggestedAmount) + (suggestedCurrency ? (' ' + suggestedCurrency) : '')) : '';
-      var message = suggestedLabel
-        ? ('Part 1 amount changed. Suggested Part 2 value: ' + suggestedLabel + '. Update Part 2 value or leave it as is.')
-        : 'Part 1 amount changed. Update Part 2 value or leave it as is.';
-      var details = {
+      if (this.amountsRoughlyEqual(suggestedAmount, reviewedSuggestedAmount)) continue;
+
+      var reviewedModelVersion = Number(second.relocationSplitSuggestionModelVersion);
+      var isModelDrift = !isNaN(reviewedModelVersion) &&
+        reviewedModelVersion !== RelocationSplitSuggestionLib.SPLIT_SUGGESTION_MODEL_VERSION;
+      var reason = isModelDrift ? 'model' : 'economic';
+      var driftedFurther = reviewedDistance > 0 &&
+        RelocationSplitSuggestionLib.isMaterialDistanceIncrease(currentDistance, reviewedDistance);
+      var suggestionMessage;
+      if (driftedFurther) {
+        suggestionMessage = 'You decided to leave the original Part 2 value last time, but the suggested value has drifted further now.';
+      } else if (reason === 'model') {
+        suggestionMessage = 'The suggested Part 2 value changed because the suggestion formula changed.';
+      } else {
+        suggestionMessage = 'The suggested Part 2 value changed due to updated economic data.';
+      }
+
+      var suggestionDetails = {
         linkedEventId: String(chainIds[j]),
+        reason: reason,
         anchorAmount: anchorAmount,
         part1Amount: updatedPart1Amount,
         suggestedAmount: suggestedAmount,
         suggestedCurrency: suggestedCurrency,
-        currentPart2Amount: isNaN(currentPart2Amount) ? second.amount : currentPart2Amount,
+        currentPart2Amount: currentPart2Amount,
+        reviewedSuggestedAmount: reviewedSuggestedAmount,
+        previousDistance: reviewedDistance,
+        currentDistance: currentDistance,
         originCountry: originCountry,
-        destinationCountry: destinationCountry
+        destinationCountry: destinationCountry,
+        splitSuggestionModelVersion: RelocationSplitSuggestionLib.SPLIT_SUGGESTION_MODEL_VERSION,
+        reviewedSuggestionModelVersion: second.relocationSplitSuggestionModelVersion
       };
-      this.addImpact(second, 'split_amount_shift', message, this.getMvImpactId(markerMv), true, details);
+      this.addImpact(second, 'split_suggestion_shift', suggestionMessage, this.getMvImpactId(markerMv), true, suggestionDetails);
     }
   },
 
