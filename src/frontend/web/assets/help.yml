@@ -261,7 +261,7 @@ WizardSteps:
     tours: [full, mini]
     card: personalCircumstances
     popover:
-      description: "<p>The year that you got married or entered into a civil partnership, or that you plan to.</p><p>Your income tax band limits change if you are married or in a civil partnership.</p>"
+      description: "<p>The year that you got married or entered into a civil partnership, or that you plan to (leave empty if you don't).</p><p>Your income tax band limits may change if you are married or in a civil partnership.</p>"
       side: "right"
       align: "start"
 
@@ -269,7 +269,7 @@ WizardSteps:
     tours: [full, mini]
     card: personalCircumstances
     popover:
-      description: "<p>The year that your oldest child was born or is expected or speculated to be born.</p><p>Your income tax band limits are increased if you have dependent children, starting when your first child is born.</p>"
+      description: "<p>The year that your oldest child was born or is expected or speculated to be born.</p><p>Your income tax band limits may increase if you have dependent children, starting when your first child is born.</p>"
       side: "right"
       align: "start"
 
@@ -277,7 +277,7 @@ WizardSteps:
     tours: [full, mini]
     card: personalCircumstances
     popover:
-      description: "<p>The year that your youngest child was born or is expected or speculated to be born.</p><p>The increased income tax band limits for dependent children go on until your youngest child is over 18.</p>"
+      description: "<p>The year that your youngest child was born or is expected or speculated to be born.</p><p>Your income tax band limits increase for dependent children may continue until your youngest child is over ${taxRules.incomeTax.dependentChildMaxAge}.</p>"
       side: "right"
       align: "start"
 

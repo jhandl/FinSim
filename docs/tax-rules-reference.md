@@ -78,6 +78,8 @@ Defines the core income tax structure:
   - **`age`** bands like `"65": 245` (additional credits by age).
 - **`ageExemptionAge` / `ageExemptionLimit`** (optional, IE):
   - Age and income threshold for age-based income tax exemption.
+- **`dependentChildMaxAge`** (required when child-dependent status affects bands/help):
+  - Maximum child age still treated as dependent for `singleWithDependents` band selection.
 - **`jointBandIncreaseMax`** (optional, IE): Max extra standard rate band for the secondary earner.
 - **`applicableIncomeTypes`** (optional): Array of income-type strings this tax applies to. When absent, the tax applies to all income (backward-compatible). Supported vocabulary: `employment`, `privatePension`, `statePension`, `definedBenefit`, `rental`, `otherIncome`, `investmentTypeIncome`, `investmentIncome`.
 - **`bracketsByStatus`**:

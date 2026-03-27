@@ -209,6 +209,14 @@ class TaxRuleSet {
     return typeof it.jointBandIncreaseMax === 'number' ? it.jointBandIncreaseMax : 0;
   }
 
+  getDependentChildMaxAge() {
+    var it = this.raw.incomeTax || {};
+    if (typeof it.dependentChildMaxAge !== 'number') {
+      throw new Error('incomeTax.dependentChildMaxAge is required');
+    }
+    return it.dependentChildMaxAge;
+  }
+
   isJointFilingAllowed() {
     if (typeof this.raw.jointFilingAllowed === 'boolean') return this.raw.jointFilingAllowed;
     var it = this.raw.incomeTax || {};

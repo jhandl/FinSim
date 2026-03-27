@@ -51,6 +51,9 @@ module.exports = {
       if (ruleset.getIncomeTaxAgeExemptionLimit() !== 18000) {
         testResults.success = false; testResults.errors.push('Age exemption limit incorrect');
       }
+      if (ruleset.getDependentChildMaxAge() !== raw.incomeTax.dependentChildMaxAge) {
+        testResults.success = false; testResults.errors.push('Dependent child max age incorrect');
+      }
 
       // Pension lump sum bands
       const bands = ruleset.getPensionLumpSumTaxBands();

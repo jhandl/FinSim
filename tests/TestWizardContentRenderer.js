@@ -52,6 +52,11 @@ module.exports = {
                     testResults.errors.push('help.yml does not maintain backward compatibility examples');
                     testResults.success = false;
                 }
+
+                if (!helpContent.includes('${taxRules.incomeTax.dependentChildMaxAge}')) {
+                    testResults.errors.push('help.yml does not source the dependent child age from tax rules');
+                    testResults.success = false;
+                }
             }
 
             // Test 2: Verify ContentRenderer.js has wizard support

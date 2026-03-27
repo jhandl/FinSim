@@ -509,21 +509,23 @@ class Taxman {
 
     this.people = this.person1Ref ? (this.person2Ref ? 2 : 1) : 0;
 
-    this.married = ((typeof params.marriageYear === 'number') && (params.marriageYear > 0) && (typeof this.currentYear === 'number') && (this.currentYear >= params.marriageYear));
-
-    if ((typeof params.oldestChildBorn === 'number') || (typeof params.youngestChildBorn === 'number')) {
-      let dependentStartYear = (typeof params.oldestChildBorn === 'number' ? params.oldestChildBorn : params.youngestChildBorn);
-      let dependentEndYear = (typeof params.youngestChildBorn === 'number' ? params.youngestChildBorn : params.oldestChildBorn) + 18;
-      this.dependentChildren = ((typeof this.currentYear === 'number') && isBetween(this.currentYear, dependentStartYear, dependentEndYear));
-    } else {
-      this.dependentChildren = false;
-    }
     // Load the active ruleset for the current country. Tests and WebUI preload into Config for sync use.
     const cfg = Config.getInstance();
     var countryCode = currentCountry || cfg.getDefaultCountry();
     this.ruleset = cfg.getCachedTaxRuleSet ? cfg.getCachedTaxRuleSet(countryCode) : null;
     if (!this.ruleset) {
       console.error(`TaxRuleSet not found for ${countryCode}`);
+    }
+
+    this.married = ((typeof params.marriageYear === 'number') && (params.marriageYear > 0) && (typeof this.currentYear === 'number') && (this.currentYear >= params.marriageYear));
+
+    if ((typeof params.oldestChildBorn === 'number') || (typeof params.youngestChildBorn === 'number')) {
+      var dependentChildMaxAge = this.ruleset.getDependentChildMaxAge();
+      let dependentStartYear = (typeof params.oldestChildBorn === 'number' ? params.oldestChildBorn : params.youngestChildBorn);
+      let dependentEndYear = (typeof params.youngestChildBorn === 'number' ? params.youngestChildBorn : params.oldestChildBorn) + dependentChildMaxAge;
+      this.dependentChildren = ((typeof this.currentYear === 'number') && isBetween(this.currentYear, dependentStartYear, dependentEndYear));
+    } else {
+      this.dependentChildren = false;
     }
     // Residence currency is defined by Simulator and is the canonical currency for all Taxman declarations.
     // Use the global `residenceCurrency` when available; fall back to ruleset locale currency.

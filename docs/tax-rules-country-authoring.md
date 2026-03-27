@@ -242,6 +242,11 @@ Married band shifting:
   - This currently approximates Ireland's "standard-rate band increase".
   - If your country does not have a similar mechanism, set to 0.
 
+Dependent-child status:
+- `dependentChildMaxAge` (number)
+  - Maximum child age still treated as dependent for `singleWithDependents` bracket selection.
+  - The help system uses the same field for child-dependency copy, so keep it aligned with the engine rule.
+
 Tax credits:
 - `taxCredits` is a free-form object, but only some IDs have special semantics today:
   - `employee`: special handling supports a base amount and optional min/max specifications.
@@ -669,6 +674,7 @@ Use this as a starting point (fill values; do not leave placeholders in committe
     "name": "Income Tax",
     "tooltip": "",
     "taxCredits": {},
+    "dependentChildMaxAge": 18,
     "jointBandIncreaseMax": 0,
     "bracketsByStatus": {
       "single": { "0": 0.0 },

@@ -34,6 +34,7 @@
     },
     "ageExemptionAge": 65,
     "ageExemptionLimit": 18000,
+    "dependentChildMaxAge": 18,
     "jointBandIncreaseMax": 35000,
     "bracketsByStatus": {
       "single": { "0": 0.2, "44000": 0.4 },

@@ -25,6 +25,7 @@
     "taxCredits": {  },
     "ageExemptionAge": 65,
     "ageExemptionLimit": 0,
+    "dependentChildMaxAge": 18,
     "jointBandIncreaseMax": 0,
     "bracketsByStatus": {
       "single": { "0": 0.0, "14600": 0.1, "26200": 0.12, "61750": 0.22, "115125": 0.24, "206550": 0.32, "258325": 0.35, "623950": 0.37 },

@@ -54,24 +54,14 @@ class Wizard {
         rawConfig.steps = rawConfig.WizardSteps;
       }
 
-      // Store original config with variables processed but placeholders intact
-      this.originalConfig = FormatUtils.processVariablesInObject(rawConfig);
+      // Keep placeholders intact so step rendering can resolve tax-rule values
+      // against the currently active country instead of freezing them at load.
+      this.originalConfig = JSON.parse(JSON.stringify(rawConfig));
 
-      // Process content: use ContentRenderer for structured content, markdown links for legacy HTML
       if (this.originalConfig.steps) {
         this.originalConfig.steps = this.originalConfig.steps.map(step => {
-          if (step.popover) {
-            if (step.popover.contentType && typeof ContentRenderer !== 'undefined') {
-              // Use ContentRenderer for structured content
-              step.popover.description = ContentRenderer.render(
-                step.popover.contentType,
-                step.popover.content,
-                { context: 'wizard', compact: true }
-              );
-            } else if (step.popover.description) {
-              // Backward compatibility: process as HTML string
-              step.popover.description = FormatUtils.processMarkdownLinks(step.popover.description);
-            }
+          if (step.popover && step.popover.description) {
+            step.popover.description = FormatUtils.processMarkdownLinks(step.popover.description);
           }
           return step;
         });
@@ -242,7 +232,7 @@ class Wizard {
   processAgeYearInContent(content, context = null) {
     if (typeof content === 'string') {
       const withAgeYear = FormatUtils.replaceAgeYearPlaceholders(content);
-      return FormatUtils.processVariables(withAgeYear, context);
+      return FormatUtils.processMarkdownLinks(FormatUtils.processVariables(withAgeYear, context));
     }
     if (Array.isArray(content)) {
       return content.map(item => this.processAgeYearInContent(item, context));
@@ -399,6 +389,45 @@ class Wizard {
     }
     
     return null;
+  }
+
+  resolveHelpContext(element) {
+    const investmentContext = this.resolveInvestmentTypeContext(element);
+    if (investmentContext) return investmentContext;
+
+    const config = Config.getInstance();
+    let activeCountry = null;
+
+    if (element && element.closest) {
+      const countryContainer = element.closest('[data-country-code]');
+      if (countryContainer) {
+        activeCountry = countryContainer.getAttribute('data-country-code');
+      }
+    }
+
+    if (!activeCountry) {
+      try {
+        const webUI = (typeof WebUI !== 'undefined' && WebUI.getInstance) ? WebUI.getInstance() : null;
+        const manager = webUI && webUI.countryTabSyncManager;
+        if (manager && typeof manager.getSelectedCountry === 'function' && element && element.closest) {
+          if (element.closest('#personalCircumstances')) {
+            activeCountry = manager.getSelectedCountry('personalCircumstances');
+          } else if (element.closest('#allocations')) {
+            activeCountry = manager.getSelectedCountry('allocations');
+          } else if (element.closest('#growthRates')) {
+            activeCountry = manager.getSelectedCountry('growthRates');
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!activeCountry) {
+      activeCountry = config.getStartCountry();
+    }
+
+    const ruleset = config.getCachedTaxRuleSet(activeCountry);
+    if (!ruleset) return null;
+    return { taxRules: ruleset.raw };
   }
 
   getEventTableState() {
@@ -2284,7 +2313,7 @@ class Wizard {
       let context = null;
       if (step.element) {
         const el = document.querySelector(step.element);
-        context = this.resolveInvestmentTypeContext(el);
+        context = this.resolveHelpContext(el);
       }
 
       if (step.popover) {
@@ -2370,7 +2399,7 @@ class Wizard {
         let context = null;
         if (step.element) {
           const el = document.querySelector(step.element);
-          context = this.resolveInvestmentTypeContext(el);
+          context = this.resolveHelpContext(el);
         }
 
         if (step.popover) {
