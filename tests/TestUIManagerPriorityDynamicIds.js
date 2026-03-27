@@ -402,6 +402,66 @@ module.exports = {
       errors.push(err.message || String(err));
     }
 
+    try {
+      const result = vm.runInContext(`
+        document = {
+          getElementById: function() {
+            return null;
+          }
+        };
+        Config = {
+          getInstance: function() {
+            return {
+              getStartCountry: function() { return 'ar'; },
+              getDefaultCountry: function() { return 'ie'; },
+              isRelocationEnabled: function() { return true; },
+              getCachedTaxRuleSet: function() {
+                return {
+                  getResolvedInvestmentTypes: function() { return []; },
+                  getUIConfigurableCredits: function() { return []; },
+                  hasPrivatePensions: function() { return false; }
+                };
+              }
+            };
+          }
+        };
+        var values = {
+          StartingAge: 30,
+          TargetAge: 90,
+          InitialSavings: 10000,
+          InitialPension: 25000,
+          RetirementAge: 65,
+          EmergencyStash: 0,
+          PensionGrowthRate: 5,
+          PensionGrowthStdDev: 0,
+          MarriageYear: '',
+          YoungestChildBorn: '',
+          OldestChildBorn: '',
+          P2StartingAge: 30,
+          P2RetirementAge: 65,
+          InitialPensionP2: 12000,
+          simulation_mode: 'couple',
+          economy_mode: 'deterministic'
+        };
+        var ui = {
+          getValue: function(id) {
+            if (Object.prototype.hasOwnProperty.call(values, id)) return values[id];
+            return '';
+          },
+          getScenarioCountries: function() { return ['ar']; }
+        };
+        var manager = new UIManager(ui);
+        manager.readEvents = function() { return []; };
+        var params = manager.readParameters(false);
+        ({ params: params });
+      `, ctx);
+
+      assert.strictEqual(result.params.initialPension, 0, 'State-only start country must ignore InitialPension');
+      assert.strictEqual(result.params.initialPensionP2, 0, 'State-only start country must ignore InitialPensionP2');
+    } catch (err) {
+      errors.push(err.message || String(err));
+    }
+
     return { success: errors.length === 0, errors: errors };
   }
 };

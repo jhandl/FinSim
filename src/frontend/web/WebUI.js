@@ -26,6 +26,7 @@ class WebUI extends AbstractUI {
     this.allocationsCountryChipSelector = null;
     this.personalCircumstancesCountryChipSelector = null;
     this._allocationValueCache = {};
+    this.startCountryHasPrivatePensions = null;
     this.pensionCappedDropdowns = {};
     this.countryTabSyncManager = CountryTabSyncManager.getInstance();
 
@@ -605,8 +606,10 @@ class WebUI extends AbstractUI {
     if (!ruleset) {
       ruleset = await config.getTaxRuleSet(startCountry);
     }
+    this.startCountryHasPrivatePensions = !(ruleset && typeof ruleset.hasPrivatePensions === 'function') || ruleset.hasPrivatePensions();
     const investmentTypes = ruleset.getResolvedInvestmentTypes() || [];
     this.renderInvestmentParameterFields(investmentTypes);
+    this._syncStartCountryPrivatePensionVisibility();
 
     if (this.formatUtils) {
       this.formatUtils.setupCurrencyInputs(true);
@@ -3446,6 +3449,21 @@ class WebUI extends AbstractUI {
     }
   }
 
+  _syncStartCountryPrivatePensionVisibility() {
+    const hasPrivatePensions = this.startCountryHasPrivatePensions !== false;
+    const p1 = document.getElementById('InitialPension');
+    const p1Wrapper = p1 ? p1.closest('.input-wrapper') : null;
+    if (p1Wrapper) {
+      p1Wrapper.style.display = hasPrivatePensions ? 'flex' : 'none';
+    }
+
+    const p2 = document.getElementById('InitialPensionP2');
+    const p2Wrapper = p2 ? p2.closest('.input-wrapper') : null;
+    if (p2Wrapper) {
+      p2Wrapper.style.display = (hasPrivatePensions && this.currentSimMode !== 'single') ? 'flex' : 'none';
+    }
+  }
+
   updateUIForSimMode() {
     const isSingleMode = this.currentSimMode === 'single';
 
@@ -3487,6 +3505,8 @@ class WebUI extends AbstractUI {
     if (initialSavingsLabel) {
       initialSavingsLabel.textContent = isSingleMode ? 'Current Savings' : 'Current Savings (Joint)';
     }
+
+    this._syncStartCountryPrivatePensionVisibility();
 
     // Sync chip-driven state pension fields with sim mode (single/couple).
     try {

@@ -360,6 +360,11 @@ class UIManager {
 
     // Dynamic investment parameters from ruleset
     const ruleset = cfg.getCachedTaxRuleSet(params.StartCountry);
+    const startCountryHasPrivatePensions = !(ruleset && typeof ruleset.hasPrivatePensions === 'function') || ruleset.hasPrivatePensions();
+    if (!startCountryHasPrivatePensions) {
+      params.initialPension = 0;
+      params.initialPensionP2 = 0;
+    }
     const investmentTypes = ruleset.getResolvedInvestmentTypes() || [];
     const initialCapitalByKey = {};
     const investmentAllocationsByCountry = {};

@@ -32,15 +32,19 @@ global.RelocationImpactAssistant = class {};
 global.IntroJs = class {};
 
 // Mock Config
+const defaultRuleset = () => ({
+  getResolvedInvestmentTypes: () => [],
+  findInvestmentTypeByKey: () => null,
+  hasPrivatePensions: () => true
+});
+
 const mockConfig = {
   getInvestmentBaseTypes: jest.fn(() => []),
   isRelocationEnabled: jest.fn(() => false),
   getStartCountry: jest.fn(() => 'IE'),
   getCountryNameByCode: jest.fn(() => 'Ireland'),
-  getCachedTaxRuleSet: jest.fn(() => ({
-    getResolvedInvestmentTypes: () => [],
-    findInvestmentTypeByKey: () => null
-  })),
+  getCachedTaxRuleSet: jest.fn(() => defaultRuleset()),
+  getTaxRuleSet: jest.fn(async () => defaultRuleset()),
   getDefaultCountry: jest.fn(() => 'IE')
 };
 global.Config = {
@@ -60,9 +64,28 @@ describe('WebUI.renderInvestmentParameterFields', () => {
   let stash;
   
   beforeEach(() => {
+    mockConfig.getInvestmentBaseTypes.mockReturnValue([]);
+    mockConfig.isRelocationEnabled.mockReturnValue(false);
+    mockConfig.getStartCountry.mockReturnValue('IE');
+    mockConfig.getCountryNameByCode.mockReturnValue('Ireland');
+    mockConfig.getCachedTaxRuleSet.mockImplementation(() => defaultRuleset());
+    mockConfig.getTaxRuleSet.mockImplementation(async () => defaultRuleset());
+    mockConfig.getDefaultCountry.mockReturnValue('IE');
+
     document.body.innerHTML = `
       <div id="hidden-parameter-stash"></div>
-      <div id="startingPosition"><div class="input-group"></div></div>
+      <div id="startingPosition">
+        <div class="input-group">
+          <div class="input-wrapper">
+            <label for="InitialPension">Your Pension Fund</label>
+            <input id="InitialPension" class="currency">
+          </div>
+          <div class="input-wrapper">
+            <label for="InitialPensionP2">Their Pension Fund</label>
+            <input id="InitialPensionP2" class="currency">
+          </div>
+        </div>
+      </div>
       <div id="growthRates"><table class="growth-rates-table"><tbody></tbody></table></div>
       <div id="Allocations"><div class="input-group"></div></div>
       <button id="runSimulation"></button>
@@ -295,6 +318,27 @@ describe('WebUI.renderInvestmentParameterFields', () => {
 
     expect(document.getElementById('LocalAssetGrowth_ie_localInv').value).toBe('5');
     expect(document.getElementById('LocalAssetVolatility_ie_localInv').value).toBe('12');
+  });
+
+  test('hides starting-position pension funds when start country has no private pensions', async () => {
+    const noPensionRuleset = {
+      getResolvedInvestmentTypes: () => [],
+      findInvestmentTypeByKey: () => null,
+      hasPrivatePensions: () => false
+    };
+    mockConfig.getCachedTaxRuleSet.mockImplementation(() => noPensionRuleset);
+    mockConfig.getTaxRuleSet.mockImplementation(async () => noPensionRuleset);
+
+    webUI.currentSimMode = 'couple';
+    webUI.updateUIForSimMode();
+
+    expect(document.getElementById('InitialPension').closest('.input-wrapper').style.display).toBe('flex');
+    expect(document.getElementById('InitialPensionP2').closest('.input-wrapper').style.display).toBe('flex');
+
+    await webUI.ensureInvestmentParameterFields();
+
+    expect(document.getElementById('InitialPension').closest('.input-wrapper').style.display).toBe('none');
+    expect(document.getElementById('InitialPensionP2').closest('.input-wrapper').style.display).toBe('none');
   });
 });
 
