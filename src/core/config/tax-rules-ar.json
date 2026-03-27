@@ -51,6 +51,13 @@
     "statePensionPeriod": "monthly",
     "pensionSystem": { "type": "state_only" },
     "taxAdvantaged": true,
+    "helpText": {
+      "label": "State Pension",
+      "contributionDescriptionP1": "<p>Private pension contributions are not used in this ruleset.</p>",
+      "contributionDescriptionP2": "<p>Private pension contributions are not used in this ruleset.</p>",
+      "statePensionDescriptionP1": "<p>Enter your expected monthly state pension amount.</p><p>Refer to [this page](https://calcularsueldo.com.ar/jubilaciones/calcular-jubilacion){Calculadora de Jubilación} to find how to calculate yours.</p>",
+      "statePensionDescriptionP2": "<p>Enter your partner's expected monthly state pension amount.</p><p>Refer to [this page](https://calcularsueldo.com.ar/jubilaciones/calcular-jubilacion){Calculadora de Jubilación} to find how to calculate theirs</p>"
+    },
     "contributionLimits": {  },
     "lumpSumTaxBands": {  },
     "minDrawdownRates": {  }

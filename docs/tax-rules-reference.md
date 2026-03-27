@@ -223,7 +223,13 @@ Configures both state and private pension behaviour:
     - Map from age to weekly increase amount (e.g. extra after age 80).
   - `statePensionPeriod`: String — `"weekly"`, `"monthly"`, or `"annual"`. Determines how the user-entered state pension amount is interpreted. Default `"weekly"` when absent.
 - **`taxAdvantaged`**: Boolean. Whether private pension contributions are tax-advantaged (i.e., deducted from taxable income before IT). Default `true`. Consumed by `TaxRuleSet.isPrivatePensionTaxAdvantaged()`.
-- **`helpText`** (optional): Object providing UI help text for the pension panel. Supported sub-fields: `label` (panel heading), `contributionDescriptionP1` (HTML description for P1 contribution input), `contributionDescriptionP2` (HTML description for P2 contribution input). Consumed by the help/wizard context provider.
+- **`helpText`** (optional): Object providing UI help text for pension/state-pension fields. Supported sub-fields:
+  - `label` (panel heading),
+  - `contributionDescriptionP1` (HTML description for P1 contribution input),
+  - `contributionDescriptionP2` (HTML description for P2 contribution input),
+  - `statePensionDescriptionP1` (HTML description for P1 state pension input),
+  - `statePensionDescriptionP2` (HTML description for P2 state pension input).
+  - Consumed by the help/wizard context provider.
 - **`definedBenefit`** (optional, required when DBI events exist): Object describing how Defined Benefit income is classified for tax. Sub-field: `treatment` — `"privatePension"` (taxed as pension drawdown) or `"salary"` (taxed as employment income). Consumed by `TaxRuleSet.getDefinedBenefitSpec()` and `Simulator.js` DBI event handling.
 - **`pensionSystem.type`**:
   - `"state_only"`: Only state pension exists (no private pillar).

@@ -358,6 +358,7 @@ Minimum fields to set for a usable experience:
 - `minDrawdownRates` (if there is a minimum withdrawal regime)
 - `definedBenefit.treatment`: REQUIRED by current engine for DBI classification (must be provided even if simple)
 - `helpText`: the UI help object referenced by the help/wizard system (use this key, not `wizardHelp`)
+  - Include `statePensionDescriptionP1` and `statePensionDescriptionP2` for country-specific state pension field help.
 
 If the country's pension system has multiple account types (401k/IRA/ISA, etc.) with different rules, FinSim cannot represent that today. Document in the gap report.
 
@@ -698,7 +699,7 @@ Use this as a starting point (fill values; do not leave placeholders in committe
     "statePensionIncreaseBands": {},
     "pensionSystem": { "type": "mixed" },
     "taxAdvantaged": true,
-    "helpText": { "label": "Private Pension", "contributionDescriptionP1": "", "contributionDescriptionP2": "" },
+    "helpText": { "label": "Private Pension", "contributionDescriptionP1": "", "contributionDescriptionP2": "", "statePensionDescriptionP1": "", "statePensionDescriptionP2": "" },
     "definedBenefit": { "treatment": "privatePension" }
   },
   "residencyRules": { "postEmigrationTaxYears": 0, "taxesForeignIncome": false },

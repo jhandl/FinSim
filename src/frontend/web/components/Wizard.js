@@ -293,9 +293,12 @@ class Wizard {
       }
       const activeCountry = ccFromId || config.getStartCountry();
       const ruleset = config.getCachedTaxRuleSet(activeCountry);
+      const pensionHelpText = (ruleset && ruleset.raw && ruleset.raw.pensionRules)
+        ? (ruleset.raw.pensionRules.helpText || ruleset.raw.pensionRules.wizardHelp || {})
+        : {};
       return {
         taxRules: ruleset.raw,
-        investmentType: ruleset.raw.pensionRules.helpText
+        investmentType: pensionHelpText
       };
     }
 

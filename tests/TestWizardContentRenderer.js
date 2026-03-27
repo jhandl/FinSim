@@ -57,6 +57,12 @@ module.exports = {
                     testResults.errors.push('help.yml does not source the dependent child age from tax rules');
                     testResults.success = false;
                 }
+
+                if (!helpContent.includes('${taxRules.pensionRules.helpText.statePensionDescriptionP1}') ||
+                    !helpContent.includes('${taxRules.pensionRules.helpText.statePensionDescriptionP2}')) {
+                    testResults.errors.push('help.yml does not source state pension help text from tax rules');
+                    testResults.success = false;
+                }
             }
 
             // Test 2: Verify ContentRenderer.js has wizard support
