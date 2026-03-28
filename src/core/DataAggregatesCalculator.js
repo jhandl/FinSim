@@ -107,8 +107,8 @@ function computeNominalAggregates(ctx) {
       "cashPV": 0,
       "pensionContributionPV": 0,
       "worthPV": 0,
-      // Attribution and dynamic per-key maps (nominal and PV)
-      "attributions": {},
+      // Display-ready attribution and dynamic per-key maps (nominal and PV)
+      "displayAttributions": {},
       "investmentIncomeByKey": {},
       "investmentCapitalByKey": {},
       "investmentIncomeByKeyPV": {},

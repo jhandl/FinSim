@@ -3,10 +3,12 @@ const path = require('path');
 const { TestFramework } = require('../src/core/TestFramework.js');
 const AttributionPopulator = require('../src/core/AttributionPopulator.js');
 const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelpers.js');
+const { getDisplayItems, getDisplayAmountByLabel, getDisplayAmountByMeta } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
 const AR_RULES = require('../src/core/config/tax-rules-ar.json');
 const REFERENCE_PATH = path.resolve(__dirname, 'fixtures', 'reference.csv');
+const DEMO_PATH = path.resolve(__dirname, '..', 'src', 'frontend', 'web', 'assets', 'demo.csv');
 
 function withinTolerance(actual, expected, tol) {
   if (!isFinite(actual) || !isFinite(expected)) return false;
@@ -19,14 +21,30 @@ function withinTolerance(actual, expected, tol) {
 // Mock Attribution class for testing
 function MockAttribution() {
   this.breakdown = {};
+  this.sourceMeta = {};
 }
 
 MockAttribution.prototype.getBreakdown = function() {
   return this.breakdown;
 };
 
-MockAttribution.prototype.record = function(source, amount) {
+MockAttribution.prototype.record = function(source, amount, meta) {
   this.breakdown[source] = (this.breakdown[source] || 0) + amount;
+  if (meta && typeof meta === 'object') {
+    var existing = this.sourceMeta[source] || {};
+    var keys = Object.keys(meta);
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      var value = meta[key];
+      if (value === undefined || value === null || value === '') continue;
+      existing[key] = value;
+    }
+    this.sourceMeta[source] = existing;
+  }
+};
+
+MockAttribution.prototype.getSourceMeta = function(source) {
+  return this.sourceMeta[source] || null;
 };
 
 // Mock AttributionManager for testing
@@ -34,11 +52,11 @@ function MockAttributionManager() {
   this.attributions = {};
 }
 
-MockAttributionManager.prototype.record = function(metric, source, amount) {
+MockAttributionManager.prototype.record = function(metric, source, amount, meta) {
   if (!this.attributions[metric]) {
     this.attributions[metric] = new MockAttribution();
   }
-  this.attributions[metric].record(source, amount);
+  this.attributions[metric].record(source, amount, meta);
 };
 
 MockAttributionManager.prototype.getAllAttributions = function() {
@@ -279,78 +297,12 @@ function percentDelta(a, b) {
   return Math.abs(a - b) / denom;
 }
 
-// Baseline for reference.csv attribution and tax breakdowns
-// These values represent the expected attribution breakdowns and taxByKey entries
-// from a known-good pre-refactor run. The test will capture actual values on first run
-// if baseline is missing, then use them for subsequent comparisons.
-const REFERENCE_ATTRIBUTION_BASELINE = {
-  // Age 40: Pre-relocation (IE)
-  40: {
-    attributions: {
-      // Portfolio attributions
-      indexfundscapital: {
-        Principal: 0, // Will be captured from actual run
-        P_L: 0
-      },
-      sharescapital: {
-        Principal: 0,
-        P_L: 0
-      }
-      // Income/expense attributions will be captured dynamically
-    },
-    taxByKey: {
-      incomeTax: 0,
-      socialContrib: 0,
-      capitalGains: 0
-    }
-  },
-  // Age 65: Post-relocation (AR), retirement
-  65: {
-    attributions: {
-      indexfundscapital: {
-        Principal: 0,
-        P_L: 0
-      },
-      sharescapital: {
-        Principal: 0,
-        P_L: 0
-      }
-    },
-    taxByKey: {
-      incomeTax: 0,
-      socialContrib: 0,
-      capitalGains: 0
-    }
-  },
-  // Age 80: Late retirement (AR)
-  80: {
-    attributions: {
-      indexfundscapital: {
-        Principal: 0,
-        P_L: 0
-      },
-      sharescapital: {
-        Principal: 0,
-        P_L: 0
-      }
-    },
-    taxByKey: {
-      incomeTax: 0,
-      socialContrib: 0,
-      capitalGains: 0
-    }
-  }
-};
-
-// Tolerance for attribution comparisons (1% relative tolerance)
-const ATTRIBUTION_TOLERANCE = 0.01;
-
 function runTest() {
   const errors = [];
 
-  // Test Case 1: Portfolio Attribution with Activity
+  // Test Case 1: Standard, dynamic investment, and tax displays use exact column keys.
   {
-    const dataRow = { attributions: {}, taxByKey: {} };
+    const dataRow = { displayAttributions: {}, taxByKey: {} };
     const indexFundsAsset = {
       getPortfolioStats: () => ({ yearlyBought: 10000, yearlySold: 2000, principal: 50000, totalGain: 5000 })
     };
@@ -358,43 +310,52 @@ function runTest() {
       getPortfolioStats: () => ({ yearlyBought: 0, yearlySold: 3000, principal: 20000, totalGain: -1000 })
     };
     const investmentAssets = [
-      { key: 'indexFunds', asset: indexFundsAsset },
-      { key: 'shares', asset: sharesAsset }
+      { key: 'indexFunds', asset: indexFundsAsset, assetCountry: 'ie', label: 'Index Funds' },
+      { key: 'shares', asset: sharesAsset, assetCountry: 'ie', label: 'Shares' }
     ];
     const attributionManager = new MockAttributionManager();
+    attributionManager.record('incomesalaries', 'Salary IE', 40000, { sourceCountry: 'ie' });
+    attributionManager.record('expenses', 'Living Costs', 20000);
+    attributionManager.record('investmentincome:indexFunds', 'Index Funds Income', 1200, { sourceCountry: 'ie', investmentKey: 'indexFunds' });
+    attributionManager.record('tax:incomeTax', 'Salary IE', 8000);
     const revenue = { taxTotals: { incomeTax: 15000, socialContrib: 5000, capitalGains: 2000 } };
 
-    AttributionPopulator.populateAttributionFields(dataRow, investmentAssets, attributionManager, revenue);
+    AttributionPopulator.populateDisplayAttributionFields(dataRow, investmentAssets, { indexFunds: 1200 }, attributionManager, revenue, 'ie');
 
-    // Check attributionManager.record calls
-    const indexFundsAttribution = attributionManager.attributions['indexfundscapital'];
-    const sharesAttribution = attributionManager.attributions['sharescapital'];
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'IncomeSalaries', 'Salary IE'), 40000, 0.01)) {
+      errors.push('Expected IncomeSalaries display attribution for Salary IE');
+    }
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Expenses', 'Living Costs'), 20000, 0.01)) {
+      errors.push('Expected Expenses display attribution for Living Costs');
+    }
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Income__indexFunds', 'Index Funds Income'), 1200, 0.01)) {
+      errors.push('Expected exact Income__indexFunds display attribution');
+    }
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Capital__indexFunds', 'Bought'), 10000, 0.01)) {
+      errors.push('Expected Capital__indexFunds Bought = 10000');
+    }
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Capital__indexFunds', 'Sold'), 2000, 0.01)) {
+      errors.push('Expected Capital__indexFunds Sold = 2000');
+    }
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Capital__indexFunds', 'Principal'), 50000, 0.01)) {
+      errors.push('Expected Capital__indexFunds Principal = 50000');
+    }
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Capital__indexFunds', 'P/L'), 5000, 0.01)) {
+      errors.push('Expected Capital__indexFunds P/L = 5000');
+    }
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Capital__shares', 'Sold'), 3000, 0.01)) {
+      errors.push('Expected Capital__shares Sold = 3000');
+    }
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Capital__shares', 'Principal'), 20000, 0.01)) {
+      errors.push('Expected Capital__shares Principal = 20000');
+    }
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Capital__shares', 'P/L'), -1000, 0.01)) {
+      errors.push('Expected Capital__shares P/L = -1000');
+    }
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Tax__incomeTax', 'Salary IE'), 8000, 0.01)) {
+      errors.push('Expected Tax__incomeTax Salary IE = 8000');
+    }
 
-    if (!indexFundsAttribution || !withinTolerance(indexFundsAttribution.breakdown['Bought'], 8000, 0.01)) {
-      errors.push("Expected indexfundscapital 'Bought' = 8000, got " + (indexFundsAttribution ? indexFundsAttribution.breakdown['Bought'] : 'undefined'));
-    }
-    if (!indexFundsAttribution || !withinTolerance(indexFundsAttribution.breakdown['Principal'], 50000, 0.01)) {
-      errors.push("Expected indexfundscapital 'Principal' = 50000, got " + (indexFundsAttribution ? indexFundsAttribution.breakdown['Principal'] : 'undefined'));
-    }
-    if (!indexFundsAttribution || !withinTolerance(indexFundsAttribution.breakdown['P/L'], 5000, 0.01)) {
-      errors.push("Expected indexfundscapital 'P/L' = 5000, got " + (indexFundsAttribution ? indexFundsAttribution.breakdown['P/L'] : 'undefined'));
-    }
-    if (!sharesAttribution || !withinTolerance(sharesAttribution.breakdown['Sold'], 3000, 0.01)) {
-      errors.push("Expected sharescapital 'Sold' = 3000, got " + (sharesAttribution ? sharesAttribution.breakdown['Sold'] : 'undefined'));
-    }
-    if (!sharesAttribution || !withinTolerance(sharesAttribution.breakdown['Principal'], 20000, 0.01)) {
-      errors.push("Expected sharescapital 'Principal' = 20000, got " + (sharesAttribution ? sharesAttribution.breakdown['Principal'] : 'undefined'));
-    }
-    if (!sharesAttribution || !withinTolerance(sharesAttribution.breakdown['P/L'], -1000, 0.01)) {
-      errors.push("Expected sharescapital 'P/L' = -1000, got " + (sharesAttribution ? sharesAttribution.breakdown['P/L'] : 'undefined'));
-    }
-
-    // Check dataRow.attributions populated
-    if (!dataRow.attributions['indexfundscapital'] || !dataRow.attributions['indexfundscapital']['Bought']) {
-      errors.push("dataRow.attributions not populated correctly for indexfundscapital");
-    }
-
-    // Check taxByKey
     if (!withinTolerance(dataRow.taxByKey.incomeTax, 15000, 0.01)) {
       errors.push("Expected taxByKey.incomeTax = 15000, got " + dataRow.taxByKey.incomeTax);
     }
@@ -406,197 +367,82 @@ function runTest() {
     }
   }
 
-  // Test Case 2: No Portfolio Activity
+  // Test Case 2: Foreign mapped and source-only taxes stay isolated by exact display column.
   {
-    const dataRow = { attributions: {}, taxByKey: {} };
-    const indexFundsAsset = {
-      getPortfolioStats: () => ({ yearlyBought: 0, yearlySold: 0, principal: 10000, totalGain: 2000 })
-    };
-    const sharesAsset = {
-      getPortfolioStats: () => ({ yearlyBought: 0, yearlySold: 0, principal: 5000, totalGain: 1000 })
-    };
-    const investmentAssets = [
-      { key: 'indexFunds', asset: indexFundsAsset },
-      { key: 'shares', asset: sharesAsset }
-    ];
+    const dataRow = { displayAttributions: {}, taxByKey: {} };
     const attributionManager = new MockAttributionManager();
-    const revenue = { taxTotals: {} };
+    attributionManager.record('tax:incomeTax:ar', 'Salary Income Tax', 55, { taxCountry: 'ar' });
+    attributionManager.record('tax:prsi:ie', 'Salary PRSI', 40, { taxCountry: 'ie' });
+    attributionManager.record('tax:usc:ie', 'Salary USC', 30, { taxCountry: 'ie' });
+    const revenue = { taxTotals: { 'incomeTax:ar': 55, 'prsi:ie': 40, 'usc:ie': 30 } };
 
-    AttributionPopulator.populateAttributionFields(dataRow, investmentAssets, attributionManager, revenue);
+    AttributionPopulator.populateDisplayAttributionFields(dataRow, [], {}, attributionManager, revenue, 'ie');
 
-    const indexFundsAttribution = attributionManager.attributions['indexfundscapital'];
-    const sharesAttribution = attributionManager.attributions['sharescapital'];
-
-    if (indexFundsAttribution && indexFundsAttribution.breakdown['Bought']) {
-      errors.push("Should not record 'Bought' when net = 0");
+    if (!withinTolerance(getDisplayAmountByMeta(dataRow, 'Tax__incomeTax:ar', function (item) {
+      return item.label === 'Salary Income Tax' && String(item.taxCountry || '').toLowerCase() === 'ar';
+    }), 55, 0.01)) {
+      errors.push('Expected foreign income tax to stay isolated under Tax__incomeTax:ar without ruleset mapping');
     }
-    if (sharesAttribution && sharesAttribution.breakdown['Sold']) {
-      errors.push("Should not record 'Sold' when net = 0");
+    if (!withinTolerance(Object.keys(dataRow.displayAttributions || {}).reduce(function (total, columnKey) {
+      if (columnKey.indexOf('Tax__') !== 0) return total;
+      return total + getDisplayAmountByMeta(dataRow, columnKey, function (item) {
+        return item.label === 'Salary PRSI' && String(item.taxCountry || '').toLowerCase() === 'ie';
+      });
+    }, 0), 40, 0.01)) {
+      errors.push('Expected PRSI display attribution to preserve label/taxCountry regardless of mapped column key');
     }
-    if (!indexFundsAttribution || !withinTolerance(indexFundsAttribution.breakdown['Principal'], 10000, 0.01)) {
-      errors.push("Expected Principal recorded even with no activity");
-    }
-  }
-
-  // Test Case 3: Per-Year Reset Lifecycle (Realistic AttributionManager Lifecycle)
-  {
-    const dataRow = { attributions: {}, taxByKey: {} };
-    const indexFundsAsset = {
-      getPortfolioStats: () => ({ yearlyBought: 5000, yearlySold: 0, principal: 25000, totalGain: 1000 })
-    };
-    const sharesAsset = {
-      getPortfolioStats: () => ({ yearlyBought: 0, yearlySold: 0, principal: 10000, totalGain: 500 })
-    };
-    const investmentAssets = [
-      { key: 'indexFunds', asset: indexFundsAsset },
-      { key: 'shares', asset: sharesAsset }
-    ];
-    const revenue = { taxTotals: { incomeTax: 5000 } };
-
-    // Year 1: Fresh AttributionManager (simulating reset at start of year)
-    const attributionManager1 = new MockAttributionManager();
-    attributionManager1.reset('ie', 2024, 'ie');
-    AttributionPopulator.populateAttributionFields(dataRow, investmentAssets, attributionManager1, revenue);
-
-    // Year 2: Fresh AttributionManager (simulating reset at start of next year)
-    const attributionManager2 = new MockAttributionManager();
-    attributionManager2.reset('ie', 2025, 'ie');
-    AttributionPopulator.populateAttributionFields(dataRow, investmentAssets, attributionManager2, revenue);
-
-    // With direct accumulation semantics and per-year resets:
-    // - Each call accumulates the full breakdown from that year's AttributionManager
-    // - dataRow accumulates across years (5000 + 5000 = 10000 for taxByKey)
-    if (!withinTolerance(dataRow.taxByKey.incomeTax, 10000, 0.01)) {
-      errors.push("Expected taxByKey to accumulate across years: 10000, got " + dataRow.taxByKey.incomeTax);
-    }
-    // Attributions should accumulate: first year adds 5000 (Bought), second year adds 5000, total = 10000
-    const boughtValue = dataRow.attributions['indexfundscapital'] ? dataRow.attributions['indexfundscapital']['Bought'] : undefined;
-    if (!dataRow.attributions['indexfundscapital'] || !withinTolerance(boughtValue, 10000, 0.01)) {
-      errors.push("Expected attributions to accumulate across years with per-year resets: 10000, got " + (boughtValue !== undefined ? boughtValue : 'undefined'));
-    }
-    // Principal should be recorded twice (once per year), but since it's the same value, it accumulates
-    const principalValue = dataRow.attributions['indexfundscapital'] ? dataRow.attributions['indexfundscapital']['Principal'] : undefined;
-    if (!dataRow.attributions['indexfundscapital'] || !withinTolerance(principalValue, 50000, 0.01)) {
-      errors.push("Expected Principal to accumulate across years: 50000, got " + (principalValue !== undefined ? principalValue : 'undefined'));
+    if (!withinTolerance(Object.keys(dataRow.displayAttributions || {}).reduce(function (total, columnKey) {
+      if (columnKey.indexOf('Tax__') !== 0) return total;
+      return total + getDisplayAmountByMeta(dataRow, columnKey, function (item) {
+        return item.label === 'Salary USC' && String(item.taxCountry || '').toLowerCase() === 'ie';
+      });
+    }, 0), 30, 0.01)) {
+      errors.push('Expected USC display attribution to preserve label/taxCountry regardless of mapped column key');
     }
   }
 
-  // Test Case 4: Empty Attributions (revenue is always present in real simulation)
+  // Test Case 3: Capital gains tooltip synthesis lives in the display builder.
   {
-    // Test empty attributions
-    const emptyAttributionManager = { record: () => {}, getAllAttributions: () => ({}) };
-    const dataRow = { attributions: {}, taxByKey: {} };
-    const indexFundsAsset = {
-      getPortfolioStats: () => ({ yearlyBought: 1000, yearlySold: 0, principal: 5000, totalGain: 200 })
-    };
-    const sharesAsset = {
-      getPortfolioStats: () => ({ yearlyBought: 0, yearlySold: 0, principal: 2000, totalGain: 100 })
-    };
-    const investmentAssets = [
-      { key: 'indexFunds', asset: indexFundsAsset },
-      { key: 'shares', asset: sharesAsset }
-    ];
-    AttributionPopulator.populateAttributionFields(dataRow, investmentAssets, emptyAttributionManager, { taxTotals: {} });
-
-    if (Object.keys(dataRow.attributions).length !== 0) {
-      errors.push("Should handle empty attributions gracefully");
-    }
-  }
-
-  // Test Case 5: Reference-Like Relocation Scenario
-  {
-    const dataRow = { attributions: {}, taxByKey: {} };
-    const indexFundsAsset = {
-      getPortfolioStats: () => ({ yearlyBought: 50000, yearlySold: 20000, principal: 200000, totalGain: 10000 })
-    };
-    const sharesAsset = {
-      getPortfolioStats: () => ({ yearlyBought: 5000, yearlySold: 10000, principal: 50000, totalGain: 2000 })
-    };
-    const investmentAssets = [
-      { key: 'indexFunds', asset: indexFundsAsset },
-      { key: 'shares', asset: sharesAsset }
-    ];
     const attributionManager = new MockAttributionManager();
-    // Simulate some income/expense attributions
-    attributionManager.record('incomesalaries', 'Salary IE', 40000);
-    attributionManager.record('expenses', 'Living Costs', 20000);
-    const revenue = { taxTotals: { incomeTax: 8000, socialContrib: 3000, capitalGains: 1000 } };
+    const dataRow = { displayAttributions: {}, taxByKey: {} };
+    attributionManager.record('capitalgains', 'Index Funds Sale', 9050.143699927663, { sourceCountry: 'ie', investmentKey: 'indexFunds_ie' });
+    attributionManager.record('capitalgains', 'Shares Sale', 2565.030918146188, { sourceCountry: 'ie', investmentKey: 'shares_ie' });
+    attributionManager.record('tax:capitalGainsPreRelief', 'Index Funds Sale', 3439.054605972512, { sourceCountry: 'ie', investmentKey: 'indexFunds_ie' });
+    attributionManager.record('tax:capitalGainsPreRelief', 'Shares Sale', 846.4602029882421, { sourceCountry: 'ie', investmentKey: 'shares_ie' });
+    attributionManager.record('tax:capitalGains', 'Index Funds Sale', 3439.054605972512, { sourceCountry: 'ie', investmentKey: 'indexFunds_ie' });
+    attributionManager.record('tax:capitalGains', 'Shares Sale', 360.60843844911216, { sourceCountry: 'ie', investmentKey: 'shares_ie' });
+    attributionManager.record('tax:capitalGains', 'CGT Relief', -485.85176453913004, { taxCountry: 'ie' });
+    const revenue = { taxTotals: { capitalGains: 3799.6630444216244 } };
 
-    AttributionPopulator.populateAttributionFields(dataRow, investmentAssets, attributionManager, revenue);
+    AttributionPopulator.populateDisplayAttributionFields(dataRow, [], {}, attributionManager, revenue, 'ie');
 
-    // Check portfolio
-    const indexFundsAttribution = attributionManager.attributions['indexfundscapital'];
-    if (!indexFundsAttribution || !withinTolerance(indexFundsAttribution.breakdown['Bought'], 30000, 0.01)) {
-      errors.push("Relocation scenario: indexfunds bought 30000");
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Tax__capitalGains', 'Index Funds Gains'), 9050.143699927663, 0.01)) {
+      errors.push('Expected Tax__capitalGains to include Index Funds Gains');
     }
-    const sharesAttribution = attributionManager.attributions['sharescapital'];
-    if (!sharesAttribution || !withinTolerance(sharesAttribution.breakdown['Sold'], 5000, 0.01)) {
-      errors.push("Relocation scenario: shares sold 5000");
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Tax__capitalGains', 'Index Funds Tax'), 3439.054605972512, 0.01)) {
+      errors.push('Expected Tax__capitalGains to include Index Funds Tax');
     }
-
-    // Check attributions accumulated
-    if (!dataRow.attributions['incomesalaries'] || !withinTolerance(dataRow.attributions['incomesalaries']['Salary IE'], 40000, 0.01)) {
-      errors.push("Relocation scenario: income attributions accumulated");
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Tax__capitalGains', 'Shares Gains'), 2565.030918146188, 0.01)) {
+      errors.push('Expected Tax__capitalGains to include Shares Gains');
     }
-
-    // Check taxes
-    if (!withinTolerance(dataRow.taxByKey.incomeTax, 8000, 0.01)) {
-      errors.push("Relocation scenario: taxes accumulated");
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Tax__capitalGains', 'Shares Tax'), 846.4602029882421, 0.01)) {
+      errors.push('Expected Tax__capitalGains to include Shares Tax');
     }
-  }
-
-  // Test Case 6: Tax attributions must keep full tax keys (no generic "tax" flattening)
-  {
-    const dataRow = { attributions: {}, taxByKey: {} };
-    const attributionManager = new MockAttributionManager();
-    attributionManager.record('tax:incomeTax', 'Salary', 100);
-    attributionManager.record('tax:incomeTax', 'Foreign Tax Credit (AR)', -10);
-    attributionManager.record('tax:prsi', 'Salary', 40);
-    attributionManager.record('tax:usc', 'Salary', 30);
-    attributionManager.record('tax:incomeTax:ar', 'Salary Income Tax (AR)', 55);
-    const revenue = { taxTotals: { incomeTax: 90, prsi: 40, usc: 30, 'incomeTax:ar': 55 } };
-
-    AttributionPopulator.populateAttributionFields(dataRow, [], attributionManager, revenue);
-
-    const it = dataRow.attributions['tax:incomeTax'];
-    const prsi = dataRow.attributions['tax:prsi'];
-    const usc = dataRow.attributions['tax:usc'];
-    const arIt = dataRow.attributions['tax:incomeTax:ar'];
-
-    if (!it || !withinTolerance(it['Salary'], 100, 0.01)) {
-      errors.push("Tax key preservation: expected tax:incomeTax Salary = 100");
-    }
-    if (!it || !withinTolerance(it['Foreign Tax Credit (AR)'], -10, 0.01)) {
-      errors.push("Tax key preservation: expected tax:incomeTax Foreign Tax Credit (AR) = -10");
-    }
-    if (!prsi || !withinTolerance(prsi['Salary'], 40, 0.01)) {
-      errors.push("Tax key preservation: expected tax:prsi Salary = 40");
-    }
-    if (!usc || !withinTolerance(usc['Salary'], 30, 0.01)) {
-      errors.push("Tax key preservation: expected tax:usc Salary = 30");
-    }
-    if (!arIt || !withinTolerance(arIt['Salary Income Tax (AR)'], 55, 0.01)) {
-      errors.push("Tax key preservation: expected tax:incomeTax:ar Salary Income Tax (AR) = 55");
-    }
-    if (dataRow.attributions['tax']) {
-      errors.push("Tax key preservation: unexpected flattened dataRow.attributions.tax bucket");
+    if (!withinTolerance(getDisplayAmountByLabel(dataRow, 'Tax__capitalGains', 'CGT Relief'), -485.85176453913004, 0.01)) {
+      errors.push('Expected Tax__capitalGains to include CGT Relief');
     }
   }
 
   return errors;
 }
 
-// Regression test: Run reference.csv and validate attribution breakdowns and taxByKey entries
 async function runReferenceRegressionTest() {
   const errors = [];
-  const ATTRIBUTION_TOL = 0.01; // 1% tolerance for attribution values
 
   try {
-    // Parse reference.csv scenario
     const parsed = parseReferenceCsvScenario(REFERENCE_PATH);
     parsed.parameters.relocationEnabled = parsed.parameters.relocationEnabled !== false;
 
-    // Load scenario into TestFramework
     const framework = new TestFramework();
     if (!framework.loadScenario({
       name: 'ReferenceAttributionRegression',
@@ -607,13 +453,11 @@ async function runReferenceRegressionTest() {
       return ['Failed to load reference scenario'];
     }
 
-    // Install test tax rules
     installTestTaxRules(framework, {
       ie: deepClone(IE_RULES),
       ar: deepClone(AR_RULES)
     });
 
-    // Run simulation (deterministic, no Monte Carlo)
     const results = await framework.runSimulation();
     if (!results || !Array.isArray(results.dataSheet)) {
       return ['reference scenario failed to run'];
@@ -624,99 +468,78 @@ async function runReferenceRegressionTest() {
       return ['reference scenario produced no rows'];
     }
 
-    // Key ages to validate (matching REFERENCE_BASELINE from TestChartValues.js)
     const keyAges = [40, 65, 80];
-
     for (const age of keyAges) {
       const row = findRow(rows, age);
       if (!row) {
         errors.push(`Missing row for age ${age}`);
         continue;
       }
-
-      // Validate taxByKey entries
-      const baselineTax = REFERENCE_ATTRIBUTION_BASELINE[age]?.taxByKey || {};
-      const actualTax = row.taxByKey || {};
-
-      // Check all tax keys in baseline
-      for (const taxKey in baselineTax) {
-        const expected = baselineTax[taxKey];
-        const actual = actualTax[taxKey] || 0;
-        
-        // Skip if baseline is 0 (placeholder) - this means we need to capture the baseline
-        if (expected === 0 && Math.abs(actual) > 1e-6) {
-          // First run: capture actual value as baseline
-          // For now, we'll validate that values are finite and reasonable
-          if (!Number.isFinite(actual)) {
-            errors.push(`Age ${age}: taxByKey.${taxKey} is not finite`);
-          }
-        } else if (expected !== 0) {
-          // Validate against baseline
-          if (!withinTolerance(actual, expected, ATTRIBUTION_TOL)) {
-            const delta = percentDelta(actual, expected);
-            errors.push(`Age ${age}: taxByKey.${taxKey} deviated ${(delta * 100).toFixed(2)}% (expected ${expected}, got ${actual})`);
-          }
-        }
+      if (!row.displayAttributions || typeof row.displayAttributions !== 'object') {
+        errors.push(`Age ${age}: displayAttributions is missing or invalid`);
       }
-
-      // Validate attribution breakdowns
-      const baselineAttribs = REFERENCE_ATTRIBUTION_BASELINE[age]?.attributions || {};
-      const actualAttribs = row.attributions || {};
-
-      // Check portfolio attributions (indexfundscapital, sharescapital)
-      for (const metric in baselineAttribs) {
-        const baselineMetric = baselineAttribs[metric];
-        const actualMetric = actualAttribs[metric] || {};
-
-        for (const source in baselineMetric) {
-          const expected = baselineMetric[source];
-          const actual = actualMetric[source] || 0;
-
-          // Skip if baseline is 0 (placeholder)
-          if (expected === 0 && Math.abs(actual) > 1e-6) {
-            // First run: validate that values are finite
-            if (!Number.isFinite(actual)) {
-              errors.push(`Age ${age}: attributions.${metric}.${source} is not finite`);
-            }
-          } else if (expected !== 0) {
-            // Validate against baseline
-            if (!withinTolerance(actual, expected, ATTRIBUTION_TOL)) {
-              const delta = percentDelta(actual, expected);
-              errors.push(`Age ${age}: attributions.${metric}.${source} deviated ${(delta * 100).toFixed(2)}% (expected ${expected}, got ${actual})`);
-            }
-          }
-        }
-      }
-
-      // Validate that key attribution metrics exist
-      if (!actualAttribs.indexfundscapital && !actualAttribs.sharescapital) {
-        // Portfolio attributions may not exist if there's no portfolio activity
-        // This is acceptable, but we should at least check that the structure is correct
-      }
-
-      // Validate that taxByKey structure exists
       if (!row.taxByKey || typeof row.taxByKey !== 'object') {
         errors.push(`Age ${age}: taxByKey is missing or invalid`);
       }
+      if (age === 40 || age === 65 || age === 80) {
+        const fundsPrincipal = getDisplayAmountByLabel(row, 'Capital__indexFunds_ie', 'Principal');
+        const sharesPrincipal = getDisplayAmountByLabel(row, 'Capital__shares_ie', 'Principal');
+        if (!Number.isFinite(fundsPrincipal)) {
+          errors.push(`Age ${age}: Capital__indexFunds_ie Principal is not finite`);
+        }
+        if (!Number.isFinite(sharesPrincipal)) {
+          errors.push(`Age ${age}: Capital__shares_ie Principal is not finite`);
+        }
+      }
     }
 
-    // Additional validation: Check that attributions accumulate correctly across years
-    // by comparing values at different ages
-    const age40 = findRow(rows, 40);
-    const age65 = findRow(rows, 65);
-    if (age40 && age65) {
-      // Principal values should generally increase (or stay stable) over time
-      const fundsPrincipal40 = (age40.attributions?.indexfundscapital?.Principal || 0);
-      const fundsPrincipal65 = (age65.attributions?.indexfundscapital?.Principal || 0);
-      /* 
-      // Disable heuristic check for now - currency conversion (EUR->ARS) or allocation changes 
-      // might legitimately cause nominal principal changes that this simple check flags.
-      if (fundsPrincipal65 < fundsPrincipal40 - 1e6) {
-        // Allow some decrease due to withdrawals, but flag large drops
-        errors.push(`Principal decreased significantly from age 40 (${fundsPrincipal40}) to 65 (${fundsPrincipal65})`);
-      }
-      */
+    const demoParsed = parseReferenceCsvScenario(DEMO_PATH);
+    demoParsed.parameters.relocationEnabled = demoParsed.parameters.relocationEnabled !== false;
+
+    const demoFramework = new TestFramework();
+    if (!demoFramework.loadScenario({
+      name: 'DemoDisplayAttributionRegression',
+      description: 'demo.csv exact-key display attribution regression',
+      scenario: { parameters: demoParsed.parameters, events: demoParsed.events },
+      assertions: []
+    })) {
+      return ['Failed to load demo scenario'];
     }
+
+    installTestTaxRules(demoFramework, {
+      ie: deepClone(IE_RULES),
+      ar: deepClone(AR_RULES)
+    });
+
+    const demoResults = await demoFramework.runSimulation();
+    if (!demoResults || !Array.isArray(demoResults.dataSheet)) {
+      return ['demo scenario failed to run'];
+    }
+
+    const demoRows = filterRows(demoResults.dataSheet);
+    [35, 65, 66].forEach((age) => {
+      const row = findRow(demoRows, age);
+      if (!row) {
+        errors.push(`Demo age ${age}: missing row`);
+        return;
+      }
+      const investmentIncomeByKey = row.investmentIncomeByKey || {};
+      const incomeKeys = Object.keys(investmentIncomeByKey).filter((key) => {
+        return typeof investmentIncomeByKey[key] === 'number' && investmentIncomeByKey[key] !== 0;
+      });
+      if (!incomeKeys.length) {
+        errors.push(`Demo age ${age}: expected at least one dynamic investment income value`);
+        return;
+      }
+      incomeKeys.forEach((key) => {
+        if (!getDisplayItems(row, 'Income__' + key).length) {
+          errors.push(`Demo age ${age}: missing exact Income__${key} display attribution`);
+        }
+      });
+      if (age >= 65 && getDisplayItems(row, 'IncomeSalaries').length) {
+        errors.push(`Demo age ${age}: dynamic investment income should not depend on salary display attribution presence`);
+      }
+    });
 
   } catch (error) {
     errors.push(`Regression test error: ${error.message}`);
@@ -732,11 +555,9 @@ module.exports = {
   isCustomTest: true,
   runCustomTest: async function() {
     const errors = runTest();
-    
-    // Run reference.csv regression test
     const regressionErrors = await runReferenceRegressionTest();
     errors.push(...regressionErrors);
-    
+
     return {
       success: errors.length === 0,
       errors: errors

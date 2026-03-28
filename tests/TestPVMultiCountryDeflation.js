@@ -11,6 +11,7 @@ const vm = require('vm');
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { TaxRuleSet } = require('../src/core/TaxRuleSet.js');
 const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelpers.js');
+const { getDisplayItems } = require('./helpers/DisplayAttributionTestHelpers.js');
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
 const AR_RULES = require('../src/core/config/tax-rules-ar.json');
 
@@ -526,8 +527,7 @@ module.exports = {
     // ========================================================================
     // Test 0.5: Attribution Separation by Country
     // ========================================================================
-    // Verify that attributions are properly separated by country with
-    // country-qualified source names in the dataRow.attributions structure.
+    // Verify that exact-key display attributions retain source-country metadata.
     // 
     // NOTE: In the salaries multi-country scenario at age 40:
     // - Salary_IE is flushed BEFORE relocation when currentCountry='ie' → no suffix
@@ -548,31 +548,27 @@ module.exports = {
 
       if (!attrRow40) {
         errors.push('Test 0.5 SKIP: Missing age 40 row for attribution test');
-      } else if (!attrRow40.attributions || !attrRow40.attributions.incomesalaries) {
-        errors.push('Test 0.5 SKIP: No incomesalaries attributions found at age 40');
+      } else if (!attrRow40.displayAttributions || !attrRow40.displayAttributions.IncomeSalaries) {
+        errors.push('Test 0.5 SKIP: No IncomeSalaries display attributions found at age 40');
       } else {
-        const salaryAttrs = attrRow40.attributions.incomesalaries;
-        const sources = Object.keys(salaryAttrs);
+        const salaryAttrs = getDisplayItems(attrRow40, 'IncomeSalaries');
 
-        // Check for both salary sources
-        // Expected pattern: "Salary_IE" and "Salary_AR" (both without country suffix
-        // because each is processed in its home country context)
-        const hasIeSource = sources.some(s => s.includes('Salary_IE'));
-        const hasArSource = sources.some(s => s.includes('Salary_AR'));
+        const hasIeSource = salaryAttrs.some(item => item.label === 'Salary_IE' && String(item.sourceCountry || '').toLowerCase() === 'ie');
+        const hasArSource = salaryAttrs.some(item => item.label === 'Salary_AR' && String(item.sourceCountry || '').toLowerCase() === 'ar');
 
         if (!hasIeSource || !hasArSource) {
           errors.push(
             `Test 0.5 FAIL: Expected both IE and AR salary sources at age 40, ` +
-            `but found: [${sources.join(', ')}]. ` +
+            `but found: [${salaryAttrs.map(item => item.label + ':' + (item.sourceCountry || 'none')).join(', ')}]. ` +
             `One or both sources are missing from attributions.`
           );
         }
 
         // Verify amounts are reasonable (non-zero)
-        for (const source of sources) {
-          const amount = salaryAttrs[source];
+        for (const item of salaryAttrs) {
+          const amount = item.amount;
           if (!amount || amount <= 0) {
-            errors.push(`Test 0.5 FAIL: Attribution source "${source}" has invalid amount: ${amount}`);
+            errors.push(`Test 0.5 FAIL: Attribution source "${item.label}" has invalid amount: ${amount}`);
           }
         }
       }

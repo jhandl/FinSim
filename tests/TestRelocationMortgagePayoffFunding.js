@@ -1,5 +1,6 @@
 const vm = require('vm');
 const { TestFramework } = require('../src/core/TestFramework.js');
+const { getDisplayAmountByLabel } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 function findRowByAge(rows, age) {
   return rows.find(row => row && typeof row === 'object' && Math.round(row.age) === age);
@@ -102,9 +103,8 @@ module.exports = {
       return { success: false, errors: ['Missing required rows around payoff age (38/39)'] };
     }
 
-    const payoffExpenses = (payoffRow.attributions && payoffRow.attributions.expenses) ? payoffRow.attributions.expenses : {};
     const payoffLabel = 'Mortgage Payoff (HomeA)';
-    const payoffAmount = typeof payoffExpenses[payoffLabel] === 'number' ? payoffExpenses[payoffLabel] : 0;
+    const payoffAmount = getDisplayAmountByLabel(payoffRow, 'Expenses', payoffLabel);
 
     if (!(payoffAmount > 0)) {
       errors.push('Expected positive "' + payoffLabel + '" expense at payoff age');

@@ -1,6 +1,7 @@
 // @finsim-test-speed: fast
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { TOY_AA, microParams, installTestTaxRules } = require('./helpers/CoreConfidenceFixtures.js');
+const { getDisplayAmountByLabel } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 module.exports = {
   name: 'TestMortgagePayoffEvent',
@@ -41,16 +42,12 @@ module.exports = {
       return { success: false, errors: ['Missing expected data rows'] };
     }
 
-    const payoff = row32.attributions && row32.attributions.expenses
-      ? row32.attributions.expenses['Mortgage Payoff (home)']
-      : 0;
+    const payoff = getDisplayAmountByLabel(row32, 'Expenses', 'Mortgage Payoff (home)');
     if (!(payoff > 0)) {
       errors.push(`Expected Mortgage Payoff at age 32, got ${payoff}`);
     }
 
-    const mortgageAfterPayoff = row33.attributions && row33.attributions.expenses
-      ? (row33.attributions.expenses['Mortgage (home)'] || 0)
-      : 0;
+    const mortgageAfterPayoff = getDisplayAmountByLabel(row33, 'Expenses', 'Mortgage (home)');
     if (mortgageAfterPayoff > 1) {
       errors.push(`Expected no regular mortgage payment after payoff, got ${mortgageAfterPayoff}`);
     }

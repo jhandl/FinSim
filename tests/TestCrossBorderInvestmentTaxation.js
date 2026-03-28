@@ -126,7 +126,7 @@ module.exports = {
         if (incomeTaxUsAttr) {
           var iub = incomeTaxUsAttr.getBreakdown();
           for (var iuk in iub) {
-            if (iuk === 'Foreign Tax Credit (US)' && iub[iuk] < 0) {
+            if (iuk === 'Foreign Tax Credit' && iub[iuk] < 0) {
               hasCountryCreditSlice = true;
             }
           }
@@ -165,7 +165,7 @@ module.exports = {
       errors.push('Treaty case: expected negative Foreign Tax Credit attribution slice');
     }
     if (!treatyCase.hasCountryCreditSlice) {
-      errors.push('Treaty case: expected negative Foreign Tax Credit (US) slice under tax:incomeTax:us');
+      errors.push('Treaty case: expected negative Foreign Tax Credit slice under tax:incomeTax:us');
     }
 
     const noTreatyCase = vm.runInContext(`

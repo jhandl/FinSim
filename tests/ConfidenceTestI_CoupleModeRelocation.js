@@ -1,5 +1,6 @@
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { TOY_AA, TOY_BB, microParams, installTestTaxRules, installTreatyPairs, TREATY_PAIRS } = require('./helpers/CoreConfidenceFixtures.js');
+const { getDisplayAmountByMeta } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 module.exports = {
   name: 'C_I-COUPLE-RELOC',
@@ -52,10 +53,14 @@ module.exports = {
     }
 
     // Assert tax attribution on the specific year row (Taxman yearlyAttributions resets each year).
-    const taxAttrDomestic = row30 && row30.attributions ? row30.attributions['tax:incomeTax'] : null;
-    const taxAttrBB = row30 && row30.attributions ? row30.attributions['tax:incomeTax:bb'] : null;
-    if (!taxAttrDomestic) errors.push('Missing tax:incomeTax attribution');
-    if (!taxAttrBB) errors.push('Missing tax:incomeTax:bb attribution');
+    const domesticIncomeTax = getDisplayAmountByMeta(row30, 'Tax__incomeTax', (item) => {
+      return String(item.taxCountry || '').toLowerCase() === 'aa' && item.amount > 0;
+    });
+    const bbIncomeTax = getDisplayAmountByMeta(row30, 'Tax__incomeTax', (item) => {
+      return String(item.taxCountry || '').toLowerCase() === 'bb' && item.amount > 0;
+    });
+    if (!(domesticIncomeTax > 0)) errors.push('Missing domestic Tax__incomeTax attribution');
+    if (!(bbIncomeTax > 0)) errors.push('Missing BB Tax__incomeTax attribution');
 
     return {
       success: errors.length === 0,

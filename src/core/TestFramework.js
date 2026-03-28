@@ -754,6 +754,18 @@ class TestFramework {
             if (r.taxByKey) {
               for (var t in r.taxByKey) { if (r.taxByKey.hasOwnProperty(t)) { r.taxByKey[t] = r.taxByKey[t] / runs; } }
             }
+            if (r.displayAttributions) {
+              for (var columnKey in r.displayAttributions) {
+                if (!r.displayAttributions.hasOwnProperty(columnKey)) continue;
+                var itemMap = r.displayAttributions[columnKey];
+                if (!itemMap) continue;
+                for (var itemId in itemMap) {
+                  if (!itemMap.hasOwnProperty(itemId)) continue;
+                  if (!itemMap[itemId] || typeof itemMap[itemId].amount !== 'number') continue;
+                  itemMap[itemId].amount = itemMap[itemId].amount / runs;
+                }
+              }
+            }
             // Also average any dynamic Tax__ columns that may exist directly on the row
             for (var prop in r) {
               if (!r.hasOwnProperty(prop)) continue;

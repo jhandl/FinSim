@@ -15,13 +15,13 @@ class AttributionManager {
    * @param {string} source The description of the source.
    * @param {number} amount The amount from this source.
    */
-  record(metric, source, amount) {
+  record(metric, source, amount, meta) {
     if (this.yearlyAttributions[metric]) {
       this.yearlyAttributions[metric].setCountryContext(this.currentCountry, this.year);
     } else {
       this.yearlyAttributions[metric] = new Attribution(metric, this.currentCountry, this.year);
     }
-    this.yearlyAttributions[metric].add(source, amount);
+    this.yearlyAttributions[metric].add(source, amount, meta);
   }
 
   /**

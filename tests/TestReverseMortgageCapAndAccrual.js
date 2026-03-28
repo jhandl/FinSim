@@ -1,6 +1,7 @@
 // @finsim-test-speed: fast
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { TOY_AA, microParams, installTestTaxRules } = require('./helpers/CoreConfidenceFixtures.js');
+const { getDisplayAmountByLabel } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 module.exports = {
   name: 'TestReverseMortgageCapAndAccrual',
@@ -40,30 +41,22 @@ module.exports = {
       return { success: false, errors: ['Missing expected data rows'] };
     }
 
-    const payout32 = row32.attributions && row32.attributions.incometaxfree
-      ? (row32.attributions.incometaxfree['Reverse Mortgage (home)'] || 0)
-      : 0;
+    const payout32 = getDisplayAmountByLabel(row32, 'IncomeTaxFree', 'Reverse Mortgage (home)');
     if (Math.abs(payout32 - 30000) > 1) {
       errors.push(`Expected reverse payout ≈ 30000 at age 32, got ${payout32}`);
     }
 
-    const payout33 = row33.attributions && row33.attributions.incometaxfree
-      ? (row33.attributions.incometaxfree['Reverse Mortgage (home)'] || 0)
-      : 0;
+    const payout33 = getDisplayAmountByLabel(row33, 'IncomeTaxFree', 'Reverse Mortgage (home)');
     if (payout33 > 1) {
       errors.push(`Expected reverse payout to be capped to 0 at age 33, got ${payout33}`);
     }
 
-    const reverseSettlement = row34.attributions && row34.attributions.expenses
-      ? (row34.attributions.expenses['Reverse Mortgage Settlement (home)'] || 0)
-      : 0;
+    const reverseSettlement = getDisplayAmountByLabel(row34, 'Expenses', 'Reverse Mortgage Settlement (home)');
     if (Math.abs(reverseSettlement - 100000) > 2) {
       errors.push(`Expected reverse settlement ≈ 100000 at sale, got ${reverseSettlement}`);
     }
 
-    const reverseWriteoff = row34.attributions && row34.attributions.realestatecapital
-      ? (row34.attributions.realestatecapital['Reverse Mortgage Write-off (home)'] || 0)
-      : 0;
+    const reverseWriteoff = getDisplayAmountByLabel(row34, 'RealEstateCapital', 'Reverse Mortgage Write-off (home)');
     // Hand math:
     // Age30: (0 + 30,000) * 1.10 = 33,000
     // Age31: (33,000 + 30,000) * 1.10 = 69,300

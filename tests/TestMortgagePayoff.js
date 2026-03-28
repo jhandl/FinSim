@@ -1,6 +1,7 @@
 // @finsim-test-speed: fast
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { microParams, installTestTaxRules } = require('./helpers/CoreConfidenceFixtures.js');
+const { getDisplayAmountByLabel } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 module.exports = {
   name: 'TestMortgagePayoffGeneric',
@@ -53,7 +54,7 @@ module.exports = {
 
     // Check for a payoff entry at age 40 in the shortened scenario
     const row40_Short = resultsShort.dataSheet.find(r => r && r.age === 40);
-    const payoffExpense = row40_Short.attributions.expenses["Mortgage Payoff (home)"];
+    const payoffExpense = getDisplayAmountByLabel(row40_Short, 'Expenses', 'Mortgage Payoff (home)');
 
     if (!payoffExpense || payoffExpense <= 0) {
       errors.push(`No mortgage payoff recorded at age 40 in shortened scenario.`);
@@ -61,7 +62,7 @@ module.exports = {
 
     // Verify Scenario 1 has NO payoff at age 40
     const row40_20 = results20.dataSheet.find(r => r && r.age === 40);
-    const payoff20 = row40_20.attributions.expenses["Mortgage Payoff (home)"];
+    const payoff20 = getDisplayAmountByLabel(row40_20, 'Expenses', 'Mortgage Payoff (home)');
     if (payoff20) {
       errors.push(`Unexpected payoff recorded at age 40 in full term scenario.`);
     }

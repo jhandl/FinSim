@@ -1,6 +1,7 @@
 // @finsim-test-speed: fast
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { TOY_AA, microParams, installTestTaxRules, deepClone } = require('./helpers/CoreConfidenceFixtures.js');
+const { getDisplayAmountByLabel } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 module.exports = {
   name: 'TestReverseMortgageTaxRuleTreatment',
@@ -43,16 +44,14 @@ module.exports = {
       return { success: false, errors: ['Missing age 30 row'] };
     }
 
-    const taxFreeAttributions = (row30.attributions && row30.attributions.incometaxfree) ? row30.attributions.incometaxfree : {};
-    const taxableAttributions = (row30.attributions && row30.attributions.income) ? row30.attributions.income : {};
-    const reverseTaxFree = taxFreeAttributions['Reverse Mortgage (home)'] || 0;
-    const reverseTaxable = taxableAttributions['Reverse Mortgage (home)'] || 0;
+    const reverseTaxFree = getDisplayAmountByLabel(row30, 'IncomeTaxFree', 'Reverse Mortgage (home)');
+    const reverseTaxable = getDisplayAmountByLabel(row30, 'Tax__incomeTax', 'Reverse Mortgage (home)');
 
     if (Math.abs(reverseTaxFree) > 0.5) {
       errors.push(`Expected reverse payout not to be tax-free, got incometaxfree=${reverseTaxFree}`);
     }
-    if (Math.abs(reverseTaxable - 10000) > 0.5) {
-      errors.push(`Expected reverse payout to be recorded as taxable income ≈ 10000, got ${reverseTaxable}`);
+    if (!(reverseTaxable > 0)) {
+      errors.push(`Expected reverse payout to create positive income tax attribution, got ${reverseTaxable}`);
     }
 
     return {

@@ -15,6 +15,7 @@ class InvestmentAsset {
     this._typeDef = investmentTypeDef || {};
     this._ruleset = ruleset || null;
     this.key = this._typeDef.key || 'asset';
+    this.investmentKey = this.key;
     this.label = this._typeDef.label || this.key;
     this.baseCurrency = this._typeDef.baseCurrency;
     this.assetCountry = this._typeDef.assetCountry;
@@ -135,7 +136,7 @@ class InvestmentAsset {
   declareRevenue(income, gains) {
     var incomeMoney = Money.from(income, residenceCurrency, currentCountry);
     // Use configured label and assetCountry
-    revenue.declareInvestmentIncome(incomeMoney, this.label + ' Income', this.assetCountry);
+    revenue.declareInvestmentIncome(incomeMoney, this.label + ' Income', this.assetCountry, this.investmentKey);
     if (gains > 0 || this.canOffsetLosses) {
       var isExit = (this._taxCategory === 'exitTax');
       var eligible = !!this.eligibleForAnnualExemption;
@@ -146,7 +147,8 @@ class InvestmentAsset {
         eligibleForAnnualExemption: eligible,
         allowLossOffset: allowOffset,
         exemptionKey: this._exemptionKey,
-        annualExemptionAmount: this._annualExemptionAmount
+        annualExemptionAmount: this._annualExemptionAmount,
+        investmentKey: this.investmentKey
       }, this.assetCountry);
     }
   }

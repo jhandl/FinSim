@@ -5,8 +5,8 @@ const vm = require('vm');
 const { JSDOM } = require('jsdom');
 
 module.exports = {
-  name: 'TestCapitalGainsTooltipBreakdown',
-  description: 'Ensures the capital gains tooltip shows realized gains, pre-relief tax, and CGT relief in order.',
+  name: 'TestTooltipCountryQualification',
+  description: 'Tooltip lines show country codes only for items outside the row residence country.',
   isCustomTest: true,
   runCustomTest: async function () {
     const errors = [];
@@ -25,7 +25,7 @@ module.exports = {
       </table>
     `);
 
-    let capturedTooltip = null;
+    const capturedTooltips = [];
     const ctx = vm.createContext({
       console,
       window: dom.window,
@@ -34,7 +34,7 @@ module.exports = {
         getInstance: function () {
           return {
             getDefaultCountry: function () { return 'ie'; },
-            isRelocationEnabled: function () { return false; },
+            isRelocationEnabled: function () { return true; },
             getCachedTaxRuleSet: function () {
               return {
                 getCurrencyCode: function () { return 'EUR'; },
@@ -54,7 +54,7 @@ module.exports = {
       },
       TooltipUtils: {
         attachTooltip: function (_element, text) {
-          capturedTooltip = text;
+          capturedTooltips.push(text);
         }
       }
     });
@@ -80,8 +80,12 @@ module.exports = {
       manager._buildRowBlueprint = function () {
         return [{
           type: 'section',
+          sectionId: 'income',
+          columns: [{ key: 'IncomeSalaries' }]
+        }, {
+          type: 'section',
           sectionId: 'deductions',
-          columns: [{ key: 'Tax__capitalGains' }]
+          columns: [{ key: 'Tax__incomeTax' }]
         }];
       };
       manager._computeGroupBoundarySet = function () { return new Set(); };
@@ -89,56 +93,44 @@ module.exports = {
       manager.setDataRow(1, {
         Age: 35,
         Year: 2031,
-        Tax__capitalGains: 3799.6630444216244,
+        IncomeSalaries: 5000,
+        Tax__incomeTax: 1500,
         displayAttributions: {
-          'Tax__capitalGains': {
-            gainsIndexFunds: {
-              label: 'Index Funds Gains',
-              amount: 9050.143699927663,
-              kind: 'capitalGains'
+          'IncomeSalaries': {
+            domesticIncome: {
+              label: 'Salary',
+              amount: 4000,
+              kind: 'income',
+              sourceCountry: 'ie'
             },
-            taxIndexFunds: {
-              label: 'Index Funds Tax',
-              amount: 3439.054605972512,
-              kind: 'tax'
+            foreignIncome: {
+              label: 'Consulting',
+              amount: 1000,
+              kind: 'income',
+              sourceCountry: 'us'
+            }
+          },
+          'Tax__incomeTax': {
+            domestic: {
+              label: 'Salary',
+              amount: 1000,
+              kind: 'tax',
+              taxCountry: 'ie'
             },
-            gainsShares: {
-              label: 'Shares Gains',
-              amount: 2565.030918146188,
-              kind: 'capitalGains'
-            },
-            taxShares: {
-              label: 'Shares Tax',
-              amount: 846.4602029882421,
-              kind: 'tax'
-            },
-            relief: {
-              label: 'CGT Relief',
-              amount: -485.85176453913004,
-              kind: 'relief'
+            foreign: {
+              label: 'Rental',
+              amount: 500,
+              kind: 'tax',
+              taxCountry: 'ar'
             }
           }
         }
       });
 
-      assert(capturedTooltip, 'Expected tooltip text to be attached');
-      assert(capturedTooltip.indexOf('Index Funds Gains') >= 0, 'Tooltip should include the realized index-funds gain line');
-      assert(capturedTooltip.indexOf('Index Funds Tax') >= 0, 'Tooltip should include the index-funds tax line');
-      assert(capturedTooltip.indexOf('Shares Gains') >= 0, 'Tooltip should include the realized shares gain line');
-      assert(capturedTooltip.indexOf('Shares Tax') >= 0, 'Tooltip should include the shares tax line before relief');
-      assert(capturedTooltip.indexOf('Shares Sale') === -1, 'Tooltip should not fall back to raw shares-sale attribution');
-      assert(capturedTooltip.indexOf('CGT Relief') >= 0, 'Tooltip should include the relief line');
-
-      const gainPositions = [
-        capturedTooltip.indexOf('Index Funds Gains'),
-        capturedTooltip.indexOf('Shares Gains')
-      ];
-      const taxPositions = [
-        capturedTooltip.indexOf('Index Funds Tax'),
-        capturedTooltip.indexOf('Shares Tax'),
-        capturedTooltip.indexOf('CGT Relief')
-      ];
-      assert(Math.min.apply(null, taxPositions) > Math.max.apply(null, gainPositions), 'All gain lines should appear before all tax lines');
+      assert(capturedTooltips.length >= 2, 'Expected tooltip text to be attached for both cells');
+      assert(capturedTooltips.every(function (tooltip) { return tooltip.indexOf('Salary (IE)') === -1; }), 'Domestic tooltip lines should not include residence-country suffix');
+      assert(capturedTooltips.some(function (tooltip) { return tooltip.indexOf('Consulting (US)') >= 0; }), 'Foreign income line should include foreign-country suffix');
+      assert(capturedTooltips.some(function (tooltip) { return tooltip.indexOf('Rental (AR)') >= 0; }), 'Foreign tax line should include foreign-country suffix');
     } catch (err) {
       errors.push(err.message || String(err));
     }

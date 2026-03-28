@@ -1,5 +1,6 @@
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { TOY_AA, microParams, installTestTaxRules } = require('./helpers/CoreConfidenceFixtures.js');
+const { getDisplayAmountByLabel } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 module.exports = {
   name: 'C_B-PropertySaleLoanAttribution',
@@ -42,10 +43,10 @@ module.exports = {
     // Mortgage principal = 50,000. Remaining at age-33 sale = 35,000.
     // Reverse balance at sale = 20,000.
     // Net sale proceeds = 100,000 - 35,000 - 20,000 = 45,000.
-    const mortgageSettlement = row33.attributions.expenses['Mortgage Settlement (home)'] || 0;
-    const reverseSettlement = row33.attributions.expenses['Reverse Mortgage Settlement (home)'] || 0;
-    const saleAttribution = row33.attributions.realestatecapital['Sale (home)'] || 0;
-    const writeOff = row33.attributions.realestatecapital['Reverse Mortgage Write-off (home)'] || 0;
+    const mortgageSettlement = getDisplayAmountByLabel(row33, 'Expenses', 'Mortgage Settlement (home)');
+    const reverseSettlement = getDisplayAmountByLabel(row33, 'Expenses', 'Reverse Mortgage Settlement (home)');
+    const saleAttribution = getDisplayAmountByLabel(row33, 'RealEstateCapital', 'Sale (home)');
+    const writeOff = getDisplayAmountByLabel(row33, 'RealEstateCapital', 'Reverse Mortgage Write-off (home)');
 
     if (Math.abs(mortgageSettlement - 35000) > 2) {
       errors.push(`Expected Mortgage Settlement ≈ 35000, got ${mortgageSettlement}`);

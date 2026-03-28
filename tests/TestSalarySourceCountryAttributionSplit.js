@@ -1,5 +1,6 @@
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelpers.js');
+const { getDisplayAmountByMeta } = require('./helpers/DisplayAttributionTestHelpers.js');
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
 const AR_RULES = require('../src/core/config/tax-rules-ar.json');
 
@@ -7,10 +8,15 @@ function findRowByAge(rows, age) {
   return rows.find(row => row && typeof row === 'object' && Math.round(row.age) === age);
 }
 
-function hasPositiveAttribution(breakdown, key) {
-  if (!breakdown || typeof breakdown !== 'object') return false;
-  var value = breakdown[key];
-  return typeof value === 'number' && value > 0;
+function sumForeignNonIncomeTaxForLabel(row, countryCode, label) {
+  if (!row || !row.displayAttributions) return 0;
+  const expected = String(countryCode || '').toLowerCase();
+  return Object.keys(row.displayAttributions).reduce((total, columnKey) => {
+    if (columnKey.indexOf('Tax__') !== 0 || columnKey === 'Tax__incomeTax') return total;
+    return total + getDisplayAmountByMeta(row, columnKey, function (item) {
+      return item.label === label && String(item.taxCountry || '').toLowerCase() === expected;
+    });
+  }, 0);
 }
 
 module.exports = {
@@ -82,30 +88,22 @@ module.exports = {
       return { success: false, errors: ['Missing age 40 row in SalarySourceCountryAttributionSplit'] };
     }
 
-    const attrs = row40.attributions || {};
-    const ieIncomeTax = attrs['tax:incomeTax:ie'];
-    const iePrsi = attrs['tax:prsi:ie'];
-    const ieUsc = attrs['tax:usc:ie'];
-
-    if (!hasPositiveAttribution(ieIncomeTax, 'You')) {
+    if (!(getDisplayAmountByMeta(row40, 'Tax__incomeTax', function (item) {
+      return item.label === 'You' && String(item.taxCountry || '').toLowerCase() === 'ie';
+    }) > 0)) {
       errors.push('Expected tax:incomeTax:ie attribution for You at age 40');
     }
-    if (!hasPositiveAttribution(ieIncomeTax, 'Your Partner')) {
+    if (!(getDisplayAmountByMeta(row40, 'Tax__incomeTax', function (item) {
+      return item.label === 'Your Partner' && String(item.taxCountry || '').toLowerCase() === 'ie';
+    }) > 0)) {
       errors.push('Expected tax:incomeTax:ie attribution for Your Partner at age 40');
     }
 
-    if (!hasPositiveAttribution(iePrsi, 'You')) {
-      errors.push('Expected tax:prsi:ie attribution for You at age 40');
+    if (!(sumForeignNonIncomeTaxForLabel(row40, 'ie', 'You') > 0)) {
+      errors.push('Expected source-country non-income tax attribution for You at age 40');
     }
-    if (!hasPositiveAttribution(iePrsi, 'Your Partner')) {
-      errors.push('Expected tax:prsi:ie attribution for Your Partner at age 40');
-    }
-
-    if (!hasPositiveAttribution(ieUsc, 'You')) {
-      errors.push('Expected tax:usc:ie attribution for You at age 40');
-    }
-    if (!hasPositiveAttribution(ieUsc, 'Your Partner')) {
-      errors.push('Expected tax:usc:ie attribution for Your Partner at age 40');
+    if (!(sumForeignNonIncomeTaxForLabel(row40, 'ie', 'Your Partner') > 0)) {
+      errors.push('Expected source-country non-income tax attribution for Your Partner at age 40');
     }
 
     return { success: errors.length === 0, errors };

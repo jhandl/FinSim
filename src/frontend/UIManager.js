@@ -23,13 +23,14 @@ class UIManager {
     // Divide once here to present averages (avoid storing per-run attribution snapshots).
     if (montecarlo && runs > 1) {
       for (let i = 1; i <= row; i++) {
-        const attributions = (dataSheet[i] && dataSheet[i].attributions) ? dataSheet[i].attributions : null;
-        if (!attributions) continue;
-        for (const metric in attributions) {
-          const metricObj = attributions[metric];
-          if (!metricObj) continue;
-          for (const source in metricObj) {
-            metricObj[source] = metricObj[source] / runs;
+        const displayAttributions = (dataSheet[i] && dataSheet[i].displayAttributions) ? dataSheet[i].displayAttributions : null;
+        if (!displayAttributions) continue;
+        for (const columnKey in displayAttributions) {
+          const itemMap = displayAttributions[columnKey];
+          if (!itemMap) continue;
+          for (const itemId in itemMap) {
+            if (!itemMap[itemId] || typeof itemMap[itemId].amount !== 'number') continue;
+            itemMap[itemId].amount = itemMap[itemId].amount / runs;
           }
         }
       }
@@ -178,7 +179,7 @@ class UIManager {
       CashPV: dataSheet[row].cashPV / scale,
       PensionContributionPV: dataSheet[row].pensionContributionPV / scale,
       WorthPV: dataSheet[row].worthPV / scale,
-      attributions: dataSheet[row].attributions
+      displayAttributions: dataSheet[row].displayAttributions
     };
 
     // Add dynamic per-investment-type fields so the table can render N investment types

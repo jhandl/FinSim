@@ -13,6 +13,7 @@ class Attribution {
   constructor(name, country, year) {
     this.name = name;
     this.slices = {}; // { source_description: amount }
+    this.sourceMeta = {}; // { source_description: meta }
     this.country = country || null;
     this.year = year || null;
   }
@@ -22,12 +23,23 @@ class Attribution {
    * @param {string} source The description of the source (e.g., "Salary 'My Google salary'").
    * @param {number} amount The amount from this source.
    */
-  add(source, amount) {
+  add(source, amount, meta) {
     if (amount === 0) return;
     if (!this.slices[source]) {
       this.slices[source] = 0;
     }
     this.slices[source] += amount;
+    if (meta && typeof meta === 'object') {
+      if (!this.sourceMeta[source]) {
+        this.sourceMeta[source] = {};
+      }
+      var targetMeta = this.sourceMeta[source];
+      for (var key in meta) {
+        if (!Object.prototype.hasOwnProperty.call(meta, key)) continue;
+        if (meta[key] === undefined || meta[key] === null || meta[key] === '') continue;
+        targetMeta[key] = meta[key];
+      }
+    }
   }
 
   /**
@@ -116,12 +128,22 @@ class Attribution {
   }
 
   /**
+   * Returns metadata recorded for a given source.
+   * @param {string} source The source label.
+   * @returns {Object|null} Metadata object or null when absent.
+   */
+  getSourceMeta(source) {
+    return this.sourceMeta[source] || null;
+  }
+
+  /**
    * Creates a new Attribution object with the same slices.
    * @returns {Attribution} A new Attribution object.
    */
   clone() {
     const newAttribution = new Attribution(this.name, this.country, this.year);
     newAttribution.slices = { ...this.slices };
+    newAttribution.sourceMeta = { ...this.sourceMeta };
     return newAttribution;
   }
 }

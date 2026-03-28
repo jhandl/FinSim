@@ -1,6 +1,7 @@
 // @finsim-test-speed: fast
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { TOY_AA, microParams, installTestTaxRules } = require('./helpers/CoreConfidenceFixtures.js');
+const { getDisplayAmountByLabel } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 module.exports = {
   name: 'TestMortgageOverpayShortensTerm',
@@ -57,9 +58,7 @@ module.exports = {
       return { success: false, errors: ['Missing expected data rows'] };
     }
 
-    const payoff = row40Overpay.attributions && row40Overpay.attributions.expenses
-      ? row40Overpay.attributions.expenses['Mortgage Payoff (home)']
-      : 0;
+    const payoff = getDisplayAmountByLabel(row40Overpay, 'Expenses', 'Mortgage Payoff (home)');
     // Hand math at 0%:
     // principal 80,000 (4,000 * 20 years), after 10 amortized years -> 40,000 remaining.
     // MO from 31..40 adds 30,000 total, leaving 10,000 payoff.
@@ -67,16 +66,12 @@ module.exports = {
       errors.push(`Expected payoff around 10000 at age 40, got ${payoff}`);
     }
 
-    const mortgageAfterOverpayPlan = row41Overpay.attributions && row41Overpay.attributions.expenses
-      ? (row41Overpay.attributions.expenses['Mortgage (home)'] || 0)
-      : 0;
+    const mortgageAfterOverpayPlan = getDisplayAmountByLabel(row41Overpay, 'Expenses', 'Mortgage (home)');
     if (mortgageAfterOverpayPlan > 1) {
       errors.push(`Expected no mortgage payment at age 41 in overpay scenario, got ${mortgageAfterOverpayPlan}`);
     }
 
-    const baselineMortgageAt41 = row41Baseline.attributions && row41Baseline.attributions.expenses
-      ? (row41Baseline.attributions.expenses['Mortgage (home)'] || 0)
-      : 0;
+    const baselineMortgageAt41 = getDisplayAmountByLabel(row41Baseline, 'Expenses', 'Mortgage (home)');
     if (Math.abs(baselineMortgageAt41 - 4000) > 1) {
       errors.push(`Expected baseline mortgage payment ≈ 4000 at age 41, got ${baselineMortgageAt41}`);
     }

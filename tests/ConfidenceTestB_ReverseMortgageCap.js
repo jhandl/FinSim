@@ -1,5 +1,6 @@
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { TOY_AA, microParams, installTestTaxRules } = require('./helpers/CoreConfidenceFixtures.js');
+const { getDisplayAmountByLabel } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 module.exports = {
   name: 'C_B-ReverseMortgageCap',
@@ -45,20 +46,17 @@ module.exports = {
     // B33 = 109,230 * 1.10 = 120,153
     // Sale at age34:
     // reverse settlement = 100,000, write-off = 20,153.
-    const row33Income = row33.attributions && row33.attributions.incometaxfree ? row33.attributions.incometaxfree : {};
-    const payout33 = row33Income['Reverse Mortgage (home)'] || 0;
+    const payout33 = getDisplayAmountByLabel(row33, 'IncomeTaxFree', 'Reverse Mortgage (home)');
     if (Math.abs(payout33) > 1) {
       errors.push(`Age 33: Expected payout cap (0), got ${payout33}`);
     }
 
-    const row34Expenses = row34.attributions && row34.attributions.expenses ? row34.attributions.expenses : {};
-    const reverseSettlement = row34Expenses['Reverse Mortgage Settlement (home)'] || 0;
+    const reverseSettlement = getDisplayAmountByLabel(row34, 'Expenses', 'Reverse Mortgage Settlement (home)');
     if (Math.abs(reverseSettlement - 100000) > 2) {
       errors.push(`Age 34: Expected reverse settlement ≈ 100000, got ${reverseSettlement}`);
     }
 
-    const row34Capital = row34.attributions && row34.attributions.realestatecapital ? row34.attributions.realestatecapital : {};
-    const writeOff = row34Capital['Reverse Mortgage Write-off (home)'] || 0;
+    const writeOff = getDisplayAmountByLabel(row34, 'RealEstateCapital', 'Reverse Mortgage Write-off (home)');
     if (Math.abs(writeOff + 20153) > 5) {
       errors.push(`Age 34: Expected write-off attribution ≈ -20153, got ${writeOff}`);
     }

@@ -955,12 +955,12 @@ function calculatePensionIncome() {
           if (p1AttrCountry !== currentCountry) {
             p1MetricKey = 'incomeprivatepension:' + p1AttrCountry;
           }
-          attributionManager.record(p1MetricKey, 'Your Private Pension', p1AttrAmount);
+          attributionManager.record(p1MetricKey, 'Your Private Pension', p1AttrAmount, { sourceCountry: p1AttrCountry });
         }
       }
     } else {
       // Fallback for single-country scenarios
-      attributionManager.record('incomeprivatepension', 'Your Private Pension', person1.yearlyIncomePrivatePension);
+      attributionManager.record('incomeprivatepension', 'Your Private Pension', person1.yearlyIncomePrivatePension, { sourceCountry: currentCountry });
     }
     incomePrivatePension += person1.yearlyIncomePrivatePension;
   }
@@ -973,7 +973,7 @@ function calculatePensionIncome() {
   }
   var person1StatePension = person1.yearlyIncomeStatePension ? person1.yearlyIncomeStatePension.amount : 0;
   if (person1StatePension > 0) {
-    attributionManager.record('incomestatepension', 'Your State Pension', person1StatePension);
+    attributionManager.record('incomestatepension', 'Your State Pension', person1StatePension, { sourceCountry: currentCountry });
     incomeStatePension += person1StatePension;
   }
 
@@ -1008,12 +1008,12 @@ function calculatePensionIncome() {
             if (p2AttrCountry !== currentCountry) {
               p2MetricKey = 'incomeprivatepension:' + p2AttrCountry;
             }
-            attributionManager.record(p2MetricKey, 'Their Private Pension', p2AttrAmount);
+            attributionManager.record(p2MetricKey, 'Their Private Pension', p2AttrAmount, { sourceCountry: p2AttrCountry });
           }
         }
       } else {
         // Fallback for single-country scenarios
-        attributionManager.record('incomeprivatepension', 'Their Private Pension', person2.yearlyIncomePrivatePension);
+        attributionManager.record('incomeprivatepension', 'Their Private Pension', person2.yearlyIncomePrivatePension, { sourceCountry: currentCountry });
       }
       incomePrivatePension += person2.yearlyIncomePrivatePension;
     }
@@ -1026,7 +1026,7 @@ function calculatePensionIncome() {
     }
     var person2StatePension = person2.yearlyIncomeStatePension ? person2.yearlyIncomeStatePension.amount : 0;
     if (person2StatePension > 0) {
-      attributionManager.record('incomestatepension', 'Their State Pension', person2StatePension);
+      attributionManager.record('incomestatepension', 'Their State Pension', person2StatePension, { sourceCountry: currentCountry });
       incomeStatePension += person2StatePension;
     }
   }
@@ -1355,7 +1355,7 @@ function processEvents() {
           if (bucketCountry && bucketCountry !== currentCountry) {
             salaryMetricKey = 'incomesalaries:' + bucketCountry;
           }
-          attributionManager.record(salaryMetricKey, entry.eventId, entryConvertedAmount);
+          attributionManager.record(salaryMetricKey, entry.eventId, entryConvertedAmount, { sourceCountry: bucketCountry });
 
           if (isPensionable && entryConvertedAmount > 0) {
             // Use salary's origin country for pension rules (not current residence)
@@ -1513,7 +1513,7 @@ function processEvents() {
           if (sourceCountry && sourceCountry !== currentCountry) {
             rentalMetricKey = 'incomerentals:' + sourceCountry;
           }
-          attributionManager.record(rentalMetricKey, entry.eventId, entryConvertedAmount);
+          attributionManager.record(rentalMetricKey, entry.eventId, entryConvertedAmount, { sourceCountry: sourceCountry });
           if (entryConvertedAmount > 0 && !declaredEntries[entryKey]) {
             const rentalIncomeMoney = Money.from(entryConvertedAmount, residenceCurrency, currentCountry);
             revenue.declareRentalIncome(rentalIncomeMoney, sourceCountry, entry.eventId);
@@ -2985,12 +2985,14 @@ function updateYearlyData() {
   // Compute present-value aggregates (extracted to PresentValueCalculator.js for testability)
   PresentValueCalculator.computePresentValueAggregates(ctx);
 
-  // Populate attribution fields (extracted to AttributionPopulator.js for testability)
-  AttributionPopulator.populateAttributionFields(
+  // Populate display attribution fields (extracted for exact-key tooltip testability)
+  DisplayAttributionBuilder.populateDisplayAttributionFields(
     dataSheet[row],
     investmentAssets,
+    investmentIncomeByKey,
     attributionManager,
-    revenue
+    revenue,
+    currentCountry
   );
 
   if (!montecarlo) {

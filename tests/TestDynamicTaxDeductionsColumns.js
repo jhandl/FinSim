@@ -46,8 +46,8 @@ module.exports = {
         null,
         {
           attributions: {
-            'tax:incomeTax:ie': { 'Salary Income Tax (IE)': 1200 },
-            'tax:capitalGains:ie': { 'CGT (IE)': 200 },
+            'tax:incomeTax:ie': { 'Salary Income Tax': 1200 },
+            'tax:capitalGains:ie': { 'CGT': 200 },
             'tax:prsi:ie': { PRSI: 500 },
             'tax:usc:ie': { USC: 200 },
             'tax:extra levy:ie': { 'Extra Levy': 50 }

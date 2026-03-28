@@ -5,8 +5,8 @@ const vm = require('vm');
 const { JSDOM } = require('jsdom');
 
 module.exports = {
-  name: 'TestCapitalGainsTooltipBreakdown',
-  description: 'Ensures the capital gains tooltip shows realized gains, pre-relief tax, and CGT relief in order.',
+  name: 'TestTooltipHidesRoundedZeroAttributions',
+  description: 'Tooltip omits attribution lines whose formatted display rounds to zero.',
   isCustomTest: true,
   runCustomTest: async function () {
     const errors = [];
@@ -25,7 +25,7 @@ module.exports = {
       </table>
     `);
 
-    let capturedTooltip = null;
+    const capturedTooltips = [];
     const ctx = vm.createContext({
       console,
       window: dom.window,
@@ -50,11 +50,11 @@ module.exports = {
         getRepresentativeCountryForCurrency: function () { return 'ie'; }
       },
       FormatUtils: {
-        formatCurrency: function (value) { return String(Math.round(value * 100) / 100); }
+        formatCurrency: function (value) { return String(Math.round(value)); }
       },
       TooltipUtils: {
         attachTooltip: function (_element, text) {
-          capturedTooltip = text;
+          capturedTooltips.push(text);
         }
       }
     });
@@ -89,56 +89,31 @@ module.exports = {
       manager.setDataRow(1, {
         Age: 35,
         Year: 2031,
-        Tax__capitalGains: 3799.6630444216244,
+        Tax__capitalGains: 10,
         displayAttributions: {
           'Tax__capitalGains': {
-            gainsIndexFunds: {
-              label: 'Index Funds Gains',
-              amount: 9050.143699927663,
-              kind: 'capitalGains'
-            },
-            taxIndexFunds: {
-              label: 'Index Funds Tax',
-              amount: 3439.054605972512,
-              kind: 'tax'
-            },
-            gainsShares: {
-              label: 'Shares Gains',
-              amount: 2565.030918146188,
-              kind: 'capitalGains'
-            },
-            taxShares: {
-              label: 'Shares Tax',
-              amount: 846.4602029882421,
-              kind: 'tax'
-            },
-            relief: {
-              label: 'CGT Relief',
-              amount: -485.85176453913004,
-              kind: 'relief'
-            }
+            tiny: { label: 'Tiny Tax', amount: 0.4, kind: 'tax' },
+            visible: { label: 'Visible Tax', amount: 1.6, kind: 'tax' }
           }
         }
       });
 
-      assert(capturedTooltip, 'Expected tooltip text to be attached');
-      assert(capturedTooltip.indexOf('Index Funds Gains') >= 0, 'Tooltip should include the realized index-funds gain line');
-      assert(capturedTooltip.indexOf('Index Funds Tax') >= 0, 'Tooltip should include the index-funds tax line');
-      assert(capturedTooltip.indexOf('Shares Gains') >= 0, 'Tooltip should include the realized shares gain line');
-      assert(capturedTooltip.indexOf('Shares Tax') >= 0, 'Tooltip should include the shares tax line before relief');
-      assert(capturedTooltip.indexOf('Shares Sale') === -1, 'Tooltip should not fall back to raw shares-sale attribution');
-      assert(capturedTooltip.indexOf('CGT Relief') >= 0, 'Tooltip should include the relief line');
+      manager.setDataRow(2, {
+        Age: 36,
+        Year: 2032,
+        Tax__capitalGains: 10,
+        displayAttributions: {
+          'Tax__capitalGains': {
+            tinyOnly: { label: 'Tiny Only', amount: 0.4, kind: 'tax' }
+          }
+        }
+      });
 
-      const gainPositions = [
-        capturedTooltip.indexOf('Index Funds Gains'),
-        capturedTooltip.indexOf('Shares Gains')
-      ];
-      const taxPositions = [
-        capturedTooltip.indexOf('Index Funds Tax'),
-        capturedTooltip.indexOf('Shares Tax'),
-        capturedTooltip.indexOf('CGT Relief')
-      ];
-      assert(Math.min.apply(null, taxPositions) > Math.max.apply(null, gainPositions), 'All gain lines should appear before all tax lines');
+      assert(capturedTooltips.length === 1, 'Expected tooltip only for row with at least one non-zero displayed line');
+      const tooltip = capturedTooltips[0];
+      assert(tooltip.indexOf('Visible Tax') >= 0, 'Expected non-zero displayed attribution line to remain visible');
+      assert(tooltip.indexOf('Tiny Tax') === -1, 'Expected rounded-to-zero attribution line to be omitted');
+      assert(tooltip.indexOf('Tiny Only') === -1, 'Expected row with only rounded-zero lines to have no tooltip');
     } catch (err) {
       errors.push(err.message || String(err));
     }

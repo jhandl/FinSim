@@ -1,6 +1,7 @@
 // @finsim-test-speed: fast
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { TOY_AA, microParams, installTestTaxRules } = require('./helpers/CoreConfidenceFixtures.js');
+const { getDisplayAmountByLabel } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 module.exports = {
   name: 'TestMortgageBoundaryPaymentAtToAge',
@@ -39,10 +40,8 @@ module.exports = {
       return { success: false, errors: ['Missing expected rows'] };
     }
 
-    const row31Expenses = row31.attributions && row31.attributions.expenses ? row31.attributions.expenses : {};
-    const row32Expenses = row32.attributions && row32.attributions.expenses ? row32.attributions.expenses : {};
-    const mortgageAtBoundary = row31Expenses['Mortgage (home)'] || 0;
-    const mortgageAfterBoundary = row32Expenses['Mortgage (home)'] || 0;
+    const mortgageAtBoundary = getDisplayAmountByLabel(row31, 'Expenses', 'Mortgage (home)');
+    const mortgageAfterBoundary = getDisplayAmountByLabel(row32, 'Expenses', 'Mortgage (home)');
 
     const errors = [];
     if (Math.abs(mortgageAtBoundary - 1000) > 1) {

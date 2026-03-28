@@ -6,11 +6,11 @@ class Taxman {
    * Internal helper to record a specific tax amount, updating both the
    * dynamic taxTotals map and the attribution manager under key `tax:<id>`.
    */
-  _recordTax(taxId, source, amount) {
+  _recordTax(taxId, source, amount, meta) {
     if (!this.taxTotals) this.taxTotals = {};
     this.taxTotals[taxId] = (this.taxTotals[taxId] || 0) + amount;
     if (this.attributionManager && typeof this.attributionManager.record === 'function') {
-      this.attributionManager.record(`tax:${taxId}`, source, amount);
+      this.attributionManager.record(`tax:${taxId}`, source, amount, meta);
     }
   }
 
@@ -162,7 +162,7 @@ class Taxman {
     // Attribution for state pension is handled in Simulator.js
   };
 
-  declareInvestmentIncome(money, description, assetCountry) {
+  declareInvestmentIncome(money, description, assetCountry, investmentKey) {
     if (!money || typeof money.amount !== 'number' || !money.currency || !money.country) {
       throw new Error('declareInvestmentIncome requires a Money object');
     }
@@ -198,7 +198,13 @@ class Taxman {
     
     // Record gross income; withholding is materialized as a tax during computeTaxes()
     this.investmentIncome += grossAmount;
-    this.attributionManager.record('investmentincome', description, grossAmount);
+    var investmentMeta = {};
+    if (assetCountry) investmentMeta.sourceCountry = String(assetCountry).toLowerCase();
+    if (investmentKey) investmentMeta.investmentKey = investmentKey;
+    this.attributionManager.record('investmentincome', description, grossAmount, investmentMeta);
+    if (investmentKey) {
+      this.attributionManager.record('investmentincome:' + investmentKey, description, grossAmount, investmentMeta);
+    }
 
     Money.add(this.investmentIncomeMoney, money);
   };
@@ -325,10 +331,14 @@ class Taxman {
       allowLossOffset: options && typeof options.allowLossOffset === 'boolean' ? options.allowLossOffset : true,
       exemptionKey: (options && options.exemptionKey) ? options.exemptionKey : 'global',
       annualExemptionAmount: (options && typeof options.annualExemptionAmount === 'number') ? options.annualExemptionAmount : null,
-      assetCountry: assetCountry ? String(assetCountry).toLowerCase() : null
+      assetCountry: assetCountry ? String(assetCountry).toLowerCase() : null,
+      investmentKey: (options && options.investmentKey) ? options.investmentKey : null
     };
     rateBucket.entries.push(entry);
-    this.attributionManager.record('capitalgains', description, amount);
+    var gainsMeta = {};
+    if (entry.assetCountry) gainsMeta.sourceCountry = entry.assetCountry;
+    if (entry.investmentKey) gainsMeta.investmentKey = entry.investmentKey;
+    this.attributionManager.record('capitalgains', description, amount, gainsMeta);
 
   };
 
@@ -644,7 +654,7 @@ class Taxman {
       var allocated = (j === entries.length - 1) ? remaining : (creditAmount * (entry.foreignAmount / totalForeign));
       if (allocated <= 0) continue;
       remaining -= allocated;
-      this.attributionManager.record('tax:' + taxId + ':' + entry.countryCode, 'Foreign Tax Credit (' + entry.countryCode.toUpperCase() + ')', -allocated);
+      this.attributionManager.record('tax:' + taxId + ':' + entry.countryCode, 'Foreign Tax Credit', -allocated);
     }
   }
 
@@ -890,7 +900,7 @@ class Taxman {
           foreignSalaryTaxes[sourceCountryCode] = (foreignSalaryTaxes[sourceCountryCode] || 0) + sourceSalaryTax;
           recordSourceTaxWithBreakdown(
             'incomeTax:' + sourceCountryCode,
-            'Salary Income Tax (' + sourceCountryCode.toUpperCase() + ')',
+            'Salary Income Tax',
             sourceSalaryTax,
             sourceSalaryBreakdown
           );
@@ -917,7 +927,7 @@ class Taxman {
           if (sourceContribTax > 0) {
             recordSourceTaxWithBreakdown(
               sourceContribTaxId + ':' + sourceCountryCode,
-              String(sourceContrib.name || sourceContribTaxId) + ' Salary Tax (' + sourceCountryCode.toUpperCase() + ')',
+              String(sourceContrib.name || sourceContribTaxId) + ' Salary Tax',
               sourceContribTax,
               sourceSalaryBreakdown
             );
@@ -961,7 +971,7 @@ class Taxman {
           if (sourceAdditionalTaxAmount > 0) {
             recordSourceTaxWithBreakdown(
               sourceAdditionalTaxId + ':' + sourceCountryCode,
-              String(sourceAdditionalTax.name || sourceAdditionalTaxId) + ' Salary Tax (' + sourceCountryCode.toUpperCase() + ')',
+              String(sourceAdditionalTax.name || sourceAdditionalTaxId) + ' Salary Tax',
               sourceAdditionalTaxAmount,
               sourceSalaryBreakdown
             );
@@ -980,7 +990,7 @@ class Taxman {
         }
         if (sourcePensionTax > 0) {
           foreignPensionTaxes[sourceCountryCode] = (foreignPensionTaxes[sourceCountryCode] || 0) + sourcePensionTax;
-          this._recordTax('incomeTax:' + sourceCountryCode, 'Private Pension Tax (' + sourceCountryCode.toUpperCase() + ')', sourcePensionTax);
+          this._recordTax('incomeTax:' + sourceCountryCode, 'Private Pension Tax', sourcePensionTax);
         }
       }
     }
@@ -1408,7 +1418,7 @@ class Taxman {
         if (sourceIncomeTaxResidence > 0) {
           recordSourceTaxWithBreakdown(
             'incomeTax:' + trailingCountryCode,
-            'Trailing Income Tax (' + trailingCountryCode.toUpperCase() + ')',
+            'Income Tax',
             sourceIncomeTaxResidence,
             baseMap
           );
@@ -1432,7 +1442,7 @@ class Taxman {
           if (sourceContribTax > 0) {
             recordSourceTaxWithBreakdown(
               sourceContribTaxId + ':' + trailingCountryCode,
-              String(sourceContrib.name || sourceContribTaxId) + ' Trailing Tax (' + trailingCountryCode.toUpperCase() + ')',
+              String(sourceContrib.name || sourceContribTaxId) + ' Tax',
               sourceContribTax,
               baseMap
             );
@@ -1473,7 +1483,7 @@ class Taxman {
           if (sourceAdditionalTaxAmount > 0) {
             recordSourceTaxWithBreakdown(
               sourceAdditionalTaxId + ':' + trailingCountryCode,
-              String(sourceAdditionalTax.name || sourceAdditionalTaxId) + ' Trailing Tax (' + trailingCountryCode.toUpperCase() + ')',
+              String(sourceAdditionalTax.name || sourceAdditionalTaxId) + ' Tax',
               sourceAdditionalTaxAmount,
               baseMap
             );
@@ -1509,7 +1519,7 @@ class Taxman {
           }
           if (rentalTax > 0) {
             foreignRentalTaxes[rentalSourceCountry] = (foreignRentalTaxes[rentalSourceCountry] || 0) + rentalTax;
-            this._recordTax('incomeTax:' + rentalSourceCountry, 'Rental Income Tax (' + rentalSourceCountry.toUpperCase() + ')', rentalTax);
+            this._recordTax('incomeTax:' + rentalSourceCountry, 'Rental Income Tax', rentalTax);
           }
         } catch (err) {
           console.warn('Could not load tax rules for rental source country: ' + rentalSourceCountry);
@@ -2110,7 +2120,10 @@ class Taxman {
         }
 
         if (remainingForThis > 0) {
-          this.attributionManager.record('tax:capitalGainsPreRelief', entry.description, remainingForThis * numericRate);
+          this.attributionManager.record('tax:capitalGainsPreRelief', entry.description, remainingForThis * numericRate, {
+            sourceCountry: entry.assetCountry || null,
+            investmentKey: entry.investmentKey || null
+          });
         }
 
         // For CGT entries, apply annual exemption if eligible
@@ -2134,7 +2147,10 @@ class Taxman {
         if (remainingForThis > 0) {
           const taxOnEntry = remainingForThis * numericRate;
           // Attribute tax to the unified 'capitalGains' metric for backward compatibility
-          this._recordTax('capitalGains', entry.description, taxOnEntry);
+          this._recordTax('capitalGains', entry.description, taxOnEntry, {
+            sourceCountry: entry.assetCountry || null,
+            investmentKey: entry.investmentKey || null
+          });
           if (entry.category === 'cgt') {
             totalCGTTax += taxOnEntry;
           } else if (entry.category === 'exitTax') {
@@ -2217,7 +2233,7 @@ class Taxman {
         if (!trailingCountryCode || !trailingRuleset) continue;
         var trailingTax = taxForTrailingCountry(trailingRuleset, trailingCountryCode);
         if (trailingTax > 0) {
-          this._recordTax('capitalGains:' + trailingCountryCode, 'Trailing Capital Gains Tax (' + trailingCountryCode.toUpperCase() + ')', trailingTax);
+          this._recordTax('capitalGains:' + trailingCountryCode, 'Capital Gains Tax', trailingTax);
         }
       }
     }

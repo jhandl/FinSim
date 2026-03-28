@@ -78,7 +78,7 @@ module.exports = {
           var attr = tm.attributionManager.getAttribution(key);
           if (!attr) return 0;
           var breakdown = attr.getBreakdown();
-          var label = 'Foreign Tax Credit (' + String(cc).toUpperCase() + ')';
+          var label = 'Foreign Tax Credit';
           return breakdown[label] ? -breakdown[label] : 0;
         }
 

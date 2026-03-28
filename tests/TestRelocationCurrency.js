@@ -2,6 +2,7 @@ const { TestFramework } = require('../src/core/TestFramework.js');
 const { EconomicData } = require('../src/core/EconomicData.js');
 const { TaxRuleSet } = require('../src/core/TaxRuleSet.js');
 const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelpers.js');
+const { getDisplayAmountByLabelAndCountry } = require('./helpers/DisplayAttributionTestHelpers.js');
 const vm = require('vm');
 
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
@@ -104,14 +105,6 @@ function assertInRange(label, actual, lowerBound, upperBound, errors) {
   if (actual < lowerBound || actual > upperBound) {
     errors.push(`${label} out of range [${lowerBound}, ${upperBound}]: got ${actual}`);
   }
-}
-
-function readAttribution(row, bucket, key) {
-  if (!row || !row.attributions) return null;
-  const group = row.attributions[bucket];
-  if (!group || typeof group !== 'object') return null;
-  if (!Object.prototype.hasOwnProperty.call(group, key)) return null;
-  return group[key];
 }
 
 function buildEconomicData() {
@@ -305,8 +298,8 @@ module.exports = {
       assertFinite(row.cash, `Cash balance @${age}`, errors, 5e12);
     });
 
-    const preMoveSalary = readAttribution(row34, 'incomesalaries', 'IE_Salary');
-    const preMoveRent = readAttribution(row34, 'incomerentals', 'IE_Rent');
+    const preMoveSalary = getDisplayAmountByLabelAndCountry(row34, 'IncomeSalaries', 'IE_Salary', 'sourceCountry', 'ie');
+    const preMoveRent = getDisplayAmountByLabelAndCountry(row34, 'IncomeRentals', 'IE_Rent', 'sourceCountry', 'ie');
     if (!Number.isFinite(preMoveSalary) || preMoveSalary <= 0) {
       errors.push('Pre-move IE salary attribution missing or invalid');
     }
@@ -314,8 +307,8 @@ module.exports = {
       errors.push('Pre-move IE rent attribution missing or invalid');
     }
 
-    const moveYearIERent = readAttribution(row35, 'incomerentals', 'IE_Rent (IE)');
-    const moveYearARRent = readAttribution(row35, 'incomerentals', 'AR_Rent');
+    const moveYearIERent = getDisplayAmountByLabelAndCountry(row35, 'IncomeRentals', 'IE_Rent', 'sourceCountry', 'ie');
+    const moveYearARRent = getDisplayAmountByLabelAndCountry(row35, 'IncomeRentals', 'AR_Rent', 'sourceCountry', 'ar');
     if (!Number.isFinite(moveYearARRent) || moveYearARRent <= 0) {
       errors.push('AR rent should contribute immediately after relocation');
     }

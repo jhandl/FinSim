@@ -118,7 +118,8 @@ graph TD
 *   **[`DataAggregatesCalculator.js`](src/core/DataAggregatesCalculator.js:1):** Calculates aggregate statistics from simulation data for charts and summaries.
 *   **[`Attribution.js`](src/core/Attribution.js:1):** Primitive used to capture and aggregate per‑source contributions (income, taxes, gains).
 *   **[`AttributionManager.js`](src/core/AttributionManager.js:1):** Orchestrates yearly attribution tracking used across `Taxman` and the simulator.
-*   **[`InvestmentTypeFactory.js`](src/core/InvestmentTypeFactory.js:1):** Builds generic investment assets from tax‑rule `investmentTypes`, enabling dynamic per‑type assets beyond the legacy two (Funds/Shares).
+*   **Display attribution contract:** raw attribution buckets remain internal to the core; row objects exposed to the UI use exact rendered column keys under `displayAttributions[columnKey][itemId]` with structured metadata such as `sourceCountry`, `taxCountry`, and `investmentKey`.
+*   **[`InvestmentTypeFactory.js`](src/core/InvestmentTypeFactory.js:1):** Builds generic investment assets from tax‑rule `investmentTypes`, enabling dynamic per-type assets beyond the legacy two (Funds/Shares).
 *   **[`LegacyScenarioAdapter.js`](src/core/LegacyScenarioAdapter.js:1):** Standalone module that maps legacy CSV field names (`InitialETFs`, `FundsAllocation`, `PriorityFunds`, etc.) to modern namespaced equivalents. Supports backward compatibility with `demo.csv` and older scenarios.
 
 #### Investment Management

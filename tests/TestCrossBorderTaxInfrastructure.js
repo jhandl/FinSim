@@ -251,7 +251,7 @@ module.exports = {
       + 'if (countryAttr) {'
       + '  var bd = countryAttr.getBreakdown();'
       + '  for (var key in bd) {'
-      + '    if (key === "Foreign Tax Credit (US)") {'
+      + '    if (key === "Foreign Tax Credit") {'
       + '      countryCredit += bd[key];'
       + '      hasCountryLabel = true;'
       + '    }'
@@ -268,7 +268,7 @@ module.exports = {
       errors.push('Foreign tax credit should be attributed under tax:incomeTax:us as -50');
     }
     if (!ftcResults.hasCountryLabel) {
-      errors.push('Foreign tax credit country attribution should include label "Foreign Tax Credit (US)"');
+      errors.push('Foreign tax credit country attribution should include label "Foreign Tax Credit"');
     }
 
     // Test 8: Cross-border rental source taxation + treaty credit behavior

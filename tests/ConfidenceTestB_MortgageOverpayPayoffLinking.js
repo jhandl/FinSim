@@ -1,5 +1,6 @@
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { TOY_AA, microParams, installTestTaxRules } = require('./helpers/CoreConfidenceFixtures.js');
+const { getDisplayAmountByLabel } = require('./helpers/DisplayAttributionTestHelpers.js');
 
 module.exports = {
   name: 'C_B-MortgageOverpayPayoffLinking',
@@ -45,13 +46,12 @@ module.exports = {
     // By age-40 payoff row, regular amortization has reduced 40,000.
     // MO contributes 3,000 for ages 31..40 => 30,000.
     // Remaining = 80,000 - 40,000 - 30,000 = 10,000.
-    const payoff = row40.attributions.expenses['Mortgage Payoff (home)'] || 0;
+    const payoff = getDisplayAmountByLabel(row40, 'Expenses', 'Mortgage Payoff (home)');
     if (Math.abs(payoff - 10000) > 2) {
       errors.push(`Age 40: Expected payoff ≈ 10000, got ${payoff}`);
     }
 
-    const row41Expenses = row41.attributions && row41.attributions.expenses ? row41.attributions.expenses : {};
-    const mortgageAt41 = row41Expenses['Mortgage (home)'] || 0;
+    const mortgageAt41 = getDisplayAmountByLabel(row41, 'Expenses', 'Mortgage (home)');
     if (Math.abs(mortgageAt41) > 1) {
       errors.push(`Age 41: Expected no mortgage payment after payoff, got ${mortgageAt41}`);
     }

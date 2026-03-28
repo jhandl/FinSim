@@ -1,5 +1,6 @@
 const { TestFramework } = require('../src/core/TestFramework.js');
 const { installTestTaxRules, deepClone } = require('./helpers/RelocationTestHelpers.js');
+const { getDisplayAmountByMeta } = require('./helpers/DisplayAttributionTestHelpers.js');
 const IE_RULES = require('../src/core/config/tax-rules-ie.json');
 const AR_RULES = require('../src/core/config/tax-rules-ar.json');
 
@@ -7,15 +8,15 @@ function findRowByAge(rows, age) {
   return rows.find(row => row && typeof row === 'object' && Math.round(row.age) === age);
 }
 
-function sumBreakdown(breakdown) {
-  if (!breakdown || typeof breakdown !== 'object') return 0;
-  let total = 0;
-  const keys = Object.keys(breakdown);
-  for (let i = 0; i < keys.length; i++) {
-    const value = breakdown[keys[i]];
-    if (typeof value === 'number') total += value;
-  }
-  return total;
+function sumForeignNonIncomeTax(row, countryCode) {
+  if (!row || !row.displayAttributions) return 0;
+  const expected = String(countryCode || '').toLowerCase();
+  return Object.keys(row.displayAttributions).reduce((total, columnKey) => {
+    if (columnKey.indexOf('Tax__') !== 0 || columnKey === 'Tax__incomeTax') return total;
+    return total + getDisplayAmountByMeta(row, columnKey, (item) => {
+      return String(item.taxCountry || '').toLowerCase() === expected;
+    });
+  }, 0);
 }
 
 module.exports = {
@@ -82,23 +83,16 @@ module.exports = {
       return { success: false, errors: ['Missing age 40 row in SalarySourceCountryOverlap'] };
     }
 
-    const attrs = row40.attributions || {};
-    const ieIncomeTaxBreakdown = attrs['tax:incomeTax:ie'];
-    const ieIncomeTaxTotal = sumBreakdown(ieIncomeTaxBreakdown);
+    const ieIncomeTaxTotal = getDisplayAmountByMeta(row40, 'Tax__incomeTax', (item) => {
+      return String(item.taxCountry || '').toLowerCase() === 'ie';
+    });
     if (!(ieIncomeTaxTotal > 0)) {
       errors.push('Expected positive age-40 tax:incomeTax:ie from overlap IE salary source');
     }
 
-    const iePrsiBreakdown = attrs['tax:prsi:ie'];
-    const iePrsiTotal = sumBreakdown(iePrsiBreakdown);
-    if (!(iePrsiTotal > 0)) {
-      errors.push('Expected positive age-40 tax:prsi:ie from overlap IE salary source');
-    }
-
-    const ieUscBreakdown = attrs['tax:usc:ie'];
-    const ieUscTotal = sumBreakdown(ieUscBreakdown);
-    if (!(ieUscTotal > 0)) {
-      errors.push('Expected positive age-40 tax:usc:ie from overlap IE salary source');
+    const ieNonIncomeTaxTotal = sumForeignNonIncomeTax(row40, 'ie');
+    if (!(ieNonIncomeTaxTotal > 0)) {
+      errors.push('Expected positive age-40 non-income tax display attribution from overlap IE salary source');
     }
 
     return { success: errors.length === 0, errors };

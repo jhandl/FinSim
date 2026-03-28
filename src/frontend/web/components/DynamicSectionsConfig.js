@@ -221,17 +221,6 @@ const DYNAMIC_SECTIONS = [
       const lowerCountryCode = String(countryCode || '').toLowerCase();
       const cachedRuleSets = config.listCachedRuleSets();
 
-      const sampleAttributions = [];
-      if (typeof window !== 'undefined' && Array.isArray(window.dataSheet) && window.dataSheet.length > 1) {
-        for (let i = 1; i < window.dataSheet.length; i++) {
-          const row = window.dataSheet[i];
-          const attrs = row && row.attributions;
-          if (attrs) {
-            sampleAttributions.push(attrs);
-          }
-        }
-      }
-
       const sourceOnlyTaxIdsByCountry = {};
       const cachedCountries = Object.keys(cachedRuleSets || {}).sort();
       for (let ci = 0; ci < cachedCountries.length; ci++) {
@@ -256,40 +245,33 @@ const DYNAMIC_SECTIONS = [
         }
       }
 
-      for (let i = 0; i < sampleAttributions.length; i++) {
-        const attrs = sampleAttributions[i];
-        if (!attrs || typeof attrs !== 'object') continue;
-        const metricKeys = Object.keys(attrs);
-        for (let mk = 0; mk < metricKeys.length; mk++) {
-          const metricKey = metricKeys[mk];
-          const match = /^tax:([^:]+):([a-z]{2,})$/i.exec(metricKey);
-          if (!match) continue;
-          const taxId = String(match[1] || '');
-          const taxIdLower = taxId.toLowerCase();
-          const foreignCountry = String(match[2] || '').toLowerCase();
-          if (!foreignCountry || foreignCountry === lowerCountryCode) continue;
-          const sourceRuleSet = cachedRuleSets ? cachedRuleSets[foreignCountry] : null;
-          let mappedTaxId = null;
-          if (sourceRuleSet && typeof sourceRuleSet.getEquivalentTaxIdIn === 'function') {
-            mappedTaxId = sourceRuleSet.getEquivalentTaxIdIn(taxRuleSet, taxId);
-          } else if (residenceTaxSet[taxIdLower]) {
-            mappedTaxId = taxId;
-          }
-          if (mappedTaxId) continue;
-          const metric = attrs[metricKey];
-          if (!metric || typeof metric !== 'object') continue;
-          const sources = Object.keys(metric);
-          let hasAmount = false;
-          for (let j = 0; j < sources.length; j++) {
-            const amount = metric[sources[j]];
-            if (typeof amount === 'number' && amount !== 0) {
-              hasAmount = true;
-              break;
+      if (typeof window !== 'undefined' && Array.isArray(window.dataSheet) && window.dataSheet.length > 1) {
+        for (let i = 1; i < window.dataSheet.length; i++) {
+          const row = window.dataSheet[i];
+          const taxByKey = row && row.taxByKey;
+          if (!taxByKey || typeof taxByKey !== 'object') continue;
+          const taxKeys = Object.keys(taxByKey);
+          for (let tk = 0; tk < taxKeys.length; tk++) {
+            const rawTaxKey = taxKeys[tk];
+            const match = /^([^:]+):([a-z]{2,})$/i.exec(String(rawTaxKey || ''));
+            if (!match) continue;
+            const taxId = String(match[1] || '');
+            const taxIdLower = taxId.toLowerCase();
+            const foreignCountry = String(match[2] || '').toLowerCase();
+            const amount = taxByKey[rawTaxKey];
+            if (!taxId || !foreignCountry || foreignCountry === lowerCountryCode) continue;
+            if (typeof amount !== 'number' || amount === 0) continue;
+            const sourceRuleSet = cachedRuleSets ? cachedRuleSets[foreignCountry] : null;
+            let mappedTaxId = null;
+            if (sourceRuleSet && typeof sourceRuleSet.getEquivalentTaxIdIn === 'function') {
+              mappedTaxId = sourceRuleSet.getEquivalentTaxIdIn(taxRuleSet, taxId);
+            } else if (residenceTaxSet[taxIdLower]) {
+              mappedTaxId = taxId;
             }
+            if (mappedTaxId) continue;
+            if (!sourceOnlyTaxIdsByCountry[foreignCountry]) sourceOnlyTaxIdsByCountry[foreignCountry] = {};
+            sourceOnlyTaxIdsByCountry[foreignCountry][taxId] = true;
           }
-          if (!hasAmount) continue;
-          if (!sourceOnlyTaxIdsByCountry[foreignCountry]) sourceOnlyTaxIdsByCountry[foreignCountry] = {};
-          sourceOnlyTaxIdsByCountry[foreignCountry][taxId] = true;
         }
       }
 
