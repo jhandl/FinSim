@@ -390,7 +390,7 @@ class FormatUtils {
       // Config not initialized yet; continue with null to allow fallbacks
     }
 
-    return text.replace(/\${([^}]+)}/g, (match, variable) => {
+    const resolveVariable = (variable) => {
       let [varToken, format] = variable.split(',').map(s => s.trim());
 
       if (varToken.startsWith('investmentType.')) {
@@ -404,12 +404,26 @@ class FormatUtils {
             return FormatUtils.formatValue(value, format);
           }
         }
-        return match;
+        return undefined;
       }
 
       if (varToken.startsWith('taxRules.') && context && context.taxRules) {
         const path = varToken.substring('taxRules.'.length).split('.');
         let value = context.taxRules;
+        for (let i = 0; i < path.length && value !== undefined && value !== null; i++) {
+          value = value[path[i]];
+        }
+        if (value !== undefined && value !== null) {
+          return FormatUtils.formatValue(value, format);
+        }
+      }
+
+      if (context && Object.prototype.hasOwnProperty.call(context, varToken)) {
+        return FormatUtils.formatValue(context[varToken], format);
+      }
+      if (context && varToken.includes('.')) {
+        const path = varToken.split('.');
+        let value = context;
         for (let i = 0; i < path.length && value !== undefined && value !== null; i++) {
           value = value[path[i]];
         }
@@ -498,7 +512,28 @@ class FormatUtils {
         }
       } catch (_) {}
 
-      console.warn(`Variable ${varToken} not found in config.`);
+      return undefined;
+    };
+
+    return text.replace(/(\s*)\[([^\[\]]*\${[^}]+}[^\[\]]*)\](\s*)|\${([^}]+)}/g, (match, leadingWs, optionalText, trailingWs, variable, offset, sourceText) => {
+      if (optionalText !== undefined) {
+        if (sourceText.charAt(offset + match.length) === '(') return match;
+        let missingValue = false;
+        const resolved = optionalText.replace(/\${([^}]+)}/g, (innerMatch, innerVariable) => {
+          const value = resolveVariable(innerVariable);
+          if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+            missingValue = true;
+            return '';
+          }
+          return value;
+        });
+        return missingValue ? (leadingWs && trailingWs ? ' ' : '') : leadingWs + resolved + trailingWs;
+      }
+
+      const value = resolveVariable(variable);
+      if (value !== undefined && value !== null) return value;
+
+      console.warn(`Variable ${variable.split(',')[0].trim()} not found in config.`);
       return match;
     });
   }

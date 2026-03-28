@@ -761,6 +761,38 @@ class WebUI extends AbstractUI {
         const defaultInflation = getCountryInflationDefault(code);
         input.placeholder = formatInflationPlaceholder(defaultInflation);
       };
+      const getInflationDefaultTooltipText = () => {
+        const help = window.driver?.js?.getHelpData?.();
+        const step = Array.isArray(help?.WizardSteps)
+          ? help.WizardSteps.find((s) => s.element === '#Inflation_currentCountry')
+          : null;
+        return step && typeof step.defaultTooltip === 'string'
+          ? step.defaultTooltip.trim()
+          : '';
+      };
+      const inflationDefaultTooltipText = getInflationDefaultTooltipText();
+      const attachInflationDefaultTooltip = (input, code) => {
+        if (!input || !inflationDefaultTooltipText || typeof TooltipUtils === 'undefined') return;
+        if (input.dataset.defaultInflationTooltipAttached === 'true') return;
+        TooltipUtils.attachTooltip(input, () => {
+          const hasUserValue = String(input.value || '').trim() !== '';
+          const hasDefaultPlaceholder = String(input.placeholder || '').trim() !== '';
+          if (hasUserValue || !hasDefaultPlaceholder) return '';
+          if (typeof FormatUtils !== 'undefined' && typeof FormatUtils.processVariables === 'function') {
+            const scenarioCountries = this.getScenarioCountries();
+            const countryName = (Array.isArray(scenarioCountries) && scenarioCountries.length > 1)
+              ? (cfg.getCountryNameByCode(code) || '')
+              : '';
+            return FormatUtils.processVariables(inflationDefaultTooltipText, { countryName: countryName });
+          }
+          return inflationDefaultTooltipText;
+        }, {
+          hoverDelay: 300,
+          touchDelay: 400,
+          hideOnWizard: true
+        });
+        input.dataset.defaultInflationTooltipAttached = 'true';
+      };
       const makeGrowthRow = (labelText, growthId, volId) => {
         const tr = document.createElement('tr');
         tr.setAttribute('data-dynamic-investment-param', 'true');
@@ -841,7 +873,9 @@ class WebUI extends AbstractUI {
         const trInflation = document.createElement('tr');
         trInflation.setAttribute('data-dynamic-inflation-row', 'true');
         const infLabel = document.createElement('td');
-        infLabel.textContent = 'Inflation (' + selectedCode.toUpperCase() + ')';
+        infLabel.textContent = showCountryChips
+          ? 'Inflation (' + selectedCode.toUpperCase() + ')'
+          : 'Inflation';
         trInflation.appendChild(infLabel);
         const infGrowth = document.createElement('td');
         const infWrap = document.createElement('div');
@@ -852,6 +886,7 @@ class WebUI extends AbstractUI {
         infInput.setAttribute('pattern', '[0-9]*');
         infInput.setAttribute('step', '0.1');
         applyInflationPlaceholder(infInput, selectedCode);
+        attachInflationDefaultTooltip(infInput, selectedCode);
         infWrap.appendChild(infInput);
         infGrowth.appendChild(infWrap);
         trInflation.appendChild(infGrowth);

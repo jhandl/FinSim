@@ -3,8 +3,15 @@ const path = require('path');
 
 // Mocks
 global.AbstractUI = class {};
-global.FormatUtils = class { 
-  setupPercentageInputs() {} 
+global.FormatUtils = class {
+  static formatPercentage(value) {
+    return `${(Number(value || 0) * 100).toFixed(1)}%`;
+  }
+  static processVariables(text, context = null) {
+    const countryName = context && context.countryName ? `${context.countryName}'s ` : '';
+    return String(text || '').replace('[${countryName}\'s ]', countryName);
+  }
+  setupPercentageInputs() {}
   setupCurrencyInputs() {}
 };
 global.NotificationUtils = class { setStatus() {} setErrorModalUtils() {} };
@@ -25,7 +32,7 @@ global.runs = 1000;
 global.RelocationUtils = { extractRelocationTransitions: () => {} };
 global.Wizard = class { static getInstance() {} };
 global.DropdownUtils = { create: () => {} };
-global.TooltipUtils = { attachTooltip: () => {} };
+global.TooltipUtils = { attachTooltip: jest.fn() };
 global.CountryChipSelector = class { render() {} };
 global.RelocationImpactDetector = class {};
 global.RelocationImpactAssistant = class {};
@@ -123,6 +130,8 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     webUI.hasRelocationEvents = jest.fn(() => false);
     webUI.hasEffectiveRelocationEvents = jest.fn(() => false);
     webUI.getScenarioCountries = jest.fn(() => ['ie']);
+    TooltipUtils.attachTooltip.mockClear();
+    window.driver = { js: { getHelpData: () => ({ WizardSteps: [] }) } };
   });
 
   test('skips wrapper-level inputs for investment types with baseRef', () => {
@@ -242,6 +251,7 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     const tbody = document.querySelector('.growth-rates-table tbody');
     const lastRow = tbody.querySelector('tr:last-child');
     expect(lastRow.getAttribute('data-dynamic-inflation-row')).toBe('true');
+    expect(lastRow.querySelector('td').textContent).toBe('Inflation');
   });
 
   test('renders inflation row as last row in multi-country mode', () => {
@@ -266,6 +276,71 @@ describe('WebUI.renderInvestmentParameterFields', () => {
     const tbody = document.querySelector('.growth-rates-table tbody');
     const lastRow = tbody.querySelector('tr:last-child');
     expect(lastRow.getAttribute('data-dynamic-inflation-row')).toBe('true');
+    expect(lastRow.querySelector('td').textContent).toBe('Inflation (IE)');
+  });
+
+  test('attaches inflation default tooltip and only shows text when input is blank with default placeholder', () => {
+    const tooltipText = 'Leave this blank to use the default inflation rate based on [${countryName}\'s ]historical data.';
+    window.driver = {
+      js: {
+        getHelpData: () => ({
+          WizardSteps: [
+            { element: '#Inflation_currentCountry', defaultTooltip: tooltipText }
+          ]
+        })
+      }
+    };
+    mockConfig.getCachedTaxRuleSet.mockImplementation((code) => ({
+      ...defaultRuleset(),
+      getInflationRate: () => (String(code || '').toLowerCase() === 'ie' ? 0.021 : 0.03)
+    }));
+
+    webUI.renderInvestmentParameterFields([]);
+
+    const inflationInput = document.getElementById('Inflation_ie');
+    const tooltipCall = TooltipUtils.attachTooltip.mock.calls.find((args) => args[0] === inflationInput);
+    expect(tooltipCall).toBeDefined();
+    expect(typeof tooltipCall[1]).toBe('function');
+    expect(tooltipCall[2].showOnFocus).toBeUndefined();
+    expect(tooltipCall[2].hideOnWizard).toBe(true);
+
+    const provider = tooltipCall[1];
+    inflationInput.value = '';
+    expect(provider()).toBe('Leave this blank to use the default inflation rate based on historical data.');
+
+    inflationInput.value = '3';
+    expect(provider()).toBe('');
+
+    inflationInput.value = '';
+    inflationInput.placeholder = '';
+    expect(provider()).toBe('');
+  });
+
+  test('includes country name in inflation tooltip text when scenario has multiple countries', () => {
+    const tooltipText = 'Leave this blank to use the default inflation rate based on [${countryName}\'s ]historical data.';
+    window.driver = {
+      js: {
+        getHelpData: () => ({
+          WizardSteps: [
+            { element: '#Inflation_currentCountry', defaultTooltip: tooltipText }
+          ]
+        })
+      }
+    };
+    webUI.getScenarioCountries = jest.fn(() => ['ie', 'ar']);
+    mockConfig.getCachedTaxRuleSet.mockImplementation((code) => ({
+      ...defaultRuleset(),
+      getInflationRate: () => (String(code || '').toLowerCase() === 'ie' ? 0.021 : 0.03)
+    }));
+
+    webUI.renderInvestmentParameterFields([]);
+
+    const inflationInput = document.getElementById('Inflation_ie');
+    const tooltipCall = TooltipUtils.attachTooltip.mock.calls.find((args) => args[0] === inflationInput);
+    const provider = tooltipCall[1];
+
+    inflationInput.value = '';
+    expect(provider()).toBe('Leave this blank to use the default inflation rate based on Ireland\'s historical data.');
   });
 
   test('keeps canonical StartCountry inflation when switching chip visibility', () => {
