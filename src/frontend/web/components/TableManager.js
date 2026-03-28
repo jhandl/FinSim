@@ -383,37 +383,38 @@ class TableManager {
             breakdown = attributions.income;
           }
 
-          // Consolidated display for capital gains tax: show pre-relief by category and relief at end
+          // Consolidated display for capital gains tax: show realized gains, pre-relief tax, and relief
           if (key === 'Tax__capitalGains' && !taxCountry && attributions) {
-            try {
-              const cap = attributions['tax:capitalGains'] || {};
-              let fundsPost = 0;
-              let sharesPost = 0;
-              let relief = 0; // positive value for magnitude
-              for (const src in cap) {
-                const amt = cap[src] || 0;
-                if (src === 'CGT Relief' && amt < 0) { relief += (-amt); continue; }
-                const s = String(src).toLowerCase();
-                // Heuristics: index funds and deemed disposal entries belong to funds/exit tax
-                if (s.includes('index') || s.includes('fund')) {
-                  fundsPost += amt;
-                } else if (s.includes('deemed')) {
-                  fundsPost += amt;
-                } else if (s.includes('share')) {
-                  sharesPost += amt;
-                } else {
-                  // Unknown label: assign to shares by default (CGT category)
-                  sharesPost += amt;
-                }
-              }
-              const fundsPre = fundsPost; // exit tax not subject to CGT relief
-              const sharesPre = sharesPost + relief; // reconstruct pre-relief tax for shares
-              const synthetic = {};
-              synthetic['Index Funds gains'] = fundsPre;
-              synthetic['Shares gains'] = sharesPre;
-              synthetic['CGT Relief'] = -relief;
-              breakdown = synthetic;
-            } catch (_) { }
+            const gainsBreakdown = attributions['capitalgains'] || {};
+            const preReliefTaxBreakdown = attributions['tax:capitalGainsPreRelief'] || {};
+            const taxBreakdown = attributions['tax:capitalGains'] || {};
+            const synthetic = {};
+            const seenSources = {};
+            const orderedSources = [];
+            const appendSource = (source) => {
+              if (!source || seenSources[source]) return;
+              seenSources[source] = true;
+              orderedSources.push(source);
+            };
+            const toBaseLabel = (source) => String(source || '').trim().replace(/\s+(sale|sim)$/i, '');
+            const toGainLabel = (baseLabel) => /gain(s)?$/i.test(baseLabel) ? baseLabel : (baseLabel + ' Gains');
+            const toTaxLabel = (baseLabel) => /tax$/i.test(baseLabel) ? baseLabel : (baseLabel + ' Tax');
+
+            for (const source in gainsBreakdown) appendSource(source);
+            for (const source in preReliefTaxBreakdown) appendSource(source);
+
+            for (let i = 0; i < orderedSources.length; i++) {
+              const source = orderedSources[i];
+              const baseLabel = toBaseLabel(source);
+              const gainsAmount = gainsBreakdown[source] || 0;
+              const preReliefTaxAmount = preReliefTaxBreakdown[source] || 0;
+              if (gainsAmount !== 0) synthetic[toGainLabel(baseLabel)] = gainsAmount;
+              if (preReliefTaxAmount !== 0) synthetic[toTaxLabel(baseLabel)] = preReliefTaxAmount;
+            }
+            if ((taxBreakdown['CGT Relief'] || 0) !== 0) {
+              synthetic['CGT Relief'] = taxBreakdown['CGT Relief'];
+            }
+            breakdown = synthetic;
           }
         }
 
@@ -526,10 +527,12 @@ class TableManager {
                 });
               }
             } else {
-              const residenceBreakdown = attributions['tax:' + taxId]
-                || attributions['tax:' + taxId.toLowerCase()]
-                || breakdown
-                || {};
+              const residenceBreakdown = (key === 'Tax__capitalGains' && !taxCountry && breakdown)
+                ? breakdown
+                : (attributions['tax:' + taxId]
+                  || attributions['tax:' + taxId.toLowerCase()]
+                  || breakdown
+                  || {});
               const residenceEntries = Object.entries(residenceBreakdown);
               const residenceTaxLines = [];
               const creditByLabel = {};

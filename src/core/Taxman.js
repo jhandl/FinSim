@@ -328,6 +328,7 @@ class Taxman {
       assetCountry: assetCountry ? String(assetCountry).toLowerCase() : null
     };
     rateBucket.entries.push(entry);
+    this.attributionManager.record('capitalgains', description, amount);
 
   };
 
@@ -2106,6 +2107,10 @@ class Taxman {
           const usedLoss = Math.min(remainingAllowableLosses, remainingForThis);
           remainingAllowableLosses -= usedLoss;
           remainingForThis -= usedLoss;
+        }
+
+        if (remainingForThis > 0) {
+          this.attributionManager.record('tax:capitalGainsPreRelief', entry.description, remainingForThis * numericRate);
         }
 
         // For CGT entries, apply annual exemption if eligible
