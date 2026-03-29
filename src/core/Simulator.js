@@ -1255,7 +1255,7 @@ function processEvents() {
           cash += entryConvertedAmount;
           cashMoney.amount += entryConvertedAmount;
           incomeSale += entryConvertedAmount;
-          attributionManager.record('incomesale', 'Sale (' + entry.eventId + ')', entryConvertedAmount);
+          attributionManager.record('incomesale', entry.label || ('Sale (' + entry.eventId + ')'), entryConvertedAmount);
           attributionManager.record('realestatecapital', entry.label || ('Sale (' + entry.eventId + ')'), -entryConvertedAmount);
           var salePropertyId = entry.eventId;
           var forwardSettlement = (typeof entry.forwardMortgagePayoff === 'number') ? (entry.forwardMortgagePayoff * entryConversionFactor) : 0;
@@ -1773,7 +1773,7 @@ function processEvents() {
       recordIncomeEntry(saleState, saleEntryInfo, saleProceeds, {
         type: 'sale',
         eventId: event.id,
-        label: 'Sale (' + event.id + ')',
+        label: 'Sale (' + (event.name || event.id) + ')',
         allowZero: true,
         purchaseBasis: purchaseBasis,
         propertyCountry: salePropertyCountry,

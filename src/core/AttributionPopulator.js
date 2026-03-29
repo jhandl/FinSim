@@ -331,6 +331,122 @@ function addCapitalGainsDisplay(dataRow, currentAttributions, residenceCountry) 
   }
 }
 
+function sumAttributionBaseTotals(currentAttributions, baseSet) {
+  var out = {};
+  var baseKeys = Object.keys(baseSet || {});
+  for (var b = 0; b < baseKeys.length; b++) {
+    out[baseKeys[b]] = 0;
+  }
+  if (!currentAttributions) return out;
+
+  var keys = Object.keys(currentAttributions || {});
+  for (var i = 0; i < keys.length; i++) {
+    var metricKey = keys[i];
+    if (!metricKey) continue;
+    var base = metricKey;
+    var idx = metricKey.indexOf(':');
+    if (idx > 0) base = metricKey.substring(0, idx);
+    if (!baseSet || !baseSet[base]) continue;
+
+    var attribution = currentAttributions[metricKey];
+    if (!attribution || typeof attribution.getBreakdown !== 'function') continue;
+    var breakdown = attribution.getBreakdown() || {};
+    for (var src in breakdown) {
+      if (!Object.prototype.hasOwnProperty.call(breakdown, src)) continue;
+      var amount = breakdown[src];
+      if (typeof amount !== 'number' || amount === 0) continue;
+      out[base] += amount;
+    }
+  }
+  return out;
+}
+
+function sumInvestmentIncome(investmentIncomeByKey) {
+  var total = 0;
+  if (!investmentIncomeByKey) return 0;
+  var keys = Object.keys(investmentIncomeByKey || {});
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var amount = investmentIncomeByKey[k];
+    if (typeof amount !== 'number' || amount === 0) continue;
+    total += amount;
+  }
+  return total;
+}
+
+function addAttributionBaseSlicesToDisplay(dataRow, currentAttributions, baseMetricKey, columnKey, kind) {
+  if (!currentAttributions) return;
+  var keys = Object.keys(currentAttributions || {});
+  for (var i = 0; i < keys.length; i++) {
+    var metricKey = keys[i];
+    if (!metricKey) continue;
+    var base = metricKey;
+    var idx = metricKey.indexOf(':');
+    if (idx > 0) base = metricKey.substring(0, idx);
+    if (base !== baseMetricKey) continue;
+
+    var attribution = currentAttributions[metricKey];
+    if (!attribution || typeof attribution.getBreakdown !== 'function') continue;
+    var breakdown = attribution.getBreakdown() || {};
+    for (var src in breakdown) {
+      if (!Object.prototype.hasOwnProperty.call(breakdown, src)) continue;
+      var amount = breakdown[src];
+      if (typeof amount !== 'number' || amount === 0) continue;
+      addDisplayItem(dataRow, columnKey, { label: src, amount: amount, kind: kind || 'other' });
+    }
+  }
+}
+
+function sumTaxTotals(revenue) {
+  var total = 0;
+  var map = (revenue && revenue.taxTotals) ? revenue.taxTotals : null;
+  if (!map) return 0;
+  for (var taxId in map) {
+    if (!Object.prototype.hasOwnProperty.call(map, taxId)) continue;
+    var amount = map[taxId];
+    if (typeof amount !== 'number' || amount === 0) continue;
+    total += amount;
+  }
+  return total;
+}
+
+function addNetIncomeDisplay(dataRow, currentAttributions, revenue, investmentIncomeByKey) {
+  var investmentIncomeTotal = sumInvestmentIncome(investmentIncomeByKey);
+  var totals = sumAttributionBaseTotals(currentAttributions, {
+    incomesalaries: true,
+    incomersus: true,
+    incomerentals: true,
+    incomeprivatepension: true,
+    incomestatepension: true,
+    incomedefinedbenefit: true,
+    incometaxfree: true,
+    incomecash: true,
+    pensioncontribution: true
+  });
+  var grossIncome =
+    (totals.incomesalaries || 0) +
+    (totals.incomersus || 0) +
+    (totals.incomerentals || 0) +
+    (totals.incomeprivatepension || 0) +
+    (totals.incomestatepension || 0) +
+    (totals.incomedefinedbenefit || 0) +
+    (totals.incometaxfree || 0) +
+    investmentIncomeTotal;
+  var cashWithdrawals = totals.incomecash || 0;
+  var pensionContrib = totals.pensioncontribution || 0;
+  var totalTax = sumTaxTotals(revenue);
+  var deductions = totalTax + pensionContrib;
+
+  addDisplayItem(dataRow, 'NetIncome', { label: 'Gross income', amount: grossIncome, kind: 'income' });
+  addAttributionBaseSlicesToDisplay(dataRow, currentAttributions, 'incomesale', 'NetIncome', 'income');
+  if (cashWithdrawals) {
+    addDisplayItem(dataRow, 'NetIncome', { label: 'Cash withdrawals', amount: cashWithdrawals, kind: 'income' });
+  }
+  if (deductions) {
+    addDisplayItem(dataRow, 'NetIncome', { label: 'Deductions', amount: -deductions, kind: 'deduction' });
+  }
+}
+
 function populateDisplayAttributionFields(dataRow, investmentAssets, investmentIncomeByKey, attributionManager, revenue, residenceCountry) {
   var currentAttributions = attributionManager.getAllAttributions();
   addExpenseDisplays(dataRow, currentAttributions);
@@ -339,6 +455,7 @@ function populateDisplayAttributionFields(dataRow, investmentAssets, investmentI
   addDynamicInvestmentCapitalDisplays(dataRow, investmentAssets);
   addTaxDisplays(dataRow, currentAttributions, residenceCountry);
   addCapitalGainsDisplay(dataRow, currentAttributions, residenceCountry);
+  addNetIncomeDisplay(dataRow, currentAttributions, revenue, investmentIncomeByKey);
 
   // After processing display attributions, accumulate dynamic taxTotals
   var totMap = revenue.taxTotals;
