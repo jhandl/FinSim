@@ -1,5 +1,8 @@
 /* Chart management functionality */
 
+const SPIKE_CLIP_MARGIN = 0.10;
+const SPIKE_VIRTUAL_APEX_RATIO = 0.30;
+
 class ChartManager {
 
   constructor(webUI) {
@@ -1109,6 +1112,83 @@ class ChartManager {
     this.drawRelocationMarkers();
   }
 
+  _formatCompactSpikeValue(value) {
+    const n = Math.abs(value);
+    if (n >= 1000000) return '€' + ((Math.round(n / 100000) / 10) + 'M').replace('.0M', 'M');
+    if (n >= 1000) return '€' + ((Math.round(n / 100) / 10) + 'k').replace('.0k', 'k');
+    return '€' + Math.round(n);
+  }
+
+  _roundUpNice(value) {
+    if (!isFinite(value) || value <= 0) return value;
+    const exponent = Math.max(0, Math.floor(Math.log10(value)) - 1);
+    const step = Math.pow(10, exponent);
+    return Math.ceil(value / step) * step;
+  }
+
+  _computeAndApplySpikeClip() {
+    if (!this.cashflowChart) return;
+    const chart = this.cashflowChart;
+    const yScale = chart.options && chart.options.scales && chart.options.scales.y;
+    if (!yScale) return;
+
+    this._spikeOriginals = {};
+    delete chart.$spikeAnnotations;
+    yScale.max = undefined;
+
+    const datasets = (chart.data && chart.data.datasets) || [];
+    const mainDatasets = datasets.filter(ds => ds && ds.stack === 'main');
+    if (!mainDatasets.length) return;
+
+    const points = (chart.data && chart.data.labels && chart.data.labels.length) || 0;
+    let maxSum = 0;
+    for (let i = 0; i < points; i++) {
+      let sum = 0;
+      for (let j = 0; j < mainDatasets.length; j++) {
+        const v = mainDatasets[j].data[i];
+        if (isFinite(v)) sum += v;
+      }
+      if (sum > maxSum) maxSum = sum;
+    }
+
+    const threshold = this._roundUpNice(maxSum * (1 + SPIKE_CLIP_MARGIN));
+    if (!isFinite(threshold) || threshold <= 0) return;
+    yScale.max = threshold;
+    const virtualApex = threshold * (1 + SPIKE_VIRTUAL_APEX_RATIO);
+
+    const byLabel = this.cashflowIndexByLabel || {};
+    const inflowsIdx = byLabel['Inflows'];
+    const outflowsIdx = byLabel['Outflows'];
+    const inflowsDs = inflowsIdx !== undefined ? datasets[inflowsIdx] : null;
+    const outflowsDs = outflowsIdx !== undefined ? datasets[outflowsIdx] : null;
+
+    const collectSpikes = (series, key) => {
+      if (!series || !Array.isArray(series.data)) return;
+      for (let i = 0; i < series.data.length; i++) {
+        const value = series.data[i];
+        if (!isFinite(value) || value <= threshold) continue;
+        if (!this._spikeOriginals[i]) this._spikeOriginals[i] = {};
+        this._spikeOriginals[i][key] = value;
+        series.data[i] = Math.min(value, virtualApex);
+      }
+    };
+
+    collectSpikes(inflowsDs, 'inflows');
+    collectSpikes(outflowsDs, 'outflows');
+
+    const spikeIndexes = Object.keys(this._spikeOriginals);
+    if (!spikeIndexes.length) return;
+    chart.$spikeAnnotations = [];
+    for (let k = 0; k < spikeIndexes.length; k++) {
+      const index = parseInt(spikeIndexes[k], 10);
+      const spike = this._spikeOriginals[index];
+      const entries = [];
+      if (spike.inflows > threshold) entries.push({ text: this._formatCompactSpikeValue(spike.inflows), color: '#4CAF50' });
+      if (spike.outflows > threshold) entries.push({ text: this._formatCompactSpikeValue(spike.outflows), color: '#f44336' });
+      if (entries.length) chart.$spikeAnnotations.push({ index: index, entries: entries });
+    }
+  }
+
   _repopulateFromCache() {
     if (!this.chartsInitialized) return false;
     const cached = this.cachedRowData || {};
@@ -1135,6 +1215,7 @@ class ChartManager {
       this.updateChartsRow(rowIndex, clone, { skipCashflowUpdate: true, skipAssetsUpdate: true, skipCacheStore: true });
     }
 
+    this._computeAndApplySpikeClip();
     if (this.cashflowChart) this.cashflowChart.update();
     if (this.assetsChart) this.assetsChart.update();
 
@@ -1155,6 +1236,10 @@ class ChartManager {
           this.cashflowChart.data.datasets.forEach(dataset => {
             dataset.data = [];
           });
+          delete this.cashflowChart.$spikeAnnotations;
+          if (this.cashflowChart.options && this.cashflowChart.options.scales && this.cashflowChart.options.scales.y) {
+            this.cashflowChart.options.scales.y.max = undefined;
+          }
           this.cashflowChart.update();
         }
         if (this.assetsChart) {
@@ -1165,6 +1250,7 @@ class ChartManager {
           this.assetsChart.update();
         }
         this.cachedRowData = {};
+        this._spikeOriginals = {};
         return;
       }
 

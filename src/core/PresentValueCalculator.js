@@ -70,6 +70,7 @@ function computePresentValueAggregates(ctx) {
   var incomeSalaries = ctx.incomeSalaries;
   var incomeShares = ctx.incomeShares;
   var incomeRentals = ctx.incomeRentals;
+  var incomeSale = ctx.incomeSale;
   var incomePrivatePension = ctx.incomePrivatePension;
   var incomeStatePension = ctx.incomeStatePension;
   var incomeStatePensionByCountry = ctx.incomeStatePensionByCountry;
@@ -79,6 +80,7 @@ function computePresentValueAggregates(ctx) {
   var incomeTaxFree = ctx.incomeTaxFree;
   var netIncome = ctx.netIncome;
   var expenses = ctx.expenses;
+  var purchaseCashUsedThisYear = ctx.purchaseCashUsedThisYear || 0;
   var cash = ctx.cash;
   var personalPensionContribution = ctx.personalPensionContribution;
   var personalPensionContributionByCountry = ctx.personalPensionContributionByCountry;
@@ -391,11 +393,12 @@ function computePresentValueAggregates(ctx) {
     }
     dataRow.incomeStatePensionPV += (statePensionPVInResidenceCurrency > 0) ? statePensionPVInResidenceCurrency : incomeStatePension;
     dataRow.incomeCashPV += Math.max(cashWithdraw, 0);
+    dataRow.incomeSalePV += incomeSale;
     dataRow.incomeDefinedBenefitPV += incomeDefinedBenefit;
     dataRow.incomeTaxFreePV += incomeTaxFree;
     dataRow.realEstateCapitalPV += realEstateCapitalPV;
     dataRow.netIncomePV += netIncome;
-    dataRow.expensesPV += expenses;
+    dataRow.expensesPV += expenses + purchaseCashUsedThisYear;
     dataRow.pensionFundPV += pensionFundPVTotal;
     // Pension contribution PV: Use per-country deflation (similar to pension fund PV logic)
     if (personalPensionContributionByCountry && typeof personalPensionContributionByCountry === 'object') {
@@ -518,11 +521,12 @@ function computePresentValueAggregates(ctx) {
     // State Pension PV: Use the pre-calculated statePensionPVInResidenceCurrency (calculated above before the if/else)
     dataRow.incomeStatePensionPV += statePensionPVInResidenceCurrency;
     dataRow.incomeCashPV += Math.max(cashWithdraw, 0) * deflationFactor;
+    dataRow.incomeSalePV += incomeSale * deflationFactor;
     dataRow.incomeDefinedBenefitPV += incomeDefinedBenefit * deflationFactor;
     dataRow.incomeTaxFreePV += incomeTaxFree * deflationFactor;
     dataRow.realEstateCapitalPV += realEstateCapitalPV;
     dataRow.netIncomePV += netIncome * deflationFactor;
-    dataRow.expensesPV += expenses * deflationFactor;
+    dataRow.expensesPV += (expenses + purchaseCashUsedThisYear) * deflationFactor;
     dataRow.pensionFundPV += pensionFundPVTotal;
     // Pension contribution PV: Use per-country deflation (similar to pension fund PV logic)
     if (personalPensionContributionByCountry && typeof personalPensionContributionByCountry === 'object') {
@@ -599,6 +603,7 @@ function computePresentValueAggregates(ctx) {
     dataRow.incomeSalariesPV +
     dataRow.incomeRSUsPV +
     dataRow.incomeRentalsPV +
+    dataRow.incomeSalePV +
     dataRow.incomePrivatePensionPV +
     dataRow.incomeStatePensionPV +
     dataRow.incomeDefinedBenefitPV +

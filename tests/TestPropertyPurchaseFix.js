@@ -64,7 +64,7 @@ module.exports = {
             target: 'age',
             age: 30,
             field: 'expenses',
-            expected: 90000, // Should show only unfunded portion (100k - 10k cash)
+            expected: 100000, // Outflows show full purchase amount
             tolerance: 1
         },
         {

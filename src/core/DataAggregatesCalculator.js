@@ -23,6 +23,7 @@
  *   @param {number} ctx.incomeSalaries - Pre-extracted .amount from salary Money objects
  *   @param {number} ctx.incomeShares - Pre-extracted .amount from RSU Money objects
  *   @param {number} ctx.incomeRentals - Pre-extracted .amount from rental Money objects
+ *   @param {number} ctx.incomeSale - Pre-extracted .amount from property sale Money objects
  *   @param {number} ctx.incomePrivatePension - Pre-extracted .amount from pension Money objects
  *   @param {number} ctx.incomeStatePension - Pre-extracted .amount from state pension Money objects
  *   @param {number} ctx.cashWithdraw - Pre-extracted .amount from cash withdrawal Money objects
@@ -30,6 +31,7 @@
  *   @param {number} ctx.incomeTaxFree - Pre-extracted .amount from tax-free income Money objects
  *   @param {number} ctx.netIncome - Pre-extracted .amount (take-home cash excluding withdrawals)
  *   @param {number} ctx.expenses - Pre-extracted .amount from expense Money objects
+ *   @param {number} ctx.purchaseCashUsedThisYear - Cash-funded property purchase amount for display outflows
  *   @param {number} ctx.personalPensionContribution - Pre-extracted .amount from contribution Money objects
  *   @param {number} ctx.withdrawalRate - Numeric withdrawal rate
  *   @param {number} ctx.pensionCap - Pre-computed total pension capital in residence currency
@@ -49,6 +51,7 @@ function computeNominalAggregates(ctx) {
   var incomeSalaries = ctx.incomeSalaries;
   var incomeShares = ctx.incomeShares;
   var incomeRentals = ctx.incomeRentals;
+  var incomeSale = ctx.incomeSale;
   var incomePrivatePension = ctx.incomePrivatePension;
   var incomeStatePension = ctx.incomeStatePension;
   var cashWithdraw = ctx.cashWithdraw;
@@ -56,6 +59,7 @@ function computeNominalAggregates(ctx) {
   var incomeTaxFree = ctx.incomeTaxFree;
   var netIncome = ctx.netIncome;
   var expenses = ctx.expenses;
+  var purchaseCashUsedThisYear = ctx.purchaseCashUsedThisYear || 0;
   var personalPensionContribution = ctx.personalPensionContribution;
   var withdrawalRate = ctx.withdrawalRate;
   var pensionCap = ctx.pensionCap;
@@ -76,6 +80,7 @@ function computeNominalAggregates(ctx) {
       "incomeSalaries": 0,
       "incomeRSUs": 0,
       "incomeRentals": 0,
+      "incomeSale": 0,
       "incomePrivatePension": 0,
       "incomeStatePension": 0,
       "incomeCash": 0,
@@ -94,6 +99,7 @@ function computeNominalAggregates(ctx) {
       "incomeSalariesPV": 0,
       "incomeRSUsPV": 0,
       "incomeRentalsPV": 0,
+      "incomeSalePV": 0,
       "incomePrivatePensionPV": 0,
       "incomeStatePensionPV": 0,
       "incomeCashPV": 0,
@@ -140,6 +146,7 @@ function computeNominalAggregates(ctx) {
   dataSheet[row].incomeSalaries += incomeSalaries;
   dataSheet[row].incomeRSUs += incomeShares;
   dataSheet[row].incomeRentals += incomeRentals;
+  dataSheet[row].incomeSale += incomeSale;
   dataSheet[row].incomePrivatePension += incomePrivatePension;
   dataSheet[row].incomeStatePension += incomeStatePension;
   var incomeCash = Math.max(cashWithdraw, 0);
@@ -148,7 +155,7 @@ function computeNominalAggregates(ctx) {
   dataSheet[row].incomeTaxFree += incomeTaxFree;
   dataSheet[row].realEstateCapital += realEstateConverted;
   dataSheet[row].netIncome += netIncome;
-  dataSheet[row].expenses += expenses;
+  dataSheet[row].expenses += expenses + purchaseCashUsedThisYear;
   dataSheet[row].pensionFund += pensionCap;
   dataSheet[row].cash += cash;
   // Accumulate per-type income and capital for dynamic UI columns
@@ -186,6 +193,7 @@ function computeNominalAggregates(ctx) {
     incomeSalaries +
     incomeShares +
     incomeRentals +
+    incomeSale +
     incomePrivatePension +
     incomeStatePension +
     incomeDefinedBenefit +

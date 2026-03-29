@@ -5,8 +5,9 @@ var currentEconomicRegime = null;
 var economicRegimesModel = null;
 var netIncome, expenses, savings, targetCash, cashWithdraw, cashDeficit;
 var purchaseShortfallThisYear;
+var purchaseCashUsedThisYear;
 var incomeStatePension, incomePrivatePension, withdrawalRate;
-var incomeSalaries, incomeShares, incomeRentals, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
+var incomeSalaries, incomeShares, incomeRentals, incomeSale, incomeDefinedBenefit, incomeTaxFree, pensionContribution;
 var personalPensionContribution, personalPensionContributionByCountry;
 var incomePrivatePensionByCountry;
 var incomeSalariesByCountry;
@@ -816,6 +817,7 @@ function resetYearlyVariables() {
   incomeSalaries = 0;
   incomeShares = 0;
   incomeRentals = 0;
+  incomeSale = 0;
   incomePrivatePension = 0;
   incomeStatePension = 0;
   incomeDefinedBenefit = 0;
@@ -833,6 +835,7 @@ function resetYearlyVariables() {
   cashWithdraw = 0;
   savings = 0;
   purchaseShortfallThisYear = 0;
+  purchaseCashUsedThisYear = 0;
 
   // Add year to Person objects (this increments their ages and calls pension.addYear())
   person1.addYear();
@@ -1251,6 +1254,8 @@ function processEvents() {
         case 'sale': {
           cash += entryConvertedAmount;
           cashMoney.amount += entryConvertedAmount;
+          incomeSale += entryConvertedAmount;
+          attributionManager.record('incomesale', 'Sale (' + entry.eventId + ')', entryConvertedAmount);
           attributionManager.record('realestatecapital', entry.label || ('Sale (' + entry.eventId + ')'), -entryConvertedAmount);
           var salePropertyId = entry.eventId;
           var forwardSettlement = (typeof entry.forwardMortgagePayoff === 'number') ? (entry.forwardMortgagePayoff * entryConversionFactor) : 0;
@@ -1624,19 +1629,24 @@ function processEvents() {
           break;
 
         case 'purchase': {
-          // Purchases are cash-funded (not "expenses" unless shortfall).
-          // Do NOT use consolidated totals here: multiple purchase entries in the same year would
-          // otherwise be double-charged against cash (see TestRealEstatePVRelocation).
           var purchaseTotal = entryConvertedAmount;
           var cashUsed = Math.min(cash, purchaseTotal);
           cash -= cashUsed;
           cashMoney.amount -= cashUsed;
+          purchaseCashUsedThisYear += cashUsed;
           var shortfall = purchaseTotal - cashUsed;
           if (shortfall > 0) {
             expenses += shortfall;
             purchaseShortfallThisYear += shortfall;
-            attributionManager.record('expenses', 'Purchase shortfall (' + entry.eventId + ')', shortfall);
           }
+          var expenseLabel = 'Cash Purchase (' + entry.eventId + ')';
+          for (var eventIndex = 0; eventIndex < events.length; eventIndex++) {
+            if (events[eventIndex].type === 'M' && events[eventIndex].id === entry.eventId) {
+              expenseLabel = 'Downpayment (' + entry.eventId + ')';
+              break;
+            }
+          }
+          attributionManager.record('expenses', expenseLabel, purchaseTotal);
           attributionManager.record('realestatecapital', 'Purchase (' + entry.eventId + ')', purchaseTotal);
           break;
         }
@@ -2258,9 +2268,6 @@ function handleInvestments() {
    */
   if (netIncome > expenses) {
     savings = netIncome - expenses;
-    // When a property purchase cannot be funded from available cash, we track the
-    // "shortfall" as an expense. In these cases, keep cash at 0 for the year
-    // instead of accumulating surplus (see TestPropertyPurchaseAttribution).
     if (!(purchaseShortfallThisYear > 0)) {
       cash += savings;
       cashMoney.amount += savings;
@@ -2922,6 +2929,7 @@ function buildAggregateContext() {
     incomeSalaries: incomeSalaries,
     incomeShares: incomeShares,
     incomeRentals: incomeRentals,
+    incomeSale: incomeSale,
     incomePrivatePension: incomePrivatePension,
     incomeStatePension: incomeStatePension,
     incomeStatePensionByCountry: (person1 && person1.yearlyIncomeStatePensionByCountry) ? person1.yearlyIncomeStatePensionByCountry : {},
@@ -2935,6 +2943,7 @@ function buildAggregateContext() {
     netIncome: earnedNetIncome,
     expenses: expenses,
     cash: cash,
+    purchaseCashUsedThisYear: purchaseCashUsedThisYear,
     personalPensionContribution: personalPensionContribution,
     personalPensionContributionByCountry: personalPensionContributionByCountry,
     incomePrivatePensionByCountry: incomePrivatePensionByCountry,

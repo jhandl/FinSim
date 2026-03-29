@@ -132,6 +132,7 @@ function addStandardMetricDisplays(dataRow, currentAttributions) {
     incomesalaries: { columnKey: 'IncomeSalaries', kind: 'income' },
     incomersus: { columnKey: 'IncomeRSUs', kind: 'income' },
     incomerentals: { columnKey: 'IncomeRentals', kind: 'income' },
+    incomesale: { columnKey: 'IncomeSale', kind: 'income' },
     incomeprivatepension: { columnKey: 'IncomePrivatePension', kind: 'income' },
     incomestatepension: { columnKey: 'IncomeStatePension', kind: 'income' },
     incomecash: { columnKey: 'IncomeCash', kind: 'income' },
