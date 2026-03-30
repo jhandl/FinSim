@@ -247,10 +247,11 @@ Inline selectors in amount inputs with symbol (€) and caret (▼). Chart contr
 
 ### CSV Meta Column
 
-Meta column stores URL-encoded key=value pairs: `currency=EUR;linkedCountry=ie;linkedEventId=split_123;resolved=1`.
+Meta column stores URL-encoded key=value pairs, including relocation split metadata: `currency=EUR;linkedCountry=ie;linkedEventId=split_123;splitSegmentId=seg_1;resolved=1`.
 - `currency`: Currency code.
 - `linkedCountry`: Linked country.
 - `linkedEventId`: Linked event ID.
+- `splitSegmentId`: Identifies the specific split segment (pair of rows) created for one relocation boundary. Used for segment-aware orphan detection and resolution actions.
 - `resolved`: `1` for user override, `0` for unresolved relocation impact.
 
 ## Integration Points

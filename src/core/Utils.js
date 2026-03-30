@@ -356,7 +356,8 @@ var EVENT_META_FIELD_DEFS = [
   { key: 'resolvedCategory', header: 'ResolvedCategory' },
   { key: 'splitValueMode', header: 'SplitValueMode' },
   { key: 'splitReviewedSuggestedAmount', header: 'SplitReviewedSuggestedAmount' },
-  { key: 'splitSuggestionModelVersion', header: 'SplitSuggestionModelVersion' }
+  { key: 'splitSuggestionModelVersion', header: 'SplitSuggestionModelVersion' },
+  { key: 'splitSegmentId', header: 'SplitSegmentId' }
 ];
 
 var EVENT_META_HEADER_KEY_MAP = {
@@ -370,6 +371,7 @@ var EVENT_META_HEADER_KEY_MAP = {
   SplitValueMode: 'splitValueMode',
   SplitReviewedSuggestedAmount: 'splitReviewedSuggestedAmount',
   SplitSuggestionModelVersion: 'splitSuggestionModelVersion',
+  SplitSegmentId: 'splitSegmentId',
   MvLinkId: 'mvLinkId',
   SellMvId: 'sellMvId',
   SellMvRow: 'sellMvRow',
@@ -391,6 +393,7 @@ var EVENT_META_INLINE_KEYS = [
   'splitValueMode',
   'splitReviewedSuggestedAmount',
   'splitSuggestionModelVersion',
+  'splitSegmentId',
   'mvLinkId',
   'sellMvId',
   'sellMvRow',
@@ -399,8 +402,7 @@ var EVENT_META_INLINE_KEYS = [
   'resolved',
   'resolvedMvId',
   'resolvedMvRow',
-  'resolvedCategory',
-  'splitValueMode'
+  'resolvedCategory'
 ];
 
 function encodeScenarioCsvValue(value) {
@@ -939,6 +941,12 @@ function serializeSimulation(ui) {
             meta.splitSuggestionModelVersion = splitSuggestionModelVersionInput.value;
           }
         } catch (_e3dc) { }
+        try {
+          var splitSegmentIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-split-segment-id') : null;
+          if (splitSegmentIdInput && splitSegmentIdInput.value !== '') {
+            meta.splitSegmentId = splitSegmentIdInput.value;
+          }
+        } catch (_e3dd) { }
         try {
           var mvLinkIdInput = rowEl.querySelector ? rowEl.querySelector('.event-relocation-link-id') : null;
           if (mvLinkIdInput && mvLinkIdInput.value) {

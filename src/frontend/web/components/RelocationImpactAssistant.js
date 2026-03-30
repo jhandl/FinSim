@@ -94,6 +94,46 @@ var RelocationImpactAssistant = {
   createPanelHtml: function (event, rowId, env, eventId) {
     // Based on table manager implementation
     const events = (env && env.webUI && typeof env.webUI.readEvents === 'function') ? env.webUI.readEvents(false) : [];
+    const eventRow = (function () {
+      if (rowId) {
+        const byRow = document.querySelector('tr[data-row-id="' + rowId + '"]');
+        if (byRow && !(byRow.classList && byRow.classList.contains('resolution-panel-row'))) return byRow;
+      }
+      if (eventId) {
+        const byEvent = document.querySelector('tr[data-event-id="' + eventId + '"]');
+        if (byEvent && !(byEvent.classList && byEvent.classList.contains('resolution-panel-row'))) return byEvent;
+      }
+      return null;
+    })();
+    const canJoinWithPreviousSplitSegment = (function () {
+      if (!eventRow || !event || !event.linkedEventId) return false;
+      const linkedId = String(event.linkedEventId || '');
+      if (!linkedId) return false;
+      const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(function (r) {
+        return r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row'));
+      });
+      const chainRows = rows.filter(function (candidate) {
+        const linkedInput = candidate.querySelector('.event-linked-event-id');
+        return linkedInput && String(linkedInput.value || '') === linkedId;
+      });
+      if (chainRows.length < 3) return false;
+      chainRows.sort(function (a, b) {
+        const aFrom = Number(a.querySelector('.event-from-age') ? a.querySelector('.event-from-age').value : '');
+        const bFrom = Number(b.querySelector('.event-from-age') ? b.querySelector('.event-from-age').value : '');
+        if (aFrom !== bFrom) return aFrom - bFrom;
+        const aTo = Number(a.querySelector('.event-to-age') ? a.querySelector('.event-to-age').value : '');
+        const bTo = Number(b.querySelector('.event-to-age') ? b.querySelector('.event-to-age').value : '');
+        return aTo - bTo;
+      });
+      const idx = chainRows.indexOf(eventRow);
+      if (idx <= 0 || idx >= chainRows.length - 1) return false;
+      const prev = chainRows[idx - 1];
+      const cur = chainRows[idx];
+      const prevTo = Number(prev.querySelector('.event-to-age') ? prev.querySelector('.event-to-age').value : '');
+      const curFrom = Number(cur.querySelector('.event-from-age') ? cur.querySelector('.event-from-age').value : '');
+      if (isNaN(prevTo) || isNaN(curFrom)) return true;
+      return prevTo === curFrom || prevTo + 1 === curFrom;
+    })();
     const impactCategory = event && event.relocationImpact ? event.relocationImpact.category : '';
     let impactDetails = event && event.relocationImpact ? event.relocationImpact.details : null;
     if (typeof impactDetails === 'string') {
@@ -102,7 +142,7 @@ var RelocationImpactAssistant = {
     const isRelocationRentalOrphan = !!(impactDetails && impactDetails.relocationRentalOrphan === true);
     const mvEventId = event && event.relocationImpact ? event.relocationImpact.mvEventId : null;
     let mvEvent = events.find(function (e) {
-      return e && (e.id === mvEventId || e._mvRuntimeId === mvEventId);
+      return e && (e.id === mvEventId || e._mvRuntimeId === mvEventId || e.relocationLinkId === mvEventId);
     });
     if (!mvEvent && mvEventId) {
       // Fallback: find mvEvent from DOM by matching row id
@@ -111,7 +151,9 @@ var RelocationImpactAssistant = {
         for (let i = 0; i < rows.length; i++) {
           const mvRow = rows[i];
           const rowId = mvRow && mvRow.dataset ? mvRow.dataset.eventId : '';
-          if (rowId !== mvEventId) continue;
+          const linkIdInput = mvRow ? mvRow.querySelector('.event-relocation-link-id') : null;
+          const linkId = linkIdInput ? linkIdInput.value : '';
+          if (rowId !== mvEventId && linkId !== mvEventId) continue;
           const typeInput = mvRow.querySelector('.event-type');
           const fromAgeInput = mvRow.querySelector('.event-from-age');
           const nameInput = mvRow.querySelector('.event-name');
@@ -161,6 +203,45 @@ var RelocationImpactAssistant = {
       const num = Number(value);
       try { const formatted = new Intl.NumberFormat(locale || 'en-US', { style: 'decimal', maximumFractionDigits: 0 }).format(num); return (symbol || '') + formatted; } catch (_) { return (symbol || '') + String(Math.round(num)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
     }
+    function parseAmountByCountry(value, countryCode) {
+      if (value == null || value === '') return NaN;
+      let s = String(value);
+      try {
+        const rs = Config.getInstance().getCachedTaxRuleSet(countryCode);
+        const ls = (typeof FormatUtils !== 'undefined' && typeof FormatUtils.getLocaleSettings === 'function') ? FormatUtils.getLocaleSettings() : { numberLocale: 'en-US', currencySymbol: '' };
+        const locale = rs && rs.getNumberLocale ? rs.getNumberLocale() : (ls.numberLocale || 'en-US');
+        const symbol = rs && rs.getCurrencySymbol ? rs.getCurrencySymbol() : (ls.currencySymbol || '');
+        if (symbol) {
+          const escSym = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          s = s.replace(new RegExp(escSym, 'g'), '');
+        }
+        s = s.replace(/\s+/g, '');
+        const parts = new Intl.NumberFormat(locale).formatToParts(12345.6);
+        const group = (parts.find(p => p.type === 'group') || {}).value || ',';
+        const decimal = (parts.find(p => p.type === 'decimal') || {}).value || '.';
+        s = s.split(group).join('');
+        if (decimal !== '.') s = s.split(decimal).join('.');
+        const n = parseFloat(s);
+        if (!isNaN(n)) return n;
+      } catch (_) { }
+      const cleaned = String(value).replace(/[^0-9,\.\-]/g, '');
+      if (!cleaned) return NaN;
+      const lastComma = cleaned.lastIndexOf(',');
+      const lastDot = cleaned.lastIndexOf('.');
+      let normalized = cleaned;
+      if (lastComma !== -1 && lastDot !== -1) {
+        if (lastComma > lastDot) {
+          normalized = normalized.split('.').join('');
+          normalized = normalized.replace(',', '.');
+        } else {
+          normalized = normalized.split(',').join('');
+        }
+      } else if (lastComma !== -1 && lastDot === -1) {
+        normalized = normalized.replace(',', '.');
+      }
+      const fallback = Number(normalized);
+      return isNaN(fallback) ? NaN : fallback;
+    }
 
     const addAction = function (arr, cfg) {
       if (!cfg || !cfg.action) return;
@@ -196,18 +277,23 @@ var RelocationImpactAssistant = {
         addAction(actions, { action: 'keep_property', tabLabel: 'Keep debt', instantApply: true, tooltip: 'Continue paying the mortgage in ' + (originCurrency || 'origin currency') + '. You will be subject to exchange rate fluctuations.', buttonAttrs: ' data-row-id="' + rowId + '"' });
         addAction(actions, { action: 'sell_property', tabLabel: 'Pay off', instantApply: true, tooltip: 'Fully repay the remaining balance of the mortgage at the time of relocation.', buttonAttrs: ' data-row-id="' + rowId + '"' });
       } else {
-        const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, originCountry, destCountry));
-        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(originCountry);
-        const toRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
+        const sourceLinkedCountry = (event.type === 'RI' && event.linkedCountry)
+          ? String(event.linkedCountry).toLowerCase()
+          : '';
+        const conversionFromCountry = sourceLinkedCountry || originCountry;
+        const conversionToCountry = sourceLinkedCountry || destCountry;
+        const pppSuggestionNum = Number(this.calculatePPPSuggestion(event.amount, conversionFromCountry, conversionToCountry));
+        const fromRuleSet = Config.getInstance().getCachedTaxRuleSet(conversionFromCountry);
+        const toRuleSet = Config.getInstance().getCachedTaxRuleSet(conversionToCountry);
         const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
         const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
         const isIncomeOrExpenseType = ['S', 'PP', 'SI', 'SI2', 'SInp', 'SI2np', 'UI', 'RI', 'DBI', 'FI', 'E'].indexOf(event.type) !== -1;
-        const fromMeta = getSymbolAndLocaleByCountry(originCountry);
-        const toMeta = getSymbolAndLocaleByCountry(destCountry);
+        const fromMeta = getSymbolAndLocaleByCountry(conversionFromCountry);
+        const toMeta = getSymbolAndLocaleByCountry(conversionToCountry);
         const inputFormatted = !isNaN(pppSuggestionNum) ? fmtWithSymbol(toMeta.symbol, toMeta.locale, pppSuggestionNum) : '';
         const currentFormatted = fmtWithSymbol(fromMeta.symbol, fromMeta.locale, baseAmountSanitized);
         
-        containerAttributes = ' data-from-country="' + originCountry + '" data-to-country="' + destCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
+        containerAttributes = ' data-from-country="' + conversionFromCountry + '" data-to-country="' + conversionToCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
         
         addAction(actions, { 
           action: 'split', 
@@ -325,8 +411,25 @@ var RelocationImpactAssistant = {
       const toRuleSet = Config.getInstance().getCachedTaxRuleSet(toCountry);
       const originCurrency = fromRuleSet ? fromRuleSet.getCurrencyCode() : 'EUR';
       const destCurrency = toRuleSet ? toRuleSet.getCurrencyCode() : 'EUR';
+      const jurisdictionBaseAmount = !isNaN(baseAmountSanitized)
+        ? baseAmountSanitized
+        : parseAmountByCountry(event.amount, fromCountry);
+      let convertedAmount = null;
+      if (!isNaN(jurisdictionBaseAmount)) {
+        const modelConverted = RelocationSplitSuggestionLib.getSuggestedAmount(jurisdictionBaseAmount, fromCountry, toCountry);
+        if (!isNaN(modelConverted)) convertedAmount = modelConverted;
+      }
+      const fxRateForJurisdiction = econ && econ.ready ? econ.getFX(fromCountry, toCountry) : null;
+      const pppForJurisdiction = econ && econ.ready ? econ.getPPP(fromCountry, toCountry) : null;
+      const fxConvertedAmount = (fxRateForJurisdiction != null && !isNaN(jurisdictionBaseAmount))
+        ? Math.round(jurisdictionBaseAmount * fxRateForJurisdiction)
+        : null;
+      const pppConvertedAmount = (pppForJurisdiction != null && !isNaN(jurisdictionBaseAmount))
+        ? Math.round(jurisdictionBaseAmount * pppForJurisdiction)
+        : null;
+      if (convertedAmount == null) convertedAmount = fxConvertedAmount;
 
-      containerAttributes = ' data-from-country="' + fromCountry + '" data-to-country="' + toCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(baseAmountSanitized) ? '' : String(baseAmountSanitized)) + '" data-fx="' + (fxRate != null ? fxRate : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppRatio != null ? pppRatio : '') + '" data-fx-amount="' + (fxAmount != null ? fxAmount : '') + '" data-ppp-amount="' + (pppAmount != null ? pppAmount : '') + '"';
+      containerAttributes = ' data-from-country="' + fromCountry + '" data-to-country="' + toCountry + '" data-from-currency="' + originCurrency + '" data-to-currency="' + destCurrency + '" data-base-amount="' + (isNaN(jurisdictionBaseAmount) ? '' : String(jurisdictionBaseAmount)) + '" data-fx="' + (fxRateForJurisdiction != null ? fxRateForJurisdiction : '') + '" data-fx-date="' + (fxDate || '') + '" data-ppp="' + (pppForJurisdiction != null ? pppForJurisdiction : '') + '" data-fx-amount="' + (fxConvertedAmount != null ? fxConvertedAmount : '') + '" data-ppp-amount="' + (pppConvertedAmount != null ? pppConvertedAmount : '') + '"';
 
       addAction(actions, {
         action: 'peg',
@@ -335,12 +438,21 @@ var RelocationImpactAssistant = {
         tooltip: 'Maintains ' + (originCurrency || 'original currency') + ' for this event, linked to ' + (fromCountry || 'original country') + '.',
         buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + originCurrency + '" data-country="' + fromCountry + '" data-from-country="' + fromCountry + '"'
       });
+      if (canJoinWithPreviousSplitSegment) {
+        addAction(actions, {
+          action: 'join_previous',
+          tabLabel: 'Join with previous',
+          instantApply: true,
+          tooltip: 'Rejoins this segment with the previous one while keeping later segments linked.',
+          buttonAttrs: ' data-row-id="' + rowId + '"'
+        });
+      }
       addAction(actions, {
         action: 'peg',
         tabLabel: 'Change to ' + (destCurrency || 'new currency'),
         instantApply: true,
         tooltip: 'Changes currency to ' + (destCurrency || 'new currency') + ' and links to ' + (toCountry || 'new country') + '.',
-        buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + destCurrency + '" data-country="' + toCountry + '" data-from-country="' + toCountry + '"'
+        buttonAttrs: ' data-row-id="' + rowId + '" data-currency="' + destCurrency + '" data-country="' + toCountry + '" data-from-country="' + toCountry + '"' + (convertedAmount != null ? (' data-converted-amount="' + String(convertedAmount) + '"') : '')
       });
     } else if (event.relocationImpact.category === 'split_amount_shift' || event.relocationImpact.category === 'split_suggestion_shift') {
       let splitAmountDetails = event.relocationImpact.details;
@@ -511,7 +623,8 @@ var RelocationImpactAssistant = {
       case 'peg': {
         const currency = payload && payload.currency;
         const linkedCountry = payload && (payload.country || payload.fromCountry);
-        if (typeof etm.pegCurrencyToOriginal === 'function') etm.pegCurrencyToOriginal(rowId, currency, linkedCountry, eventId);
+        const convertedAmount = payload && payload.convertedAmount;
+        if (typeof etm.pegCurrencyToOriginal === 'function') etm.pegCurrencyToOriginal(rowId, currency, linkedCountry, eventId, convertedAmount);
         break;
       }
       case 'accept': {
@@ -536,6 +649,10 @@ var RelocationImpactAssistant = {
       }
       case 'join_split': {
         if (typeof etm.joinSplitEvents === 'function') etm.joinSplitEvents(rowId, eventId);
+        break;
+      }
+      case 'join_previous': {
+        if (typeof etm.joinSplitWithPrevious === 'function') etm.joinSplitWithPrevious(rowId, eventId);
         break;
       }
       case 'adapt_split_to_move': {

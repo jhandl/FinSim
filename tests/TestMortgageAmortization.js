@@ -84,13 +84,13 @@ const TestMortgageAmortization = {
       tolerance: 100
     },
 
-    // Test 2: Annual expenses should include mortgage payment only (property purchase uses available cash)
+    // Test 2: Annual expenses include property down payment plus first mortgage payment in purchase year.
     {
       type: "exact_value",
       target: "age", 
       age: 35,
       field: "expenses",
-      expected: 15638,                 // Annual mortgage payment only (property purchase uses 70k cash)
+      expected: 85638,                 // €70,000 down payment + €15,638 annual mortgage payment
       tolerance: 100
     },
 

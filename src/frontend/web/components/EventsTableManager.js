@@ -741,6 +741,7 @@ class EventsTableManager {
       if (chainId !== linkedId) continue;
       this._removeHiddenInput(rows[i], 'event-linked-event-id');
       this._removeHiddenInput(rows[i], 'event-relocation-split-mv-id');
+      this._removeHiddenInput(rows[i], 'event-relocation-split-segment-id');
       this._removeHiddenInput(rows[i], 'event-relocation-split-anchor-age');
       this._removeHiddenInput(rows[i], 'event-relocation-split-anchor-amount');
       this._removeHiddenInput(rows[i], 'event-relocation-split-value-mode');
@@ -839,6 +840,55 @@ class EventsTableManager {
     }
     const category = row.dataset ? String(row.dataset.relocationImpactCategory || '') : '';
     return { mvId: String(mvId || ''), category: category };
+  }
+
+  _getSegmentRowsForImpact(row) {
+    if (!row) return [];
+    let segmentId = '';
+    let linkedEventId = '';
+    let details = null;
+    if (row.dataset && row.dataset.relocationImpactDetails) {
+      try {
+        details = JSON.parse(row.dataset.relocationImpactDetails);
+      } catch (_) {
+        details = null;
+      }
+    }
+    if (details && details.relocationSplitSegmentId) {
+      segmentId = String(details.relocationSplitSegmentId || '');
+    }
+    if (details && details.linkedEventId) {
+      linkedEventId = String(details.linkedEventId || '');
+    }
+    if (!segmentId) {
+      const segmentInput = row.querySelector('.event-relocation-split-segment-id');
+      segmentId = segmentInput ? String(segmentInput.value || '') : '';
+    }
+    if (!linkedEventId) {
+      const linkedEventIdInput = row.querySelector('.event-linked-event-id');
+      linkedEventId = linkedEventIdInput ? String(linkedEventIdInput.value || '') : '';
+    }
+    if (!segmentId || !linkedEventId) return [];
+
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter((candidate) => {
+      if (!candidate || (candidate.classList && candidate.classList.contains('resolution-panel-row'))) return false;
+      const segmentInput = candidate.querySelector('.event-relocation-split-segment-id');
+      const linkedInput = candidate.querySelector('.event-linked-event-id');
+      return segmentInput && linkedInput
+        && String(segmentInput.value || '') === segmentId
+        && String(linkedInput.value || '') === linkedEventId;
+    });
+
+    rows.sort((a, b) => {
+      const aFrom = Number(a.querySelector('.event-from-age') ? a.querySelector('.event-from-age').value : '');
+      const bFrom = Number(b.querySelector('.event-from-age') ? b.querySelector('.event-from-age').value : '');
+      if (aFrom !== bFrom) return aFrom - bFrom;
+      const aTo = Number(a.querySelector('.event-to-age') ? a.querySelector('.event-to-age').value : '');
+      const bTo = Number(b.querySelector('.event-to-age') ? b.querySelector('.event-to-age').value : '');
+      return aTo - bTo;
+    });
+
+    return rows;
   }
 
   _setResolutionOverride(row, scope) {
@@ -2264,12 +2314,11 @@ class EventsTableManager {
           document.querySelectorAll('.visualization-tooltip').forEach(function (tooltipEl) {
             TooltipUtils.hideTooltip(tooltipEl);
           });
-          const rowId = row.dataset.rowId;
           const isOpen = (row.nextElementSibling && row.nextElementSibling.classList && row.nextElementSibling.classList.contains('resolution-panel-row'));
           if (isOpen) {
-            this.collapseResolutionPanel(rowId);
+            this.collapseResolutionPanel(row);
           } else {
-            this.expandResolutionPanel(rowId);
+            this.expandResolutionPanel(row);
           }
         });
       } else {
@@ -2294,76 +2343,48 @@ class EventsTableManager {
   /**
    * Expand inline resolution panel below the event row
    */
-  expandResolutionPanel(rowId) {
-    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  expandResolutionPanel(rowRef) {
+    const row = (rowRef && rowRef.nodeType === 1)
+      ? rowRef
+      : document.querySelector(`tr[data-row-id="${rowRef}"]`);
     if (!row) return;
 
     // Check if row has impact dataset - if not, no panel needed
     if (row.dataset.relocationImpact !== '1') return;
 
-    const tableRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
-    const rowIndex = tableRows.indexOf(row);
-    if (rowIndex === -1) return;
+    const typeInput = row.querySelector('.event-type');
+    const nameInput = row.querySelector('.event-name');
+    const amountInput = row.querySelector('.event-amount');
+    const fromAgeInput = row.querySelector('.event-from-age');
+    const toAgeInput = row.querySelector('.event-to-age');
+    const rateInput = row.querySelector('.event-rate');
+    const matchInput = row.querySelector('.event-match');
+    if (!typeInput || !nameInput) return;
 
-    // Try to get event from readEvents, but reconstruct from row if needed
-    let event = null;
-    const events = this.webUI.readEvents(false);
-    if (events && events.length > rowIndex) {
-      event = events[rowIndex];
-    }
-
-    // If readEvents didn't return the event, reconstruct it from the row DOM
-    if (!event) {
-      try {
-        const typeInput = row.querySelector('.event-type');
-        const nameInput = row.querySelector('.event-name');
-        const amountInput = row.querySelector('.event-amount');
-        const fromAgeInput = row.querySelector('.event-from-age');
-        const toAgeInput = row.querySelector('.event-to-age');
-        const rateInput = row.querySelector('.event-rate');
-        const matchInput = row.querySelector('.event-match');
-
-        if (typeInput && nameInput) {
-          // Create a plain object (SimEvent-like) with required properties
-          event = {
-            type: typeInput.value || '',
-            id: nameInput.value || '',
-            amount: amountInput ? amountInput.value : '',
-            fromAge: fromAgeInput ? fromAgeInput.value : '',
-            toAge: toAgeInput ? toAgeInput.value : '',
-            rate: rateInput ? rateInput.value : undefined,
-            match: matchInput ? matchInput.value : undefined
-          };
-
-          // Read hidden fields
-          const currencyInput = row.querySelector('.event-currency');
-          if (currencyInput && currencyInput.value) event.currency = currencyInput.value;
-          const linkedCountryInput = row.querySelector('.event-linked-country');
-          if (linkedCountryInput && linkedCountryInput.value) event.linkedCountry = linkedCountryInput.value;
-        }
-      } catch (e) {
-        // If reconstruction fails, can't proceed
-        return;
-      }
-    }
-
-    if (!event) return;
-
-    // Reconstruct relocationImpact from row dataset if readEvents didn't preserve it
-    if (!event.relocationImpact && row.dataset.relocationImpact === '1') {
-      event.relocationImpact = {
-        category: row.dataset.relocationImpactCategory || '',
-        message: row.dataset.relocationImpactMessage || '',
-        mvEventId: row.dataset.relocationImpactMvId || '',
-        autoResolvable: row.dataset.relocationImpactAuto === '1'
-      };
-      if (row.dataset.relocationImpactDetails) {
-        event.relocationImpact.details = row.dataset.relocationImpactDetails;
-      }
-    }
-    if (event.relocationImpact && row.dataset.relocationImpactDetails && event.relocationImpact.details == null) {
-      event.relocationImpact.details = row.dataset.relocationImpactDetails;
-    }
+    const event = {
+      type: typeInput.value || '',
+      id: nameInput.value || '',
+      amount: amountInput ? amountInput.value : '',
+      fromAge: fromAgeInput ? fromAgeInput.value : '',
+      toAge: toAgeInput ? toAgeInput.value : '',
+      rate: rateInput ? rateInput.value : undefined,
+      match: matchInput ? matchInput.value : undefined
+    };
+    const currencyInput = row.querySelector('.event-currency');
+    if (currencyInput && currencyInput.value) event.currency = currencyInput.value;
+    const linkedCountryInput = row.querySelector('.event-linked-country');
+    if (linkedCountryInput && linkedCountryInput.value) event.linkedCountry = linkedCountryInput.value;
+    const linkedEventIdInput = row.querySelector('.event-linked-event-id');
+    if (linkedEventIdInput && linkedEventIdInput.value) event.linkedEventId = linkedEventIdInput.value;
+    const rentMvIdInput = row.querySelector('.event-relocation-rent-mv-id');
+    if (rentMvIdInput && rentMvIdInput.value) event.relocationRentMvId = rentMvIdInput.value;
+    event.relocationImpact = {
+      category: row.dataset.relocationImpactCategory || '',
+      message: row.dataset.relocationImpactMessage || '',
+      mvEventId: row.dataset.relocationImpactMvId || '',
+      autoResolvable: row.dataset.relocationImpactAuto === '1'
+    };
+    if (row.dataset.relocationImpactDetails) event.relocationImpact.details = row.dataset.relocationImpactDetails;
 
     if (!event.relocationImpact) return;
     const env = { webUI: this.webUI, eventsTableManager: this, config: (typeof Config !== 'undefined' ? Config.getInstance() : null), formatUtils: this.webUI && this.webUI.formatUtils };
@@ -2373,23 +2394,33 @@ class EventsTableManager {
   /**
    * Collapse the resolution panel for the given row
    */
-  collapseResolutionPanel(rowId) {
-    const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
+  collapseResolutionPanel(rowRef) {
+    const row = (rowRef && rowRef.nodeType === 1)
+      ? rowRef
+      : document.querySelector(`tr[data-row-id="${rowRef}"]`);
     if (!row) return;
     RelocationImpactAssistant.collapsePanelForTableRow(row);
   }
 
   _findEventRow(rowId, eventId) {
     const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
-    // Row id is the canonical table identity; prefer it over event ids (which can be duplicated).
-    if (rowId) {
+    if (rowId && eventId) {
       for (let i = 0; i < rows.length; i++) {
-        if (rows[i].dataset && rows[i].dataset.rowId === rowId) return rows[i];
+        const rid = rows[i].dataset ? rows[i].dataset.rowId : '';
+        const eid = rows[i].dataset ? rows[i].dataset.eventId : '';
+        if (rid === rowId && eid === eventId) return rows[i];
       }
     }
+    // eventId is globally unique and remains stable after sorting.
     if (eventId) {
       for (let i = 0; i < rows.length; i++) {
         if (rows[i].dataset && rows[i].dataset.eventId === eventId) return rows[i];
+      }
+    }
+    // Row id fallback for legacy callers that don't pass eventId.
+    if (rowId) {
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].dataset && rows[i].dataset.rowId === rowId) return rows[i];
       }
     }
     return null;
@@ -2429,6 +2460,8 @@ class EventsTableManager {
     if (!fromCountryHint) {
       fromCountryHint = this.getOriginCountry(mvEvent, Config.getInstance().getStartCountry());
     }
+    toCountryHint = toCountryHint ? String(toCountryHint).toLowerCase() : '';
+    fromCountryHint = fromCountryHint ? String(fromCountryHint).toLowerCase() : '';
 
     // Locale-aware parser using a specific country's number formatting
     const parseByCountry = (val, countryCode) => {
@@ -2461,9 +2494,10 @@ class EventsTableManager {
       }
     };
 
-    const part2AmountNum = parseByCountry(part2AmountRaw, toCountryHint);
-    const part2Amount = (typeof part2AmountNum === 'number') ? String(part2AmountNum) : '';
-    const destRuleSet = Config.getInstance().getCachedTaxRuleSet(destCountry);
+    let part2AmountNum = parseByCountry(part2AmountRaw, toCountryHint);
+    let part2Amount = (typeof part2AmountNum === 'number') ? String(part2AmountNum) : '';
+    const effectiveDestinationCountry = toCountryHint || destCountry;
+    const destRuleSet = Config.getInstance().getCachedTaxRuleSet(effectiveDestinationCountry);
     const destCurrency = destRuleSet ? destRuleSet.getCurrencyCode() : 'EUR';
 
     let part2EventType = event.type;
@@ -2472,7 +2506,17 @@ class EventsTableManager {
       else if (event.type === 'SI2') part2EventType = 'SI2np';
     }
 
-    const linkedEventId = this._nextCompactId('split');
+    const linkedEventIdInput = row.querySelector('.event-linked-event-id');
+    const linkedEventId = (linkedEventIdInput && linkedEventIdInput.value)
+      ? String(linkedEventIdInput.value)
+      : ((event && event.linkedEventId) ? String(event.linkedEventId) : this._nextCompactId('split'));
+    const usedSegIds = new Set(
+      Array.from(document.querySelectorAll('#Events tbody tr .event-relocation-split-segment-id'))
+        .map(input => String(input.value || ''))
+        .filter(Boolean)
+    );
+    let segId = this._nextCompactId('seg');
+    while (usedSegIds.has(segId)) segId = this._nextCompactId('seg');
     const splitMvId = this._getRelocationLinkIdByImpactId(mvImpactId) || String(mvImpactId || '');
     // Prefer parsing the original row's displayed amount using the row's current locale/country hint.
     // This avoids blank amount issues when an event was first created post-relocation and later moved
@@ -2491,6 +2535,15 @@ class EventsTableManager {
       part1AmountNum = parseByCountry(originalAmountRaw, toCountryHint);
     }
     const part1Amount = (typeof part1AmountNum === 'number') ? String(part1AmountNum) : '';
+    if ((typeof part2AmountNum !== 'number' || isNaN(part2AmountNum)) && typeof part1AmountNum === 'number' && !isNaN(part1AmountNum)) {
+      const fallbackFromCountry = (fromCountryHint ? String(fromCountryHint).toLowerCase() : Config.getInstance().getStartCountry());
+      const fallbackToCountry = (toCountryHint ? String(toCountryHint).toLowerCase() : destCountry);
+      const fallbackSuggested = RelocationSplitSuggestionLib.getSuggestedAmount(part1AmountNum, fallbackFromCountry, fallbackToCountry);
+      if (!isNaN(fallbackSuggested)) {
+        part2AmountNum = fallbackSuggested;
+        part2Amount = String(fallbackSuggested);
+      }
+    }
 
     // Normalize percentage fields for inputs: inputs expect percentage (e.g., 3.5 for 3.5%)
     const normalizePercentForInput = (v) => {
@@ -2511,11 +2564,22 @@ class EventsTableManager {
 
     const part1Row = this.createEventRow(event.type, event.id, part1Amount, event.fromAge, part1ToAge, rateForInput, matchForInput);
     this.getOrCreateHiddenInput(part1Row, 'event-linked-event-id', linkedEventId);
+    this.getOrCreateHiddenInput(part1Row, 'event-relocation-split-segment-id', segId);
     if (splitMvId) this.getOrCreateHiddenInput(part1Row, 'event-relocation-split-mv-id', splitMvId);
     if (!isNaN(relocationAgeNum)) this.getOrCreateHiddenInput(part1Row, 'event-relocation-split-anchor-age', String(relocationAgeNum));
     if (fromCountryHint) this.getOrCreateHiddenInput(part1Row, 'event-country', String(fromCountryHint).toLowerCase());
+    const originalLinkedCountry = event && event.linkedCountry ? String(event.linkedCountry).toLowerCase() : '';
+    const originalCurrency = event && event.currency ? String(event.currency).toUpperCase() : '';
+    if (originalLinkedCountry) {
+      this.getOrCreateHiddenInput(part1Row, 'event-linked-country', originalLinkedCountry);
+      this.getOrCreateHiddenInput(part1Row, 'event-country', originalLinkedCountry);
+    }
+    if (originalCurrency) this.getOrCreateHiddenInput(part1Row, 'event-currency', originalCurrency);
+    const originalRentMvId = event && event.relocationRentMvId ? String(event.relocationRentMvId) : '';
+    if (originalRentMvId) this.getOrCreateHiddenInput(part1Row, 'event-relocation-rent-mv-id', originalRentMvId);
     const part2Row = this.createEventRow(part2EventType, event.id, part2Amount, relocationAge, event.toAge, rateForInput, matchForInput);
     this.getOrCreateHiddenInput(part2Row, 'event-linked-event-id', linkedEventId);
+    this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-segment-id', segId);
     if (splitMvId) this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-mv-id', splitMvId);
     if (!isNaN(relocationAgeNum)) this.getOrCreateHiddenInput(part2Row, 'event-relocation-split-anchor-age', String(relocationAgeNum));
     if (typeof part1AmountNum === 'number' && !isNaN(part1AmountNum)) {
@@ -2534,6 +2598,7 @@ class EventsTableManager {
       this.getOrCreateHiddenInput(part2Row, 'event-country', part2LinkedCountry);
       this.getOrCreateHiddenInput(part2Row, 'event-linked-country', part2LinkedCountry);
     }
+    if (originalRentMvId) this.getOrCreateHiddenInput(part2Row, 'event-relocation-rent-mv-id', originalRentMvId);
 
     row.insertAdjacentElement('afterend', part1Row);
     part1Row.insertAdjacentElement('afterend', part2Row);
@@ -2640,6 +2705,7 @@ class EventsTableManager {
     const linkedEventIdInput = row.querySelector('.event-linked-event-id');
     const linkedEventId = linkedEventIdInput ? linkedEventIdInput.value : '';
     if (!linkedEventId) return;
+    const segmentRows = this._getSegmentRowsForImpact(row);
 
     const allRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
     const splitRows = allRows.filter(r => {
@@ -2659,8 +2725,20 @@ class EventsTableManager {
       return getNum(a, '.event-to-age') - getNum(b, '.event-to-age');
     });
 
-    const firstRow = splitRows[0];
-    const lastRow = splitRows[splitRows.length - 1];
+    const useSegmentPair = segmentRows.length >= 2;
+    let firstRow = splitRows[0];
+    let lastRow = splitRows[splitRows.length - 1];
+    let rowsToRemove = splitRows;
+    if (useSegmentPair) {
+      const scopedRows = segmentRows.slice(0, 2).sort((a, b) => {
+        const fromDiff = getNum(a, '.event-from-age') - getNum(b, '.event-from-age');
+        if (fromDiff !== 0) return fromDiff;
+        return getNum(a, '.event-to-age') - getNum(b, '.event-to-age');
+      });
+      firstRow = scopedRows[0];
+      lastRow = scopedRows[1];
+      rowsToRemove = scopedRows;
+    }
 
     const mergedType = firstRow.querySelector('.event-type') ? firstRow.querySelector('.event-type').value : '';
     const mergedName = firstRow.querySelector('.event-name') ? firstRow.querySelector('.event-name').value : '';
@@ -2689,7 +2767,27 @@ class EventsTableManager {
 
     this.collapseResolutionPanel(resolvedRowId);
     firstRow.insertAdjacentElement('beforebegin', mergedRow);
-    for (let i = 0; i < splitRows.length; i++) splitRows[i].remove();
+    for (let i = 0; i < rowsToRemove.length; i++) rowsToRemove[i].remove();
+    if (useSegmentPair) {
+      const remainingRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter((candidate) => {
+        if (!candidate || (candidate.classList && candidate.classList.contains('resolution-panel-row'))) return false;
+        const idInput = candidate.querySelector('.event-linked-event-id');
+        return idInput && idInput.value === linkedEventId;
+      });
+      const remainingSegmentRows = remainingRows.filter((candidate) => {
+        const segmentInput = candidate.querySelector('.event-relocation-split-segment-id');
+        return !!(segmentInput && String(segmentInput.value || ''));
+      });
+      if (remainingSegmentRows.length > 0) {
+        this.getOrCreateHiddenInput(mergedRow, 'event-linked-event-id', linkedEventId);
+      } else {
+        for (let i = 0; i < remainingRows.length; i++) {
+          const segmentInput = remainingRows[i].querySelector('.event-relocation-split-segment-id');
+          const segmentId = segmentInput ? String(segmentInput.value || '') : '';
+          if (!segmentId) this._removeHiddenInput(remainingRows[i], 'event-linked-event-id');
+        }
+      }
+    }
 
     if (this.webUI && this.webUI.formatUtils) {
       this.webUI.formatUtils.setupCurrencyInputs();
@@ -2703,6 +2801,103 @@ class EventsTableManager {
       if (ageInput) {
         ageInput.dispatchEvent(new Event('blur', { bubbles: true }));
       }
+    }
+
+    const mergedRowId = mergedRow && mergedRow.dataset ? mergedRow.dataset.rowId : resolvedRowId;
+    this._afterResolutionAction(mergedRowId, { flashFields: ['.event-to-age'], pulse: true });
+  }
+
+  joinSplitWithPrevious(rowId, eventId) {
+    const row = this._findEventRow(rowId, eventId);
+    if (!row) return;
+    const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
+    const linkedEventIdInput = row.querySelector('.event-linked-event-id');
+    const linkedEventId = linkedEventIdInput ? String(linkedEventIdInput.value || '') : '';
+    if (!linkedEventId) return;
+
+    const allRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter((r) => !(r.classList && r.classList.contains('resolution-panel-row')));
+    const splitRows = allRows.filter((r) => {
+      const idInput = r.querySelector('.event-linked-event-id');
+      return idInput && String(idInput.value || '') === linkedEventId;
+    });
+    if (splitRows.length < 3) return;
+
+    const getNum = (rowEl, selector) => {
+      const input = rowEl.querySelector(selector);
+      const n = Number(input ? input.value : '');
+      return isNaN(n) ? Number.POSITIVE_INFINITY : n;
+    };
+    splitRows.sort((a, b) => {
+      const fromDiff = getNum(a, '.event-from-age') - getNum(b, '.event-from-age');
+      if (fromDiff !== 0) return fromDiff;
+      return getNum(a, '.event-to-age') - getNum(b, '.event-to-age');
+    });
+
+    const rowIndex = splitRows.indexOf(row);
+    if (rowIndex <= 0 || rowIndex >= splitRows.length - 1) return;
+    const previousRow = splitRows[rowIndex - 1];
+    const currentRow = splitRows[rowIndex];
+
+    const mergedType = previousRow.querySelector('.event-type') ? previousRow.querySelector('.event-type').value : '';
+    const mergedName = previousRow.querySelector('.event-name') ? previousRow.querySelector('.event-name').value : '';
+    const mergedAmount = previousRow.querySelector('.event-amount') ? previousRow.querySelector('.event-amount').value : '';
+    const mergedFromAge = previousRow.querySelector('.event-from-age') ? previousRow.querySelector('.event-from-age').value : '';
+    const mergedToAge = currentRow.querySelector('.event-to-age') ? currentRow.querySelector('.event-to-age').value : '';
+    const mergedRate = previousRow.querySelector('.event-rate') ? previousRow.querySelector('.event-rate').value : '';
+    const mergedMatch = previousRow.querySelector('.event-match') ? previousRow.querySelector('.event-match').value : '';
+
+    const mergedRow = this.createEventRow(
+      mergedType,
+      mergedName,
+      mergedAmount,
+      mergedFromAge,
+      mergedToAge,
+      mergedRate,
+      mergedMatch
+    );
+
+    const copyHiddenValue = (sourceRow, targetRow, selector, className, preserveCase) => {
+      const input = sourceRow ? sourceRow.querySelector(selector) : null;
+      const value = input ? String(input.value || '') : '';
+      if (!value) return;
+      const normalized = preserveCase ? value : value.toLowerCase();
+      this.getOrCreateHiddenInput(targetRow, className, normalized);
+    };
+    // Keep user-visible financial identity from the previous segment (origin-side amount/currency).
+    copyHiddenValue(previousRow, mergedRow, '.event-currency', 'event-currency', true);
+    copyHiddenValue(previousRow, mergedRow, '.event-linked-country', 'event-linked-country', false);
+    copyHiddenValue(previousRow, mergedRow, '.event-country', 'event-country', false);
+    copyHiddenValue(previousRow, mergedRow, '.event-relocation-rent-mv-id', 'event-relocation-rent-mv-id', true);
+    copyHiddenValue(currentRow, mergedRow, '.event-currency', 'event-currency', true);
+    copyHiddenValue(currentRow, mergedRow, '.event-linked-country', 'event-linked-country', false);
+    copyHiddenValue(currentRow, mergedRow, '.event-country', 'event-country', false);
+    copyHiddenValue(currentRow, mergedRow, '.event-relocation-rent-mv-id', 'event-relocation-rent-mv-id', true);
+
+    // Keep downstream split linkage from the current segment so part 3 remains chain-linked.
+    this.getOrCreateHiddenInput(mergedRow, 'event-linked-event-id', linkedEventId);
+    copyHiddenValue(currentRow, mergedRow, '.event-relocation-split-mv-id', 'event-relocation-split-mv-id', true);
+    copyHiddenValue(currentRow, mergedRow, '.event-relocation-split-segment-id', 'event-relocation-split-segment-id', true);
+    copyHiddenValue(currentRow, mergedRow, '.event-relocation-split-anchor-age', 'event-relocation-split-anchor-age', true);
+    copyHiddenValue(currentRow, mergedRow, '.event-relocation-split-anchor-amount', 'event-relocation-split-anchor-amount', true);
+    copyHiddenValue(currentRow, mergedRow, '.event-relocation-split-value-mode', 'event-relocation-split-value-mode', true);
+    copyHiddenValue(currentRow, mergedRow, '.event-relocation-split-reviewed-suggested-amount', 'event-relocation-split-reviewed-suggested-amount', true);
+    copyHiddenValue(currentRow, mergedRow, '.event-relocation-split-suggestion-model-version', 'event-relocation-split-suggestion-model-version', true);
+
+    this.collapseResolutionPanel(resolvedRowId);
+    previousRow.insertAdjacentElement('beforebegin', mergedRow);
+    previousRow.remove();
+    currentRow.remove();
+
+    if (this.webUI && this.webUI.formatUtils) {
+      this.webUI.formatUtils.setupCurrencyInputs();
+      this.webUI.formatUtils.setupPercentageInputs();
+    }
+
+    if (this.sortKeys && this.sortKeys.length > 0 && typeof this.applySort === 'function') {
+      this.applySort({ skipAnimation: true });
+    } else {
+      const ageInput = document.querySelector('#Events tbody tr .event-from-age');
+      if (ageInput) ageInput.dispatchEvent(new Event('blur', { bubbles: true }));
     }
 
     const mergedRowId = mergedRow && mergedRow.dataset ? mergedRow.dataset.rowId : resolvedRowId;
@@ -2744,25 +2939,30 @@ class EventsTableManager {
     const fallbackLinkId = this._getRelocationLinkIdByImpactId(impacted.mvImpactId);
     if (fallbackLinkId) markerCandidates.push(String(fallbackLinkId));
     const ageShift = this._consumeRelocationAgeShift(Array.from(new Set(markerCandidates)));
-
-    const allRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
-    const splitRows = allRows.filter(r => {
-      const idInput = r.querySelector('.event-linked-event-id');
-      return idInput && idInput.value === linkedEventId;
-    });
-    if (splitRows.length < 2) return;
-
-    splitRows.sort((a, b) => {
-      const aFrom = Number(a.querySelector('.event-from-age') ? a.querySelector('.event-from-age').value : '');
-      const bFrom = Number(b.querySelector('.event-from-age') ? b.querySelector('.event-from-age').value : '');
-      if (aFrom !== bFrom) return aFrom - bFrom;
-      const aTo = Number(a.querySelector('.event-to-age') ? a.querySelector('.event-to-age').value : '');
-      const bTo = Number(b.querySelector('.event-to-age') ? b.querySelector('.event-to-age').value : '');
-      return aTo - bTo;
-    });
-
-    const firstRow = splitRows[0];
-    const secondRow = splitRows[1];
+    const segmentRows = this._getSegmentRowsForImpact(row);
+    let firstRow = null;
+    let secondRow = null;
+    if (segmentRows.length >= 2) {
+      firstRow = segmentRows[0];
+      secondRow = segmentRows[1];
+    } else {
+      const allRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+      const splitRows = allRows.filter(r => {
+        const idInput = r.querySelector('.event-linked-event-id');
+        return idInput && idInput.value === linkedEventId;
+      });
+      if (splitRows.length < 2) return;
+      splitRows.sort((a, b) => {
+        const aFrom = Number(a.querySelector('.event-from-age') ? a.querySelector('.event-from-age').value : '');
+        const bFrom = Number(b.querySelector('.event-from-age') ? b.querySelector('.event-from-age').value : '');
+        if (aFrom !== bFrom) return aFrom - bFrom;
+        const aTo = Number(a.querySelector('.event-to-age') ? a.querySelector('.event-to-age').value : '');
+        const bTo = Number(b.querySelector('.event-to-age') ? b.querySelector('.event-to-age').value : '');
+        return aTo - bTo;
+      });
+      firstRow = splitRows[0];
+      secondRow = splitRows[1];
+    }
     const firstFromInput = firstRow.querySelector('.event-from-age');
     const firstToInput = firstRow.querySelector('.event-to-age');
     const secondFromInput = secondRow.querySelector('.event-from-age');
@@ -2791,6 +2991,7 @@ class EventsTableManager {
       secondFromInput.value = String(firstFrom);
       this._removeHiddenInput(secondRow, 'event-linked-event-id');
       this._removeHiddenInput(secondRow, 'event-relocation-split-mv-id');
+      this._removeHiddenInput(secondRow, 'event-relocation-split-segment-id');
       this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-age');
       this._removeHiddenInput(secondRow, 'event-relocation-split-anchor-amount');
       this._removeHiddenInput(secondRow, 'event-relocation-split-value-mode');
@@ -2806,6 +3007,7 @@ class EventsTableManager {
       firstToInput.value = String(secondTo);
       this._removeHiddenInput(firstRow, 'event-linked-event-id');
       this._removeHiddenInput(firstRow, 'event-relocation-split-mv-id');
+      this._removeHiddenInput(firstRow, 'event-relocation-split-segment-id');
       this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-age');
       this._removeHiddenInput(firstRow, 'event-relocation-split-anchor-amount');
       this._removeHiddenInput(firstRow, 'event-relocation-split-value-mode');
@@ -2841,12 +3043,18 @@ class EventsTableManager {
     if (impacted && impacted.mvEvent && impacted.mvEvent.relocationLinkId) splitMarkerCandidates.push(String(impacted.mvEvent.relocationLinkId));
     if (splitMarkerCandidates.length) this._clearRelocationAgeShift(Array.from(new Set(splitMarkerCandidates)));
     const resolutionScope = this._getResolutionScopeForRow(row);
-
-    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
-    for (let i = 0; i < rows.length; i++) {
-      const idInput = rows[i].querySelector('.event-linked-event-id');
-      if (idInput && idInput.value === linkedEventId) {
-        this._setResolutionOverride(rows[i], resolutionScope);
+    const segmentRows = this._getSegmentRowsForImpact(row);
+    if (segmentRows.length > 0) {
+      for (let i = 0; i < segmentRows.length; i++) {
+        this._setResolutionOverride(segmentRows[i], resolutionScope);
+      }
+    } else if (segmentRows.length === 0) {
+      const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+      for (let i = 0; i < rows.length; i++) {
+        const idInput = rows[i].querySelector('.event-linked-event-id');
+        if (idInput && idInput.value === linkedEventId) {
+          this._setResolutionOverride(rows[i], resolutionScope);
+        }
       }
     }
     this._afterResolutionAction(row.dataset.rowId, { pulse: true });
@@ -2859,23 +3067,30 @@ class EventsTableManager {
     const linkedEventIdInput = row.querySelector('.event-linked-event-id');
     const linkedEventId = linkedEventIdInput ? linkedEventIdInput.value : '';
     if (!linkedEventId) return;
-
-    const allRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
-    const splitRows = allRows.filter(r => {
-      const idInput = r.querySelector('.event-linked-event-id');
-      return idInput && idInput.value === linkedEventId;
-    });
-    if (splitRows.length < 2) return;
-    splitRows.sort((a, b) => {
-      const aFrom = Number(a.querySelector('.event-from-age') ? a.querySelector('.event-from-age').value : '');
-      const bFrom = Number(b.querySelector('.event-from-age') ? b.querySelector('.event-from-age').value : '');
-      if (aFrom !== bFrom) return aFrom - bFrom;
-      const aTo = Number(a.querySelector('.event-to-age') ? a.querySelector('.event-to-age').value : '');
-      const bTo = Number(b.querySelector('.event-to-age') ? b.querySelector('.event-to-age').value : '');
-      return aTo - bTo;
-    });
-    const part1Row = splitRows[0];
-    const part2Row = splitRows[1];
+    const segmentRows = this._getSegmentRowsForImpact(row);
+    let part1Row = null;
+    let part2Row = null;
+    if (segmentRows.length >= 2) {
+      part1Row = segmentRows[0];
+      part2Row = segmentRows[1];
+    } else {
+      const allRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+      const splitRows = allRows.filter(r => {
+        const idInput = r.querySelector('.event-linked-event-id');
+        return idInput && idInput.value === linkedEventId;
+      });
+      if (splitRows.length < 2) return;
+      splitRows.sort((a, b) => {
+        const aFrom = Number(a.querySelector('.event-from-age') ? a.querySelector('.event-from-age').value : '');
+        const bFrom = Number(b.querySelector('.event-from-age') ? b.querySelector('.event-from-age').value : '');
+        if (aFrom !== bFrom) return aFrom - bFrom;
+        const aTo = Number(a.querySelector('.event-to-age') ? a.querySelector('.event-to-age').value : '');
+        const bTo = Number(b.querySelector('.event-to-age') ? b.querySelector('.event-to-age').value : '');
+        return aTo - bTo;
+      });
+      part1Row = splitRows[0];
+      part2Row = splitRows[1];
+    }
     const part1AmountInput = part1Row.querySelector('.event-amount');
     if (!part1AmountInput) return;
     const part1Amount = RelocationSplitSuggestionLib.parseAmountValue(part1AmountInput.value);
@@ -3134,7 +3349,7 @@ class EventsTableManager {
     this._afterResolutionAction(focusRowId, { flashFields: ['.event-to-age'], pulse: true });
   }
 
-  pegCurrencyToOriginal(rowId, currencyCode, linkedCountry, eventId) {
+  pegCurrencyToOriginal(rowId, currencyCode, linkedCountry, eventId, convertedAmount) {
     const row = this._findEventRow(rowId, eventId);
     if (!row) return;
     const resolvedRowId = row.dataset ? row.dataset.rowId : rowId;
@@ -3176,6 +3391,15 @@ class EventsTableManager {
       if (!resolvedLinkedCountry) resolvedLinkedCountry = Config.getInstance().getStartCountry();
     }
     const resolutionScope = this._getResolutionScopeForRow(row);
+    const hasConvertedAmount = convertedAmount !== undefined && convertedAmount !== null && String(convertedAmount).trim() !== '';
+    const convertedAmountNum = hasConvertedAmount ? Number(convertedAmount) : NaN;
+    if (hasConvertedAmount && !isNaN(convertedAmountNum)) {
+      const amountInput = row.querySelector('.event-amount');
+      if (amountInput) {
+        amountInput.value = String(convertedAmountNum);
+        amountInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
     const normalizeAmountForCurrencyFormatting = (targetRow) => {
       const amountInput = targetRow ? targetRow.querySelector('.event-amount') : null;
       if (!amountInput || !amountInput.value) return;
@@ -4396,11 +4620,6 @@ class EventsTableManager {
     const row = this.createEventRow();
     const eventId = row.dataset.eventId;
     /* Debug log removed */
-
-    // Assign a stable data-row-id like row_1, row_2,...
-    const tbodyRows = tbody.querySelectorAll('tr');
-    const index = tbodyRows ? (tbodyRows.length + 1) : 1;
-    row.setAttribute('data-row-id', 'row_' + index);
 
     tbody.appendChild(row);
 

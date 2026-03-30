@@ -807,6 +807,13 @@ describe('MV relocation remediation', () => {
       },
       eventsTableManager: {
         eventRowCounter: 0,
+        _compactIdCounters: {},
+        _nextCompactId: function (prefix) {
+          const key = String(prefix || 'id');
+          const next = (this._compactIdCounters[key] || 0) + 1;
+          this._compactIdCounters[key] = next;
+          return key + '_' + next.toString(36);
+        },
         handleAgeYearToggle: jest.fn(),
         createEventRow: (type, name, amount, fromAge, toAge, rate, match) => {
           const tr = document.createElement('tr');
@@ -998,6 +1005,13 @@ describe('MV relocation remediation', () => {
       },
       eventsTableManager: {
         eventRowCounter: 0,
+        _compactIdCounters: {},
+        _nextCompactId: function (prefix) {
+          const key = String(prefix || 'id');
+          const next = (this._compactIdCounters[key] || 0) + 1;
+          this._compactIdCounters[key] = next;
+          return key + '_' + next.toString(36);
+        },
         handleAgeYearToggle: jest.fn(),
         createEventRow: (type, name, amount, fromAge, toAge, rate, match) => {
           const tr = document.createElement('tr');

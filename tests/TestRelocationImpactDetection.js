@@ -1129,6 +1129,288 @@ module.exports = {
         assert(!mortgageResult.currency && !propertyResult.currency, 'Paired currency should be cleared');
       });
 
+      // Test 20: One event crossing two MVs can be resolved in two segment-aware passes.
+      runTest('20', function () {
+        const mv1 = makeEvent({ id: 'mv20_1', type: 'MV', name: 'BB', fromAge: 35, toAge: 35, relocationLinkId: 'mvlink_1' });
+        const mv2 = makeEvent({ id: 'mv20_2', type: 'MV', name: 'CC', fromAge: 50, toAge: 50, relocationLinkId: 'mvlink_2' });
+        const salary = makeEvent({ id: 'salary20', type: 'SI', fromAge: 30, toAge: 60, linkedEventId: null });
+
+        const initial = runDetector([salary, mv1, mv2], 'aa');
+        const initialImpact = initial.find(e => e.id === 'salary20').relocationImpact;
+        assert(initialImpact && initialImpact.category === 'boundary', 'Expected initial boundary impact');
+        assert.strictEqual(initialImpact.mvEventId, 'mv20_1', 'Expected nearest boundary to point at first relocation');
+
+        const part1 = makeEvent({
+          id: 'salary20_p1',
+          type: 'SI',
+          fromAge: 30,
+          toAge: 34,
+          linkedEventId: 'family_20',
+          relocationSplitSegmentId: 'seg_A',
+          relocationSplitMvId: 'mvlink_1'
+        });
+        const part2 = makeEvent({
+          id: 'salary20_p2',
+          type: 'SI',
+          fromAge: 35,
+          toAge: 60,
+          linkedEventId: 'family_20',
+          relocationSplitSegmentId: 'seg_A',
+          relocationSplitMvId: 'mvlink_1'
+        });
+        const afterFirstSplit = runDetector([part1, part2, mv1, mv2], 'aa');
+        assert(!afterFirstSplit.find(e => e.id === 'salary20_p1').relocationImpact, 'Part 1 should remain clear after first split');
+        const secondBoundary = afterFirstSplit.find(e => e.id === 'salary20_p2').relocationImpact;
+        assert(secondBoundary && secondBoundary.category === 'boundary', 'Part 2 should still cross the second relocation');
+        assert.strictEqual(secondBoundary.mvEventId, 'mv20_2', 'Second boundary should point to second relocation');
+
+        const part2a = makeEvent({
+          id: 'salary20_p2a',
+          type: 'SI',
+          fromAge: 35,
+          toAge: 49,
+          linkedEventId: 'family_20',
+          relocationSplitSegmentId: 'seg_B',
+          relocationSplitMvId: 'mvlink_2'
+        });
+        const part2b = makeEvent({
+          id: 'salary20_p2b',
+          type: 'SI',
+          fromAge: 50,
+          toAge: 60,
+          linkedEventId: 'family_20',
+          relocationSplitSegmentId: 'seg_B',
+          relocationSplitMvId: 'mvlink_2'
+        });
+        const afterSecondSplit = runDetector([part1, part2a, part2b, mv1, mv2], 'aa');
+        assert(!afterSecondSplit.find(e => e.id === 'salary20_p1').relocationImpact, 'Part 1 should remain clear');
+        assert(!afterSecondSplit.find(e => e.id === 'salary20_p2a').relocationImpact, 'Part 2a should be clear');
+        assert(!afterSecondSplit.find(e => e.id === 'salary20_p2b').relocationImpact, 'Part 2b should be clear');
+      });
+
+      // Test 21: In a 3-part family, moving only the first MV impacts only its segment.
+      runTest('21', function () {
+        const mv1 = makeEvent({ id: 'mv21_1', type: 'MV', name: 'BB', fromAge: 38, toAge: 38, relocationLinkId: 'mvlink_21a' });
+        const mv2 = makeEvent({ id: 'mv21_2', type: 'MV', name: 'CC', fromAge: 50, toAge: 50, relocationLinkId: 'mvlink_21b' });
+        const part1 = makeEvent({
+          id: 'family21_p1',
+          type: 'SI',
+          fromAge: 30,
+          toAge: 34,
+          linkedEventId: 'family_21',
+          relocationSplitSegmentId: 'seg_21A',
+          relocationSplitMvId: 'mvlink_21a',
+          relocationSplitAnchorAge: 35
+        });
+        const part2 = makeEvent({
+          id: 'family21_p2',
+          type: 'SI',
+          fromAge: 35,
+          toAge: 49,
+          linkedEventId: 'family_21',
+          relocationSplitSegmentId: 'seg_21A',
+          relocationSplitMvId: 'mvlink_21a',
+          relocationSplitAnchorAge: 35
+        });
+        const part3 = makeEvent({
+          id: 'family21_p3',
+          type: 'SI',
+          fromAge: 50,
+          toAge: 60,
+          linkedEventId: 'family_21',
+          relocationSplitSegmentId: 'seg_21B',
+          relocationSplitMvId: 'mvlink_21b',
+          relocationSplitAnchorAge: 50
+        });
+
+        const result = runDetector([part1, part2, part3, mv1, mv2], 'aa');
+        const p1Impact = result.find(e => e.id === 'family21_p1').relocationImpact;
+        const p2Impact = result.find(e => e.id === 'family21_p2').relocationImpact;
+        const p3Impact = result.find(e => e.id === 'family21_p3').relocationImpact;
+        assert(p1Impact && p1Impact.category === 'split_relocation_shift', 'Segment A part 1 should be impacted');
+        assert(p2Impact && p2Impact.category === 'boundary', 'Segment A part 2 should remain impacted at the moved relocation boundary');
+        assert(!p3Impact, 'Segment B should remain aligned and clear');
+      });
+
+      // Test 22: In a 3-part family, deleting only the second MV orphans only that segment.
+      runTest('22', function () {
+        const mv1 = makeEvent({ id: 'mv22_1', type: 'MV', name: 'BB', fromAge: 35, toAge: 35, relocationLinkId: 'mvlink_21a' });
+        const part1 = makeEvent({
+          id: 'family22_p1',
+          type: 'SI',
+          fromAge: 30,
+          toAge: 34,
+          linkedEventId: 'family_21',
+          relocationSplitSegmentId: 'seg_21A',
+          relocationSplitMvId: 'mvlink_21a',
+          relocationSplitAnchorAge: 35
+        });
+        const part2 = makeEvent({
+          id: 'family22_p2',
+          type: 'SI',
+          fromAge: 35,
+          toAge: 49,
+          linkedEventId: 'family_21',
+          relocationSplitSegmentId: 'seg_21A',
+          relocationSplitMvId: 'mvlink_21a',
+          relocationSplitAnchorAge: 35
+        });
+        const part3 = makeEvent({
+          id: 'family22_p3',
+          type: 'SI',
+          fromAge: 50,
+          toAge: 54,
+          linkedEventId: 'family_21',
+          relocationSplitSegmentId: 'seg_21B',
+          relocationSplitMvId: 'mvlink_21b',
+          relocationSplitAnchorAge: 50
+        });
+        const part4 = makeEvent({
+          id: 'family22_p4',
+          type: 'SI',
+          fromAge: 55,
+          toAge: 60,
+          linkedEventId: 'family_21',
+          relocationSplitSegmentId: 'seg_21B',
+          relocationSplitMvId: 'mvlink_21b',
+          relocationSplitAnchorAge: 50
+        });
+
+        const result = runDetector([part1, part2, part3, part4, mv1], 'aa');
+        assert(!result.find(e => e.id === 'family22_p1').relocationImpact, 'Segment A part 1 should remain clear');
+        assert(!result.find(e => e.id === 'family22_p2').relocationImpact, 'Segment A part 2 should remain clear');
+        const p3Impact = result.find(e => e.id === 'family22_p3').relocationImpact;
+        const p4Impact = result.find(e => e.id === 'family22_p4').relocationImpact;
+        assert(p3Impact && p3Impact.category === 'split_orphan', 'Segment B part should be orphaned');
+        assert(p4Impact && p4Impact.category === 'split_orphan', 'Segment B continuation part should be orphaned');
+      });
+
+      // Test 23: Amount drift should flag only the segment whose part 1 amount changed.
+      runTest('23', function () {
+        const mv1 = makeEvent({ id: 'mv23_1', type: 'MV', name: 'BB', fromAge: 35, toAge: 35, relocationLinkId: 'mvlink_23' });
+        const mv2 = makeEvent({ id: 'mv23_2', type: 'MV', name: 'CC', fromAge: 50, toAge: 50, relocationLinkId: 'mvlink_23b' });
+        econ = new EconomicData({
+          AA: { country: 'AA', currency: 'AAA', inflation: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', inflation: 2.0, ppp: 0.8, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          CC: { country: 'CC', currency: 'CCC', inflation: 2.0, ppp: 1.6, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' }
+        });
+
+        const segAPart1 = makeEvent({
+          id: 'seg23_a1',
+          type: 'SI',
+          fromAge: 30,
+          toAge: 34,
+          amount: 10000,
+          linkedEventId: 'family_23',
+          relocationSplitSegmentId: 'seg_23A',
+          relocationSplitMvId: 'mvlink_23'
+        });
+        const segAPart2 = makeEvent({
+          id: 'seg23_a2',
+          type: 'SI',
+          fromAge: 35,
+          toAge: 49,
+          amount: 9000,
+          linkedEventId: 'family_23',
+          relocationSplitSegmentId: 'seg_23A',
+          relocationSplitMvId: 'mvlink_23',
+          relocationSplitAnchorAmount: 8000
+        });
+        const segBPart1 = makeEvent({
+          id: 'seg23_b1',
+          type: 'SI',
+          fromAge: 35,
+          toAge: 49,
+          amount: 9000,
+          linkedEventId: 'family_23',
+          relocationSplitSegmentId: 'seg_23B',
+          relocationSplitMvId: 'mvlink_23b'
+        });
+        const segBPart2 = makeEvent({
+          id: 'seg23_b2',
+          type: 'SI',
+          fromAge: 50,
+          toAge: 60,
+          amount: 18000,
+          linkedEventId: 'family_23',
+          relocationSplitSegmentId: 'seg_23B',
+          relocationSplitMvId: 'mvlink_23b',
+          relocationSplitAnchorAmount: 9000
+        });
+
+        const result = runDetector([segAPart1, segAPart2, segBPart1, segBPart2, mv1, mv2], 'aa');
+        const segAImpact = result.find(e => e.id === 'seg23_a2').relocationImpact;
+        const segBImpact = result.find(e => e.id === 'seg23_b2').relocationImpact;
+        assert(segAImpact && segAImpact.category === 'split_amount_shift', 'Segment A destination part should get amount shift');
+        assert(!segBImpact, 'Segment B destination part should remain clear');
+      });
+
+      // Test 24: Suggestion-model drift should flag only the segment with stale reviewed suggestion.
+      runTest('24', function () {
+        const mv1 = makeEvent({ id: 'mv24_1', type: 'MV', name: 'BB', fromAge: 35, toAge: 35, relocationLinkId: 'mvlink_23' });
+        const mv2 = makeEvent({ id: 'mv24_2', type: 'MV', name: 'CC', fromAge: 50, toAge: 50, relocationLinkId: 'mvlink_23b' });
+        econ = new EconomicData({
+          AA: { country: 'AA', currency: 'AAA', inflation: 2.0, ppp: 1.0, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          BB: { country: 'BB', currency: 'BBB', inflation: 2.0, ppp: 0.8, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' },
+          CC: { country: 'CC', currency: 'CCC', inflation: 2.0, ppp: 1.6, ppp_year: 2024, fx: 1.0, fx_date: '2024-12-31' }
+        });
+
+        const segAPart1 = makeEvent({
+          id: 'seg24_a1',
+          type: 'SI',
+          fromAge: 30,
+          toAge: 34,
+          amount: 10000,
+          linkedEventId: 'family_24',
+          relocationSplitSegmentId: 'seg_24A',
+          relocationSplitMvId: 'mvlink_23'
+        });
+        const segAPart2 = makeEvent({
+          id: 'seg24_a2',
+          type: 'SI',
+          fromAge: 35,
+          toAge: 49,
+          amount: 9000,
+          linkedEventId: 'family_24',
+          relocationSplitSegmentId: 'seg_24A',
+          relocationSplitMvId: 'mvlink_23',
+          relocationSplitAnchorAmount: 10000,
+          relocationSplitReviewedSuggestedAmount: 9200,
+          relocationSplitSuggestionModelVersion: 1,
+          relocationSplitValueMode: 'suggested'
+        });
+        const segBPart1 = makeEvent({
+          id: 'seg24_b1',
+          type: 'SI',
+          fromAge: 35,
+          toAge: 49,
+          amount: 9000,
+          linkedEventId: 'family_24',
+          relocationSplitSegmentId: 'seg_24B',
+          relocationSplitMvId: 'mvlink_23b'
+        });
+        const segBPart2 = makeEvent({
+          id: 'seg24_b2',
+          type: 'SI',
+          fromAge: 50,
+          toAge: 60,
+          amount: 18000,
+          linkedEventId: 'family_24',
+          relocationSplitSegmentId: 'seg_24B',
+          relocationSplitMvId: 'mvlink_23b',
+          relocationSplitAnchorAmount: 9000,
+          relocationSplitReviewedSuggestedAmount: 18000,
+          relocationSplitSuggestionModelVersion: 1,
+          relocationSplitValueMode: 'suggested'
+        });
+
+        const result = runDetector([segAPart1, segAPart2, segBPart1, segBPart2, mv1, mv2], 'aa');
+        const segAImpact = result.find(e => e.id === 'seg24_a2').relocationImpact;
+        const segBImpact = result.find(e => e.id === 'seg24_b2').relocationImpact;
+        assert(segAImpact && segAImpact.category === 'split_suggestion_shift', 'Segment A destination part should get suggestion shift');
+        assert(!segBImpact, 'Segment B destination part should remain clear');
+      });
+
     } catch (err) {
       errors.push(err.message || String(err));
     }

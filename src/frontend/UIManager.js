@@ -1041,6 +1041,8 @@ class UIManager {
               const splitSuggestionModelVersion = Number(splitSuggestionModelVersionInput.value);
               if (!isNaN(splitSuggestionModelVersion)) eventObj.relocationSplitSuggestionModelVersion = splitSuggestionModelVersion;
             }
+            const splitSegmentIdInput = domRow.querySelector('.event-relocation-split-segment-id');
+            if (splitSegmentIdInput && splitSegmentIdInput.value) eventObj.relocationSplitSegmentId = splitSegmentIdInput.value;
 
             const relocationLinkIdInput = domRow.querySelector('.event-relocation-link-id');
             if (relocationLinkIdInput && relocationLinkIdInput.value) eventObj.relocationLinkId = relocationLinkIdInput.value;

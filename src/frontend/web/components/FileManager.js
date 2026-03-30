@@ -533,6 +533,7 @@ class FileManager {
               if (metaValues.splitValueMode) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-value-mode', metaValues.splitValueMode);
               if (metaValues.splitReviewedSuggestedAmount) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-reviewed-suggested-amount', metaValues.splitReviewedSuggestedAmount);
               if (metaValues.splitSuggestionModelVersion) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-suggestion-model-version', metaValues.splitSuggestionModelVersion);
+              if (metaValues.splitSegmentId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-split-segment-id', metaValues.splitSegmentId);
               if (metaValues.mvLinkId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-link-id', metaValues.mvLinkId);
               if (metaValues.sellMvId) this.webUI.eventsTableManager.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', metaValues.sellMvId);
               else queueMarkerRef(row, metaValues, 'sellMvRow', 'event-relocation-sell-mv-id');
@@ -574,6 +575,54 @@ class FileManager {
         if (!markerId) continue;
         this.webUI.eventsTableManager.getOrCreateHiddenInput(pending.row, pending.inputClass, markerId);
       }
+
+      const legacySplitFamilies = new Map();
+      for (let i = 0; i < createdEventRows.length; i++) {
+        const row = createdEventRows[i];
+        if (!row) continue;
+        const linkedEventInput = row.querySelector('.event-linked-event-id');
+        const linkedEventId = linkedEventInput && linkedEventInput.value ? String(linkedEventInput.value).trim() : '';
+        if (!linkedEventId) continue;
+        if (!legacySplitFamilies.has(linkedEventId)) legacySplitFamilies.set(linkedEventId, []);
+        legacySplitFamilies.get(linkedEventId).push(row);
+      }
+      const usedSplitSegmentIds = new Set(
+        createdEventRows
+          .map((row) => {
+            const segmentInput = row ? row.querySelector('.event-relocation-split-segment-id') : null;
+            return segmentInput && segmentInput.value ? String(segmentInput.value).trim() : '';
+          })
+          .filter(Boolean)
+      );
+      const maxExistingSegCounter = Array.from(usedSplitSegmentIds).reduce((max, id) => {
+        const match = /^seg_([0-9a-z]+)$/i.exec(id);
+        if (!match) return max;
+        const parsed = parseInt(match[1], 36);
+        return Number.isFinite(parsed) && parsed > max ? parsed : max;
+      }, 0);
+      const currentSegCounter = this.webUI.eventsTableManager._compactIdCounters.seg || 0;
+      if (maxExistingSegCounter > currentSegCounter) {
+        this.webUI.eventsTableManager._compactIdCounters.seg = maxExistingSegCounter;
+      }
+      legacySplitFamilies.forEach((familyRows) => {
+        if (!familyRows || familyRows.length !== 2) return;
+        const firstRow = familyRows[0];
+        const secondRow = familyRows[1];
+        const firstSegmentInput = firstRow.querySelector('.event-relocation-split-segment-id');
+        const secondSegmentInput = secondRow.querySelector('.event-relocation-split-segment-id');
+        const firstSegmentId = firstSegmentInput && firstSegmentInput.value ? String(firstSegmentInput.value).trim() : '';
+        const secondSegmentId = secondSegmentInput && secondSegmentInput.value ? String(secondSegmentInput.value).trim() : '';
+        if (firstSegmentId || secondSegmentId) return;
+        const firstSplitMvInput = firstRow.querySelector('.event-relocation-split-mv-id');
+        const secondSplitMvInput = secondRow.querySelector('.event-relocation-split-mv-id');
+        const firstSplitMvId = firstSplitMvInput && firstSplitMvInput.value ? String(firstSplitMvInput.value).trim() : '';
+        const secondSplitMvId = secondSplitMvInput && secondSplitMvInput.value ? String(secondSplitMvInput.value).trim() : '';
+        if (!firstSplitMvId || !secondSplitMvId || firstSplitMvId !== secondSplitMvId) return;
+        const segId = this.webUI.eventsTableManager._nextCompactId('seg');
+        usedSplitSegmentIds.add(segId);
+        this.webUI.eventsTableManager.getOrCreateHiddenInput(firstRow, 'event-relocation-split-segment-id', segId);
+        this.webUI.eventsTableManager.getOrCreateHiddenInput(secondRow, 'event-relocation-split-segment-id', segId);
+      });
 
       this.webUI.formatUtils.setupCurrencyInputs();
       this.webUI.formatUtils.setupPercentageInputs();

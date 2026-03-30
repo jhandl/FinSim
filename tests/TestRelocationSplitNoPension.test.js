@@ -755,4 +755,351 @@ describe('Relocation Split No Pension', () => {
     expect(document.querySelector('tr[data-row-id="row-1"] .event-to-age').value).toBe('44');
     expect(document.querySelector('tr[data-row-id="row-2"] .event-from-age').value).toBe('47');
   });
+
+  test('splitting an already-split row generates a new relocation split segment id', () => {
+    const configStub = {
+      isRelocationEnabled: () => true,
+      getStartCountry: () => 'us',
+      getAvailableCountries: () => [],
+      getCachedTaxRuleSet: () => ({
+        getCurrencyCode: () => 'USD',
+        hasPrivatePensions: () => true,
+        getNumberLocale: () => 'en-US',
+        getCurrencySymbol: () => '$'
+      }),
+      getEconomicData: () => null,
+      getInstance: () => configStub
+    };
+    global.Config = { getInstance: () => configStub };
+
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-1">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-amount" value="100000"></td>
+            <td><input class="event-from-age" value="30"></td>
+            <td><input class="event-to-age" value="34"></td>
+            <td><input class="event-linked-event-id" value="split_existing"></td>
+            <td><input class="event-relocation-split-segment-id" value="seg_old"></td>
+            <td><input class="event-relocation-split-mv-id" value="mvlink_old"></td>
+          </tr>
+          <tr data-row-id="row-2">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-amount" value="90000"></td>
+            <td><input class="event-from-age" value="35"></td>
+            <td><input class="event-to-age" value="45"></td>
+            <td><input class="event-linked-event-id" value="split_existing"></td>
+            <td><input class="event-relocation-split-segment-id" value="seg_old"></td>
+            <td><input class="event-relocation-split-mv-id" value="mvlink_old"></td>
+          </tr>
+          <tr data-row-id="row-3">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-amount" value="80000"></td>
+            <td><input class="event-from-age" value="46"></td>
+            <td><input class="event-to-age" value="60"></td>
+            <td><input class="event-linked-event-id" value="split_existing"></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    constructorNoops.forEach((method) => {
+      jest.spyOn(EventsTableManager.prototype, method).mockImplementation(() => {});
+    });
+
+    const events = [
+      { id: 'Job', type: 'SI', fromAge: 30, toAge: 34, amount: 100000, linkedEventId: 'split_existing', relocationSplitSegmentId: 'seg_old', relocationSplitMvId: 'mvlink_old' },
+      { id: 'Job', type: 'SI', fromAge: 35, toAge: 45, amount: 90000, linkedEventId: 'split_existing', relocationSplitSegmentId: 'seg_old', relocationSplitMvId: 'mvlink_old' },
+      { id: 'Job', type: 'SI', fromAge: 46, toAge: 60, amount: 80000, linkedEventId: 'split_existing', relocationImpact: { category: 'boundary', mvEventId: 'mv_new' } },
+      { id: 'Relocation', type: 'MV', name: 'UK', fromAge: 50, toAge: 50, relocationLinkId: 'mvlink_new', _mvRuntimeId: 'mv_new' }
+    ];
+    const webUIStub = {
+      readEvents: jest.fn(() => events),
+      getValue: jest.fn(() => 'single'),
+      formatUtils: {
+        setupCurrencyInputs: jest.fn(),
+        setupPercentageInputs: jest.fn()
+      }
+    };
+
+    const manager = new EventsTableManager(webUIStub);
+    jest.spyOn(manager, '_afterResolutionAction').mockImplementation(() => {});
+    jest.spyOn(manager, 'createEventRow').mockImplementation((type, id, amount, fromAge, toAge, rate, match) => {
+      const tr = document.createElement('tr');
+      tr.dataset.rowId = 'new-' + fromAge + '-' + toAge;
+      tr.innerHTML = `
+        <td><div class="event-type-container"><input class="event-type" value="${type}"></div></td>
+        <td><input class="event-name" value="${id}"></td>
+        <td><input class="event-amount" value="${amount}"></td>
+        <td><input class="event-from-age" value="${fromAge}"></td>
+        <td><input class="event-to-age" value="${toAge}"></td>
+        <td><input class="event-rate" value="${rate || ''}"></td>
+        <td><input class="event-match" value="${match || ''}"></td>
+      `;
+      return tr;
+    });
+    const originalGetOrCreateHiddenInput = manager.getOrCreateHiddenInput.bind(manager);
+    const hiddenInputSpy = jest.spyOn(manager, 'getOrCreateHiddenInput').mockImplementation((row, className, value) => {
+      return originalGetOrCreateHiddenInput(row, className, value);
+    });
+
+    jest.useFakeTimers();
+    manager.splitEventAtRelocation('row-3', '80000');
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+
+    const segmentCalls = hiddenInputSpy.mock.calls.filter((call) => call[1] === 'event-relocation-split-segment-id');
+    expect(segmentCalls.length).toBeGreaterThan(0);
+    expect(segmentCalls.some((call) => String(call[2]) !== 'seg_old')).toBe(true);
+
+    const linkedCalls = hiddenInputSpy.mock.calls.filter((call) => call[1] === 'event-linked-event-id');
+    expect(linkedCalls.length).toBeGreaterThan(0);
+    expect(linkedCalls.some((call) => String(call[2]) === 'split_existing')).toBe(true);
+  });
+
+  test('adaptSplitToRelocationAge updates only the impacted segment', () => {
+    const configStub = {
+      isRelocationEnabled: () => true,
+      getStartCountry: () => 'us',
+      getAvailableCountries: () => [],
+      getCachedTaxRuleSet: () => ({
+        getCurrencyCode: () => 'USD',
+        hasPrivatePensions: () => true,
+        getNumberLocale: () => 'en-US',
+        getCurrencySymbol: () => '$'
+      }),
+      getEconomicData: () => null,
+      getInstance: () => configStub
+    };
+    global.Config = { getInstance: () => configStub };
+
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-1">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-from-age" value="30"></td>
+            <td><input class="event-to-age" value="34"></td>
+            <td><input class="event-linked-event-id" value="family_B"></td>
+            <td><input class="event-relocation-split-segment-id" value="seg_B1"></td>
+            <td><input class="event-relocation-split-mv-id" value="mvlink_B1"></td>
+          </tr>
+          <tr data-row-id="row-2">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-from-age" value="35"></td>
+            <td><input class="event-to-age" value="49"></td>
+            <td><input class="event-linked-event-id" value="family_B"></td>
+            <td><input class="event-relocation-split-segment-id" value="seg_B1"></td>
+            <td><input class="event-relocation-split-mv-id" value="mvlink_B1"></td>
+          </tr>
+          <tr data-row-id="row-3">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-from-age" value="35"></td>
+            <td><input class="event-to-age" value="44"></td>
+            <td><input class="event-linked-event-id" value="family_B"></td>
+            <td><input class="event-relocation-split-segment-id" value="seg_B2"></td>
+            <td><input class="event-relocation-split-mv-id" value="mvlink_B2"></td>
+            <td><input class="event-relocation-split-anchor-age" value="45"></td>
+          </tr>
+          <tr data-row-id="row-4">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-from-age" value="45"></td>
+            <td><input class="event-to-age" value="60"></td>
+            <td><input class="event-linked-event-id" value="family_B"></td>
+            <td><input class="event-relocation-split-segment-id" value="seg_B2"></td>
+            <td><input class="event-relocation-split-mv-id" value="mvlink_B2"></td>
+            <td><input class="event-relocation-split-anchor-age" value="45"></td>
+          </tr>
+          <tr data-row-id="row-mv-b2" data-event-id="mv_B2">
+            <td><div class="event-type-container"><input class="event-type" value="MV"></div></td>
+            <td><input class="event-name" value="UK"></td>
+            <td><input class="event-from-age" value="50"></td>
+            <td><input class="event-to-age" value="50"></td>
+            <td><input class="event-relocation-link-id" value="mvlink_B2"></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    constructorNoops.filter((method) => method !== 'setupEventTypeChangeHandler').forEach((method) => {
+      jest.spyOn(EventsTableManager.prototype, method).mockImplementation(() => {});
+    });
+    jest.spyOn(EventsTableManager.prototype, '_scheduleRelocationReanalysis').mockImplementation(() => {});
+
+    const events = [
+      { id: 'Job', type: 'SI', fromAge: 30, toAge: 34, linkedEventId: 'family_B', relocationSplitSegmentId: 'seg_B1', relocationSplitMvId: 'mvlink_B1' },
+      { id: 'Job', type: 'SI', fromAge: 35, toAge: 49, linkedEventId: 'family_B', relocationSplitSegmentId: 'seg_B1', relocationSplitMvId: 'mvlink_B1' },
+      { id: 'Job', type: 'SI', fromAge: 35, toAge: 44, linkedEventId: 'family_B', relocationSplitSegmentId: 'seg_B2', relocationSplitMvId: 'mvlink_B2', relocationSplitAnchorAge: 45 },
+      {
+        id: 'Job',
+        type: 'SI',
+        fromAge: 45,
+        toAge: 60,
+        linkedEventId: 'family_B',
+        relocationSplitSegmentId: 'seg_B2',
+        relocationSplitMvId: 'mvlink_B2',
+        relocationSplitAnchorAge: 45,
+        relocationImpact: { category: 'split_relocation_shift', mvEventId: 'mv_B2' }
+      },
+      { id: 'mv_B2', type: 'MV', name: 'UK', fromAge: 50, toAge: 50, relocationLinkId: 'mvlink_B2' }
+    ];
+    const webUIStub = {
+      readEvents: jest.fn(() => events),
+      getValue: jest.fn(() => 'single'),
+      formatUtils: {
+        setupCurrencyInputs: jest.fn(),
+        setupPercentageInputs: jest.fn()
+      }
+    };
+
+    const manager = new EventsTableManager(webUIStub);
+    jest.spyOn(manager, '_afterResolutionAction').mockImplementation(() => {});
+
+    manager.adaptSplitToRelocationAge('row-4');
+
+    expect(document.querySelector('tr[data-row-id="row-3"] .event-to-age').value).toBe('49');
+    expect(document.querySelector('tr[data-row-id="row-4"] .event-from-age').value).toBe('50');
+    expect(document.querySelector('tr[data-row-id="row-1"] .event-to-age').value).toBe('34');
+    expect(document.querySelector('tr[data-row-id="row-2"] .event-from-age').value).toBe('35');
+  });
+
+  test('joinSplitEvents removes only orphaned segment and keeps other split segment', () => {
+    const configStub = {
+      isRelocationEnabled: () => true,
+      getStartCountry: () => 'us',
+      getAvailableCountries: () => [],
+      getCachedTaxRuleSet: () => ({
+        getCurrencyCode: () => 'USD',
+        hasPrivatePensions: () => true,
+        getNumberLocale: () => 'en-US',
+        getCurrencySymbol: () => '$'
+      }),
+      getEconomicData: () => null,
+      getInstance: () => configStub
+    };
+    global.Config = { getInstance: () => configStub };
+
+    document.body.innerHTML = `
+      <table id="Events">
+        <tbody>
+          <tr data-row-id="row-1">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-amount" value="100000"></td>
+            <td><input class="event-from-age" value="30"></td>
+            <td><input class="event-to-age" value="39"></td>
+            <td><input class="event-rate" value=""></td>
+            <td><input class="event-match" value=""></td>
+            <td><input class="event-linked-event-id" value="family_C"></td>
+            <td><input class="event-relocation-split-segment-id" value="seg_C1"></td>
+          </tr>
+          <tr data-row-id="row-2">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-amount" value="90000"></td>
+            <td><input class="event-from-age" value="40"></td>
+            <td><input class="event-to-age" value="50"></td>
+            <td><input class="event-rate" value=""></td>
+            <td><input class="event-match" value=""></td>
+            <td><input class="event-linked-event-id" value="family_C"></td>
+            <td><input class="event-relocation-split-segment-id" value="seg_C1"></td>
+          </tr>
+          <tr data-row-id="row-3">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-amount" value="85000"></td>
+            <td><input class="event-from-age" value="51"></td>
+            <td><input class="event-to-age" value="55"></td>
+            <td><input class="event-rate" value=""></td>
+            <td><input class="event-match" value=""></td>
+            <td><input class="event-linked-event-id" value="family_C"></td>
+            <td><input class="event-relocation-split-segment-id" value="seg_C2"></td>
+          </tr>
+          <tr data-row-id="row-4">
+            <td><div class="event-type-container"><input class="event-type" value="SI"></div></td>
+            <td><input class="event-name" value="Job"></td>
+            <td><input class="event-amount" value="83000"></td>
+            <td><input class="event-from-age" value="56"></td>
+            <td><input class="event-to-age" value="60"></td>
+            <td><input class="event-rate" value=""></td>
+            <td><input class="event-match" value=""></td>
+            <td><input class="event-linked-event-id" value="family_C"></td>
+            <td><input class="event-relocation-split-segment-id" value="seg_C2"></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    const orphanDetails = {
+      relocationSplitSegmentId: 'seg_C1',
+      linkedEventId: 'family_C',
+      fromAge: 30,
+      toAge: 50
+    };
+    document.querySelector('tr[data-row-id="row-1"]').dataset.relocationImpactDetails = JSON.stringify(orphanDetails);
+
+    const webUIStub = {
+      readEvents: jest.fn(() => [
+        {
+          id: 'Job',
+          type: 'SI',
+          fromAge: 30,
+          toAge: 39,
+          linkedEventId: 'family_C',
+          relocationSplitSegmentId: 'seg_C1',
+          relocationImpact: { category: 'split_orphan', details: orphanDetails }
+        },
+        { id: 'Job', type: 'SI', fromAge: 40, toAge: 50, linkedEventId: 'family_C', relocationSplitSegmentId: 'seg_C1' },
+        { id: 'Job', type: 'SI', fromAge: 51, toAge: 55, linkedEventId: 'family_C', relocationSplitSegmentId: 'seg_C2' },
+        { id: 'Job', type: 'SI', fromAge: 56, toAge: 60, linkedEventId: 'family_C', relocationSplitSegmentId: 'seg_C2' }
+      ]),
+      getValue: jest.fn(() => 'single'),
+      formatUtils: {
+        setupCurrencyInputs: jest.fn(),
+        setupPercentageInputs: jest.fn()
+      }
+    };
+
+    const manager = new EventsTableManager(webUIStub);
+    jest.spyOn(manager, 'createEventRow').mockImplementation((type, name, amount, fromAge, toAge, rate, match) => {
+      const tr = document.createElement('tr');
+      tr.dataset.rowId = 'merged-row';
+      tr.innerHTML = `
+        <td><div class="event-type-container"><input class="event-type" value="${type}"></div></td>
+        <td><input class="event-name" value="${name}"></td>
+        <td><input class="event-amount" value="${amount}"></td>
+        <td><input class="event-from-age" value="${fromAge}"></td>
+        <td><input class="event-to-age" value="${toAge}"></td>
+        <td><input class="event-rate" value="${rate || ''}"></td>
+        <td><input class="event-match" value="${match || ''}"></td>
+      `;
+      return tr;
+    });
+    jest.spyOn(manager, '_afterResolutionAction').mockImplementation(() => {});
+
+    manager.joinSplitEvents('row-1');
+
+    const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => !(r.classList && r.classList.contains('resolution-panel-row')));
+    expect(rows).toHaveLength(3);
+    const mergedRow = document.querySelector('tr[data-row-id="merged-row"]');
+    expect(mergedRow).toBeTruthy();
+    expect(mergedRow.querySelector('.event-from-age').value).toBe('30');
+    expect(mergedRow.querySelector('.event-to-age').value).toBe('50');
+
+    const row3 = document.querySelector('tr[data-row-id="row-3"]');
+    const row4 = document.querySelector('tr[data-row-id="row-4"]');
+    expect(row3).toBeTruthy();
+    expect(row4).toBeTruthy();
+    expect(row3.querySelector('.event-relocation-split-segment-id').value).toBe('seg_C2');
+    expect(row4.querySelector('.event-relocation-split-segment-id').value).toBe('seg_C2');
+    expect(mergedRow.querySelector('.event-linked-event-id')).toBeTruthy();
+    expect(mergedRow.querySelector('.event-linked-event-id').value).toBe('family_C');
+  });
 });

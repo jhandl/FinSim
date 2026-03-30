@@ -174,6 +174,7 @@ function createEventDomRow(eventType, meta) {
       if (selector === '.event-linked-country' && values.linkedCountry) return { value: values.linkedCountry };
       if (selector === '.event-linked-event-id' && values.linkedEventId) return { value: values.linkedEventId };
       if (selector === '.event-relocation-split-mv-id' && values.splitMvId) return { value: values.splitMvId };
+      if (selector === '.event-relocation-split-segment-id' && values.splitSegmentId) return { value: values.splitSegmentId };
       if (selector === '.event-relocation-split-anchor-amount' && values.splitAnchorAmount !== undefined && values.splitAnchorAmount !== '') {
         return { value: values.splitAnchorAmount };
       }
@@ -559,13 +560,14 @@ function runRelocationCase(errors) {
     ['E:Sparse Expense', '', '38', '', '', '']
   ];
   const eventDomRows = [
-    createEventDomRow('SI', { currency: 'AAA', linkedCountry: 'aa', linkedEventId: 'income_chain' }),
+    createEventDomRow('SI', { currency: 'AAA', linkedCountry: 'aa', linkedEventId: 'income_chain', splitSegmentId: 'seg_rt1' }),
     createEventDomRow('MV', { mvLinkId: 'mvrow_A' }),
     createEventDomRow('SI', {
       currency: 'BBB',
       linkedCountry: 'bb',
       linkedEventId: 'income_chain',
       splitMvId: 'mvrow_A',
+      splitSegmentId: 'seg_rt1',
       splitAnchorAmount: '5000.75',
       splitValueMode: 'suggested',
       splitReviewedSuggestedAmount: '9800.25',
@@ -604,7 +606,7 @@ function runRelocationCase(errors) {
 
   const csv = serializeSimulation(ui);
   assertContains(csv, '# EventMeta', 'Relocation CSV meta section', errors);
-  assertContains(csv, 'Row,Currency,LinkedCountry,LinkedRows,SplitMvRow,SplitMvId,SplitAnchorAmount,SellMvRow,SellMvId,RentMvRow,RentMvId,Resolved,ResolvedMvRow,ResolvedMvId,ResolvedCategory,SplitValueMode,SplitReviewedSuggestedAmount,SplitSuggestionModelVersion', 'Relocation EventMeta header', errors);
+  assertContains(csv, 'Row,Currency,LinkedCountry,LinkedRows,SplitMvRow,SplitMvId,SplitAnchorAmount,SellMvRow,SellMvId,RentMvRow,RentMvId,Resolved,ResolvedMvRow,ResolvedMvId,ResolvedCategory,SplitValueMode,SplitReviewedSuggestedAmount,SplitSuggestionModelVersion,SplitSegmentId', 'Relocation EventMeta header', errors);
   assertContains(csv, 'MV,bb,,32,32,,', 'Relocation first MV row', errors);
   assertContains(csv, 'MV,aa,,37,37,,', 'Relocation second MV row', errors);
 
@@ -629,9 +631,11 @@ function runRelocationCase(errors) {
   assertEqual(getMetaCell(meta, 1, 'Currency'), 'AAA', 'Relocation meta row 1 currency', errors);
   assertEqual(getMetaCell(meta, 1, 'LinkedCountry'), 'aa', 'Relocation meta row 1 linked country', errors);
   assertEqual(getMetaCell(meta, 1, 'LinkedRows'), '1|3|7', 'Relocation meta row 1 linked rows', errors);
+  assertEqual(getMetaCell(meta, 1, 'SplitSegmentId'), 'seg_rt1', 'Relocation meta row 1 split segment id', errors);
   assertEqual(getMetaCell(meta, 3, 'Currency'), 'BBB', 'Relocation meta row 3 currency', errors);
   assertEqual(getMetaCell(meta, 3, 'LinkedCountry'), 'bb', 'Relocation meta row 3 linked country', errors);
   assertEqual(getMetaCell(meta, 3, 'LinkedRows'), '1|3|7', 'Relocation meta row 3 linked rows', errors);
+  assertEqual(getMetaCell(meta, 3, 'SplitSegmentId'), 'seg_rt1', 'Relocation meta row 3 split segment id', errors);
   assertEqual(getMetaCell(meta, 3, 'SplitMvRow'), '2', 'Relocation meta row 3 split MV row', errors);
   assertEqual(getMetaCell(meta, 3, 'SplitAnchorAmount'), '5000.75', 'Relocation meta row 3 split anchor amount', errors);
   assertEqual(getMetaCell(meta, 3, 'SplitValueMode'), 'suggested', 'Relocation meta row 3 split value mode', errors);
@@ -674,7 +678,9 @@ function runRelocationCase(errors) {
   assertEqual(row0Meta.currency, 'AAA', 'Relocation row 1 inline currency', errors);
   assertEqual(row0Meta.linkedCountry, 'aa', 'Relocation row 1 inline linked country', errors);
   assertEqual(row0Meta.linkedEventId, 'split_1', 'Relocation row 1 regenerated linked event id', errors);
+  assertEqual(row0Meta.splitSegmentId, 'seg_rt1', 'Relocation row 1 segment id survives round-trip', errors);
   assertEqual(row2Meta.linkedEventId, 'split_1', 'Relocation row 3 regenerated linked event id', errors);
+  assertEqual(row2Meta.splitSegmentId, 'seg_rt1', 'Relocation row 3 segment id survives round-trip', errors);
   assertEqual(row2Meta.splitMvRow, '2', 'Relocation row 3 split MV row in inline meta', errors);
   assertEqual(row2Meta.splitValueMode, 'suggested', 'Relocation row 3 split value mode in inline meta', errors);
   assertEqual(row2Meta.splitReviewedSuggestedAmount, '9800.25', 'Relocation row 3 reviewed suggested amount in inline meta', errors);
@@ -701,6 +707,7 @@ function runRelocationCase(errors) {
   const reroundUi = createUi(reroundDoc, reround.eventRows);
   seedValues(reroundUi, snapshotDocumentValues(sinkDoc));
   const csv2 = serializeSimulation(reroundUi);
+  assertContains(csv2, 'Row,Currency,LinkedCountry,LinkedRows,SplitMvRow,SplitMvId,SplitAnchorAmount,SellMvRow,SellMvId,RentMvRow,RentMvId,Resolved,ResolvedMvRow,ResolvedMvId,ResolvedCategory,SplitValueMode,SplitReviewedSuggestedAmount,SplitSuggestionModelVersion,SplitSegmentId', 'Relocation reserialized EventMeta header keeps split segment id column', errors);
   if (csv !== csv2) {
     errors.push('Relocation CSV round-trip is not idempotent');
     const lines1 = csv.split('\n');
