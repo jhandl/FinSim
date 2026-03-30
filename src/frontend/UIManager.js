@@ -89,6 +89,9 @@ class UIManager {
   }
 
   updateStatusCell(successes, runs) {
+    if (this.ui && typeof this.ui.markSimulationComplete === 'function') {
+      this.ui.markSimulationComplete();
+    }
     if (montecarlo) {
       let percentSuccess = successes / runs;
       let msg = `Success ${(percentSuccess * 100).toFixed(1)}%`;

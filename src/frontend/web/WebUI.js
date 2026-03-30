@@ -7,6 +7,7 @@ class WebUI extends AbstractUI {
 
     // Initialize simulation state tracking
     this.isSimulationRunning = false;
+    this.pendingSimulationFinalize = false;
     this.currentSimMode = 'single'; // Default to single person mode
     this.currentEconomyMode = 'deterministic'; // Default to deterministic mode
     this.preservedVolatilityValues = {}; // Store volatility values when switching modes
@@ -100,6 +101,10 @@ class WebUI extends AbstractUI {
 
   setStatus(message, color = STATUS_COLORS.INFO) {
     this.notificationUtils.setStatus(message, color);
+  }
+
+  markSimulationComplete() {
+    this.pendingSimulationFinalize = true;
   }
 
   setError(message) {
@@ -3063,6 +3068,7 @@ class WebUI extends AbstractUI {
 
   proceedWithSimulation(runButton, mobileRunButton) {
     this.isSimulationRunning = true;
+    this.pendingSimulationFinalize = false;
     // Clear stored country timeline at the start of a new simulation
     if (this.tableManager) {
       this.tableManager.storedCountryTimeline = null;
@@ -3089,6 +3095,7 @@ class WebUI extends AbstractUI {
         this.setError(error);
         // Re-enable button on error
         this.isSimulationRunning = false;
+        this.pendingSimulationFinalize = false;
         runButton.disabled = false;
         runButton.classList.remove('disabled');
         runButton.style.pointerEvents = '';
@@ -3355,7 +3362,7 @@ class WebUI extends AbstractUI {
       return;
     }
     // flush() is called at the end of updateStatusCell, which signals simulation completion
-    if (this.isSimulationRunning) {
+    if (this.isSimulationRunning && this.pendingSimulationFinalize) {
       // End-of-run: rebuild datasets transactionally and re-apply visibility to ensure single-step update
       const cfg = Config.getInstance();
       const rs = (cfg && typeof cfg.getCachedTaxRuleSet === 'function') ? cfg.getCachedTaxRuleSet(cfg.getDefaultCountry && cfg.getDefaultCountry()) : null;
@@ -3370,6 +3377,7 @@ class WebUI extends AbstractUI {
       }
 
       this.isSimulationRunning = false;
+      this.pendingSimulationFinalize = false;
       // Update button state (will re-enable if no impacts, or keep disabled if impacts exist)
       setTimeout(() => {
         this.updateRunButtonState();
