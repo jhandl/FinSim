@@ -147,7 +147,6 @@ function seedParameterIds(ui, extraIds) {
     'P2StartingAge', 'P2RetirementAge', 'P2StatePensionWeekly',
     'InitialPensionP2', 'PensionContributionPercentageP2',
     'simulation_mode', 'economy_mode',
-    'investmentStrategiesEnabled',
     'InitialCapital_indexFunds_ie', 'InitialCapital_shares_ie',
     'InvestmentAllocation_ie_indexFunds', 'InvestmentAllocation_ie_shares',
     'InitialCapital_indexFunds', 'InitialCapital_shares',
@@ -176,7 +175,6 @@ function seedLegacyDemoBaseParameterIds(ui) {
     'Priority_cash', 'Priority_pension', 'Priority_indexFunds', 'Priority_shares',
     'P2StartingAge', 'P2RetirementAge', 'P2StatePensionWeekly', 'InitialPensionP2',
     'PensionContributionPercentageP2', 'simulation_mode', 'economy_mode',
-    'investmentStrategiesEnabled',
     'InvestmentAllocation_indexFunds', 'InvestmentAllocation_shares',
     'InitialCapital_indexFunds', 'InitialCapital_shares',
     'InvestmentAllocation_ie_indexFunds', 'InvestmentAllocation_ie_shares',
@@ -380,7 +378,6 @@ module.exports = {
         ui1.setValue('InitialSavings', '5000');
         ui1.setValue('simulation_mode', 'single');
         ui1.setValue('economy_mode', 'deterministic');
-        ui1.setValue('investmentStrategiesEnabled', 'off');
 
         const csv1 = serializeSimulation(ui1);
 

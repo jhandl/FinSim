@@ -153,7 +153,6 @@ function runCanonicalEconomyRoundTripCase(errors) {
   ui.setValue('StartCountry', 'ie');
   ui.setValue('simulation_mode', 'single');
   ui.setValue('economy_mode', 'deterministic');
-  ui.setValue('investmentStrategiesEnabled', 'off');
 
   ui.setValue('GlobalAssetGrowth_globalEquity', '7');
   ui.setValue('GlobalAssetVolatility_globalEquity', '15');
@@ -209,7 +208,6 @@ function runRelocationEconomyRoundTripCase(errors) {
   ui.setValue('StartCountry', 'ie');
   ui.setValue('simulation_mode', 'single');
   ui.setValue('economy_mode', 'deterministic');
-  ui.setValue('investmentStrategiesEnabled', 'off');
   ui.setValue('Inflation_ie', '2');
   ui.setValue('Inflation_us', '3');
   ui.setValue('LocalAssetGrowth_us_localIndex', '6');
@@ -243,7 +241,6 @@ function runLegacyNoBackfillCase(errors) {
   ui.setValue('StartCountry', 'ie');
   ui.setValue('simulation_mode', 'single');
   ui.setValue('economy_mode', 'deterministic');
-  ui.setValue('investmentStrategiesEnabled', 'off');
 
   // Legacy scalar ids should not backfill canonical per-country economy ids on save.
   ui.setValue('Inflation', '3');

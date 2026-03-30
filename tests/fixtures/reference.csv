@@ -27,7 +27,6 @@ InitialPensionP2,0
 PensionContributionPercentageP2,25%
 simulation_mode,couple
 economy_mode,montecarlo
-investmentStrategiesEnabled,true
 perCountryInvestmentsEnabled,true
 InitialCapital_indexFunds_ie,0
 indexFunds_ieGrowthRate,7%

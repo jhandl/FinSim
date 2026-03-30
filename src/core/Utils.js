@@ -563,9 +563,7 @@ function serializeSimulation(ui) {
     // Simulation Mode
     simulation_mode: ui.getValue('simulation_mode'),
     // Economy Mode
-    economy_mode: ui.getValue('economy_mode'),
-    // Feature toggles
-    investmentStrategiesEnabled: ui.getValue('investmentStrategiesEnabled')
+    economy_mode: ui.getValue('economy_mode')
   };
   if (normalizedStartCountry) {
     var canonicalStartInflationId = 'Inflation_' + normalizedStartCountry;
@@ -1285,11 +1283,6 @@ function deserializeSimulation(content, ui) {
         // Skip if parameter doesn't exist
       }
     }
-  }
-
-  var investmentStrategiesValue = ui.getValue('investmentStrategiesEnabled');
-  if (investmentStrategiesValue === undefined || investmentStrategiesValue === null || investmentStrategiesValue === '') {
-    ui.setValue('investmentStrategiesEnabled', 'off');
   }
 
   // Ensure canonical country-scoped inputs are materialized after load (web UI only).

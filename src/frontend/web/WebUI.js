@@ -11,7 +11,6 @@ class WebUI extends AbstractUI {
     this.currentSimMode = 'single'; // Default to single person mode
     this.currentEconomyMode = 'deterministic'; // Default to deterministic mode
     this.preservedVolatilityValues = {}; // Store volatility values when switching modes
-    this.investmentStrategiesEnabled = false;
     this.economicRegimesEnabled = 'off';
 
     this.p1Labels = {
@@ -331,9 +330,6 @@ class WebUI extends AbstractUI {
     if (elementId === 'economy_mode') {
       return this.currentEconomyMode;
     }
-    if (elementId === 'investmentStrategiesEnabled') {
-      return this.investmentStrategiesEnabled;
-    }
     if (elementId === 'economicRegimesEnabled') {
       return this.economicRegimesEnabled;
     }
@@ -353,10 +349,6 @@ class WebUI extends AbstractUI {
     if (elementId === 'economy_mode') {
       if (this.currentEconomyMode === value) return; // No change, do nothing
       this.switchEconomyMode(value);
-      return;
-    }
-    if (elementId === 'investmentStrategiesEnabled') {
-      this.investmentStrategiesEnabled = (value === 'on' || value === true || value === 'true');
       return;
     }
     DOMUtils.setValue(elementId, value);
@@ -402,21 +394,6 @@ class WebUI extends AbstractUI {
   }
 
   syncToggleStates() {
-    const strategiesState = this.investmentStrategiesEnabled ? 'on' : 'off';
-    localStorage.setItem('investmentStrategiesEnabled', strategiesState);
-    const strategiesButton = document.getElementById('investmentStrategiesToggleMobile');
-    if (strategiesButton) {
-      strategiesButton.setAttribute('data-toggle-state', strategiesState);
-      const toggleSwitch = strategiesButton.querySelector('.toggle-switch');
-      if (toggleSwitch) {
-        if (strategiesState === 'on') toggleSwitch.classList.add('active');
-        else toggleSwitch.classList.remove('active');
-      }
-    }
-    window.dispatchEvent(new CustomEvent('investmentStrategiesToggle', {
-      detail: { state: strategiesState, enabled: strategiesState === 'on' }
-    }));
-
   }
 
   // Lightweight proxy to read events without creating a new UIManager instance
@@ -1566,7 +1543,7 @@ class WebUI extends AbstractUI {
     const mixInputs = this._ensureMixConfigInputs(mixPrefix, defaultBaseKey);
     const hidden = mixInputs.asset1;
 
-    const strategiesEnabled = !!this.investmentStrategiesEnabled;
+    const strategiesEnabled = true;
     const mixValue = '__mix__';
     const buildOptions = (selectedValue) => {
       const out = [];
@@ -4413,19 +4390,10 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     // Apply dynamic investment labels from ruleset (first two investment types)
     webUi.applyInvestmentLabels();
 
-    const investmentStrategiesState = localStorage.getItem('investmentStrategiesEnabled') || 'off';
-    webUi.investmentStrategiesEnabled = (investmentStrategiesState === 'on');
-
     const cfg = Config.getInstance();
     const isRegimesEnabled = !!(cfg && cfg.isEconomicRegimesFeatureEnabled && cfg.isEconomicRegimesFeatureEnabled());
     const economicRegimesState = isRegimesEnabled ? (localStorage.getItem('economicRegimesEnabled') || 'off') : 'off';
     webUi.economicRegimesEnabled = economicRegimesState;
-
-    // Listen for Investment Strategies toggle
-    window.addEventListener('investmentStrategiesToggle', (e) => {
-      webUi.investmentStrategiesEnabled = e.detail.enabled;
-      webUi.refreshCountryChipsFromScenario(webUi._lastInvestmentTypesForGrowthRates);
-    });
 
     // Listen for Economic Regimes toggle
     if (isRegimesEnabled) {

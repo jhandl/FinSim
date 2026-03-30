@@ -418,7 +418,6 @@ function buildFullParameterValues() {
     InitialPensionP2: '7000',
     simulation_mode: 'couple',
     economy_mode: 'montecarlo',
-    investmentStrategiesEnabled: 'on',
     Inflation_aa: '2.0',
     Inflation_bb: '3.0',
     Priority_cash: '1',
