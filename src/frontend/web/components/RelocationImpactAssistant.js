@@ -94,22 +94,24 @@ var RelocationImpactAssistant = {
   createPanelHtml: function (event, rowId, env, eventId) {
     // Based on table manager implementation
     const events = (env && env.webUI && typeof env.webUI.readEvents === 'function') ? env.webUI.readEvents(false) : [];
+    const doc = (typeof document !== 'undefined') ? document : null;
     const eventRow = (function () {
+      if (!doc) return null;
       if (rowId) {
-        const byRow = document.querySelector('tr[data-row-id="' + rowId + '"]');
+        const byRow = doc.querySelector('tr[data-row-id="' + rowId + '"]');
         if (byRow && !(byRow.classList && byRow.classList.contains('resolution-panel-row'))) return byRow;
       }
       if (eventId) {
-        const byEvent = document.querySelector('tr[data-event-id="' + eventId + '"]');
+        const byEvent = doc.querySelector('tr[data-event-id="' + eventId + '"]');
         if (byEvent && !(byEvent.classList && byEvent.classList.contains('resolution-panel-row'))) return byEvent;
       }
       return null;
     })();
     const canJoinWithPreviousSplitSegment = (function () {
-      if (!eventRow || !event || !event.linkedEventId) return false;
+      if (!doc || !eventRow || !event || !event.linkedEventId) return false;
       const linkedId = String(event.linkedEventId || '');
       if (!linkedId) return false;
-      const rows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(function (r) {
+      const rows = Array.from(doc.querySelectorAll('#Events tbody tr')).filter(function (r) {
         return r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row'));
       });
       const chainRows = rows.filter(function (candidate) {
@@ -144,10 +146,10 @@ var RelocationImpactAssistant = {
     let mvEvent = events.find(function (e) {
       return e && (e.id === mvEventId || e._mvRuntimeId === mvEventId || e.relocationLinkId === mvEventId);
     });
-    if (!mvEvent && mvEventId) {
+    if (!mvEvent && mvEventId && doc) {
       // Fallback: find mvEvent from DOM by matching row id
       try {
-        const rows = document.querySelectorAll('#Events tbody tr');
+        const rows = doc.querySelectorAll('#Events tbody tr');
         for (let i = 0; i < rows.length; i++) {
           const mvRow = rows[i];
           const rowId = mvRow && mvRow.dataset ? mvRow.dataset.eventId : '';
