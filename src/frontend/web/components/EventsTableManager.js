@@ -5236,26 +5236,30 @@ class EventsTableManager {
     const wizardGrid = document.createElement('div');
     wizardGrid.className = 'wizard-selection-grid';
 
-    wizards.forEach(wizard => {
-      const option = document.createElement('div');
-      option.className = 'wizard-selection-option';
-      option.dataset.eventType = wizard.eventType;
-      option.dataset.category = wizard.category; // expose category to CSS
-      option.classList.add(`wizard-category-${wizard.category}`);
-
-      option.innerHTML = `
-        <div class="wizard-option-content">
-          <h4>${wizard.name}</h4>
-        </div>
-      `;
-
-      // Add click handler
-      option.addEventListener('click', () => {
-        this.startWizardForEventType(wizard.eventType, initialData);
-        overlay.remove();
-      });
-
-      wizardGrid.appendChild(option);
+    const propertyWizards = wizards.filter(wizard => wizard && wizard.category === 'property');
+    const showPropertySecondPage = propertyWizards.length > 1;
+    const propertyHeaderOption = {
+      eventType: '__property_group__',
+      name: 'Property',
+      category: 'property',
+      isCategoryHeader: true
+    };
+    const firstPageWizards = [];
+    let insertedPropertyHeader = false;
+    wizards.forEach((wizard) => {
+      const isPropertyWizard = wizard && wizard.category === 'property';
+      if (!isPropertyWizard) {
+        firstPageWizards.push(wizard);
+        return;
+      }
+      if (!showPropertySecondPage) {
+        firstPageWizards.push(wizard);
+        return;
+      }
+      if (!insertedPropertyHeader) {
+        firstPageWizards.push(propertyHeaderOption);
+        insertedPropertyHeader = true;
+      }
     });
 
     body.appendChild(wizardGrid);
@@ -5269,17 +5273,76 @@ class EventsTableManager {
     const buttonContainer = document.createElement('div');
     buttonContainer.className = 'event-wizard-buttons';
 
+    const backButton = document.createElement('button');
+    backButton.className = 'event-wizard-button';
+    backButton.textContent = 'Back';
+    backButton.style.display = 'none';
+    buttonContainer.appendChild(backButton);
+
     const cancelButton = document.createElement('button');
     cancelButton.className = 'event-wizard-button';
     cancelButton.textContent = 'Cancel';
-    cancelButton.addEventListener('click', () => {
+    buttonContainer.appendChild(cancelButton);
+
+    let handleKeyDown = null;
+    const dismissSelectionModal = () => {
+      overlay.remove();
+      if (handleKeyDown) document.removeEventListener('keydown', handleKeyDown);
+    };
+    const cancelSelectionModal = () => {
       // Clear pending empty row reference when wizard selection is cancelled
       this.pendingEmptyRowForReplacement = null;
-      overlay.remove();
-    });
+      dismissSelectionModal();
+    };
+    const renderWizardOptions = (wizardOptions) => {
+      wizardGrid.innerHTML = '';
+      wizardOptions.forEach((wizard) => {
+        const option = document.createElement('div');
+        option.className = 'wizard-selection-option';
+        option.dataset.eventType = wizard.eventType;
+        option.dataset.category = wizard.category; // expose category to CSS
+        option.classList.add(`wizard-category-${wizard.category}`);
 
-    // Append the cancel button to the container, then container to footer
-    buttonContainer.appendChild(cancelButton);
+        option.innerHTML = `
+          <div class="wizard-option-content">
+            <h4>${wizard.name}</h4>
+          </div>
+        `;
+
+        option.addEventListener('click', () => {
+          if (wizard.isCategoryHeader) {
+            renderSelectionPage('property');
+            return;
+          }
+          this.startWizardForEventType(wizard.eventType, initialData);
+          dismissSelectionModal();
+        });
+
+        wizardGrid.appendChild(option);
+      });
+    };
+    const renderSelectionPage = (page) => {
+      const isPropertyPage = page === 'property' && showPropertySecondPage;
+      if (isPropertyPage) {
+        title.textContent = 'Property Events';
+        subtitle.textContent = 'Select the property event you want to create:';
+        backButton.style.display = '';
+        renderWizardOptions(propertyWizards);
+      } else {
+        title.textContent = 'Choose Event Type';
+        subtitle.textContent = 'Select the type of event you want to create:';
+        backButton.style.display = 'none';
+        renderWizardOptions(firstPageWizards);
+      }
+    };
+    backButton.addEventListener('click', () => {
+      renderSelectionPage('main');
+    });
+    cancelButton.addEventListener('click', () => {
+      cancelSelectionModal();
+    });
+    renderSelectionPage('main');
+
     footer.appendChild(buttonContainer);
     modal.appendChild(footer);
 
@@ -5299,19 +5362,14 @@ class EventsTableManager {
       }
 
       if (e.target === overlay) {
-        // Clear pending empty row reference when wizard selection is cancelled
-        this.pendingEmptyRowForReplacement = null;
-        overlay.remove();
+        cancelSelectionModal();
       }
     });
 
     // ESC key to close
-    const handleKeyDown = (e) => {
+    handleKeyDown = (e) => {
       if (e.key === 'Escape') {
-        // Clear pending empty row reference when wizard selection is cancelled
-        this.pendingEmptyRowForReplacement = null;
-        overlay.remove();
-        document.removeEventListener('keydown', handleKeyDown);
+        cancelSelectionModal();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
