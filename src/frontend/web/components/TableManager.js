@@ -869,10 +869,12 @@ class TableManager {
 
   setupTableCurrencyControls() {
     const cfg = Config.getInstance();
-    if (!cfg.isRelocationEnabled()) return;
-
     const container = document.getElementById('data-table-controls');
     if (!container) return;
+    if (!cfg.isRelocationEnabled() || !RelocationUtils.hasMultipleScenarioCurrencies(this.webUI)) {
+      container.innerHTML = '';
+      return;
+    }
 
     RelocationUtils.createCurrencyControls(container, this, this.webUI);
   }
@@ -893,19 +895,13 @@ class TableManager {
   }
 
   updateCurrencyControlVisibility() {
-    const naturalToggle = document.getElementById(`currencyModeNatural_${this.constructor.name}`);
-    const unifiedToggle = document.getElementById(`currencyModeUnified_${this.constructor.name}`);
-    const dropdownContainer = document.querySelector(`#data-table-controls .currency-dropdown-container`);
-
+    const select = document.getElementById(`reportingCurrencySelect_${this.constructor.name}`);
+    if (!select) return;
     if (this.currencyMode === 'natural') {
-      if (naturalToggle) naturalToggle.classList.add('mode-toggle-active');
-      if (unifiedToggle) unifiedToggle.classList.remove('mode-toggle-active');
-      if (dropdownContainer) dropdownContainer.style.display = 'none';
-    } else {
-      if (unifiedToggle) unifiedToggle.classList.add('mode-toggle-active');
-      if (naturalToggle) naturalToggle.classList.remove('mode-toggle-active');
-      if (dropdownContainer) dropdownContainer.style.display = 'block';
+      select.value = 'LOCAL';
+      return;
     }
+    if (this.reportingCurrency) select.value = this.reportingCurrency;
   }
 
   // Reformat existing table cells to reflect current currency mode/reportingCurrency

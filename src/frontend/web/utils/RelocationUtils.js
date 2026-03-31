@@ -1,5 +1,26 @@
 class RelocationUtils {
 
+  static getScenarioCountryCodes(webUI) {
+    const cfg = Config.getInstance();
+    const startCountry = String(cfg.getStartCountry() || cfg.getDefaultCountry() || '').trim().toLowerCase();
+    const set = {};
+    if (startCountry) set[startCountry] = true;
+
+    const uiManager = new UIManager(webUI);
+    const events = uiManager.readEvents(false) || [];
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      if (!ev || ev.type !== 'MV') continue;
+      const code = getRelocationCountryCode(ev);
+      if (code) set[code] = true;
+    }
+    return Object.keys(set);
+  }
+
+  static hasMultipleScenarioCurrencies(webUI) {
+    return RelocationUtils.getCurrencyOptions(webUI).length > 1;
+  }
+
   static extractRelocationTransitions(webUI, instance) {
     const cfg = Config.getInstance();
     if (!cfg.isRelocationEnabled()) return;
@@ -44,16 +65,12 @@ class RelocationUtils {
   static getCurrencyOptions(webUI) {
     const cfg = Config.getInstance();
     const currencySet = new Set();
-    const startCountry = cfg.getStartCountry();
+    const startCountry = String(cfg.getStartCountry() || '').toLowerCase();
+    const scenarioCountries = RelocationUtils.getScenarioCountryCodes(webUI);
 
-    // Only include currencies that are backed by a loaded/cached ruleset.
-    // Unified currency conversion is country-based; offering unsupported currencies
-    // is invalid and must fail fast rather than silently falling back.
-    const countries = cfg.getAvailableCountries() || [];
-    for (let i = 0; i < countries.length; i++) {
-      const country = countries[i];
-      if (!country || !country.code) continue;
-      const rs = cfg.getCachedTaxRuleSet(String(country.code).toLowerCase());
+    // Only include currencies for countries actually present in this scenario.
+    for (let i = 0; i < scenarioCountries.length; i++) {
+      const rs = cfg.getCachedTaxRuleSet(String(scenarioCountries[i]).toLowerCase());
       if (!rs || typeof rs.getCurrencyCode !== 'function') continue;
       const cur = rs.getCurrencyCode();
       if (cur) currencySet.add(String(cur).toUpperCase());
@@ -112,50 +129,7 @@ class RelocationUtils {
     container.innerHTML = ''; // Clear existing controls
 
     const isChartManager = manager.constructor.name === 'ChartManager';
-
-    // --- Currency Mode Toggle ---
-    // Only create mode toggle for TableManager, not for ChartManager
-    if (!isChartManager) {
-      const toggleContainer = document.createElement('div');
-      toggleContainer.className = 'age-year-toggle';
-
-      const naturalToggle = document.createElement('span');
-      naturalToggle.id = `currencyModeNatural_${manager.constructor.name}`;
-      naturalToggle.className = 'mode-toggle-option';
-      naturalToggle.textContent = 'Natural';
-      // Keep border + baseline cutout switch immediate for this control.
-      naturalToggle.style.transition = 'none';
-      toggleContainer.appendChild(naturalToggle);
-
-      const unifiedToggle = document.createElement('span');
-      unifiedToggle.id = `currencyModeUnified_${manager.constructor.name}`;
-      unifiedToggle.className = 'mode-toggle-option';
-      unifiedToggle.textContent = 'Unified';
-      // Keep border + baseline cutout switch immediate for this control.
-      unifiedToggle.style.transition = 'none';
-      toggleContainer.appendChild(unifiedToggle);
-
-      const applyCurrencyModeVisual = (mode) => {
-        if (mode === 'natural') {
-          naturalToggle.classList.add('mode-toggle-active');
-          unifiedToggle.classList.remove('mode-toggle-active');
-        } else {
-          unifiedToggle.classList.add('mode-toggle-active');
-          naturalToggle.classList.remove('mode-toggle-active');
-        }
-      };
-
-      naturalToggle.addEventListener('click', () => {
-        applyCurrencyModeVisual('natural');
-        manager.handleCurrencyModeChange('natural');
-      });
-      unifiedToggle.addEventListener('click', () => {
-        applyCurrencyModeVisual('unified');
-        manager.handleCurrencyModeChange('unified');
-      });
-
-      container.appendChild(toggleContainer);
-    } else {
+    if (isChartManager) {
       // For ChartManager, always use unified mode
       manager.currencyMode = 'unified';
     }
@@ -166,6 +140,7 @@ class RelocationUtils {
 
     manager.reportingCurrency = manager.reportingCurrency || RelocationUtils.getDefaultReportingCurrency(webUI);
     const options = RelocationUtils.getCurrencyOptions(webUI) || [];
+    const tableOptions = [{ value: 'LOCAL', label: 'Local' }].concat(options);
 
     // Validate that the current reporting currency is still a valid option
     const validCodes = new Set(options.map(o => o.value));
@@ -180,20 +155,36 @@ class RelocationUtils {
 
     const select = document.createElement('select');
     select.id = `reportingCurrencySelect_${manager.constructor.name}`;
-    options.forEach(opt => {
+    const label = document.createElement('span');
+    label.className = 'currency-dropdown-label';
+    label.textContent = 'Currency ';
+    const renderedOptions = isChartManager ? options : tableOptions;
+    renderedOptions.forEach(opt => {
       const optionEl = document.createElement('option');
       optionEl.value = opt.value;
       optionEl.textContent = opt.label;
-      if (opt.value === manager.reportingCurrency) {
+      if ((!isChartManager && manager.currencyMode === 'natural' && opt.value === 'LOCAL') ||
+        (opt.value === manager.reportingCurrency)) {
         optionEl.selected = true;
       }
       select.appendChild(optionEl);
     });
 
     select.addEventListener('change', (event) => {
-      manager.reportingCurrency = event.target.value;
+      const selected = event.target.value;
       if (manager.constructor.name === 'TableManager') {
+        if (selected === 'LOCAL') {
+          manager.handleCurrencyModeChange('natural');
+          return;
+        }
+        manager.reportingCurrency = selected;
         manager.conversionCache = {}; // Clear cache on currency change
+        if (manager.currencyMode !== 'unified') {
+          manager.handleCurrencyModeChange('unified');
+          return;
+        }
+      } else {
+        manager.reportingCurrency = selected;
       }
       if (manager.currencyMode === 'unified') {
         // Let the dropdown selection paint before heavy refresh work.
@@ -214,6 +205,7 @@ class RelocationUtils {
       } catch (_) { }
     }
 
+    dropdownContainer.appendChild(label);
     dropdownContainer.appendChild(select);
     container.appendChild(dropdownContainer);
 

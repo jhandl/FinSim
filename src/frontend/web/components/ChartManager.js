@@ -678,10 +678,15 @@ class ChartManager {
 
   setupChartCurrencyControls(webUI) {
     const cfg = Config.getInstance();
-    if (!cfg.isRelocationEnabled()) return;
-
     const graphContainers = Array.prototype.slice.call(document.querySelectorAll('.graph-container'));
     if (!graphContainers.length) return;
+    if (!cfg.isRelocationEnabled() || !RelocationUtils.hasMultipleScenarioCurrencies(webUI)) {
+      for (var g = 0; g < graphContainers.length; g++) {
+        var stale = graphContainers[g].querySelector('.chart-controls');
+        if (stale) stale.parentNode.removeChild(stale);
+      }
+      return;
+    }
 
     const primaryContainer = graphContainers[0];
     let controlsDiv = primaryContainer.querySelector('.chart-controls');
