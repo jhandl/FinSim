@@ -886,7 +886,10 @@ class TableManager {
       this.reportingCurrency = RelocationUtils.getDefaultReportingCurrency(this.webUI);
     }
     this.updateCurrencyControlVisibility();
-    this.refreshDisplayedCurrencies({ recomputeDynamicSectionWidths: true });
+    // Let the toggle visual state paint before heavy table refresh work.
+    setTimeout(() => {
+      this.refreshDisplayedCurrencies({ recomputeDynamicSectionWidths: true });
+    }, 0);
   }
 
   updateCurrencyControlVisibility() {

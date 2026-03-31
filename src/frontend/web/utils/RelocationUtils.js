@@ -123,15 +123,36 @@ class RelocationUtils {
       naturalToggle.id = `currencyModeNatural_${manager.constructor.name}`;
       naturalToggle.className = 'mode-toggle-option';
       naturalToggle.textContent = 'Natural';
-      naturalToggle.addEventListener('click', () => manager.handleCurrencyModeChange('natural'));
+      // Keep border + baseline cutout switch immediate for this control.
+      naturalToggle.style.transition = 'none';
       toggleContainer.appendChild(naturalToggle);
 
       const unifiedToggle = document.createElement('span');
       unifiedToggle.id = `currencyModeUnified_${manager.constructor.name}`;
       unifiedToggle.className = 'mode-toggle-option';
       unifiedToggle.textContent = 'Unified';
-      unifiedToggle.addEventListener('click', () => manager.handleCurrencyModeChange('unified'));
+      // Keep border + baseline cutout switch immediate for this control.
+      unifiedToggle.style.transition = 'none';
       toggleContainer.appendChild(unifiedToggle);
+
+      const applyCurrencyModeVisual = (mode) => {
+        if (mode === 'natural') {
+          naturalToggle.classList.add('mode-toggle-active');
+          unifiedToggle.classList.remove('mode-toggle-active');
+        } else {
+          unifiedToggle.classList.add('mode-toggle-active');
+          naturalToggle.classList.remove('mode-toggle-active');
+        }
+      };
+
+      naturalToggle.addEventListener('click', () => {
+        applyCurrencyModeVisual('natural');
+        manager.handleCurrencyModeChange('natural');
+      });
+      unifiedToggle.addEventListener('click', () => {
+        applyCurrencyModeVisual('unified');
+        manager.handleCurrencyModeChange('unified');
+      });
 
       container.appendChild(toggleContainer);
     } else {
@@ -175,11 +196,15 @@ class RelocationUtils {
         manager.conversionCache = {}; // Clear cache on currency change
       }
       if (manager.currencyMode === 'unified') {
-        if (manager.constructor.name === 'TableManager') {
-          manager.refreshDisplayedCurrencies({ recomputeDynamicSectionWidths: true });
-        } else {
-          manager.refreshChartsWithCurrency();
-        }
+        // Let the dropdown selection paint before heavy refresh work.
+        setTimeout(() => {
+          if (manager.currencyMode !== 'unified') return;
+          if (manager.constructor.name === 'TableManager') {
+            manager.refreshDisplayedCurrencies({ recomputeDynamicSectionWidths: true });
+          } else {
+            manager.refreshChartsWithCurrency();
+          }
+        }, 0);
       }
     });
 
