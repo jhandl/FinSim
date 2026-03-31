@@ -700,6 +700,7 @@ function initializeSimulationVariables() {
     startCountryKeys = null;
   }
   var startCurrency = getCurrencyForCountry(startCountry);
+  var startAgeForMix = params.startingAge;
   for (var i = 0; i < investmentAssets.length; i++) {
     var entry = investmentAssets[i];
     var initialCapital = initialCapitalByKey[entry.key];
@@ -707,7 +708,21 @@ function initializeSimulationVariables() {
     if (initialCapital > 0 && (startCountryKeys === null || startCountryKeys[entry.key])) {
       var currency = entry.baseCurrency || startCurrency;
       var country = entry.assetCountry || startCountry;
-      entry.asset.buy(initialCapital, currency, country);
+      var mixConfig = entry.asset.mixConfig;
+      if (mixConfig && (mixConfig.type === 'fixed' || mixConfig.type === 'glidePath')) {
+        var asset1Pct = mixConfig.startAsset1Pct;
+        if (mixConfig.type === 'glidePath' && typeof GlidePathCalculator !== 'undefined') {
+          var seededMix = GlidePathCalculator.getCurrentMix(startAgeForMix, mixConfig);
+          if (seededMix) asset1Pct = seededMix.asset1Pct;
+        }
+        if (asset1Pct === null || asset1Pct === undefined) asset1Pct = mixConfig.endAsset1Pct;
+        var amount1 = initialCapital * (asset1Pct / 100);
+        var amount2 = initialCapital - amount1;
+        if (amount1 > 0) entry.asset.buy(amount1, currency, country, 1);
+        if (amount2 > 0) entry.asset.buy(amount2, currency, country, 2);
+      } else {
+        entry.asset.buy(initialCapital, currency, country);
+      }
     }
   }
 

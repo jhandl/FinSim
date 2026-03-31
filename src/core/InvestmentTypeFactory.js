@@ -63,6 +63,19 @@ class InvestmentTypeFactory {
     return mix;
   }
 
+  static resolveSelectedBaseKey(params, countryCode, baseKey, defaultBaseKey) {
+    if (!params) return defaultBaseKey;
+    var countryPrefix = countryCode ? ('MixConfig_' + countryCode + '_' + baseKey) : null;
+    var globalPrefix = 'GlobalMixConfig_' + baseKey;
+    var selected = null;
+    if (countryPrefix && params[countryPrefix + '_asset1'] !== undefined && params[countryPrefix + '_asset1'] !== null && params[countryPrefix + '_asset1'] !== '') {
+      selected = params[countryPrefix + '_asset1'];
+    } else if (params[globalPrefix + '_asset1'] !== undefined && params[globalPrefix + '_asset1'] !== null && params[globalPrefix + '_asset1'] !== '') {
+      selected = params[globalPrefix + '_asset1'];
+    }
+    return selected ? String(selected).trim() : defaultBaseKey;
+  }
+
   static _resolveAssetClassForBaseKey(baseKey) {
     if (!baseKey) {
       throw new Error('Economic regime configuration error: Missing base key in mix configuration');
@@ -125,6 +138,7 @@ class InvestmentTypeFactory {
         baseKey = String(key).slice(0, String(key).length - suffix.length);
       }
       var mixConfig = InvestmentTypeFactory.resolveMixConfig(params, countryCode, baseKey);
+      var selectedBaseRef = t.baseRef ? InvestmentTypeFactory.resolveSelectedBaseKey(params, countryCode, baseKey, t.baseRef) : null;
       
       // Check if this is a mixed asset
       if (mixConfig && (mixConfig.type === 'fixed' || mixConfig.type === 'glidePath')) {
@@ -162,8 +176,9 @@ class InvestmentTypeFactory {
 
       var gr, sd;
       if (t.baseRef) {
+        var effectiveBaseRef = selectedBaseRef || t.baseRef;
         // Non-local wrapper: use asset-level parameters (treated as percentages)
-        var rawGr = params['GlobalAssetGrowth_' + t.baseRef];
+        var rawGr = params['GlobalAssetGrowth_' + effectiveBaseRef];
         var valGr = normalizeRate(rawGr);
         if (valGr !== null) {
           gr = valGr;
@@ -179,7 +194,7 @@ class InvestmentTypeFactory {
           }
         }
 
-        var rawSd = params['GlobalAssetVolatility_' + t.baseRef];
+        var rawSd = params['GlobalAssetVolatility_' + effectiveBaseRef];
         var valSd = normalizeRate(rawSd);
         if (valSd !== null) {
           sd = valSd;
@@ -214,7 +229,12 @@ class InvestmentTypeFactory {
       var baseCurrency = t.baseCurrency;
       var assetCountry = t.assetCountry;
       var residenceScope = t.residenceScope;
-      var assetInstance = new InvestmentAsset(t, gr, sd, ruleset);
+      var typeDef = t;
+      if (t.baseRef && selectedBaseRef && selectedBaseRef !== t.baseRef) {
+        typeDef = Object.assign({}, t);
+        typeDef.assetClass = InvestmentTypeFactory._resolveAssetClassForBaseKey(selectedBaseRef);
+      }
+      var assetInstance = new InvestmentAsset(typeDef, gr, sd, ruleset);
       if (mixConfig) assetInstance.mixConfig = mixConfig;
       assets.push({
         key: key,

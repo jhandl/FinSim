@@ -153,6 +153,96 @@ module.exports = {
       }
     }
 
+    // Starting capital honors mix split at startingAge
+    {
+      const params = {
+        startingAge: 30,
+        targetAge: 31,
+        retirementAge: 65,
+        initialSavings: 0,
+        initialPension: 0,
+        emergencyStash: 0,
+        inflation: 0,
+        growthRatePension: 0,
+        growthDevPension: 0,
+        StartCountry: 'ie',
+        simulation_mode: 'single',
+        economy_mode: 'deterministic',
+        priorityCash: 1,
+        priorityPension: 4,
+        priorityFunds: 2,
+        priorityShares: 3,
+        initialCapitalByKey: { indexFunds_ie: 1000, shares_ie: 0 },
+        investmentAllocationsByCountry: { ie: { indexFunds_ie: 0, shares_ie: 0 } },
+        investmentGrowthRatesByKey: { shares_ie: 0 },
+        investmentVolatilitiesByKey: { shares_ie: 0 },
+        GlobalAssetGrowth_globalEquity: 10,
+        GlobalAssetGrowth_globalBonds: 0,
+        GlobalAssetVolatility_globalEquity: 0,
+        GlobalAssetVolatility_globalBonds: 0,
+        MixConfig_ie_indexFunds_type: 'glide',
+        MixConfig_ie_indexFunds_asset1: 'globalEquity',
+        MixConfig_ie_indexFunds_asset2: 'globalBonds',
+        MixConfig_ie_indexFunds_startAge: 30,
+        MixConfig_ie_indexFunds_targetAge: 31,
+        MixConfig_ie_indexFunds_startAsset1Pct: 100,
+        MixConfig_ie_indexFunds_endAsset1Pct: 0
+      };
+
+      const { results, error } = await runScenario(params, []);
+      if (error || !results || !results.success) {
+        errors.push('Starting capital mix split: simulation failed');
+      } else {
+        const row31 = getRowByAge(results, 31);
+        const cap = row31 && row31.investmentCapitalByKey ? row31.investmentCapitalByKey.indexFunds_ie : null;
+        if (typeof cap !== 'number' || !approxEqual(cap, 1210, 0.01)) {
+          errors.push('Starting capital mix split: expected indexFunds_ie ≈ 1210 at age 31, got ' + cap);
+        }
+      }
+    }
+
+    // Single "holds" selection (without mix type) overrides baseRef behavior
+    {
+      const params = {
+        startingAge: 30,
+        targetAge: 31,
+        retirementAge: 65,
+        initialSavings: 0,
+        initialPension: 0,
+        emergencyStash: 0,
+        inflation: 0,
+        growthRatePension: 0,
+        growthDevPension: 0,
+        StartCountry: 'ie',
+        simulation_mode: 'single',
+        economy_mode: 'deterministic',
+        priorityCash: 1,
+        priorityPension: 4,
+        priorityFunds: 2,
+        priorityShares: 3,
+        initialCapitalByKey: { indexFunds_ie: 1000, shares_ie: 0 },
+        investmentAllocationsByCountry: { ie: { indexFunds_ie: 0, shares_ie: 0 } },
+        investmentGrowthRatesByKey: { shares_ie: 0 },
+        investmentVolatilitiesByKey: { shares_ie: 0 },
+        GlobalAssetGrowth_globalEquity: 10,
+        GlobalAssetGrowth_globalBonds: 0,
+        GlobalAssetVolatility_globalEquity: 0,
+        GlobalAssetVolatility_globalBonds: 0,
+        MixConfig_ie_indexFunds_asset1: 'globalBonds'
+      };
+
+      const { results, error } = await runScenario(params, []);
+      if (error || !results || !results.success) {
+        errors.push('Starting capital holds selection: simulation failed');
+      } else {
+        const row31 = getRowByAge(results, 31);
+        const cap = row31 && row31.investmentCapitalByKey ? row31.investmentCapitalByKey.indexFunds_ie : null;
+        if (typeof cap !== 'number' || !approxEqual(cap, 1000, 0.01)) {
+          errors.push('Starting capital holds selection: expected indexFunds_ie ≈ 1000 at age 31, got ' + cap);
+        }
+      }
+    }
+
     // Per-country mix config: assets use per-country settings
     {
       const params = {
