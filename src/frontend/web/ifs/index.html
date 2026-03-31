@@ -504,7 +504,7 @@
   <script src="/src/frontend/web/components/WizardManager.js?v=20260331-1"></script>
   <script src="/src/frontend/web/components/WizardRenderer.js?v=20260331-3"></script>
   <script src="/src/frontend/web/components/EventsWizard.js?v=20260331-4"></script>
-  <script src="/src/frontend/web/components/ChartManager.js?v=20260331-3"></script>
+  <script src="/src/frontend/web/components/ChartManager.js?v=20260331-4"></script>
   <script src="/src/frontend/web/components/FileManager.js?v=20260331-2"></script>
   <script src="/src/frontend/web/components/DragAndDrop.js?v=20260207-2"></script>
   <script src="/src/frontend/web/components/Wizard.js?v=20260327-11"></script>
@@ -1008,18 +1008,21 @@
           detail: { state: newState, enabled: newState === 'on' }
         }));
 
-        // Apply to managers via WebUI singleton
-        try {
-          if (typeof WebUI !== 'undefined') {
-            const webUI = WebUI.getInstance();
-            if (webUI && webUI.tableManager && typeof webUI.tableManager.setPresentValueMode === 'function') {
-              webUI.tableManager.setPresentValueMode(newState === 'on');
+        // Defer heavy rerenders so the toggle visual state paints immediately.
+        setTimeout(() => {
+          try {
+            if (typeof WebUI !== 'undefined') {
+              const webUI = WebUI.getInstance();
+              const enabled = toggleButton.getAttribute('data-toggle-state') === 'on';
+              if (webUI && webUI.tableManager && typeof webUI.tableManager.setPresentValueMode === 'function') {
+                webUI.tableManager.setPresentValueMode(enabled);
+              }
+              if (webUI && webUI.chartManager && typeof webUI.chartManager.setPresentValueMode === 'function') {
+                webUI.chartManager.setPresentValueMode(enabled);
+              }
             }
-            if (webUI && webUI.chartManager && typeof webUI.chartManager.setPresentValueMode === 'function') {
-              webUI.chartManager.setPresentValueMode(newState === 'on');
-            }
-          }
-        } catch (_) { /* no-op */ }
+          } catch (_) { /* no-op */ }
+        }, 0);
       }
 
       handleCountryTabsSyncToggle(toggleButton) {

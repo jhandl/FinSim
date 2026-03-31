@@ -894,26 +894,25 @@ class ChartManager {
         }
         const toCountry = this.getRepresentativeCountryForCurrency(targetCurrency);
         const monetaryFields = ['NetIncome', 'Expenses', 'IncomeSalaries', 'IncomeRentals', 'IncomeRSUs', 'IncomePrivatePension', 'IncomeStatePension', 'IncomeDefinedBenefit', 'IncomeTaxFree', 'IncomeCash', 'RealEstateCapital', 'PensionFund', 'Cash'];
+        const shouldConvert = sourceCurrency !== targetCurrency;
         var skippedCount = 0;
+        var rowFxMultiplier = null;
+        if (shouldConvert) {
+          // Compute a single row-level multiplier (same source/target/year for all row fields).
+          rowFxMultiplier = economicData.convert(1, sourceCountry, toCountry, yearForFX, { baseYear: simStartYear });
+          if (rowFxMultiplier === null || !Number.isFinite(rowFxMultiplier)) {
+            rowFxMultiplier = null;
+          }
+        }
         monetaryFields.forEach(field => {
           if (data[field] !== undefined) {
             var originalVal = data[field];
-            var actualSourceCountry = sourceCountry;
-            var actualSourceCurrency = sourceCurrency;
-            var isStatePension = (field === 'IncomeStatePension');
-            if (actualSourceCurrency !== targetCurrency) {
-              // FX conversion using evolution mode (inflation-driven, default mode) - not PPP.
-              // We always call EconomicData.convert with baseYear = simulation start; the
-              // conversion engine derives year-specific cross-rates from inflation profiles.
-              var fxOptions = { baseYear: simStartYear };
-              const converted = economicData.convert(originalVal, actualSourceCountry, toCountry, yearForFX, fxOptions);
-              // Conversion result safeguards
-              if (converted === null || !Number.isFinite(converted)) {
-                console.error('ChartManager: Conversion failed for ' + field + ' at age ' + age + ': null/NaN result, original=' + originalVal + '');
+            if (shouldConvert) {
+              if (rowFxMultiplier === null) {
                 skippedCount++;
                 data[field] = originalVal; // Keep original
               } else {
-                data[field] = converted;
+                data[field] = originalVal * rowFxMultiplier;
               }
               this.originalValues[i] = this.originalValues[i] || {};
               this.originalValues[i][field] = { value: originalVal, currency: sourceCurrency };
@@ -929,16 +928,12 @@ class ChartManager {
             const field = key;
             if (data[field] !== undefined) {
               var originalDynVal = data[field];
-              if (sourceCurrency !== targetCurrency) {
-                // FX conversion using evolved mode (inflation-driven) - not PPP
-                const converted = economicData.convert(originalDynVal, sourceCountry, toCountry, yearForFX, { baseYear: simStartYear });
-                // Conversion result safeguards for dynamic fields
-                if (converted === null || !Number.isFinite(converted)) {
-                  console.error('ChartManager: Conversion failed for ' + field + ' at age ' + age + ': null/NaN result, original=' + originalDynVal + '');
+              if (shouldConvert) {
+                if (rowFxMultiplier === null) {
                   skippedCount++;
                   data[field] = originalDynVal; // Keep original
                 } else {
-                  data[field] = converted;
+                  data[field] = originalDynVal * rowFxMultiplier;
                 }
                 this.originalValues[i] = this.originalValues[i] || {};
                 this.originalValues[i][field] = { value: originalDynVal, currency: sourceCurrency };
