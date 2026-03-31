@@ -54,13 +54,13 @@ async function createRelocationViaWizard(page, frame, countryCode, age) {
   await overlay.waitFor({ state: 'visible', timeout: 15000 });
   await overlay.locator('h3:has-text("Destination Country")').waitFor({ state: 'visible', timeout: 10000 });
 
-  const countrySelect = frame.locator('#wizard-destCountryCode');
-  await countrySelect.waitFor({ state: 'visible', timeout: 10000 });
-  if (String(countryCode || '').toUpperCase() === 'AR') {
-    await countrySelect.selectOption({ label: 'Argentina' });
-  } else {
-    await countrySelect.selectOption(String(countryCode || '').toUpperCase());
-  }
+  const normalizedCountryCode = String(countryCode || '').trim().toUpperCase();
+  const countryToggle = overlay.locator('#wizard-destCountryCode-toggle');
+  await countryToggle.waitFor({ state: 'visible', timeout: 10000 });
+  await smartClick(countryToggle, { preferProgrammatic: true });
+  const countryOption = frame.locator(`#wizard-destCountryCode-options [data-value="${normalizedCountryCode}"]`);
+  await countryOption.waitFor({ state: 'visible', timeout: 10000 });
+  await smartClick(countryOption, { preferProgrammatic: true });
   await smartClick(overlay.locator('.event-wizard-button-next'));
   await overlay.locator('h3:has-text("Relocation Cost")').waitFor({ state: 'visible', timeout: 10000 });
 

@@ -600,6 +600,7 @@ var RelocationImpactAssistant = {
     const etm = env.eventsTableManager;
     const rowId = payload && payload.rowId;
     const eventId = payload && payload.eventId;
+    let actionResult = null;
     switch (action) {
       case 'delete': {
         const row = document.querySelector('tr[data-row-id="' + rowId + '"]');
@@ -699,16 +700,17 @@ var RelocationImpactAssistant = {
         break;
       }
       case 'rent_out': {
-        try { this._rentOutProperty(event, payload, env); } catch (_) { }
+        try { actionResult = this._rentOutProperty(event, payload, env); } catch (_) { }
         break;
       }
       case 'sell_property': {
-        try { this._sellProperty(event, payload, env); } catch (_) { }
+        try { actionResult = this._sellProperty(event, payload, env); } catch (_) { }
         break;
       }
       default:
         break;
     }
+    return actionResult;
   },
 
   calculatePPPSuggestion: function (amount, fromCountry, toCountry) {
@@ -817,6 +819,33 @@ var RelocationImpactAssistant = {
     }
     const interactionRoot = (root.closest && root.closest('.resolution-panel-container')) || root;
     const self = this;
+    let clearPressedTimeoutId = null;
+    const clearPressedState = function () {
+      if (clearPressedTimeoutId) {
+        clearTimeout(clearPressedTimeoutId);
+        clearPressedTimeoutId = null;
+      }
+      const pressedButtons = interactionRoot.querySelectorAll('.resolution-tab-pressed');
+      pressedButtons.forEach(function (btn) { btn.classList.remove('resolution-tab-pressed'); });
+    };
+    const clearPressedStateSoon = function () {
+      if (clearPressedTimeoutId) clearTimeout(clearPressedTimeoutId);
+      clearPressedTimeoutId = setTimeout(function () { clearPressedState(); }, 120);
+    };
+    interactionRoot.addEventListener('pointerdown', function (e) {
+      const btn = e.target && e.target.closest && e.target.closest('.resolution-instant-btn');
+      if (!btn) return;
+      clearPressedState();
+      btn.classList.add('resolution-tab-pressed');
+    });
+    interactionRoot.addEventListener('pointerup', clearPressedStateSoon);
+    interactionRoot.addEventListener('pointercancel', clearPressedStateSoon);
+    interactionRoot.addEventListener('touchstart', function (e) {
+      const btn = e.target && e.target.closest && e.target.closest('.resolution-instant-btn');
+      if (!btn) return;
+      clearPressedState();
+      btn.classList.add('resolution-tab-pressed');
+    }, { passive: true });
 
     // Handle country selector changes for link action to update conversion preview
     const linkCountrySelector = interactionRoot.querySelector('.link-country-selector');
@@ -857,6 +886,9 @@ var RelocationImpactAssistant = {
       const instantBtn = e.target && e.target.closest && e.target.closest('.resolution-instant-btn');
       if (instantBtn) {
         e.preventDefault(); e.stopPropagation();
+        clearPressedState();
+        instantBtn.classList.add('resolution-tab-pending');
+        instantBtn.setAttribute('aria-busy', 'true');
         const action = instantBtn.getAttribute('data-action');
         const panelContainer = (interactionRoot.classList && interactionRoot.classList.contains('resolution-panel-container'))
           ? interactionRoot
@@ -873,7 +905,24 @@ var RelocationImpactAssistant = {
           fromCountry: panelContainer ? panelContainer.getAttribute('data-from-country') : null,
           toCountry: panelContainer ? panelContainer.getAttribute('data-to-country') : null
         };
-        self.handlePanelAction(ctx.event, action, payload, ctx.env);
+        const actionResult = self.handlePanelAction(ctx.event, action, payload, ctx.env);
+        if (actionResult && typeof actionResult.finally === 'function') {
+          actionResult.finally(function () {
+            const stillConnected = !!(instantBtn && instantBtn.isConnected);
+            if (stillConnected) {
+              instantBtn.classList.remove('resolution-tab-pending');
+              instantBtn.removeAttribute('aria-busy');
+            }
+          });
+        } else {
+          requestAnimationFrame(function () {
+            const stillConnected = !!(instantBtn && instantBtn.isConnected);
+            if (stillConnected) {
+              instantBtn.classList.remove('resolution-tab-pending');
+              instantBtn.removeAttribute('aria-busy');
+            }
+          });
+        }
         return;
       }
     });
@@ -961,7 +1010,7 @@ var RelocationImpactAssistant = {
     if (typeof etm._afterResolutionAction === 'function') etm._afterResolutionAction(rowId, { pulse: true });
   },
 
-  _keepProperty: function (event, payload, env) {
+  _keepProperty: function (event, payload, env, options) {
     var webUI = env && env.webUI ? env.webUI : null;
     var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
     if (!webUI || !etm) return;
@@ -986,7 +1035,8 @@ var RelocationImpactAssistant = {
     if (originCurrency) etm.getOrCreateHiddenInput(baseRow, 'event-currency', originCurrency);
     if (resolutionScope && typeof etm._setResolutionOverride === 'function') etm._setResolutionOverride(baseRow, resolutionScope);
 
-    if (etm && typeof etm._afterResolutionAction === 'function') {
+    var deferRefresh = !!(options && options.deferRefresh);
+    if (!deferRefresh && etm && typeof etm._afterResolutionAction === 'function') {
       etm._afterResolutionAction(rowId);
     }
   },
@@ -1046,12 +1096,20 @@ var RelocationImpactAssistant = {
     }
 
     etm._suppressSellMarkerClear = previousSuppress;
+    var ensurePromise = null;
     if (event.type === 'M' && typeof etm.ensureMortgagePayoffEvent === 'function') {
-      etm.ensureMortgagePayoffEvent(rowId, eventId);
+      ensurePromise = etm.ensureMortgagePayoffEvent(rowId, eventId);
     }
     if (etm && typeof etm._afterResolutionAction === 'function') {
-      etm._afterResolutionAction(rowId, { flashFields: ['.event-to-age'] });
+      if (ensurePromise && typeof ensurePromise.finally === 'function') {
+        ensurePromise.finally(function () {
+          etm._afterResolutionAction(rowId, { flashFields: ['.event-to-age'], skipAccordionRefresh: true });
+        });
+      } else {
+        etm._afterResolutionAction(rowId, { flashFields: ['.event-to-age'], skipAccordionRefresh: true });
+      }
     }
+    return ensurePromise;
   },
 
   _rentOutProperty: function (event, payload, env) {
@@ -1059,7 +1117,7 @@ var RelocationImpactAssistant = {
     var etm = env && env.eventsTableManager ? env.eventsTableManager : null;
     if (!webUI || !etm) return;
 
-    this._keepProperty(event, payload, env);
+    this._keepProperty(event, payload, env, { deferRefresh: true });
 
     var events = webUI.readEvents(false) || [];
     var mvImpactId = event.relocationImpact && event.relocationImpact.mvEventId;
@@ -1072,6 +1130,7 @@ var RelocationImpactAssistant = {
     var relocationAge = mv ? mv.fromAge : null;
 
     var amount = '';
+    var createPromise = null;
     if (relocationAge && typeof etm.addEventFromWizardWithSorting === 'function') {
       try {
         var startCountry = Config.getInstance().getStartCountry();
@@ -1095,21 +1154,44 @@ var RelocationImpactAssistant = {
         }
       } catch (_) { }
 
-      etm.addEventFromWizardWithSorting({
-        eventType: 'RI',
-        name: event.name || event.id,
-        amount: amount,
-        fromAge: relocationAge,
-        toAge: event.toAge,
-        relocationReviewed: true,
-        relocationImpact: event.relocationImpact,
-        relocationRentMvId: rentMarkerId,
-        linkedCountry: origin,
-        currency: originCurrency
+      createPromise = (typeof requestAnimationFrame === 'function'
+        ? new Promise(function (resolve) { requestAnimationFrame(resolve); })
+        : Promise.resolve()
+      ).then(function () {
+        return etm.addEventFromWizardWithSorting({
+          eventType: 'RI',
+          name: event.name || event.id,
+          amount: amount,
+          fromAge: relocationAge,
+          toAge: event.toAge,
+          fastAutoCreate: true,
+          relocationReviewed: true,
+          relocationImpact: event.relocationImpact,
+          relocationRentMvId: rentMarkerId,
+          linkedCountry: origin,
+          currency: originCurrency
+        }, {
+          skipSortAnimation: true,
+          skipChartRefresh: true,
+          skipAccordionNewEventAnimation: false,
+          skipRelocationRefresh: true,
+          skipReanalysisSchedule: true,
+          newEventFlashDelayMs: 16
+        });
       });
+    }
+    if (createPromise && typeof createPromise.then === 'function') {
+      createPromise.then(function () {
+        if (etm && typeof etm._afterResolutionAction === 'function') {
+          etm._afterResolutionAction((payload && payload.rowId) || '', { pulse: true, skipAccordionRefresh: true });
+        }
+      });
+    } else if (etm && typeof etm._afterResolutionAction === 'function') {
+      etm._afterResolutionAction((payload && payload.rowId) || '', { pulse: true });
     }
 
     // No need for separate refresh here as _keepProperty (now using _afterResolutionAction) or addEventFromWizardWithSorting will handle it
+    return createPromise;
   }
 };
 

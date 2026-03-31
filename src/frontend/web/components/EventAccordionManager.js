@@ -777,17 +777,23 @@ class EventAccordionManager {
   /**
    * Refresh the accordion with animation for newly created event
    */
-  refreshWithNewEventAnimation(eventData, id) {
+  refreshWithNewEventAnimation(eventData, id, options = {}) {
+    const sortDelayMs = (options.sortDelayMs == null) ? 50 : Number(options.sortDelayMs);
+    const highlightDelayMs = (options.highlightDelayMs == null) ? 400 : Number(options.highlightDelayMs);
+    const skipTableSort = !!options.skipTableSort;
     // Store reference to identify new item by unique ID
     this._newEventId = id;
+    this._newEventHighlightDelayMs = highlightDelayMs;
 
     // First refresh the accordion to get the new event (unsorted)
     this.renderAccordion();
 
     // Then apply sorting with animation and highlight the new item
-    setTimeout(() => {
-      this.applySortingWithAnimation(true); // true = highlight new item
-    }, 50);
+    const runSort = () => {
+      this.applySortingWithAnimation({ highlightNew: true, highlightDelayMs: highlightDelayMs, skipTableSort: skipTableSort });
+    };
+    if (sortDelayMs <= 0) runSort();
+    else setTimeout(runSort, sortDelayMs);
   }
 
   /**
@@ -861,6 +867,12 @@ class EventAccordionManager {
    */
   applySortingWithAnimation(options = {}) {
     const highlightNew = (typeof options === 'boolean') ? options : !!options.highlightNew;
+    const skipTableSort = (typeof options === 'boolean') ? false : !!options.skipTableSort;
+    const highlightDelayMs = (typeof options === 'boolean')
+      ? (this._newEventHighlightDelayMs == null ? 400 : Number(this._newEventHighlightDelayMs))
+      : ((options.highlightDelayMs == null)
+        ? (this._newEventHighlightDelayMs == null ? 400 : Number(this._newEventHighlightDelayMs))
+        : Number(options.highlightDelayMs));
     const tableManager = this.webUI.eventsTableManager;
     if (!tableManager || !tableManager.sortKeys || tableManager.sortKeys.length === 0) {
       // No sorting active, just highlight if needed
@@ -878,7 +890,7 @@ class EventAccordionManager {
 
     // Also sort the table (without notification to avoid recursion)
     const tbody = document.querySelector('#Events tbody');
-    if (tbody && window.RowSorter) {
+    if (!skipTableSort && tbody && window.RowSorter) {
       // Close any open inline resolution panels in the table before DOM reorder
       if (tableManager && tableManager.collapseAllResolutionPanels) tableManager.collapseAllResolutionPanels();
       window.RowSorter.sortRows(tbody, tableManager.sortKeys, { skipAnimation: !!options.skipTableAnimation });
@@ -886,9 +898,11 @@ class EventAccordionManager {
 
     // Highlight the new event after sorting animation
     if (highlightNew && this._newEventId) {
-      setTimeout(() => {
+      const fireHighlight = () => {
         this.highlightNewEvent();
-      }, 400); // After animation completes
+      };
+      if (highlightDelayMs <= 20) fireHighlight();
+      else setTimeout(fireHighlight, highlightDelayMs); // After sorting animation completes
     }
 
     // Clear the new event reference

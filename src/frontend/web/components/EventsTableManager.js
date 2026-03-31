@@ -1280,32 +1280,43 @@ class EventsTableManager {
   }
 
   _createMortgagePayoffEvent(id, rows, model, overpayWindows) {
-    if (!id || !rows || !rows.mRow || rows.mpRow) return;
-    if (this._pendingAutoPayoffIds[id]) return;
+    if (!id || !rows || !rows.mRow || rows.mpRow) return null;
+    if (this._pendingAutoPayoffIds[id]) return this._pendingAutoPayoffIds[id];
 
     const mToInput = rows.mRow.querySelector('.event-to-age');
     const payoffAge = this._parseAgeValue(mToInput ? mToInput.value : '');
-    if (isNaN(payoffAge)) return;
+    if (isNaN(payoffAge)) return null;
 
     const rawPayoffAmount = this._remainingPrincipalAtAge(model, overpayWindows, payoffAge);
     const payoffAmount = Math.max(0, Math.round(rawPayoffAmount));
-    if (!(payoffAmount > 0)) return;
+    if (!(payoffAmount > 0)) return null;
     const linkedCountryInput = rows.mRow.querySelector('.event-linked-country');
     const currencyInput = rows.mRow.querySelector('.event-currency');
     const sellMvIdInput = rows.mRow.querySelector('.event-relocation-sell-mv-id');
     const sellAnchorAgeInput = rows.mRow.querySelector('.event-relocation-sell-anchor-age');
 
-    const createPromise = this.addEventFromWizardWithSorting({
+    const createPromise = (typeof requestAnimationFrame === 'function'
+      ? new Promise((resolve) => requestAnimationFrame(resolve))
+      : Promise.resolve()
+    ).then(() => this.addEventFromWizardWithSorting({
       eventType: 'MP',
       name: id,
       amount: payoffAmount,
       fromAge: payoffAge,
       toAge: payoffAge,
+      fastAutoCreate: true,
       relocationSellMvId: sellMvIdInput ? sellMvIdInput.value : '',
       relocationSellAnchorAge: sellAnchorAgeInput ? sellAnchorAgeInput.value : '',
       linkedCountry: linkedCountryInput ? linkedCountryInput.value : '',
       currency: currencyInput ? currencyInput.value : ''
-    }).then((result) => {
+    }, {
+      skipSortAnimation: true,
+      skipChartRefresh: true,
+      skipAccordionNewEventAnimation: false,
+      skipRelocationRefresh: true,
+      skipReanalysisSchedule: true,
+      newEventFlashDelayMs: 16
+    })).then((result) => {
       if (result && result.row) {
         this.getOrCreateHiddenInput(result.row, 'event-auto-payoff', '1');
         if (sellMvIdInput && sellMvIdInput.value) {
@@ -1328,15 +1339,16 @@ class EventsTableManager {
     });
 
     this._pendingAutoPayoffIds[id] = createPromise;
+    return createPromise;
   }
 
   _syncMortgagePlanById(id, context = {}) {
-    if (!id) return;
+    if (!id) return null;
     const rows = this._collectMortgageRowsById(id);
-    if (!rows.mRow) return;
+    if (!rows.mRow) return null;
 
     const model = this._buildMortgageModelFromRow(rows.mRow);
-    if (!model) return;
+    if (!model) return null;
     const overpayWindows = this._buildOverpayWindowsFromRows(rows.moRows);
     const estimate = this._estimatePayoff(model, overpayWindows);
     const hasOverpay = rows.moRows.length > 0;
@@ -1352,9 +1364,9 @@ class EventsTableManager {
     if (!rows.mpRow) {
       const shouldCreatePayoff = forceCreatePayoff || (sourceType === 'M' && sourceField === 'toAge');
       if (shouldCreatePayoff) {
-        this._createMortgagePayoffEvent(id, rows, model, overpayWindows);
+        const createPromise = this._createMortgagePayoffEvent(id, rows, model, overpayWindows);
         this._scheduleMortgagePlanReanalysis();
-        return;
+        return createPromise || this._pendingAutoPayoffIds[id] || null;
       }
       if (forceAutoAlign || sourceType === 'MO' || sourceType === 'MP' || (sourceType === 'M' && sourceField !== 'toAge')) {
         this._suppressMortgagePlanSync = true;
@@ -1365,7 +1377,7 @@ class EventsTableManager {
         }
       }
       this._scheduleMortgagePlanReanalysis();
-      return;
+      return null;
     }
 
     const mpFromInput = rows.mpRow.querySelector('.event-from-age');
@@ -1473,6 +1485,7 @@ class EventsTableManager {
     }
 
     this._scheduleMortgagePlanReanalysis();
+    return null;
   }
 
   _handleMortgagePlanFieldChange(row, target) {
@@ -1527,13 +1540,13 @@ class EventsTableManager {
 
   ensureMortgagePayoffEvent(rowId, eventId) {
     const row = this._findEventRow(rowId, eventId);
-    if (!row) return;
+    if (!row) return null;
     const typeInput = row.querySelector('.event-type');
-    if (!typeInput || typeInput.value !== 'M') return;
+    if (!typeInput || typeInput.value !== 'M') return null;
     const nameInput = row.querySelector('.event-name');
     const id = nameInput ? String(nameInput.value || '').trim() : '';
-    if (!id) return;
-    this._syncMortgagePlanById(id, { sourceType: 'M', sourceField: 'toAge', forceCreatePayoff: true });
+    if (!id) return null;
+    return this._syncMortgagePlanById(id, { sourceType: 'M', sourceField: 'toAge', forceCreatePayoff: true });
   }
 
   _syncLinkedMortgageEventsToPropertyAge(id) {
@@ -3646,6 +3659,7 @@ class EventsTableManager {
   }
 
   _afterResolutionAction(rowId, options = {}) {
+    const skipAccordionRefresh = !!options.skipAccordionRefresh;
     this.collapseResolutionPanel(rowId);
     const events = this.webUI.readEvents(false);
     const startCountry = Config.getInstance().getStartCountry();
@@ -3653,7 +3667,7 @@ class EventsTableManager {
     RelocationImpactDetector.analyzeEvents(events, startCountry);
     this.updateRelocationImpactIndicators(events);
     this.webUI.updateStatusForRelocationImpacts(this._getRelocationStatusEvents(events));
-    if (this.webUI.eventAccordionManager) {
+    if (this.webUI.eventAccordionManager && !skipAccordionRefresh) {
       // Relocation resolution impacts should generally skip the "flying" sort animation
       // unless they involve creating a second event (which is handled by split/rent actions explicitly calling applySort)
       this.webUI.eventAccordionManager.refresh({ skipSortAnimation: true });
@@ -4638,7 +4652,8 @@ class EventsTableManager {
     return row;
   }
 
-  addEventRow() {
+  addEventRow(options = {}) {
+    const skipPostAddEffects = !!(options && options.skipPostAddEffects);
     const tbody = document.querySelector('#Events tbody');
     if (!tbody) return;
 
@@ -4654,44 +4669,46 @@ class EventsTableManager {
     // Update empty state after adding a row
     this.updateEmptyStateMessage(true);
 
-    this.webUI.formatUtils.setupCurrencyInputs();
-    this.webUI.formatUtils.setupPercentageInputs();
+    if (!skipPostAddEffects) {
+      this.webUI.formatUtils.setupCurrencyInputs();
+      this.webUI.formatUtils.setupPercentageInputs();
 
-    // Refresh accordion if it's active
-    if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
-      /* Debug log removed */
+      // Refresh accordion if it's active
+      if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
+        /* Debug log removed */
 
-      // First refresh the accordion to include the new event
-      this.webUI.eventAccordionManager.refresh();
-    }
-
-    // Prevent any automatic focus that might cause scrolling
-    // Use setTimeout to ensure this runs after any potential focus events
-    setTimeout(() => {
-      // Restore scroll position if it changed (prevents mobile page jumping)
-      if (window.scrollY !== currentScrollY) {
-        window.scrollTo(0, currentScrollY);
+        // First refresh the accordion to include the new event
+        this.webUI.eventAccordionManager.refresh();
       }
-    }, 0);
 
-    // Call detector if relocation is enabled
-    if (Config.getInstance().isRelocationEnabled()) {
-      try {
-        var events = this.webUI.readEvents(false);
-        var startCountry = Config.getInstance().getStartCountry();
-        RelocationImpactDetector.analyzeEvents(events, startCountry);
-        this.updateRelocationImpactIndicators(events);
-        // Update currency selector when relocation events are added
-        if (this.webUI.chartManager) {
-          RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
-          this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+      // Prevent any automatic focus that might cause scrolling
+      // Use setTimeout to ensure this runs after any potential focus events
+      setTimeout(() => {
+        // Restore scroll position if it changed (prevents mobile page jumping)
+        if (window.scrollY !== currentScrollY) {
+          window.scrollTo(0, currentScrollY);
         }
-        if (this.webUI.tableManager) {
-          RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
-          this.webUI.tableManager.setupTableCurrencyControls();
+      }, 0);
+
+      // Call detector if relocation is enabled
+      if (Config.getInstance().isRelocationEnabled()) {
+        try {
+          var events = this.webUI.readEvents(false);
+          var startCountry = Config.getInstance().getStartCountry();
+          RelocationImpactDetector.analyzeEvents(events, startCountry);
+          this.updateRelocationImpactIndicators(events);
+          // Update currency selector when relocation events are added
+          if (this.webUI.chartManager) {
+            RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
+            this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
+          }
+          if (this.webUI.tableManager) {
+            RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
+            this.webUI.tableManager.setupTableCurrencyControls();
+          }
+        } catch (err) {
+          console.error('Error analyzing relocation impacts:', err);
         }
-      } catch (err) {
-        console.error('Error analyzing relocation impacts:', err);
       }
     }
 
@@ -4990,6 +5007,7 @@ class EventsTableManager {
 
   applySort(options = {}) {
     const skipAnimation = !!(options && options.skipAnimation);
+    const skipRelocationRefresh = !!(options && options.skipRelocationRefresh);
     // Collapse any open inline resolution panels before reordering rows
     RelocationImpactAssistant.collapseAllPanels();
     const tbody = document.querySelector('#Events tbody');
@@ -5037,7 +5055,7 @@ class EventsTableManager {
     this.notifyAccordionOfSortChange();
 
     // Call updateRelocationImpactIndicators after sorting
-    if (Config.getInstance().isRelocationEnabled()) {
+    if (!skipRelocationRefresh && Config.getInstance().isRelocationEnabled()) {
       const events = this.webUI.readEvents(false);
       this.updateRelocationImpactIndicators(events);
       this.webUI.updateStatusForRelocationImpacts(this._getRelocationStatusEvents(events));
@@ -5432,7 +5450,49 @@ class EventsTableManager {
    * @returns {HTMLElement} The created table row
    */
   async createEventFromWizard(eventData) {
-    const result = this.addEventRow();
+    const eventType = eventData && eventData.eventType ? String(eventData.eventType) : '';
+    const useFastAutoCreate = !!(eventData && eventData.fastAutoCreate && (eventType === 'RI' || eventType === 'MP'));
+    if (useFastAutoCreate) {
+      const tbody = document.querySelector('#Events tbody');
+      if (!tbody) return { row: null, id: null };
+      const row = this.createEventRow(
+        eventType,
+        eventData && eventData.name != null ? eventData.name : '',
+        eventData && eventData.amount != null ? eventData.amount : '',
+        eventData && eventData.fromAge != null ? eventData.fromAge : '',
+        eventData && eventData.toAge != null ? eventData.toAge : '',
+        eventData && eventData.rate != null ? eventData.rate : '',
+        eventData && eventData.match != null ? eventData.match : ''
+      );
+      tbody.appendChild(row);
+      this.updateEmptyStateMessage(true);
+      if (eventData && eventData.linkedCountry) {
+        this.getOrCreateHiddenInput(row, 'event-linked-country', eventData.linkedCountry);
+        this.getOrCreateHiddenInput(row, 'event-country', eventData.linkedCountry);
+      }
+      if (eventData && eventData.currency) this.getOrCreateHiddenInput(row, 'event-currency', eventData.currency);
+      if (eventData && eventData.relocationRentMvId) this.getOrCreateHiddenInput(row, 'event-relocation-rent-mv-id', eventData.relocationRentMvId);
+      if (eventData && eventData.relocationSellMvId) this.getOrCreateHiddenInput(row, 'event-relocation-sell-mv-id', eventData.relocationSellMvId);
+      if (eventData && eventData.relocationSellAnchorAge != null && String(eventData.relocationSellAnchorAge) !== '') {
+        this.getOrCreateHiddenInput(row, 'event-relocation-sell-anchor-age', String(eventData.relocationSellAnchorAge));
+      }
+      if (eventData && eventData.relocationReviewed) {
+        const scope = {
+          mvId: eventData.relocationImpact ? eventData.relocationImpact.mvEventId : '',
+          category: eventData.relocationImpact ? eventData.relocationImpact.category : ''
+        };
+        this._setResolutionOverride(row, scope);
+      }
+      row.dataset.originalEventType = eventType;
+      this._refreshValidation();
+      if (this.webUI && this.webUI.formatUtils) {
+        this.webUI.formatUtils.setupCurrencyInputs(true);
+        this.webUI.formatUtils.setupPercentageInputs();
+      }
+      return { row: row, id: row.dataset ? row.dataset.eventId : null };
+    }
+
+    const result = this.addEventRow({ skipPostAddEffects: true });
     if (!result || !result.row) return { row: null, id: null };
     await this.populateRowFromWizardData(result.row, eventData);
     if (this.webUI && this.webUI.formatUtils) {
@@ -5446,7 +5506,13 @@ class EventsTableManager {
    * Add event from wizard data with sorting and animation for table view
    * @param {Object} eventData - Data collected from wizard
    */
-  async addEventFromWizardWithSorting(eventData) {
+  async addEventFromWizardWithSorting(eventData, options = {}) {
+    const skipSortAnimation = !!options.skipSortAnimation;
+    const skipChartRefresh = !!options.skipChartRefresh;
+    const skipAccordionNewEventAnimation = !!options.skipAccordionNewEventAnimation;
+    const skipRelocationRefresh = !!options.skipRelocationRefresh;
+    const skipReanalysisSchedule = !!options.skipReanalysisSchedule;
+    const newEventFlashDelayMs = (options.newEventFlashDelayMs == null) ? 400 : Number(options.newEventFlashDelayMs);
     const result = await this.createEventFromWizard(eventData);
     if (!result || !result.row) return null;
 
@@ -5457,20 +5523,32 @@ class EventsTableManager {
     newRow.classList.add('just-created');
 
     // Apply sorting animation
-    this.applySort(); // Apply FLIP animation for moved rows
-    this._scheduleRelocationReanalysis();
+    this.applySort({ skipAnimation: skipSortAnimation, skipRelocationRefresh: skipRelocationRefresh }); // Apply FLIP animation for moved rows
+    if (!skipReanalysisSchedule) this._scheduleRelocationReanalysis();
 
     // After sorting completes, animate the new table row highlight smoothly
     if (typeof this.animateNewTableRow === 'function') {
-      setTimeout(() => { this.animateNewTableRow(eventData, { flashFields: ['.event-amount'] }); }, 400);
+      setTimeout(() => {
+        this.animateNewTableRow(eventData, { flashFields: ['.event-amount'] });
+      }, newEventFlashDelayMs);
     }
 
     // Refresh accordion if active
     if (this.viewMode === 'accordion' && this.webUI.eventAccordionManager) {
-      this.webUI.eventAccordionManager.refreshWithNewEventAnimation(eventData, newEventId);
+      const accordionSortDelayMs = newEventFlashDelayMs <= 20 ? 0 : 50;
+      const accordionHighlightDelayMs = newEventFlashDelayMs <= 20 ? 16 : 400;
+      if (skipAccordionNewEventAnimation) {
+        this.webUI.eventAccordionManager.refresh({ skipSortAnimation: true });
+      } else {
+        this.webUI.eventAccordionManager.refreshWithNewEventAnimation(eventData, newEventId, {
+          sortDelayMs: accordionSortDelayMs,
+          highlightDelayMs: accordionHighlightDelayMs,
+          skipTableSort: newEventFlashDelayMs <= 20
+        });
+      }
     }
     // Refresh chart relocation transitions
-    if (this.webUI.chartManager) {
+    if (this.webUI.chartManager && !skipChartRefresh) {
       RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.chartManager);
       this.webUI.chartManager.setupChartCurrencyControls(this.webUI);
       this.webUI.chartManager.refreshChartsWithCurrency();

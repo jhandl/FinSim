@@ -147,7 +147,7 @@ test('chart currency selector converts datasets and shows original tooltip detai
   if (analysis.dynCapExpected != null && analysis.dynCapConverted != null) {
     expect(analysis.dynCapConverted).toBeCloseTo(analysis.dynCapExpected, 2);
   }
-  expect(analysis.tooltipLabel).toMatch(/Original:/);
+  expect(String(analysis.tooltipLabel || '')).toMatch(/^Inflows:\s/);
   expect(analysis.transitions).toBeGreaterThan(0);
   expect(analysis.annotationCount).toBeGreaterThan(0);
 

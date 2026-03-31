@@ -24,6 +24,16 @@ describe('Relocation cut-short resolution', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     global.requestAnimationFrame = (cb) => { if (typeof cb === 'function') cb(); };
+    global.UIManager = {
+      getRequiredFields: () => ({}),
+      getFields: () => []
+    };
+    global.DropdownUtils = {
+      create: jest.fn(() => ({
+        wrapper: null,
+        setOptions: jest.fn()
+      }))
+    };
     global.RelocationImpactDetector = { analyzeEvents: jest.fn() };
     global.TooltipUtils = { attachTooltip: jest.fn() };
     global.FormatUtils = {
@@ -110,6 +120,10 @@ describe('Relocation cut-short resolution', () => {
       isRelocationEnabled: () => true,
       getStartCountry: () => 'ar',
       getDefaultCountry: () => 'ar',
+      getAvailableCountries: () => [
+        { code: 'AR', name: 'Argentina' },
+        { code: 'US', name: 'United States' }
+      ],
       getCountryNameByCode: (code) => (code === 'us' ? 'United States' : 'Argentina'),
       getCachedTaxRuleSet: (code) => ({
         getCurrencySymbol: () => (code === 'us' ? '$' : '$'),
@@ -493,6 +507,10 @@ describe('Relocation cut-short resolution', () => {
 
     const row = document.querySelector('tr[data-row-id="row_mismatch"]');
     const manager = Object.create(EventsTableManager.prototype);
+    manager.webUI = {
+      getValue: jest.fn(() => 'single'),
+      readEvents: jest.fn(() => [])
+    };
     manager.updateFieldVisibility = jest.fn();
     manager.applyTypeColouring = jest.fn();
     manager.syncTaxRuleSetsForCurrentEvents = jest.fn(() => Promise.resolve());

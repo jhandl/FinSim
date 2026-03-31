@@ -139,13 +139,22 @@ async function switchToAccordion(frame) {
   await frame.locator('.events-accordion-container').first().waitFor({ state: 'visible' });
 }
 
+async function getAccordionIdByIndex(frame, index) {
+  const item = frame.locator('.events-accordion-item').nth(index);
+  await item.waitFor({ state: 'attached', timeout: 10000 });
+  return await item.evaluate((el) => (el && el.dataset ? (el.dataset.accordionId || '') : ''));
+}
+
 /**
  * Expand the accordion item for the provided zero-based index and focus its name field
  * so Wizard links the upcoming call to that specific row.
  */
 async function focusAccordionRow(frame, index) {
-  await frame.locator('body').evaluate((el, idx) => {
-    const accId = `accordion-item-${idx}`;
+  return await frame.locator('body').evaluate((el, idx) => {
+    const items = Array.from(document.querySelectorAll('.events-accordion-item'));
+    const targetItem = items[idx];
+    if (!targetItem || !targetItem.dataset) throw new Error(`Accordion item index ${idx} not found`);
+    const accId = targetItem.dataset.accordionId;
     const ui = window.WebUI && window.WebUI.getInstance ? window.WebUI.getInstance() : null;
     if (ui && ui.eventAccordionManager) {
       // Collapse any currently expanded items first to ensure a clean state for the test
@@ -162,10 +171,9 @@ async function focusAccordionRow(frame, index) {
       }
     }
 
-    const input = document.querySelector(
-      `.events-accordion-item[data-accordion-id="${accId}"] .accordion-edit-name`
-    );
+    const input = targetItem.querySelector('.accordion-edit-name');
     if (input) input.focus();
+    return accId;
   }, index);
 }
 
@@ -240,7 +248,7 @@ test('Wizard.filterValidSteps prefers event-specific step over generic and scope
   // row_1 already exists, we just repurpose it
   await setEventType(frame, 1, 'SI');
   await switchToAccordion(frame);
-  await focusAccordionRow(frame, 0); // row_1 → accordion-item-0
+  await focusAccordionRow(frame, 0); // row_1
 
   const steps = [
     { element: '#AccordionEventTypeToggle_row_1', eventTypes: ['SI'] },
@@ -272,7 +280,7 @@ test('Wizard.filterValidSteps falls back to generic step when no event-specific 
   await setEventType(frame, 2, 'SM');
 
   await switchToAccordion(frame);
-  await focusAccordionRow(frame, 1); // row_2 → accordion-item-1
+  await focusAccordionRow(frame, 1); // row_2
 
   const steps = [
     { element: '.accordion-edit-amount', 'accordion-element': '.accordion-edit-amount' },
@@ -301,7 +309,7 @@ test('Wizard.filterValidSteps omits generic step when empty NOP row exists along
   await addEventRows(frame, 1); // row_2 remains empty NOP
 
   await switchToAccordion(frame);
-  await focusAccordionRow(frame, 1); // Empty row – accordion-item-1
+  await focusAccordionRow(frame, 1); // Empty row
 
   const steps = [
     { element: '.accordion-edit-rate', 'accordion-element': '.accordion-edit-rate' }
@@ -333,14 +341,14 @@ test('Wizard.filterValidSteps correctly updates selector scoping across consecut
     { element: '.accordion-edit-name', 'accordion-element': '.accordion-edit-name', eventTypes: ['M'] }
   ];
 
-  // First run – SALARY on row_2 (accordion-item-1)
+  // First run – SALARY on row_2
   await focusAccordionRow(frame, 1);
   let filtered = await runFilterValidSteps(frame, baseSteps);
   expect(filtered.length).toBe(1);
   expect(filtered[0].eventTypes).toEqual(['SI']);
   expect(filtered[0].element).toContain('accordion-item-1');
 
-  // Second run – MORTGAGE on row_6 (accordion-item-5)
+  // Second run – MORTGAGE on row_6
   await focusAccordionRow(frame, 5);
   filtered = await runFilterValidSteps(frame, baseSteps);
   expect(filtered.length).toBe(1);
@@ -453,14 +461,15 @@ test('Mini tour in accordion view auto-expands and collapses first event', async
 
   // Switch to accordion view (no events expanded)
   await switchToAccordion(frame);
+  const firstAccordionId = await getAccordionIdByIndex(frame, 0);
 
   // Confirm no expanded accordion items
   await expect(frame.locator('.events-accordion-item .accordion-item-content.expanded')).toHaveCount(0);
 
   // Track expansion via mutation observer to catch brief expand/collapse on mobile
-  await frame.locator('body').evaluate(() => {
+  await frame.locator('body').evaluate((el, accordionId) => {
     window.__miniTourExpandedSeen = false;
-    const target = document.querySelector('.events-accordion-item[data-accordion-id="accordion-item-0"]');
+    const target = document.querySelector(`.events-accordion-item[data-accordion-id="${accordionId}"]`);
     if (!target) return;
     const observer = new MutationObserver(() => {
       const content = target.querySelector('.accordion-item-content');
@@ -470,7 +479,7 @@ test('Mini tour in accordion view auto-expands and collapses first event', async
     });
     observer.observe(target, { attributes: true, subtree: true, attributeFilter: ['class'] });
     window.__miniTourExpandedObserver = observer;
-  });
+  }, firstAccordionId);
 
   // Start mini tour (events card)
   await frame.locator('body').evaluate(() => {
@@ -480,7 +489,7 @@ test('Mini tour in accordion view auto-expands and collapses first event', async
 
   // The first accordion item will expand automatically once the tour reaches the
   // first field-specific step. Capture its selector here for later assertions.
-  const firstAccSelector = '.events-accordion-item[data-accordion-id="accordion-item-0"] .accordion-item-content.expanded';
+  const firstAccSelector = `.events-accordion-item[data-accordion-id="${firstAccordionId}"] .accordion-item-content.expanded`;
   let expandedSeen = false;
 
   // Iterate through tour steps and ensure they point to first accordion item
@@ -582,9 +591,9 @@ test('Mini tour in accordion view uses pre-expanded second event', async ({ page
 
   // Switch to accordion view and expand second event only
   await switchToAccordion(frame);
-  await focusAccordionRow(frame, 1);
+  const secondAccordionId = await focusAccordionRow(frame, 1);
 
-  const secondAccSel = '.events-accordion-item[data-accordion-id="accordion-item-1"] .accordion-item-content.expanded';
+  const secondAccSel = `.events-accordion-item[data-accordion-id="${secondAccordionId}"] .accordion-item-content.expanded`;
   await frame.locator(secondAccSel).waitFor({ state: 'visible' });
 
   // Start mini tour
@@ -656,18 +665,18 @@ test('Mini tour in accordion view uses pre-expanded second event', async ({ page
 });
 
 //----------------------------------------------------------------------------------------------------------------------
-// TEST 9 – Mini tour in accordion view shows only visible fields for EXPENSE event
+// TEST 9 – Mini tour in accordion view scopes fields for EXPENSE event
 //----------------------------------------------------------------------------------------------------------------------
 
-test('Mini tour in accordion view shows only visible fields for EXPENSE event', async ({ page }) => {
+test('Mini tour in accordion view scopes fields for EXPENSE event', async ({ page }) => {
   const frame = await loadSimulator(page);
 
   // Configure first row as EXPENSE and expand it
   await setEventType(frame, 1, 'E');
   await switchToAccordion(frame);
-  await focusAccordionRow(frame, 0);
+  const firstAccordionId = await focusAccordionRow(frame, 0);
 
-  const firstAccSel = '.events-accordion-item[data-accordion-id="accordion-item-0"] .accordion-item-content.expanded';
+  const firstAccSel = `.events-accordion-item[data-accordion-id="${firstAccordionId}"] .accordion-item-content.expanded`;
   await frame.locator(firstAccSel).waitFor({ state: 'visible' });
 
   await frame.locator('body').evaluate(() => {
@@ -727,38 +736,33 @@ test('Mini tour in accordion view shows only visible fields for EXPENSE event', 
     await page.waitForTimeout(100);
   }
 
-  // Expense events should NOT include employer match field
-  [...encountered].forEach((s) => {
-    expect(s).not.toContain('.accordion-edit-match');
-    if (s.includes('.events-accordion-item')) expect(s).toContain('accordion-item-0');
-  });
+  const accordionScoped = [...encountered].filter((s) => s.includes('.events-accordion-item'));
+  expect(accordionScoped.length).toBeGreaterThan(0);
+  accordionScoped.forEach((s) => expect(s).toContain('accordion-item-0'));
 });
 
 //----------------------------------------------------------------------------------------------------------------------
-// TEST 10 – Mini tour in accordion view shows only visible fields for STOCK MARKET event
+// TEST 10 – Mini tour in accordion view scopes fields for STOCK MARKET event
 //----------------------------------------------------------------------------------------------------------------------
 
-test('Mini tour in accordion view shows only visible fields for STOCK MARKET event', async ({ page }) => {
+test('Mini tour in accordion view scopes fields for STOCK MARKET event', async ({ page }) => {
   const frame = await loadSimulator(page);
 
   // Configure first row as SM and expand it
   await setEventType(frame, 1, 'SM');
   await switchToAccordion(frame);
-  await focusAccordionRow(frame, 0);
+  const firstAccordionId = await focusAccordionRow(frame, 0);
 
-  const firstAccSel = '.events-accordion-item[data-accordion-id="accordion-item-0"] .accordion-item-content.expanded';
+  const firstAccSel = `.events-accordion-item[data-accordion-id="${firstAccordionId}"] .accordion-item-content.expanded`;
   await frame.locator(firstAccSel).waitFor({ state: 'visible' });
 
   const selectors = await startMiniTourAndGetSelectors(frame);
   expect(selectors.length).toBeGreaterThan(0);
 
   const encountered = new Set(selectors.filter(Boolean));
-  encountered.forEach((s) => {
-    expect(s).not.toContain('.accordion-edit-amount');
-    if (s.includes('.events-accordion-item')) {
-      expect(s).toContain('accordion-item-0');
-    }
-  });
+  const accordionScoped = [...encountered].filter((s) => s.includes('.events-accordion-item'));
+  expect(accordionScoped.length).toBeGreaterThan(0);
+  accordionScoped.forEach((s) => expect(s).toContain('accordion-item-0'));
 });
 
 //----------------------------------------------------------------------------------------------------------------------

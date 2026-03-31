@@ -79,7 +79,7 @@ describe('Relocation Rent Option', () => {
     `;
   }
 
-  test('Render "Rent Out" option and trigger action', () => {
+  test('Render "Rent Out" option and trigger action', async () => {
     const economicData = {
       ready: true,
       getFX: jest.fn(() => 1.0),
@@ -162,23 +162,35 @@ describe('Relocation Rent Option', () => {
     expect(applyButton).toBeTruthy();
 
     applyButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
     
     expect(rentOutSpy).toHaveBeenCalled();
     
     // Check if addEventFromWizardWithSorting was called with estimated amount
     // property value 500,000 * 4% yield = 20,000. Origin currency '$' (ARS in mock). PPP is NOT applied.
-    expect(env.eventsTableManager.addEventFromWizardWithSorting).toHaveBeenCalledWith({
+    expect(env.eventsTableManager.addEventFromWizardWithSorting).toHaveBeenCalledWith(
+      expect.objectContaining({
         eventType: 'RI',
         name: 'MyHouse',
         amount: '$20000',
         fromAge: 40,
         toAge: 80,
+        fastAutoCreate: true,
         relocationReviewed: true,
         relocationImpact: event.relocationImpact,
         relocationRentMvId: 'mvlink_rent_1',
         linkedCountry: 'ar',
         currency: 'AR'
-    });
+      }),
+      expect.objectContaining({
+        skipSortAnimation: true,
+        skipChartRefresh: true,
+        skipRelocationRefresh: true,
+        skipReanalysisSchedule: true,
+        newEventFlashDelayMs: 16
+      })
+    );
   });
 
   test('orphan rent-out panel shows Keep Renting and Remove actions', () => {

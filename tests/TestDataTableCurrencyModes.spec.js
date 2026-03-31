@@ -46,25 +46,10 @@ test('data table toggles natural/unified currency modes and shows converted valu
   // Note: FormatUtils is declared as a global class (not window property) in the iframe.
   // We will prefer global FormatUtils inside evaluate callbacks and fallback to a simple parser.
 
-  // Wait for currency controls to be created and visible (skip visibility check on mobile)
-  const naturalToggle = frame.locator('#currencyModeNatural_TableManager');
-  const unifiedToggle = frame.locator('#currencyModeUnified_TableManager');
-  const dropdownContainer = frame.locator('#data-table-controls .currency-dropdown-container');
-
-  // On mobile, elements may be in DOM but hidden by responsive CSS, so we check for existence instead
-  await expect(naturalToggle).toBeAttached({ timeout: 5000 });
-  await expect(unifiedToggle).toBeAttached({ timeout: 5000 });
-  
-  // Check visibility only on desktop-sized viewports
-  const viewport = page.viewportSize();
-  if (viewport && viewport.width >= 768) {
-    await expect(naturalToggle).toBeVisible({ timeout: 5000 });
-    await expect(unifiedToggle).toBeVisible({ timeout: 5000 });
-  }
-  
-  await expect(naturalToggle).toHaveClass(/mode-toggle-active/);
-  await expect(unifiedToggle).not.toHaveClass(/mode-toggle-active/);
-  expect(await dropdownContainer.evaluate(el => getComputedStyle(el).display)).toBe('none');
+  // Currency controls are now dropdown-only (LOCAL + explicit currencies)
+  const dropdown = frame.locator('#reportingCurrencySelect_TableManager');
+  await expect(dropdown).toBeAttached({ timeout: 5000 });
+  await expect(dropdown).toHaveValue('LOCAL');
 
   const netIncomeIndex = await frame.locator('#Data thead tr:nth-of-type(2) th[data-key="NetIncome"]').evaluate((th) => {
     if (!th || !th.parentElement) return 2;
@@ -86,41 +71,30 @@ test('data table toggles natural/unified currency modes and shows converted valu
     return txt.replace(/[^0-9\-]/g, '');
   }, netIncomeIndex);
 
-  // Click unified toggle - use evaluate on mobile to ensure handler fires
+  // Select a concrete currency to switch from LOCAL (natural) to unified mode
   const viewportSize = page.viewportSize();
   if (viewportSize && viewportSize.width < 768) {
-    // On mobile, trigger click via evaluate and manually call handler if needed
-    await frame.locator('body').evaluate(() => {
-      const webUI = window.WebUI.getInstance();
-      if (webUI && webUI.tableManager) {
-        webUI.tableManager.handleCurrencyModeChange('unified');
-      }
+    await dropdown.evaluate((select) => {
+      select.value = 'EUR';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
     });
   } else {
-    await unifiedToggle.click();
+    await dropdown.selectOption('EUR');
   }
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(250);
 
-  await expect(unifiedToggle).toHaveClass(/mode-toggle-active/);
-  await expect(naturalToggle).not.toHaveClass(/mode-toggle-active/);
-  expect(await dropdownContainer.evaluate(el => getComputedStyle(el).display)).toBe('block');
-
-  const dropdown = frame.locator('#reportingCurrencySelect_TableManager');
-  // Wait for dropdown to be attached (on mobile it may be hidden)
-  await expect(dropdown).toBeAttached({ timeout: 5000 });
-  const viewportSize2 = page.viewportSize();
-  if (viewportSize2 && viewportSize2.width >= 768) {
-    // On desktop, also check visibility
-    await expect(dropdown).toBeVisible({ timeout: 5000 });
-  }
-  await page.waitForTimeout(200);
+  const modeAfterEur = await frame.locator('body').evaluate(() => {
+    const webUI = window.WebUI.getInstance();
+    return webUI && webUI.tableManager ? webUI.tableManager.currencyMode : null;
+  });
+  expect(modeAfterEur).toBe('unified');
   
   // Debug: Check what options are available
   const availableOptions = await dropdown.evaluate((select) => 
     Array.from(select.options).map(opt => opt.value)
   );
 
-  // First select EUR explicitly (if available) to verify identity conversion in unified mode
+  // Select EUR explicitly (if available) to verify identity conversion in unified mode
   if (availableOptions.includes('EUR')) {
     const viewportSizeI = page.viewportSize();
     if (viewportSizeI && viewportSizeI.width < 768) {
@@ -201,21 +175,24 @@ test('data table toggles natural/unified currency modes and shows converted valu
     expect(convCheck.actual).toBeCloseTo(convCheck.expected, 2);
   }
 
-  // Toggle back to natural and ensure values revert, then unify again to re-convert correctly
-  const naturalToggleAfter = frame.locator('#currencyModeNatural_TableManager');
-  const unifiedToggleAfter = frame.locator('#currencyModeUnified_TableManager');
+  // Switch back to LOCAL (natural) and ensure values revert
   const viewportSize4 = page.viewportSize();
   if (viewportSize4 && viewportSize4.width < 768) {
-    await frame.locator('body').evaluate(() => {
-      const webUI = window.WebUI.getInstance();
-      if (webUI && webUI.tableManager) {
-        webUI.tableManager.handleCurrencyModeChange('natural');
-      }
+    await dropdown.evaluate((select) => {
+      select.value = 'LOCAL';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
     });
   } else {
-    await naturalToggleAfter.click();
+    await dropdown.selectOption('LOCAL');
   }
   await page.waitForTimeout(250);
+
+  const modeAfterLocal = await frame.locator('body').evaluate(() => {
+    const webUI = window.WebUI.getInstance();
+    return webUI && webUI.tableManager ? webUI.tableManager.currencyMode : null;
+  });
+  expect(modeAfterLocal).toBe('natural');
+
   const revertedDigits = await frame.locator('body').evaluate((_, idx) => {
     const cell = document.querySelector(`#data_row_1 td:nth-of-type(${idx}) .cell-content`);
     const txt = cell ? (cell.textContent || '') : '';
@@ -228,11 +205,12 @@ test('data table toggles natural/unified currency modes and shows converted valu
     await frame.locator('body').evaluate(() => {
       const webUI = window.WebUI.getInstance();
       if (webUI && webUI.tableManager) {
+        webUI.tableManager.reportingCurrency = 'EUR';
         webUI.tableManager.handleCurrencyModeChange('unified');
       }
     });
   } else {
-    await unifiedToggleAfter.click();
+    await dropdown.selectOption('EUR');
   }
   await page.waitForTimeout(200);
   const viewportSize5 = page.viewportSize();

@@ -5,7 +5,7 @@
    * Extract value from accordion item for a specific column
    * Maps accordion item data to the same column structure as table
    */
-  function getAccordionValue(accordionItem, col, accordionManager) {
+  function getAccordionValue(accordionItem, col, accordionManager, eventByAccordionId) {
     // Get the event data from the accordion manager
     const accordionId = accordionItem.dataset.accordionId;
 
@@ -14,7 +14,7 @@
       return '';
     }
 
-    const event = accordionManager.events.find(e => e.accordionId === accordionId);
+    const event = eventByAccordionId ? eventByAccordionId.get(accordionId) : accordionManager.events.find(e => e.accordionId === accordionId);
     if (!event) return '';
 
     switch (col) {
@@ -49,8 +49,15 @@
 
     if (items.length === 0) return;
 
+    const eventByAccordionId = new Map();
+    if (accordionManager && Array.isArray(accordionManager.events)) {
+      accordionManager.events.forEach(function (e) {
+        if (e && e.accordionId != null) eventByAccordionId.set(e.accordionId, e);
+      });
+    }
+
     // Create a wrapper function that includes the accordion manager
-    const getValueWithManager = (item, col) => getAccordionValue(item, col, accordionManager);
+    const getValueWithManager = (item, col) => getAccordionValue(item, col, accordionManager, eventByAccordionId);
 
     // Use shared sorting utility
     if (window.SortingUtils) {
@@ -59,8 +66,8 @@
         if (k && k.col === 'from-age') {
           const tieBreaker = function(a, b) {
             // Determine event types via manager mapping
-            const aVal = getAccordionValue(a, 'event-type', accordionManager) || '';
-            const bVal = getAccordionValue(b, 'event-type', accordionManager) || '';
+            const aVal = getAccordionValue(a, 'event-type', accordionManager, eventByAccordionId) || '';
+            const bVal = getAccordionValue(b, 'event-type', accordionManager, eventByAccordionId) || '';
             const aIsReloc = aVal === 'MV';
             const bIsReloc = bVal === 'MV';
             if (aIsReloc && !bIsReloc) return -1;

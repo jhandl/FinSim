@@ -19,6 +19,7 @@ global.deserializeSimulation = deserializeSimulation;
 const EventAccordionManager = loadClass('src/frontend/web/components/EventAccordionManager.js', 'EventAccordionManager');
 const EventSummaryRenderer = loadClass('src/frontend/web/components/EventSummaryRenderer.js', 'EventSummaryRenderer');
 const WizardRenderer = loadClass('src/frontend/web/components/WizardRenderer.js', 'WizardRenderer');
+const DropdownUtils = loadClass('src/frontend/web/utils/DropdownUtils.js', 'DropdownUtils');
 const UIManagerClass = loadClass('src/frontend/UIManager.js', 'UIManager');
 const SimEventClass = loadClass('src/core/Events.js', 'SimEvent');
 const RelocationUtils = loadClass('src/frontend/web/utils/RelocationUtils.js', 'RelocationUtils');
@@ -44,6 +45,7 @@ describe('MV relocation remediation', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     global.requestAnimationFrame = (cb) => { if (typeof cb === 'function') cb(); };
+    global.DropdownUtils = DropdownUtils;
     global.TooltipUtils = { attachTooltip: jest.fn() };
     global.FormatUtils = {
       getLocaleSettings: () => ({ numberLocale: 'en-US', currencyCode: 'USD', currencySymbol: '$' }),
@@ -177,14 +179,18 @@ describe('MV relocation remediation', () => {
     };
 
     const content = renderer.renderInputContent(step, wizardState);
-    const select = content.querySelector('#wizard-destCountryCode');
+    const hiddenInput = content.querySelector('#wizard-destCountryCode');
+    const toggle = content.querySelector('#wizard-destCountryCode-toggle');
+    const options = content.querySelectorAll('#wizard-destCountryCode-options [data-value]');
 
-    expect(select).not.toBeNull();
-    expect(select.tagName).toBe('SELECT');
-    expect(select.options.length).toBe(3);
+    expect(hiddenInput).not.toBeNull();
+    expect(hiddenInput.tagName).toBe('INPUT');
+    expect(hiddenInput.type).toBe('hidden');
+    expect(toggle).not.toBeNull();
+    expect(options.length).toBe(2);
 
-    select.value = 'US';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    const usOption = content.querySelector('#wizard-destCountryCode-options [data-value="US"]');
+    usOption.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(wizardState.data.destCountryCode).toBe('US');
   });
 
