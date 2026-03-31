@@ -1094,8 +1094,8 @@ class ChartManager {
 
   _formatCompactSpikeValue(value) {
     const n = Math.abs(value);
-    if (n >= 1000000) return '€' + ((Math.round(n / 100000) / 10) + 'M').replace('.0M', 'M');
-    if (n >= 1000) return '€' + ((Math.round(n / 100) / 10) + 'k').replace('.0k', 'k');
+    if (n >= 1000000) return '€' + Math.round(n / 1000000) + 'M';
+    if (n >= 1000) return '€' + Math.round(n / 1000) + 'k';
     return '€' + Math.round(n);
   }
 

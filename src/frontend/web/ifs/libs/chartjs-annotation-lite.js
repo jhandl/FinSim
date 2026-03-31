@@ -107,7 +107,7 @@
       const PADDING = 4;
       const FONT_SIZE = 11;
       const LINE_HEIGHT = FONT_SIZE + PADDING * 2 + 2;
-      const X_OFFSET = 4;
+      const X_OFFSET = 8;
 
       for (let i = 0; i < spikes.length; i++) {
         const spike = spikes[i];
@@ -134,11 +134,18 @@
           ctx.save();
           ctx.font = 'normal ' + FONT_SIZE + 'px Inter, sans-serif';
           const textWidth = ctx.measureText(entry.text).width;
-          ctx.fillStyle = 'rgba(255,255,255,0.9)';
-          ctx.fillRect(x + PADDING + X_OFFSET, yOffset, textWidth + PADDING * 2, LINE_HEIGHT);
+          const rectWidth = textWidth + PADDING * 2;
+          const leftRectX = x - X_OFFSET - rectWidth;
+          // Prefer labels to the left of the spike; if they don't fit, place on the right so
+          // the label box never crosses the spike line.
+          const rectX = leftRectX >= chartArea.left + PADDING
+            ? leftRectX
+            : Math.min(x + X_OFFSET, chartArea.right - rectWidth - PADDING);
+          const textX = rectX + rectWidth - PADDING;
           ctx.fillStyle = entry.color;
           ctx.textBaseline = 'top';
-          ctx.fillText(entry.text, x + PADDING * 2 + X_OFFSET, yOffset + PADDING);
+          ctx.textAlign = 'right';
+          ctx.fillText(entry.text, textX, yOffset + PADDING);
           ctx.restore();
           yOffset += LINE_HEIGHT + 2;
         }
