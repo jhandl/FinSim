@@ -21,7 +21,7 @@ class FieldLabelsManager {
 
   async _loadLabelsFromFile() {
     try {
-      const response = await fetch('/src/frontend/web/assets/field-labels.yml');
+      const response = await fetch('/src/frontend/web/assets/field-labels.yml?v=20260331-1');
       if (!response.ok) {
         throw new Error(`Failed to load field labels: ${response.status}`);
       }
@@ -100,6 +100,9 @@ class FieldLabelsManager {
     if (fieldName === 'name' && eventType === 'MV') {
       return 'Destination Country';
     }
+    if (fieldName === 'name' && eventType === 'RI') {
+      return 'Rental Property';
+    }
 
     const defaults = {
       eventType: 'Event Type',
@@ -167,6 +170,9 @@ class FieldLabelsManager {
         MR: {
           rate: "Interest Rate",
           placeholders: { rate: "" }
+        },
+        RI: {
+          name: "Rental Property"
         },
         MV: {
           amount: "Relocation cost"

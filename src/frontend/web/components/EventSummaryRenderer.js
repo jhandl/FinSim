@@ -286,7 +286,7 @@ class EventSummaryRenderer {
   }
 
   isMortgageLinked(eventType) {
-    return ['M', 'MO', 'MP', 'MR'].includes(eventType);
+    return ['M', 'MO', 'MP', 'MR', 'RI'].includes(eventType);
   }
 
   isSalaryEvent(eventType) {

@@ -49,6 +49,7 @@ eventTypes:
       rate: "inflation"
 
   RI: # Rental Income
+    name: "Rental Property"
     amount: "Annual Rental Income"
     rate: "Rent Growth"
     placeholders:

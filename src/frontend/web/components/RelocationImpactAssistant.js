@@ -1097,7 +1097,7 @@ var RelocationImpactAssistant = {
 
       etm.addEventFromWizardWithSorting({
         eventType: 'RI',
-        name: event.id,
+        name: event.name || event.id,
         amount: amount,
         fromAge: relocationAge,
         toAge: event.toAge,
