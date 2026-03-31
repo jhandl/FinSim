@@ -256,7 +256,21 @@ class WizardRenderer {
     const choicesContainer = document.createElement('div');
     choicesContainer.className = 'event-wizard-choices';
 
-    step.content.choices.forEach((choice, index) => {
+    const wizardManager = this.manager || this.context?.eventsWizard?.manager;
+    if (wizardState && wizardState.eventType === 'SI' && step.stepId === 'incomeType') {
+      const eventsTableManager = this.context && this.context.eventsTableManager;
+      const disclosureFlags = (eventsTableManager && typeof eventsTableManager.getMortgageDisclosureFlags === 'function')
+        ? eventsTableManager.getMortgageDisclosureFlags()
+        : null;
+      wizardState.data.hasPropertyEvent = !!(disclosureFlags && disclosureFlags.hasPropertyEvent);
+    }
+    const visibleChoices = (step.content.choices || []).filter((choice) => {
+      if (!choice || !choice.condition) return true;
+      if (!wizardManager || typeof wizardManager.evaluateCondition !== 'function') return true;
+      return wizardManager.evaluateCondition(choice.condition);
+    });
+
+    visibleChoices.forEach((choice, index) => {
       const choiceElement = document.createElement('div');
       choiceElement.className = 'event-wizard-choice-option';
       choiceElement.dataset.value = choice.value;

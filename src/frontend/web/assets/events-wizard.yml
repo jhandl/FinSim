@@ -31,6 +31,7 @@ EventWizards:
             - value: "rental"
               title: "Rental"
               description: "Rental property income"
+              condition: "hasPropertyEvent"
             - value: "defined_benefit"
               title: "Defined Benefit"
               description: "Pension or defined benefit plan"
@@ -63,6 +64,19 @@ EventWizards:
           text: "Give this income a descriptive name:"
           validation: "required"
         showButtons: ["back", "next"]
+        condition: "incomeType !== 'rental'"
+
+      - stepId: "rental_property"
+        title: "Linked Property"
+        contentType: "input"
+        field: "name"
+        labelPosition: "left"
+        content:
+          text: "Select the property for this rental income:"
+          inputType: "propertyLink"
+          validation: "required"
+        showButtons: ["back", "next"]
+        condition: "incomeType === 'rental'"
 
       - stepId: "amount"
         title: "Annual Amount"

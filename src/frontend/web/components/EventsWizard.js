@@ -10,7 +10,7 @@ class EventsWizard {
     this.manager.onCompleteAction = (eventData) => this.createEvent(eventData);
 
     // Load YAML config
-    this.manager.loadConfig('/src/frontend/web/assets/events-wizard.yml?v=20260331-4');
+    this.manager.loadConfig('/src/frontend/web/assets/events-wizard.yml?v=20260331-5');
   }
 
   // Delegated API
@@ -27,6 +27,7 @@ class EventsWizard {
     if (!this.validateWizardData()) return;
     this.handleSpecialCases();
     const data = Object.assign({ eventType: this.manager.wizardState.eventType }, this.manager.wizardState.data);
+    delete data.hasPropertyEvent;
     if (data.eventType === 'MV') {
       data.name = data.destCountryCode || data.name || '';
     }
