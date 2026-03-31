@@ -7,7 +7,7 @@ class NotificationUtils {
     this.errorModalUtils = null; // Will be initialized later
   }
 
-  setStatus(message, color=STATUS_COLORS.INFO) {
+  setStatus(message, color=STATUS_COLORS.INFO, progress=null) {
     // Clear any existing error state
     if (this.errorModalUtils) {
       this.errorModalUtils.clearError();
@@ -15,6 +15,12 @@ class NotificationUtils {
     
     // Set normal status
     this.statusElement.innerHTML = message;
+    this.statusElement.style.backgroundImage = '';
+    if (typeof progress === 'number' && isFinite(progress)) {
+      var clamped = Math.max(0, Math.min(1, progress));
+      var pct = Math.round(clamped * 1000) / 10;
+      this.statusElement.style.backgroundImage = 'linear-gradient(90deg, #a7d3ff ' + pct + '%, ' + color + ' ' + pct + '%)';
+    }
     this.statusElement.style.backgroundColor = color;
     this.statusElement.classList.remove('error');
   }

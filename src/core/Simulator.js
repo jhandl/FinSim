@@ -91,9 +91,23 @@ async function run() {
   // Initialize per-run results tracking
   perRunResults = capturePerRunResults ? [] : null;
 
-  uiManager.updateProgress("Running");
+  var isWebUI = (typeof window !== 'undefined');
+  var supportsProgressUpdates = (typeof SpreadsheetApp === 'undefined');
+  var progressStep = Math.max(1, Math.floor(runs / 100));
+  if (supportsProgressUpdates && montecarlo && runs > 1) {
+    uiManager.updateProgress("Running 0%", 0);
+  } else {
+    uiManager.updateProgress("Running");
+  }
   for (currentRun = 0; currentRun < runs; currentRun++) {
     successes += runSimulation();
+    if (supportsProgressUpdates && montecarlo && runs > 1 && (((currentRun + 1) % progressStep === 0) || currentRun === runs - 1)) {
+      var progress = (currentRun + 1) / runs;
+      uiManager.updateProgress("Running " + Math.round(progress * 100) + "%", progress);
+      if (isWebUI) {
+        await new Promise(function (resolve) { setTimeout(resolve, 0); });
+      }
+    }
   }
   uiManager.updateDataSheet(runs, perRunResults);
   uiManager.updateStatusCell(successes, runs);

@@ -98,8 +98,8 @@ class WebUI extends AbstractUI {
     return WebUI_instance;
   }
 
-  setStatus(message, color = STATUS_COLORS.INFO) {
-    this.notificationUtils.setStatus(message, color);
+  setStatus(message, color = STATUS_COLORS.INFO, progress = null) {
+    this.notificationUtils.setStatus(message, color, progress);
   }
 
   markSimulationComplete() {

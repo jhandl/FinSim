@@ -83,8 +83,8 @@ class UIManager {
     this.ui.clearExtraChartRows(params.targetAge);
   }
 
-  updateProgress(msg) {
-    this.ui.setStatus(msg);
+  updateProgress(msg, progress = null) {
+    this.ui.setStatus(msg, STATUS_COLORS.INFO, progress);
     this.ui.flush();
   }
 
