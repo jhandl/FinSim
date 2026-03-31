@@ -394,48 +394,33 @@ class ChartManager {
                   label += ': ';
                 }
                 if (context.parsed.y !== null) {
-                  // Check if original values exist for this data point
                   const chartManager = context.chart.chartManager || {};
-                  const originalValues = chartManager.originalValues || {};
                   const rowIndex = context.dataIndex;
                   const fieldKey = context.dataset._fieldKey || context.dataset.label;
-                  const original = originalValues[rowIndex] && originalValues[rowIndex][fieldKey];
-                  if (original) {
-                    // Format converted amount with reporting currency
-                    const reportingCurrency = chartManager.reportingCurrency;
-                    if (!reportingCurrency) throw new Error('ChartManager tooltip: missing reportingCurrency');
+                  const plottedValue = context.raw != null ? context.raw : context.parsed.y;
+                  let tooltipValue = plottedValue;
+                  if (fieldKey === 'NetIncome' || fieldKey === 'Expenses') {
+                    const spikeKey = fieldKey === 'NetIncome' ? 'inflows' : 'outflows';
+                    const spikeValue = chartManager._spikeOriginals && chartManager._spikeOriginals[rowIndex] && chartManager._spikeOriginals[rowIndex][spikeKey];
+                    if (isFinite(spikeValue)) tooltipValue = spikeValue;
+                  }
+                  const reportingCurrency = chartManager.reportingCurrency;
+                  if (reportingCurrency) {
                     const toCountry = chartManager.getRepresentativeCountryForCurrency(reportingCurrency);
-                    const cfg = Config.getInstance();
-                    const rs = cfg.getCachedTaxRuleSet(toCountry);
+                    const rs = Config.getInstance().getCachedTaxRuleSet(toCountry);
                     if (!rs) throw new Error('ChartManager tooltip: missing ruleset for reporting currency country ' + String(toCountry));
                     const numberLocale = rs.getNumberLocale();
                     const currencyCode = rs.getCurrencyCode();
                     if (!numberLocale) throw new Error('ChartManager tooltip: missing numberLocale for ' + String(toCountry));
                     if (!currencyCode) throw new Error('ChartManager tooltip: missing currencyCode for ' + String(toCountry));
-                    const converted = context.parsed.y.toLocaleString(numberLocale, {
+                    label += Number(tooltipValue).toLocaleString(numberLocale, {
                       style: 'currency',
                       currency: currencyCode,
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 0
                     });
-                    // Format original amount with original currency
-                    const origCountry = chartManager.getCountryForAge(context.chart.data.labels[rowIndex]);
-                    const origRs = cfg.getCachedTaxRuleSet(origCountry);
-                    if (!origRs) throw new Error('ChartManager tooltip: missing ruleset for origin country ' + String(origCountry));
-                    const origNumberLocale = origRs.getNumberLocale();
-                    if (!origNumberLocale) throw new Error('ChartManager tooltip: missing numberLocale for ' + String(origCountry));
-                    const origCurrencyCode = original.currency || origRs.getCurrencyCode();
-                    if (!origCurrencyCode) throw new Error('ChartManager tooltip: missing origin currency for ' + String(origCountry));
-                    const origFormatted = original.value.toLocaleString(origNumberLocale, {
-                      style: 'currency',
-                      currency: origCurrencyCode,
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0
-                    });
-                    label += converted + ' (Original: ' + origFormatted + ')';
                   } else {
-                    // Format with default currency if no original value
-                    label += FormatUtils.formatCurrency(context.parsed.y);
+                    label += FormatUtils.formatCurrency(tooltipValue);
                   }
                 }
                 return label;

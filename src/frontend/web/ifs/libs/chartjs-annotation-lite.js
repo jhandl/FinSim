@@ -96,7 +96,7 @@
 
   const spikeLabelsPlugin = {
     id: 'spikeLabels',
-    afterDraw(chart) {
+    afterDatasetsDraw(chart) {
       const spikes = chart.$spikeAnnotations;
       if (!spikes || !chart.chartArea) return;
       const ctx = chart.ctx;
