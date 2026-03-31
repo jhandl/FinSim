@@ -462,6 +462,72 @@ module.exports = {
       errors.push(err.message || String(err));
     }
 
+    try {
+      const result = vm.runInContext(`
+        document = {
+          getElementById: function() { return null; }
+        };
+        Config = {
+          getInstance: function() {
+            return {
+              getStartCountry: function() { return 'ie'; },
+              getDefaultCountry: function() { return 'ie'; },
+              isRelocationEnabled: function() { return false; },
+              mobileSimulationRuns: 120,
+              getCachedTaxRuleSet: function() {
+                return {
+                  getResolvedInvestmentTypes: function() { return []; },
+                  getUIConfigurableCredits: function() { return []; },
+                  hasPrivatePensions: function() { return true; }
+                };
+              }
+            };
+          }
+        };
+
+        var values = {
+          StartingAge: 30,
+          TargetAge: 90,
+          InitialSavings: 10000,
+          InitialPension: 0,
+          RetirementAge: 65,
+          EmergencyStash: 0,
+          PensionGrowthRate: 0.05,
+          PensionGrowthStdDev: 0.12,
+          MarriageYear: '',
+          YoungestChildBorn: '',
+          OldestChildBorn: '',
+          P2StartingAge: '',
+          P2RetirementAge: '',
+          InitialPensionP2: '',
+          simulation_mode: 'single',
+          economy_mode: 'montecarlo'
+        };
+
+        var ui = {
+          getValue: function(id) {
+            if (Object.prototype.hasOwnProperty.call(values, id)) return values[id];
+            return '';
+          }
+        };
+
+        DeviceUtils = { isMobile: function() { return true; } };
+        var manager = new UIManager(ui);
+        manager.readEvents = function() { return []; };
+        var mobileParams = manager.readParameters(false);
+
+        DeviceUtils = { isMobile: function() { return false; } };
+        var desktopParams = manager.readParameters(false);
+
+        ({ mobileParams: mobileParams, desktopParams: desktopParams });
+      `, ctx);
+
+      assert.strictEqual(result.mobileParams.monteCarloRuns, 120, 'Mobile readParameters should set monteCarloRuns from config.mobileSimulationRuns');
+      assert.strictEqual(result.desktopParams.monteCarloRuns, undefined, 'Desktop readParameters should not set monteCarloRuns override');
+    } catch (err) {
+      errors.push(err.message || String(err));
+    }
+
     return { success: errors.length === 0, errors: errors };
   }
 };

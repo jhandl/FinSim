@@ -361,6 +361,10 @@ class UIManager {
     // StartCountry is always required
     const cfg = Config.getInstance();
     params.StartCountry = cfg.getStartCountry();
+    const isMobileDevice = (typeof DeviceUtils !== 'undefined') && DeviceUtils.isMobile && DeviceUtils.isMobile();
+    if (isMobileDevice && typeof cfg.mobileSimulationRuns === 'number' && cfg.mobileSimulationRuns > 0) {
+      params.monteCarloRuns = cfg.mobileSimulationRuns;
+    }
 
     // Dynamic investment parameters from ruleset
     const ruleset = cfg.getCachedTaxRuleSet(params.StartCountry);
