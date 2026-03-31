@@ -164,6 +164,10 @@ class EventAccordionManager {
    * Sync events from the table to accordion data structure
    */
   syncEventsFromTable() {
+    const previousAccordionIdByEventId = {};
+    (this.events || []).forEach(ev => {
+      if (ev && ev.id && ev.accordionId) previousAccordionIdByEventId[ev.id] = ev.accordionId;
+    });
     this.events = [];
     // Align with readEvents: only consider visible rows
     const tableRows = Array.from(document.querySelectorAll('#Events tbody tr')).filter(r => r && r.style.display !== 'none');
@@ -171,15 +175,14 @@ class EventAccordionManager {
     tableRows.forEach((row, index) => {
       const event = this.extractEventFromRow(row);
       if (event) {
-        event.accordionId = `accordion-item-${index}`;
-        event.tableRowIndex = index;
-
         // Generate a unique ID if one doesn't exist on the row
         if (!row.dataset.eventId) {
           row.dataset.eventId = 'event_fallback_' + (index + 1).toString(36);
         }
 
         event.id = row.dataset.eventId;
+        event.accordionId = previousAccordionIdByEventId[event.id] || `accordion-item-${event.id}`;
+        event.tableRowIndex = index;
 
         this.events.push(event);
       }
@@ -281,6 +284,7 @@ class EventAccordionManager {
     item.className = 'events-accordion-item';
     item.dataset.eventIndex = index;
     item.dataset.accordionId = event.accordionId;
+    if (event.id) item.dataset.eventId = event.id;
     if (event.rowId) {
       item.dataset.rowId = event.rowId;
     }
@@ -956,9 +960,7 @@ class EventAccordionManager {
           const currentSortKey = tableManager.sortKeys[0].col;
 
           if (fieldSortKey === currentSortKey) {
-            // Sync accordion data from table first to get the updated values
-            this.syncEventsFromTable();
-            this.applySortingWithAnimation(false); // false = no highlight, just sort
+            // Sorting is applied from field-level blur handlers after sync.
           }
         }
       }
@@ -1142,6 +1144,24 @@ class EventAccordionManager {
         // Final validation and summary refresh on blur
         input.addEventListener('blur', (e) => {
           let value = e.target.value.trim();
+          const maybeApplyPostSyncSort = () => {
+            const tableManager = this.webUI.eventsTableManager;
+            if (!tableManager || !tableManager.sortKeys || tableManager.sortKeys.length === 0) return;
+            const sortKeyByTableClass = {
+              '.event-type': 'event-type',
+              '.event-name': 'event-name',
+              '.event-amount': 'event-amount',
+              '.event-from-age': 'from-age',
+              '.event-to-age': 'to-age',
+              '.event-rate': 'event-rate',
+              '.event-match': 'event-match'
+            };
+            const fieldSortKey = sortKeyByTableClass[field.tableClass] || '';
+            const currentSortKey = tableManager.sortKeys[0].col;
+            if (fieldSortKey !== currentSortKey) return;
+            this.syncEventsFromTable();
+            this.applySortingWithAnimation(false);
+          };
 
           // Handle Real Estate name uniqueness and propagation if in accordion edit mode
           if (field.selector === '.accordion-edit-name' && event.type === 'R' && value) {
@@ -1198,6 +1218,7 @@ class EventAccordionManager {
           if (validation.isValid) {
             this.clearFieldValidation(input);
             this.syncFieldToTable(event, field.tableClass, value);
+            maybeApplyPostSyncSort();
             
             // If it was an R event name change, refresh all other expanded accordion items if they are Mortgages
             if (field.selector === '.accordion-edit-name' && event.type === 'R') {
@@ -1233,6 +1254,7 @@ class EventAccordionManager {
             // For critical errors, don't update the summary
             if (validation.isWarningOnly) {
               this.syncFieldToTable(event, field.tableClass, value);
+              maybeApplyPostSyncSort();
               this.refreshEventSummary(event);
             }
           }
@@ -1750,7 +1772,10 @@ class EventAccordionManager {
     if (!tbody) return;
     const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r && r.style.display !== 'none' && !(r.classList && r.classList.contains('resolution-panel-row')));
     rows.forEach((row, index) => {
-      const accItem = document.querySelector(`.events-accordion-item[data-accordion-id="accordion-item-${index}"]`);
+      const rowEventId = row && row.dataset ? String(row.dataset.eventId || '') : '';
+      const accItem = rowEventId
+        ? document.querySelector(`.events-accordion-item[data-event-id="${rowEventId}"]`)
+        : document.querySelector(`.events-accordion-item[data-accordion-id="accordion-item-${index}"]`);
       if (accItem) this._applyHeaderWarningsForItem(accItem, row);
     });
   }
@@ -2396,17 +2421,36 @@ class EventAccordionManager {
 
     alwaysVisibleFields.forEach(field => {
       const input = container.querySelector(field.selector);
+      const row = input ? input.closest('.detail-row') : null;
       if (input && preservedValues && preservedValues[field.key] !== undefined) {
         input.value = preservedValues[field.key];
+      }
+      if (row) {
+        const labelEl = row.querySelector('label');
+        if (labelEl) {
+          const lbl = this.fieldLabelsManager.getFieldLabel(event.type, field.key);
+          if (lbl) labelEl.textContent = `${lbl}:`;
+        }
       }
     });
 
     const nameInput = container.querySelector('.accordion-edit-name');
     const countryDropdown = container.querySelector(`#AccordionEventCountry_${event.rowId}`);
-    if (nameInput && countryDropdown) {
+    const mortgageDropdown = container.querySelector(`#AccordionEventMortgage_${event.rowId}`);
+    if (nameInput && countryDropdown && mortgageDropdown) {
       const isRelocation = event.type === 'MV';
-      nameInput.style.display = isRelocation ? 'none' : '';
+      const isMortgage = this.isMortgageLinked(event.type);
+      nameInput.style.display = (isRelocation || isMortgage) ? 'none' : '';
       countryDropdown.style.display = isRelocation ? '' : 'none';
+      mortgageDropdown.style.display = isMortgage ? '' : 'none';
+      if (isRelocation && container._eventCountryDropdown && container._eventCountryDropdown.wrapper) {
+        nameInput._dropdownWrapper = container._eventCountryDropdown.wrapper;
+      } else if (isMortgage && container._eventMortgageDropdown && container._eventMortgageDropdown.wrapper) {
+        nameInput._dropdownWrapper = container._eventMortgageDropdown.wrapper;
+        this.updateAccordionMortgageOptions(event, container);
+      } else {
+        nameInput._dropdownWrapper = null;
+      }
     }
 
     // Update the event object with preserved values

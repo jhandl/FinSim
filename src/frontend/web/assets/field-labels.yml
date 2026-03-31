@@ -90,6 +90,7 @@ eventTypes:
       rate: "inflation"
 
   M: # Mortgage
+    name: "Property"
     amount: "Yearly Repayment"
     fromAge: "Mortgage Start ${timeUnit}"
     toAge: "Mortgage End ${timeUnit}"
@@ -98,16 +99,19 @@ eventTypes:
       rate: ""
 
   MO: # Mortgage Overpay
+    name: "Mortgage"
     amount: "Yearly Overpay"
     fromAge: "Overpay Start ${timeUnit}"
     toAge: "Overpay End ${timeUnit}"
 
   MP: # Mortgage Payoff
+    name: "Mortgage"
     amount: "Payoff Amount"
-    fromAge: "Payoff ${timeUnit}"
+    fromAge: "At ${timeUnit}"
     toAge: "Payoff ${timeUnit}"
 
   MR: # Reverse Mortgage
+    name: "Property"
     amount: "Yearly Payout"
     fromAge: "Reverse Mortgage Start ${timeUnit}"
     toAge: "Reverse Mortgage End ${timeUnit}"

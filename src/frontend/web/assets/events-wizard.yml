@@ -535,7 +535,7 @@ EventWizards:
 
   # Market Event Wizard (Investment Category)
   - eventType: "SM"
-    name: "Market Event"
+    name: "Market"
     category: "investment"
     steps:
       - stepId: "name"

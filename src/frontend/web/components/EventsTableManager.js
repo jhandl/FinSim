@@ -5253,7 +5253,10 @@ class EventsTableManager {
         return;
       }
       if (!showPropertySecondPage) {
-        firstPageWizards.push(wizard);
+        firstPageWizards.push({
+          ...wizard,
+          name: 'Property'
+        });
         return;
       }
       if (!insertedPropertyHeader) {
