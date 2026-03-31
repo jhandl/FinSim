@@ -220,7 +220,6 @@ class FileManager {
 
     this.webUI.clearAllWarnings();
     this.webUI.tableManager.clearContent('Events');
-    this.webUI.tableManager.clearExtraDataRows(0);
     this.webUI.chartManager.clearExtraChartRows(0);
     this.setScenarioName(name);
 
@@ -654,6 +653,9 @@ class FileManager {
     // matches a freshly loaded page (headers present, no stale data rows).
     try {
       if (this.webUI.tableManager && typeof this.webUI.tableManager.setDataRow === 'function') {
+        if (typeof this.webUI.tableManager.clearExtraDataRows === 'function') {
+          this.webUI.tableManager.clearExtraDataRows(0);
+        }
         this.webUI.tableManager.setDataRow(0, {});
         const temp = document.getElementById('data_row_0');
         if (temp && temp.parentNode) temp.parentNode.removeChild(temp);

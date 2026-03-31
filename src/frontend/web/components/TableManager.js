@@ -543,6 +543,7 @@ class TableManager {
     try {
       const tbody = document.querySelector('#Data tbody');
       if (!tbody) return;
+
       try { this._applyVisibilityEngineToEnabledSections(tbody); } catch (_) { }
       this._applyPeriodZeroHideToDynamicSections(tbody);
       this._syncDynamicSectionColSpansToSectionMaxVisible(tbody);

@@ -143,6 +143,7 @@ class DynamicSectionManager {
       allCells.forEach(cell => {
         cell.style.width = '';
         cell.style.minWidth = '';
+        cell.style.maxWidth = '';
         cell.style.flexBasis = '';
         cell.style.flexShrink = '';
         cell.style.flexGrow = '';
@@ -176,13 +177,14 @@ class DynamicSectionManager {
     const periodMeasurements = [];
     for (let p = 0; p < periods.length; p++) {
       const period = periods[p];
-      const m = { maxPerColumn: [], headerPerColumn: [], desiredPerColumn: [], cellsByColumn: [] };
+      const m = { maxPerColumn: [], headerPerColumn: [], desiredPerColumn: [], cellsByColumn: [], containers: [] };
 
       for (let r = 0; r < period.rows.length; r++) {
         const row = period.rows[r];
         const isHeaderRow = row.classList && row.classList.contains('tax-header');
         const container = row.querySelector(containerSelector);
         if (!container) continue;
+        m.containers.push(container);
 
         const cells = getVisibleCells(container);
         for (let i = 0; i < cells.length; i++) {
@@ -229,20 +231,56 @@ class DynamicSectionManager {
       const m = periodMeasurements[i];
       if (m.totalNaturalWidth === 0) continue;
       const scaleFactor = maxTotalWidth / m.totalNaturalWidth;
-      const scaledWidths = m.desiredPerColumn.map(w => Math.round((w || 0) * scaleFactor));
-      for (let colIdx = 0; colIdx < m.cellsByColumn.length; colIdx++) {
-        const width = scaledWidths[colIdx] || 0;
-        const cells = m.cellsByColumn[colIdx] || [];
-        for (let c = 0; c < cells.length; c++) {
-          const cell = cells[c];
-          cell.style.width = `${width}px`;
-          cell.style.minWidth = '';
-          cell.style.flexBasis = 'auto';
-          cell.style.flexShrink = '0';
-          cell.style.flexGrow = '0';
-          cell.style.flex = '0 0 auto';
+      const initialScaledWidths = m.desiredPerColumn.map(w => Math.max(1, Math.round((w || 0) * scaleFactor)));
+      let fittedWidths = initialScaledWidths.slice();
+
+      const measureAssignedInnerWidth = () => {
+        let out = 0;
+        for (let c = 0; c < m.containers.length; c++) {
+          const flexEl = m.containers[c] ? m.containers[c].querySelector('.dynamic-section-flex') : null;
+          if (!flexEl) continue;
+          const w = Math.round(flexEl.getBoundingClientRect().width);
+          if (w > out) out = w;
         }
+        return out;
+      };
+
+      const applyFixedWidths = (widths) => {
+        for (let colIdx = 0; colIdx < m.cellsByColumn.length; colIdx++) {
+          const width = Math.max(1, widths[colIdx] || 0);
+          const cells = m.cellsByColumn[colIdx] || [];
+          for (let c = 0; c < cells.length; c++) {
+            const cell = cells[c];
+            cell.style.width = `${width}px`;
+            cell.style.minWidth = `${width}px`;
+            cell.style.maxWidth = `${width}px`;
+            cell.style.flexBasis = 'auto';
+            cell.style.flexShrink = '0';
+            cell.style.flexGrow = '0';
+            cell.style.flex = '0 0 auto';
+          }
+        }
+      };
+
+      for (let pass = 0; pass < 3; pass++) {
+        applyFixedWidths(fittedWidths);
+        const assignedInnerWidth = measureAssignedInnerWidth();
+        const fittedTotalWidth = fittedWidths.reduce((sum, w) => sum + (w || 0), 0);
+        if (!(assignedInnerWidth > 0) || !(fittedTotalWidth > 0)) break;
+        const delta = assignedInnerWidth - fittedTotalWidth;
+        if (Math.abs(delta) <= 1) break;
+
+        const nextWidths = fittedWidths.map(w => Math.max(1, Math.round((w || 0) * assignedInnerWidth / fittedTotalWidth)));
+        let nextTotal = nextWidths.reduce((sum, w) => sum + (w || 0), 0);
+        const adjust = assignedInnerWidth - nextTotal;
+        if (adjust !== 0 && nextWidths.length > 0) {
+          const lastIdx = nextWidths.length - 1;
+          nextWidths[lastIdx] = Math.max(1, nextWidths[lastIdx] + adjust);
+          nextTotal = nextWidths.reduce((sum, w) => sum + (w || 0), 0);
+        }
+        fittedWidths = nextWidths;
       }
+      applyFixedWidths(fittedWidths);
     }
   }
 
