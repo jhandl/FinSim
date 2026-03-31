@@ -520,7 +520,9 @@ class UIManager {
         if (!c) continue;
         const rs = cfg.getCachedTaxRuleSet(c);
         if (!rs) continue;
-        if (rs.hasPrivatePensions && typeof rs.hasPrivatePensions === 'function' && !rs.hasPrivatePensions()) continue;
+        if (rs.hasPrivatePensions && typeof rs.hasPrivatePensions === 'function' && !rs.hasPrivatePensions()) {
+          continue;
+        }
         const p1Pct = this.ui.getValue(`P1PensionContrib_${c}`);
         const p2Pct = this.ui.getValue(`P2PensionContrib_${c}`);
         const capped = this.ui.getValue(`PensionCapped_${c}`);
@@ -538,11 +540,21 @@ class UIManager {
       const p1Id = `P1PensionContrib_${startCountryLower}`;
       const p2Id = `P2PensionContrib_${startCountryLower}`;
       const cappedId = `PensionCapped_${startCountryLower}`;
-      params.pensionContributionsByCountry[startCountryLower] = {
-        p1Pct: this.ui.getValue(p1Id) || 0,
-        p2Pct: this.ui.getValue(p2Id) || 0,
-        capped: this.ui.getValue(cappedId) || 'No'
-      };
+      const startCountryRuleSet = cfg.getCachedTaxRuleSet(startCountryLower);
+      const startCountryHasPrivatePensions = !(startCountryRuleSet && typeof startCountryRuleSet.hasPrivatePensions === 'function') || startCountryRuleSet.hasPrivatePensions();
+      if (startCountryHasPrivatePensions) {
+        params.pensionContributionsByCountry[startCountryLower] = {
+          p1Pct: this.ui.getValue(p1Id) || 0,
+          p2Pct: this.ui.getValue(p2Id) || 0,
+          capped: this.ui.getValue(cappedId) || 'No'
+        };
+      } else {
+        params.pensionContributionsByCountry[startCountryLower] = {
+          p1Pct: 0,
+          p2Pct: 0,
+          capped: 'No'
+        };
+      }
     }
     const startPensionContrib = params.pensionContributionsByCountry[startCountryLower] || { p1Pct: 0, p2Pct: 0, capped: 'No' };
     params.pensionPercentage = startPensionContrib.p1Pct || 0;

@@ -2335,7 +2335,8 @@ class WebUI extends AbstractUI {
     const cfg = Config.getInstance();
     const rs = cfg.getCachedTaxRuleSet(country);
     if (!rs) return;
-    if (rs && typeof rs.hasPrivatePensions === 'function' && !rs.hasPrivatePensions()) return;
+    const hasPrivatePensions = !(rs && typeof rs.hasPrivatePensions === 'function') || rs.hasPrivatePensions();
+    if (!hasPrivatePensions) return;
 
     if (host.children.length > 0) {
       const hr = document.createElement('hr');
