@@ -10,7 +10,7 @@ class EventsWizard {
     this.manager.onCompleteAction = (eventData) => this.createEvent(eventData);
 
     // Load YAML config
-    this.manager.loadConfig('/src/frontend/web/assets/events-wizard.yml?v=20260222-4');
+    this.manager.loadConfig('/src/frontend/web/assets/events-wizard.yml?v=20260331-4');
   }
 
   // Delegated API
@@ -37,6 +37,9 @@ class EventsWizard {
         if (this.manager.wizardState.eventType === 'R' && this.manager.wizardState.data.financing === 'mortgage') {
           await Promise.resolve(this.createMortgageEvent(data));
         }
+        if (data.eventType === 'M') {
+          this.syncPropertyDownPaymentFromMortgage(data);
+        }
       }
     } catch (err) {
       console.error('Error creating event from wizard:', err);
@@ -47,6 +50,59 @@ class EventsWizard {
 
   createMortgageEvent(propertyEventData) {
     const data = this.manager.wizardState.data;
+    const mortgageEventData = this.buildMortgageEventData(data);
+    const onComplete = this.manager.wizardState.onComplete;
+    if (onComplete) return onComplete(mortgageEventData);
+    return null;
+  }
+
+  parseMoneyLikeValue(value) {
+    const normalized = ValidationUtils.validateValue('money', String(value == null ? '' : value));
+    if (normalized !== null && !isNaN(normalized)) return normalized;
+    const fallback = parseFloat(String(value == null ? '' : value).replace(/[^0-9.-]/g, ''));
+    return isNaN(fallback) ? null : fallback;
+  }
+
+  syncPropertyDownPaymentFromMortgage(data) {
+    const propertyName = String(data && data.name ? data.name : '').trim();
+    if (!propertyName) return;
+
+    const downPaymentValue = this.parseMoneyLikeValue(data ? data.downPayment : null);
+    if (downPaymentValue === null) return;
+
+    const tbody = document.querySelector('#Events tbody');
+    if (!tbody) return;
+
+    const propertyRow = Array.from(tbody.querySelectorAll('tr')).find((row) => {
+      if (row.classList && row.classList.contains('resolution-panel-row')) return false;
+      const typeInput = row.querySelector('.event-type');
+      const nameInput = row.querySelector('.event-name');
+      return typeInput && nameInput && typeInput.value === 'R' && String(nameInput.value || '').trim() === propertyName;
+    });
+    if (!propertyRow) return;
+
+    const amountInput = propertyRow.querySelector('.event-amount');
+    if (!amountInput) return;
+
+    const currentAmount = this.parseMoneyLikeValue(amountInput.value);
+    const roundedDownPayment = Math.max(0, Math.round(downPaymentValue));
+    if (currentAmount !== null && Math.round(currentAmount) === roundedDownPayment) return;
+
+    const nextValue = (typeof FormatUtils !== 'undefined' && FormatUtils.formatCurrency)
+      ? FormatUtils.formatCurrency(roundedDownPayment)
+      : String(roundedDownPayment);
+
+    const tableManager = this.webUI && this.webUI.eventsTableManager;
+    if (tableManager && typeof tableManager._setInputValueWithFlash === 'function') {
+      tableManager._setInputValueWithFlash(amountInput, nextValue, true);
+      return;
+    }
+
+    amountInput.value = nextValue;
+    amountInput.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  buildMortgageEventData(data) {
     const propertyValue = parseFloat(data.propertyValue) || 0;
     const downPayment = parseFloat(data.amount) || 0;
     const loanAmount = propertyValue - downPayment;
@@ -58,7 +114,7 @@ class EventsWizard {
       ? loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1)
       : 0;
     const annualPayment = monthlyPayment * 12;
-    const mortgageEventData = {
+    return {
       eventType: 'M',
       name: data.name,
       amount: Math.round(annualPayment),
@@ -68,9 +124,6 @@ class EventsWizard {
       match: 0,
       mortgageTerm: termYears
     };
-    const onComplete = this.manager.wizardState.onComplete;
-    if (onComplete) return onComplete(mortgageEventData);
-    return null;
   }
 
   handleChoiceSpecialCases(stepId, choiceValue) {
@@ -92,6 +145,16 @@ class EventsWizard {
       data.toAge = data.fromAge;
       data.rate = '';
       data.match = '';
+    }
+
+    if (this.manager.wizardState.eventType === 'M') {
+      data.downPayment = data.amount;
+      const normalizedMortgage = this.buildMortgageEventData(data);
+      data.amount = normalizedMortgage.amount;
+      data.toAge = normalizedMortgage.toAge;
+      data.rate = normalizedMortgage.rate;
+      data.match = normalizedMortgage.match;
+      data.mortgageTerm = normalizedMortgage.mortgageTerm;
     }
 
     if (this.manager.wizardState.eventType === 'SI' && data.incomeType === 'salary') {
@@ -132,6 +195,7 @@ class EventsWizard {
   validateWizardData() {
     const data = this.manager.wizardState.data || {};
     const eventType = this.manager.wizardState.eventType;
+    const requiresExplicitAmount = eventType !== 'SM' && eventType !== 'MP';
     if (this.manager.wizardState.eventType === 'MV') {
       const destCode = data.destCountryCode || data.name;
       const nameValidation = ValidationUtils.validateRequired(destCode, 'Destination country');
@@ -143,13 +207,13 @@ class EventsWizard {
     if (eventType === 'MV') {
       const amountValidation = ValidationUtils.validateRequired(data.amount, 'Relocation cost (enter 0 if none)');
       if (!amountValidation.isValid) { alert(amountValidation.message); return false; }
-    } else if (eventType !== 'SM') {
+    } else if (requiresExplicitAmount) {
       const amountValidation = ValidationUtils.validateRequired(data.amount, 'Amount');
       if (!amountValidation.isValid) { alert(amountValidation.message); return false; }
     }
     const fromAgeValidation = ValidationUtils.validateRequired(data.fromAge, 'Starting age/year');
     if (!fromAgeValidation.isValid) { alert(fromAgeValidation.message); return false; }
-    if (eventType !== 'SM') {
+    if (eventType === 'MV' || requiresExplicitAmount) {
       if (ValidationUtils.validateValue('money', data.amount) === null) {
         alert(eventType === 'MV' ? 'Please enter a valid relocation cost (enter 0 if none).' : 'Please enter a valid amount');
         return false;
@@ -178,6 +242,33 @@ class EventsWizard {
 class EventsRenderer extends WizardRenderer {
   constructor(webUI) {
     super(webUI);
+  }
+
+  onWizardInputValueChanged(step, wizardState, nextValue) {
+    if (!step || !wizardState || wizardState.eventType !== 'M' || step.field !== 'name') return;
+    const defaults = this.getPropertyEventDefaultsByName(nextValue);
+    if (!defaults) return;
+    wizardState.data.amount = defaults.amount;
+    wizardState.data.fromAge = defaults.fromAge;
+    wizardState.data._sourcePropertyDownPayment = defaults.amount;
+    wizardState.data._sourcePropertyFromAge = defaults.fromAge;
+  }
+
+  getPropertyEventDefaultsByName(propertyName) {
+    var normalizedName = String(propertyName || '').trim();
+    if (!normalizedName) return null;
+    var events = (this.context && typeof this.context.readEvents === 'function') ? (this.context.readEvents(false) || []) : [];
+    for (var i = 0; i < events.length; i++) {
+      var evt = events[i];
+      if (!evt || evt.type !== 'R') continue;
+      var evtName = String(evt.id != null ? evt.id : (evt.name || '')).trim();
+      if (evtName !== normalizedName) continue;
+      return {
+        amount: evt.amount != null ? String(evt.amount) : '',
+        fromAge: evt.fromAge != null ? String(evt.fromAge) : ''
+      };
+    }
+    return null;
   }
 
   _syncSalaryPensionAvailability(wizardState) {

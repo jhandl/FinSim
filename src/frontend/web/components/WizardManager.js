@@ -581,7 +581,8 @@ class WizardManager {
   }
 
   showWizardFieldValidation(input, message, isWarningOnly = false) {
-    input.classList.add(isWarningOnly ? 'validation-warning' : 'validation-error');
+    const target = input._dropdownWrapper || input;
+    target.classList.add(isWarningOnly ? 'validation-warning' : 'validation-error');
     const validationMessage = document.createElement('div');
     validationMessage.className = `wizard-validation-message ${isWarningOnly ? 'warning' : 'error'}`;
     validationMessage.textContent = message;
@@ -592,7 +593,8 @@ class WizardManager {
   }
 
   clearWizardFieldValidation(input) {
-    input.classList.remove('validation-error', 'validation-warning');
+    const target = input._dropdownWrapper || input;
+    target.classList.remove('validation-error', 'validation-warning');
     const inputGroup = input.closest('.event-wizard-input-group');
     if (inputGroup) {
       const existingMessage = inputGroup.parentNode.querySelector('.wizard-validation-message');

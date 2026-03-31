@@ -64,39 +64,115 @@ class WizardRenderer {
 
     const inputType = step.content.inputType;
     const isCountryInput = inputType === 'country';
-    const input = document.createElement(isCountryInput ? 'select' : 'input');
-    input.id = `wizard-${idSuffix}`;
-    input.name = idSuffix;
-    if (isCountryInput) {
-      const placeholder = document.createElement('option');
-      placeholder.value = '';
-      placeholder.textContent = step.content.placeholder || 'Select country';
-      input.appendChild(placeholder);
-
-      const countries = Config.getInstance().getAvailableCountries();
-      countries.forEach((country) => {
-        const option = document.createElement('option');
-        option.value = country.code || '';
-        option.textContent = country.name || country.code || '';
-        input.appendChild(option);
-      });
-    } else {
-      input.type = 'text';
-      input.placeholder = step.content.placeholder || '';
-      const numericInputTypes = ['currency', 'percentage', 'age', 'number'];
-      if (numericInputTypes.includes(inputType)) {
-        input.inputMode = 'numeric';
-        input.pattern = '[0-9]*';
-      }
-
-      if (inputType === 'currency') input.className = 'currency-input';
-      else if (inputType === 'percentage') input.className = 'percentage-input';
-      else if (inputType === 'age') input.className = 'age-input';
-    }
-
+    const isPropertyLinkInput = inputType === 'propertyLink';
+    const isSelectInput = isCountryInput || isPropertyLinkInput;
     const currentValue = (wizardState.data[step.field] !== undefined)
       ? wizardState.data[step.field]
       : (step.field === 'destCountryCode' ? wizardState.data.name : undefined);
+
+    if (isSelectInput) {
+      const hiddenInput = document.createElement('input');
+      hiddenInput.type = 'hidden';
+      hiddenInput.id = `wizard-${idSuffix}`;
+      hiddenInput.name = idSuffix;
+
+      let placeholderText = '';
+      let selectedValue = '';
+      let optionObjects = [];
+
+      if (isCountryInput) {
+        const countries = Config.getInstance().getAvailableCountries();
+        const normalizedCurrent = String(currentValue || '').trim().toUpperCase();
+        optionObjects = Array.isArray(countries)
+          ? countries.map((country) => ({
+            value: String(country.code || '').toUpperCase(),
+            label: country.name || country.code || ''
+          }))
+          : [];
+        if (normalizedCurrent && !optionObjects.some(opt => opt.value === normalizedCurrent)) {
+          optionObjects.push({ value: normalizedCurrent, label: normalizedCurrent });
+        }
+        placeholderText = step.content.placeholder || 'Select country';
+        selectedValue = normalizedCurrent;
+      } else {
+        const propertyLinkOptions = this.getPropertyLinkOptions(step, wizardState);
+        optionObjects = propertyLinkOptions.names.map((name) => ({ value: name, label: name }));
+        placeholderText = propertyLinkOptions.placeholder;
+        selectedValue = String(currentValue || '').trim();
+      }
+
+      hiddenInput.value = selectedValue;
+      wizardState.data[step.field] = selectedValue;
+
+      const dropdownControl = document.createElement('div');
+      dropdownControl.className = 'event-wizard-dropdown-control visualization-control';
+
+      const toggleEl = document.createElement('span');
+      toggleEl.id = `wizard-${idSuffix}-toggle`;
+      toggleEl.className = 'dd-toggle pseudo-select';
+      const selectedOption = optionObjects.find(opt => opt.value === selectedValue) || null;
+      toggleEl.textContent = selectedOption ? selectedOption.label : placeholderText;
+
+      const dropdownEl = document.createElement('div');
+      dropdownEl.id = `wizard-${idSuffix}-options`;
+      dropdownEl.className = 'visualization-dropdown';
+      dropdownEl.style.display = 'none';
+
+      dropdownControl.appendChild(toggleEl);
+      dropdownControl.appendChild(dropdownEl);
+
+      inputGroup.appendChild(label);
+      inputGroup.appendChild(dropdownControl);
+      inputGroup.appendChild(hiddenInput);
+      container.appendChild(inputGroup);
+
+      if (step.content.help) {
+        const help = document.createElement('div');
+        help.className = 'event-wizard-help';
+        help.textContent = this.processTextVariables(step.content.help, wizardState);
+        container.appendChild(help);
+      }
+
+      const mgr = this.manager || this.context?.eventsWizard?.manager;
+      const dropdown = DropdownUtils.create({
+        toggleEl: toggleEl,
+        dropdownEl: dropdownEl,
+        options: optionObjects,
+        selectedValue: selectedValue || undefined,
+        onSelect: (value, labelText) => {
+          const nextValue = isCountryInput ? String(value || '').toUpperCase() : String(value || '');
+          hiddenInput.value = nextValue;
+          wizardState.data[step.field] = nextValue;
+          toggleEl.textContent = labelText || placeholderText;
+          if (typeof this.onWizardInputValueChanged === 'function') {
+            this.onWizardInputValueChanged(step, wizardState, nextValue);
+          }
+          if (mgr && typeof mgr.clearWizardFieldValidation === 'function') {
+            mgr.clearWizardFieldValidation(hiddenInput);
+          }
+        },
+      });
+      if (dropdown && dropdown.wrapper) {
+        hiddenInput._dropdownWrapper = dropdown.wrapper;
+      }
+
+      return container;
+    }
+
+    const input = document.createElement('input');
+    input.id = `wizard-${idSuffix}`;
+    input.name = idSuffix;
+    input.type = 'text';
+    input.placeholder = step.content.placeholder || '';
+    const numericInputTypes = ['currency', 'percentage', 'age', 'number'];
+    if (numericInputTypes.includes(inputType)) {
+      input.inputMode = 'numeric';
+      input.pattern = '[0-9]*';
+    }
+    if (inputType === 'currency') input.className = 'currency-input';
+    else if (inputType === 'percentage') input.className = 'percentage-input';
+    else if (inputType === 'age') input.className = 'age-input';
+
     if (currentValue !== undefined) input.value = currentValue;
 
     inputGroup.appendChild(label);
@@ -116,7 +192,6 @@ class WizardRenderer {
       if (mgr && typeof mgr.clearWizardFieldValidation === 'function') mgr.clearWizardFieldValidation(input);
     };
     input.addEventListener('input', syncInputValue);
-    if (isCountryInput) input.addEventListener('change', syncInputValue);
 
     input.addEventListener('blur', () => {
       const mgr = this.manager || this.context?.eventsWizard?.manager;
@@ -244,6 +319,38 @@ class WizardRenderer {
   }
 
   // Utilities
+  getPropertyLinkOptions(step, wizardState) {
+    const eventType = String((wizardState && wizardState.eventType) || '');
+    const data = (wizardState && wizardState.data) ? wizardState.data : {};
+    const currentValue = String(data[step.field] || '').trim();
+    const eventsTableManager = this.context && this.context.eventsTableManager;
+
+    let names = [];
+    if (eventsTableManager && typeof eventsTableManager.getMortgageDropdownOptionNames === 'function') {
+      const virtualRow = {
+        querySelector: (selector) => (selector === '.event-type' ? { value: eventType } : null)
+      };
+      names = eventsTableManager.getMortgageDropdownOptionNames(virtualRow);
+    }
+
+    const uniqueNames = Array.from(new Set((Array.isArray(names) ? names : [])
+      .map(name => String(name || '').trim())
+      .filter(name => !!name)));
+    if (currentValue && uniqueNames.indexOf(currentValue) === -1) {
+      uniqueNames.push(currentValue);
+    }
+
+    const defaultPlaceholder = (eventType === 'MO' || eventType === 'MP') ? 'Select Mortgage' : 'Select Property';
+    const placeholder = (eventsTableManager && typeof eventsTableManager.getMortgageDropdownPlaceholder === 'function')
+      ? eventsTableManager.getMortgageDropdownPlaceholder(eventType)
+      : defaultPlaceholder;
+
+    return {
+      placeholder: step.content.placeholder || placeholder,
+      names: uniqueNames
+    };
+  }
+
   getRelocationResidenceCountryForAge(wizardState) {
     const cfg = Config.getInstance();
     const startRaw = (this.context && typeof this.context.getValue === 'function')

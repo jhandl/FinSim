@@ -60,7 +60,7 @@ EventWizards:
         field: "name"
         labelPosition: "top"
         content:
-          text: "Give this income a descriptive name."
+          text: "Give this income a descriptive name:"
           validation: "required"
         showButtons: ["back", "next"]
 
@@ -70,7 +70,7 @@ EventWizards:
         field: "amount"
         labelPosition: "left"
         content:
-          text: "Enter the annual amount for this income."
+          text: "Enter the annual amount for this income:"
           inputType: "currency"
           validation: "required|positive"
           help: "Enter the gross annual amount before taxes and deductions."
@@ -124,7 +124,7 @@ EventWizards:
           text: "Does your employer match pension contributions? If so, up to what percentage?"
           inputType: "percentage"
           validation: "optional"
-          help: "Leave blank if no match."
+          help: "Leave blank if your employer does not match pension contributions."
         showButtons: ["back", "next"]
         condition: "incomeType === 'salary' && salaryHasPrivatePension === true && pensionContribution === 'yes'"
 
@@ -173,7 +173,7 @@ EventWizards:
         field: "name"
         labelPosition: "top"
         content:
-          text: "Give this expense a descriptive name."
+          text: "Give this expense a descriptive name:"
           validation: "required"
         showButtons: ["back", "next"]
         
@@ -258,7 +258,7 @@ EventWizards:
         field: "name"
         labelPosition: "top"
         content:
-          text: "Give this property a name for your reference."
+          text: "Give this property a name:"
           validation: "required"
         showButtons: ["back", "next"]
            
@@ -337,6 +337,70 @@ EventWizards:
             - template: "{name}: Purchase for {propertyValue} with a down payment of {amount} ({downPaymentPct}) {periodPhrase}{growthPart}. Loan term {mortgageTerm} years at {mortgageRate} (≈ {mortgageMonthlyPayment} per month, {mortgageAnnualPayment} per year)."
         showButtons: ["back", "create"]
 
+  - eventType: "M"
+    name: "Mortgage"
+    category: "property"
+    steps:
+      - stepId: "name"
+        title: "Linked Property"
+        contentType: "input"
+        field: "name"
+        labelPosition: "left"
+        content:
+          text: "Select the property for this mortgage:"
+          inputType: "propertyLink"
+          validation: "required"
+        showButtons: ["back", "next"]
+
+      - stepId: "property_value"
+        title: "Property Value"
+        contentType: "input"
+        field: "propertyValue"
+        labelPosition: "left"
+        content:
+          text: "What is the total property value?"
+          inputType: "currency"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+
+      - stepId: "down_payment"
+        title: "Down Payment"
+        contentType: "input"
+        field: "amount"
+        labelPosition: "left"
+        content:
+          text: "How much will you pay as a down payment?"
+          inputType: "currency"
+          validation: "required|positive|lt:propertyValue"
+        showButtons: ["back", "next"]
+
+      - stepId: "start_age"
+        title: "Mortgage Start Timing"
+        contentType: "input"
+        field: "fromAge"
+        labelPosition: "left"
+        content:
+          text: "At what age/year does this mortgage start?"
+          inputType: "age"
+          validation: "required|positive"
+        showButtons: ["back", "next"]
+
+      - stepId: "mortgage_setup"
+        title: "Mortgage Details"
+        contentType: "mortgage"
+        labelPosition: "left"
+        content:
+          text: ""
+        showButtons: ["back", "next"]
+
+      - stepId: "summary"
+        title: "Review & Create"
+        contentType: "summary"
+        content:
+          templates:
+            - template: "{name}: Mortgage on a property worth {propertyValue} with a down payment of {amount} ({downPaymentPct}), starting at age/year {fromAge}. Loan term {mortgageTerm} years at {mortgageRate} (≈ {mortgageMonthlyPayment} per month, {mortgageAnnualPayment} per year)."
+        showButtons: ["back", "create"]
+
   - eventType: "MO"
     name: "Mortgage Overpay"
     category: "property"
@@ -345,9 +409,10 @@ EventWizards:
         title: "Linked Mortgage"
         contentType: "input"
         field: "name"
-        labelPosition: "top"
+        labelPosition: "left"
         content:
-          text: "Select the mortgage/property this overpay applies to."
+          text: "Select the mortgage this applies to:"
+          inputType: "propertyLink"
           validation: "required"
         showButtons: ["back", "next"]
 
@@ -357,7 +422,7 @@ EventWizards:
         field: "amount"
         labelPosition: "left"
         content:
-          text: "How much extra principal will you pay each year?"
+          text: "How much extra will you pay each year?"
           inputType: "currency"
           validation: "required|positive"
         showButtons: ["back", "next"]
@@ -388,23 +453,12 @@ EventWizards:
         title: "Linked Mortgage"
         contentType: "input"
         field: "name"
-        labelPosition: "top"
-        content:
-          text: "Select the mortgage/property to pay off."
-          validation: "required"
-        showButtons: ["back", "next"]
-
-      - stepId: "amount"
-        title: "Payoff Amount"
-        contentType: "input"
-        field: "amount"
         labelPosition: "left"
         content:
-          text: "Enter the expected payoff amount (auto-updated in the table)."
-          inputType: "currency"
-          validation: "required|positive"
+          text: "Select the mortgage to pay off:"
+          inputType: "propertyLink"
+          validation: "required"
         showButtons: ["back", "next"]
-
       - stepId: "timing"
         title: "Payoff Timing"
         contentType: "input"
@@ -421,7 +475,7 @@ EventWizards:
         contentType: "summary"
         content:
           templates:
-            - template: "{name}: One-off mortgage payoff of {amount} at age/year {fromAge}."
+            - template: "{name}: One-off mortgage payoff at age/year {fromAge}."
         showButtons: ["back", "create"]
 
   - eventType: "MR"
@@ -432,9 +486,10 @@ EventWizards:
         title: "Linked Property"
         contentType: "input"
         field: "name"
-        labelPosition: "top"
+        labelPosition: "left"
         content:
-          text: "Select the property for this reverse mortgage."
+          text: "Select the property for this reverse mortgage:"
+          inputType: "propertyLink"
           validation: "required"
         showButtons: ["back", "next"]
 
@@ -489,7 +544,7 @@ EventWizards:
         field: "name"
         labelPosition: "top"
         content:
-          text: "Give this market scenario a descriptive name."
+          text: "Give this market scenario a descriptive name:"
           validation: "required"
         showButtons: ["back", "next"]
 

@@ -334,6 +334,7 @@ class EventsTableManager {
           RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
           this.webUI.tableManager.setupTableCurrencyControls();
         }
+        this.updateEventRowsVisibilityAndTypes();
         this._refreshValidation();
       }, 400);
     } else {
@@ -414,6 +415,7 @@ class EventsTableManager {
           RelocationUtils.extractRelocationTransitions(this.webUI, this.webUI.tableManager);
           this.webUI.tableManager.setupTableCurrencyControls();
         }
+        this.updateEventRowsVisibilityAndTypes();
         this._refreshValidation();
       }, 300); // Wait for slide animation to complete
     }, 200); // Wait for fade to complete
@@ -995,6 +997,7 @@ class EventsTableManager {
       setTimeout(() => {
         row.remove();
         if (!skipMortgageSync) this._syncMortgagePlanAfterDeletion(deletedType, deletedId);
+        this.updateEventRowsVisibilityAndTypes();
         this._refreshValidation();
         this._scheduleMortgagePlanReanalysis();
       }, 400);
@@ -2210,8 +2213,8 @@ class EventsTableManager {
       /* Refresh dropdown options to reflect simulation mode */
       const dropdown = row._eventTypeDropdown;
       if (dropdown) {
-        const baseOpts = this.getEventTypeOptionObjects();
         const curVal = typeInput.value;
+        const baseOpts = this.getEventTypeOptionObjects(curVal);
         const opts = baseOpts;
         dropdown.setOptions(opts);
         const curOpt = opts.find((o) => o.value === curVal)
@@ -3602,7 +3605,7 @@ class EventsTableManager {
     typeInput.value = newType;
     const toggleEl = row.querySelector(`#EventTypeToggle_${resolvedRowId}`);
     if (toggleEl) {
-      const opts = this.getEventTypeOptionObjects();
+      const opts = this.getEventTypeOptionObjects(newType);
       const opt = opts.find(o => o && o.value === newType);
       toggleEl.textContent = (opt && opt.label) ? opt.label : newType;
     }
@@ -3794,6 +3797,26 @@ class EventsTableManager {
 
   isMortgagePlanEvent(eventType) {
     return ['M', 'MO', 'MP'].includes(eventType);
+  }
+
+  getMortgageDisclosureFlags() {
+    const events = (this.webUI && typeof this.webUI.readEvents === 'function')
+      ? (this.webUI.readEvents(false) || [])
+      : [];
+    return {
+      hasPropertyEvent: events.some(evt => evt && evt.type === 'R'),
+      hasMortgageEvent: events.some(evt => evt && evt.type === 'M')
+    };
+  }
+
+  passesMortgageDisclosure(eventType, disclosureFlags, forcedVisibleEventType = '') {
+    if (!eventType) return true;
+    if (forcedVisibleEventType && eventType === forcedVisibleEventType) return true;
+    const isMortgageRelated = eventType === 'M' || eventType === 'MO' || eventType === 'MP' || eventType === 'MR';
+    if (isMortgageRelated && !disclosureFlags.hasPropertyEvent) return false;
+    const requiresMortgage = eventType === 'MO' || eventType === 'MP';
+    if (requiresMortgage && !disclosureFlags.hasMortgageEvent) return false;
+    return true;
   }
 
   isRelocation(eventType) {
@@ -4010,6 +4033,7 @@ class EventsTableManager {
     this.updateFieldVisibility(typeInput);
     this.applyTypeColouring(row);
     typeInput.dispatchEvent(new Event('change', { bubbles: true }));
+    this.updateEventRowsVisibilityAndTypes();
 
     if (typeInput.value === 'MV') {
       await this.syncTaxRuleSetsForCurrentEvents();
@@ -4176,8 +4200,8 @@ class EventsTableManager {
   async populateRowFromWizardData(row, eventData) {
     if (!row) return;
 
-    const typeOptions = this.getEventTypeOptionObjects();
     const desiredType = String((eventData && eventData.eventType) || '');
+    const typeOptions = this.getEventTypeOptionObjects(desiredType);
     const typeOption = typeOptions.find(opt => opt.value === desiredType)
       || typeOptions.find(opt => opt.value === 'NOP')
       || typeOptions[0];
@@ -4299,6 +4323,10 @@ class EventsTableManager {
     this.webUI.formatUtils.setupCurrencyInputs(true);
     this.webUI.formatUtils.setupPercentageInputs();
     this.animateRowHighlight(emptyRow, { skipScrollIfVisible: true });
+    if (eventData && eventData.eventType === 'M') {
+      const amountInput = emptyRow.querySelector('.event-amount');
+      if (amountInput) this._flashInput(amountInput);
+    }
 
     if (this.sortKeys && this.sortKeys.length > 0) {
       this.applySort();
@@ -4355,7 +4383,7 @@ class EventsTableManager {
     row.dataset.eventId = eventId;
 
     // Build dropdown options & find label for current selection
-    let optionObjects = this.getEventTypeOptionObjects();
+    let optionObjects = this.getEventTypeOptionObjects(type);
     let direct = optionObjects.find((o) => o.value === type);
     const selectedObj = direct || optionObjects.find((o) => o.value === 'NOP') || optionObjects[0];
     if (!direct) {
@@ -4673,7 +4701,7 @@ class EventsTableManager {
     return { row, id: eventId };
   }
 
-  getEventTypeOptionObjects() {
+  getEventTypeOptionObjects(forcedVisibleEventType = '') {
     const simulationMode = this.webUI.getValue('simulation_mode');
 
     const salaryTypesConfig = [
@@ -4719,6 +4747,11 @@ class EventsTableManager {
       });
     }
 
+    const disclosureFlags = this.getMortgageDisclosureFlags();
+    const filteredEventTypes = eventTypes.filter((et) =>
+      this.passesMortgageDisclosure(et && et.value, disclosureFlags, forcedVisibleEventType)
+    );
+
     /* ------------------------------------------------------------
        Enrich option objects with real descriptions from help.yml
     -------------------------------------------------------------*/
@@ -4742,7 +4775,7 @@ class EventsTableManager {
 
     // Attach description so DropdownUtils can show tooltips.
     // Preserve any description explicitly set on the option object.
-    return eventTypes.map((et) => ({
+    return filteredEventTypes.map((et) => ({
       ...et,
       description: et.description || descMap[et.value] || et.label,
     }));
@@ -5148,7 +5181,14 @@ class EventsTableManager {
 
     // Filter out relocation wizard when relocation is disabled
     const relocationEnabled = (typeof Config !== 'undefined' && Config.getInstance && Config.getInstance().isRelocationEnabled && Config.getInstance().isRelocationEnabled());
-    const filtered = relocationEnabled ? wizards : wizards.filter(w => w.eventType !== 'MV');
+    const relocationFiltered = relocationEnabled ? wizards : wizards.filter(w => w.eventType !== 'MV');
+
+    // Progressive disclosure for mortgage-related wizard options.
+    const disclosureFlags = this.getMortgageDisclosureFlags();
+    const filtered = relocationFiltered.filter((wizard) => {
+      const eventType = wizard && wizard.eventType;
+      return this.passesMortgageDisclosure(eventType, disclosureFlags);
+    });
 
     // Create selection modal
     this.createWizardSelectionModal(filtered, initialData);

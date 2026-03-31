@@ -981,7 +981,7 @@ class EventAccordionManager {
       typeInput.value = event.type;
 
       // Get event type options from table manager
-      const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects();
+      const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects(event.type);
 
       // Create custom dropdown using DropdownUtils
       const dropdown = DropdownUtils.create({
@@ -1270,7 +1270,7 @@ class EventAccordionManager {
 
         if (toggleEl && dropdown && this.webUI.eventsTableManager) {
           // Get the label for the new event type
-          const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects();
+          const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects(value);
           const selectedOption = optionObjects.find(opt => opt.value === value);
 
           if (selectedOption) {
@@ -1574,7 +1574,7 @@ class EventAccordionManager {
     const toggleEl = tableRow.querySelector(`#EventTypeToggle_${tableRow.dataset.rowId}`);
     const dropdown = tableRow._eventTypeDropdown;
     if (dropdown && this.webUI && this.webUI.eventsTableManager) {
-      const opts = this.webUI.eventsTableManager.getEventTypeOptionObjects();
+      const opts = this.webUI.eventsTableManager.getEventTypeOptionObjects(tVal);
       dropdown.setOptions(opts);
       const curOpt = opts.find(o => o.value === tVal) || opts.find(o => o.value === 'NOP') || opts[0];
       if (toggleEl && curOpt) toggleEl.textContent = curOpt.label;
@@ -2251,7 +2251,7 @@ class EventAccordionManager {
 
         if (toggleEl && dropdown && this.webUI.eventsTableManager) {
           // Get the label for the new event type
-          const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects();
+          const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects(value);
           const selectedOption = optionObjects.find(opt => opt.value === value);
 
           if (selectedOption) {
@@ -2436,7 +2436,7 @@ class EventAccordionManager {
 
     if (toggleEl && dropdown && this.webUI.eventsTableManager) {
       // Get the label for the new event type
-      const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects();
+      const optionObjects = this.webUI.eventsTableManager.getEventTypeOptionObjects(event.type);
       const selectedOption = optionObjects.find(opt => opt.value === event.type);
 
       if (selectedOption) {

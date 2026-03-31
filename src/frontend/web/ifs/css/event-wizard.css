@@ -257,6 +257,22 @@
     display: block;
 }
 
+.event-wizard-dropdown-control {
+    display: flex;
+    align-items: center;
+}
+
+.event-wizard-input-group.label-position-left .event-wizard-dropdown-control,
+.event-wizard-input-group:not([class*="label-position"]) .event-wizard-dropdown-control {
+    margin-left: auto;
+}
+
+.event-wizard-input-group.label-position-top .event-wizard-dropdown-control,
+.event-wizard-input-group.label-position-bottom .event-wizard-dropdown-control,
+.event-wizard-input-group.label-position-right .event-wizard-dropdown-control {
+    margin-left: 0;
+}
+
 .event-wizard-input-group input:focus {
     outline: none;
     border-color: var(--primary-color, #007bff);
@@ -596,6 +612,16 @@ input[name="description"] {
 
 .dropdown-wrapper.warning .dd-toggle {
     background-color: var(--warning-color);
+}
+
+.dropdown-wrapper.validation-error .dd-toggle {
+    border-color: var(--error-color);
+    box-shadow: 0 0 0 0.2rem rgba(255, 128, 128, 0.25);
+}
+
+.dropdown-wrapper.validation-warning .dd-toggle {
+    border-color: var(--warning-color);
+    box-shadow: 0 0 0 0.2rem rgba(255, 224, 102, 0.25);
 }
 
 /* --- Period age/year inputs override flex expansion --- */
