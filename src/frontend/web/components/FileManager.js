@@ -87,7 +87,9 @@ class FileManager {
       loadButton.addEventListener('click', () => {
         fileInput.click(); // Unsaved changes check is now handled in loadFromFile
       });
-      fileInput.addEventListener('change', (e) => this.webUI.loadFromFile(e.target.files[0]));
+      fileInput.addEventListener('change', (e) => {
+        this.webUI.loadFromFile(e.target.files[0]);
+      });
     }
   }
 
@@ -95,7 +97,7 @@ class FileManager {
     await this._ensureScenarioTaxRuleSetsLoaded();
     const csvContent = serializeSimulation(this.webUI);
     const currentScenarioName = this.currentScenarioName || 'my scenario';
-    const suggestedName = `${currentScenarioName.trim()}.csv`;
+    let suggestedName = `${currentScenarioName.trim()}.csv`;
 
     if ('showSaveFilePicker' in window) {
       try {
@@ -124,6 +126,11 @@ class FileManager {
       }
     } else {
       // Legacy fallback
+      const enteredName = window.prompt('Save scenario as (file name):', currentScenarioName.trim());
+      if (enteredName === null) return;
+      const normalizedName = String(enteredName || '').trim().replace(/\.csv$/i, '') || 'my scenario';
+      suggestedName = `${normalizedName}.csv`;
+      this.setScenarioName(normalizedName);
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
