@@ -1,53 +1,15 @@
-/* Debug log endpoint resolver for desktop/mobile runs */
+/* Debug log endpoint builder from explicit caller input */
 (function (global) {
-  var INGEST_PATH = '/ingest/5904e893-8fba-4499-8669-e2e4464b3ad7';
-  var LOCAL_ENDPOINT = 'http://127.0.0.1:7889' + INGEST_PATH;
-  var PROXY_PORT = '7890';
-  var STORAGE_KEY = 'finsim.debugLogEndpoint';
-  var QUERY_KEY = 'debugLogEndpoint';
-
-  function _isLocalHost(hostname) {
-    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
-  }
-
-  function getDebugLogEndpoint() {
-    if (!global || !global.location) {
-      return LOCAL_ENDPOINT;
-    }
-
-    var queryOverride = new URLSearchParams(global.location.search).get(QUERY_KEY);
-    if (queryOverride) {
-      return queryOverride;
-    }
-
-    if (global.localStorage) {
-      var storedOverride = global.localStorage.getItem(STORAGE_KEY);
-      if (storedOverride) {
-        return storedOverride;
-      }
-    }
-
-    if (global.__FINSIM_DEBUG_LOG_ENDPOINT) {
-      return String(global.__FINSIM_DEBUG_LOG_ENDPOINT);
-    }
-
-    var host = global.location.hostname || '';
-    if (_isLocalHost(host)) {
-      return LOCAL_ENDPOINT;
-    }
-
-    return 'http://' + host + ':' + PROXY_PORT + INGEST_PATH;
-  }
-
-  function setDebugLogEndpoint(endpoint) {
-    global.localStorage.setItem(STORAGE_KEY, endpoint);
-  }
-
-  function clearDebugLogEndpoint() {
-    global.localStorage.removeItem(STORAGE_KEY);
+  function getDebugLogEndpoint(port, ingestPath) {
+    if (!global || !global.location) return '';
+    var host = String(global.location.hostname || '').trim();
+    var protocol = String(global.location.protocol || 'http:');
+    var normalizedPath = String(ingestPath || '').trim();
+    var normalizedPort = Number(port);
+    if (!host || !normalizedPath || !Number.isFinite(normalizedPort) || normalizedPort <= 0) return '';
+    if (normalizedPath.charAt(0) !== '/') normalizedPath = '/' + normalizedPath;
+    return protocol + '//' + host + ':' + normalizedPort + normalizedPath;
   }
 
   global.getDebugLogEndpoint = getDebugLogEndpoint;
-  global.setDebugLogEndpoint = setDebugLogEndpoint;
-  global.clearDebugLogEndpoint = clearDebugLogEndpoint;
 })(window);

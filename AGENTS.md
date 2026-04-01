@@ -327,8 +327,16 @@ When running Playwright via `run-tests.sh`, invoke the script **directly** as `.
 
 ### 5.1. Debugging Protocol (when fixing a bug)
 
-Use this strict sequence to avoid “fixing the wrong thing” unless the user explicitly tells you to fix the issue directly (remember he's the boss, not you):
+Cursor-specific debug mode instructions:
+** If you are in Cursor and in Debug mode, your attempt to instrument the code fail. You will need to use the following MANDATORY MOBILE DEBUGGING OVERRIDE:**
+*   **MOBILE DEBUGGING OVERRIDE (MANDATORY):** In Cursor Debug mode, endpoint selection is runtime-specific and mandatory:
+    *   Get the port number and the ingest path from your failed attempt to instrument the code.
+    *   Never use `127.0.0.1`; use the window.getDebugLogEndpoint() function, passing the port and ingest path as arguments to get the correct endpoint. 
+    *   Run `python debug_log_proxy.py --host 0.0.0.0 --port 7890 --target-base http://127.0.0.1:<port>`, replacing <port> with the actual port number.
+*   **IMPORTANT:** If your attempt to instrument the code failed because you didn't apply the mandatory mobile debugging override, you will apply the above MANDATORY MOBILE DEBUGGING OVERRIDE and try again.
 
+If you are NOT in Cursor or NOT in Debug mode (as opposed to Agent, Plan or Ask modes), use this strict sequence to avoid “fixing the wrong thing” unless the user explicitly tells you to fix the issue directly (remember he's the boss, not you):
+** IMPORTANT:** These steps only apply when you are not in Cursor or you're not in Debug mode.
 1.  Read and understand the relevant code path(s).
 2.  Formulate 5–7 root-cause hypotheses.
 3.  Ask which hypotheses to pursue (wait for confirmation when collaborating interactively).
@@ -344,11 +352,6 @@ UI-specific debugging:
 *   Prefer temporary CSS visual cues (borders/overlays) over timing hacks.
 *   Avoid delay-based fixes; use explicit hooks/observers.
 *   Mobile: `phonitor.js` debug overlay exists for on-device visibility.
-
-Cursor-specific debug mode instructions:
-*   When the Cursor agent is set to Debug mode, it sets up a listener on 127.0.0.1, which works for debugging on the same machine but doesn't work for debugging mobile (because that address is the phone itself, not the machine that is running the listener). So instead, the logging endpoint calls need to detect where they are running:
-    *   Desktop browser on the same machine as Cursor: use `http://127.0.0.1:7889/ingest/<id>`.
-    *   Mobile browser: use the machine IP endpoint via proxy (`http://<cursor-machine-ip>:7890/ingest/<id>`), and run `python debug_log_proxy.py --host 0.0.0.0 --port 7890 --target-base http://127.0.0.1:7889`.
 
 ### 5.2. Planning & Documentation Etiquette
 
