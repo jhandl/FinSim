@@ -345,6 +345,11 @@ UI-specific debugging:
 *   Avoid delay-based fixes; use explicit hooks/observers.
 *   Mobile: `phonitor.js` debug overlay exists for on-device visibility.
 
+Cursor-specific debug mode instructions:
+*   When the Cursor agent is set to Debug mode, it sets up a listener on 127.0.0.1, which works for debugging on the same machine but doesn't work for debugging mobile (because that address is the phone itself, not the machine that is running the listener). So instead, the logging endpoint calls need to detect where they are running:
+    *   Desktop browser on the same machine as Cursor: use `http://127.0.0.1:7889/ingest/<id>`.
+    *   Mobile browser: use the machine IP endpoint via proxy (`http://<cursor-machine-ip>:7890/ingest/<id>`), and run `python debug_log_proxy.py --host 0.0.0.0 --port 7890 --target-base http://127.0.0.1:7889`.
+
 ### 5.2. Planning & Documentation Etiquette
 
 When asked to produce a plan (vs implement):
