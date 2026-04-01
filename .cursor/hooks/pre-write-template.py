@@ -3,7 +3,7 @@ import json
 import sys
 
 DENY_IF_FOUND = "fetch('http://127.0.0.1:"
-ALLOW_IF_FOUND = "getDebugLogEndpoint"
+ALLOW_IF_FOUND = "window.getDebugLogEndpoint"
 MANDATORY_AGENT_MESSAGE = "Your request is rejected because you failed to apply the mandatory debugging rule in AGENTS.md. Read the rule now and apply it correctly before trying again."
 PROTECTED_HOOK_PATH = ".cursor/hooks/pre-write-template.py"
 READ_BLOCK_MESSAGE = "Reading .cursor/hooks/pre-write-template.py is blocked. Follow the rejection guidance instead of inspecting the hook."
