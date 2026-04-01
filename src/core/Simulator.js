@@ -28,7 +28,6 @@ var person1, person2;
 var supportsProgressUpdatesForRun, loopProgressMaxForRun, deterministicProgressStepForRun;
 // Variables for pinch point visualization
 var perRunResults, currentRun;
-var capturePerRunResults;
 // Variables for earned net income tracking
 var earnedNetIncome, householdPhase;
 // Stable tax ids for consistent Tax__... columns per run
@@ -85,7 +84,7 @@ async function run() {
 
   // In web UI we retain per-run yearly data for pinch-point visualization.
   // In tests / GAS environments this data is unused and very expensive at Monte Carlo scale.
-  capturePerRunResults = !!(uiManager && uiManager.ui && typeof uiManager.ui.storeSimulationResults === 'function');
+  perRunResults = (uiManager && uiManager.ui && typeof uiManager.ui.storeSimulationResults === 'function') ? [] : null;
 
   // Allow scenario/tests to override Monte Carlo run count explicitly.
   // Falls back to config.simulationRuns for existing UI behavior.
@@ -94,9 +93,6 @@ async function run() {
     : null;
   let runs = (montecarlo ? ((typeof runsOverride === 'number' && isFinite(runsOverride) && runsOverride > 0) ? runsOverride : config.simulationRuns) : 1);
   let successes = 0;
-
-  // Initialize per-run results tracking
-  perRunResults = capturePerRunResults ? [] : null;
 
   var supportsProgressUpdates = (typeof SpreadsheetApp === 'undefined');
   supportsProgressUpdatesForRun = supportsProgressUpdates;
@@ -3018,7 +3014,7 @@ function updateYearlyData() {
   // dataSheet stores numeric aggregates only.
   // Money objects never leave asset class boundaries.
   // Capture per-run data for pinch point visualization
-  if (capturePerRunResults) {
+  if (perRunResults) {
     if (!perRunResults[currentRun]) {
       perRunResults[currentRun] = [];
     }

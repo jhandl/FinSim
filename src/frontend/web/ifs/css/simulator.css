@@ -3169,6 +3169,19 @@ footer {
   /* Above header and other content */
 }
 
+#table-render-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1800;
+  pointer-events: none;
+}
+
 #loading-overlay .spinner {
   width: 48px;
   height: 48px;
@@ -3186,6 +3199,42 @@ footer {
   100% {
     transform: rotate(360deg);
   }
+}
+
+#mobile-data-message {
+  position: relative;
+}
+
+#mobile-data-message.table-rendering p {
+  opacity: 0.35;
+}
+
+#mobile-data-message.table-rendering #show-data-link {
+  pointer-events: none;
+  text-decoration: none;
+}
+
+.mobile-table-loading {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+
+#mobile-data-message.table-rendering .mobile-table-loading {
+  display: inline-flex;
+}
+
+.mobile-table-loading-spinner {
+  width: 26px;
+  height: 26px;
+  border: 4px solid #e8e8e8;
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  animation: loading-spin 1s linear infinite;
 }
 
 /* ------------------------------------------------------------------

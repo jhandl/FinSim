@@ -8,6 +8,8 @@ class WebUI extends AbstractUI {
     // Initialize simulation state tracking
     this.isSimulationRunning = false;
     this.pendingSimulationFinalize = false;
+    this.deferDataTableRender = false;
+    this.deferredRowColors = null;
     this.currentSimMode = 'single'; // Default to single person mode
     this.currentEconomyMode = 'deterministic'; // Default to deterministic mode
     this.preservedVolatilityValues = {}; // Store volatility values when switching modes
@@ -100,6 +102,16 @@ class WebUI extends AbstractUI {
 
   setStatus(message, color = STATUS_COLORS.INFO, progress = null) {
     this.notificationUtils.setStatus(message, color, progress);
+  }
+
+  showTableRenderOverlay() {
+    const overlay = document.getElementById('table-render-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  }
+
+  hideTableRenderOverlay() {
+    const overlay = document.getElementById('table-render-overlay');
+    if (overlay) overlay.style.display = 'none';
   }
 
   markSimulationComplete() {
@@ -206,13 +218,16 @@ class WebUI extends AbstractUI {
   }
 
   rerenderData() {
-    if (window.dataSheet && window.dataSheet.length > 0) {
+    const simulationData = (typeof dataSheet !== 'undefined') ? dataSheet : window.dataSheet;
+    if (simulationData && simulationData.length > 0) {
       this.tableManager.conversionCache = {};
       this.tableManager.storedCountryTimeline = null; // Invalidate stored timeline before rerender
       const uiMgr = (typeof uiManager !== 'undefined') ? uiManager : null;
-      const scale = runs;
-      for (let i = 1; i < window.dataSheet.length; i++) {
-        let rowData = window.dataSheet[i];
+      const scale = (typeof montecarlo !== 'undefined' && montecarlo && this.lastSimulationResults && this.lastSimulationResults.runs)
+        ? this.lastSimulationResults.runs
+        : 1;
+      for (let i = 1; i < simulationData.length; i++) {
+        let rowData = simulationData[i];
         if (uiMgr && typeof uiMgr.buildDisplayDataRow === 'function') {
           rowData = uiMgr.buildDisplayDataRow(i, scale);
         }
@@ -224,6 +239,38 @@ class WebUI extends AbstractUI {
       // Fallback path for test/preview contexts where dataSheet isn't populated
       this.tableManager.refreshDisplayedCurrencies();
     }
+  }
+
+  shouldDeferDataTableRender() {
+    const isMobile = (typeof DeviceUtils !== 'undefined' && DeviceUtils.isMobile && DeviceUtils.isMobile());
+    if (!isMobile) return false;
+    const dataTable = document.getElementById('Data');
+    const dataSection = dataTable ? dataTable.closest('.data-section') : null;
+    const mobileMessage = document.getElementById('mobile-data-message');
+    if (!dataSection || !mobileMessage) return false;
+    return window.getComputedStyle(dataSection).display === 'none' && window.getComputedStyle(mobileMessage).display !== 'none';
+  }
+
+  setDeferredDataTableRenderState(shouldDefer, rowColors) {
+    this.deferDataTableRender = !!shouldDefer;
+    this.deferredRowColors = this.deferDataTableRender ? (rowColors || {}) : null;
+  }
+
+  renderDeferredDataTableIfNeeded() {
+    if (!this.deferDataTableRender) return false;
+    if (this.tableManager && typeof this.tableManager.clearExtraDataRows === 'function') {
+      this.tableManager.clearExtraDataRows(0);
+    }
+    this.rerenderData();
+    if (this.deferredRowColors) {
+      for (const row in this.deferredRowColors) {
+        const rowIndex = parseInt(row, 10);
+        if (!isNaN(rowIndex)) this.setDataRowBackgroundColor(rowIndex, this.deferredRowColors[row]);
+      }
+    }
+    this.deferDataTableRender = false;
+    this.deferredRowColors = null;
+    return true;
   }
 
   setDataRowBackgroundColor(rowIndex, backgroundColor) {

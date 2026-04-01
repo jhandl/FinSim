@@ -66,6 +66,11 @@ class UIManager {
       }
     } catch (_) { /* no-op */ }
 
+    const shouldDeferTableRender = !!(this.ui && typeof this.ui.shouldDeferDataTableRender === 'function' && this.ui.shouldDeferDataTableRender());
+    if (this.ui && typeof this.ui.setDeferredDataTableRenderState === 'function') {
+      this.ui.setDeferredDataTableRenderState(shouldDeferTableRender, rowColors);
+    }
+
     const scale = montecarlo ? runs : 1;
     const supportsProgress = (typeof window !== 'undefined');
     const preparedRows = new Array(row + 1);
@@ -80,26 +85,46 @@ class UIManager {
         await this.yieldToBrowserFrame();
       }
     }
-    if (supportsProgress) {
-      this.updateProgress("Running...", 0.97);
-      await this.yieldToBrowserFrame();
-    }
-
     const chartBatchOptions = { skipCashflowUpdate: true, skipAssetsUpdate: true };
+    const chartPrepStep = Math.max(1, Math.floor(row / 25));
+    const chartPrepProgressStart = 0.96;
+    const chartPrepProgressEnd = 0.995;
     for (let i = 1; i <= row; i++) {
       const displayData = preparedRows[i];
       if (!displayData) continue;
-      this.ui.setDataRow(i, displayData);
       this.ui.setChartsRow(i, displayData, chartBatchOptions);
-      if (rowColors[i]) {
-        this.ui.setDataRowBackgroundColor(i, rowColors[i]);
+      if (supportsProgress && (i % chartPrepStep === 0 || i === row)) {
+        const chartProgress = chartPrepProgressStart + ((i / row) * (chartPrepProgressEnd - chartPrepProgressStart));
+        this.updateProgress("Running...", chartProgress);
+        await this.yieldToBrowserFrame();
+      }
+    }
+
+    if (!shouldDeferTableRender && this.ui && typeof this.ui.showTableRenderOverlay === 'function') {
+      this.ui.showTableRenderOverlay();
+      await this.yieldToBrowserFrame();
+      await this.yieldToBrowserFrame();
+    }
+    if (!shouldDeferTableRender) {
+      for (let i = 1; i <= row; i++) {
+        const displayData = preparedRows[i];
+        if (!displayData) continue;
+        this.ui.setDataRow(i, displayData);
+        if (rowColors[i]) {
+          this.ui.setDataRowBackgroundColor(i, rowColors[i]);
+        }
       }
     }
     if (this.ui && typeof this.ui.flushChartUpdates === 'function') {
       this.ui.flushChartUpdates();
     }
-    this.ui.clearExtraDataRows(params.targetAge);
+    if (!shouldDeferTableRender) {
+      this.ui.clearExtraDataRows(params.targetAge);
+    }
     this.ui.clearExtraChartRows(params.targetAge);
+    if (!shouldDeferTableRender && this.ui && typeof this.ui.hideTableRenderOverlay === 'function') {
+      this.ui.hideTableRenderOverlay();
+    }
     if (supportsProgress) {
       this.updateProgress("Running...", 1);
       await this.yieldToBrowserFrame();

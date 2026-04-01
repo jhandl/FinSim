@@ -11,7 +11,7 @@
   <title></title>
   <link rel="icon" type="image/x-icon" href="/src/frontend/web/ifs/IFS.ico?v=2025-08-23-usc">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20260331-9">
+  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20260331-12">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=20260331-1">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-23-usc">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-23-usc" />
@@ -25,6 +25,9 @@
 <body>
   <div id="loading-overlay">
     <div class="spinner"></div>
+  </div>
+  <div id="table-render-overlay" aria-hidden="true">
+    <span class="mobile-table-loading-spinner" aria-hidden="true"></span>
   </div>
   <!-- Loading overlay above will be hidden by JS once initialization completes -->
   <header class="header-hidden">
@@ -471,12 +474,15 @@
 
     <div id="mobile-data-message" class="data-section card" style="text-align: center;">
       <p>📊 The detailed data table is available on wider screens. <a href="#" id="show-data-link">Show anyway</a>.</p>
+      <div class="mobile-table-loading" aria-label="Rendering table" role="status" aria-live="polite">
+        <span class="mobile-table-loading-spinner" aria-hidden="true"></span>
+      </div>
     </div>
   </main>
 
   <!-- SYSTEM UTILITIES SECTION -->
   <script src="/src/frontend/AbstractUI.js?v=20251101"></script>
-  <script src="/src/frontend/UIManager.js?v=20260331-13"></script>
+  <script src="/src/frontend/UIManager.js?v=20260331-19"></script>
   <script src="/src/frontend/web/utils/DOMUtils.js?v=20260331-2"></script>
   <script src="/src/frontend/web/utils/DeviceUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/FormatUtils.js?v=20260328-1"></script>
@@ -513,7 +519,7 @@
   <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
   <script src="/src/frontend/web/components/CountryTabSyncManager.js?v=20260114-1"></script>
   <script src="/src/frontend/web/components/CountryChipSelector.js?v=20260130-1"></script>
-  <script src="/src/frontend/web/WebUI.js?v=20260331-13"></script>
+  <script src="/src/frontend/web/WebUI.js?v=20260331-19"></script>
   <script src="/src/core/TaxRuleSet.js?v=20260327-3"></script>
   <script src="/src/core/Config.js?v=20260218-1"></script>
   <script src="/src/core/Events.js?v=20260213-4"></script>
@@ -536,7 +542,7 @@
   <script src="/src/core/Attribution.js?v=20260328-1"></script>
   <script src="/src/core/AttributionManager.js?v=20260328-1"></script>
   <script src="/src/core/EconomicRegimeModel.js?v=20260218-1"></script>
-  <script src="/src/core/Simulator.js?v=20260331-8"></script>
+  <script src="/src/core/Simulator.js?v=20260331-11"></script>
 
   <!-- Init app name after Config is initialized -->
   <script>
@@ -591,15 +597,26 @@
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const showLink = document.getElementById('show-data-link');
-      const dataSection = document.querySelector('.data-section');
+      const dataTable = document.getElementById('Data');
+      const dataSection = dataTable ? dataTable.closest('.data-section') : null;
       const mobileMessage = document.getElementById('mobile-data-message');
 
       if (showLink && dataSection && mobileMessage) {
-        showLink.addEventListener('click', function (e) {
+        showLink.addEventListener('click', async function (e) {
           e.preventDefault();
+          mobileMessage.classList.add('table-rendering');
+          showLink.setAttribute('aria-disabled', 'true');
+          showLink.style.pointerEvents = 'none';
+
+          await new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); });
+          await new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); });
+
+          const webUI = (typeof WebUI !== 'undefined' && WebUI.getInstance) ? WebUI.getInstance() : null;
+          if (webUI && typeof webUI.renderDeferredDataTableIfNeeded === 'function') {
+            await webUI.renderDeferredDataTableIfNeeded();
+          }
           dataSection.style.display = 'block';
           mobileMessage.style.display = 'none';
-          const webUI = (typeof WebUI !== 'undefined' && WebUI.getInstance) ? WebUI.getInstance() : null;
           if (webUI && webUI.tableManager && typeof webUI.tableManager.finalizeDataTableLayout === 'function') {
             webUI.tableManager.finalizeDataTableLayout();
           }
