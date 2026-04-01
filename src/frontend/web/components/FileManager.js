@@ -93,13 +93,141 @@ class FileManager {
     }
   }
 
+  _isIosLikeBrowser() {
+    const nav = window.navigator || navigator;
+    const ua = String((nav && nav.userAgent) || '');
+    const platform = String((nav && nav.platform) || '');
+    const maxTouchPoints = Number((nav && nav.maxTouchPoints) || 0);
+    return /iPad|iPhone|iPod/.test(ua) || (platform === 'MacIntel' && maxTouchPoints > 1);
+  }
+
+  _canShareScenarioFile() {
+    if (!this._isIosLikeBrowser()) return false;
+    const topWindow = this._getTopWindow();
+    const topNavigator = topWindow && topWindow.navigator ? topWindow.navigator : null;
+    const topFile = topWindow && topWindow.File ? topWindow.File : null;
+    return !!(topNavigator && typeof topNavigator.share === 'function' && topFile);
+  }
+
+  _getTopWindow() {
+    try {
+      if (window.top && window.top.location && window.top.location.origin === window.location.origin) {
+        return window.top;
+      }
+    } catch (_) { }
+    return window;
+  }
+
+  _promptForScenarioName(currentScenarioName) {
+    const enteredName = window.prompt('Save scenario as (file name):', currentScenarioName.trim());
+    if (enteredName === null) return null;
+    const normalizedName = String(enteredName || '').trim().replace(/\.csv$/i, '') || 'my scenario';
+    return {
+      normalizedName: normalizedName,
+      suggestedName: `${normalizedName}.csv`
+    };
+  }
+
+  _closeIosShareModal() {
+    const modal = document.getElementById('iosScenarioShareModal');
+    if (modal) modal.remove();
+  }
+
+  _showIosShareModal(currentScenarioName) {
+    this._closeIosShareModal();
+
+    const modal = document.createElement('div');
+    modal.id = 'iosScenarioShareModal';
+    modal.className = 'modal';
+    modal.style.display = 'block';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Save Scenario</h3>
+          <span class="modal-close" aria-label="Close">&times;</span>
+        </div>
+        <div class="modal-body">
+          <p style="margin-bottom: 12px; line-height: 1.4;">Choose a filename, then tap Save.</p>
+          <input id="iosScenarioShareName" type="text" value="${String(currentScenarioName || 'my scenario').replace(/"/g, '&quot;')}" style="width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; font: 16px sans-serif;">
+        </div>
+        <div class="modal-footer">
+          <button id="iosScenarioShareCancel" class="secondary-button">Cancel</button>
+          <button id="iosScenarioShareConfirm" class="primary-button">Save</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const input = modal.querySelector('#iosScenarioShareName');
+    const close = () => this._closeIosShareModal();
+    const closeX = modal.querySelector('.modal-close');
+    const cancel = modal.querySelector('#iosScenarioShareCancel');
+    const confirm = modal.querySelector('#iosScenarioShareConfirm');
+
+    closeX.addEventListener('click', close);
+    cancel.addEventListener('click', close);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) close();
+    });
+
+    confirm.addEventListener('click', async () => {
+      try {
+        const normalizedName = String((input && input.value) || '').trim().replace(/\.csv$/i, '') || 'my scenario';
+        const suggestedName = `${normalizedName}.csv`;
+        const csvContent = serializeSimulation(this.webUI);
+        this.setScenarioName(normalizedName);
+        const shared = await this._shareScenarioFile(csvContent, suggestedName);
+        if (!shared) {
+          throw new Error('This browser cannot share CSV files.');
+        }
+        this.lastSavedState = csvContent;
+        close();
+      } catch (err) {
+        if (err && err.name === 'AbortError') {
+          close();
+          return;
+        }
+        this.webUI.notificationUtils.showAlert('Error saving file: ' + err.message, 'Error');
+      }
+    });
+
+    setTimeout(() => {
+      if (input && typeof input.focus === 'function') input.focus();
+      if (input && typeof input.setSelectionRange === 'function') input.setSelectionRange(0, String(input.value || '').length);
+    }, 0);
+  }
+
+  async _shareScenarioFile(csvContent, suggestedName) {
+    const topWindow = this._getTopWindow();
+    if (topWindow && typeof topWindow.shareScenarioFileFromChild === 'function') {
+      return await topWindow.shareScenarioFileFromChild({
+        filename: suggestedName,
+        content: csvContent
+      });
+    }
+    const nav = topWindow && topWindow.navigator ? topWindow.navigator : (window.navigator || navigator);
+    const FileCtor = (topWindow && topWindow.File) || window.File;
+    const file = new FileCtor([csvContent], suggestedName, { type: 'text/csv' });
+    if (typeof nav.canShare === 'function' && !nav.canShare({ files: [file] })) {
+      return false;
+    }
+    await nav.share({
+      title: suggestedName,
+      text: 'FinSim scenario',
+      files: [file]
+    });
+    return true;
+  }
+
   async saveToFile() {
-    await this._ensureScenarioTaxRuleSetsLoaded();
-    const csvContent = serializeSimulation(this.webUI);
     const currentScenarioName = this.currentScenarioName || 'my scenario';
     let suggestedName = `${currentScenarioName.trim()}.csv`;
 
-    if ('showSaveFilePicker' in window) {
+    if (this._canShareScenarioFile()) {
+      this._showIosShareModal(currentScenarioName);
+    } else if ('showSaveFilePicker' in window) {
+      await this._ensureScenarioTaxRuleSetsLoaded();
+      const csvContent = serializeSimulation(this.webUI);
       try {
         const handle = await window.showSaveFilePicker({
           suggestedName: suggestedName,
@@ -125,12 +253,13 @@ class FileManager {
         this.webUI.notificationUtils.showAlert('Error saving file: ' + err.message, 'Error');
       }
     } else {
+      await this._ensureScenarioTaxRuleSetsLoaded();
+      const csvContent = serializeSimulation(this.webUI);
       // Legacy fallback
-      const enteredName = window.prompt('Save scenario as (file name):', currentScenarioName.trim());
-      if (enteredName === null) return;
-      const normalizedName = String(enteredName || '').trim().replace(/\.csv$/i, '') || 'my scenario';
-      suggestedName = `${normalizedName}.csv`;
-      this.setScenarioName(normalizedName);
+      const saveTarget = this._promptForScenarioName(currentScenarioName);
+      if (!saveTarget) return;
+      suggestedName = saveTarget.suggestedName;
+      this.setScenarioName(saveTarget.normalizedName);
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

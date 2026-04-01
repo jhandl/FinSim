@@ -29,6 +29,23 @@ document.addEventListener('DOMContentLoaded', () => {
     initRouter();
 });
 
+window.shareScenarioFileFromChild = async function(payload) {
+    const data = payload || {};
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function' || typeof File !== 'function') {
+        return false;
+    }
+    const filename = String(data.filename || 'my scenario.csv');
+    const content = String(data.content || '');
+    const file = new File([content], filename, { type: 'text/csv' });
+    if (typeof navigator.canShare === 'function' && !navigator.canShare({ files: [file] })) {
+        return false;
+    }
+    await navigator.share({
+        files: [file]
+    });
+    return true;
+};
+
 /**
  * Initialize the router, handle initial route and set up event listeners
  */
