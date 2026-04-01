@@ -1015,6 +1015,15 @@ class ChartManager {
     }
   }
 
+  flushChartUpdates() {
+    try {
+      if (!this.chartsInitialized) return;
+      this._computeAndApplySpikeClip();
+      if (this.cashflowChart) this.cashflowChart.update();
+      if (this.assetsChart) this.assetsChart.update();
+    } catch (_) { }
+  }
+
   drawRelocationMarkers() {
     if (!this.relocationTransitions.length) {
       this._clearRelocationAnnotations();

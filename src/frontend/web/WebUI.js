@@ -230,8 +230,14 @@ class WebUI extends AbstractUI {
     this.tableManager.setDataRowBackgroundColor(rowIndex, backgroundColor);
   }
 
-  setChartsRow(rowIndex, data) {
-    this.chartManager.updateChartsRow(rowIndex, data);
+  setChartsRow(rowIndex, data, options) {
+    this.chartManager.updateChartsRow(rowIndex, data, options);
+  }
+
+  flushChartUpdates() {
+    if (this.chartManager && typeof this.chartManager.flushChartUpdates === 'function') {
+      this.chartManager.flushChartUpdates();
+    }
   }
 
   downloadDataTableCSV() {
@@ -3066,7 +3072,7 @@ class WebUI extends AbstractUI {
 
     // Do not rebuild chart datasets here; defer to end-of-run to avoid mid-run resets
 
-    setTimeout(() => {
+    requestAnimationFrame(() => {
       try {
         run();
       } catch (error) {
@@ -3085,7 +3091,7 @@ class WebUI extends AbstractUI {
           mobileRunButton.style.pointerEvents = '';
         }
       }
-    }, 50); // Increased from 0 to 50ms to allow browser to render visual changes before CPU-intensive simulation
+    });
   }
 
   setupWizardInvocation() {

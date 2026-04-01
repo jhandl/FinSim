@@ -18,7 +18,7 @@ class UIManager {
   }
 
   // Constants
-  updateDataSheet(runs, perRunResults) {
+  async updateDataSheet(runs, perRunResults) {
     // In Monte Carlo mode, core accumulates attribution totals directly into dataSheet rows.
     // Divide once here to present averages (avoid storing per-run attribution snapshots).
     if (montecarlo && runs > 1) {
@@ -66,21 +66,50 @@ class UIManager {
       }
     } catch (_) { /* no-op */ }
 
-    if (montecarlo) {
-      // Re-render rows using runs count to ensure proper averaging inside updateDataRow
-      for (let i = 1; i <= row; i++) {
-        this.updateDataRow(i, i / row, runs, rowColors[i]);
+    const scale = montecarlo ? runs : 1;
+    const supportsProgress = (typeof window !== 'undefined');
+    const preparedRows = new Array(row + 1);
+    const prepStep = Math.max(1, Math.floor(row / 20));
+    const prepProgressStart = 0.8;
+    const prepProgressEnd = 0.96;
+    for (let i = 1; i <= row; i++) {
+      preparedRows[i] = this.buildDisplayDataRow(i, scale);
+      if (supportsProgress && (i % prepStep === 0 || i === row)) {
+        const progress = prepProgressStart + ((i / row) * (prepProgressEnd - prepProgressStart));
+        this.updateProgress("Running...", progress);
+        await this.yieldToBrowserFrame();
       }
-    } else {
-      // For single runs, also apply colors if available
-      for (let i = 1; i <= row; i++) {
-        if (rowColors[i]) {
-          this.ui.setDataRowBackgroundColor(i, rowColors[i]);
-        }
+    }
+    if (supportsProgress) {
+      this.updateProgress("Running...", 0.97);
+      await this.yieldToBrowserFrame();
+    }
+
+    const chartBatchOptions = { skipCashflowUpdate: true, skipAssetsUpdate: true };
+    for (let i = 1; i <= row; i++) {
+      const displayData = preparedRows[i];
+      if (!displayData) continue;
+      this.ui.setDataRow(i, displayData);
+      this.ui.setChartsRow(i, displayData, chartBatchOptions);
+      if (rowColors[i]) {
+        this.ui.setDataRowBackgroundColor(i, rowColors[i]);
       }
+    }
+    if (this.ui && typeof this.ui.flushChartUpdates === 'function') {
+      this.ui.flushChartUpdates();
     }
     this.ui.clearExtraDataRows(params.targetAge);
     this.ui.clearExtraChartRows(params.targetAge);
+    if (supportsProgress) {
+      this.updateProgress("Running...", 1);
+      await this.yieldToBrowserFrame();
+    }
+  }
+
+  async yieldToBrowserFrame() {
+    if (typeof window !== 'undefined' && typeof requestAnimationFrame === 'function') {
+      await new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); });
+    }
   }
 
   updateProgress(msg, progress = null) {
@@ -294,12 +323,12 @@ class UIManager {
     return data;
   }
 
-  updateDataRow(row, progress, scale = 1, backgroundColor = null) {
+  updateDataRow(row, progress, scale = 1, backgroundColor = null, chartOptions = null) {
     const data = this.buildDisplayDataRow(row, scale);
     if (!data) return;
 
     this.ui.setDataRow(row, data);
-    this.ui.setChartsRow(row, data);
+    this.ui.setChartsRow(row, data, chartOptions);
 
     // Apply background color if provided
     if (backgroundColor) {
@@ -307,7 +336,7 @@ class UIManager {
     }
 
     if (row % 5 === 0) {
-      this.updateProgress("Updating " + Math.round(100 * progress) + "%");
+      this.updateProgress("Running...", progress);
     }
   }
 

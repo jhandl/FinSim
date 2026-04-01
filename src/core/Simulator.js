@@ -25,6 +25,7 @@ var investmentAssets; // [{ key, label, asset }]
 // Track per-investment-type flows to support dynamic UI columns
 var investmentIncomeByKey; // { [key: string]: number }
 var person1, person2;
+var supportsProgressUpdatesForRun, loopProgressMaxForRun, deterministicProgressStepForRun;
 // Variables for pinch point visualization
 var perRunResults, currentRun;
 var capturePerRunResults;
@@ -47,6 +48,12 @@ var residencyTimeline = null;
 const Phases = {
   growth: 'growth',
   retired: 'retired'
+}
+
+async function yieldToBrowserFrame() {
+  if (typeof window !== 'undefined' && typeof requestAnimationFrame === 'function') {
+    await new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); });
+  }
 }
 
 
@@ -91,25 +98,28 @@ async function run() {
   // Initialize per-run results tracking
   perRunResults = capturePerRunResults ? [] : null;
 
-  var isWebUI = (typeof window !== 'undefined');
   var supportsProgressUpdates = (typeof SpreadsheetApp === 'undefined');
+  supportsProgressUpdatesForRun = supportsProgressUpdates;
+  loopProgressMaxForRun = 0.8;
+  deterministicProgressStepForRun = 1;
   var progressStep = Math.max(1, Math.floor(runs / 100));
-  if (supportsProgressUpdates && montecarlo && runs > 1) {
-    uiManager.updateProgress("Running 0%", 0);
+  if (supportsProgressUpdates) {
+    uiManager.updateProgress("Running...", 0);
   } else {
     uiManager.updateProgress("Running");
   }
   for (currentRun = 0; currentRun < runs; currentRun++) {
-    successes += runSimulation();
+    successes += await runSimulation();
     if (supportsProgressUpdates && montecarlo && runs > 1 && (((currentRun + 1) % progressStep === 0) || currentRun === runs - 1)) {
-      var progress = (currentRun + 1) / runs;
-      uiManager.updateProgress("Running " + Math.round(progress * 100) + "%", progress);
-      if (isWebUI) {
-        await new Promise(function (resolve) { setTimeout(resolve, 0); });
-      }
+      var progress = ((currentRun + 1) / runs) * loopProgressMaxForRun;
+      uiManager.updateProgress("Running...", progress);
+      await yieldToBrowserFrame();
     }
   }
-  uiManager.updateDataSheet(runs, perRunResults);
+  if (supportsProgressUpdates) {
+    uiManager.updateProgress("Running...", loopProgressMaxForRun);
+  }
+  await uiManager.updateDataSheet(runs, perRunResults);
   uiManager.updateStatusCell(successes, runs);
 }
 
@@ -939,7 +949,7 @@ function resolveCountryInflation(code) {
   return null;
 }
 
-function runSimulation() {
+async function runSimulation() {
   initializeSimulationVariables();
   // Clear cross-border country history at the start of each run (fixes accumulation across Monte Carlo runs)
   revenue.countryHistory = [];
@@ -952,6 +962,13 @@ function runSimulation() {
     processEvents();
     handleInvestments();
     updateYearlyData();
+    if (supportsProgressUpdatesForRun && !montecarlo && (row % deterministicProgressStepForRun === 0 || person1.age >= params.targetAge)) {
+      var targetYears = Math.max(1, params.targetAge - params.startingAge);
+      var normalized = Math.min(1, row / targetYears);
+      var progress = normalized * loopProgressMaxForRun;
+      uiManager.updateProgress("Running...", progress);
+      await yieldToBrowserFrame();
+    }
   }
   return success;
 }
@@ -3033,7 +3050,4 @@ function updateYearlyData() {
     currentCountry
   );
 
-  if (!montecarlo) {
-    uiManager.updateDataRow(row, (person1.age - params.startingAge) / (100 - params.startingAge));
-  }
 }
