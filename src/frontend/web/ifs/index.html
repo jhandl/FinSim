@@ -482,7 +482,7 @@
 
   <!-- SYSTEM UTILITIES SECTION -->
   <script src="/src/frontend/AbstractUI.js?v=20251101"></script>
-  <script src="/src/frontend/UIManager.js?v=20260331-19"></script>
+  <script src="/src/frontend/UIManager.js?v=20260402-5"></script>
   <script src="/src/frontend/web/utils/DOMUtils.js?v=20260331-2"></script>
   <script src="/src/frontend/web/utils/DeviceUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/FormatUtils.js?v=20260328-1"></script>
@@ -497,11 +497,11 @@
   <script src="/src/frontend/web/utils/ValidationUtils.js?v=20251101"></script>
   <script src="/src/frontend/web/utils/RelocationUtils.js?v=20260331-8"></script>
   <script src="/src/frontend/web/utils/DebugLogUtils.js?v=20260301"></script>
-  <script src="/src/frontend/web/components/DynamicSectionManager.js?v=20260331-10"></script>
+  <script src="/src/frontend/web/components/DynamicSectionManager.js?v=20260402-2"></script>
   <script src="/src/frontend/web/components/DynamicSectionVisibilityEngine.js?v=20260204-1"></script>
   <script src="/src/frontend/web/components/DynamicSectionsConfig.js?v=20260328-1"></script>
   <script src="/src/frontend/web/components/DynamicSectionsManager.js?v=2026-01-10-1"></script>
-  <script src="/src/frontend/web/components/TableManager.js?v=20260331-18"></script>
+  <script src="/src/frontend/web/components/TableManager.js?v=20260402-4"></script>
   <script src="/src/frontend/web/components/RelocationSplitSuggestion.js?v=20260327-1"></script>
   <script src="/src/frontend/web/components/EventsTableManager.js?v=20260331-35"></script>
   <script src="/src/frontend/web/components/RelocationImpactDetector.js?v=20260330-6"></script>
@@ -1412,8 +1412,10 @@
           }
 
           .data-section {
+            width: 100%;
+            min-width: 0;
             max-width: 100%;
-            overflow-x: auto;
+            overflow: visible;
             justify-self: center;
           }
         }
