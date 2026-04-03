@@ -100,15 +100,19 @@ async function run() {
   deterministicProgressStepForRun = 1;
   var progressStep = Math.max(1, Math.floor(runs / 100));
   if (supportsProgressUpdates) {
-    uiManager.updateProgress("Running...", 0);
+    uiManager.updateProgress(montecarlo ? "1" : "Running...", 0);
   } else {
     uiManager.updateProgress("Running");
   }
   for (currentRun = 0; currentRun < runs; currentRun++) {
+    if (supportsProgressUpdates && montecarlo) {
+      var runProgress = ((currentRun + 1) / runs) * loopProgressMaxForRun;
+      uiManager.updateProgress(String(currentRun + 1), runProgress);
+    }
     successes += await runSimulation();
     if (supportsProgressUpdates && montecarlo && runs > 1 && (((currentRun + 1) % progressStep === 0) || currentRun === runs - 1)) {
       var progress = ((currentRun + 1) / runs) * loopProgressMaxForRun;
-      uiManager.updateProgress("Running...", progress);
+      uiManager.updateProgress(String(currentRun + 1), progress);
       await yieldToBrowserFrame();
     }
   }

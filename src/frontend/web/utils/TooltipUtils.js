@@ -128,7 +128,6 @@ class TooltipUtils {
     // Mobile long-press events
     if (!SUPPRESS_TOUCH) {
       element.addEventListener('touchstart', () => {
-        if (window.innerWidth > 768) return;
         longPressTimer = setTimeout(showTooltip, TOUCH_DELAY);
       }, { passive: true });
       const touchHide = () => {
@@ -287,7 +286,6 @@ class TooltipUtils {
     } else {
       el.textContent = text;
     }
-    
     return el;
   }
 

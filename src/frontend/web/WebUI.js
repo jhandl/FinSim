@@ -148,7 +148,7 @@ class WebUI extends AbstractUI {
     } else {
       // Guard against overwriting active statuses
       const currentText = statusElement ? (statusElement.textContent || '') : '';
-      const isRunning = currentText === 'Running...';
+      const isRunning = this.isSimulationRunning || currentText === 'Running...';
       const isError = statusElement && statusElement.classList.contains('error');
       if (!isRunning && !isError) {
         this.setStatus("Ready", STATUS_COLORS.INFO);

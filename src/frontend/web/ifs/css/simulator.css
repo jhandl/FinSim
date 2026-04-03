@@ -2896,6 +2896,14 @@ footer {
   white-space: normal;
 }
 
+/* Improve readability for tablet/phone touch devices that use desktop width */
+@media (hover: none) and (pointer: coarse) {
+  .visualization-tooltip {
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+}
+
 /* Pension contribution tooltip: allow content-driven width on mobile only */
 @media (max-width: 768px) {
   .visualization-tooltip.pension-tooltip {
@@ -2954,8 +2962,8 @@ footer {
 
   /* Mobile tooltip adjustments */
   .visualization-tooltip {
-    max-width: 280px;
-    width: 90vw;
+    max-width: 90vw;
+    width: auto;
     z-index: 10056;
     /* Ensure tooltip remains above mobile dropdown */
     background-color: rgba(0, 0, 0, 0.95);
