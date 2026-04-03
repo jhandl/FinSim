@@ -88,7 +88,8 @@ class MonteCarloTestRunner {
       const simResult = await framework.runSimulation();
 
       if (simResult && simResult.success) {
-        simResult.configuredRuns = vm.runInContext('config.simulationRuns', ctx);
+        simResult.configuredTargetSeconds = vm.runInContext('config.monteCarloTargetSeconds', ctx);
+        simResult.configuredMinRuns = vm.runInContext('config.monteCarloMinRuns', ctx);
         results.push(simResult);
       }
     }
@@ -224,9 +225,8 @@ module.exports = {
         // Gate: ensure all runs actually executed Monte Carlo mode with configured run count.
         for (const result of results) {
           if (result && result.success) {
-            const expectedRuns = result.configuredRuns;
-            if (!result.montecarlo || result.runs !== expectedRuns) {
-              testResults.errors.push(`${scenario.name}: Expected Monte Carlo mode with configured runs=${expectedRuns} (got montecarlo=${!!result.montecarlo}, runs=${result.runs})`);
+            if (!result.montecarlo || typeof result.runs !== 'number' || result.runs < result.configuredMinRuns) {
+              testResults.errors.push(`${scenario.name}: Expected adaptive Monte Carlo mode with at least ${result.configuredMinRuns} runs (got montecarlo=${!!result.montecarlo}, runs=${result.runs}, targetSeconds=${result.configuredTargetSeconds})`);
               testResults.success = false;
               continue;
             }

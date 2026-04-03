@@ -4,6 +4,8 @@ class WebUI extends AbstractUI {
 
   constructor() {
     super();
+    this.statusRunsTooltipDelayMs = 2500;
+    this.lastMonteCarloRuns = null;
 
     // Initialize simulation state tracking
     this.isSimulationRunning = false;
@@ -77,6 +79,7 @@ class WebUI extends AbstractUI {
     this.setupCursorEndOnFocus(); // Ensure caret is placed at the end when inputs receive focus
     this.setupMobileLongPressHelp(); // Long-press on inputs/selects opens contextual help on mobile
     this.setupStatusClickHandler(); // Setup click handler for relocation impact status
+    this.setupStatusRunsTooltip(); // Delayed tooltip showing Monte Carlo runs on success status
     this.parameterTooltipTimeout = null; // Reference to parameter tooltip delay timeout
 
     // Defer adding the initial empty event row until after Config is initialized
@@ -102,6 +105,14 @@ class WebUI extends AbstractUI {
 
   setStatus(message, color = STATUS_COLORS.INFO, progress = null) {
     this.notificationUtils.setStatus(message, color, progress);
+  }
+
+  setMonteCarloRunsTooltip(runs) {
+    if (typeof runs === 'number' && isFinite(runs) && runs > 0) {
+      this.lastMonteCarloRuns = Math.round(runs);
+      return;
+    }
+    this.lastMonteCarloRuns = null;
   }
 
   showTableRenderOverlay() {
@@ -202,6 +213,25 @@ class WebUI extends AbstractUI {
           }
         });
       }
+    });
+  }
+
+  setupStatusRunsTooltip() {
+    const getRunsTooltipText = () => {
+      if (!this.lastMonteCarloRuns) return '';
+      const statusEl = document.getElementById('progress');
+      const text = statusEl ? String(statusEl.textContent || '').trim() : '';
+      if (text.indexOf('Success ') !== 0) return '';
+      return `${this.lastMonteCarloRuns} runs`;
+    };
+
+    ['progress', 'progressMobile'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el || typeof TooltipUtils === 'undefined' || !TooltipUtils.attachTooltip) return;
+      TooltipUtils.attachTooltip(el, getRunsTooltipText, {
+        hoverDelay: this.statusRunsTooltipDelayMs,
+        touchDelay: this.statusRunsTooltipDelayMs
+      });
     });
   }
 

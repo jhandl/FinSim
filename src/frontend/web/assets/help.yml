@@ -437,7 +437,7 @@ WizardSteps:
     tours: [full, mini]
     card: growthRates
     popover:
-      description: "<p>Variable growth mode.</p><p>In this mode, the simulation runs ${simulationRuns} times using both growth rates and volatility. This provides a probability of success rather than a single outcome, accounting for market uncertainty and fluctuations. At least one of the volatility rates must be greater than 0%.</p>"
+      description: "<p>Variable growth mode.</p><p>In this mode, the simulator runs thousands of times using both growth rates and volatility. This provides a probability of success rather than a single outcome, accounting for market uncertainty and fluctuations. At least one of the volatility rates must be greater than 0%.</p>"
       side: "right"
       align: "center"
 

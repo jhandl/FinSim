@@ -1,5 +1,5 @@
 var uiManager, params, events, config, dataSheet, row, errors;
-var year, periods, failedAt, success, montecarlo;
+var year, periods, failedAt, success, montecarlo, monteCarloRunsExecuted;
 var revenue, realEstate, stockGrowthOverride, attributionManager;
 var currentEconomicRegime = null;
 var economicRegimesModel = null;
@@ -48,6 +48,9 @@ const Phases = {
   growth: 'growth',
   retired: 'retired'
 }
+const LOOP_PROGRESS_SHARE = 0.9;
+const MONTE_CARLO_BENCHMARK_RUNS = 10;
+const MONTE_CARLO_REESTIMATE_STEP = 25;
 
 async function yieldToBrowserFrame() {
   if (typeof window !== 'undefined' && typeof requestAnimationFrame === 'function') {
@@ -87,39 +90,70 @@ async function run() {
   perRunResults = (uiManager && uiManager.ui && typeof uiManager.ui.storeSimulationResults === 'function') ? [] : null;
 
   // Allow scenario/tests to override Monte Carlo run count explicitly.
-  // Falls back to config.simulationRuns for existing UI behavior.
   var runsOverride = (params && params.monteCarloRuns !== undefined && params.monteCarloRuns !== null)
     ? (typeof params.monteCarloRuns === 'string' ? parseInt(params.monteCarloRuns, 10) : params.monteCarloRuns)
     : null;
-  let runs = (montecarlo ? ((typeof runsOverride === 'number' && isFinite(runsOverride) && runsOverride > 0) ? runsOverride : config.simulationRuns) : 1);
+  var hasRunsOverride = (typeof runsOverride === 'number' && isFinite(runsOverride) && runsOverride > 0);
+  var adaptiveMonteCarlo = montecarlo && !hasRunsOverride;
+  var minMonteCarloRuns = config.monteCarloMinRuns;
+  if (typeof minMonteCarloRuns !== 'number' || !isFinite(minMonteCarloRuns) || minMonteCarloRuns < 1) {
+    throw new Error('Config.monteCarloMinRuns must be a positive number');
+  }
+  var runs = montecarlo ? (hasRunsOverride ? runsOverride : minMonteCarloRuns) : 1;
+  var cumulativeIterationElapsedMs = 0;
   let successes = 0;
+  monteCarloRunsExecuted = runs;
 
   var supportsProgressUpdates = (typeof SpreadsheetApp === 'undefined');
   supportsProgressUpdatesForRun = supportsProgressUpdates;
-  loopProgressMaxForRun = 0.8;
+  loopProgressMaxForRun = LOOP_PROGRESS_SHARE;
   deterministicProgressStepForRun = 1;
   var progressStep = Math.max(1, Math.floor(runs / 100));
+  var loopProgressValue = 0;
   if (supportsProgressUpdates) {
-    uiManager.updateProgress(montecarlo ? "1" : "Running...", 0);
+    uiManager.updateProgress("Running...", 0);
   } else {
     uiManager.updateProgress("Running");
   }
   for (currentRun = 0; currentRun < runs; currentRun++) {
+    var iterationStartMs = adaptiveMonteCarlo ? Date.now() : 0;
     if (supportsProgressUpdates && montecarlo) {
       var runProgress = ((currentRun + 1) / runs) * loopProgressMaxForRun;
-      uiManager.updateProgress(String(currentRun + 1), runProgress);
+      loopProgressValue = Math.max(loopProgressValue, runProgress);
+      uiManager.updateProgress("Running...", loopProgressValue);
     }
     successes += await runSimulation();
     if (supportsProgressUpdates && montecarlo && runs > 1 && (((currentRun + 1) % progressStep === 0) || currentRun === runs - 1)) {
       var progress = ((currentRun + 1) / runs) * loopProgressMaxForRun;
-      uiManager.updateProgress(String(currentRun + 1), progress);
+      loopProgressValue = Math.max(loopProgressValue, progress);
+      uiManager.updateProgress("Running...", loopProgressValue);
       await yieldToBrowserFrame();
     }
+    if (adaptiveMonteCarlo) {
+      cumulativeIterationElapsedMs += (Date.now() - iterationStartMs);
+      var completedRuns = currentRun + 1;
+      if (completedRuns >= MONTE_CARLO_BENCHMARK_RUNS) {
+        var shouldReestimate = (completedRuns === MONTE_CARLO_BENCHMARK_RUNS) || (completedRuns % MONTE_CARLO_REESTIMATE_STEP === 0);
+        if (shouldReestimate) {
+          var avgIterationMs = Math.max(1, cumulativeIterationElapsedMs / completedRuns);
+          var estimatedRuns = Math.round((config.monteCarloTargetSeconds * 1000) / avgIterationMs);
+          var adjustedRuns = Math.max(minMonteCarloRuns, estimatedRuns);
+          if (adjustedRuns < completedRuns) adjustedRuns = completedRuns;
+          runs = adjustedRuns;
+          monteCarloRunsExecuted = adjustedRuns;
+          progressStep = Math.max(1, Math.floor(adjustedRuns / 100));
+        }
+      }
+    }
   }
+  monteCarloRunsExecuted = runs;
   if (supportsProgressUpdates) {
     uiManager.updateProgress("Running...", loopProgressMaxForRun);
   }
   await uiManager.updateDataSheet(runs, perRunResults);
+  if (supportsProgressUpdates) {
+    uiManager.updateProgress("Running...", 1);
+  }
   uiManager.updateStatusCell(successes, runs);
 }
 

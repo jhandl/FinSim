@@ -48,15 +48,14 @@ module.exports = {
       return { success: false, errors: ['Failed to load scenario'] };
     }
 
+    const measuredSimulationRuns = 3000;
+    framework.currentTest.scenario.parameters.monteCarloRuns = measuredSimulationRuns;
+
     // Warm-up run so the gate measures steady-state MC cost, not one-time setup/JIT.
     const warmupResults = await framework.runSimulation();
     if (!warmupResults || !warmupResults.success) {
       return { success: false, errors: ['Warm-up simulation failed'] };
     }
-
-    const expectedRuns = framework.simulationContext.config.simulationRuns;
-    const measuredSimulationRuns = Math.max(expectedRuns, 3000);
-    framework.simulationContext.config.simulationRuns = measuredSimulationRuns;
 
     const measuredResults = [];
     for (let i = 0; i < 2; i++) {

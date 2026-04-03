@@ -473,7 +473,7 @@ module.exports = {
               getStartCountry: function() { return 'ie'; },
               getDefaultCountry: function() { return 'ie'; },
               isRelocationEnabled: function() { return false; },
-              mobileSimulationRuns: 120,
+              monteCarloTargetSeconds: 3,
               getCachedTaxRuleSet: function() {
                 return {
                   getResolvedInvestmentTypes: function() { return []; },
@@ -522,8 +522,8 @@ module.exports = {
         ({ mobileParams: mobileParams, desktopParams: desktopParams });
       `, ctx);
 
-      assert.strictEqual(result.mobileParams.monteCarloRuns, 120, 'Mobile readParameters should set monteCarloRuns from config.mobileSimulationRuns');
-      assert.strictEqual(result.desktopParams.monteCarloRuns, undefined, 'Desktop readParameters should not set monteCarloRuns override');
+      assert.strictEqual(result.mobileParams.monteCarloRuns, undefined, 'Mobile readParameters should not force a Monte Carlo runs override');
+      assert.strictEqual(result.desktopParams.monteCarloRuns, undefined, 'Desktop readParameters should not force a Monte Carlo runs override');
     } catch (err) {
       errors.push(err.message || String(err));
     }

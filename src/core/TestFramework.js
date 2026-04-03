@@ -121,7 +121,7 @@ class TestFramework {
       // VM Context cleanup - reset all global variables and state
       const contextVarsToReset = [
         'uiManager', 'params', 'events', 'config', 'dataSheet', 'row', 'errors',
-        'age', 'year', 'phase', 'periods', 'failedAt', 'success', 'montecarlo',
+        'age', 'year', 'phase', 'periods', 'failedAt', 'success', 'montecarlo', 'monteCarloRunsExecuted',
         'revenue', 'realEstate', 'stockGrowthOverride', 'netIncome', 'expenses',
         'savings', 'targetCash', 'cashWithdraw', 'cashDeficit', 'incomeStatePension',
         'incomePrivatePension', 'withdrawalRate',
@@ -524,8 +524,8 @@ class TestFramework {
           console.log(`🔧 DEBUG: Config application name: ${configAppName}`);
 
           // Show some key config properties if they exist
-          const simulationRuns = vm.runInContext('Config.getInstance().simulationRuns || "not set"', this.simulationContext);
-          console.log(`🔧 DEBUG: Config simulation runs: ${simulationRuns}`);
+          const targetSeconds = vm.runInContext('Config.getInstance().monteCarloTargetSeconds || "not set"', this.simulationContext);
+          console.log(`🔧 DEBUG: Config Monte Carlo target seconds: ${targetSeconds}`);
         } catch (e) {
           console.log(`🔧 DEBUG: Error accessing config properties: ${e.message}`);
         }
@@ -612,8 +612,7 @@ class TestFramework {
       // Check if Monte Carlo was used and apply averaging
       const montecarlo = vm.runInContext('montecarlo', this.simulationContext);
       if (montecarlo) {
-        const config = vm.runInContext('config', this.simulationContext);
-        const runs = config.simulationRuns;
+        const runs = vm.runInContext('monteCarloRunsExecuted', this.simulationContext);
 
         // Add Monte Carlo metadata to results (median conversion already done in Simulator)
         results.montecarlo = true;

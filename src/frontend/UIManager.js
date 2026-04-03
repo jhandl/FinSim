@@ -74,27 +74,29 @@ class UIManager {
     const scale = montecarlo ? runs : 1;
     const supportsProgress = (typeof window !== 'undefined');
     const preparedRows = new Array(row + 1);
+    const postProcessStart = loopProgressMaxForRun;
+    const postProcessSpan = 1 - postProcessStart;
+    const totalPostUnits = row * 2;
+    let completedPostUnits = 0;
     const prepStep = Math.max(1, Math.floor(row / 20));
-    const prepProgressStart = 0.8;
-    const prepProgressEnd = 0.96;
     for (let i = 1; i <= row; i++) {
       preparedRows[i] = this.buildDisplayDataRow(i, scale);
       if (supportsProgress && (i % prepStep === 0 || i === row)) {
-        const progress = prepProgressStart + ((i / row) * (prepProgressEnd - prepProgressStart));
+        completedPostUnits = i;
+        const progress = postProcessStart + ((completedPostUnits / totalPostUnits) * postProcessSpan);
         this.updateProgress("Running...", progress);
         await this.yieldToBrowserFrame();
       }
     }
     const chartBatchOptions = { skipCashflowUpdate: true, skipAssetsUpdate: true };
     const chartPrepStep = Math.max(1, Math.floor(row / 25));
-    const chartPrepProgressStart = 0.96;
-    const chartPrepProgressEnd = 0.995;
     for (let i = 1; i <= row; i++) {
       const displayData = preparedRows[i];
       if (!displayData) continue;
       this.ui.setChartsRow(i, displayData, chartBatchOptions);
       if (supportsProgress && (i % chartPrepStep === 0 || i === row)) {
-        const chartProgress = chartPrepProgressStart + ((i / row) * (chartPrepProgressEnd - chartPrepProgressStart));
+        completedPostUnits = row + i;
+        const chartProgress = postProcessStart + ((completedPostUnits / totalPostUnits) * postProcessSpan);
         this.updateProgress("Running...", chartProgress);
         await this.yieldToBrowserFrame();
       }
@@ -147,6 +149,9 @@ class UIManager {
       this.ui.markSimulationComplete();
     }
     if (montecarlo) {
+      if (this.ui && typeof this.ui.setMonteCarloRunsTooltip === 'function') {
+        this.ui.setMonteCarloRunsTooltip(runs);
+      }
       let percentSuccess = successes / runs;
       let msg = `Success ${(percentSuccess * 100).toFixed(1)}%`;
       let r = between(255, 160, percentSuccess);
@@ -155,6 +160,9 @@ class UIManager {
       let color = rgbToHex(r, g, b);
       this.ui.setStatus(msg, color);
     } else {
+      if (this.ui && typeof this.ui.setMonteCarloRunsTooltip === 'function') {
+        this.ui.setMonteCarloRunsTooltip(null);
+      }
       if (success || failedAt > params.targetAge) {
         const msg = success ? "Success!" : "Made it to " + failedAt;
         this.ui.setStatus(msg, STATUS_COLORS.SUCCESS);
@@ -415,10 +423,6 @@ class UIManager {
     // StartCountry is always required
     const cfg = Config.getInstance();
     params.StartCountry = cfg.getStartCountry();
-    const isMobileDevice = (typeof DeviceUtils !== 'undefined') && DeviceUtils.isMobile && DeviceUtils.isMobile();
-    if (isMobileDevice && typeof cfg.mobileSimulationRuns === 'number' && cfg.mobileSimulationRuns > 0) {
-      params.monteCarloRuns = cfg.mobileSimulationRuns;
-    }
 
     // Dynamic investment parameters from ruleset
     const ruleset = cfg.getCachedTaxRuleSet(params.StartCountry);
