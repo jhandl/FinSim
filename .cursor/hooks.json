@@ -3,25 +3,25 @@
   "hooks": {
     "beforeReadFile": [
       {
-        "command": "python3 .cursor/hooks/pre-write-template.py",
+        "command": "python3 .cursor/hooks/pre-write.py",
         "failClosed": true
       }
     ],
     "beforeShellExecution": [
       {
-        "command": "python3 .cursor/hooks/pre-write-template.py",
-        "matcher": ".cursor/hooks/pre-write-template.py",
+        "command": "python3 .cursor/hooks/pre-write.py",
+        "matcher": ".cursor/hooks/pre-write.py",
         "failClosed": true
       }
     ],
     "preToolUse": [
       {
-        "command": "python3 .cursor/hooks/pre-write-template.py",
+        "command": "python3 .cursor/hooks/pre-write.py",
         "matcher": "Read",
         "failClosed": true
       },
       {
-        "command": "python3 .cursor/hooks/pre-write-template.py",
+        "command": "python3 .cursor/hooks/pre-write.py",
         "matcher": "Write",
         "failClosed": true
       }
