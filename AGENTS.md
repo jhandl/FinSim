@@ -324,6 +324,7 @@ When running Playwright via `run-tests.sh`, invoke the script **directly** as `.
 *   **Cache busting (web assets):** If you change any JS or CSS used by the web app, update cache-busting so browsers don’t serve stale assets:
     *   **JS changes:** update the `?v=...` parameter in `src/frontend/web/ifs/index.html` (SYSTEM UTILITIES script tags), typically to the current date (and add a suffix if updating more than once per day).
     *   **CSS changes:** update the version parameter at the beginning of that CSS file (when present) and/or the corresponding `?v=...` in `src/frontend/web/ifs/index.html` if the CSS is linked with a cache-buster.
+    *   **ALL changes:** always update the `?v=...` version parameter of the SPA router script `src/frontend/web/spa-router.js` in `index.html`.
 
 ### 5.1. Debugging Protocol (when fixing a bug)
 
