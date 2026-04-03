@@ -25,6 +25,32 @@
     isTouchDevice() {
       return 'ontouchstart' in window || navigator.maxTouchPoints > 0 ||
              (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+    },
+
+    /**
+     * Extra space to reserve at the bottom of the layout viewport when positioning
+     * fixed UI (help bubbles). Narrow phones use screen-vs-inner delta; touch UIs
+     * with no hover (tablets, phones) also use outer-inner and visualViewport gap
+     * so controls are not placed under browser chrome or the home indicator.
+     */
+    popoverBottomInset() {
+      const vh = window.innerHeight;
+      const vw = window.innerWidth;
+      const isNarrow = vw < 500;
+      let raw = 0;
+      if (isNarrow) {
+        raw = Math.max(raw, Math.max(0, window.screen.height - vh));
+      }
+      const expand = isNarrow || (this.isTouchDevice() && window.matchMedia &&
+        window.matchMedia('(hover: none)').matches);
+      if (expand) {
+        raw = Math.max(raw, Math.min(120, Math.max(0, window.outerHeight - vh)));
+        const vv = window.visualViewport;
+        if (vv) {
+          raw = Math.max(raw, Math.max(0, vh - vv.offsetTop - vv.height));
+        }
+      }
+      return raw + (expand ? 12 : 0);
     }
   };
 
