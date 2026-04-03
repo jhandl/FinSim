@@ -24,6 +24,7 @@ class Wizard {
     this.savedScrollPos = 0;
     // Track which tour type is currently being run ('full', 'quick', or 'mini').
     this.currentTourId = 'full';
+    this.currentTourCard = null;
     document.addEventListener('focusin', this.followFocus);
     document.addEventListener('click', this.handleClick);
   }
@@ -803,6 +804,15 @@ class Wizard {
     return fieldType;
   }
 
+  _getAccordionIdForRow(rowId) {
+    const webUI = (typeof WebUI !== 'undefined' && WebUI.getInstance) ? WebUI.getInstance() : null;
+    const mgr = webUI && webUI.eventAccordionManager ? webUI.eventAccordionManager : null;
+    const events = (mgr && Array.isArray(mgr.events)) ? mgr.events : null;
+    if (!events || !rowId) return null;
+    const match = events.find(e => e && e.rowId === rowId);
+    return (match && match.accordionId) ? match.accordionId : null;
+  }
+
   filterValidSteps(stepsOverride = null) {
     // Decide which set of steps we are filtering
     const sourceSteps = stepsOverride || (this.config ? this.config.steps : []);
@@ -927,7 +937,7 @@ class Wizard {
                 accIndex = m && m[1] ? parseInt(m[1], 10) - 1 : 0;
               }
             }
-            const accId = `accordion-item-${accIndex}`;
+            const accId = this._getAccordionIdForRow(this.tableState && this.tableState.rowId) || `accordion-item-${accIndex}`;
             if (step.element.startsWith('.')) {
               // Avoid double-prefixing
               if (!step.element.startsWith('.events-accordion-item[')) {
@@ -960,15 +970,17 @@ class Wizard {
             // Fall through so event-specific guidance for the empty row is evaluated below
           }
           // Non-empty row: keep only if the step explicitly targets this event type
+          let typeAllowed = true;
           if (step.eventTypes) {
-            return step.eventTypes.includes(this.tableState.eventType);
+            typeAllowed = step.eventTypes.includes(this.tableState.eventType);
+          } else if (step.noEventTypes) {
+            typeAllowed = !step.noEventTypes.includes(this.tableState.eventType);
           }
-          if (step.noEventTypes) {
-            return !step.noEventTypes.includes(this.tableState.eventType);
-          }
-          // Generic field (no event type restrictions): keep for dedup stage.
-          // A later pass will collapse duplicates preferring event-specific when available.
-          return true;
+          if (!typeAllowed) return false;
+          // If field is rendered in the expanded accordion item, keep only when visible.
+          // If not rendered yet (collapsed item), keep so exposeHiddenElement can reveal it.
+          const scopedEl = document.querySelector(step.element);
+          return scopedEl ? this.isElementVisible(scopedEl) : true;
         }
 
         // In accordion view handle field steps specially: 
@@ -1124,7 +1136,7 @@ class Wizard {
                   accIdx = m && m[1] ? parseInt(m[1], 10) - 1 : 0;
                 }
               }
-              const accId = `accordion-item-${accIdx}`;
+              const accId = this._getAccordionIdForRow(this.tableState && this.tableState.rowId) || `accordion-item-${accIdx}`;
               if (st.element.startsWith('.')) {
                 if (!st.element.startsWith('.events-accordion-item[')) {
                   st.element = `.events-accordion-item[data-accordion-id="${accId}"] ${st.element}`;
@@ -1307,6 +1319,22 @@ class Wizard {
       return;
     }
 
+    // Enforce deterministic flow for events mini-tour:
+    // section overview -> header toggles -> event fields.
+    if (this.currentTourId === 'mini' && this.currentTourCard === 'events') {
+      const liftedSelectors = ['.events-section', '#viewModeTable', '#viewModeAccordion', '#ageYearModeAge', '#ageYearModeYear'];
+      const lifted = [];
+      liftedSelectors.forEach(sel => {
+        const idx = this.validSteps.findIndex(step => step && step.element === sel);
+        if (idx >= 0) lifted.push(this.validSteps[idx]);
+      });
+      if (lifted.length > 0) {
+        const liftedSet = new Set(lifted);
+        const rest = this.validSteps.filter(step => !liftedSet.has(step));
+        this.validSteps = lifted.concat(rest);
+      }
+    }
+
       // Ensure startingIndex is within bounds
     if (startingIndex >= this.validSteps.length) {
       startingIndex = 0;
@@ -1386,7 +1414,6 @@ class Wizard {
               }
               
               // Identify bubble content source – generic vs event-specific
-              const contentTag = step.eventTypes ? `eventTypes=${step.eventTypes.join('|')}` : 'generic';
             }
 
             // (reverted) expansion-on-highlight – we now expand targets before highlighting in exposeHiddenElement()
@@ -1725,9 +1752,24 @@ class Wizard {
 
         if (canMove) {
           // Calculate target index first
-          const targetIndex = direction === 'next'
+          let targetIndex = direction === 'next'
             ? this.tour.getActiveIndex() + 1
             : this.tour.getActiveIndex() - 1;
+          const activeIndex = this.tour.getActiveIndex();
+          const delta = direction === 'next' ? 1 : -1;
+          while (targetIndex >= 0 && targetIndex < this.validSteps.length) {
+            const candidate = this.validSteps[targetIndex];
+            const selector = candidate && candidate.element ? candidate.element : '';
+            const isAccordionField = !!(this.getCurrentEventsMode && this.getCurrentEventsMode() === 'accordion' &&
+              (selector.includes('.accordion-edit-') || selector.includes('#AccordionEventTypeToggle')));
+            if (!isAccordionField) break;
+            const el = selector ? document.querySelector(selector) : null;
+            if (el && !this.isElementVisible(el)) {
+              targetIndex += delta;
+              continue;
+            }
+            break;
+          }
 
           // Remove focus from the current field if it's an input or select
           if (document.activeElement && document.activeElement.matches('input, select')) {
@@ -1754,7 +1796,12 @@ class Wizard {
           if (targetIndex >= 0 && targetIndex < this.validSteps.length) {
             const targetElement = document.querySelector(this.validSteps[targetIndex].element);
             this.exposeHiddenElement(targetIndex).then(() => {
-              direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
+              const adjacent = targetIndex === activeIndex + delta;
+              if (adjacent) {
+                direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
+              } else {
+                this.tour.drive(targetIndex);
+              }
               const currentIndex = this.tour.getActiveIndex();
               const currentElement = document.querySelector(this.validSteps[currentIndex].element);
               if (currentElement && !this.isMobile) {
@@ -1763,7 +1810,11 @@ class Wizard {
               }
             });
           } else {
-            direction === 'next' ? this.tour.moveNext() : this.tour.movePrevious();
+            if (direction === 'next') {
+              this.finishTour();
+            } else {
+              return;
+            }
           }
         } else {
           // No further step available. Ignore "previous" on the first step,
@@ -2458,6 +2509,7 @@ class Wizard {
     }
 
     const { type = 'help', card = null, startAtStep = undefined } = actualOptions;
+    this.currentTourCard = card;
 
     // Parameter validation
     if (type === 'mini' && !card) {
