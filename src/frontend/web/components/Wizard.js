@@ -654,6 +654,24 @@ class Wizard {
     return true;
   }
 
+  _isSkippableAccordionStep(stepIndex) {
+    if (!this.validSteps || stepIndex < 0 || stepIndex >= this.validSteps.length) return false;
+    const step = this.validSteps[stepIndex];
+    const selector = step && step.element ? step.element : '';
+    const isAccordionField = !!(selector.includes('.accordion-edit-') || selector.includes('#AccordionEventTypeToggle'));
+    if (!isAccordionField) return false;
+    const el = selector ? document.querySelector(selector) : null;
+    return !!(el && !this.isElementVisible(el));
+  }
+
+  _getNavigableStepIndex(activeIndex, delta) {
+    let idx = activeIndex + delta;
+    while (idx >= 0 && idx < this.validSteps.length && this._isSkippableAccordionStep(idx)) {
+      idx += delta;
+    }
+    return idx;
+  }
+
   _getStepVisualPosition(step) {
     if (!step || !step.element) return null;
     const element = document.querySelector(step.element);
@@ -1373,12 +1391,18 @@ class Wizard {
       allowKeyboardControl: true,
       steps: this.validSteps,
       onNextClick: async () => {
-        const nextIdx = this.tour.getActiveIndex() + 1;
-        if (nextIdx < this.validSteps.length) {
-          const nextEl = document.querySelector(this.validSteps[nextIdx].element);
+        const activeIndex = this.tour.getActiveIndex();
+        const nextIdx = this._getNavigableStepIndex(activeIndex, 1);
+
+        if (nextIdx >= 0 && nextIdx < this.validSteps.length) {
           await this.exposeHiddenElement(nextIdx);
+          const nextEl = document.querySelector(this.validSteps[nextIdx].element);
           if (nextEl && !this.isMobile) nextEl.focus();
-          this.tour.moveNext();
+          if (nextIdx === activeIndex + 1) {
+            this.tour.moveNext();
+          } else {
+            this.tour.drive(nextIdx);
+          }
         } else {
           this.finishTour();
         }
@@ -1430,6 +1454,23 @@ class Wizard {
         const nextBtn = document.querySelector('.driver-popover-next-btn');
         if (nextBtn && nextBtn.textContent.trim().toLowerCase() === 'done') {
           nextBtn.classList.add('done');
+        }
+
+        // For mini tours, compute button state from the next *navigable* step.
+        // This keeps "Done" correct when hidden/non-applicable accordion fields are skipped.
+        if (this.currentTourId === 'mini' && nextBtn && this.tour && typeof this.tour.getActiveIndex === 'function') {
+          const activeIdx = this.tour.getActiveIndex();
+          const probe = this._getNavigableStepIndex(activeIdx, 1);
+          const hasNextNavigable = probe >= 0 && probe < this.validSteps.length;
+          if (!hasNextNavigable) {
+            nextBtn.textContent = 'Done';
+            nextBtn.classList.add('done');
+            nextBtn.classList.remove('arrow-next');
+          } else if (nextBtn.textContent.trim().toLowerCase() === 'done') {
+            nextBtn.textContent = 'Next';
+            nextBtn.classList.remove('done');
+            nextBtn.classList.add('arrow-next');
+          }
         }
 
         // Accordion auto-collapse when leaving event - SHARED BY ALL TOUR TYPES
@@ -1752,24 +1793,9 @@ class Wizard {
 
         if (canMove) {
           // Calculate target index first
-          let targetIndex = direction === 'next'
-            ? this.tour.getActiveIndex() + 1
-            : this.tour.getActiveIndex() - 1;
           const activeIndex = this.tour.getActiveIndex();
           const delta = direction === 'next' ? 1 : -1;
-          while (targetIndex >= 0 && targetIndex < this.validSteps.length) {
-            const candidate = this.validSteps[targetIndex];
-            const selector = candidate && candidate.element ? candidate.element : '';
-            const isAccordionField = !!(this.getCurrentEventsMode && this.getCurrentEventsMode() === 'accordion' &&
-              (selector.includes('.accordion-edit-') || selector.includes('#AccordionEventTypeToggle')));
-            if (!isAccordionField) break;
-            const el = selector ? document.querySelector(selector) : null;
-            if (el && !this.isElementVisible(el)) {
-              targetIndex += delta;
-              continue;
-            }
-            break;
-          }
+          const targetIndex = this._getNavigableStepIndex(activeIndex, delta);
 
           // Remove focus from the current field if it's an input or select
           if (document.activeElement && document.activeElement.matches('input, select')) {
