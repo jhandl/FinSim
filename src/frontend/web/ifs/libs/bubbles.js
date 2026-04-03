@@ -293,14 +293,14 @@
 
                 // For long jumps (> viewport height) scroll instantly for snappier UX
                 if (distance > window.innerHeight) {
-                    window.scrollTo({ top: dest, behavior: "auto" });
+                    DOMUtils.scrollWindowTo(dest, "auto");
                     // give browser a moment to render
                     requestAnimationFrame(() => res());
                     return;
                 }
 
                 // Otherwise smooth scroll and wait
-                window.scrollTo({ top: dest, behavior: "smooth" });
+                DOMUtils.scrollWindowTo(dest, "smooth");
 
                 const start = Date.now();
                 const tick = () => {

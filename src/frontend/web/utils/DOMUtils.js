@@ -124,4 +124,39 @@ class DOMUtils {
     element.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  static scrollWindowTo(top, behavior = 'auto') {
+    const targetY = Math.max(0, Number(top) || 0);
+    if (behavior !== 'smooth') {
+      window.scrollTo(0, targetY);
+      return;
+    }
+
+    const startY = window.scrollY || window.pageYOffset || 0;
+    const distance = targetY - startY;
+    if (Math.abs(distance) < 1) {
+      window.scrollTo(0, targetY);
+      return;
+    }
+
+    const durationMs = Math.min(450, Math.max(180, Math.abs(distance) * 0.35));
+    const startTs = Date.now();
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+    const tick = () => {
+      const elapsed = Date.now() - startTs;
+      const t = Math.min(1, elapsed / durationMs);
+      window.scrollTo(0, startY + distance * easeOutCubic(t));
+      if (t < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        window.scrollTo(0, targetY);
+      }
+    };
+    requestAnimationFrame(tick);
+  }
+
+  static scrollWindowBy(deltaY, behavior = 'auto') {
+    const currentY = window.scrollY || window.pageYOffset || 0;
+    this.scrollWindowTo(currentY + (Number(deltaY) || 0), behavior);
+  }
+
 } 

@@ -3529,11 +3529,8 @@ class WebUI extends AbstractUI {
           resolveOnce();
         }, 3000);
 
-        // Start the smooth scroll
-        window.scrollTo({
-          top: Math.max(0, targetScrollY),
-          behavior: 'smooth'
-        });
+        const scrollTargetY = Math.max(0, targetScrollY);
+        DOMUtils.scrollWindowTo(scrollTargetY, 'smooth');
       }, 200);
     });
   }

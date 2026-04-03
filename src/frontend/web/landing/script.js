@@ -122,16 +122,41 @@ function setupPodcastButton() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  const scrollWindowTo = (top, behavior = 'auto') => {
+    const targetY = Math.max(0, Number(top) || 0);
+    if (behavior !== 'smooth') {
+      window.scrollTo(0, targetY);
+      return;
+    }
+    const startY = window.scrollY || window.pageYOffset || 0;
+    const distance = targetY - startY;
+    if (Math.abs(distance) < 1) {
+      window.scrollTo(0, targetY);
+      return;
+    }
+    const durationMs = Math.min(450, Math.max(180, Math.abs(distance) * 0.35));
+    const startTs = Date.now();
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+    const tick = () => {
+      const elapsed = Date.now() - startTs;
+      const t = Math.min(1, elapsed / durationMs);
+      window.scrollTo(0, startY + distance * easeOutCubic(t));
+      if (t < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        window.scrollTo(0, targetY);
+      }
+    };
+    requestAnimationFrame(tick);
+  };
+
   // Handle scroll links
   document.querySelectorAll('[data-scroll-to]').forEach(link => {
     link.addEventListener('click', (e) => {
       const targetId = link.getAttribute('data-scroll-to');
       const targetElement = document.querySelector(`#${targetId}`);
       if (targetElement) {
-        window.scrollTo({
-          top: targetElement.offsetTop - 80, // Offset for header
-          behavior: 'smooth'
-        });
+        scrollWindowTo(targetElement.offsetTop - 80, 'smooth'); // Offset for header
       }
     });
   });

@@ -2631,7 +2631,7 @@ class EventAccordionManager {
         const maxAllowedDownScroll = Math.max(0, itemTopBefore - TOP_MARGIN);
         const appliedDownScroll = Math.min(diff, maxAllowedDownScroll);
         if (appliedDownScroll > 0) {
-          window.scrollBy({ top: appliedDownScroll, behavior: 'smooth' });
+          DOMUtils.scrollWindowBy(appliedDownScroll, 'smooth');
         }
         // Do not early-return; we will perform a follow-up top safety check below
       }
@@ -2643,7 +2643,7 @@ class EventAccordionManager {
         const itemTopNow = item.getBoundingClientRect().top;
         if (itemTopNow < TOP_MARGIN) {
           const adjust = itemTopNow - TOP_MARGIN;
-          window.scrollBy({ top: adjust, behavior: 'smooth' });
+          DOMUtils.scrollWindowBy(adjust, 'smooth');
         }
       };
 
