@@ -171,9 +171,12 @@ class TableManager {
       this._lastCountry = currentCountry;
     }
 
+    let taxHeaderRow = null;
+    const isEmptyHeaderRow = !data || !isFinite(data.Age);
+
     // Insert country-specific tax header row when needed
     if (needsNewTaxHeader && currentCountry) {
-      const taxHeaderRow = this._createTaxHeaderRow(currentCountry, data.Age);
+      taxHeaderRow = this._createTaxHeaderRow(currentCountry, data.Age);
 
       // Insert before the current data row
       const existingRow = document.getElementById(`data_row_${rowIndex}`);
@@ -183,21 +186,16 @@ class TableManager {
         tbody.appendChild(taxHeaderRow);
       }
 
-      // Empty table (pre-simulation): distribute dynamic header cells across
-      // the full dynamic section width so they don't bunch to the left.
-      try {
-        const age = data ? data.Age : null;
-        if (age === null || age === undefined || !isFinite(age)) {
-          this._applyEmptyStateFlexLayoutToDynamicSectionHeaderRow(taxHeaderRow);
-        }
-      } catch (_) { }
-
       // Register with IntersectionObserver for sticky behavior
       this._registerTaxHeader(taxHeaderRow);
       try { this._applyVisibilityEngineToEnabledSections(tbody); } catch (_) { }
     }
 
     this._updateDynamicSectionGroupColSpans();
+    if (taxHeaderRow && isEmptyHeaderRow) {
+      try { this._syncDynamicSectionColSpansToSectionMaxVisible(tbody); } catch (_) { }
+      try { this._applyEmptyStateFlexLayoutToDynamicSectionHeaderRow(taxHeaderRow); } catch (_) { }
+    }
 
     const blueprint = this._buildRowBlueprint(currentCountry);
     const boundarySet = this._computeGroupBoundarySet(blueprint);
@@ -1380,7 +1378,7 @@ class TableManager {
   /**
    * Pre-simulation empty-state layout for dynamic (flexbox) section headers.
    * When the table has no data rows yet, DynamicSectionManager.finalizeSectionWidths()
-   * hasn't run, so flex items have no explicit widths and can bunch up visually.
+   * hasn't run, so the visible header cells need explicit content widths.
    *
    * finalizeSectionWidths() will override these styles once real data exists.
    *
@@ -1397,7 +1395,6 @@ class TableManager {
       const sectionCfg = this.dynamicSectionsManager.getSectionConfig(sectionId);
       const emptyState = (sectionCfg && sectionCfg.emptyState) ? sectionCfg.emptyState : {};
       const minWidthByKey = emptyState.minWidthByKey || {};
-      const minWeightAvgFactorByKey = emptyState.minWeightAvgFactorByKey || {};
 
       const flex = container.querySelector('.dynamic-section-flex');
       if (!flex) return;
@@ -1408,47 +1405,96 @@ class TableManager {
       });
       if (cells.length === 0) return;
 
-      const weights = [];
       const labelWidths = [];
       for (let i = 0; i < cells.length; i++) {
-        const w = cells[i].scrollWidth || 0;
-        weights.push(Math.max(1, Math.round(w)));
-        labelWidths.push(w);
+        labelWidths.push(this._measureDynamicSectionHeaderCellWidth(cells[i]));
       }
-
-      let avgWeight = 0;
-      for (let i = 0; i < weights.length; i++) avgWeight += weights[i];
-      avgWeight = weights.length ? (avgWeight / weights.length) : 0;
+      let totalWidth = 0;
 
       for (let i = 0; i < cells.length; i++) {
         const cell = cells[i];
         const key = cell.getAttribute('data-key');
-        let weight = weights[i] || 1;
-
-        const factor = minWeightAvgFactorByKey[key];
-        if (factor && avgWeight) {
-          weight = Math.max(weight, Math.round(avgWeight * factor));
-        }
-
-        try { cell.style.width = ''; } catch (_) { }
-
-        const minWidthPolicy = minWidthByKey[key];
+        const minWidthPolicy = Object.prototype.hasOwnProperty.call(minWidthByKey, key) ? minWidthByKey[key] : 'label';
+        let resolvedWidth = 0;
         if (minWidthPolicy === 'label') {
-          const labelWidth = labelWidths[i] || 0;
-          const MIN_COL_PX = 100;
-          const w = Math.max(MIN_COL_PX, labelWidth || 0);
-          try { cell.style.minWidth = w ? `${w}px` : '0px'; } catch (_) { }
-        } else {
-          try { cell.style.minWidth = '0px'; } catch (_) { }
+          resolvedWidth = labelWidths[i] || 0;
+        } else if (typeof minWidthPolicy === 'number' && isFinite(minWidthPolicy)) {
+          resolvedWidth = Math.max(0, Math.round(minWidthPolicy));
         }
-
-        try { cell.style.flexGrow = String(weight); } catch (_) { }
+        totalWidth += resolvedWidth;
+        try { cell.style.width = ''; } catch (_) { }
+        try { cell.style.minWidth = resolvedWidth ? `${resolvedWidth}px` : '0px'; } catch (_) { }
+        try { cell.style.maxWidth = ''; } catch (_) { }
+        try { cell.style.flexGrow = '1'; } catch (_) { }
         try { cell.style.flexShrink = '1'; } catch (_) { }
         try { cell.style.flexBasis = '0px'; } catch (_) { }
+        try { cell.style.flex = '1 1 0px'; } catch (_) { }
         try { cell.style.overflow = 'hidden'; } catch (_) { }
         try { cell.style.textOverflow = 'ellipsis'; } catch (_) { }
       }
+
+      const sectionMinWidth = totalWidth + Math.max(0, cells.length - 1);
+      try { flex.style.width = ''; } catch (_) { }
+      try { flex.style.minWidth = sectionMinWidth ? `${sectionMinWidth}px` : '0px'; } catch (_) { }
+      try { flex.style.maxWidth = ''; } catch (_) { }
+      try { container.style.width = ''; } catch (_) { }
+      try { container.style.minWidth = sectionMinWidth ? `${sectionMinWidth}px` : '0px'; } catch (_) { }
+      try { container.style.maxWidth = ''; } catch (_) { }
     });
+  }
+
+  _measureDynamicSectionHeaderCellWidth(cell) {
+    if (!cell) return 0;
+
+    const label = cell.querySelector('.cell-content');
+    let width = Math.ceil((label && label.scrollWidth) || cell.scrollWidth || 0);
+    const measuredTextWidth = this._measureDynamicSectionHeaderTextWidth(label || cell);
+    if (measuredTextWidth > width) width = measuredTextWidth;
+    const style = (typeof window !== 'undefined' && window.getComputedStyle) ? window.getComputedStyle(cell) : null;
+    if (style) {
+      width += Math.ceil(parseFloat(style.paddingLeft) || 0);
+      width += Math.ceil(parseFloat(style.paddingRight) || 0);
+      width += Math.ceil(parseFloat(style.borderLeftWidth) || 0);
+      width += Math.ceil(parseFloat(style.borderRightWidth) || 0);
+    }
+    return width;
+  }
+
+  _measureDynamicSectionHeaderTextWidth(referenceEl) {
+    if (!referenceEl || typeof document === 'undefined' || !document.body || typeof window === 'undefined' || !window.getComputedStyle) {
+      return 0;
+    }
+
+    const text = referenceEl.textContent || '';
+    if (!text) return 0;
+
+    const probe = document.createElement('span');
+    probe.textContent = text;
+    probe.setAttribute('aria-hidden', 'true');
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    probe.style.whiteSpace = 'nowrap';
+    probe.style.left = '-99999px';
+    probe.style.top = '0';
+    probe.style.pointerEvents = 'none';
+
+    try {
+      const refStyle = window.getComputedStyle(referenceEl);
+      probe.style.font = refStyle.font;
+      probe.style.fontFamily = refStyle.fontFamily;
+      probe.style.fontSize = refStyle.fontSize;
+      probe.style.fontWeight = refStyle.fontWeight;
+      probe.style.fontStyle = refStyle.fontStyle;
+      probe.style.letterSpacing = refStyle.letterSpacing;
+      probe.style.wordSpacing = refStyle.wordSpacing;
+      probe.style.textTransform = refStyle.textTransform;
+      probe.style.textRendering = refStyle.textRendering;
+    } catch (_) { }
+
+    document.body.appendChild(probe);
+    const width = Math.ceil((probe.getBoundingClientRect && probe.getBoundingClientRect().width) || probe.scrollWidth || 0);
+    probe.remove();
+    return width;
   }
 
   /**

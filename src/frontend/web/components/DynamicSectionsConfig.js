@@ -32,16 +32,6 @@ const DYNAMIC_SECTIONS = [
         IncomeDefinedBenefit: 'label',
         IncomeTaxFree: 'label',
         IncomeCash: 'label'
-      },
-      minWeightAvgFactorByKey: {
-        IncomeSalaries: 0.9,
-        IncomeRentals: 0.9,
-        IncomeRSUs: 0.9,
-        IncomePrivatePension: 0.9,
-        IncomeStatePension: 0.9,
-        IncomeDefinedBenefit: 0.9,
-        IncomeTaxFree: 0.9,
-        IncomeCash: 0.9
       }
     },
     getColumns: function (countryCode) {
@@ -194,8 +184,7 @@ const DYNAMIC_SECTIONS = [
       }
     },
     emptyState: {
-      minWidthByKey: { PensionContribution: 'label' },
-      minWeightAvgFactorByKey: { PensionContribution: 0.85 }
+      minWidthByKey: { PensionContribution: 'label' }
     },
     getColumns: (countryCode) => {
       const config = Config.getInstance();
