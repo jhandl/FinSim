@@ -220,6 +220,7 @@ test('Wizard.filterValidSteps keeps generic steps when only a single empty NOP r
   const frame = await loadSimulator(page);
   // No additional rows/events – initial row is NOP and empty
   await switchToAccordion(frame);
+  const firstAccordionId = await getAccordionIdByIndex(frame, 0);
 
   // Generic step (no eventTypes)
   const steps = [
@@ -232,7 +233,7 @@ test('Wizard.filterValidSteps keeps generic steps when only a single empty NOP r
   const filtered = await runFilterValidSteps(frame, steps);
   expect(filtered.length).toBe(1);
   expect(filtered[0].element.startsWith(
-    '.events-accordion-item[data-accordion-id="accordion-item-0"]'
+    `.events-accordion-item[data-accordion-id="${firstAccordionId}"]`
   )).toBe(true);
 });
 
@@ -248,7 +249,7 @@ test('Wizard.filterValidSteps prefers event-specific step over generic and scope
   // row_1 already exists, we just repurpose it
   await setEventType(frame, 1, 'SI');
   await switchToAccordion(frame);
-  await focusAccordionRow(frame, 0); // row_1
+  const firstAccordionId = await focusAccordionRow(frame, 0); // row_1
 
   const steps = [
     { element: '#AccordionEventTypeToggle_row_1', eventTypes: ['SI'] },
@@ -264,7 +265,7 @@ test('Wizard.filterValidSteps prefers event-specific step over generic and scope
   expect(nameStep).toBeDefined();
   expect(nameStep.eventTypes).toEqual(['SI']);
   expect(nameStep.element.startsWith(
-    '.events-accordion-item[data-accordion-id="accordion-item-0"]'
+    `.events-accordion-item[data-accordion-id="${firstAccordionId}"]`
   )).toBe(true);
 });
 
@@ -272,28 +273,28 @@ test('Wizard.filterValidSteps prefers event-specific step over generic and scope
 // TEST 3 – Generic vs event-specific precedence (fallback to generic when mismatch)
 //----------------------------------------------------------------------------------------------------------------------
 
-test('Wizard.filterValidSteps falls back to generic step when no event-specific match exists', async ({ page }) => {
+test('Wizard.filterValidSteps falls back to generic visible step when no event-specific match exists', async ({ page }) => {
   const frame = await loadSimulator(page);
 
-  // Create BONUS row under row_2
+  // Create a stock market row under row_2
   await addEventRows(frame, 1); // row_2
   await setEventType(frame, 2, 'SM');
 
   await switchToAccordion(frame);
-  await focusAccordionRow(frame, 1); // row_2
+  const secondAccordionId = await focusAccordionRow(frame, 1); // row_2
 
   const steps = [
-    { element: '.accordion-edit-amount', 'accordion-element': '.accordion-edit-amount' },
-    { element: '.accordion-edit-amount', 'accordion-element': '.accordion-edit-amount', eventTypes: ['SI'] }
+    { element: '.accordion-edit-rate', 'accordion-element': '.accordion-edit-rate' },
+    { element: '.accordion-edit-rate', 'accordion-element': '.accordion-edit-rate', eventTypes: ['SI'] }
   ];
 
   const filtered = await runFilterValidSteps(frame, steps);
 
   expect(filtered.length).toBe(1);
-  const amtStep = filtered[0];
-  expect(amtStep.eventTypes).toBeUndefined();
-  expect(amtStep.element.startsWith(
-    '.events-accordion-item[data-accordion-id="accordion-item-1"]'
+  const rateStep = filtered[0];
+  expect(rateStep.eventTypes).toBeUndefined();
+  expect(rateStep.element.startsWith(
+    `.events-accordion-item[data-accordion-id="${secondAccordionId}"]`
   )).toBe(true);
 });
 
@@ -337,23 +338,23 @@ test('Wizard.filterValidSteps correctly updates selector scoping across consecut
   await switchToAccordion(frame);
 
   const baseSteps = [
-    { element: '.accordion-edit-name', 'accordion-element': '.accordion-edit-name', eventTypes: ['SI'] },
-    { element: '.accordion-edit-name', 'accordion-element': '.accordion-edit-name', eventTypes: ['M'] }
+    { element: '.accordion-edit-rate', 'accordion-element': '.accordion-edit-rate', eventTypes: ['SI'] },
+    { element: '.accordion-edit-rate', 'accordion-element': '.accordion-edit-rate', eventTypes: ['M'] }
   ];
 
   // First run – SALARY on row_2
-  await focusAccordionRow(frame, 1);
+  const salaryAccordionId = await focusAccordionRow(frame, 1);
   let filtered = await runFilterValidSteps(frame, baseSteps);
   expect(filtered.length).toBe(1);
   expect(filtered[0].eventTypes).toEqual(['SI']);
-  expect(filtered[0].element).toContain('accordion-item-1');
+  expect(filtered[0].element).toContain(salaryAccordionId);
 
   // Second run – MORTGAGE on row_6
-  await focusAccordionRow(frame, 5);
+  const mortgageAccordionId = await focusAccordionRow(frame, 5);
   filtered = await runFilterValidSteps(frame, baseSteps);
   expect(filtered.length).toBe(1);
   expect(filtered[0].eventTypes).toEqual(['M']);
-  expect(filtered[0].element).toContain('accordion-item-5');
+  expect(filtered[0].element).toContain(mortgageAccordionId);
 });
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -536,11 +537,7 @@ test('Mini tour in accordion view auto-expands and collapses first event', async
     });
 
     if (selector && selector.includes('.events-accordion-item')) {
-      expect(selector).toContain('accordion-item-0');
-    }
-
-    if (selector && selector.includes('.events-accordion-item')) {
-      expect(selector).toContain('accordion-item-0');
+      expect(selector).toContain(firstAccordionId);
     }
 
     const nextBtn = frame.locator('.driver-popover button:has-text("Next"), .driver-popover button:has-text("Done")');
@@ -634,7 +631,7 @@ test('Mini tour in accordion view uses pre-expanded second event', async ({ page
       })();
     });
     if (sel && sel.includes('.events-accordion-item')) {
-      expect(sel).toContain('accordion-item-1');
+      expect(sel).toContain(secondAccordionId);
     }
 
     const nextBtn = frame.locator('.driver-popover button:has-text("Next"), .driver-popover button:has-text("Done")');
@@ -738,7 +735,7 @@ test('Mini tour in accordion view scopes fields for EXPENSE event', async ({ pag
 
   const accordionScoped = [...encountered].filter((s) => s.includes('.events-accordion-item'));
   expect(accordionScoped.length).toBeGreaterThan(0);
-  accordionScoped.forEach((s) => expect(s).toContain('accordion-item-0'));
+  accordionScoped.forEach((s) => expect(s).toContain(firstAccordionId));
 });
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -762,7 +759,7 @@ test('Mini tour in accordion view scopes fields for STOCK MARKET event', async (
   const encountered = new Set(selectors.filter(Boolean));
   const accordionScoped = [...encountered].filter((s) => s.includes('.events-accordion-item'));
   expect(accordionScoped.length).toBeGreaterThan(0);
-  accordionScoped.forEach((s) => expect(s).toContain('accordion-item-0'));
+  accordionScoped.forEach((s) => expect(s).toContain(firstAccordionId));
 });
 
 //----------------------------------------------------------------------------------------------------------------------

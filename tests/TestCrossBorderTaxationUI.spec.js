@@ -35,6 +35,7 @@ async function runSimulation(frame) {
 }
 
 async function waitForDataRows(frame) {
+  await ensureDetailedDataTableVisible(frame);
   await expect.poll(async () => {
     return await frame.locator('#Data tbody tr:not(.tax-header)').count();
   }, { timeout: 60000 }).toBeGreaterThan(0);
