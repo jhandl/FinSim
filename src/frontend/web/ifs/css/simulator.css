@@ -5360,3 +5360,189 @@ footer {
   align-items: flex-end;
   gap: 1rem;
 }
+
+/* Visual refresh aligned with the landing page style language.
+   Colors/surfaces only: no spacing, layout, or typography-size changes. */
+:root {
+  --primary-color: #2563eb;
+  --secondary-color: #1d4ed8;
+  --background-color: #f5f8fd;
+  --card-background: #ffffff;
+  --text-color: #334155;
+  --border-color: #d8e1ee;
+  --box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --surface-muted: #f3f7fc;
+  --surface-group: #e6eef8;
+  --surface-alt: #f8fbff;
+  --table-divider-color: #70839a;
+  --header-glass-bg: rgba(255, 255, 255, 0.88);
+  --header-glass-border: rgba(216, 225, 238, 0.95);
+  --focus-ring-color: rgba(37, 99, 235, 0.16);
+}
+
+body {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(59, 130, 246, 0.07), transparent 36%),
+    radial-gradient(circle at 82% 86%, rgba(96, 165, 250, 0.08), transparent 34%),
+    var(--background-color);
+}
+
+header {
+  background-color: var(--header-glass-bg);
+  border-bottom: 1px solid var(--header-glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+.mobile-menu {
+  background-color: var(--card-background);
+  border: 1px solid var(--border-color);
+  border-top: none;
+}
+
+.mobile-menu-button {
+  background-color: var(--card-background);
+}
+
+.mobile-menu-button:hover {
+  background-color: var(--surface-muted);
+}
+
+.card,
+.events-section,
+.graph-container,
+.data-section {
+  border: 1px solid var(--border-color);
+  box-shadow: var(--box-shadow);
+}
+
+input:focus {
+  box-shadow: 0 0 0 2px var(--focus-ring-color);
+}
+
+.primary-button {
+  background: linear-gradient(135deg, var(--primary-color) 0%, #1f58d6 100%);
+  border-color: #1f58d6;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.28);
+}
+
+.primary-button:hover {
+  background: linear-gradient(135deg, var(--secondary-color) 0%, #1e40af 100%);
+  border-color: #1e40af;
+}
+
+/* Match landing CTA style for Run button only. */
+#runSimulation.primary-button,
+#runSimulationMobile.primary-button {
+  background: linear-gradient(135deg, #6f9ad8 0%, #5989cf 50%, #3f72bf 100%);
+  border-color: #3f72bf;
+  box-shadow: 0 4px 14px rgba(79, 129, 202, 0.3), 0 2px 4px rgba(79, 129, 202, 0.15);
+}
+
+#runSimulation.primary-button:hover,
+#runSimulationMobile.primary-button:hover {
+  background: linear-gradient(135deg, #658fcf 0%, #4f80c8 50%, #3668b3 100%);
+  border-color: #3668b3;
+}
+
+.secondary-button {
+  background: #edf3ff;
+  color: #1e4fc6;
+  border-color: #c8d8f7;
+}
+
+.secondary-button:hover {
+  background: #e3ecfc;
+  border-color: #aec4ef;
+}
+
+.status-indicator,
+.mobile-menu-status {
+  background-color: #f7faff;
+  border-color: #ced9eb;
+  color: var(--text-color);
+}
+
+.status-indicator.error:hover,
+.status-indicator.relocation-impact:hover {
+  background-color: #eef4fd;
+}
+
+.card-info-icon {
+  background: var(--card-background);
+}
+
+.card-info-icon:hover {
+  background: #e9f0ff;
+}
+
+th,
+#Events th,
+.accordion-header-row,
+#Data th,
+#Data th.dynamic-section-container .dynamic-section-cell,
+#Data tbody tr.tax-header th.dynamic-section-container .dynamic-section-cell,
+#Data thead tr:last-child,
+#Data thead tr:last-child th,
+#Data tbody tr.tax-header th,
+#Data tbody tr.tax-header th:nth-child(1),
+#Data tbody tr.tax-header th:nth-child(2),
+#Data thead tr:last-child th:nth-child(1),
+#Data thead tr:last-child th:nth-child(2) {
+  background-color: var(--surface-muted);
+}
+
+#Data .header-groups th,
+#Data thead tr:first-child th:not(:first-child):not(:last-child) {
+  background-color: var(--surface-group);
+  border-top-color: var(--table-divider-color);
+  border-bottom-color: var(--table-divider-color);
+}
+
+#Data .header-groups th:first-child,
+#Data .header-groups th:last-child,
+#Data thead tr:first-child th:first-child {
+  background-color: var(--card-background);
+}
+
+#Data .header-groups th:first-child,
+#Data .header-groups th:nth-child(2),
+#Data .header-groups th:nth-child(3),
+#Data .header-groups th:nth-child(4),
+#Data .header-groups th:nth-child(5),
+#Data .header-groups th:nth-child(6),
+#Data thead tr:nth-child(2) th[data-group-end="1"],
+#Data tbody td[data-group-end="1"],
+#Data tbody tr.tax-header th[data-group-end="1"] {
+  border-right-color: var(--table-divider-color);
+}
+
+#Data td:nth-child(1),
+#Data th:nth-child(1) {
+  border-left-color: var(--table-divider-color);
+}
+
+#Data thead tr:last-child th,
+#Data tbody tr.tax-header th {
+  border-bottom-color: var(--table-divider-color);
+}
+
+#Data thead tr:last-child::after,
+#Data tbody tr.tax-header::after {
+  border-bottom-color: var(--table-divider-color);
+}
+
+#Data tbody tr:nth-child(even) {
+  background-color: var(--surface-alt);
+}
+
+#Data tbody td:nth-child(1),
+#Data tbody td:nth-child(2) {
+  background-color: var(--card-background);
+}
+
+#Data tbody tr:nth-child(even) td:nth-child(1),
+#Data tbody tr:nth-child(even) td:nth-child(2) {
+  background-color: var(--surface-alt);
+}

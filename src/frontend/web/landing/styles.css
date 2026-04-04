@@ -3,13 +3,13 @@
 
 /* Modern Color System - Sophisticated cohesive palette */
 :root {
-  /* Core brand colors - deep sophisticated teal-blue */
-  --primary-600: #0d7377;
-  --primary-500: #14a098;
-  --primary-400: #2ccdc4;
-  --primary-300: #4de1d9;
-  --primary-100: rgba(20, 160, 152, 0.1);
-  --primary-50: rgba(20, 160, 152, 0.05);
+  /* Core brand colors - aligned with simulator blues */
+  --primary-600: #3f6fbc;
+  --primary-500: #4f81ca;
+  --primary-400: #72a2dd;
+  --primary-300: #98bbe7;
+  --primary-100: rgba(79, 129, 202, 0.1);
+  --primary-50: rgba(79, 129, 202, 0.05);
 
   /* Secondary accent - warm amber */
   --accent-500: #f4a261;
@@ -83,9 +83,9 @@
   /* Gradient backgrounds - sophisticated muted tones */
   --gradient-hero: linear-gradient(135deg, #f0fdfa 0%, #f0f9ff 25%, #f5f3ff 50%, #fdf4ff 75%, #fff7ed 100%);
   --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,252,255,0.95) 100%);
-  --gradient-cta: linear-gradient(135deg, #0d7377 0%, #14a098 50%, #2ccdc4 100%);
+  --gradient-cta: linear-gradient(135deg, #6f9ad8 0%, #5989cf 50%, #3f72bf 100%);
   --gradient-accent: linear-gradient(135deg, rgba(244, 162, 97, 0.15) 0%, rgba(244, 162, 97, 0.05) 100%);
-  --gradient-mesh: radial-gradient(ellipse at 20% 20%, rgba(20, 160, 152, 0.08) 0%, transparent 50%),
+  --gradient-mesh: radial-gradient(ellipse at 20% 20%, rgba(79, 129, 202, 0.08) 0%, transparent 50%),
                     radial-gradient(ellipse at 80% 80%, rgba(244, 162, 97, 0.08) 0%, transparent 50%),
                     radial-gradient(ellipse at 50% 50%, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
 }
@@ -320,8 +320,8 @@ nav ul li a:hover {
   border-radius: var(--radius-md);
   font-weight: 600;
   font-size: var(--text-base);
-  box-shadow: 0 4px 14px rgba(13, 115, 119, 0.4),
-              0 2px 4px rgba(13, 115, 119, 0.2);
+  box-shadow: 0 4px 14px rgba(79, 129, 202, 0.3),
+              0 2px 4px rgba(79, 129, 202, 0.15);
   letter-spacing: 0.01em;
 }
 
@@ -493,7 +493,7 @@ nav ul li a:hover {
   align-items: center;
   justify-content: center;
   margin: 0 auto var(--space-5);
-  box-shadow: 0 4px 12px rgba(13, 115, 119, 0.3);
+  box-shadow: 0 4px 12px rgba(79, 129, 202, 0.24);
 }
 
 .feature-icon i {
@@ -595,7 +595,7 @@ nav ul li a:hover {
   font-weight: 700;
   font-size: var(--text-sm);
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(13, 115, 119, 0.3);
+  box-shadow: 0 4px 12px rgba(79, 129, 202, 0.24);
 }
 
 .step-header h3 {
@@ -695,7 +695,7 @@ nav ul li a:hover {
   right: -20%;
   width: 80%;
   height: 200%;
-  background: radial-gradient(ellipse, rgba(20, 160, 152, 0.08) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(79, 129, 202, 0.08) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -724,8 +724,8 @@ nav ul li a:hover {
 }
 
 .cta .cta-button {
-  box-shadow: 0 4px 16px rgba(13, 115, 119, 0.5),
-              0 2px 4px rgba(13, 115, 119, 0.3);
+  box-shadow: 0 4px 16px rgba(79, 129, 202, 0.4),
+              0 2px 4px rgba(79, 129, 202, 0.22);
 }
 
 /* Footer - Subtle refined */
