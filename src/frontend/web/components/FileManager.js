@@ -325,6 +325,9 @@ class FileManager {
   }
 
   async loadFromString(content, name) {
+    const startCountryMatch = String(content || '').match(/(?:^|\n)\s*StartCountry\s*,\s*([^\n\r]*)/i);
+    const hasExplicitStartCountry = !!(startCountryMatch && String(startCountryMatch[1] || '').trim());
+
     try {
       const cfg = Config.getInstance();
       if (cfg && typeof cfg.isRelocationEnabled === 'function' && !cfg.isRelocationEnabled()) {
@@ -374,11 +377,18 @@ class FileManager {
     } catch (_) { }
 
     const eventData = deserializeSimulation(content, this.webUI);
+    const startCountryInput = document.getElementById('StartCountry');
+    if (startCountryInput && startCountryInput.dataset) {
+      startCountryInput.dataset.auto = hasExplicitStartCountry ? '0' : '1';
+    }
 
     // Note: Simulation mode is already set by deserializeSimulation based on file version and P2 data
     // No need to override it here
 
     const cfgForPriorities = Config.getInstance();
+    if (!cfgForPriorities.isRelocationEnabled()) {
+      cfgForPriorities.defaultCountry = cfgForPriorities.getStartCountry();
+    }
     const startCountryForPriorities = cfgForPriorities.getStartCountry();
     const scenarioCountrySetForPriorities = {};
     scenarioCountrySetForPriorities[String(startCountryForPriorities || '').toLowerCase()] = true;

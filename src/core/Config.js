@@ -241,11 +241,8 @@ class Config {
    * Always returns a valid lowercase country code.
    */
   getStartCountry() {
-    if (Config.getInstance().isRelocationEnabled()) {
-      const raw = this.ui.getStartCountryRaw();
-      if (!raw) throw new Error('StartCountry is required when relocation is enabled');
-      return raw.trim().toLowerCase();
-    }
+    const raw = (this.ui && typeof this.ui.getStartCountryRaw === 'function') ? this.ui.getStartCountryRaw() : null;
+    if (raw) return raw.trim().toLowerCase();
     return this.getDefaultCountry();
   }
 

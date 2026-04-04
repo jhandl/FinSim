@@ -241,6 +241,7 @@ class WebUI extends AbstractUI {
   }
 
   getStartCountryRaw() {
+    if (typeof document !== 'undefined' && !document.getElementById('StartCountry')) return null;
     return this.getValue('StartCountry');
   }
 
@@ -4013,7 +4014,33 @@ class WebUI extends AbstractUI {
   setupStartCountryDropdown() {
     try {
       const config = Config.getInstance();
-      if (!config.isRelocationEnabled()) return;
+      const relocationEnabled = config.isRelocationEnabled();
+      const availableCountries = config.getAvailableCountries();
+      const options = availableCountries.map(c => ({ value: c.code, label: c.name }));
+
+      // Initialize deterministically, but mark as "auto" so geolocation may override it
+      // without being treated as a user edit.
+      let initialCountry = config.getDefaultCountry();
+
+      if (!relocationEnabled) {
+        this.ensureParameterInput('StartCountry', 'string');
+        const hidden = document.getElementById('StartCountry');
+        if (!hidden) return;
+        hidden.classList.add('string');
+        hidden.autocomplete = 'off';
+        hidden.value = initialCountry;
+        hidden.dataset.auto = '1';
+        if (hidden.dataset.ensureFieldsListener !== '1') {
+          hidden.addEventListener('change', async () => {
+            await this.ensureInvestmentParameterFields();
+          });
+          hidden.dataset.ensureFieldsListener = '1';
+        }
+        // In single-country mode, StartCountry is represented by defaultCountry.
+        config.defaultCountry = initialCountry;
+        this.fetchUserCountry();
+        return;
+      }
 
       const inputGroup = document.querySelector('#startingPosition .input-group');
       if (!inputGroup) return;
@@ -4028,25 +4055,12 @@ class WebUI extends AbstractUI {
       label.textContent = 'Current Country';
       wrapper.appendChild(label);
 
-      const availableCountries = config.getAvailableCountries();
-      const options = availableCountries.map(c => ({ value: c.code, label: c.name }));
-
       // Create hidden input
       const hiddenInput = document.createElement('input');
       hiddenInput.type = 'hidden';
       hiddenInput.id = 'StartCountry';
       hiddenInput.className = 'string';
       hiddenInput.autocomplete = 'off';
-      // Initialize deterministically, but mark as "auto" so geolocation may override it
-      // without being treated as a user edit.
-      // IMPORTANT: do NOT call config.getStartCountry() here because StartCountry doesn't exist yet
-      // and getStartCountry() reads it when relocation is enabled.
-      let initialCountry = config.getDefaultCountry();
-      const cachedGeo = localStorage.getItem('geoCountry');
-      if (cachedGeo) {
-        const cachedMatch = options.find(o => String(o.value).trim().toLowerCase() === String(cachedGeo).trim().toLowerCase());
-        if (cachedMatch) initialCountry = cachedMatch.value;
-      }
       hiddenInput.value = initialCountry;
       hiddenInput.dataset.auto = '1';
       wrapper.appendChild(hiddenInput);
@@ -4169,34 +4183,35 @@ class WebUI extends AbstractUI {
         var code = (c && c.code != null) ? String(c.code) : '';
         return code.trim().toLowerCase() === countryCode;
       });
-      if (match) {
-        const from = this.getValue('StartCountry');
-        const baselineSet = (this.fileManager && this.fileManager.lastSavedState !== null);
-        const wasDirty = (this.fileManager && this.fileManager.hasUnsavedChanges && await this.fileManager.hasUnsavedChanges());
-        // Only auto-set if StartCountry is still "auto"/default (not user-selected) and hasn't started editing.
-        const el = (typeof document !== 'undefined') ? document.getElementById('StartCountry') : null;
-        const isAuto = !!(el && el.dataset && el.dataset.auto === '1');
-        if (!isAuto) return;
-        if (wasDirty) return;
-
-        this.setValue('StartCountry', match.code);
-        try { if (el && el.dataset) el.dataset.auto = '1'; } catch (_) { }
-        // Also update the visible dropdown label/selected state (avoid re-dispatching change)
-        const optionsEl = document.getElementById('StartCountryOptions');
-        const toggleEl = document.getElementById('StartCountryToggle');
-        if (optionsEl && toggleEl) {
-          optionsEl.querySelectorAll('[data-value]').forEach(el => el.classList.remove('selected'));
-          const optEl = optionsEl.querySelector(`[data-value="${match.code}"]`);
-          if (optEl) {
-            optEl.classList.add('selected');
-            toggleEl.textContent = optEl.textContent;
-          }
+      if (!match) return;
+      const baselineSet = (this.fileManager && this.fileManager.lastSavedState !== null);
+      const wasDirty = (this.fileManager && this.fileManager.hasUnsavedChanges && await this.fileManager.hasUnsavedChanges());
+      // Only auto-set if StartCountry is still "auto"/default (not user-selected) and hasn't started editing.
+      const el = (typeof document !== 'undefined') ? document.getElementById('StartCountry') : null;
+      const isAuto = !!(el && el.dataset && el.dataset.auto === '1');
+      if (!isAuto) return;
+      if (wasDirty) return;
+      this.setValue('StartCountry', match.code);
+      if (!config.isRelocationEnabled()) {
+        config.defaultCountry = match.code;
+      }
+      await this.ensureInvestmentParameterFields();
+      try { if (el && el.dataset) el.dataset.auto = '1'; } catch (_) { }
+      // Also update the visible dropdown label/selected state (avoid re-dispatching change)
+      const optionsEl = document.getElementById('StartCountryOptions');
+      const toggleEl = document.getElementById('StartCountryToggle');
+      if (optionsEl && toggleEl) {
+        optionsEl.querySelectorAll('[data-value]').forEach(el => el.classList.remove('selected'));
+        const optEl = optionsEl.querySelector(`[data-value="${match.code}"]`);
+        if (optEl) {
+          optEl.classList.add('selected');
+          toggleEl.textContent = optEl.textContent;
         }
-        // Auto-detected StartCountry is part of initial app state, not a user edit:
-        // refresh baseline if one was already established.
-        if (this.fileManager && baselineSet) {
-          await this.fileManager.updateLastSavedState();
-        }
+      }
+      // Auto-detected StartCountry is part of initial app state, not a user edit:
+      // refresh baseline if one was already established.
+      if (this.fileManager && baselineSet) {
+        await this.fileManager.updateLastSavedState();
       }
     } catch (e) {
       console.error('Failed to fetch user country:', e);

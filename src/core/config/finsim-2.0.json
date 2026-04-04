@@ -1,15 +1,15 @@
 {
     "latestVersion": "2.0",
     "codeUpdateMessage": "New Event Wizard to help you create scenarios.\n\n• Cards View for better readability.",
-    "relocationEnabled": false,
+    "relocationEnabled": true,
     "autoShiftOnRelocationAgeChange": true,
     "availableCountries": [
       {"code": "ie", "name": "Ireland"},
       {"code": "ar", "name": "Argentina"}
     ],
     "defaultCountry": "ie",
-    "monteCarloTargetSeconds": 10,
+    "monteCarloTargetSeconds": 5,
     "monteCarloMinRuns": 500,
     "economicRegimesEnabled": true,
-    "applicationName": "Ireland Financial Simulator"
+    "applicationName": "FinSim - Your Personal Finance Lab"
 }
