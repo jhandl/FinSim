@@ -9,6 +9,7 @@ class WebUI extends AbstractUI {
 
     // Initialize simulation state tracking
     this.isSimulationRunning = false;
+    this.isRunValidationInProgress = false;
     this.pendingSimulationFinalize = false;
     this.deferDataTableRender = false;
     this.deferredRowColors = null;
@@ -549,6 +550,11 @@ class WebUI extends AbstractUI {
           // Unsaved changes check is now handled in loadFromUrl
           const success = await this.loadFromUrl("/src/frontend/web/assets/demo.csv", "demo");
           if (!success) return; // User cancelled or load failed
+
+          // Clear stale run-lock state from previously blocked runs before auto-running demo.
+          this.isSimulationRunning = false;
+          this.pendingSimulationFinalize = false;
+          this.updateRunButtonState();
 
           // After successfully loading the demo scenario, scroll to graphs and run the simulation
           const runButton = document.getElementById('runSimulation');
@@ -3083,11 +3089,11 @@ class WebUI extends AbstractUI {
     if (!runButton) return;
 
     // Use a more comprehensive event handler that prevents multiple rapid triggers
-    this.handleRunSimulation = (e) => {
+    this.handleRunSimulation = async (e) => {
       e.preventDefault();
       e.stopPropagation();
 
-      if (this.isSimulationRunning || runButton.disabled) {
+      if (this.isSimulationRunning || this.isRunValidationInProgress || runButton.disabled) {
         return; // Don't start another simulation
       }
 
@@ -3119,15 +3125,31 @@ class WebUI extends AbstractUI {
         console.error('Error checking relocation impacts:', err);
       }
 
-      // No impacts or relocation disabled - proceed normally
+      let hasPrevalidatedRunState = false;
+      if (typeof initializeSimulator === 'function') {
+        this.isRunValidationInProgress = true;
+        try {
+          hasPrevalidatedRunState = await initializeSimulator({ skipInitStatus: true });
+          if (!hasPrevalidatedRunState) {
+            return; // Validation failed; keep Run enabled so user can fix and retry
+          }
+        } catch (error) {
+          this.setError(error);
+          return;
+        } finally {
+          this.isRunValidationInProgress = false;
+        }
+      }
+
+      // No impacts and preflight passed - proceed with simulation
       const mobileRunButton = document.getElementById('runSimulationMobile');
-      this.proceedWithSimulation(runButton, mobileRunButton);
+      this.proceedWithSimulation(runButton, mobileRunButton, hasPrevalidatedRunState);
     };
 
     runButton.addEventListener('click', this.handleRunSimulation);
   }
 
-  proceedWithSimulation(runButton, mobileRunButton) {
+  proceedWithSimulation(runButton, mobileRunButton, hasPrevalidatedRunState = false) {
     this.isSimulationRunning = true;
     this.pendingSimulationFinalize = false;
     // Clear stored country timeline at the start of a new simulation
@@ -3151,7 +3173,7 @@ class WebUI extends AbstractUI {
 
     requestAnimationFrame(() => {
       try {
-        run();
+        run(hasPrevalidatedRunState ? { skipInitialization: true } : undefined);
       } catch (error) {
         this.setError(error);
         // Re-enable button on error

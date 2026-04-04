@@ -59,12 +59,16 @@ async function yieldToBrowserFrame() {
 }
 
 
-async function run() {
+async function run(options) {
+  options = options || {};
   residencyTimeline = null;
-  if (!(await initializeSimulator())) {
-    // If initialization fails (validation errors), ensure UI state is reset
-    uiManager.ui.flush();
-    return;
+  var skipInitialization = options.skipInitialization === true;
+  if (!skipInitialization) {
+    if (!(await initializeSimulator())) {
+      // If initialization fails (validation errors), ensure UI state is reset
+      uiManager.ui.flush();
+      return;
+    }
   }
   residencyTimeline = getResidencyTimeline(params, events);
 
@@ -460,9 +464,12 @@ function readScenario(validate) {
   return !errors;
 }
 
-async function initializeSimulator() {
+async function initializeSimulator(options) {
+  options = options || {};
   initializeUI();
-  uiManager.setStatus("Initializing", STATUS_COLORS.INFO);
+  if (!options.skipInitStatus) {
+    uiManager.setStatus("Initializing", STATUS_COLORS.INFO);
+  }
   config = Config.getInstance(uiManager.ui);
   revenue = new Taxman();
   attributionManager = new AttributionManager();
