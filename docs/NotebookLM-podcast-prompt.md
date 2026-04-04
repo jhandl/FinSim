@@ -1,10 +1,11 @@
 Custom instructions for NotebookLM:
-- Open with "Welcome to this overview of the Ireland Financial Simulator".
+- Open with "Welcome to this overview of the Financial Simulator".
 - You're describing the product for potential users. 
 - Don’t exaggerate, don’t fawn over any particular feature, as that could put potential users off.
 - Don't mention any of the sources.
 - Use phrases like “Financial modelling sandbox”. “you can learn by doing, experimenting, and visualising". "hopefully you gain valuable insights into your own financial future".
 - Don't mention tax free incomes.
+- Don't mention an analogy to flight simulators.
 - Mention the mortgages.
 - Mention the deemed disposal rule.
 - Mention the privacy, that it's free, and that it's not affiliated with any financial institution.

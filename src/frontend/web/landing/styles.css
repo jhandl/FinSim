@@ -328,62 +328,6 @@ nav ul li a:hover {
   border: 1px solid rgba(255, 255, 255, 0.6);
 }
 
-/* Podcast button - Glass morphism */
-.podcast-button {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-1);
-  background: var(--glass-bg);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--glass-border);
-  color: var(--primary-600);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  font-weight: 500;
-  font-size: var(--text-xs);
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  position: relative;
-  overflow: hidden;
-}
-
-.podcast-button:hover {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: var(--primary-400);
-}
-
-.podcast-button.playing {
-  background: var(--primary-50);
-  border-color: var(--primary-400);
-}
-
-.podcast-button .podcast-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.podcast-button i {
-  font-size: var(--text-xs);
-}
-
-.progress-bar {
-  height: 3px;
-  background-color: rgba(20, 160, 152, 0.2);
-  border-radius: 2px;
-  overflow: hidden;
-  min-width: 80px;
-}
-
-.progress-fill {
-  height: 100%;
-  background-color: var(--primary-500);
-  width: 0%;
-  transition: width 0.1s ease;
-}
-
 /* Original Disclaimer Section styles - kept for compatibility but not used on landing */
 .disclaimer {
   background: var(--neutral-100);
@@ -769,6 +713,13 @@ footer p {
   color: var(--neutral-500);
 }
 
+/* Desktop-only styles */
+@media (min-width: 769px) {
+  .hero-content .cta-button {
+    align-self: flex-start;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .features-grid {
@@ -897,41 +848,7 @@ footer p {
     gap: var(--space-3);
   }
 
-  .podcast-button {
-    width: 100%;
-    align-items: center;
   }
-
-  .progress-bar {
-    width: 100%;
-  }
-}
-
-/* Animation keyframes - kept for podcast soundwave only */
-@keyframes soundwave {
-  0% {
-    left: -100%;
-  }
-  100% {
-    left: 100%;
-  }
-}
-
-.podcast-button.playing::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(20, 160, 152, 0.1) 25%,
-    rgba(20, 160, 152, 0.2) 50%,
-    rgba(20, 160, 152, 0.1) 75%,
-    transparent 100%);
-  animation: soundwave 2s ease-in-out infinite;
-  pointer-events: none;
 }
 
 [data-scroll-to] {
