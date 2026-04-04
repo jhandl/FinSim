@@ -1421,6 +1421,20 @@
           }
         }
 
+        /* Parameters cards ordering for 3-column parameters layout:
+           row 2 = Drawdown, Allocations, Economy */
+        @media (max-width: ${lbp.medium}px) and (min-width: ${lbp.narrow + 1}px) {
+          .parameters-section > #drawdownPriorities {
+            order: 4;
+          }
+          .parameters-section > #Allocations {
+            order: 5;
+          }
+          .parameters-section > #growthRates {
+            order: 6;
+          }
+        }
+
         /* Parameters section back to 2 columns */
         @media (max-width: ${lbp.narrow}px) {
           .parameters-section {
@@ -1457,6 +1471,10 @@
 
           .data-section {
             justify-self: center;
+          }
+
+          .parameters-section > #drawdownPriorities {
+            order: 99;
           }
         }
         
