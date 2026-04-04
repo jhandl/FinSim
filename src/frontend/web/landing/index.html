@@ -3,15 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Ireland Financial Simulator</title>
-  <link rel="stylesheet" href="styles.css?v=20260404-11">
+  <title>FinSim | Personal Finance Lab</title>
+  <link rel="stylesheet" href="styles.css?v=20260404-15">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <noscript><style>#landing-logo-title { visibility: visible; }</style></noscript>
 </head>
 <body>
   <header>
     <div class="container">
       <div class="logo">
-        <h1>Ireland Financial Simulator</h1>
+        <h1 id="landing-logo-title">FinSim - Your Personal Finance Lab</h1>
       </div>
       <nav>
         <ul>
@@ -30,11 +31,11 @@
           <h1>What if...?</h1>
         </div>
         <h2>Your Personal Finance Lab</h2>
-        <p>A private sandbox for testing salary changes, house purchases, pension contributions, retirement timing, investments, market shocks, and other what-if scenarios, all in your browser.</p>
+        <p>A private sandbox for exploring life, tax, investing, and retirement scenarios across countries, all in your browser.</p>
         <a href="/#ifs" class="cta-button">Start Planning</a>
       </div>
       <div class="hero-image">
-        <img src="finsim.png" alt="Financial Simulator Dashboard">
+        <img src="finsim.png" alt="Plan your life and retirement with FinSim">
       </div>
     </div>
   </section>
@@ -54,14 +55,14 @@
           <p>Accurate modeling of local taxes for multiple countries. See what happens if you move to another country.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon"><i class="fas fa-bolt"></i></div>
-          <h3>Stress Testing</h3>
-          <p>Test your financial plan against market crashes and adverse economic conditions.</p>
-        </div>
-        <div class="feature-card">
           <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
           <h3>Private by Design</h3>
           <p>Your data never leaves your device. We don't connect to your bank account. We don't collect any data.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+          <h3>Stress Testing</h3>
+          <p>Test your financial plan against market crashes and adverse economic conditions.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon"><i class="fas fa-random"></i></div>
@@ -82,32 +83,40 @@
       <h2>How It Works</h2>
       <div class="steps">
         <div class="step">
-          <div class="step-number">1</div>
           <div class="step-content">
-            <h3>Input Your Financial Data</h3>
+            <div class="step-header">
+              <span class="step-number">1</span>
+              <h3>Input Your Financial Data</h3>
+            </div>
             <p>Enter your current financial situation and goals, and expected economic conditions. Get detailed help for each field. It all stays in your browser.</p>
           </div>
         </div>
         <div class="step">
-          <div class="step-number">2</div>
           <div class="step-content">
-            <h3>Add Life Events</h3>
+            <div class="step-header">
+              <span class="step-number">2</span>
+              <h3>Add Life Events</h3>
+            </div>
             <p>Create events for income, expenses, and major life changes like buying a house or changing jobs. A wizard is there to help you create events.</p>
           </div>
         </div>
         <div class="step">
-          <div class="step-number">3</div>
           <div class="step-content">
-            <h3>Run Simulation</h3>
+            <div class="step-header">
+              <span class="step-number">3</span>
+              <h3>Run Simulation</h3>
+            </div>
             <p>See how your financial future could unfold through detailed graphs and year-by-year breakdowns. Get a high-level overview or dive into the numbers.</p>
           </div>
         </div>
         <div class="step">
-          <div class="step-number">4</div>
           <div class="step-content">
-            <h3>Change one thing and compare</h3>
-            <p>Tweak assumptions, save versions, see where your plan is more likely to fail, learn which decisions actually move the needle.</p>
+            <div class="step-header">
+              <span class="step-number">4</span>
+              <h3>Change one thing and compare</h3>
             </div>
+            <p>Tweak assumptions, save versions, see where your plan is more likely to fail, learn which decisions actually move the needle.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -168,8 +177,6 @@
     </div>
   </footer>
 
-  <script src="script.js?v=20260404-1"></script>
+  <script src="script.js?v=20260404-2"></script>
 </body>
 </html>
-
-

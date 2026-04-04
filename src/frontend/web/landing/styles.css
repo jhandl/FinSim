@@ -203,11 +203,21 @@ header .container {
   padding: var(--space-4) var(--space-6);
 }
 
+.logo {
+  min-width: 0;
+}
+
 .logo h1 {
   font-size: var(--text-xl);
   font-weight: 700;
   color: var(--primary-600);
   letter-spacing: -0.02em;
+  white-space: nowrap;
+  visibility: hidden;
+}
+
+.logo h1.logo-ready {
+  visibility: visible;
 }
 
 nav ul {
@@ -525,29 +535,8 @@ nav ul li a:hover {
   gap: 0;
 }
 
-/* Connecting vertical line - stops exactly at last step number center */
-.steps::before {
-  content: '';
-  position: absolute;
-  top: 22px;
-  bottom: 46px;
-  left: 20px;
-  width: 3px;
-  background: linear-gradient(180deg,
-    var(--primary-500) 0%,
-    var(--primary-400) 30%,
-    var(--accent-500) 50%,
-    var(--primary-400) 70%,
-    var(--primary-500) 100%);
-  border-radius: 3px;
-  opacity: 0.3;
-}
-
 .step {
-  display: flex;
-  gap: var(--space-6);
-  align-items: flex-start;
-  padding: var(--space-6) 0;
+  padding: var(--space-3) 0;
   position: relative;
 }
 
@@ -559,24 +548,6 @@ nav ul li a:hover {
   padding-bottom: 0;
 }
 
-.step-number {
-  background: var(--gradient-cta);
-  color: white;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: var(--text-lg);
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(13, 115, 119, 0.3),
-              0 0 0 4px rgba(255, 255, 255, 0.8);
-  position: relative;
-  z-index: 2;
-}
-
 .step-content {
   background: var(--glass-bg);
   backdrop-filter: blur(12px);
@@ -584,21 +555,61 @@ nav ul li a:hover {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
-  flex: 1;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
 }
 
-.step-content h3 {
+.step-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-500), var(--accent-500));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.step-content:hover::before {
+  opacity: 1;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   margin-bottom: var(--space-2);
+}
+
+.step-number {
+  background: var(--gradient-cta);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(13, 115, 119, 0.3);
+}
+
+.step-header h3 {
   font-size: var(--text-lg);
   font-weight: 600;
   color: var(--neutral-900);
+  margin: 0;
 }
 
 .step-content p {
   font-size: var(--text-sm);
   color: var(--neutral-600);
   line-height: 1.6;
+  padding-left: calc(32px + var(--space-3));
 }
 
 /* About Section - Refined text layout */
@@ -634,6 +645,26 @@ nav ul li a:hover {
   gap: var(--space-4);
   padding: var(--space-4);
   background: var(--glass-bg);
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.about-text p::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-500), var(--accent-500));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.about-text p:hover::before {
+  opacity: 1;
+}
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--glass-border);
@@ -715,8 +746,9 @@ footer p {
 
 /* Desktop-only styles */
 @media (min-width: 769px) {
-  .hero-content .cta-button {
-    align-self: flex-start;
+  .hero-content {
+    text-align: center;
+    align-items: center;
   }
 }
 
@@ -811,18 +843,18 @@ footer p {
     margin: 0 auto;
   }
 
-  .steps::before {
-    left: 18px;
-  }
-
   .step-number {
-    width: 36px;
-    height: 36px;
-    font-size: var(--text-base);
+    width: 28px;
+    height: 28px;
+    font-size: var(--text-xs);
   }
 
-  .step {
-    gap: var(--space-4);
+  .step-header {
+    gap: var(--space-2);
+  }
+
+  .step-content p {
+    padding-left: calc(28px + var(--space-2));
   }
 
   .about-text p {
@@ -846,8 +878,6 @@ footer p {
   .hero-title {
     flex-direction: column;
     gap: var(--space-3);
-  }
-
   }
 }
 

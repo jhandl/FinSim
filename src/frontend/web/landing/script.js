@@ -121,7 +121,50 @@ function setupPodcastButton() {
   }
 }
 
+function fitHeaderLogoTitle() {
+  const logoTitle = document.getElementById("landing-logo-title")
+  const headerContainer = document.querySelector("header .container")
+  const nav = headerContainer ? headerContainer.querySelector("nav") : null
+
+  if (!logoTitle || !headerContainer) {
+    return
+  }
+
+  const computedStyle = window.getComputedStyle(logoTitle)
+  const containerStyle = window.getComputedStyle(headerContainer)
+  const maxFontSize = parseFloat(logoTitle.dataset.maxFontSize || computedStyle.fontSize)
+  const minFontSize = 12
+  const isStackedLayout = containerStyle.flexDirection === "column"
+  const horizontalPadding = parseFloat(containerStyle.paddingLeft) + parseFloat(containerStyle.paddingRight)
+  const containerContentWidth = headerContainer.clientWidth - horizontalPadding
+  const navWidth = !isStackedLayout && nav ? Math.ceil(nav.getBoundingClientRect().width) : 0
+  const availableWidth = Math.max(0, Math.floor(containerContentWidth - navWidth - (isStackedLayout ? 0 : 24)))
+
+  if (!logoTitle.dataset.maxFontSize) {
+    logoTitle.dataset.maxFontSize = String(maxFontSize)
+  }
+
+  logoTitle.style.fontSize = `${maxFontSize}px`
+
+  let fittedFontSize = maxFontSize
+  for (let size = maxFontSize; size >= minFontSize; size -= 0.5) {
+    logoTitle.style.fontSize = `${size}px`
+    fittedFontSize = size
+    if (logoTitle.scrollWidth <= availableWidth) {
+      break
+    }
+  }
+
+  logoTitle.style.fontSize = `${fittedFontSize}px`
+  logoTitle.classList.add("logo-ready")
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  fitHeaderLogoTitle()
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(fitHeaderLogoTitle)
+  }
+
   const scrollWindowTo = (top, behavior = 'auto') => {
     const targetY = Math.max(0, Number(top) || 0);
     if (behavior !== 'smooth') {
@@ -186,13 +229,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Listen for orientation changes
-  window.addEventListener('orientationchange', preventZoomOnOrientationChange);
+  window.addEventListener('orientationchange', () => {
+    preventZoomOnOrientationChange();
+    fitHeaderLogoTitle();
+  });
   
   // Also listen for resize events as a fallback
   let resizeTimeout;
   window.addEventListener('resize', function() {
     clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(preventZoomOnOrientationChange, 100);
+    fitHeaderLogoTitle();
+    resizeTimeout = setTimeout(() => {
+      preventZoomOnOrientationChange();
+      fitHeaderLogoTitle();
+    }, 100);
   });
 
   // Podcast player functionality
@@ -234,5 +284,3 @@ document.addEventListener("DOMContentLoaded", () => {
     })
   }
 })
-
-
