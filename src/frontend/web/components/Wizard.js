@@ -1686,10 +1686,6 @@ class Wizard {
     const bottomInset = DeviceUtils.popoverBottomInset();
     const viewportHeight = window.innerHeight - bottomInset;
     const viewportWidth = window.innerWidth;
-    // #region agent log
-    fetch(window.getDebugLogEndpoint(7526, '/ingest/487ed893-69aa-47f0-ae54-7a83fcee135c'),{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9a74c'},body:JSON.stringify({sessionId:'f9a74c',runId:'post-fix',hypothesisId:'H1',location:'Wizard.js:fixPopoverPositioning:entry',message:'[DBG] Wizard mobile clamp input',data:{rectTop:rect.top,rectBottom:rect.bottom,rectHeight:rect.height,rectLeft:rect.left,rectRight:rect.right,innerHeight:window.innerHeight,visibleBottom:viewportHeight,bottomInset:bottomInset,innerWidth:viewportWidth,vvHeight:window.visualViewport?window.visualViewport.height:null,vvOffsetTop:window.visualViewport?window.visualViewport.offsetTop:null,currentTop:popover.style.top||null,currentLeft:popover.style.left||null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     // Check if popover is positioned outside the viewport
     if (rect.top < 0 || rect.bottom > viewportHeight || rect.left < 0 || rect.right > viewportWidth) {
       // Calculate new position to keep popover within viewport
@@ -1716,9 +1712,6 @@ class Wizard {
         popover.style.top = `${newTop}px`;
         popover.style.left = `${newLeft}px`;
         popover.style.transform = 'none'; // Remove any existing transforms that might interfere
-        // #region agent log
-        fetch(window.getDebugLogEndpoint(7526, '/ingest/487ed893-69aa-47f0-ae54-7a83fcee135c'),{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9a74c'},body:JSON.stringify({sessionId:'f9a74c',runId:'post-fix',hypothesisId:'H1',location:'Wizard.js:fixPopoverPositioning:applied',message:'[DBG] Wizard mobile clamp applied',data:{newTop:newTop,newLeft:newLeft,rectTop:rect.top,rectBottom:rect.bottom,rectHeight:rect.height,innerHeight:window.innerHeight,visibleBottom:viewportHeight,vvHeight:window.visualViewport?window.visualViewport.height:null},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
       }
     }
     const finalRect = popover.getBoundingClientRect();
@@ -1726,9 +1719,6 @@ class Wizard {
     const nextBtn = popover.querySelector('.driver-popover-next-btn');
     const prevRect = prevBtn ? prevBtn.getBoundingClientRect() : null;
     const nextRect = nextBtn ? nextBtn.getBoundingClientRect() : null;
-    // #region agent log
-    fetch(window.getDebugLogEndpoint(7526, '/ingest/487ed893-69aa-47f0-ae54-7a83fcee135c'),{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9a74c'},body:JSON.stringify({sessionId:'f9a74c',runId:'post-fix',hypothesisId:'H4',location:'Wizard.js:fixPopoverPositioning:final',message:'[DBG] Wizard mobile clamp output',data:{popoverBottom:finalRect.bottom,popoverTop:finalRect.top,popoverHeight:finalRect.height,prevBottom:prevRect?prevRect.bottom:null,nextBottom:nextRect?nextRect.bottom:null,innerHeight:window.innerHeight,visibleBottom:viewportHeight,nextAboveFold:nextRect?nextRect.bottom<=viewportHeight:null,vvHeight:window.visualViewport?window.visualViewport.height:null,vvOffsetTop:window.visualViewport?window.visualViewport.offsetTop:null},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
   }
 
   cleanupHighlighting() {

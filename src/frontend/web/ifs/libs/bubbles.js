@@ -503,9 +503,6 @@
             const measuredHeight = pop.offsetHeight;
 
             Object.assign(debugInfo, { measuredWidth, measuredHeight });
-            // #region agent log
-            fetch(window.getDebugLogEndpoint(7526, '/ingest/487ed893-69aa-47f0-ae54-7a83fcee135c'),{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9a74c'},body:JSON.stringify({sessionId:'f9a74c',runId:'post-fix',hypothesisId:'H3',location:'bubbles.js:positionPopover:measure',message:'[DBG] Bubbles popover measured',data:{stepIndex:this.activeIdx,prefSide:prefSide,measuredWidth:measuredWidth,measuredHeight:measuredHeight,innerWidth:window.innerWidth,innerHeight:window.innerHeight,vvWidth:window.visualViewport?window.visualViewport.width:null,vvHeight:window.visualViewport?window.visualViewport.height:null,vvOffsetTop:window.visualViewport?window.visualViewport.offsetTop:null},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
 
             // restore initial scale for animation
             pop.style.transform = 'scale(0.95)';
@@ -615,12 +612,6 @@
                 const clampedLeft = clamp(rawLeft, 8, vw - measuredWidth - 8);
                 pop.style.top = clampedTop + 'px';
                 pop.style.left = clampedLeft + 'px';
-                // #region agent log
-                fetch(window.getDebugLogEndpoint(7526, '/ingest/487ed893-69aa-47f0-ae54-7a83fcee135c'),{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9a74c'},body:JSON.stringify({sessionId:'f9a74c',runId:'post-fix',hypothesisId:'H2',location:'bubbles.js:positionPopover:apply',message:'[DBG] Bubbles popover clamped',data:{stepIndex:debugInfo.stepIndex,chosenSide:debugInfo.chosenSide||null,rawTop:rawTop,rawLeft:rawLeft,clampedTop:clampedTop,clampedLeft:clampedLeft,vh:vh,vw:vw,effectiveInset:effectiveInset,bottomInset:bottomInset,measuredHeight:measuredHeight,measuredWidth:measuredWidth},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
-                // #region agent log
-                fetch(window.getDebugLogEndpoint(7526, '/ingest/487ed893-69aa-47f0-ae54-7a83fcee135c'),{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f9a74c'},body:JSON.stringify({sessionId:'f9a74c',runId:'post-fix',hypothesisId:'H5',location:'bubbles.js:positionPopover:viewport-metrics',message:'[DBG] Bubbles viewport metrics',data:{stepIndex:debugInfo.stepIndex,isNarrow:isNarrow,effectiveInset:effectiveInset,rawScreenInset:Math.max(0,window.screen.height-window.innerHeight),screenHeight:window.screen.height,screenAvailHeight:window.screen.availHeight,innerHeight:window.innerHeight,innerWidth:window.innerWidth,outerHeight:window.outerHeight,docClientHeight:document.documentElement?document.documentElement.clientHeight:null,bodyClientHeight:document.body?document.body.clientHeight:null,vvHeight:window.visualViewport?window.visualViewport.height:null,vvOffsetTop:window.visualViewport?window.visualViewport.offsetTop:null,popComputedMaxHeight:window.getComputedStyle(pop).maxHeight,popRectBottom:(pop.getBoundingClientRect?pop.getBoundingClientRect().bottom:null)},timestamp:Date.now()})}).catch(()=>{});
-                // #endregion
             }
         }
 
