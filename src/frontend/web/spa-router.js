@@ -9,12 +9,12 @@ const routes = {
     '/': {
         titleTemplate: ' - Home',
         contentPath: '/src/frontend/web/landing/index.html',
-        favicon: '/src/frontend/web/ifs/IFS.ico'
+        favicon: '/src/frontend/web/ifs/IFS.svg?v=20260404-1'
     },
     '/#ifs': {
         titleTemplate: '',
         contentPath: '/src/frontend/web/ifs/index.html',
-        favicon: '/src/frontend/web/ifs/IFS.ico'
+        favicon: '/src/frontend/web/ifs/IFS.svg?v=20260404-1'
     }
 };
 
@@ -162,7 +162,7 @@ function updateFavicon(faviconPath) {
     
     const favicon = document.createElement('link');
     favicon.rel = 'icon';
-    favicon.type = 'image/x-icon';
+    favicon.type = 'image/svg+xml';
     favicon.href = faviconPath;
     document.head.appendChild(favicon);
 }
