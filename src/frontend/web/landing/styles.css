@@ -344,6 +344,8 @@ nav ul li a:hover {
   font-size: var(--text-xs);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
 }
 
 .podcast-button:hover {
@@ -381,7 +383,7 @@ nav ul li a:hover {
   transition: width 0.1s ease;
 }
 
-/* Disclaimer Section - Glass cards */
+/* Original Disclaimer Section styles - kept for compatibility but not used on landing */
 .disclaimer {
   background: var(--neutral-100);
 }
@@ -454,6 +456,34 @@ nav ul li a:hover {
   line-height: 1.7;
 }
 
+/* De-emphasized disclaimer at bottom */
+.disclaimer-bottom {
+  background: var(--neutral-100);
+  padding: var(--space-8) 0;
+}
+
+.disclaimer-simple {
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.disclaimer-simple p {
+  font-size: var(--text-sm);
+  color: var(--neutral-500);
+  line-height: 1.6;
+}
+
+.disclaimer-simple i {
+  color: var(--primary-400);
+  margin-right: var(--space-2);
+}
+
+.disclaimer-simple strong {
+  color: var(--neutral-600);
+  font-weight: 600;
+}
+
 /* Features Section - Modern elevated cards */
 .features {
   background: var(--neutral-50);
@@ -468,7 +498,7 @@ nav ul li a:hover {
 
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-6);
 }
 
@@ -550,12 +580,12 @@ nav ul li a:hover {
   gap: 0;
 }
 
-/* Connecting vertical line - stops at last step number center */
+/* Connecting vertical line - stops exactly at last step number center */
 .steps::before {
   content: '';
   position: absolute;
   top: 22px;
-  height: calc(100% - 44px);
+  bottom: 46px;
   left: 20px;
   width: 3px;
   background: linear-gradient(180deg,

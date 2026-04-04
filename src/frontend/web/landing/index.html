@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Ireland Financial Simulator</title>
-  <link rel="stylesheet" href="styles.css?v=20260404-2">
+  <link rel="stylesheet" href="styles.css?v=20260404-6">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -39,7 +39,7 @@
           </button>
         </div>
         <h2>Your Personal Finance Lab</h2>
-        <p>An educational tool to help you understand how different decisions and scenarios can affect your long-term financial future within the Irish tax system.</p>
+        <p>A private sandbox for testing salary changes, house purchases, pension contributions, retirement timing, investments, market shocks, and other what-if scenarios, all in your browser.</p>
         <a href="/#ifs" class="cta-button">Try The Simulator</a>
         <audio id="podcast-audio" preload="metadata">
           <source src="../assets/podcast.wav" type="audio/wav">
@@ -48,24 +48,6 @@
       </div>
       <div class="hero-image">
         <img src="finsim.png" alt="Financial Simulator Dashboard">
-      </div>
-    </div>
-  </section>
-
-  <section id="disclaimer" class="disclaimer">
-    <div class="container">
-      <div class="disclaimer-box">
-        <h2>Educational Purpose Only</h2>
-        <div class="disclaimer-content">
-          <div class="disclaimer-item">
-            <h3><i class="fas fa-check-circle"></i> What it is</h3>
-            <p>This is a tool to help you understand how different decisions and scenarios can affect your long-term financial future, within the context of the Irish tax system.</p>
-          </div>
-          <div class="disclaimer-item">
-            <h3><i class="fas fa-times-circle"></i> What it's not</h3>
-            <p>This is not a budgeting tool nor financial advice. Don't make serious life decisions based on this. It's not a substitute for a good financial advisor.</p>
-          </div>
-        </div>
       </div>
     </div>
   </section>
@@ -80,9 +62,19 @@
           <p>Model your financial future with customizable life events and economic conditions.</p>
         </div>
         <div class="feature-card">
+          <div class="feature-icon"><i class="fas fa-globe"></i></div>
+          <h3>Multi-Country Tax Engine</h3>
+          <p>Accurate modeling of local taxes for multiple countries. See what happens if you move to another country.</p>
+        </div>
+        <div class="feature-card">
           <div class="feature-icon"><i class="fas fa-bolt"></i></div>
           <h3>Stress Testing</h3>
           <p>Test your financial plan against market crashes and adverse economic conditions.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon"><i class="fas fa-shield-alt"></i></div>
+          <h3>Private by Design</h3>
+          <p>Your financial data never leaves your device. Everything runs locally in your browser. No accounts, no servers.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon"><i class="fas fa-random"></i></div>
@@ -90,9 +82,9 @@
           <p>Understand the probability of success with volatility-based simulations.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon"><i class="fas fa-save"></i></div>
-          <h3>Save Scenarios</h3>
-          <p>Save and reload your financial scenarios for future reference and comparison.</p>
+          <div class="feature-icon"><i class="fas fa-table"></i></div>
+          <h3>Data Deep Dive</h3>
+          <p>See the year by year detailed breakdown of numbers. Hover to see where each number comes from.</p>
         </div>
       </div>
     </div>
@@ -106,29 +98,29 @@
           <div class="step-number">1</div>
           <div class="step-content">
             <h3>Input Your Financial Data</h3>
-            <p>Enter your current financial situation and goals, and expected economic conditions.</p>
+            <p>Enter your current financial situation and goals, and expected economic conditions. There's detailed help for each field. All data stays in your browser.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-number">2</div>
           <div class="step-content">
             <h3>Add Life Events</h3>
-            <p>Create events for income, expenses, and major life changes like buying a house or changing jobs.</p>
+            <p>Create events for income, expenses, and major life changes like buying a house or changing jobs. A wizard is there to help you create events.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-number">3</div>
           <div class="step-content">
             <h3>Run Simulation</h3>
-            <p>See how your financial future could unfold through detailed graphs and year-by-year breakdowns.</p>
+            <p>See how your financial future could unfold through detailed graphs and year-by-year breakdowns. Get a high-level overview or dive into the numbers.</p>
           </div>
         </div>
         <div class="step">
           <div class="step-number">4</div>
           <div class="step-content">
-            <h3>Privacy</h3>
-            <p>Your financial data never leaves your computer or phone. It's all processed in your browser.</p>
-          </div>
+            <h3>Change one thing and compare</h3>
+            <p>Tweak assumptions, save versions, see where your plan is more likely to fail, learn which decisions actually move the needle.</p>
+            </div>
         </div>
       </div>
     </div>
@@ -175,13 +167,21 @@
   </section>
   -->
 
+  <section id="disclaimer" class="disclaimer disclaimer-bottom">
+    <div class="container">
+      <div class="disclaimer-simple">
+        <p><i class="fas fa-info-circle"></i> <strong>Educational Purpose Only:</strong> This is a tool to help you understand how different decisions affect your financial future. It is not a budgeting tool nor financial advice. Don't make serious life decisions based on this—it's not a substitute for a good financial advisor.</p>
+      </div>
+    </div>
+  </section>
+
   <footer>
     <div class="container">
-      <p>&copy; 2025 Financial Simulator. For educational purposes only.</p>
+      <p>&copy; 2026 Financial Simulator</p>
     </div>
   </footer>
 
-  <script src="script.js?v=20260403-2"></script>
+  <script src="script.js?v=20260404-1"></script>
 </body>
 </html>
 
