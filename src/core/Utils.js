@@ -842,7 +842,7 @@ function serializeSimulation(ui) {
   }
 
   // StartCountry is always serialized as canonical scenario context.
-  parameters.StartCountry = ui.getValue('StartCountry') || normalizedStartCountry;
+  parameters.StartCountry = normalizedStartCountry;
 
   // Preserve empty input values as empty strings in CSV output.
   if (typeof document !== 'undefined') {

@@ -1,7 +1,7 @@
 {
     "latestVersion": "2.0",
     "codeUpdateMessage": "New Event Wizard to help you create scenarios.\n\n• Cards View for better readability.",
-    "relocationEnabled": true,
+    "relocationEnabled": false,
     "autoShiftOnRelocationAgeChange": true,
     "availableCountries": [
       {"code": "ie", "name": "Ireland"},
