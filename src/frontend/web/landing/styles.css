@@ -247,7 +247,6 @@ nav ul li a:hover {
 .hero {
   background: var(--gradient-hero);
   padding: var(--space-20) 0;
-  min-height: calc(100vh - 72px);
   display: flex;
   align-items: center;
 }
@@ -551,19 +550,19 @@ nav ul li a:hover {
   gap: 0;
 }
 
-/* Connecting vertical line */
+/* Connecting vertical line - stops at last step number center */
 .steps::before {
   content: '';
   position: absolute;
-  top: 20px;
-  bottom: 20px;
+  top: 22px;
+  height: calc(100% - 44px);
   left: 20px;
   width: 3px;
   background: linear-gradient(180deg,
     var(--primary-500) 0%,
-    var(--primary-400) 25%,
+    var(--primary-400) 30%,
     var(--accent-500) 50%,
-    var(--primary-400) 75%,
+    var(--primary-400) 70%,
     var(--primary-500) 100%);
   border-radius: 3px;
   opacity: 0.3;
