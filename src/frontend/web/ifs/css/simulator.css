@@ -1,21 +1,30 @@
+@import '../../common.css';
 @import 'layout.css';
 @import 'wizard.css';
 
 :root {
-  --primary-color: #0077cc;
-  --secondary-color: #005fa3;
-  --background-color: #f0f4f8;
-  --card-background: #ffffff;
-  --text-color: #333333;
-  --border-color: #dddddd;
-  --success-color: #9fdf9f;
-  --warning-color: #ffe066;
-  --error-color: #ff8080;
-  --label-width: 162px;
-  --box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  /* Simulator palette (local extensions of the shared tokens) */
+  --neutral-400: #cbd5e0;
+  --primary-100: rgba(79, 129, 202, 0.1);
+  --radius-xs: 4px;
+
+  /* Aliases: map legacy simulator variables to shared design tokens */
+  --primary-color: var(--color-button);
+  --secondary-color: var(--color-button-dark);
+  --background-color: var(--bg-page);
+  --card-background: var(--bg-card);
+  --text-color: var(--color-text);
+  --border-color: var(--neutral-400);
+  --success-color: var(--color-success);
+  --warning-color: var(--color-warning);
+  --error-color: var(--color-error);
+  --box-shadow: var(--shadow-card);
   --transition-default: background-color 0.2s;
-  --border-radius: 4px;
-  --border-radius-large: 8px;
+  --border-radius: var(--radius-xs);
+  --border-radius-large: var(--radius-sm);
+
+  /* Simulator-specific variables */
+  --label-width: 162px;
   --input-field-border: 1px;
   --events-line-divider: 0px;
   --card-header-border-width: 1px;
@@ -5399,23 +5408,15 @@ footer {
   gap: 1rem;
 }
 
-/* Visual refresh aligned with the landing page style language.
-   Colors/surfaces only: no spacing, layout, or typography-size changes. */
+/* Simulator-specific surface variants (data table, header glass, etc.) */
 :root {
-  --primary-color: #2563eb;
-  --secondary-color: #1d4ed8;
-  --background-color: #f5f8fd;
-  --card-background: #ffffff;
-  --text-color: #334155;
-  --border-color: #d8e1ee;
-  --box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
   --surface-muted: #f3f7fc;
   --surface-group: #e6eef8;
   --surface-alt: #f8fbff;
   --table-divider-color: #70839a;
   --header-glass-bg: rgba(255, 255, 255, 0.88);
   --header-glass-border: rgba(216, 225, 238, 0.95);
-  --focus-ring-color: rgba(37, 99, 235, 0.16);
+  --focus-ring-color: var(--primary-100);
 }
 
 body {
@@ -5460,26 +5461,12 @@ input:focus {
 }
 
 .primary-button {
-  background: linear-gradient(135deg, var(--primary-color) 0%, #1f58d6 100%);
-  border-color: #1f58d6;
-  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.28);
+  background: var(--gradient-cta);
+  border-color: var(--color-button-dark);
+  box-shadow: var(--shadow-cta);
 }
 
 .primary-button:hover {
-  background: linear-gradient(135deg, var(--secondary-color) 0%, #1e40af 100%);
-  border-color: #1e40af;
-}
-
-/* Match landing CTA style for Run button only. */
-#runSimulation.primary-button,
-#runSimulationMobile.primary-button {
-  background: linear-gradient(135deg, #6f9ad8 0%, #5989cf 50%, #3f72bf 100%);
-  border-color: #3f72bf;
-  box-shadow: 0 4px 14px rgba(79, 129, 202, 0.3), 0 2px 4px rgba(79, 129, 202, 0.15);
-}
-
-#runSimulation.primary-button:hover,
-#runSimulationMobile.primary-button:hover {
   background: linear-gradient(135deg, #658fcf 0%, #4f80c8 50%, #3668b3 100%);
   border-color: #3668b3;
 }

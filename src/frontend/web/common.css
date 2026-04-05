@@ -1,0 +1,36 @@
+/* Shared Design Tokens — single source of truth for both landing and simulator pages.
+   Every token here is used by BOTH pages for the same purpose.
+   Edit these values to change the visual style across the entire application. */
+
+:root {
+  /* Button / interactive accent color */
+  --color-button: #4f81ca;
+  --color-button-dark: #3f6fbc;
+
+  /* Page background */
+  --bg-page: #f5f8fc;
+
+  /* Card / panel background */
+  --bg-card: #ffffff;
+
+  /* Main text color */
+  --color-text: #2d3748;
+
+  /* Semantic indicators */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+
+  /* Card / panel elevation (landing cards, simulator sections) */
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.06);
+
+  /* Brand-accent glow on action buttons and icons */
+  --shadow-cta: 0 4px 14px rgba(79, 129, 202, 0.3),
+                0 2px 4px rgba(79, 129, 202, 0.15);
+
+  /* Standard rounded corner */
+  --radius-sm: 8px;
+
+  /* Action-button gradient (CTA on landing, primary buttons on simulator) */
+  --gradient-cta: linear-gradient(135deg, #6f9ad8 0%, #5989cf 50%, #3f72bf 100%);
+}
