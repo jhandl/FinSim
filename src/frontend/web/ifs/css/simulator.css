@@ -2805,6 +2805,28 @@ footer {
   padding: 0;
 }
 
+/* Visual cue: dropdown can scroll for hidden options */
+.visualization-dropdown.dd-scrollable::before,
+.visualization-dropdown.dd-scrollable::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 12px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.visualization-dropdown.dd-scrollable:not(.dd-scroll-top)::before {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(0, 119, 204, 0.22), rgba(0, 119, 204, 0));
+}
+
+.visualization-dropdown.dd-scrollable:not(.dd-scroll-bottom)::after {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(0, 119, 204, 0.22), rgba(0, 119, 204, 0));
+}
+
 .dropdown-header {
   font-weight: 600;
   color: #666;
@@ -2958,6 +2980,22 @@ footer {
     transform: translate(0, -50%);
     max-width: 90vw;
     z-index: 10050;
+  }
+
+  .visualization-dropdown .dropdown-header {
+    font-size: 0.84rem;
+    padding: 0.45rem 0.65rem;
+  }
+
+  .visualization-dropdown div[data-value] {
+    font-size: 0.9rem;
+    line-height: 1.25;
+    padding: 0.5rem 0.65rem 0.5rem 1.3rem;
+  }
+
+  .visualization-dropdown div[data-value].selected::before {
+    left: 7px;
+    font-size: 0.78rem;
   }
 
   /* Mobile tooltip adjustments */

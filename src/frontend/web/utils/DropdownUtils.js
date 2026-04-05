@@ -123,6 +123,32 @@ class DropdownUtils {
     let selected = selectedValue;
     let tooltipEl = null;
     let tooltipTimer = null;
+    let __dropdownTouchStartY = 0;
+    const measureSafeAreaTop = () => {
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);';
+      document.body.appendChild(probe);
+      const value = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+      probe.remove();
+      return value;
+    };
+    const measureSafeAreaBottom = () => {
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;left:0;bottom:0;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom);';
+      document.body.appendChild(probe);
+      const value = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+      probe.remove();
+      return value;
+    };
+    const updateScrollIndicators = () => {
+      const canScroll = dropdownEl.scrollHeight > (dropdownEl.clientHeight + 1);
+      const atTop = dropdownEl.scrollTop <= 1;
+      const atBottom = (dropdownEl.scrollTop + dropdownEl.clientHeight) >= (dropdownEl.scrollHeight - 1);
+      dropdownEl.classList.toggle('dd-scrollable', canScroll);
+      dropdownEl.classList.toggle('dd-scroll-top', atTop);
+      dropdownEl.classList.toggle('dd-scroll-bottom', atBottom);
+    };
+    dropdownEl.addEventListener('scroll', updateScrollIndicators, { passive: true });
 
     // ---------------------------------------------------------------------
     // DOM helpers
@@ -216,9 +242,27 @@ class DropdownUtils {
       const iconRect = toggleEl.getBoundingClientRect();
       const ddRect = dropdownEl.getBoundingClientRect();
       const vpH = window.innerHeight;
-      const spaceBelow = vpH - iconRect.bottom;
-      const spaceAbove = iconRect.top;
-      const ddH = ddRect.height;
+      const vv = window.visualViewport;
+      const viewportTop = vv ? vv.offsetTop : 0;
+      const viewportHeight = vv ? vv.height : vpH;
+      const isTouchViewport = (window.innerWidth <= 768) && ((navigator && navigator.maxTouchPoints > 0) || ('ontouchstart' in window));
+      const browserUiReserve = isTouchViewport ? Math.min(80, Math.max(0, (window.outerHeight || vpH) - vpH)) : 0;
+      const safeAreaTop = measureSafeAreaTop();
+      const safeAreaBottom = measureSafeAreaBottom();
+      const topUiReserve = isTouchViewport ? Math.max(24, Math.round(safeAreaTop + 8)) : Math.round(safeAreaTop);
+      const bottomUiReserve = isTouchViewport ? Math.max(Math.round(safeAreaBottom), Math.round(browserUiReserve + 24)) : Math.round(safeAreaBottom);
+      const viewportTopAdjusted = viewportTop + topUiReserve;
+      const viewportBottomAdjusted = viewportTop + Math.max(120, viewportHeight - bottomUiReserve);
+      const spaceBelow = viewportBottomAdjusted - iconRect.bottom;
+      const spaceAbove = iconRect.top - viewportTopAdjusted;
+      const availableDropdownHeight = Math.max(120, Math.floor(viewportBottomAdjusted - viewportTopAdjusted - 20));
+      const maxDropdownHeight = availableDropdownHeight;
+      dropdownEl.style.maxHeight = `${maxDropdownHeight}px`;
+      dropdownEl.style.overflowY = 'auto';
+      dropdownEl.style.overflowX = 'hidden';
+      dropdownEl.style.webkitOverflowScrolling = 'touch';
+      dropdownEl.style.touchAction = 'pan-y';
+      const ddH = Math.min(ddRect.height, maxDropdownHeight);
 
 
 
@@ -248,14 +292,25 @@ class DropdownUtils {
       // Apply computed width
       dropdownEl.style.width = `${desiredWidth}px`;
 
-      // Vertical placement (unchanged)
+      // Vertical placement (with centered fallback in constrained mobile viewports)
+      let placementStrategy = 'center-fallback';
+      let topValue = viewportTopAdjusted + 10;
       if (spaceBelow >= ddH + 10) {
-        dropdownEl.style.top = `${iconRect.bottom + 2}px`;
-      } else if (spaceAbove >= ddH + 10) {
-        dropdownEl.style.top = `${iconRect.top - ddH - 2}px`;
+        placementStrategy = 'below';
+        topValue = iconRect.bottom + 2;
       } else {
-        dropdownEl.style.top = `${Math.max(10, vpH - ddH - 10)}px`;
+        const aboveTop = iconRect.top - ddH - 2;
+        if (spaceAbove >= ddH + 10 && aboveTop >= viewportTopAdjusted + 10) {
+          placementStrategy = 'above';
+          topValue = aboveTop;
+        } else {
+          placementStrategy = 'center-fallback';
+          const centeredTop = viewportTopAdjusted + ((viewportBottomAdjusted - viewportTopAdjusted - ddH) / 2);
+          topValue = centeredTop;
+        }
       }
+      topValue = Math.max(viewportTopAdjusted + 10, Math.min(topValue, viewportBottomAdjusted - ddH - 10));
+      dropdownEl.style.top = `${topValue}px`;
 
       // Horizontal placement: align to toggle's left, but keep within viewport
       const vpW = window.innerWidth;
@@ -285,12 +340,14 @@ class DropdownUtils {
       if (dropdownEl.parentNode !== document.body) {
         document.body.appendChild(dropdownEl);
       }
+      updateScrollIndicators();
     }
 
     const close = () => {
       dropdownEl.style.display = 'none';
       dropdownEl.querySelectorAll('.highlighted').forEach((n) => n.classList.remove('highlighted'));
       window.__openDropdowns.delete(close);
+      dropdownEl.classList.remove('dd-scrollable', 'dd-scroll-top', 'dd-scroll-bottom');
       controlContainer.setAttribute('aria-expanded', 'false');
     };
 
@@ -423,7 +480,6 @@ class DropdownUtils {
       },
       { passive: true },
     );
-
     // Long-press tooltip for options (mobile)
     let longPressTimer = null;
     dropdownEl.addEventListener(
@@ -432,6 +488,8 @@ class DropdownUtils {
         if (window.innerWidth > 768) return;
         const tgt = e.target;
         if (!tgt.hasAttribute('data-value')) return;
+        const touch = e.touches && e.touches[0];
+        __dropdownTouchStartY = touch ? touch.clientY : 0;
         // Always prefer showing the item's own tooltip on long-press when the menu is open
         longPressTimer = setTimeout(() => {
           const desc = tgt.getAttribute('data-description');
@@ -450,7 +508,28 @@ class DropdownUtils {
       removeTooltip();
     };
     dropdownEl.addEventListener('touchend', cancelLongPress, { passive: true });
-    dropdownEl.addEventListener('touchmove', cancelLongPress, { passive: true });
+    dropdownEl.addEventListener('touchmove', (e) => {
+      cancelLongPress();
+      const touch = e.touches && e.touches[0];
+      const currentY = touch ? touch.clientY : __dropdownTouchStartY;
+      const deltaY = currentY - __dropdownTouchStartY;
+      const canScroll = dropdownEl.scrollHeight > dropdownEl.clientHeight;
+      const atTop = dropdownEl.scrollTop <= 0;
+      const atBottom = (dropdownEl.scrollTop + dropdownEl.clientHeight) >= (dropdownEl.scrollHeight - 1);
+      if (!canScroll || ((atTop && deltaY > 0) || (atBottom && deltaY < 0))) {
+        e.preventDefault();
+      }
+      e.stopPropagation();
+    }, { passive: false });
+    dropdownEl.addEventListener('wheel', (e) => {
+      const canScroll = dropdownEl.scrollHeight > dropdownEl.clientHeight;
+      const atTop = dropdownEl.scrollTop <= 0;
+      const atBottom = (dropdownEl.scrollTop + dropdownEl.clientHeight) >= (dropdownEl.scrollHeight - 1);
+      if (!canScroll || ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0))) {
+        e.preventDefault();
+      }
+      e.stopPropagation();
+    }, { passive: false });
     dropdownEl.addEventListener('touchcancel', cancelLongPress, { passive: true });
 
     // Prevent native context menu/callouts on long-press within dropdown items
