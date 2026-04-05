@@ -416,12 +416,12 @@ class UIManager {
       initialPensionP2: this.ui.getValue("InitialPensionP2"),
       pensionPercentageP2: 0,
       simulation_mode: this.ui.getValue("simulation_mode"),
-      economyMode: this.ui.getValue("economy_mode"),
-      economicRegimesEnabled: this.ui.getValue('economicRegimesEnabled') === 'on'
+      economyMode: this.ui.getValue("economy_mode")
     };
 
     // StartCountry is always required
     const cfg = Config.getInstance();
+    params.economicRegimesEnabled = cfg.economicRegimesEnabled === true;
     params.StartCountry = cfg.getStartCountry();
 
     // Dynamic investment parameters from ruleset

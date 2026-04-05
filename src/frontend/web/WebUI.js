@@ -16,7 +16,6 @@ class WebUI extends AbstractUI {
     this.currentSimMode = 'single'; // Default to single person mode
     this.currentEconomyMode = 'deterministic'; // Default to deterministic mode
     this.preservedVolatilityValues = {}; // Store volatility values when switching modes
-    this.economicRegimesEnabled = 'off';
 
     this.p1Labels = {
       'StartingAge': { neutral: 'Current Age', your: 'Your Current Age' },
@@ -414,9 +413,6 @@ class WebUI extends AbstractUI {
     }
     if (elementId === 'economy_mode') {
       return this.currentEconomyMode;
-    }
-    if (elementId === 'economicRegimesEnabled') {
-      return this.economicRegimesEnabled;
     }
     return DOMUtils.getValue(elementId);
   }
@@ -4507,18 +4503,7 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
     // Tax ruleset is preloaded by Config.initialize(); no need to preload again here
     // Apply dynamic investment labels from ruleset (first two investment types)
     webUi.applyInvestmentLabels();
-
     const cfg = Config.getInstance();
-    const isRegimesEnabled = !!(cfg && cfg.isEconomicRegimesFeatureEnabled && cfg.isEconomicRegimesFeatureEnabled());
-    const economicRegimesState = isRegimesEnabled ? (localStorage.getItem('economicRegimesEnabled') || 'off') : 'off';
-    webUi.economicRegimesEnabled = economicRegimesState;
-
-    // Listen for Economic Regimes toggle
-    if (isRegimesEnabled) {
-      window.addEventListener('economicRegimesToggle', (e) => {
-        webUi.economicRegimesEnabled = e.detail.enabled ? 'on' : 'off';
-      });
-    }
 
     // Initialize controls that depend on Config/tax rules being available
     // IMPORTANT: Create StartCountry controls before any code may read it
