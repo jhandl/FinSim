@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { smartClick, openWizard, dismissWelcomeModal } from '../src/frontend/web/utils/FrontendTestUtils.js';
 
-const BASE = 'http://localhost:8080/#ifs';
+const BASE = 'http://localhost:8080/#lab';
 
 /**
  * Navigate to the simulator and return a frame locator pointing to #app-frame.

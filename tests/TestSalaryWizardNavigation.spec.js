@@ -6,7 +6,7 @@ import {
   dismissWelcomeModal
 } from '../src/frontend/web/utils/FrontendTestUtils.js';
 
-const BASE_URL = 'http://localhost:8080/#ifs';
+const BASE_URL = 'http://localhost:8080/#lab';
 
 // Relax action timeout for this spec to help slower mobile devices
 test.use({ actionTimeout: 20000 });

@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import { dismissWelcomeModal, waitForOverlayGone } from '../../src/frontend/web/utils/FrontendTestUtils.js';
 
-export const BASE_URL = 'http://localhost:8080/#ifs';
+export const BASE_URL = 'http://localhost:8080/#lab';
 
 export async function loadSimulator(page, { wizardOn = false } = {}) {
   await page.addInitScript(({ wizardEnabled }) => {

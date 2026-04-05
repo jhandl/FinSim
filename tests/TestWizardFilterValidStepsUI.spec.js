@@ -6,7 +6,7 @@ import {
 } from '../src/frontend/web/utils/FrontendTestUtils.js';
 
 // URL that serves the SPA (dev server started by Playwright test runner)
-const BASE_URL = 'http://localhost:8080/#ifs';
+const BASE_URL = 'http://localhost:8080/#lab';
 
 // Slightly increase action timeouts across this spec to reduce mobile flakiness
 test.use({ actionTimeout: 20000 });

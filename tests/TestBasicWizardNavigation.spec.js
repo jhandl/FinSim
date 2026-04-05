@@ -7,7 +7,7 @@ import {
 } from '../src/frontend/web/utils/FrontendTestUtils.js';
 
 // Base URL for the simulator (served by the dev/preview server)
-const BASE_URL = 'http://localhost:8080/#ifs';
+const BASE_URL = 'http://localhost:8080/#lab';
 
 // Relax action timeout for slower mobile devices (Pixel/iPhone).
 test.use({ actionTimeout: 20000 });

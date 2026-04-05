@@ -4,7 +4,7 @@ import { smartClick, openWizard, waitForOverlayGone, dismissWelcomeModal } from 
 // helpers imported above; no local redefinitions
 
 // Base URL for the simulator (served by the dev/preview server)
-const BASE_URL = 'http://localhost:8080/#ifs';
+const BASE_URL = 'http://localhost:8080/#lab';
 
 // Slightly relax per-action timeout for this spec to accommodate mobile devices
 test.use({ actionTimeout: 20000 });

@@ -1,6 +1,6 @@
 /**
  * SPA Router for Ireland Financial Simulator
- * Handles routing between landing page (/) and simulator (/#ifs)
+ * Handles routing between landing page (/) and simulator (/#lab)
  * Uses hash-based routing for simplified navigation
  */
 
@@ -11,7 +11,7 @@ const routes = {
         contentPath: '/src/frontend/web/landing/index.html',
         favicon: '/src/frontend/web/ifs/IFS.svg?v=20260404-1'
     },
-    '/#ifs': {
+    '/#lab': {
         titleTemplate: '',
         contentPath: '/src/frontend/web/ifs/index.html',
         favicon: '/src/frontend/web/ifs/IFS.svg?v=20260404-1'
@@ -68,7 +68,7 @@ function initRouter() {
         const { type, href } = event.data;
         if (type === 'navigate' && href) {
             // Only handle specific routes we know about
-            if (href === '/' || href === '/#ifs') {
+            if (href === '/' || href === '/#lab') {
                 navigateTo(href);
             }
         }
@@ -94,8 +94,8 @@ function handleRoute(route) {
     // Basic route handling based on hash
     if (route === '' || route === '/') {
         loadPage(routes['/']);
-    } else if (route === '#ifs') {
-        loadPage(routes['/#ifs']);
+    } else if (route === '#lab') {
+        loadPage(routes['/#lab']);
     } else {
         // Handle 404 or redirect to default
         navigateTo('/');

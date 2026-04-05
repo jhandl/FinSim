@@ -18,7 +18,7 @@ import {
   dismissWelcomeModal
 } from '../src/frontend/web/utils/FrontendTestUtils.js';
 
-const BASE = 'http://localhost:8080/#ifs';
+const BASE = 'http://localhost:8080/#lab';
 
 test('Scenario description', async ({ page }) => {
   await page.goto(BASE);
