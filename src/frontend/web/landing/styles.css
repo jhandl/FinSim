@@ -665,12 +665,6 @@ nav ul li a:hover {
 .about-text p:hover::before {
   opacity: 1;
 }
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-xs);
-}
 
 .about-text p i {
   color: var(--primary-500);

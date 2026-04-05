@@ -1264,6 +1264,9 @@
         
         /* Wide Screen to 2-column layout */
         @media (max-width: ${lbp.wide}px) {
+          header {
+            max-width: calc(2 * 306px + 1.35rem + 810px + 3 * 1.8rem);
+          }
           main {
             width: 100%;
             max-width: calc(2 * 306px + 1.35rem + 810px + 3 * 1.8rem);
@@ -1307,6 +1310,9 @@
 
         /* Medium Screen to single column layout */
         @media (max-width: ${lbp.medium}px) {
+          header {
+            max-width: calc(3 * 306px + 2 * 1.35rem + 2 * 1.2rem);
+          }
           main {
             grid-template-columns: 1fr;
             grid-template-areas: 
@@ -1365,6 +1371,9 @@
 
         /* Parameters section back to 2 columns */
         @media (max-width: ${lbp.narrow}px) {
+          header {
+            max-width: calc(810px + 2 * 1.2rem);
+          }
           .parameters-section {
             grid-template-columns: repeat(2, minmax(306px, 306px));
             justify-content: center;
@@ -1373,6 +1382,9 @@
 
         /* Mobile Screen adjustments */
         @media (max-width: ${lbp.mobile}px) {
+          header {
+            max-width: none;
+          }
           main {
             margin: 1.8rem auto;
             max-width: none;
