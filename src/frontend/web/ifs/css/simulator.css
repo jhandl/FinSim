@@ -5,7 +5,7 @@
 :root {
   /* Simulator palette (local extensions of the shared tokens) */
   --neutral-400: #cbd5e0;
-  --primary-100: rgba(79, 129, 202, 0.1);
+  --primary-100: rgba(var(--color-button-rgb), 0.1);
   --radius-xs: 4px;
 
   /* Aliases: map legacy simulator variables to shared design tokens */
@@ -112,7 +112,7 @@ header.header-hidden {
 .header-left {
   flex: 0 0 auto;
   min-width: 40px;
-  color: #2563eb;
+  color: var(--color-button);
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -5421,8 +5421,8 @@ footer {
 
 body {
   background:
-    radial-gradient(circle at 18% 12%, rgba(59, 130, 246, 0.07), transparent 36%),
-    radial-gradient(circle at 82% 86%, rgba(96, 165, 250, 0.08), transparent 34%),
+    radial-gradient(circle at 18% 12%, rgba(var(--color-button-rgb), 0.07), transparent 36%),
+    radial-gradient(circle at 82% 86%, rgba(var(--color-button-rgb), 0.08), transparent 34%),
     var(--background-color);
 }
 
@@ -5467,31 +5467,31 @@ input:focus {
 }
 
 .primary-button:hover {
-  background: linear-gradient(135deg, #658fcf 0%, #4f80c8 50%, #3668b3 100%);
-  border-color: #3668b3;
+  background: var(--gradient-cta-hover);
+  border-color: var(--color-button-hover-dark);
 }
 
 .secondary-button {
-  background: #edf3ff;
-  color: #1e4fc6;
-  border-color: #c8d8f7;
+  background: rgba(var(--color-button-rgb), 0.04);
+  color: var(--color-button-dark);
+  border-color: var(--color-button-pale);
 }
 
 .secondary-button:hover {
-  background: #e3ecfc;
-  border-color: #aec4ef;
+  background: rgba(var(--color-button-rgb), 0.1);
+  border-color: var(--color-button-light);
 }
 
 .status-indicator,
 .mobile-menu-status {
-  background-color: #f7faff;
-  border-color: #ced9eb;
+  background-color: rgba(var(--color-button-rgb), 0.03);
+  border-color: rgba(var(--color-button-dark-rgb), 0.12);
   color: var(--text-color);
 }
 
 .status-indicator.error:hover,
 .status-indicator.relocation-impact:hover {
-  background-color: #eef4fd;
+  background-color: rgba(var(--color-button-rgb), 0.06);
 }
 
 .card-info-icon {
@@ -5499,7 +5499,7 @@ input:focus {
 }
 
 .card-info-icon:hover {
-  background: #e9f0ff;
+  background: rgba(var(--color-button-rgb), 0.08);
 }
 
 th,

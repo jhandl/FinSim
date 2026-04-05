@@ -12,15 +12,15 @@
   --success: var(--color-success);
   --error: var(--color-error);
 
-  /* Extended brand palette */
-  --primary-400: #72a2dd;
-  --primary-300: #98bbe7;
-  --primary-100: rgba(79, 129, 202, 0.1);
-  --primary-50: rgba(79, 129, 202, 0.05);
+  /* Extended brand palette — derived from common tokens */
+  --primary-400: var(--color-button-light);
+  --primary-300: var(--color-button-pale);
+  --primary-100: rgba(var(--color-button-rgb), 0.1);
+  --primary-50: rgba(var(--color-button-rgb), 0.05);
 
-  /* Accent — warm amber */
-  --accent-500: #f4a261;
-  --accent-400: #f6b47a;
+  /* Accent — derived from common tokens */
+  --accent-500: var(--color-accent);
+  --accent-400: var(--color-accent-light);
 
   /* Neutral scale */
   --neutral-950: #0f1419;
@@ -32,9 +32,9 @@
   --neutral-100: #f7fafc;
   --neutral-50: var(--bg-page);
 
-  /* Semantic light variants */
-  --success-light: rgba(16, 185, 129, 0.12);
-  --error-light: rgba(239, 68, 68, 0.12);
+  /* Semantic light variants — derived from common tokens */
+  --success-light: rgba(var(--color-success-rgb), 0.12);
+  --error-light: rgba(var(--color-error-rgb), 0.12);
 
   /* Glass morphism */
   --glass-bg: rgba(255, 255, 255, 0.7);
@@ -57,9 +57,9 @@
   /* Gradients */
   --gradient-hero: linear-gradient(135deg, #f0fdfa 0%, #f0f9ff 25%, #f5f3ff 50%, #fdf4ff 75%, #fff7ed 100%);
   --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,252,255,0.95) 100%);
-  --gradient-accent: linear-gradient(135deg, rgba(244, 162, 97, 0.15) 0%, rgba(244, 162, 97, 0.05) 100%);
-  --gradient-mesh: radial-gradient(ellipse at 20% 20%, rgba(79, 129, 202, 0.08) 0%, transparent 50%),
-                    radial-gradient(ellipse at 80% 80%, rgba(244, 162, 97, 0.08) 0%, transparent 50%),
+  --gradient-accent: linear-gradient(135deg, rgba(var(--color-accent-rgb), 0.15) 0%, rgba(var(--color-accent-rgb), 0.05) 100%);
+  --gradient-mesh: radial-gradient(ellipse at 20% 20%, rgba(var(--color-button-rgb), 0.08) 0%, transparent 50%),
+                    radial-gradient(ellipse at 80% 80%, rgba(var(--color-accent-rgb), 0.08) 0%, transparent 50%),
                     radial-gradient(ellipse at 50% 50%, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
 
   /* Spacing scale */
@@ -686,7 +686,7 @@ nav ul li a:hover {
   right: -20%;
   width: 80%;
   height: 200%;
-  background: radial-gradient(ellipse, rgba(79, 129, 202, 0.08) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(var(--color-button-rgb), 0.08) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -715,8 +715,8 @@ nav ul li a:hover {
 }
 
 .cta .cta-button {
-  box-shadow: 0 4px 16px rgba(79, 129, 202, 0.4),
-              0 2px 4px rgba(79, 129, 202, 0.22);
+  box-shadow: 0 4px 16px rgba(var(--color-button-rgb), 0.4),
+              0 2px 4px rgba(var(--color-button-rgb), 0.22);
 }
 
 /* Footer - Subtle refined */

@@ -6,6 +6,18 @@
   /* Button / interactive accent color */
   --color-button: #4f81ca;
   --color-button-dark: #3f6fbc;
+  --color-button-light: #72a2dd;
+  --color-button-pale: #98bbe7;
+  --color-button-hover-dark: #3668b3;
+
+  /* RGB channels for composing tints and shadows via rgba(var(--*-rgb), alpha) */
+  --color-button-rgb: 79, 129, 202;
+  --color-button-dark-rgb: 63, 111, 188;
+
+  /* Accent — warm amber */
+  --color-accent: #f4a261;
+  --color-accent-light: #f6b47a;
+  --color-accent-rgb: 244, 162, 97;
 
   /* Page background */
   --bg-page: #f5f8fc;
@@ -18,19 +30,28 @@
 
   /* Semantic indicators */
   --color-success: #10b981;
+  --color-success-rgb: 16, 185, 129;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
+  --color-error-rgb: 239, 68, 68;
 
-  /* Card / panel elevation (landing cards, simulator sections) */
+  /* Card / panel elevation */
   --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.06);
 
   /* Brand-accent glow on action buttons and icons */
-  --shadow-cta: 0 4px 14px rgba(79, 129, 202, 0.3),
-                0 2px 4px rgba(79, 129, 202, 0.15);
+  --shadow-cta: 0 4px 14px rgba(var(--color-button-rgb), 0.3),
+                0 2px 4px rgba(var(--color-button-rgb), 0.15);
 
   /* Standard rounded corner */
   --radius-sm: 8px;
 
-  /* Action-button gradient (CTA on landing, primary buttons on simulator) */
-  --gradient-cta: linear-gradient(135deg, #6f9ad8 0%, #5989cf 50%, #3f72bf 100%);
+  /* Action-button gradient */
+  --gradient-cta: linear-gradient(135deg, var(--color-button-light) 0%, var(--color-button) 50%, var(--color-button-dark) 100%);
+
+  /* Button hover mid-tones — between --color-button and --color-button-dark */
+  --color-button-hover-mid: #658fcf;
+  --color-button-hover-deep: #4f80c8;
+
+  /* Button hover gradient (one step darker) */
+  --gradient-cta-hover: linear-gradient(135deg, var(--color-button-hover-mid) 0%, var(--color-button-hover-deep) 50%, var(--color-button-hover-dark) 100%);
 }
