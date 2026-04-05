@@ -54,13 +54,12 @@
   --radius-xl: 24px;
   --radius-full: 9999px;
 
-  /* Gradients */
-  --gradient-hero: linear-gradient(135deg, #f0fdfa 0%, #f0f9ff 25%, #f5f3ff 50%, #fdf4ff 75%, #fff7ed 100%);
-  --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(250,252,255,0.95) 100%);
-  --gradient-accent: linear-gradient(135deg, rgba(var(--color-accent-rgb), 0.15) 0%, rgba(var(--color-accent-rgb), 0.05) 100%);
-  --gradient-mesh: radial-gradient(ellipse at 20% 20%, rgba(var(--color-button-rgb), 0.08) 0%, transparent 50%),
-                    radial-gradient(ellipse at 80% 80%, rgba(var(--color-accent-rgb), 0.08) 0%, transparent 50%),
-                    radial-gradient(ellipse at 50% 50%, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
+  /* Gradients - cohesive light blue palette */
+  --gradient-hero: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #dbeafe 50%, #c7d2fe 75%, #93c5fd 100%);
+  --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.98) 100%);
+  --gradient-accent: linear-gradient(135deg, rgba(var(--color-accent-rgb), 0.2) 0%, rgba(var(--color-accent-rgb), 0.08) 100%);
+  --gradient-mesh: radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
+                    radial-gradient(ellipse at 80% 80%, rgba(147, 197, 253, 0.08) 0%, transparent 50%);
 
   /* Spacing scale */
   --space-1: 4px;
@@ -438,7 +437,7 @@ nav ul li a:hover {
 
 /* Features Section - Modern elevated cards */
 .features {
-  background: var(--neutral-50);
+  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
 }
 
 .features h2 {
@@ -513,7 +512,7 @@ nav ul li a:hover {
 
 /* How It Works Section - Connected steps */
 .how-it-works {
-  background: var(--neutral-100);
+  background: linear-gradient(180deg, #e0f2fe 0%, #dbeafe 100%);
 }
 
 .how-it-works h2 {
@@ -611,7 +610,7 @@ nav ul li a:hover {
 
 /* About Section - Refined text layout */
 .about {
-  background: var(--neutral-50);
+  background: linear-gradient(135deg, #dbeafe 0%, #f0f9ff 100%);
   padding: var(--space-12) 0;
 }
 
@@ -674,7 +673,7 @@ nav ul li a:hover {
 
 /* CTA Section - Gradient with glass card */
 .cta {
-  background: linear-gradient(135deg, #f0fdfa 0%, #f0f9ff 50%, #fdf4ff 100%);
+  background: linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 50%, #93c5fd 100%);
   position: relative;
   overflow: hidden;
 }

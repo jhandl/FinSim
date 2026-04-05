@@ -19,8 +19,8 @@
   --color-accent-light: #f6b47a;
   --color-accent-rgb: 244, 162, 97;
 
-  /* Page background */
-  --bg-page: #f5f8fc;
+  /* Page background - slightly deeper for card contrast */
+  --bg-page: #e2e8f0;
 
   /* Card / panel background */
   --bg-card: #ffffff;
@@ -35,8 +35,12 @@
   --color-error: #ef4444;
   --color-error-rgb: 239, 68, 68;
 
-  /* Card / panel elevation */
-  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.06);
+  /* Card / panel elevation - more visible shadow */
+  --shadow-card: 0 6px 20px rgba(30, 64, 175, 0.12),
+                  0 2px 6px rgba(0, 0, 0, 0.08);
+
+  /* Subtle card border for additional definition */
+  --border-card: 1px solid rgba(147, 197, 253, 0.25);
 
   /* Brand-accent glow on action buttons and icons */
   --shadow-cta: 0 4px 14px rgba(var(--color-button-rgb), 0.3),
