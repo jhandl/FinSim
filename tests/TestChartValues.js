@@ -70,10 +70,10 @@ const PARAM_KEY_MAP = {
   PriorityPension: 'priorityPension',
   PriorityFunds: 'priorityFunds',
   PriorityShares: 'priorityShares',
-  P2StartingAge: 'P2StartingAge',
-  P2RetirementAge: 'P2RetirementAge',
-  P2StatePensionWeekly: 'P2StatePensionWeekly',
-  InitialPensionP2: 'InitialPensionP2',
+  P2StartingAge: 'p2StartingAge',
+  P2RetirementAge: 'p2RetirementAge',
+  P2StatePensionWeekly: 'p2StatePensionWeekly',
+  InitialPensionP2: 'initialPensionP2',
   simulation_mode: 'simulation_mode',
   economy_mode: 'economy_mode',
   StartCountry: 'StartCountry'
@@ -88,7 +88,7 @@ const REFERENCE_BASELINE = {
     // to all source-country income-side taxes (income tax + deductions).
     40: { worth: 226584.6624617942, cash: 0, netIncome: 30747612.3411853 },
     65: { worth: 839826.2294873288, cash: 0, netIncome: -120507.88343857395 },
-    80: { worth: 1120592627.9692883, cash: 0, netIncome: 70668.56502155837 }
+    80: { worth: 1120592627.9692883, cash: 0, netIncome: 161853.81021066598 }
   },
   final: { age: 90, worth: 1505982787.300201, cash: 0 },
   maxWorth: 1505982787.300201

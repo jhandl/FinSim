@@ -1889,7 +1889,9 @@ function processEvents() {
       inflationRate = resolveCountryInflation(countryForInflation);
     }
     let amount = adjust(event.amount, inflationRate);
-    let inScope = (person1.age >= event.fromAge && person1.age <= (event.toAge || 999));
+    let scopeAge = person1.age;
+    if ((event.type === 'SI2' || event.type === 'SI2np') && person2) scopeAge = person2.age;
+    let inScope = (scopeAge >= event.fromAge && scopeAge <= (event.toAge || 999));
 
     switch (event.type) {
       case 'NOP':

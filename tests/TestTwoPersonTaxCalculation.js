@@ -63,8 +63,8 @@ module.exports = {
         type: 'SI2np',             // P2 Salary Income (no pension)
         id: 'p2-salary',
         amount: 40000,             // €40,000 annual salary  
-        fromAge: 60,               // Based on P1's age
-        toAge: 61,
+        fromAge: 65,               // Based on P2's age
+        toAge: 66,
         rate: 0,                   // No pension contribution
         match: 0
       }

@@ -161,7 +161,7 @@ describe('Non-Joint Filing Mode', () => {
         // P1 earns 15k (under 18k limit), P2 earns 10k
         const events = [
             { type: 'SI', id: 'p1-salary', amount: 15000, fromAge: 65, toAge: 65, currency: 'AAA', rate: 0, match: 0 },
-            { type: 'SI2np', id: 'p2-salary', amount: 10000, fromAge: 65, toAge: 65, currency: 'AAA', rate: 0, match: 0 }
+            { type: 'SI2np', id: 'p2-salary', amount: 10000, fromAge: 60, toAge: 60, currency: 'AAA', rate: 0, match: 0 }
         ];
 
         const scenarioDef = {
