@@ -3103,6 +3103,27 @@ footer {
   line-height: 1;
 }
 
+/* Prevent text selection/callout on attribution long-press targets */
+@media (pointer: coarse) {
+  #Data tbody td.attribution-tooltip-cell,
+  #Data .dynamic-section-cell.attribution-tooltip-cell {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  #Data tbody td.attribution-tooltip-cell .cell-content,
+  #Data .dynamic-section-cell.attribution-tooltip-cell .cell-content {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+}
+
 /* Ensure proper background colors for sticky elements */
 #Data tbody tr:nth-child(even) td:nth-child(1),
 #Data tbody tr:nth-child(even) td:nth-child(2) {
@@ -3178,7 +3199,8 @@ footer {
 }
 
 /* Table cell tooltip highlight effect */
-#Data tbody td.tooltip-highlighted {
+#Data tbody td.tooltip-highlighted,
+#Data .dynamic-section-cell.tooltip-highlighted {
   background-color: white !important;
   border: none !important;
   border-radius: 6px;

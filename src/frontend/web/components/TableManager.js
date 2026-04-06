@@ -457,7 +457,7 @@ class TableManager {
           // Only attach tooltip and show 'i' icon if there's meaningful content to display
           // Guard with non-zero check to allow tooltips for negative and small positive values
           if ((itemMap || originalValue !== undefined) && tooltipText.trim() !== '' && Math.abs(v) > 0) {
-            TooltipUtils.attachTooltip(cellElement, tooltipText);
+            TooltipUtils.attachTooltip(cellElement, tooltipText, { showOnClick: true });
             hasTooltip = true;
           }
         }
@@ -482,6 +482,7 @@ class TableManager {
 
       // Add 'i' icon if the cell has a tooltip
       if (hasTooltip) {
+        cellElement.classList.add('attribution-tooltip-cell');
         const infoIcon = document.createElement('span');
         infoIcon.className = 'cell-info-icon';
         infoIcon.textContent = 'i';

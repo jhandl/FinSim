@@ -10,6 +10,7 @@ class TooltipUtils {
    * @param {number}      [opts.touchDelay]       – Delay (ms) before showing on long-press (touch).
    * @param {boolean}     [opts.showOnFocus]      – If true, show immediately when the element receives focus.
    * @param {boolean}     [opts.persistWhileFocused] – If true, keep visible while the element has focus (hide on blur).
+   * @param {boolean}     [opts.showOnClick]      – If true, toggle tooltip visibility on click/tap.
    * @param {boolean}     [opts.suppressTouchLongPress] – If true, disable touch long-press behavior for this tooltip.
    * @param {boolean}     [opts.hideOnWizard]     – If true, hide the tooltip when the help wizard (driver popover) appears.
    */
@@ -23,6 +24,7 @@ class TooltipUtils {
     const TOUCH_DELAY  = opts.touchDelay  ?? 500;
     const SHOW_ON_FOCUS = !!opts.showOnFocus;
     const PERSIST_FOCUS = !!opts.persistWhileFocused;
+    const SHOW_ON_CLICK = !!opts.showOnClick;
     const SUPPRESS_TOUCH = !!opts.suppressTouchLongPress;
     const HIDE_ON_WIZARD = !!opts.hideOnWizard;
 
@@ -36,8 +38,8 @@ class TooltipUtils {
       if (tooltipEl) return;
       tooltipEl = TooltipUtils.showTooltip(textOrProvider, element, opts);
       
-      // Add highlight effect for TD elements
-      if (element.tagName === 'TD') {
+      // Add highlight effect for attribution data-table cells (td + dynamic-section div)
+      if (element.tagName === 'TD' || (element.classList && element.classList.contains('attribution-tooltip-cell'))) {
         element.classList.add('tooltip-highlighted');
       }
 
@@ -97,8 +99,8 @@ class TooltipUtils {
         tooltipEl = null;
       }
       
-      // Remove highlight effect for TD elements
-      if (element.tagName === 'TD') {
+      // Remove highlight effect for attribution data-table cells (td + dynamic-section div)
+      if (element.tagName === 'TD' || (element.classList && element.classList.contains('attribution-tooltip-cell'))) {
         element.classList.remove('tooltip-highlighted');
       }
 
@@ -122,7 +124,23 @@ class TooltipUtils {
       hideTooltip();
     });
     element.addEventListener('click', () => {
-      hideTooltip();
+      if (!SHOW_ON_CLICK) {
+        hideTooltip();
+        return;
+      }
+      if (tooltipEl) {
+        hideTooltip();
+        return;
+      }
+      if (hoverTimeout) {
+        clearTimeout(hoverTimeout);
+        hoverTimeout = null;
+      }
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      showTooltip();
     });
 
     // Mobile long-press events
