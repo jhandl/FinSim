@@ -132,7 +132,7 @@ async function loadPage(routeConfig) {
         // Create a new iframe
         const newFrame = document.createElement('iframe');
         newFrame.id = 'app-frame';
-        newFrame.style.cssText = 'width: 100%; height: 100%; border: none; overflow: hidden;';
+        newFrame.style.cssText = 'position: absolute; inset: 0; width: 100%; height: 100%; border: none; overflow: hidden; display: block; vertical-align: top;';
         
         // Add the new iframe to the container
         container.appendChild(newFrame);
