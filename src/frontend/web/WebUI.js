@@ -4527,17 +4527,6 @@ window.addEventListener('DOMContentLoaded', async () => { // Add async
       webUi.tableManager.setDataRow(0, {});
       const temp = document.getElementById('data_row_0');
       if (temp && temp.parentNode) temp.parentNode.removeChild(temp);
-      if (window.__logDataSectionDebug) {
-        const dataTable = document.getElementById('Data');
-        const tbody = dataTable ? dataTable.querySelector('tbody') : null;
-        const taxHeaderRow = tbody ? tbody.querySelector('tr.tax-header') : null;
-        window.__logDataSectionDebug('boot-empty-header', {
-          taxH: Math.ceil((taxHeaderRow && (taxHeaderRow.getBoundingClientRect().height || taxHeaderRow.offsetHeight || taxHeaderRow.scrollHeight)) || 0),
-          tableH: Math.ceil((dataTable && (dataTable.getBoundingClientRect().height || dataTable.offsetHeight || dataTable.scrollHeight)) || 0),
-          tbodyRows: tbody ? tbody.querySelectorAll('tr').length : 0,
-          dataRows: tbody ? tbody.querySelectorAll('tr:not(.tax-header)').length : 0
-        });
-      }
     }
 
     // Capture static header tooltip text for reuse in dynamic tax headers, then
