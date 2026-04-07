@@ -35,6 +35,11 @@
 
   /* Header positioning control */
   --header-height: 60px;
+  --data-section-viewport-gap: 18px;
+  --data-section-card-header-height: 3rem;
+  --data-section-empty-bottom-pad: 0.675rem;
+  --data-section-available-height: calc(100vh - var(--header-height) - 2 * var(--data-section-viewport-gap));
+  --data-section-sticky-top: calc(var(--header-height) + var(--data-section-viewport-gap));
 
   /* Welcome modal item spacing */
   --welcome-space-above-line: 0.5rem;
@@ -79,7 +84,7 @@ body {
   display: flex;
   flex-direction: column;
   padding-top: 60px;
-  padding-bottom: 60px;
+  padding-bottom: 0;
   overflow-x: hidden;
   width: 100%;
 }
@@ -1253,21 +1258,35 @@ th {
 }
 
 
-/* Make table scrollable on mobile, but expandable on desktop to show all rows/panels */
+/* Base table container behavior */
 .table-container {
   overflow-x: auto;
   margin: 0;
   width: 100%;
-  max-height: 80vh; /* Allow internal scrolling in the data table */
-  overflow-y: auto;
 }
 
-@media (max-width: 540px) {
-  .table-container {
-    position: sticky;
-    max-height: calc(100vh - var(--header-height) - 60px - 2.9rem);
-    overflow-y: auto;
-  }
+/*
+ * Keep the whole data section locked into the available viewport area
+ * (viewport minus fixed FinSim header), and scroll table rows internally.
+ */
+.data-section:not(#mobile-data-message) {
+  position: sticky;
+  top: var(--data-section-sticky-top, var(--header-height));
+  max-height: var(--data-section-available-height, calc(100vh - var(--header-height) - 2 * var(--data-section-viewport-gap)));
+  overflow: hidden;
+  scroll-margin-top: calc(var(--header-height) + var(--data-section-viewport-gap));
+}
+
+.data-section:not(#mobile-data-message) .table-container {
+  max-height: calc(var(--data-section-available-height, calc(100vh - var(--header-height) - 2 * var(--data-section-viewport-gap))) - var(--data-section-card-header-height, 3rem));
+  position: relative;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-section:not(#mobile-data-message) .table-container.data-table-empty {
+  padding-bottom: var(--data-section-empty-bottom-pad);
 }
 
 /* Events table container: resolution panel tracks this width so it doesn't get clipped */
@@ -1667,6 +1686,7 @@ th {
   font-size: 0.9rem;
   position: relative;
   --table-sticky-top-base: 0px; /* Internal scroll starts at top of container */
+  --data-header-group-height: 40px;
 }
 
 /*
@@ -1974,16 +1994,14 @@ input.percentage::placeholder {
 
 #Data thead tr:last-child {
   position: sticky;
-  top: calc(var(--table-sticky-top-base, 0px) + 38px);
-  /* First table header row height */
+  top: calc(var(--table-sticky-top-base, 0px) + var(--data-header-group-height, 40px));
   background-color: #f5f5f5;
   z-index: 2;
 }
 
 #Data thead tr:last-child th {
   position: sticky;
-  top: calc(var(--table-sticky-top-base, 0px) + 38px);
-  /* First table header row height */
+  top: calc(var(--table-sticky-top-base, 0px) + var(--data-header-group-height, 40px));
   background-color: #f5f5f5;
 }
 
@@ -2000,8 +2018,7 @@ input.percentage::placeholder {
 #Data tbody tr.tax-header {
   /* Position sticky below group headers, replacing static column header row */
   position: sticky;
-  top: calc(var(--table-sticky-top-base, 0px) + 40px);
-  /* Adjusted from 38px to eliminate 1px jump when scrolling */
+  top: calc(var(--table-sticky-top-base, 0px) + var(--data-header-group-height, 40px));
   z-index: 11;
   /* Above static column headers */
 }

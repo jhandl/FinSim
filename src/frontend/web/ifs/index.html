@@ -11,7 +11,7 @@
   <title></title>
   <link rel="icon" type="image/svg+xml" href="/src/frontend/web/ifs/IFS.svg?v=20260404-1">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20260406-3">
+  <link rel="stylesheet" href="/src/frontend/web/ifs/css/simulator.css?v=20260407-13">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/event-wizard.css?v=20260331-1">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/events-sort.css?v=2025-08-23-usc">
   <link rel="stylesheet" href="/src/frontend/web/ifs/css/bubbles.css?v=2025-08-23-usc" />
@@ -474,7 +474,7 @@
 
   <!-- SYSTEM UTILITIES SECTION -->
   <script src="/src/frontend/AbstractUI.js?v=20251101"></script>
-  <script src="/src/frontend/UIManager.js?v=20260405-2"></script>
+  <script src="/src/frontend/UIManager.js?v=20260407-4"></script>
   <script src="/src/frontend/web/utils/DOMUtils.js?v=20260403-1"></script>
   <script src="/src/frontend/web/utils/DeviceUtils.js?v=20260403-1"></script>
   <script src="/src/frontend/web/utils/FormatUtils.js?v=20260328-1"></script>
@@ -493,7 +493,7 @@
   <script src="/src/frontend/web/components/DynamicSectionVisibilityEngine.js?v=20260204-1"></script>
   <script src="/src/frontend/web/components/DynamicSectionsConfig.js?v=20260404-1"></script>
   <script src="/src/frontend/web/components/DynamicSectionsManager.js?v=2026-01-10-1"></script>
-  <script src="/src/frontend/web/components/TableManager.js?v=20260406-1"></script>
+  <script src="/src/frontend/web/components/TableManager.js?v=20260407-dbg1"></script>
   <script src="/src/frontend/web/components/RelocationSplitSuggestion.js?v=20260327-1"></script>
   <script src="/src/frontend/web/components/EventsTableManager.js?v=20260405-37"></script>
   <script src="/src/frontend/web/components/RelocationImpactDetector.js?v=20260330-6"></script>
@@ -512,7 +512,7 @@
   <script src="/src/frontend/web/components/PinchPointVisualizer.js?v=20251101"></script>
   <script src="/src/frontend/web/components/CountryTabSyncManager.js?v=20260114-1"></script>
   <script src="/src/frontend/web/components/CountryChipSelector.js?v=20260130-1"></script>
-  <script src="/src/frontend/web/WebUI.js?v=20260405-1"></script>
+  <script src="/src/frontend/web/WebUI.js?v=20260407-dbg1"></script>
   <script src="/src/core/TaxRuleSet.js?v=20260327-3"></script>
   <script src="/src/core/Config.js?v=20260404-2"></script>
   <script src="/src/core/Events.js?v=20260213-4"></script>
@@ -536,6 +536,32 @@
   <script src="/src/core/AttributionManager.js?v=20260328-1"></script>
   <script src="/src/core/EconomicRegimeModel.js?v=20260218-1"></script>
   <script src="/src/core/Simulator.js?v=20260404-1"></script>
+
+  <script>
+    window.__dataSectionDebugSeq = 0;
+    window.__dataSectionDebugLogs = [];
+    window.__getDataSectionDebugLogs = function () {
+      return (window.__dataSectionDebugLogs || []).join('\n');
+    };
+    window.__logDataSectionDebug = function (stage, fields) {
+      var parts = [];
+      var key;
+      if (fields) {
+        for (key in fields) {
+          if (Object.prototype.hasOwnProperty.call(fields, key)) {
+            parts.push(key + '=' + fields[key]);
+          }
+        }
+      }
+      window.__dataSectionDebugSeq += 1;
+      var msg = '[DBG] data-section #' + window.__dataSectionDebugSeq + ' ' + stage + (parts.length ? ' ' + parts.join(' ') : '');
+      window.__dataSectionDebugLogs.push(msg);
+      if (window.__dataSectionDebugLogs.length > 200) {
+        window.__dataSectionDebugLogs.shift();
+      }
+      console.log(msg);
+    };
+  </script>
 
   <!-- Init app name after Config is initialized -->
   <script>
@@ -612,6 +638,9 @@
           mobileMessage.style.display = 'none';
           if (webUI && webUI.tableManager && typeof webUI.tableManager.finalizeDataTableLayout === 'function') {
             webUI.tableManager.finalizeDataTableLayout();
+          }
+          if (typeof updateDataSectionViewportLock === 'function') {
+            updateDataSectionViewportLock();
           }
           dataSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -1270,7 +1299,7 @@
           main {
             width: 100%;
             max-width: calc(2 * 306px + 1.35rem + 810px + 3 * 1.8rem);
-            margin: 1.8rem auto;
+            margin: 1.8rem auto var(--data-section-viewport-gap) auto;
             grid-template-columns: minmax(auto, max-content) minmax(0, 1fr);
             grid-template-areas: 
                 "parameters events"
@@ -1386,7 +1415,7 @@
             max-width: none;
           }
           main {
-            margin: 1.8rem auto;
+            margin: 1.8rem auto var(--data-section-viewport-gap) auto;
             max-width: none;
           }
 
@@ -1422,7 +1451,7 @@
         @media (max-width: ${bp.smallMobile}px) {
           main {
             margin-top: calc(60px + 1.8rem);
-            margin-bottom: 1.8rem;
+            margin-bottom: var(--data-section-viewport-gap);
           }
         }
         `;
@@ -1519,10 +1548,168 @@
 
   <!-- Dynamic Sticky Column Width Calculator -->
   <script>
+    let dataSectionViewportLockScheduled = false;
+
+    function scheduleDataSectionViewportLockUpdate() {
+      if (dataSectionViewportLockScheduled) return;
+      dataSectionViewportLockScheduled = true;
+      requestAnimationFrame(function () {
+        dataSectionViewportLockScheduled = false;
+        updateDataSectionViewportLock();
+      });
+    }
+
+    function updateDataSectionViewportLock() {
+      const dataSection = document.querySelector('.data-section:not(#mobile-data-message)');
+      const header = document.querySelector('header');
+      if (!dataSection || !header) return;
+      if (window.getComputedStyle(dataSection).display === 'none') return;
+
+      const visualViewportHeight = window.visualViewport ? window.visualViewport.height : 0;
+      const viewportHeight = Math.max(window.innerHeight || 0, visualViewportHeight || 0);
+      const headerHeight = Math.ceil(header.getBoundingClientRect().height || 60);
+      const rootStyles = window.getComputedStyle(document.documentElement);
+      const viewportGap = parseFloat(rootStyles.getPropertyValue('--data-section-viewport-gap')) || 18;
+      const availableHeight = Math.max(220, Math.floor(viewportHeight - headerHeight - 2 * viewportGap));
+      document.documentElement.style.setProperty('--data-section-available-height', `${availableHeight}px`);
+
+      const cardHeader = dataSection.querySelector('.card-header-flex');
+      const tableContainer = dataSection.querySelector('.table-container');
+      if (!tableContainer) return;
+      let cardHeaderHeight = 0;
+      if (cardHeader) {
+        cardHeaderHeight = Math.ceil(cardHeader.getBoundingClientRect().height || cardHeader.offsetHeight || 0);
+      }
+      if (cardHeaderHeight > 0) {
+        document.documentElement.style.setProperty('--data-section-card-header-height', `${cardHeaderHeight}px`);
+      } else {
+        cardHeaderHeight = 48; // fallback for transient initial layout
+      }
+
+      const dataTable = document.getElementById('Data');
+      const thead = dataTable ? dataTable.querySelector('thead') : null;
+      const groupHeaderRow = dataTable ? dataTable.querySelector('thead tr.header-groups') : null;
+      const taxHeader = dataTable ? dataTable.querySelector('tbody tr.tax-header') : null;
+      const tbody = dataTable ? dataTable.querySelector('tbody') : null;
+      const secondHeaderRow = dataTable ? dataTable.querySelector('thead tr:nth-child(2)') : null;
+      const dataRowCount = tbody ? tbody.querySelectorAll('tr:not(.tax-header)').length : 0;
+      const taxHeaderCount = tbody ? tbody.querySelectorAll('tr.tax-header').length : 0;
+      tableContainer.classList.toggle('data-table-empty', dataRowCount === 0 && taxHeaderCount > 0);
+      if (dataRowCount === 0 && taxHeaderCount === 0) {
+        if (window.__logDataSectionDebug) {
+          window.__logDataSectionDebug('viewport-lock-skip', {
+            reason: 'empty-without-tax-header'
+          });
+        }
+        return;
+      }
+
+      // Measure intrinsic table content first, then pin the section to that exact height.
+      dataSection.style.removeProperty('height');
+      dataSection.style.removeProperty('max-height');
+      tableContainer.style.removeProperty('max-height');
+      tableContainer.style.removeProperty('overflow-y');
+      const sectionRect = dataSection.getBoundingClientRect();
+      const tableContainerRect = tableContainer.getBoundingClientRect();
+      const sectionChromeHeight = Math.ceil(Math.max(0, tableContainerRect.top - sectionRect.top));
+      if (sectionChromeHeight > 0) {
+        document.documentElement.style.setProperty('--data-section-card-header-height', `${sectionChromeHeight}px`);
+      }
+
+      const theadHeight = Math.ceil((thead && (thead.getBoundingClientRect().height || thead.offsetHeight || thead.scrollHeight)) || 0);
+      const taxHeaderHeight = Math.ceil((taxHeader && (taxHeader.getBoundingClientRect().height || taxHeader.offsetHeight || taxHeader.scrollHeight)) || 0);
+      const structuralTableHeight = theadHeight + taxHeaderHeight;
+      const tableContainerScrollHeight = Math.ceil(tableContainer.scrollHeight || 0);
+      const dataTableHeight = Math.ceil((dataTable && (dataTable.getBoundingClientRect().height || dataTable.offsetHeight || dataTable.scrollHeight)) || 0);
+      const sectionHeightBefore = Math.ceil(dataSection.getBoundingClientRect().height || dataSection.offsetHeight || 0);
+      const containerHeightBefore = Math.ceil(tableContainer.getBoundingClientRect().height || tableContainer.offsetHeight || 0);
+      const secondHeaderDisplay = secondHeaderRow ? window.getComputedStyle(secondHeaderRow).display : 'missing';
+      const groupHeaderHeight = Math.ceil((groupHeaderRow && (groupHeaderRow.getBoundingClientRect().height || groupHeaderRow.offsetHeight || groupHeaderRow.scrollHeight)) || 0);
+      const naturalTableHeight = Math.max(structuralTableHeight, tableContainerScrollHeight, dataTableHeight);
+      const maxTableHeight = Math.max(0, availableHeight - sectionChromeHeight);
+      const clampedTableHeight = Math.min(naturalTableHeight, maxTableHeight);
+      const clampedHeight = sectionChromeHeight + clampedTableHeight;
+      if (dataRowCount === 0 && window.__logDataSectionDebug) {
+        window.__logDataSectionDebug('viewport-lock-measure', {
+          viewportH: viewportHeight,
+          availH: availableHeight,
+          cardH: cardHeaderHeight,
+          chromeH: sectionChromeHeight,
+          sectionBeforeH: sectionHeightBefore,
+          containerBeforeH: containerHeightBefore,
+          groupH: groupHeaderHeight,
+          theadH: theadHeight,
+          taxH: taxHeaderHeight,
+          structuralH: structuralTableHeight,
+          tableScrollH: tableContainerScrollHeight,
+          tableH: dataTableHeight,
+          naturalH: naturalTableHeight,
+          dataRows: dataRowCount,
+          taxHeaders: taxHeaderCount,
+          thead2Display: secondHeaderDisplay
+        });
+      }
+      dataSection.style.height = `${clampedHeight}px`;
+      dataSection.style.maxHeight = `${clampedHeight}px`;
+      tableContainer.style.maxHeight = `${clampedTableHeight}px`;
+      tableContainer.style.overflowY = 'auto';
+
+      const centerOffset = Math.max(0, Math.floor((availableHeight - clampedHeight) / 2));
+      const stickyTop = headerHeight + viewportGap + centerOffset;
+      document.documentElement.style.setProperty('--data-section-sticky-top', `${stickyTop}px`);
+      if (dataRowCount === 0 && window.__logDataSectionDebug) {
+        const containerRect = tableContainer.getBoundingClientRect();
+        const groupRect = groupHeaderRow ? groupHeaderRow.getBoundingClientRect() : null;
+        const taxRect = taxHeader ? taxHeader.getBoundingClientRect() : null;
+        const requiredVisibleStack = Math.ceil(Math.max(
+          groupRect ? (groupRect.bottom - containerRect.top) : 0,
+          taxRect ? (taxRect.bottom - containerRect.top) : 0
+        ));
+        window.__logDataSectionDebug('viewport-lock-apply', {
+          clampedTableH: clampedTableHeight,
+          clampedH: clampedHeight,
+          sectionAfterH: Math.ceil(dataSection.getBoundingClientRect().height || dataSection.offsetHeight || 0),
+          containerAfterH: Math.ceil(tableContainer.getBoundingClientRect().height || tableContainer.offsetHeight || 0),
+          containerClientH: Math.ceil(tableContainer.clientHeight || 0),
+          containerOffsetH: Math.ceil(tableContainer.offsetHeight || 0),
+          containerScrollH: Math.ceil(tableContainer.scrollHeight || 0),
+          tableClientH: Math.ceil((dataTable && dataTable.clientHeight) || 0),
+          tableOffsetH: Math.ceil((dataTable && dataTable.offsetHeight) || 0),
+          tableScrollH: Math.ceil((dataTable && dataTable.scrollHeight) || 0),
+          clientW: Math.ceil(tableContainer.clientWidth || 0),
+          scrollW: Math.ceil(tableContainer.scrollWidth || 0),
+          reqStackH: requiredVisibleStack,
+          stickyTop: stickyTop
+        });
+        requestAnimationFrame(function () {
+          const postContainerRect = tableContainer.getBoundingClientRect();
+          const postGroupRect = groupHeaderRow ? groupHeaderRow.getBoundingClientRect() : null;
+          const postTaxRect = taxHeader ? taxHeader.getBoundingClientRect() : null;
+          const postRequiredVisibleStack = Math.ceil(Math.max(
+            postGroupRect ? (postGroupRect.bottom - postContainerRect.top) : 0,
+            postTaxRect ? (postTaxRect.bottom - postContainerRect.top) : 0
+          ));
+          window.__logDataSectionDebug('viewport-lock-postframe', {
+            containerClientH: Math.ceil(tableContainer.clientHeight || 0),
+            containerOffsetH: Math.ceil(tableContainer.offsetHeight || 0),
+            containerScrollH: Math.ceil(tableContainer.scrollHeight || 0),
+            tableOffsetH: Math.ceil((dataTable && dataTable.offsetHeight) || 0),
+            tableScrollH: Math.ceil((dataTable && dataTable.scrollHeight) || 0),
+            reqStackH: postRequiredVisibleStack,
+            overflowX: tableContainer.scrollWidth > tableContainer.clientWidth ? 1 : 0,
+            overflowY: tableContainer.scrollHeight > tableContainer.clientHeight ? 1 : 0
+          });
+        });
+      }
+    }
+
     // Calculate and set dynamic Age column width for sticky positioning
     function updateStickyColumnWidths() {
       const dataTable = document.getElementById('Data');
       if (!dataTable) return;
+      const tbody = dataTable.querySelector('tbody');
+      const dataRowCount = tbody ? tbody.querySelectorAll('tr:not(.tax-header)').length : 0;
+      const taxHeader = tbody ? tbody.querySelector('tr.tax-header') : null;
 
       // Read Age column width from the visible sticky headers when available.
       // On fresh load we create a dynamic `.tax-header` row but remove the temporary data row,
@@ -1555,16 +1742,42 @@
       } else {
         dataTable.style.removeProperty('--age-column-width');
       }
+
+      const groupHeaderRow = dataTable.querySelector('thead tr.header-groups');
+      if (groupHeaderRow) {
+        const rowHeight = Math.ceil(groupHeaderRow.getBoundingClientRect().height || groupHeaderRow.offsetHeight || 0);
+        if (rowHeight > 0) {
+          dataTable.style.setProperty('--data-header-group-height', `${rowHeight}px`);
+        } else {
+          dataTable.style.removeProperty('--data-header-group-height');
+        }
+        if (dataRowCount === 0 && window.__logDataSectionDebug) {
+          window.__logDataSectionDebug('sticky-widths', {
+            ageW: Math.ceil(ageWidth || 0),
+            groupH: rowHeight,
+            taxH: Math.ceil((taxHeader && (taxHeader.getBoundingClientRect().height || taxHeader.offsetHeight || taxHeader.scrollHeight)) || 0),
+            thead2Display: (function () {
+              const row = dataTable.querySelector('thead tr:nth-child(2)');
+              return row ? window.getComputedStyle(row).display : 'missing';
+            })()
+          });
+        }
+      }
     }
 
     // Update on DOM content loaded
     document.addEventListener('DOMContentLoaded', function () {
       // Initial calculation with a small delay to ensure table is rendered
       setTimeout(updateStickyColumnWidths, 100);
+      scheduleDataSectionViewportLockUpdate();
     });
 
     // Update on window resize
     window.addEventListener('resize', updateStickyColumnWidths);
+    window.addEventListener('resize', scheduleDataSectionViewportLockUpdate);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', scheduleDataSectionViewportLockUpdate);
+    }
 
     // Update when table content changes (observe for changes)
     const observer = new MutationObserver(function (mutations) {
@@ -1577,6 +1790,7 @@
       });
       if (shouldUpdate) {
         setTimeout(updateStickyColumnWidths, 50);
+        scheduleDataSectionViewportLockUpdate();
       }
     });
 

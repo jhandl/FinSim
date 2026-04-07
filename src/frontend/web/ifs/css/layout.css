@@ -9,7 +9,7 @@
 main {
   width: 100%;
   max-width: none;
-  margin: 1.8rem auto;
+  margin: 1.8rem auto var(--data-section-viewport-gap, 1.8rem) auto;
   padding: 0 0.9rem;
   flex: 1;
   display: grid;
@@ -125,7 +125,4 @@ footer {
 }
 
 /* Layout media queries will be generated dynamically by JavaScript */
-
-
-
 

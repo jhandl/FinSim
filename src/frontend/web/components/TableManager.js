@@ -195,6 +195,21 @@ class TableManager {
     if (taxHeaderRow && isEmptyHeaderRow) {
       try { this._syncDynamicSectionColSpansToSectionMaxVisible(tbody); } catch (_) { }
       try { this._applyEmptyStateFlexLayoutToDynamicSectionHeaderRow(taxHeaderRow); } catch (_) { }
+      if (window.__logDataSectionDebug) {
+        const dataTable = document.getElementById('Data');
+        const tableContainer = dataTable ? dataTable.parentElement : null;
+        const secondHeaderRow = dataTable ? dataTable.querySelector('thead tr:nth-child(2)') : null;
+        window.__logDataSectionDebug('setDataRow-empty-header', {
+          row: rowIndex,
+          country: currentCountry,
+          taxH: Math.ceil(taxHeaderRow.getBoundingClientRect().height || taxHeaderRow.offsetHeight || taxHeaderRow.scrollHeight || 0),
+          tableH: Math.ceil((dataTable && (dataTable.getBoundingClientRect().height || dataTable.offsetHeight || dataTable.scrollHeight)) || 0),
+          containerH: Math.ceil((tableContainer && (tableContainer.getBoundingClientRect().height || tableContainer.offsetHeight || tableContainer.scrollHeight)) || 0),
+          tbodyRows: tbody.querySelectorAll('tr').length,
+          dataRows: tbody.querySelectorAll('tr:not(.tax-header)').length,
+          thead2Display: secondHeaderRow ? window.getComputedStyle(secondHeaderRow).display : 'missing'
+        });
+      }
     }
 
     const blueprint = this._buildRowBlueprint(currentCountry);
@@ -547,6 +562,17 @@ class TableManager {
       this._applyPeriodZeroHideToDynamicSections(tbody);
       this._syncDynamicSectionColSpansToSectionMaxVisible(tbody);
       this.dynamicSectionsManager.finalizeSectionWidths(tbody);
+      if (window.__logDataSectionDebug && tbody.querySelectorAll('tr:not(.tax-header)').length === 0) {
+        const dataTable = document.getElementById('Data');
+        const tableContainer = dataTable ? dataTable.parentElement : null;
+        const taxHeaderRow = tbody.querySelector('tr.tax-header');
+        window.__logDataSectionDebug('finalize-empty-layout', {
+          taxH: Math.ceil((taxHeaderRow && (taxHeaderRow.getBoundingClientRect().height || taxHeaderRow.offsetHeight || taxHeaderRow.scrollHeight)) || 0),
+          tableH: Math.ceil((dataTable && (dataTable.getBoundingClientRect().height || dataTable.offsetHeight || dataTable.scrollHeight)) || 0),
+          containerH: Math.ceil((tableContainer && (tableContainer.getBoundingClientRect().height || tableContainer.offsetHeight || tableContainer.scrollHeight)) || 0),
+          taxHeaders: tbody.querySelectorAll('tr.tax-header').length
+        });
+      }
     } catch (_) { }
   }
 
