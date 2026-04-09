@@ -3486,10 +3486,13 @@ class EventsTableManager {
         if (rs && typeof rs.getPensionSystemType === 'function' && rs.getPensionSystemType() === 'state_only') {
           const newType = currentType === 'SI' ? 'SInp' : 'SI2np';
           typeInput.value = newType;
+          const opts = this.getEventTypeOptionObjects(newType);
+          const opt = opts.find(o => o && o.value === newType);
+          const nextLabel = (opt && opt.label) ? opt.label : newType;
           const toggleEl = row.querySelector(`#EventTypeToggle_${resolvedRowId}`);
-          if (toggleEl) toggleEl.textContent = newType;
+          if (toggleEl) toggleEl.textContent = nextLabel;
           if (row._eventTypeDropdown && typeof row._eventTypeDropdown.setValue === 'function') {
-            row._eventTypeDropdown.setValue(newType);
+            row._eventTypeDropdown.setValue(newType, nextLabel);
           }
           this.updateFieldVisibility(typeInput);
           typeInput.dispatchEvent(new Event('change', { bubbles: true }));
@@ -3622,7 +3625,11 @@ class EventsTableManager {
       const opt = opts.find(o => o && o.value === newType);
       toggleEl.textContent = (opt && opt.label) ? opt.label : newType;
     }
-    if (row._eventTypeDropdown && typeof row._eventTypeDropdown.setValue === 'function') row._eventTypeDropdown.setValue(newType);
+    if (row._eventTypeDropdown && typeof row._eventTypeDropdown.setValue === 'function') {
+      const opts = this.getEventTypeOptionObjects(newType);
+      const opt = opts.find(o => o && o.value === newType);
+      row._eventTypeDropdown.setValue(newType, (opt && opt.label) ? opt.label : newType);
+    }
     this.updateFieldVisibility(typeInput);
     typeInput.dispatchEvent(new Event('change', { bubbles: true }));
     const matchInput = row.querySelector('.event-match');

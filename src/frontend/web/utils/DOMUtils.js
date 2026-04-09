@@ -23,13 +23,39 @@ class DOMUtils {
         return undefined;
       }
       if (element.classList.contains('currency')) {
+        const parseWithLocale = (rawValue, numberLocale, currencySymbol, currencyCode) => {
+          if (rawValue === undefined || rawValue === null || !numberLocale) return undefined;
+          const escSym = String(currencySymbol || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          let s = String(rawValue);
+          if (escSym) s = s.replace(new RegExp(escSym, 'g'), '');
+          s = s.replace(/\s+/g, '');
+          try {
+            let parts;
+            if (currencyCode) {
+              parts = new Intl.NumberFormat(numberLocale, { style: 'currency', currency: String(currencyCode).toUpperCase() }).formatToParts(12345.6);
+            } else {
+              parts = new Intl.NumberFormat(numberLocale).formatToParts(12345.6);
+            }
+            const group = parts.find(p => p.type === 'group')?.value || ',';
+            const decimal = parts.find(p => p.type === 'decimal')?.value || '.';
+            s = s.split(group).join('');
+            if (decimal !== '.') s = s.split(decimal).join('.');
+          } catch (_) { /* leave s as-is */ }
+          const num = parseFloat(s);
+          return isNaN(num) ? undefined : num;
+        };
+
         // Try to parse using per-row locale hints (event country/currency) first
         let parsed;
+        const inputLocale = element.getAttribute('data-currency-locale');
+        const inputSymbol = element.getAttribute('data-currency-symbol') || '';
+        const inputCode = element.getAttribute('data-currency-code') || '';
+        parsed = parseWithLocale(value, inputLocale, inputSymbol, inputCode);
         try {
           // Detect if this input is inside an Events table row and derive locale
           const row = element.closest('tr');
           const inEventsTable = !!(row && row.closest && row.closest('#Events'));
-          if (inEventsTable) {
+          if (inEventsTable && parsed === undefined) {
             // Prefer explicit country hint, else infer by currency code
             const countryHint = row && row.querySelector ? (row.querySelector('.event-country')?.value || '') : '';
             const currencyCode = row && row.querySelector ? (row.querySelector('.event-currency')?.value || '') : '';
@@ -44,6 +70,19 @@ class DOMUtils {
                   numberLocale = (rs.getNumberLocale && rs.getNumberLocale()) || null;
                   currencySymbol = (rs.getCurrencySymbol && rs.getCurrencySymbol()) || '';
                   currencyCodeEff = (rs.getCurrencyCode && rs.getCurrencyCode()) || '';
+                }
+              }
+              if (!numberLocale && currencyCode) {
+                const startCountry = (typeof cfg.getStartCountry === 'function') ? String(cfg.getStartCountry() || '').toLowerCase() : '';
+                if (startCountry) {
+                  try {
+                    const startRs = cfg.getCachedTaxRuleSet(startCountry);
+                    if (startRs && typeof startRs.getCurrencyCode === 'function' && startRs.getCurrencyCode() === currencyCode) {
+                      numberLocale = (startRs.getNumberLocale && startRs.getNumberLocale()) || null;
+                      currencySymbol = (startRs.getCurrencySymbol && startRs.getCurrencySymbol()) || '';
+                      currencyCodeEff = startRs.getCurrencyCode();
+                    }
+                  } catch (_) { /* continue with generic scan */ }
                 }
               }
               if (!numberLocale && currencyCode) {
@@ -63,18 +102,7 @@ class DOMUtils {
             } catch (_) { /* fall back to global */ }
 
             if (numberLocale) {
-              // Locale-aware parse: strip symbol, normalise group/decimal
-              const escSym = currencySymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              let s = String(value).replace(new RegExp(escSym, 'g'), '').replace(/\s+/g, '');
-              try {
-                const parts = new Intl.NumberFormat(numberLocale).formatToParts(12345.6);
-                const group = parts.find(p => p.type === 'group')?.value || ',';
-                const decimal = parts.find(p => p.type === 'decimal')?.value || '.';
-                s = s.split(group).join('');
-                if (decimal !== '.') s = s.split(decimal).join('.');
-              } catch (_) { /* leave s as-is */ }
-              const num = parseFloat(s);
-              parsed = isNaN(num) ? undefined : num;
+              parsed = parseWithLocale(value, numberLocale, currencySymbol, currencyCodeEff);
             }
           }
         } catch (_) { /* ignore and fall back */ }

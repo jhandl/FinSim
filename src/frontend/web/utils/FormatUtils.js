@@ -82,7 +82,7 @@ class FormatUtils {
     let s = value.replace(new RegExp(escSym, 'g'), '').replace(/\s+/g, '');
 
     // Derive separators using formatToParts
-    const parts = new Intl.NumberFormat(numberLocale).formatToParts(12345.6);
+    const parts = new Intl.NumberFormat(numberLocale, { style: 'currency', currency: currencyCode }).formatToParts(12345.6);
     const group = parts.find(p => p.type === 'group')?.value || ',';
     const decimal = parts.find(p => p.type === 'decimal')?.value || '.';
 
@@ -219,6 +219,19 @@ class FormatUtils {
           } catch(_) { /* fall through to currency-based lookup */ }
         }
         if (code) {
+          const startCountry = (typeof cfg.getStartCountry === 'function') ? String(cfg.getStartCountry() || '').toLowerCase() : '';
+          if (startCountry) {
+            try {
+              const startRs = cfg.getCachedTaxRuleSet(startCountry);
+              if (startRs && typeof startRs.getCurrencyCode === 'function' && startRs.getCurrencyCode() === code) {
+                return {
+                  numberLocale: (startRs.getNumberLocale && startRs.getNumberLocale()) || FormatUtils.getLocaleSettings().numberLocale,
+                  currencyCode: startRs.getCurrencyCode(),
+                  currencySymbol: (startRs.getCurrencySymbol && startRs.getCurrencySymbol()) || ''
+                };
+              }
+            } catch (_) { /* continue with generic scan */ }
+          }
           const countries = (typeof cfg.getAvailableCountries === 'function') ? cfg.getAvailableCountries() : [];
           for (let i = 0; i < countries.length; i++) {
             try {
@@ -243,7 +256,10 @@ class FormatUtils {
       if (typeof text !== 'string') text = String(text);
       const escSym = (ls.currencySymbol || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       let s = text.replace(new RegExp(escSym, 'g'), '').replace(/\s+/g, '');
-      const parts = new Intl.NumberFormat(ls.numberLocale).formatToParts(12345.6);
+      const parts = new Intl.NumberFormat(
+        ls.numberLocale,
+        ls.currencyCode ? { style: 'currency', currency: ls.currencyCode } : undefined
+      ).formatToParts(12345.6);
       const group = parts.find(p => p.type === 'group')?.value || ',';
       const decimal = parts.find(p => p.type === 'decimal')?.value || '.';
       s = s.split(group).join('');
@@ -256,8 +272,9 @@ class FormatUtils {
       if (force && input) {
         const prevLocale = input.getAttribute('data-currency-locale');
         const prevSymbol = input.getAttribute('data-currency-symbol') || '';
+        const prevCode = input.getAttribute('data-currency-code') || '';
         if (prevLocale && prevLocale !== ls.numberLocale) {
-          const prevParsed = parseWithLocaleCore(text, { numberLocale: prevLocale, currencySymbol: prevSymbol });
+          const prevParsed = parseWithLocaleCore(text, { numberLocale: prevLocale, currencySymbol: prevSymbol, currencyCode: prevCode });
           if (!isNaN(prevParsed)) return prevParsed;
         }
       }
@@ -291,7 +308,10 @@ class FormatUtils {
 
       const ls = getInputLocaleSettings(input);
       const currencySymbolEscaped = (ls.currencySymbol || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const parts = new Intl.NumberFormat(ls.numberLocale).formatToParts(12345.6);
+      const parts = new Intl.NumberFormat(
+        ls.numberLocale,
+        ls.currencyCode ? { style: 'currency', currency: ls.currencyCode } : undefined
+      ).formatToParts(12345.6);
       const groupSep = parts.find(p => p.type === 'group')?.value || ',';
       const decimalSep = parts.find(p => p.type === 'decimal')?.value || '.';
       const escGroup = groupSep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

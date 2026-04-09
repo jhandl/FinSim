@@ -630,11 +630,29 @@ class DropdownUtils {
     dropdownEl.addEventListener('keydown', handleKeyDown);
 
     // Public API
+    const setValue = (value, label) => {
+      selected = (value === undefined || value === null) ? '' : String(value);
+      let matched = null;
+      dropdownEl.querySelectorAll('[data-value]').forEach((el) => {
+        const isSelected = String(el.getAttribute('data-value') || '') === selected;
+        el.classList.toggle('selected', isSelected);
+        if (isSelected) matched = el;
+      });
+      if (toggleEl) {
+        if (label !== undefined && label !== null && String(label) !== '') {
+          toggleEl.textContent = String(label);
+        } else if (matched) {
+          toggleEl.textContent = matched.textContent;
+        }
+      }
+    };
+
     return {
       open,
       close,
       getSelected: () => selected,
       setOptions: rebuildOptions,
+      setValue,
       wrapper // Expose wrapper for reference
     };
   }

@@ -521,6 +521,8 @@ class WebUI extends AbstractUI {
           if (this.eventsTableManager) {
             this.eventsTableManager.recomputeRelocationImpacts();
           }
+          // Re-render existing simulation outputs in the new locale/country context.
+          this.rerenderData();
         }
       } catch (_) { }
     });
@@ -4099,44 +4101,138 @@ class WebUI extends AbstractUI {
         selectedValue: hiddenInput.value,
         onSelect: (val, label) => {
           if (hiddenInput.value === val) return;
-          
-          // Capture current values as numbers before changing the country (and thus the locale)
-          const capturedValues = {};
-          const currencyInputs = document.querySelectorAll('input.currency, input.percentage');
-          currencyInputs.forEach(input => {
-            if (input && input.id) {
-              if (input.value === undefined || String(input.value).trim() === '') return;
-              try {
-                const num = this.getValue(input.id);
-                if (num !== undefined && num !== null && !isNaN(num)) {
-                  capturedValues[input.id] = num;
-                }
-              } catch (_) { }
-            }
-          });
-
-          hiddenInput.value = val;
-          hiddenInput.dataset.auto = '0'; // user-chosen
+          // Reflect user choice immediately in the visible control text.
+          // Heavy parsing/reformat work still runs in the deferred block below.
           toggleSpan.textContent = label;
-          
-          // Apply captured numeric values back to inputs after the country change
-          // but before listeners (like ensureInvestmentParameterFields) run.
-          // This ensures they are re-formatted using the NEW locale from the same numeric base.
-          for (const [id, num] of Object.entries(capturedValues)) {
-            const input = document.getElementById(id);
-            if (input) {
-              if (input.classList.contains('percentage')) {
-                input.value = FormatUtils.formatPercentage(num).replace('%', '');
-              } else {
-                // For currency and other numeric types, we set the raw number; 
-                // FormatUtils.setupCurrencyInputs will format it correctly.
-                input.value = num;
-              }
-            }
+          if (this.startCountryDropdown && typeof this.startCountryDropdown.close === 'function') {
+            this.startCountryDropdown.close();
           }
+          this.showTableRenderOverlay();
+          setTimeout(() => {
+            try {
+              // Capture current values as canonical numbers before changing locale.
+              // This avoids locale reinterpretation (e.g. "30,000" -> "30.000" -> 30).
+              const parseCurrencyWithLocale = (rawValue, numberLocale, currencySymbol, currencyCode) => {
+                const text = (rawValue == null) ? '' : String(rawValue);
+                if (!text.trim() || !numberLocale) return undefined;
+                try {
+                  const escSym = String(currencySymbol || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                  let normalized = text;
+                  if (escSym) normalized = normalized.replace(new RegExp(escSym, 'g'), '');
+                  normalized = normalized.replace(/\s+/g, '');
+                  const parts = new Intl.NumberFormat(
+                    numberLocale,
+                    currencyCode ? { style: 'currency', currency: String(currencyCode).toUpperCase() } : undefined
+                  ).formatToParts(12345.6);
+                  const group = parts.find(p => p.type === 'group')?.value || ',';
+                  const decimal = parts.find(p => p.type === 'decimal')?.value || '.';
+                  normalized = normalized.split(group).join('');
+                  if (decimal !== '.') normalized = normalized.split(decimal).join('.');
+                  const parsed = parseFloat(normalized);
+                  return isNaN(parsed) ? undefined : parsed;
+                } catch (_) {
+                  return undefined;
+                }
+              };
 
-          // Fire change so listeners update
-          hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+              const parseCurrencyInputValue = (input) => {
+                if (!input) return undefined;
+                const raw = (input.value == null) ? '' : String(input.value);
+                if (!raw.trim()) return undefined;
+
+                // Prefer UI-level parsing for ID-backed inputs (uses row/country hints where relevant).
+                if (input.id) {
+                  try {
+                    const parsedByUI = this.getValue(input.id);
+                    if (parsedByUI !== undefined && parsedByUI !== null && !isNaN(parsedByUI)) return parsedByUI;
+                  } catch (_) { }
+                }
+
+                // Explicitly parse using the input's previous locale metadata when available.
+                const prevLocale = input.getAttribute('data-currency-locale');
+                const prevSymbol = input.getAttribute('data-currency-symbol') || '';
+                const prevCode = input.getAttribute('data-currency-code') || '';
+                const parsedByPrevLocale = parseCurrencyWithLocale(raw, prevLocale, prevSymbol, prevCode);
+                if (parsedByPrevLocale !== undefined && parsedByPrevLocale !== null && !isNaN(parsedByPrevLocale)) {
+                  return parsedByPrevLocale;
+                }
+
+                if (typeof FormatUtils !== 'undefined' && typeof FormatUtils.parseCurrency === 'function') {
+                  try {
+                    const parsedByFormatUtils = FormatUtils.parseCurrency(raw);
+                    if (parsedByFormatUtils !== undefined && parsedByFormatUtils !== null && !isNaN(parsedByFormatUtils)) {
+                      return parsedByFormatUtils;
+                    }
+                  } catch (_) { }
+                }
+
+                const fallback = Number(raw.replace(/[^0-9.\-]/g, ''));
+                return isNaN(fallback) ? undefined : fallback;
+              };
+
+              const parsePercentageInputValue = (input) => {
+                if (!input) return undefined;
+                const raw = (input.value == null) ? '' : String(input.value);
+                if (!raw.trim()) return undefined;
+
+                if (input.id) {
+                  try {
+                    const parsedByUI = this.getValue(input.id);
+                    if (parsedByUI !== undefined && parsedByUI !== null && !isNaN(parsedByUI)) return parsedByUI;
+                  } catch (_) { }
+                }
+
+                if (typeof FormatUtils !== 'undefined' && typeof FormatUtils.parsePercentage === 'function') {
+                  try {
+                    const parsedByFormatUtils = FormatUtils.parsePercentage(raw);
+                    if (parsedByFormatUtils !== undefined && parsedByFormatUtils !== null && !isNaN(parsedByFormatUtils)) {
+                      return parsedByFormatUtils;
+                    }
+                  } catch (_) { }
+                }
+
+                const fallback = parseFloat(String(raw).replace('%', ''));
+                return isNaN(fallback) ? undefined : fallback / 100;
+              };
+
+              const capturedValues = [];
+              const currencyInputs = document.querySelectorAll('input.currency, input.percentage');
+              currencyInputs.forEach(input => {
+                if (!input || input.value === undefined || String(input.value).trim() === '') return;
+                const isPercentage = !!(input.classList && input.classList.contains('percentage'));
+                const num = isPercentage ? parsePercentageInputValue(input) : parseCurrencyInputValue(input);
+                if (num !== undefined && num !== null && !isNaN(num)) {
+                  capturedValues.push({ input: input, num: num, isPercentage: isPercentage });
+                }
+              });
+
+              hiddenInput.value = val;
+              hiddenInput.dataset.auto = '0'; // user-chosen
+              toggleSpan.textContent = label;
+
+              // Apply captured numeric values back to inputs after the country change
+              // but before listeners (like ensureInvestmentParameterFields) run.
+              // This ensures they are re-formatted using the NEW locale from the same numeric base.
+              for (let i = 0; i < capturedValues.length; i++) {
+                const entry = capturedValues[i];
+                const input = entry && entry.input ? entry.input : null;
+                if (input) {
+                  if (entry.isPercentage) {
+                    input.value = FormatUtils.formatPercentage(entry.num).replace('%', '');
+                  } else {
+                    // For currency and other numeric types, we set the raw number;
+                    // FormatUtils.setupCurrencyInputs will format it correctly.
+                    input.value = entry.num;
+                  }
+                }
+              }
+
+              // Fire change so listeners update
+              hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+            } finally {
+              this.hideTableRenderOverlay();
+            }
+          }, 0);
         },
       });
 
